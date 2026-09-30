@@ -36,6 +36,15 @@ describe('settle (no overlap, ever)', () => {
     noOverlaps(s);
   });
 
+  it('when two anchored blocks are in each other\'s way, the first-listed (most recent) stays put', () => {
+    let b = loose(B.createBoard(), 'older', 0, 0);
+    b = loose(b, 'newer', 40, 40);
+    const s = settle(b, measured, ['newer', 'older']);
+    expect(s.cards.newer).toMatchObject({ x: 40, y: 40 });
+    expect(s.cards.older).not.toMatchObject({ x: 0, y: 0 });
+    noOverlaps(s);
+  });
+
   it('a column that grows pushes the card below it further down', () => {
     let b = B.addColumn(B.createBoard(), { ...createColumn('col'), x: 0, y: 0 });
     heights.col = 220;

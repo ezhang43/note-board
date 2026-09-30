@@ -130,6 +130,26 @@ export function deleteColumn(board: Board, columnId: string): Board {
   return { ...board, cards, columns, order: board.order.filter((id) => id !== columnId) };
 }
 
+/** Deletes every listed card and column (columns go with their cards). */
+export function deleteBlocks(board: Board, ids: string[]): Board {
+  let next = board;
+  for (const id of ids) next = next.columns[id] ? deleteColumn(next, id) : deleteCard(next, id);
+  return next;
+}
+
+/** Moves every listed top-level block (loose cards and columns) by dx, dy, bringing them to the front. */
+export function moveBlocksBy(board: Board, ids: string[], dx: number, dy: number): Board {
+  const top = ids.filter((id) => board.order.includes(id));
+  if (!top.length || (dx === 0 && dy === 0)) return board;
+  const cards = { ...board.cards };
+  const columns = { ...board.columns };
+  for (const id of top) {
+    if (columns[id]) columns[id] = { ...columns[id], x: columns[id].x + dx, y: columns[id].y + dy };
+    else cards[id] = { ...cards[id], x: cards[id].x + dx, y: cards[id].y + dy };
+  }
+  return { ...board, cards, columns, order: [...board.order.filter((id) => !top.includes(id)), ...top] };
+}
+
 /** Recolour every listed card and column. */
 export function recolour(board: Board, ids: string[], color: ColorKey): Board {
   let next = board;

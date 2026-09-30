@@ -493,3 +493,14 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* ---------- selection box (step 4) ---------- */
+
+.marquee {
+  position: absolute;
+  z-index: 3;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  background: rgba(31, 95, 91, 0.1);
+  pointer-events: none;
+}

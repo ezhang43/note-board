@@ -7,7 +7,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { CARD_W } from '../model/constants';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
-import { blockPointerDown } from './useBlockDrag';
+import { blockPointerDown, useGroupOffset } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -20,12 +20,13 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
+  const [groupDx, groupDy] = useGroupOffset(id);
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!card) return null;
 
   const colors = PALETTE[card.color];
-  const pos = drag ?? card;
+  const pos = drag ?? { x: card.x + groupDx, y: card.y + groupDy };
   // Inside a column a card follows the column's width and fits its content.
   const w = resize?.w ?? card.w ?? CARD_W;
   const h = resize?.h ?? card.h;

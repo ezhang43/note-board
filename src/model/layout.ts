@@ -25,6 +25,14 @@ export function topLevelRects(board: Board, measured: MeasuredHeight, except: st
   });
 }
 
+/** Top-level blocks (columns and loose cards) that the rectangle touches, for the selection box. */
+export function blocksTouching(board: Board, rect: Rect, measured: MeasuredHeight): string[] {
+  return board.order.filter((id) => {
+    const r = blockRect(board, id, measured);
+    return r ? overlaps(rect, r) : false;
+  });
+}
+
 /**
  * Where a new block of size w × h goes: as close as possible to `centre` (normally the middle of
  * the screen) without covering or touching any existing block. On the grid when snapping is on.
@@ -46,12 +54,15 @@ export function landingSpot(board: Board, id: string, x: number, y: number, size
 
 /**
  * Makes sure no two loose blocks overlap or come within 10px of each other.
- * `anchors` (the block just moved, resized, grown or dropped into) stay put; everything else that
- * is in the way moves to the nearest free spot. Columns are moved before loose cards.
- * Returns the same board when nothing needs to move.
+ * `anchors` (the blocks just moved, resized, grown, pasted or dropped into, most important first)
+ * stay put; everything else that is in the way moves to the nearest free spot. Columns are moved
+ * before loose cards. Returns the same board when nothing needs to move.
  */
 export function settle(board: Board, measured: MeasuredHeight, anchors: string[] = []): Board {
-  const rank = (id: string) => (anchors.includes(id) ? 0 : board.columns[id] ? 1 : 2);
+  const rank = (id: string) => {
+    const a = anchors.indexOf(id);
+    return a >= 0 ? a : anchors.length + (board.columns[id] ? 0 : 1);
+  };
   const blocks = board.order
     .map((id, i) => ({ id, i, rect: blockRect(board, id, measured)! }))
     .sort((a, b) => rank(a.id) - rank(b.id) || a.i - b.i);

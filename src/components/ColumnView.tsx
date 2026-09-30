@@ -5,7 +5,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
-import { blockPointerDown } from './useBlockDrag';
+import { blockPointerDown, useGroupOffset } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -16,7 +16,11 @@ export function ColumnView({ id }: { id: string }) {
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
   const dropTarget = useAppState((s) => s.ui.drag?.kind === 'card' && s.ui.drag.overColumn === id);
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
-  const confirming = useAppState((s) => s.ui.confirmDelete === id);
+  // How many columns the "Delete …?" shown on this column would delete (0 = not shown here).
+  const confirmColumns = useAppState((s) =>
+    s.ui.confirm?.columnId === id ? s.ui.confirm.ids.filter((x) => s.board.columns[x]).length : 0,
+  );
+  const [groupDx, groupDy] = useGroupOffset(id);
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const ref = useRef<HTMLElement>(null);
@@ -24,7 +28,7 @@ export function ColumnView({ id }: { id: string }) {
   if (!col) return null;
 
   const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
-  const pos = drag ?? col;
+  const pos = drag ?? { x: col.x + groupDx, y: col.y + groupDy };
   const w = resize?.w ?? col.w;
   const minH = col.collapsed ? undefined : (resize?.h ?? col.h ?? COLUMN_MIN_H);
   // A card being dragged out is drawn on its own until it is dropped.
@@ -73,15 +77,17 @@ export function ColumnView({ id }: { id: string }) {
         </button>
       </div>
 
-      {confirming && (
+      {confirmColumns > 0 && (
         <div className="confirm" role="alertdialog" aria-label="Delete column?">
-          <div className="confirm-title">Delete “{col.title || 'Untitled'}”?</div>
+          <div className="confirm-title">
+            {confirmColumns === 1 ? `Delete “${col.title || 'Untitled'}”?` : `Delete ${confirmColumns} columns?`}
+          </div>
           <div className="confirm-actions">
-            <button type="button" className="confirm-cancel" autoFocus onClick={appStore.cancelDeleteColumn}>
+            <button type="button" className="confirm-cancel" autoFocus onClick={appStore.cancelDelete}>
               Cancel
             </button>
-            <button type="button" className="confirm-delete" onClick={appStore.confirmDeleteColumn}>
-              Delete column
+            <button type="button" className="confirm-delete" onClick={appStore.confirmDelete}>
+              {confirmColumns === 1 ? 'Delete column' : 'Delete columns'}
             </button>
           </div>
         </div>

@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 4 — Selection, clipboard, delete, undo/redo (2026-10-01)
+
+- Ctrl + click (or Shift + click) adds or removes a block from the selection. ⌘ works instead of Ctrl on a Mac.
+- Select tool (V): drag a box on empty board; everything it touches is selected as you drag. Hold Ctrl to add to the current selection.
+- Ctrl + A selects every column and loose card. Escape clears the selection and closes menus.
+- Dragging a selected block moves the whole selection together. Colour recolours every selected block.
+- Delete / Backspace deletes the selection; if it includes a column, the same "Delete '…'?" confirmation appears first.
+- Ctrl + C then Ctrl + V pastes copies 40px further each time (a column copies with its cards, titled "… copy"). Ctrl + D duplicates.
+- Ctrl + Z undoes, up to 100 steps, even while typing; a burst of typing is one step. Ctrl + Y redoes; Ctrl + Shift + Z does nothing. Undo and Redo buttons fade when there is nothing to undo or redo.
+- Block shortcuts don't fire while typing in a text field (undo, redo and zoom still do).
+
 ## Step 3 — No overlap, resizing, size matching, snap realignment (2026-10-01)
 
 - No overlap, ever: loose cards and columns always keep at least 10px apart.

@@ -48,5 +48,10 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 - 2026-10-01 (step 2): A card drops into a column when the pointer is over the column (or up to 60px below it), as in the prototype.
 - 2026-10-01 (step 2): Text on cards is always black (#1F1D1A) whatever the card colour, including done items, the link address and the "Open …" button. The palette's Text colours are not used for card text.
 - 2026-10-01 (step 3): Resize limits follow the prototype: cards 200–640 wide, columns 240–640 wide, heights 100–700. When clearing overlaps, the block that just moved/grew/was resized stays put, then columns, then loose cards move out of the way.
+- 2026-10-01 (step 4): Pasted blocks keep their spot and whatever they would cover moves (spec wording). The prototype did the opposite (the pasted copy moved away); flip by making pasted ids non-anchors in `placeCopies`.
+- 2026-10-01 (step 4): A card copied from inside a column is pasted back into that column, right below the original (as in the prototype). Ctrl+D duplicates without replacing what Ctrl+C copied.
+- 2026-10-01 (step 4): Several selected blocks dragged together don't drop into columns and show no landing outline; after the drop, anything they cover moves.
+- 2026-10-01 (step 4): Delete with several columns selected asks "Delete N columns?" on the first selected column.
+- 2026-10-01 (step 4): Automatic overlap clean-up is part of the change that caused it, not a separate undo step. Undo covers board data only (not pan, zoom, tool or selection).
 - 2026-10-01: Owner approved committing each step on branch `build/v1` and continuing through step 5 without pausing for manual checks.
 - 2026-10-01: Ctrl+= / Ctrl+− / Ctrl+0 also work while typing, so the browser never zooms the whole page instead. Pan and zoom are remembered between visits; the tool always starts as Hand.

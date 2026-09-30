@@ -54,6 +54,8 @@ export function Toolbar() {
   const name = useAppState((s) => s.board.name);
   const snap = useAppState((s) => s.board.snap);
   const tool = useAppState((s) => s.view.tool);
+  const canUndo = useAppState((s) => s.ui.canUndo);
+  const canRedo = useAppState((s) => s.ui.canRedo);
 
   return (
     <header className="toolbar">
@@ -89,11 +91,25 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Undo / Redo work from step 4; until then there is nothing to undo, so they stay faded. */}
-      <button type="button" className="tb-button icon-only faded-undo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" aria-disabled="true">
+      {/* Faded when there is nothing to undo or redo. */}
+      <button
+        type="button"
+        className="tb-button icon-only faded-undo"
+        aria-label="Undo (Ctrl+Z)"
+        title="Undo (Ctrl+Z)"
+        aria-disabled={canUndo ? undefined : true}
+        onClick={appStore.undo}
+      >
         <UndoIcon />
       </button>
-      <button type="button" className="tb-button icon-only faded-undo" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" aria-disabled="true">
+      <button
+        type="button"
+        className="tb-button icon-only faded-undo"
+        aria-label="Redo (Ctrl+Y)"
+        title="Redo (Ctrl+Y)"
+        aria-disabled={canRedo ? undefined : true}
+        onClick={appStore.redo}
+      >
         <RedoIcon />
       </button>
 

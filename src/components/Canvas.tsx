@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { gridStyle, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import { setCanvasElement } from './canvasDom';
+import type { Point } from '../model/types';
+import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 
@@ -63,30 +64,38 @@ export function Canvas() {
   }, []);
 
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
-  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
+  const marquee = useAppState((s) => s.ui.marquee);
 
+  // Blocks stop their own presses, so these handle presses on empty board.
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
-    // Blocks stop their own presses, so this is a press on empty board: clear the selection.
-    appStore.clearSelection();
+    const keep = e.ctrlKey || e.metaKey || e.shiftKey;
+    if (!keep) appStore.clearSelection();
     // Clicking the board takes focus away from any text field (e.g. the board name).
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     e.preventDefault();
-    if (appStore.getState().view.tool !== 'hand') return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    const at = clientToCanvas(e.clientX, e.clientY);
+    const mode = appStore.getState().view.tool === 'hand' ? 'pan' : 'marquee';
+    drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
+    // Select tool: drag a box; everything it touches is selected (Ctrl adds to the selection).
+    if (mode === 'marquee') appStore.startMarquee(at, keep);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
+    if (d.mode === 'marquee') return appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
     appStore.panBy(e.clientX - d.x, e.clientY - d.y);
     d.x = e.clientX;
     d.y = e.clientY;
   }
 
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
-    if (drag.current?.id === e.pointerId) drag.current = null;
+    if (drag.current?.id !== e.pointerId) return;
+    if (drag.current.mode === 'marquee') appStore.endMarquee();
+    drag.current = null;
   }
 
   const grid = gridStyle(view);
@@ -127,6 +136,14 @@ export function Canvas() {
           />
         )}
       </div>
+      {marquee && (
+        <div
+          className="marquee"
+          data-testid="marquee"
+          aria-hidden="true"
+          style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }}
+        />
+      )}
       {resizeLabel && (
         <div className="size-label" data-testid="size-label" style={{ left: resizeLabel.labelAt.x, top: resizeLabel.labelAt.y }}>
           {resizeLabel.label}

@@ -1,25 +1,31 @@
 import type React from 'react';
 import { DRAG_THRESHOLD } from '../model/constants';
 import { snapToGrid } from '../model/geometry';
-import { appStore } from '../store/appStore';
+import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex } from './canvasDom';
 
 const INTERACTIVE = 'input, textarea, button, a, select, label';
 
 /**
- * Pointer handling for a card or column: pressing selects it; pressing a blank part and
- * moving at least 5px drags it.
+ * Pointer handling for a card or column. Pressing selects it (Ctrl / Shift + click adds or removes
+ * it from the selection); pressing a blank part and moving at least 5px drags it, together with
+ * the rest of the selection.
  */
 export function blockPointerDown(kind: 'card' | 'column', id: string) {
   return (e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation(); // the board underneath must not pan or clear the selection
-    appStore.select(id);
-    if ((e.target as Element).closest(INTERACTIVE)) return;
+    const additive = e.ctrlKey || e.metaKey || e.shiftKey;
+    const interactive = !!(e.target as Element).closest(INTERACTIVE);
+    // Clicking into a text field selects just that block; a modifier-click toggles it.
+    if (interactive && !additive) return appStore.select(id);
+    appStore.pressBlock(id, additive);
+    if (interactive) return;
 
     // Pressing blank card space: no text selection, and leave any text box being edited.
     e.preventDefault();
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (additive) return;
 
     const el = e.currentTarget;
     const start = { x: e.clientX, y: e.clientY };
@@ -32,7 +38,10 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
         const topLeft = clientToBoard(r.left, r.top);
         const grab = clientToBoard(start.x, start.y);
         offset = { x: grab.x - topLeft.x, y: grab.y - topLeft.y };
-        appStore.startDrag({ kind, id, x: topLeft.x, y: topLeft.y, overColumn: null });
+        // Start from the block's saved position when it has one, so a group keeps its spacing exactly.
+        const s = appStore.getState().board;
+        const saved = s.order.includes(id) ? (s.columns[id] ?? s.cards[id]) : null;
+        appStore.startDrag(kind, id, saved?.x ?? topLeft.x, saved?.y ?? topLeft.y);
       }
       const p = clientToBoard(ev.clientX, ev.clientY);
       const snap = appStore.getState().board.snap ? snapToGrid : Math.round;
@@ -43,7 +52,11 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
-      if (!offset) return;
+      if (!offset) {
+        // A plain click on a block that was part of a bigger selection selects just that block.
+        if (ev.type === 'pointerup') appStore.select(id);
+        return;
+      }
       if (ev.type === 'pointercancel') return appStore.cancelDrag();
       const over = appStore.getState().ui.drag?.overColumn;
       appStore.dropDrag(over ? dropIndex(over, ev.clientY) : null);
@@ -53,4 +66,11 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
   };
+}
+
+/** How far this block is being moved as part of a group drag (0, 0 when it isn't). */
+export function useGroupOffset(id: string): [number, number] {
+  const dx = useAppState((s) => (s.ui.drag?.group.includes(id) ? s.ui.drag.x - s.ui.drag.startX : 0));
+  const dy = useAppState((s) => (s.ui.drag?.group.includes(id) ? s.ui.drag.y - s.ui.drag.startY : 0));
+  return [dx, dy];
 }

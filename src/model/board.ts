@@ -1,0 +1,208 @@
+import { DEFAULT_BOARD_NAME } from './constants';
+import type { ColorKey } from './palette';
+import type { Board, Card, Column, TodoItem } from './types';
+
+// Every function here takes a board and returns a new one (or the same one when nothing changes).
+// None of them change the board they are given.
+
+export function createBoard(): Board {
+  return { name: DEFAULT_BOARD_NAME, snap: true, cards: {}, columns: {}, order: [] };
+}
+
+export function renameBoard(board: Board, name: string): Board {
+  return name === board.name ? board : { ...board, name };
+}
+
+export function setSnap(board: Board, snap: boolean): Board {
+  return snap === board.snap ? board : { ...board, snap };
+}
+
+/** Where a card goes: loose on the board at x,y, or into a column at a position (0 = top). */
+export type Placement = { type: 'loose'; x: number; y: number } | { type: 'column'; columnId: string; index: number };
+
+export function columnOf(board: Board, cardId: string): Column | null {
+  for (const id of board.order) {
+    const col = board.columns[id];
+    if (col && col.cardIds.includes(cardId)) return col;
+  }
+  return null;
+}
+
+/** Take a card out of wherever it is (the loose layer or its column), keeping the card itself. */
+function detach(board: Board, cardId: string): Board {
+  const col = columnOf(board, cardId);
+  if (col) {
+    return { ...board, columns: { ...board.columns, [col.id]: { ...col, cardIds: col.cardIds.filter((id) => id !== cardId) } } };
+  }
+  return { ...board, order: board.order.filter((id) => id !== cardId) };
+}
+
+function attach(board: Board, cardId: string, place: Placement): Board {
+  const card = board.cards[cardId];
+  if (place.type === 'loose') {
+    return {
+      ...board,
+      cards: { ...board.cards, [cardId]: { ...card, x: place.x, y: place.y } },
+      order: [...board.order, cardId],
+    };
+  }
+  const col = board.columns[place.columnId];
+  const cardIds = [...col.cardIds];
+  cardIds.splice(Math.max(0, Math.min(place.index, cardIds.length)), 0, cardId);
+  // Dropping into a collapsed column opens it.
+  return { ...board, columns: { ...board.columns, [col.id]: { ...col, cardIds, collapsed: false } } };
+}
+
+export function addCard(board: Board, card: Card, place: Placement): Board {
+  if (place.type === 'column' && !board.columns[place.columnId]) return board;
+  return attach({ ...board, cards: { ...board.cards, [card.id]: card } }, card.id, place);
+}
+
+export function addColumn(board: Board, column: Column): Board {
+  return { ...board, columns: { ...board.columns, [column.id]: column }, order: [...board.order, column.id] };
+}
+
+/** Move a card to a new place. A card moved on the board comes to the front. */
+export function moveCard(board: Board, cardId: string, place: Placement): Board {
+  if (!board.cards[cardId]) return board;
+  if (place.type === 'column' && !board.columns[place.columnId]) return board;
+  return attach(detach(board, cardId), cardId, place);
+}
+
+/** Move a column (its cards go with it) and bring it to the front. */
+export function moveColumn(board: Board, columnId: string, x: number, y: number): Board {
+  const col = board.columns[columnId];
+  if (!col) return board;
+  return {
+    ...board,
+    columns: { ...board.columns, [columnId]: { ...col, x, y } },
+    order: [...board.order.filter((id) => id !== columnId), columnId],
+  };
+}
+
+export function updateCard(board: Board, cardId: string, change: (card: Card) => Card): Board {
+  const card = board.cards[cardId];
+  if (!card) return board;
+  const next = change(card);
+  return next === card ? board : { ...board, cards: { ...board.cards, [cardId]: next } };
+}
+
+export function updateColumn(board: Board, columnId: string, change: Partial<Pick<Column, 'title' | 'collapsed'>>): Board {
+  const col = board.columns[columnId];
+  if (!col) return board;
+  return { ...board, columns: { ...board.columns, [columnId]: { ...col, ...change } } };
+}
+
+export function toggleCollapsed(board: Board, id: string): Board {
+  if (board.columns[id]) return updateColumn(board, id, { collapsed: !board.columns[id].collapsed });
+  return updateCard(board, id, (c) => ({ ...c, collapsed: !c.collapsed }));
+}
+
+export function deleteCard(board: Board, cardId: string): Board {
+  if (!board.cards[cardId]) return board;
+  const detached = detach(board, cardId);
+  const cards = { ...detached.cards };
+  delete cards[cardId];
+  return { ...detached, cards };
+}
+
+/** Deletes a column and every card in it. */
+export function deleteColumn(board: Board, columnId: string): Board {
+  const col = board.columns[columnId];
+  if (!col) return board;
+  const cards = { ...board.cards };
+  for (const id of col.cardIds) delete cards[id];
+  const columns = { ...board.columns };
+  delete columns[columnId];
+  return { ...board, cards, columns, order: board.order.filter((id) => id !== columnId) };
+}
+
+/** Recolour every listed card and column. */
+export function recolour(board: Board, ids: string[], color: ColorKey): Board {
+  let next = board;
+  for (const id of ids) {
+    if (next.columns[id]) next = { ...next, columns: { ...next.columns, [id]: { ...next.columns[id], color } } };
+    else next = updateCard(next, id, (c) => (c.color === color ? c : { ...c, color }));
+  }
+  return next;
+}
+
+/**
+ * Where a newly added card should go, given the selected block:
+ * a selected column gets it at the end; a selected card inside a column gets it directly below;
+ * otherwise null (the card goes loose on the board).
+ */
+export function placementForNewCard(board: Board, selectedId: string | null): Placement | null {
+  if (!selectedId) return null;
+  const col = board.columns[selectedId];
+  if (col) return { type: 'column', columnId: col.id, index: col.cardIds.length };
+  const parent = columnOf(board, selectedId);
+  if (parent) return { type: 'column', columnId: parent.id, index: parent.cardIds.indexOf(selectedId) + 1 };
+  return null;
+}
+
+// ---------- checklist items (full checklist editing comes in step 5) ----------
+
+function mapItems(items: TodoItem[], itemId: string, change: (it: TodoItem) => TodoItem): TodoItem[] {
+  let changed = false;
+  const out = items.map((it) => {
+    if (it.id === itemId) {
+      changed = true;
+      return change(it);
+    }
+    const children = mapItems(it.children, itemId, change);
+    if (children !== it.children) {
+      changed = true;
+      return { ...it, children };
+    }
+    return it;
+  });
+  return changed ? out : items;
+}
+
+function updateItem(board: Board, cardId: string, itemId: string, change: (it: TodoItem) => TodoItem): Board {
+  return updateCard(board, cardId, (card) => {
+    if (card.kind !== 'todo') return card;
+    const items = mapItems(card.items, itemId, change);
+    return items === card.items ? card : { ...card, items };
+  });
+}
+
+export function setItemText(board: Board, cardId: string, itemId: string, text: string): Board {
+  return updateItem(board, cardId, itemId, (it) => (it.text === text ? it : { ...it, text }));
+}
+
+export function toggleItemDone(board: Board, cardId: string, itemId: string): Board {
+  return updateItem(board, cardId, itemId, (it) => ({ ...it, done: !it.done }));
+}
+
+// ---------- reading ----------
+
+export function isColumn(board: Board, id: string): boolean {
+  return id in board.columns;
+}
+
+/**
+ * Problems with the "every card in exactly one place" rule. Empty when the board is healthy.
+ * Used by tests and when loading saved data.
+ */
+export function problems(board: Board): string[] {
+  const out: string[] = [];
+  const seen = new Map<string, number>();
+  const count = (id: string) => seen.set(id, (seen.get(id) ?? 0) + 1);
+  for (const id of board.order) {
+    if (board.columns[id]) {
+      for (const cid of board.columns[id].cardIds) {
+        if (!board.cards[cid]) out.push(`column ${id} lists missing card ${cid}`);
+        count(cid);
+      }
+    } else if (board.cards[id]) count(id);
+    else out.push(`order lists unknown block ${id}`);
+  }
+  for (const id of Object.keys(board.columns)) if (!board.order.includes(id)) out.push(`column ${id} is not on the board`);
+  for (const id of Object.keys(board.cards)) {
+    const n = seen.get(id) ?? 0;
+    if (n !== 1) out.push(`card ${id} is in ${n} places`);
+  }
+  return out;
+}

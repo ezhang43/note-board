@@ -6,6 +6,8 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 
+const NEW_CARD_LABEL = { note: 'New note', todo: 'New to-do list', link: 'New link' } as const;
+
 /** Wheel deltas can be in pixels, lines or pages; turn them into pixels. */
 function wheelPixels(e: WheelEvent, pageHeight: number) {
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? pageHeight : 1;
@@ -21,7 +23,8 @@ export function Canvas() {
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   const draggedColumn = useAppState((s) => (s.ui.drag?.kind === 'column' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
-  const land = useAppState((s) => s.ui.drag?.land ?? null);
+  const land = useAppState((s) => s.ui.drag?.land ?? s.ui.newDrag?.land ?? null);
+  const newDrag = useAppState((s) => s.ui.newDrag);
   const resizeLabel = useAppState((s) => s.ui.resize);
 
   // Keep the store told how big the canvas is, so zoom buttons can zoom around its centre
@@ -137,6 +140,11 @@ export function Canvas() {
           />
         )}
       </div>
+      {newDrag?.at && (
+        <div className="item-ghost" data-testid="new-card-ghost" style={{ left: newDrag.at.x + 14, top: newDrag.at.y + 10 }}>
+          <span className="item-ghost-label">{NEW_CARD_LABEL[newDrag.kind]}</span>
+        </div>
+      )}
       {itemDrag && (
         <div className="item-ghost" data-testid="item-ghost" style={{ left: itemDrag.at.x + 14, top: itemDrag.at.y + 10 }}>
           <span className="item-ghost-label">{itemDrag.label}</span>

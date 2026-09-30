@@ -42,6 +42,17 @@ export interface Resize {
   labelAt: Point;
 }
 
+/** A new card being dragged from the toolbar onto the board (it doesn't exist until dropped). */
+export interface NewDrag {
+  kind: CardKind;
+  /** Pointer position in screen pixels from the canvas's top-left; null while off the board. */
+  at: Point | null;
+  /** The column the pointer is over (the card will go into it), if any. */
+  overColumn: string | null;
+  /** Where the card will appear if dropped now on empty board. */
+  land: Rect | null;
+}
+
 /** "Delete …?" confirmation, shown on `columnId`, for deleting `ids`. */
 export interface ConfirmDelete {
   columnId: string;
@@ -87,6 +98,8 @@ export interface Ui {
   colourMenuOpen: boolean;
   confirm: ConfirmDelete | null;
   drag: Drag | null;
+  /** A new card being dragged from a toolbar Add button. */
+  newDrag: NewDrag | null;
   resize: Resize | null;
   /** The selection box being drawn, in screen pixels from the canvas's top-left. */
   marquee: Rect | null;
@@ -113,6 +126,7 @@ const emptyUi: Ui = {
   colourMenuOpen: false,
   confirm: null,
   drag: null,
+  newDrag: null,
   resize: null,
   marquee: null,
   canUndo: false,
@@ -242,6 +256,14 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     const h = heights.get(d.id) ?? NEW_BLOCK_H.column;
     if (d.kind === 'column') return { w: state.board.columns[d.id]?.w ?? COLUMN_W, h };
     return { w: state.board.cards[d.id]?.w ?? CARD_W, h };
+  }
+
+  /** Adds a new card and selects it; a new to-do list gets the cursor in its first item. */
+  function addNewCard(kind: CardKind, place: B.Placement) {
+    const card = createCard(kind);
+    const focusItem = card.kind === 'todo' ? card.items[0].id : null;
+    commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusItem } });
+    requestSettle([place.type === 'column' ? place.columnId : card.id]);
   }
 
   /** Select the checklist items shown from `anchor` to `to` in one list. */
@@ -395,14 +417,42 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     endMarquee: () => updateUi({ marquee: null }),
 
     // ---------- adding ----------
+    /** Clicking Add Note / To-do list / Link. */
     addCard(kind: CardKind) {
-      const card = createCard(kind);
       const selected = state.ui.selection.length === 1 ? state.ui.selection[0] : null;
       const place =
         B.placementForNewCard(state.board, selected) ??
         ({ type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H[kind], screenCentre(), measured) } as const);
-      const focusItem = card.kind === 'todo' ? card.items[0].id : null;
-      commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusItem } });
+      addNewCard(kind, place);
+    },
+
+    // ---------- dragging a new card from the toolbar ----------
+    startNewDrag: (kind: CardKind) => updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
+    /**
+     * The pointer moved: `at` is where it is on the canvas (null when off the board), `boardAt` the
+     * same point in board coordinates. On empty board the card would appear with its top edge
+     * just above the pointer, at the nearest free spot.
+     */
+    moveNewDrag(at: Point | null, boardAt: Point | null, overColumn: string | null) {
+      const d = state.ui.newDrag;
+      if (!d) return;
+      let land: Rect | null = null;
+      if (at && boardAt && !overColumn) {
+        const size = { w: CARD_W, h: NEW_BLOCK_H[d.kind] };
+        const snap = state.board.snap ? snapToGrid : Math.round;
+        const spot = landingSpot(state.board, '', snap(boardAt.x - size.w / 2), snap(boardAt.y - 18), size, measured);
+        land = { ...spot, ...size };
+      }
+      updateUi({ newDrag: { ...d, at, overColumn: at ? overColumn : null, land } });
+    },
+    cancelNewDrag: () => updateUi({ newDrag: null }),
+    /** Let go: the card goes into the column under the pointer (at `index`), or onto the board at the landing spot. */
+    dropNewDrag(index: number | null) {
+      const d = state.ui.newDrag;
+      updateUi({ newDrag: null });
+      if (!d) return;
+      if (d.overColumn && index != null) addNewCard(d.kind, { type: 'column', columnId: d.overColumn, index });
+      else if (d.land) addNewCard(d.kind, { type: 'loose', x: d.land.x, y: d.land.y });
     },
     addColumn() {
       const col = createColumn();

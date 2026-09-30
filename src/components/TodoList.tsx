@@ -104,11 +104,10 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
       />
-      {item.done && (
-        <button type="button" className="item-trash" aria-label="Delete item" title="Delete item" onClick={() => appStore.trashItem(cardId, item.id)}>
-          <TrashIcon />
-        </button>
-      )}
+      {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
+      <button type="button" className="item-trash" aria-label="Delete item" title="Delete item" onClick={() => appStore.trashItem(cardId, item.id)}>
+        <TrashIcon />
+      </button>
       <button type="button" className="item-grip" aria-label="Drag item" onPointerDown={gripPointerDown(cardId, item.id)}>
         <GripIcon />
       </button>

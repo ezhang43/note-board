@@ -1,5 +1,10 @@
 # Changelog
 
+## Owner additions (2026-10-01)
+
+- Drag a new Note, To-do list or Link straight from the toolbar: press the Add button and drag onto the board. A dashed outline shows where the card will appear (never on top of another block); over a column it goes into the column at the pointer. A plain click still adds as before; letting go off the board adds nothing.
+- Every checklist item now shows a trash can on hover, not just completed ones.
+
 ## Step 5 — Checklists (2026-10-01)
 
 - Enter adds a new item below at the same level; Tab nests an item under the one above (up to 6 levels); Shift+Tab moves it out a level; Backspace on an empty item deletes it (not the list's last item).

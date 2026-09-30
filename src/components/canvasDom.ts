@@ -23,6 +23,12 @@ export function clientToCanvas(clientX: number, clientY: number) {
   return { x: clientX - r.left, y: clientY - r.top };
 }
 
+/** True if the point is over the board (not the toolbar or outside the window). */
+export function isOverCanvas(clientX: number, clientY: number) {
+  const r = canvasEl?.getBoundingClientRect();
+  return !!r && clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+}
+
 /** Drawn sizes (board pixels) of every block except `block` and anything inside it. */
 export function otherBlockSizes(block: HTMLElement) {
   if (!canvasEl) return [];

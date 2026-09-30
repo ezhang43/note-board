@@ -1,7 +1,20 @@
 import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE, type ColorKey } from '../model/palette';
+import type { CardKind } from '../model/types';
+import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { CaretIcon, GridIcon, HandIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
+
+/** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
+function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
+  const drag = useNewCardDrag(kind);
+  return (
+    <button type="button" className={`tb-button add-${kind}`} title={`Click to add a ${label.toLowerCase()}, or drag it onto the board`} {...drag}>
+      <span className="add-dot" aria-hidden="true" />
+      {label}
+    </button>
+  );
+}
 
 /** Colour button: recolours the selected block(s). Faded while nothing is selected. */
 function ColourControl() {
@@ -123,18 +136,9 @@ export function Toolbar() {
       <div className="toolbar-divider" aria-hidden="true" />
       <span className="toolbar-label">Add</span>
 
-      <button type="button" className="tb-button add-note" onClick={() => appStore.addCard('note')}>
-        <span className="add-dot" aria-hidden="true" />
-        Note
-      </button>
-      <button type="button" className="tb-button add-todo" onClick={() => appStore.addCard('todo')}>
-        <span className="add-dot" aria-hidden="true" />
-        To-do list
-      </button>
-      <button type="button" className="tb-button add-link" onClick={() => appStore.addCard('link')}>
-        <span className="add-dot" aria-hidden="true" />
-        Link
-      </button>
+      <AddCardButton kind="note" label="Note" />
+      <AddCardButton kind="todo" label="To-do list" />
+      <AddCardButton kind="link" label="Link" />
       <button type="button" className="tb-button add-column" onClick={appStore.addColumn}>
         <PlusIcon />
         New column

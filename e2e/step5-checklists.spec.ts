@@ -88,17 +88,24 @@ test('ticking a top-level item moves it to "Completed · N"; ticking a sub-item 
   await expect(list.locator('.completed')).toHaveCount(0);
 });
 
-test('grip shows on hover; trash shows on hover for completed items and deletes them with sub-items', async ({ page }) => {
-  const list = await makeList(page, ['A', 'A sub']);
-  await rows(list).nth(1).getByLabel('Item text').press('Tab');
-  const row = rows(list).nth(0);
+test('grip and trash show on hover on every item; trash deletes the item with its sub-items', async ({ page }) => {
+  const list = await makeList(page, ['A', 'A sub', 'B', 'B sub']);
+  await rowWithText(list, 'A sub').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'B sub').getByLabel('Item text').press('Tab');
+  const row = rowWithText(list, 'B');
   await clickEmpty(page);
   await expect(row.getByRole('button', { name: 'Drag item' })).toHaveCSS('opacity', '0');
+  await expect(row.getByRole('button', { name: 'Delete item' })).toHaveCSS('opacity', '0');
   await row.hover();
   await expect(row.getByRole('button', { name: 'Drag item' })).toHaveCSS('opacity', '1');
-  await expect(row.getByRole('button', { name: 'Delete item' })).toHaveCount(0);
 
-  await row.getByLabel('Done').click();
+  // An open (not ticked) item can be trashed too.
+  const openTrash = row.getByRole('button', { name: 'Delete item' });
+  await expect(openTrash).toHaveCSS('opacity', '1');
+  await openTrash.click();
+  expect(await texts(list)).toEqual(['A', 'A sub']);
+
+  await rowWithText(list, 'A').getByLabel('Done').click();
   await rowWithText(list, 'A').hover();
   const trash = rowWithText(list, 'A').getByRole('button', { name: 'Delete item' });
   await expect(trash).toHaveCSS('opacity', '1');

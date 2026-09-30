@@ -14,7 +14,9 @@ export function ColumnView({ id }: { id: string }) {
   const col = useAppState((s) => s.board.columns[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
-  const dropTarget = useAppState((s) => s.ui.drag?.kind === 'card' && s.ui.drag.overColumn === id);
+  const dropTarget = useAppState(
+    (s) => (s.ui.drag?.kind === 'card' && s.ui.drag.overColumn === id) || s.ui.newDrag?.overColumn === id,
+  );
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   // How many columns the "Delete …?" shown on this column would delete (0 = not shown here).
   const confirmColumns = useAppState((s) =>

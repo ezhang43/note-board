@@ -76,7 +76,7 @@ test('Add To-do list starts "New list" with one blank item and the cursor in it'
   await expect(list.getByLabel('Item text')).toBeFocused();
   await expect(list.locator('.card-meta')).toHaveText('0/1 done');
   await page.keyboard.type('Buy milk');
-  await list.getByLabel('Done').check();
+  await list.getByLabel('Done').click();
   await expect(list.locator('.card-meta')).toHaveText('1/1 done');
   await expect(list.getByLabel('Item text')).toHaveValue('Buy milk');
 });

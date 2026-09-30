@@ -1,12 +1,13 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf, progressText } from '../model/cards';
+import { CARD_W } from '../model/constants';
 import { PALETTE } from '../model/palette';
-import type { Card, LinkCard, NoteCard, TodoCard, TodoItem } from '../model/types';
+import type { Card, LinkCard, NoteCard } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
-import { CARD_W } from '../model/constants';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
+import { TodoBody } from './TodoList';
 import { blockPointerDown, useGroupOffset } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
@@ -99,51 +100,6 @@ function NoteBody({ card }: { card: NoteCard }) {
       value={card.text}
       onChange={(text) => appStore.setNoteText(card.id, text)}
     />
-  );
-}
-
-function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
-  return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
-}
-
-// Only the basics here; Enter / Tab / Completed section / dragging items come in step 5.
-function TodoBody({ card }: { card: TodoCard }) {
-  return (
-    <div className="todo-body">
-      <AutoSizeInput
-        className="card-title"
-        aria-label="List title"
-        placeholder="List"
-        value={card.title}
-        onChange={(title) => appStore.setCardTitle(card.id, title)}
-      />
-      <div className="todo-items">
-        {flatten(card.items).map(({ item, depth }) => (
-          <TodoItemRow key={item.id} cardId={card.id} item={item} depth={depth} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TodoItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (appStore.takeFocusRequest(item.id)) ref.current?.focus();
-  }, [item.id]);
-
-  return (
-    <div className={`todo-item${item.done ? ' done' : ''}`} data-item-id={item.id} style={{ paddingLeft: depth * 22 }}>
-      <input type="checkbox" aria-label="Done" checked={item.done} onChange={() => appStore.toggleItemDone(cardId, item.id)} />
-      <GrowTextarea
-        ref={ref}
-        className="item-text"
-        aria-label="Item text"
-        placeholder="Item"
-        value={item.text}
-        onChange={(text) => appStore.setItemText(cardId, item.id, text)}
-      />
-    </div>
   );
 }
 

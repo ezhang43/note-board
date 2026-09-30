@@ -1,12 +1,15 @@
 import * as B from '../model/board';
-import { createCard, createColumn } from '../model/cards';
+import { createCard, createColumn, createItem, newId } from '../model/cards';
+import * as C from '../model/checklist';
+import type { ItemDrop } from '../model/checklist';
+import { snapToGrid } from '../model/geometry';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../model/clipboard';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../model/constants';
 import { emptyHistory, recordChange, redo, undo, type History } from '../model/history';
 import { blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
 import type { ColorKey } from '../model/palette';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
-import type { Board, CardKind, Point, Rect, Size, Tool, View } from '../model/types';
+import type { Board, CardKind, Point, Rect, Size, TodoItem, Tool, View } from '../model/types';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../model/view';
 
 /** A block being dragged. x / y are its top-left on the board while it follows the pointer. */
@@ -45,9 +48,42 @@ export interface ConfirmDelete {
   ids: string[];
 }
 
+/** Checklist items selected together (by press-and-drag or Shift+click), all in one list. */
+export interface ItemSelection {
+  cardId: string;
+  /** The item the range started from. */
+  anchor: string;
+  ids: string[];
+}
+
+/** Where dragged checklist items would go if dropped now, and which row shows the drop mark. */
+export type ItemHint =
+  | { cardId: string; drop: ItemDrop; markId: string | null; markMode: 'before' | 'after' | 'nest' | null }
+  | { newList: Point };
+
+/** Checklist items being dragged by their grip. */
+export interface ItemDrag {
+  cardId: string;
+  /** The dragged items (not counting their sub-items), in order. */
+  roots: string[];
+  /** The dragged items and all their sub-items. */
+  allIds: string[];
+  /** Deepest nesting under the dragged items, to keep drops within 6 levels. */
+  height: number;
+  label: string;
+  extra: string;
+  /** Pointer position, in screen pixels from the canvas's top-left. */
+  at: Point;
+  hint: ItemHint | null;
+}
+
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {
   selection: string[];
+  itemSel: ItemSelection | null;
+  itemDrag: ItemDrag | null;
+  /** A checklist item whose text box should get the cursor (at the end of its text). */
+  focusItem: string | null;
   colourMenuOpen: boolean;
   confirm: ConfirmDelete | null;
   drag: Drag | null;
@@ -71,6 +107,9 @@ export const VIEW_SAVE_DELAY = 250;
 
 const emptyUi: Ui = {
   selection: [],
+  itemSel: null,
+  itemDrag: null,
+  focusItem: null,
   colourMenuOpen: false,
   confirm: null,
   drag: null,
@@ -97,8 +136,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   let viewportSize: Size = { width: 0, height: 0 };
   /** Last drawn heights of blocks, in board pixels. Not state: nothing re-renders when they change. */
   const heights = new Map<string, number>();
-  /** A checklist item whose text box should get the cursor as soon as it appears. */
-  let focusRequest: string | null = null;
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
   let settleQueued = false;
@@ -107,6 +144,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   let clipboard: { entries: ClipEntry[]; pastes: number } | null = null;
   /** Selection when the selection box started (kept when Ctrl is held). */
   let marqueeBase: string[] = [];
+  /** Copied checklist items. */
+  let itemClipboard: TodoItem[] | null = null;
 
   function read(key: string): string | null {
     try {
@@ -205,6 +244,36 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     return { w: state.board.cards[d.id]?.w ?? CARD_W, h };
   }
 
+  /** Select the checklist items shown from `anchor` to `to` in one list. */
+  function selectItemRange(cardId: string, anchor: string, to: string) {
+    const card = state.board.cards[cardId];
+    if (card?.kind !== 'todo') return;
+    const ids = C.itemRange(card.items, anchor, to);
+    if (ids.length) updateUi({ itemSel: { cardId, anchor, ids }, selection: [cardId] });
+  }
+
+  /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
+  function deleteSelectedItems(): boolean {
+    const sel = state.ui.itemSel;
+    if (!sel) return false;
+    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } });
+    return true;
+  }
+
+  function copyItems(): boolean {
+    const sel = state.ui.itemSel;
+    const card = sel && state.board.cards[sel.cardId];
+    if (!sel || card?.kind !== 'todo') return false;
+    itemClipboard = C.copyItems(card.items, sel.ids);
+    return itemClipboard.length > 0;
+  }
+
+  /** The selected checklist items, if `itemId` in `cardId` is one of several selected; otherwise null. */
+  function selectedItemsIncluding(cardId: string, itemId: string): string[] | null {
+    const sel = state.ui.itemSel;
+    return sel && sel.cardId === cardId && sel.ids.length > 1 && sel.ids.includes(itemId) ? sel.ids : null;
+  }
+
   /** The selection, minus blocks that no longer exist (or are listed in `gone`). */
   function liveSelection(board: Board, gone: string[] = []): string[] {
     return state.ui.selection.filter((id) => (board.cards[id] || board.columns[id]) && !gone.includes(id));
@@ -224,7 +293,15 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     set({
       ...state,
       board: result.board,
-      ui: uiWith({ selection: liveSelection(result.board), confirm: null, drag: null, resize: null, marquee: null }),
+      ui: uiWith({
+        selection: liveSelection(result.board),
+        confirm: null,
+        drag: null,
+        resize: null,
+        marquee: null,
+        itemSel: null,
+        itemDrag: null,
+      }),
     });
     requestSettle();
   }
@@ -248,11 +325,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       // A loose block or column that grew may now cover something: move that out of its way.
       if (state.board.order.includes(id)) requestSettle([id]);
     },
-    /** True (once) if this checklist item was just created and should get the cursor. */
-    takeFocusRequest(itemId: string): boolean {
-      if (focusRequest !== itemId) return false;
-      focusRequest = null;
-      return true;
+    /** The checklist item that was asked to take the cursor has taken it. */
+    focusTaken: (itemId: string) => {
+      if (state.ui.focusItem === itemId) updateUi({ focusItem: null });
     },
 
     // ---------- undo ----------
@@ -276,10 +351,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     resetZoom: () => updateView((v) => resetZoom(v, viewportSize)),
 
     // ---------- selection and menus ----------
-    /** Select just this block. */
+    /** Select just this block. (Selected checklist items stay selected if they are in it.) */
     select: (id: string) => {
       const sel = state.ui.selection;
-      updateUi({ selection: sel.length === 1 && sel[0] === id ? sel : [id] });
+      updateUi({ selection: sel.length === 1 && sel[0] === id ? sel : [id], itemSel: state.ui.itemSel?.cardId === id ? state.ui.itemSel : null });
     },
     /**
      * Pressing a block: with Ctrl / Shift it is added to or removed from the selection;
@@ -288,13 +363,14 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
      */
     pressBlock(id: string, additive: boolean) {
       const sel = state.ui.selection;
-      if (additive) updateUi({ selection: sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id] });
-      else if (!sel.includes(id)) updateUi({ selection: [id] });
+      if (additive) updateUi({ selection: sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id], itemSel: null });
+      else if (!sel.includes(id)) updateUi({ selection: [id], itemSel: null });
+      else updateUi({ itemSel: null });
     },
     /** Ctrl+A: every column and loose card. */
     selectAll: () => updateUi({ selection: [...state.board.order] }),
     /** Click on empty board or Escape: clear the selection and close menus. */
-    clearSelection: () => updateUi({ selection: [], colourMenuOpen: false, confirm: null }),
+    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null }),
     toggleColourMenu() {
       if (!state.ui.selection.length) return;
       updateUi({ colourMenuOpen: !state.ui.colourMenuOpen });
@@ -325,8 +401,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const place =
         B.placementForNewCard(state.board, selected) ??
         ({ type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H[kind], screenCentre(), measured) } as const);
-      if (card.kind === 'todo') focusRequest = card.items[0].id;
-      commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id] } });
+      const focusItem = card.kind === 'todo' ? card.items[0].id : null;
+      commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusItem } });
     },
     addColumn() {
       const col = createColumn();
@@ -343,9 +419,113 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       commit((b) => B.updateCard(b, id, (c) => (c.kind === 'link' && c.url !== url ? { ...c, url } : c)), { merge: `url:${id}` }),
     setItemText: (cardId: string, itemId: string, text: string) =>
       commit((b) => B.setItemText(b, cardId, itemId, text), { merge: `item:${itemId}` }),
-    toggleItemDone: (cardId: string, itemId: string) => commit((b) => B.toggleItemDone(b, cardId, itemId)),
     setColumnTitle: (id: string, title: string) => commit((b) => B.updateColumn(b, id, { title }), { merge: `coltitle:${id}` }),
     toggleCollapsed: (id: string) => commit((b) => B.toggleCollapsed(b, id)),
+
+    // ---------- checklists ----------
+    /** Enter: a new item below, at the same level, with the cursor in it. */
+    itemEnter(cardId: string, itemId: string) {
+      const item = createItem();
+      commit((b) => C.editItems(b, cardId, (items) => C.addItemAfter(items, itemId, item)), { ui: { focusItem: item.id, itemSel: null } });
+    },
+    /** Tab nests the item under the one above; Shift+Tab moves it out a level. */
+    itemTab(cardId: string, itemId: string, outdent: boolean) {
+      commit((b) => C.editItems(b, cardId, (items) => (outdent ? C.outdentItem(items, itemId) : C.indentItem(items, itemId))), {
+        ui: { focusItem: itemId },
+      });
+    },
+    /** Backspace in an empty item deletes it (not the list's last item). Returns whether it did. */
+    itemBackspace(cardId: string, itemId: string): boolean {
+      const card = state.board.cards[cardId];
+      if (card?.kind !== 'todo') return false;
+      const result = C.removeEmptyItem(card.items, itemId);
+      if (!result) return false;
+      commit((b) => C.editItems(b, cardId, () => result.items), { ui: { focusItem: result.focus } });
+      return true;
+    },
+    /** Tick / untick. With several items selected, ticking any one ticks (or unticks) them all. */
+    toggleItem(cardId: string, itemId: string) {
+      const card = state.board.cards[cardId];
+      if (card?.kind !== 'todo') return;
+      const item = C.findItem(card.items, itemId)?.item;
+      if (!item) return;
+      const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
+      commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+    },
+    /** Trash can: deletes the item and everything under it (or every selected item, if it is one of them). */
+    trashItem(cardId: string, itemId: string) {
+      const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
+      commit((b) => C.editItems(b, cardId, (items) => C.deleteItems(items, ids)), { ui: { itemSel: null } });
+    },
+    toggleCompletedSection: (cardId: string) => commit((b) => C.toggleCompletedSection(b, cardId)),
+
+    // ---------- selecting several checklist items ----------
+    selectItemRange,
+    /** Shift+click: extend the item selection to here. Returns false if there is no selection in this list to extend. */
+    extendItemSelection(cardId: string, to: string): boolean {
+      const sel = state.ui.itemSel;
+      if (!sel || sel.cardId !== cardId) return false;
+      selectItemRange(cardId, sel.anchor, to);
+      return true;
+    },
+    clearItemSelection: () => updateUi({ itemSel: null }),
+    deleteSelectedItems,
+    copyItems,
+    cutItems: (): boolean => copyItems() && deleteSelectedItems(),
+    /** Pastes copied items right after the selected items, and selects the pasted ones. */
+    pasteItems(): boolean {
+      const sel = state.ui.itemSel;
+      const card = sel && state.board.cards[sel.cardId];
+      if (!sel || card?.kind !== 'todo' || !itemClipboard?.length) return false;
+      const order = C.displayOrder(card.items).filter((id) => sel.ids.includes(id));
+      const fresh = C.freshCopies(itemClipboard);
+      commit((b) => C.editItems(b, sel.cardId, (items) => C.pasteItemsAfter(items, order[order.length - 1], fresh)), {
+        ui: { itemSel: { cardId: sel.cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
+      });
+      return true;
+    },
+
+    // ---------- dragging checklist items ----------
+    /** Start dragging an item by its grip (or every selected item, if it is one of them). */
+    startItemDrag(cardId: string, itemId: string, at: Point) {
+      const card = state.board.cards[cardId];
+      if (card?.kind !== 'todo') return;
+      const loc = C.findItem(card.items, itemId);
+      if (!loc) return;
+      const selected = selectedItemsIncluding(cardId, itemId);
+      const roots = selected ? C.rootsOf(card.items, selected) : [itemId];
+      const subtrees = roots.map((id) => C.findItem(card.items, id)!.item);
+      const allIds = subtrees.flatMap(C.subtreeIds);
+      const height = subtrees.reduce((h, it) => Math.max(h, C.subtreeHeight(it)), 0);
+      const kids = allIds.length - 1;
+      const label = roots.length > 1 ? `${allIds.length} items` : loc.item.text || 'Untitled item';
+      const extra = roots.length > 1 || !kids ? '' : `+ ${kids} ${kids === 1 ? 'sub-item' : 'sub-items'}`;
+      updateUi({ itemDrag: { cardId, roots, allIds, height, label, extra, at, hint: null }, confirm: null });
+    },
+    moveItemDrag(at: Point, hint: ItemHint | null) {
+      const d = state.ui.itemDrag;
+      if (d) updateUi({ itemDrag: { ...d, at, hint } });
+    },
+    cancelItemDrag: () => updateUi({ itemDrag: null }),
+    /** Drop dragged items where the hint says: into a list, or onto the board as a new list. */
+    dropItems() {
+      const d = state.ui.itemDrag;
+      if (!d) return;
+      const h = d.hint;
+      if (!h) return updateUi({ itemDrag: null });
+      const keep = d.roots.length > 1 ? d.allIds : null;
+      if ('newList' in h) {
+        const snap = state.board.snap ? snapToGrid : Math.round;
+        const id = newId('k');
+        commit((b) => C.moveItems(b, d.cardId, d.roots, { newList: { id, x: snap(h.newList.x), y: snap(h.newList.y) } }), {
+          ui: { itemDrag: null, itemSel: null, selection: [id] },
+        });
+        return requestSettle([id]);
+      }
+      commit((b) => C.moveItems(b, d.cardId, d.roots, { cardId: h.cardId, drop: h.drop }), {
+        ui: { itemDrag: null, itemSel: keep ? { cardId: h.cardId, anchor: d.roots[0], ids: keep } : null },
+      });
+    },
 
     // ---------- deleting ----------
     deleteCard(id: string) {

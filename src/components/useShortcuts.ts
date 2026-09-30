@@ -25,8 +25,18 @@ export function useShortcuts() {
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
 
-      // Everything below is for blocks, and is ignored while typing.
+      // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
+
+      // Several checklist items selected: these keys act on the items.
+      if (appStore.getState().ui.itemSel) {
+        if (key === 'delete' || key === 'backspace') return run(e, appStore.deleteSelectedItems);
+        if (key === 'escape') return appStore.clearItemSelection();
+        if (mod && key === 'c') return run(e, appStore.copyItems);
+        if (mod && key === 'x') return run(e, appStore.cutItems);
+        if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();
+      }
+
       if (mod) {
         if (key === 'a') return run(e, appStore.selectAll);
         if (key === 'c' && appStore.copySelection()) return e.preventDefault();

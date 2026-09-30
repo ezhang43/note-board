@@ -110,6 +110,22 @@ export function ResizeIcon() {
   );
 }
 
+export function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
+      <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4" />
+    </svg>
+  );
+}
+
+export function GripIcon() {
+  return (
+    <svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true">
+      {[3, 9, 15].flatMap((cy) => [3, 9].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.7" />))}
+    </svg>
+  );
+}
+
 export function MinusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.8" {...common}>

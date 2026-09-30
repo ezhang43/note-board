@@ -66,6 +66,7 @@ export function Canvas() {
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
+  const itemDrag = useAppState((s) => s.ui.itemDrag);
 
   // Blocks stop their own presses, so these handle presses on empty board.
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -136,6 +137,16 @@ export function Canvas() {
           />
         )}
       </div>
+      {itemDrag && (
+        <div className="item-ghost" data-testid="item-ghost" style={{ left: itemDrag.at.x + 14, top: itemDrag.at.y + 10 }}>
+          <span className="item-ghost-label">{itemDrag.label}</span>
+          {itemDrag.hint && 'newList' in itemDrag.hint ? (
+            <span className="item-ghost-extra">New list</span>
+          ) : (
+            itemDrag.extra && <span className="item-ghost-extra">{itemDrag.extra}</span>
+          )}
+        </div>
+      )}
       {marquee && (
         <div
           className="marquee"

@@ -65,7 +65,15 @@ function parseCard(id: string, c: unknown): Card | null {
   };
   if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
-  return { ...base, kind, title: str(c.title, ''), items: parseItems(c.items) };
+  const items = parseItems(c.items);
+  return {
+    ...base,
+    kind,
+    title: str(c.title, ''),
+    // A list always has at least one item to type in.
+    items: items.length ? items : [{ id: `${id}_i0`, text: '', done: false, children: [] }],
+    completedOpen: bool(c.completedOpen, true),
+  };
 }
 
 function parseColumn(id: string, c: unknown): Column | null {

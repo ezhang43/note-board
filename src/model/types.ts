@@ -30,6 +30,8 @@ export interface TodoCard extends CardBase {
   kind: 'todo';
   title: string;
   items: TodoItem[];
+  /** Whether the "Completed · N" section is expanded. */
+  completedOpen: boolean;
 }
 
 export interface LinkCard extends CardBase {

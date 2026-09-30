@@ -53,5 +53,8 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 - 2026-10-01 (step 4): Several selected blocks dragged together don't drop into columns and show no landing outline; after the drop, anything they cover moves.
 - 2026-10-01 (step 4): Delete with several columns selected asks "Delete N columns?" on the first selected column.
 - 2026-10-01 (step 4): Automatic overlap clean-up is part of the change that caused it, not a separate undo step. Undo covers board data only (not pan, zoom, tool or selection).
+- 2026-10-01 (step 5): Behaviour follows the prototype where the spec is silent: Enter adds the new item after the current one's sub-items; a top-level item only nests (Tab) under an item in the same section (open or completed); Backspace does nothing in an empty item that has sub-items; nesting by drag puts items first under the target.
+- 2026-10-01 (step 5): Dropping dragged items back onto themselves does nothing (the prototype appended them to the end of their list). An item drag starts after a 5px nudge, like block drags.
+- 2026-10-01 (step 5): A new list made by dropping items on the board keeps its spot; anything under it moves out of the way. Whether "Completed" is open is saved per list.
 - 2026-10-01: Owner approved committing each step on branch `build/v1` and continuing through step 5 without pausing for manual checks.
 - 2026-10-01: Ctrl+= / Ctrl+− / Ctrl+0 also work while typing, so the browser never zooms the whole page instead. Pan and zoom are remembered between visits; the tool always starts as Hand.

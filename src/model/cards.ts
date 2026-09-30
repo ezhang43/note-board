@@ -18,7 +18,7 @@ export function createCard(kind: CardKind, id = newId('k')): Card {
     case 'note':
       return { ...base, kind, text: '' };
     case 'todo':
-      return { ...base, kind, title: 'New list', items: [createItem()] };
+      return { ...base, kind, title: 'New list', items: [createItem()], completedOpen: true };
     case 'link':
       return { ...base, kind, title: '', url: '' };
   }

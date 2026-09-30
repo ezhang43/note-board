@@ -38,6 +38,8 @@ function isObject(x: unknown): x is Obj {
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+/** A resized width/height, or null for "not resized" (also for anything unreadable). */
+const size = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
 function parseItems(v: unknown, depth = 0): TodoItem[] {
   if (!Array.isArray(v) || depth > 10) return [];
@@ -58,6 +60,8 @@ function parseCard(id: string, c: unknown): Card | null {
     collapsed: bool(c.collapsed, false),
     x: num(c.x, 0),
     y: num(c.y, 0),
+    w: size(c.w),
+    h: size(c.h),
   };
   if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
@@ -72,6 +76,7 @@ function parseColumn(id: string, c: unknown): Column | null {
     x: num(c.x, 0),
     y: num(c.y, 0),
     w: num(c.w, COLUMN_W),
+    h: size(c.h),
     color: isColorKey(c.color) ? c.color : null,
     collapsed: bool(c.collapsed, false),
     cardIds: Array.isArray(c.cardIds) ? c.cardIds.filter((x): x is string => typeof x === 'string') : [],

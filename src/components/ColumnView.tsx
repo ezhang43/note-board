@@ -3,8 +3,10 @@ import { COLUMN_DEFAULT, PALETTE } from '../model/palette';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { CardView } from './CardView';
-import { ChevronIcon, CloseIcon } from './icons';
+import { COLUMN_MIN_H } from '../model/constants';
+import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
 import { blockPointerDown } from './useBlockDrag';
+import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
 /** A column: a titled stack of cards. */
@@ -15,15 +17,26 @@ export function ColumnView({ id }: { id: string }) {
   const dropTarget = useAppState((s) => s.ui.drag?.kind === 'card' && s.ui.drag.overColumn === id);
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   const confirming = useAppState((s) => s.ui.confirmDelete === id);
+  const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
+  const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!col) return null;
 
   const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
   const pos = drag ?? col;
+  const w = resize?.w ?? col.w;
+  const minH = col.collapsed ? undefined : (resize?.h ?? col.h ?? COLUMN_MIN_H);
   // A card being dragged out is drawn on its own until it is dropped.
   const cardIds = col.cardIds.filter((c) => c !== draggedCard);
-  const classes = ['column', selected && 'selected', drag && 'dragging', dropTarget && 'drop-target', col.collapsed && 'collapsed'];
+  const classes = [
+    'column',
+    selected && 'selected',
+    drag && 'dragging',
+    sizeMatch && 'size-match',
+    dropTarget && 'drop-target',
+    col.collapsed && 'collapsed',
+  ];
 
   return (
     <section
@@ -31,7 +44,7 @@ export function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={`Column ${col.title}`}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: pos.x, top: pos.y, width: col.w, '--bg': colors.bg, '--edge': colors.edge } as CSSProperties}
+      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
     >
       <div className="column-header">
@@ -80,6 +93,15 @@ export function ColumnView({ id }: { id: string }) {
         ) : (
           <div className="column-empty">Drop cards here</div>
         ))}
+
+      {!col.collapsed && (
+        <>
+          <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} />
+          <button type="button" className="resize-corner" aria-label="Resize column" onPointerDown={resizePointerDown('column', id, 'both')}>
+            <ResizeIcon />
+          </button>
+        </>
+      )}
     </section>
   );
 }

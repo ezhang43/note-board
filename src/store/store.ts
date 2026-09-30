@@ -1,10 +1,10 @@
 import * as B from '../model/board';
 import { createCard, createColumn } from '../model/cards';
-import { CARD_W, NEW_BLOCK_H } from '../model/constants';
-import { spotForNewBlock } from '../model/layout';
+import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../model/constants';
+import { landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
 import type { ColorKey } from '../model/palette';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
-import type { Board, CardKind, Point, Size, Tool, View } from '../model/types';
+import type { Board, CardKind, Point, Rect, Size, Tool, View } from '../model/types';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../model/view';
 
 /** A block being dragged. x / y are its top-left on the board while it follows the pointer. */
@@ -15,6 +15,21 @@ export interface Drag {
   y: number;
   /** The column a dragged card is over (it will drop into it), if any. */
   overColumn: string | null;
+  /** Where the block will land if dropped now, when that differs from x / y (shown as a dashed outline). */
+  land: Rect | null;
+}
+
+/** A block being resized: its size so far, which blocks it matches, and the size label by the pointer. */
+export interface Resize {
+  kind: 'card' | 'column';
+  id: string;
+  w: number;
+  /** null = width only (a column's right edge). */
+  h: number | null;
+  matchIds: string[];
+  label: string;
+  /** Where to show the label, in screen pixels from the canvas's top-left. */
+  labelAt: Point;
 }
 
 /** Things on screen that are not board data: never saved, never undoable. */
@@ -24,6 +39,7 @@ export interface Ui {
   /** Column whose "Delete …?" confirmation is showing. */
   confirmDelete: string | null;
   drag: Drag | null;
+  resize: Resize | null;
 }
 
 export interface AppState {
@@ -37,11 +53,15 @@ export interface AppState {
 /** Wait this long after the last pan/zoom before saving it, so scrolling doesn't write on every frame. */
 export const VIEW_SAVE_DELAY = 250;
 
-const emptyUi: Ui = { selection: [], colourMenuOpen: false, confirmDelete: null, drag: null };
+const emptyUi: Ui = { selection: [], colourMenuOpen: false, confirmDelete: null, drag: null, resize: null };
 
 export type Store = ReturnType<typeof createStore>;
 
-export function createStore(storage: StorageLike | null) {
+/** Runs a function soon, after the current work (and, in the browser, after drawing). */
+type Schedule = (fn: () => void) => void;
+const later: Schedule = (fn) => setTimeout(fn, 0);
+
+export function createStore(storage: StorageLike | null, schedule: Schedule = later) {
   let state: AppState = {
     board: parseBoard(read(BOARD_KEY)),
     view: parseView(read(VIEW_KEY)),
@@ -54,6 +74,26 @@ export function createStore(storage: StorageLike | null) {
   const heights = new Map<string, number>();
   /** A checklist item whose text box should get the cursor as soon as it appears. */
   let focusRequest: string | null = null;
+  /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
+  const settleAnchors = new Set<string>();
+  let settleQueued = false;
+
+  /**
+   * Clear up overlaps soon: after the change has been drawn, so real heights are known.
+   * Waits while a drag or resize is in progress.
+   */
+  function requestSettle(anchors: string[] = []) {
+    anchors.forEach((a) => settleAnchors.add(a));
+    if (settleQueued) return;
+    settleQueued = true;
+    schedule(() => {
+      settleQueued = false;
+      if (state.ui.drag || state.ui.resize) return;
+      const a = [...settleAnchors];
+      settleAnchors.clear();
+      updateBoard((b) => settle(b, measured, a));
+    });
+  }
 
   function read(key: string): string | null {
     try {
@@ -111,6 +151,13 @@ export function createStore(storage: StorageLike | null) {
 
   const measured = (id: string) => heights.get(id);
 
+  /** Size of a block being dragged, as it will be once dropped loose on the board. */
+  function draggedSize(d: Drag) {
+    const h = heights.get(d.id) ?? NEW_BLOCK_H.column;
+    if (d.kind === 'column') return { w: state.board.columns[d.id]?.w ?? COLUMN_W, h };
+    return { w: state.board.cards[d.id]?.w ?? CARD_W, h };
+  }
+
   /** Selection without blocks that no longer exist. */
   function without(ids: string[]): string[] {
     return state.ui.selection.filter((s) => !ids.includes(s));
@@ -130,7 +177,10 @@ export function createStore(storage: StorageLike | null) {
       viewportSize = size;
     },
     setMeasuredHeight(id: string, h: number) {
+      if (heights.get(id) === h) return;
       heights.set(id, h);
+      // A loose block or column that grew may now cover something: move that out of its way.
+      if (state.board.order.includes(id)) requestSettle([id]);
     },
     /** True (once) if this checklist item was just created and should get the cursor. */
     takeFocusRequest(itemId: string): boolean {
@@ -141,7 +191,12 @@ export function createStore(storage: StorageLike | null) {
 
     // ---------- board ----------
     renameBoard: (name: string) => updateBoard((b) => B.renameBoard(b, name)),
-    toggleSnap: () => updateBoard((b) => B.setSnap(b, !b.snap)),
+    /** Turning snapping back on moves every block (position and resized sizes) onto the grid. */
+    toggleSnap() {
+      const on = !state.board.snap;
+      updateBoard((b) => (on ? snapAll(B.setSnap(b, true)) : B.setSnap(b, false)));
+      if (on) requestSettle();
+    },
 
     // ---------- view ----------
     setTool: (tool: Tool) => updateView((v) => (v.tool === tool ? v : { ...v, tool })),
@@ -201,24 +256,56 @@ export function createStore(storage: StorageLike | null) {
     },
 
     // ---------- dragging ----------
-    startDrag: (drag: Drag) => updateUi({ drag, confirmDelete: null }),
+    startDrag: (drag: Omit<Drag, 'land'>) => updateUi({ drag: { ...drag, land: null }, confirmDelete: null }),
     moveDrag(x: number, y: number, overColumn: string | null) {
       const d = state.ui.drag;
       if (!d || (d.x === x && d.y === y && d.overColumn === overColumn)) return;
-      updateUi({ drag: { ...d, x, y, overColumn } });
+      // Over a column the card will drop into it, so no landing spot is shown.
+      let land: Rect | null = null;
+      if (!overColumn) {
+        const size = draggedSize(d);
+        const spot = landingSpot(state.board, d.id, x, y, size, measured);
+        if (spot.x !== x || spot.y !== y) land = { ...spot, ...size };
+      }
+      updateUi({ drag: { ...d, x, y, overColumn, land } });
     },
-    cancelDrag: () => updateUi({ drag: null }),
+    cancelDrag() {
+      updateUi({ drag: null });
+      requestSettle();
+    },
     /**
      * Finish a drag. `index` is where a card dropped on a column goes in it; otherwise the block
-     * lands where it was let go.
+     * lands at the nearest free spot to where it was let go.
      */
     dropDrag(index: number | null) {
       const d = state.ui.drag;
       if (!d) return;
-      if (d.kind === 'column') return updateBoard((b) => B.moveColumn(b, d.id, d.x, d.y), { drag: null });
-      const place: B.Placement =
-        d.overColumn && index != null ? { type: 'column', columnId: d.overColumn, index } : { type: 'loose', x: d.x, y: d.y };
+      const at = d.land ?? { x: d.x, y: d.y };
+      if (d.kind === 'column') {
+        updateBoard((b) => B.moveColumn(b, d.id, at.x, at.y), { drag: null });
+        return requestSettle([d.id]);
+      }
+      const intoColumn = d.overColumn && index != null;
+      const place: B.Placement = intoColumn ? { type: 'column', columnId: d.overColumn!, index: index! } : { type: 'loose', ...at };
       updateBoard((b) => B.moveCard(b, d.id, place), { drag: null });
+      requestSettle([intoColumn ? d.overColumn! : d.id]);
+    },
+
+    // ---------- resizing ----------
+    /** Show a resize in progress (the board itself only changes when the pointer is released). */
+    showResize: (resize: Resize) => updateUi({ resize, confirmDelete: null }),
+    cancelResize() {
+      updateUi({ resize: null });
+      requestSettle();
+    },
+    commitResize() {
+      const r = state.ui.resize;
+      if (!r) return;
+      updateBoard(
+        (b) => (r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? b.cards[r.id]?.h ?? 0) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined)),
+        { resize: null },
+      );
+      requestSettle([r.id]);
     },
   };
 }

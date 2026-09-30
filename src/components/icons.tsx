@@ -102,6 +102,14 @@ export function ExternalIcon() {
   );
 }
 
+export function ResizeIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" strokeWidth="1.4" {...common} stroke="#8A8378">
+      <path d="M9 3L3 9M9 6.5L6.5 9" />
+    </svg>
+  );
+}
+
 export function MinusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.8" {...common}>

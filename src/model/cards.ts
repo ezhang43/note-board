@@ -13,7 +13,7 @@ export function createItem(id = newId('i')): TodoItem {
 }
 
 export function createCard(kind: CardKind, id = newId('k')): Card {
-  const base = { id, color: DEFAULT_COLOR[kind], collapsed: false, x: 0, y: 0 };
+  const base = { id, color: DEFAULT_COLOR[kind], collapsed: false, x: 0, y: 0, w: null, h: null };
   switch (kind) {
     case 'note':
       return { ...base, kind, text: '' };
@@ -25,7 +25,7 @@ export function createCard(kind: CardKind, id = newId('k')): Card {
 }
 
 export function createColumn(id = newId('c')): Column {
-  return { id, title: 'New column', x: 0, y: 0, w: COLUMN_W, color: null, collapsed: false, cardIds: [] };
+  return { id, title: 'New column', x: 0, y: 0, w: COLUMN_W, h: null, color: null, collapsed: false, cardIds: [] };
 }
 
 export function countItems(items: TodoItem[]): { total: number; done: number } {

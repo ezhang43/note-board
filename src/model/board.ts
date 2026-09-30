@@ -93,6 +93,19 @@ export function updateColumn(board: Board, columnId: string, change: Partial<Pic
   return { ...board, columns: { ...board.columns, [columnId]: { ...col, ...change } } };
 }
 
+/** Set a loose card's width and minimum height (from resizing). */
+export function resizeCard(board: Board, cardId: string, w: number, h: number): Board {
+  return updateCard(board, cardId, (c) => (c.w === w && c.h === h ? c : { ...c, w, h }));
+}
+
+/** Set a column's width, and its minimum height unless `h` is undefined (edge strip: width only). */
+export function resizeColumn(board: Board, columnId: string, w: number, h?: number): Board {
+  const col = board.columns[columnId];
+  if (!col) return board;
+  const next = { ...col, w, h: h === undefined ? col.h : h };
+  return next.w === col.w && next.h === col.h ? board : { ...board, columns: { ...board.columns, [columnId]: next } };
+}
+
 export function toggleCollapsed(board: Board, id: string): Board {
   if (board.columns[id]) return updateColumn(board, id, { collapsed: !board.columns[id].collapsed });
   return updateCard(board, id, (c) => ({ ...c, collapsed: !c.collapsed }));

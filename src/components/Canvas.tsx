@@ -20,6 +20,8 @@ export function Canvas() {
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   const draggedColumn = useAppState((s) => (s.ui.drag?.kind === 'column' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
+  const land = useAppState((s) => s.ui.drag?.land ?? null);
+  const resizeLabel = useAppState((s) => s.ui.resize);
 
   // Keep the store told how big the canvas is, so zoom buttons can zoom around its centre
   // and new blocks appear in the middle of the screen.
@@ -116,7 +118,20 @@ export function Canvas() {
         {/* The block being dragged is drawn last so it stays on top. */}
         {draggedColumn && <ColumnView key={draggedColumn} id={draggedColumn} />}
         {draggedCard && <CardView key={draggedCard} id={draggedCard} inColumn={false} />}
+        {land && (
+          <div
+            className="landing-spot"
+            data-testid="landing-spot"
+            aria-hidden="true"
+            style={{ left: land.x, top: land.y, width: land.w, height: land.h }}
+          />
+        )}
       </div>
+      {resizeLabel && (
+        <div className="size-label" data-testid="size-label" style={{ left: resizeLabel.labelAt.x, top: resizeLabel.labelAt.y }}>
+          {resizeLabel.label}
+        </div>
+      )}
     </div>
   );
 }

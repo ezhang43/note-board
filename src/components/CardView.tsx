@@ -5,8 +5,10 @@ import type { Card, LinkCard, NoteCard, TodoCard, TodoItem } from '../model/type
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
-import { ChevronIcon, CloseIcon, ExternalIcon } from './icons';
+import { CARD_W } from '../model/constants';
+import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { blockPointerDown } from './useBlockDrag';
+import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
 const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link' } as const;
@@ -16,18 +18,30 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const card = useAppState((s) => s.board.cards[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
+  const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
+  const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!card) return null;
 
   const colors = PALETTE[card.color];
   const pos = drag ?? card;
+  // Inside a column a card follows the column's width and fits its content.
+  const w = resize?.w ?? card.w ?? CARD_W;
+  const h = resize?.h ?? card.h;
   const style = {
     '--bg': colors.bg,
     '--edge': colors.edge,
-    ...(inColumn ? {} : { left: pos.x, top: pos.y }),
+    ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: card.collapsed ? undefined : (h ?? undefined) }),
   } as CSSProperties;
-  const classes = ['card', inColumn ? 'in-column' : 'loose', selected && 'selected', drag && 'dragging', card.collapsed && 'collapsed'];
+  const classes = [
+    'card',
+    inColumn ? 'in-column' : 'loose',
+    selected && 'selected',
+    drag && 'dragging',
+    sizeMatch && 'size-match',
+    card.collapsed && 'collapsed',
+  ];
 
   return (
     <article
@@ -55,6 +69,11 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
         </button>
       </div>
       {!card.collapsed && <CardBody card={card} />}
+      {!inColumn && !card.collapsed && (
+        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')}>
+          <ResizeIcon />
+        </button>
+      )}
     </article>
   );
 }

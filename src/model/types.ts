@@ -9,6 +9,9 @@ interface CardBase {
   /** Position on the board. Only used while the card is loose (not in a column). */
   x: number;
   y: number;
+  /** Width and minimum height set by resizing; null = default width / fits its content. Ignored inside a column. */
+  w: number | null;
+  h: number | null;
 }
 
 export interface NoteCard extends CardBase {
@@ -43,6 +46,8 @@ export interface Column {
   x: number;
   y: number;
   w: number;
+  /** Minimum height set by resizing; null = the default minimum. */
+  h: number | null;
   /** null = the neutral stone-grey a new column starts with. */
   color: ColorKey | null;
   collapsed: boolean;

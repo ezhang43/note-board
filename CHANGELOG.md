@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 3 — No overlap, resizing, size matching, snap realignment (2026-10-01)
+
+- No overlap, ever: loose cards and columns always keep at least 10px apart.
+  - While dragging over another block, a dashed teal outline shows the nearest free landing spot; the block lands there.
+  - When a note grows as you type, a column gains cards, or a block is resized, anything it would cover moves to the nearest free spot.
+  - Boards saved with overlapping blocks are tidied when they load.
+- Resize loose cards from the bottom-right corner (width and minimum height; longer content still grows the card).
+- Resize columns from the corner (width and minimum height) or the right-edge strip (width only). Cards inside follow the column width. Cards inside a column have no resize handle.
+- Size matching: within 8px of another block's width or height, the size snaps to match; matched blocks get a dashed teal outline and a label shows e.g. "240 × 180 · same width as 2 blocks". Otherwise sizes land on the 20px grid when snapping is on.
+- Turning Snap to grid back on moves every block's position and resized size to the nearest grid point.
+
 ## Step 2 — Cards and columns (2026-10-01)
 
 - Add Note (butter), To-do list (mint), Link (sky) and New column from the toolbar. New blocks appear in the middle of the screen, never on top of other blocks, and are selected.

@@ -17,6 +17,20 @@ export function clientToBoard(clientX: number, clientY: number) {
   return screenToBoard(appStore.getState().view, { x: clientX - r.left, y: clientY - r.top });
 }
 
+/** Screen (client) coordinates → pixels from the canvas's top-left corner. */
+export function clientToCanvas(clientX: number, clientY: number) {
+  const r = canvasEl?.getBoundingClientRect() ?? { left: 0, top: 0 };
+  return { x: clientX - r.left, y: clientY - r.top };
+}
+
+/** Drawn sizes (board pixels) of every block except `block` and anything inside it. */
+export function otherBlockSizes(block: HTMLElement) {
+  if (!canvasEl) return [];
+  return Array.from(canvasEl.querySelectorAll<HTMLElement>('[data-card-id], [data-col-id]'))
+    .filter((el) => el !== block && !block.contains(el))
+    .map((el) => ({ id: (el.dataset.cardId ?? el.dataset.colId)!, w: el.offsetWidth, h: el.offsetHeight }));
+}
+
 function columnElements(): HTMLElement[] {
   return canvasEl ? Array.from(canvasEl.querySelectorAll<HTMLElement>('[data-col-id]')) : [];
 }

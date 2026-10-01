@@ -18,7 +18,8 @@ import type { Board, Card, Point, TodoItem } from './types';
 type MakeId = (prefix: string) => string;
 
 const ITEM = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+// Closing #s only count after a space ("## Learn C#" keeps its #); a bare "##" has an empty title.
+const HEADING = /^(#{1,6})(?:\s+(.*?))?(?:\s+#+)?\s*$/;
 
 /** Markdown inline marks and escapes → plain text. Links keep their address in brackets. */
 export function plainText(s: string): string {
@@ -91,7 +92,7 @@ export function parseMilanote(markdown: string, makeId: MakeId = newId): Card[] 
       flushText();
       flushTitle();
       const isBoardName = first && heading[1] === '#';
-      if (!isBoardName) title = plainText(heading[2]);
+      if (!isBoardName) title = plainText(heading[2] ?? '');
       first = false;
       continue;
     }

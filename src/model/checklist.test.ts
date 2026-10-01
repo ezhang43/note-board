@@ -330,3 +330,14 @@ describe('copying and cutting exactly what is highlighted (owner request)', () =
     expect(C.removeExactly([t('a')], ['a'], makeId)).toHaveLength(1); // never empties the list
   });
 });
+
+describe('pasting items never goes past 6 levels', () => {
+  it('pastes after the nearest item higher up that leaves room', () => {
+    // a > b > c > d > e > f: f is on the sixth level.
+    const deep = [item('a', [item('b', [item('c', [item('d', [item('e', [item('f')])])])])])];
+    const out = C.pasteItemsAfter(deep, 'f', [item('x', [item('y')])]);
+    expect(C.findItem(out, 'x')?.depth).toBe(4);
+    expect(C.findItem(out, 'y')?.depth).toBe(5);
+    expect(ids(out)).toBe('a(b(c(d(e(f) x(y)))))');
+  });
+});

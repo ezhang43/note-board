@@ -29,7 +29,9 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
     if (!card || card.kind === 'completed') continue;
     const parent = columnOf(board, id);
     if (parent && selectedColumns.has(parent.id)) continue;
-    entries.push({ kind: 'card', card: structuredClone(card), columnId: parent?.id ?? null });
+    // A card in a column has no position of its own: remember the column's, in case it is gone by the paste.
+    const copy = parent ? { ...structuredClone(card), x: parent.x, y: parent.y } : structuredClone(card);
+    entries.push({ kind: 'card', card: copy, columnId: parent?.id ?? null });
   }
   return entries;
 }

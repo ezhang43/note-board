@@ -154,3 +154,12 @@ describe('days', () => {
     expect(dayLabel('2026-10-02')).toBe('2 Oct 2026');
   });
 });
+
+describe('unticking in the Completed card never leaves an open item under a ticked one', () => {
+  it('unticks the item it goes back under', () => {
+    let b = cleanUp(board(), '2026-10-02', here, makeId).board; // pears (under fruit) went to Completed
+    b = B.updateCard(b, 'g', (c) => ({ ...(c as TodoCard), items: (c as TodoCard).items.map((i) => (i.id === 'fruit' ? { ...i, done: true } : i)) }));
+    const r = restoreEntry(b, 'pears', here, makeId);
+    expect(outline(items(r.board, 'g'))).toBe('bread fruit(apples pears(seeds))');
+  });
+});

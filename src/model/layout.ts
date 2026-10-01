@@ -1,4 +1,4 @@
-import { BLOCK_GAP, BLOCK_MIN_H, CARD_W, COLUMN_MIN_W, GRID, NEW_BLOCK_H } from './constants';
+import { BLOCK_GAP, BLOCK_MIN_H, CARD_MIN_W, CARD_W, COLUMN_MIN_W, GRID, NEW_BLOCK_H } from './constants';
 import { freeSpot, overlaps, snapToGrid } from './geometry';
 import type { Board, Point, Rect } from './types';
 
@@ -112,7 +112,7 @@ export function snapAll(board: Board): Board {
   const cards = Object.fromEntries(
     Object.entries(board.cards).map(([id, c]) => [
       id,
-      { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y), w: snapSize(c.w, BLOCK_MIN_H), h: snapSize(c.h, BLOCK_MIN_H) },
+      { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y), w: snapSize(c.w, CARD_MIN_W), h: snapSize(c.h, BLOCK_MIN_H) },
     ]),
   );
   const columns = Object.fromEntries(

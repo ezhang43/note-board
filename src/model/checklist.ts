@@ -286,10 +286,15 @@ export function freshCopies(items: TodoItem[], makeId: MakeId = newId): TodoItem
   return items.map((it) => ({ ...it, id: makeId('i'), children: freshCopies(it.children, makeId) }));
 }
 
-/** Pastes items right after `afterId` (at its level), or at the end if it isn't found. */
+/**
+ * Pastes items right after `afterId` (at its level), or at the end if it isn't found. If that would
+ * go past 6 levels, they go after the nearest item above `afterId` that leaves room.
+ */
 export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: TodoItem[]): TodoItem[] {
   const next = cloned(items);
-  const loc = findItem(next, afterId);
+  const height = pasted.reduce((h, p) => Math.max(h, subtreeHeight(p)), 0);
+  let loc = findItem(next, afterId);
+  while (loc && loc.depth + height > MAX_DEPTH) loc = loc.parent && findItem(next, loc.parent.id);
   if (loc) loc.list.splice(loc.index + 1, 0, ...structuredClone(pasted));
   else next.push(...structuredClone(pasted));
   return next;

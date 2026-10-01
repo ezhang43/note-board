@@ -1,6 +1,6 @@
 import { addCard, type Placement } from './board';
 import { createItem, newId } from './cards';
-import { MAX_DEPTH, editItems, findItem, subtreeHeight } from './checklist';
+import { MAX_DEPTH, editItems, findItem, setItemsDone, subtreeHeight } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
@@ -113,8 +113,9 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
       const next = structuredClone(items);
       const parent = entry.fromParentId ? findItem(next, entry.fromParentId) : null;
       if (parent && parent.depth + 1 + subtreeHeight(item) <= MAX_DEPTH) parent.item.children.push(item);
-      else next.push(item);
-      return next;
+      else return [...next, item];
+      // An open item can't sit under a ticked one: untick the items it went back under.
+      return setItemsDone(next, [item.id], false);
     });
     return { board: b, cardId: src.id };
   }

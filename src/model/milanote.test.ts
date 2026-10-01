@@ -148,3 +148,14 @@ describe('addImported', () => {
     for (const c of cards) expect({ x: board.cards[c.id].x, y: board.cards[c.id].y }).toEqual(spots[c.id]);
   });
 });
+
+describe('headings ending in #', () => {
+  it('keeps a # that is part of the title, and drops closing #s after a space', () => {
+    expect(parse('## Learn C#\n- [ ] book').map((c) => todo(c).title)).toEqual(['Learn C#']);
+    expect(parse('## Errands ##\n- [ ] milk').map((c) => todo(c).title)).toEqual(['Errands']);
+  });
+  it('a bare ## is an empty list', () => {
+    const cards = parse('# Board\n\n##\n');
+    expect(cards.map((c) => [c.kind, todo(c).title])).toEqual([['todo', '']]);
+  });
+});

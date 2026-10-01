@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard } from './board';
 import { createCard, createColumn } from './cards';
-import { BLOCK_GAP } from './constants';
+import { BLOCK_GAP, CARD_MIN_W } from './constants';
 import { overlaps } from './geometry';
-import { spotForNewBlock, topLevelRects } from './layout';
+import { snapAll, spotForNewBlock, topLevelRects } from './layout';
 
 const unmeasured = () => undefined;
 
@@ -33,5 +33,13 @@ describe('placing new blocks', () => {
   it('when snap is off, the spot is not forced onto the grid', () => {
     const b = { ...createBoard(), snap: false };
     expect(spotForNewBlock(b, 240, 160, { x: 505, y: 407 }, unmeasured)).toEqual({ x: 385, y: 327 });
+  });
+});
+
+describe('turning snapping back on', () => {
+  it('keeps resized cards at least the minimum card width', () => {
+    let b = createBoard();
+    b = addCard(b, { ...createCard('note', 'n'), w: 150 }, { type: 'loose', x: 0, y: 0 });
+    expect(snapAll(b).cards.n.w).toBe(CARD_MIN_W);
   });
 });

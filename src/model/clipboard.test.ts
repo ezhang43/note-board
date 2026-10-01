@@ -89,3 +89,13 @@ describe('group actions', () => {
     expect(blocksTouching(b, { x: 330, y: 0, w: 100, h: 500 }, h)).toEqual([]);
   });
 });
+
+describe('pasting a card whose column is gone', () => {
+  it('lands next to where the column was, not at the top-left of the board', () => {
+    const b = board();
+    const copied = copyBlocks(b, ['b']);
+    const gone = B.deleteBlocks(b, ['c1']);
+    const { board: out, ids: pasted } = pasteBlocks(gone, copied, 1, ids);
+    expect(out.cards[pasted[0]]).toMatchObject({ x: 80, y: 80 });
+  });
+});

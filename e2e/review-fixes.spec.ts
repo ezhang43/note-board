@@ -62,3 +62,14 @@ test.describe('with motion allowed', () => {
     await expect(page.locator('.card', { hasText: 'Completed' }).getByText('first')).toBeVisible();
   });
 });
+
+test('Ctrl+Z undoes on a non-Latin keyboard layout (Russian: the Z key types я)', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await expect(cards(page)).toHaveCount(1);
+  await clickEmpty(page);
+  await page.evaluate(() =>
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'я', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })),
+  );
+  await expect(cards(page)).toHaveCount(0);
+});

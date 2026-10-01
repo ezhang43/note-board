@@ -1,5 +1,14 @@
 # Changelog
 
+## Paste, import and keyboard fixes from the code review (2026-10-02)
+
+- Pasting checklist items never makes them deeper than 6 levels: if there is no room, they go after the nearest item higher up.
+- Unticking an item in the Completed card unticks the item it goes back under, so it never hides inside a ticked item.
+- A card copied from a column that has since been deleted is pasted where the column was, not far away at the top-left of the board.
+- Importing from Milanote keeps a # that is part of a heading ("Learn C#"), and a heading with no text becomes an empty list.
+- Ctrl+Z, Ctrl+C and the other shortcuts work with a non-Latin keyboard layout (for example Russian) switched on.
+- Turning Snap to grid back on never makes a card narrower than the minimum card width.
+
 ## Ticking, dragging and selecting fixes from the code review (2026-10-02)
 
 - Ticking an item and then quickly deleting, pasting, dropping a block, pressing Backspace or pressing Clean up no longer un-ticks the item.

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
+import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
 import { handleArrowKey } from './keyboardNav';
 import { isTextField } from './textField';
@@ -9,7 +10,7 @@ export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
-      const key = e.key.toLowerCase();
+      const key = shortcutKey(e);
 
       // Undo / redo go through the board's history from anywhere, even inside a text field.
       if (mod && key === 'z' && !e.shiftKey) return run(e, appStore.undo);

@@ -342,6 +342,17 @@ test('Tab and Shift+Tab move all selected items together (owner request)', async
   await page.keyboard.press('Shift+Tab');
   expect(await Promise.all(['one', 'two', 'three', 'four'].map((t) => depthOf(rowWithText(list, t))))).toEqual([0, 0, 0, 0]);
   expect(await texts(list)).toEqual(['one', 'two', 'three', 'four']);
+
+  // Starting from the first item: it stays, the others nest under it.
+  await page.keyboard.press('Escape');
+  const top = await center(rows(list).nth(0).getByLabel('Item text'));
+  await page.mouse.move(top.x, top.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 });
+  await page.mouse.up();
+  await expect(list.locator('.todo-item.picked')).toHaveCount(3);
+  await page.keyboard.press('Tab');
+  expect(await Promise.all(['one', 'two', 'three', 'four'].map((t) => depthOf(rowWithText(list, t))))).toEqual([0, 1, 1, 0]);
 });
 
 test('Delete at the end of an item pulls the next item up into it (owner request)', async ({ page }) => {

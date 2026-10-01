@@ -127,19 +127,20 @@ export function outdentItem(items: TodoItem[], id: string): TodoItem[] | null {
 
 /**
  * Tab with several items selected: every selected item (with its sub-items) moves in one level,
- * each as Tab would move it. All or nothing: if any of them can't move, none do.
+ * each as Tab would move it. One that can't (e.g. the first item of a list, with nothing above it)
+ * stays, and the ones after it nest under it. Null if none of them can move.
  */
 export function indentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
-  let next: TodoItem[] | null = items;
-  for (const id of rootsOf(items, ids)) next = next && indentItem(next, id);
+  let next = items;
+  for (const id of rootsOf(items, ids)) next = indentItem(next, id) ?? next;
   return next === items ? null : next;
 }
 
-/** Shift+Tab with several items selected: every selected item moves out one level (all or nothing). */
+/** Shift+Tab with several items selected: every selected item that can moves out one level. */
 export function outdentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
-  let next: TodoItem[] | null = items;
+  let next = items;
   // Bottom one first, so items that end up side by side keep their order.
-  for (const id of rootsOf(items, ids).reverse()) next = next && outdentItem(next, id);
+  for (const id of rootsOf(items, ids).reverse()) next = outdentItem(next, id) ?? next;
   return next === items ? null : next;
 }
 

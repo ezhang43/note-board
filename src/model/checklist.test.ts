@@ -241,9 +241,14 @@ describe('several selected items with Tab / Shift+Tab (owner request)', () => {
     expect(ids(C.outdentItems(items, ['x', 'y'])!)).toBe('a(z) x y');
   });
 
-  it('does nothing if any of them cannot move', () => {
-    expect(C.indentItems([item('a'), item('b')], ['a', 'b'])).toBeNull(); // nothing above a
-    expect(C.outdentItems([item('a', [item('x')]), item('b')], ['x', 'b'])).toBeNull(); // b is already top level
+  it('one that cannot move stays, and the rest still move (e.g. starting from the first item)', () => {
+    expect(ids(C.indentItems([item('a'), item('b'), item('c'), item('d')], ['a', 'b', 'c'])!)).toBe('a(b c) d');
+    expect(ids(C.outdentItems([item('a', [item('x')]), item('b')], ['x', 'b'])!)).toBe('a x b');
+  });
+
+  it('does nothing when none of them can move', () => {
+    expect(C.indentItems([item('a'), item('b')], ['a'])).toBeNull();
+    expect(C.outdentItems([item('a'), item('b')], ['a', 'b'])).toBeNull();
   });
 });
 

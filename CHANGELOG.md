@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: Tab on selected items (2026-10-02)
+
+- Tab on several selected items now works when the selection starts at the first item of a list: the first item stays and the others move in under it. Before, nothing happened.
+
 ## Clean up (2026-10-02)
 
 - New **Clean up** button at the end of the toolbar: it moves every ticked item on the board (with anything under it) into a **Completed** card, grouped under today's date. The first time, it makes the Completed card in the middle of the screen.

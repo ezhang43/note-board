@@ -156,17 +156,25 @@ function parseBlocks(b: Obj): Pick<Board, 'cards' | 'columns' | 'order'> {
   return { cards, columns, order };
 }
 
-/** Reads saved board data. Anything missing or damaged falls back to the default for that field. */
-export function parseBoard(raw: string | null): Board {
+/**
+ * Reads saved board data, or null when it can't be read at all (damaged, or saved by a newer
+ * version of the app). Within a readable board, anything damaged falls back to its default.
+ */
+export function readBoard(raw: string | null): Board | null {
   const fresh = createBoard();
   const data = parseJson(raw);
-  if (!isObject(data) || !isObject(data.board)) return fresh;
+  if (!isObject(data) || !isObject(data.board)) return null;
   const b = data.board;
   const basics = { name: str(b.name, fresh.name), snap: bool(b.snap, fresh.snap) };
   // Version 1 (step 1) only had the name and snap setting.
   if (data.version === 1) return { ...fresh, ...basics };
-  if (data.version !== BOARD_VERSION) return fresh;
+  if (data.version !== BOARD_VERSION) return null;
   return { ...basics, ...parseBlocks(b) };
+}
+
+/** Reads saved board data; anything unreadable gives a fresh board. */
+export function parseBoard(raw: string | null): Board {
+  return readBoard(raw) ?? createBoard();
 }
 
 /** Only pan and zoom are remembered; the tool always starts as Hand. */

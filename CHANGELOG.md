@@ -1,5 +1,12 @@
 # Changelog
 
+## Sync fixes from the code review (2026-10-02)
+
+- Typing or other changes not yet sent online are no longer thrown away when another device saves at the same moment: your change is kept and sent.
+- A card or column you drop no longer jumps back if another device saved while you were dragging.
+- Devices no longer send each other's changes back and forth (this could undo newer typing and clear Ctrl+Z history).
+- If the online board can't be read (damaged, or saved by a newer version of the app), it is left untouched and the page says the board couldn't be loaded, instead of showing an empty board and saving that over everything.
+
 ## Dark mode (2026-10-02)
 
 - New moon button at the right end of the toolbar switches between light and dark mode.

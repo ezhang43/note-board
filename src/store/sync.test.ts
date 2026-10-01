@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBoard } from '../model/board';
+import { addCard, createBoard } from '../model/board';
+import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
 import { createStore } from './store';
 import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
@@ -28,8 +29,9 @@ function setup() {
   const store = createStore(null, (fn) => fn());
   const fake = fakeRemote();
   const onReady = vi.fn();
-  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError: () => {} });
-  return { store, fake, onReady, sync };
+  const onError = vi.fn();
+  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError });
+  return { store, fake, onReady, onError, sync };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -99,6 +101,7 @@ describe('board sync', () => {
     fake.send({ data: boardJson('Start'), client: 'laptop' });
     store.renameBoard('Local edit');
     expect(store.getState().ui.canUndo).toBe(true);
+    vi.advanceTimersByTime(SYNC_DELAY);
     fake.send({ data: boardJson('From phone'), client: 'phone' });
     expect(store.getState().ui.canUndo).toBe(false);
     store.undo();
@@ -109,6 +112,7 @@ describe('board sync', () => {
     const { store, fake } = setup();
     fake.send({ data: boardJson('Start'), client: 'laptop' });
     store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
     const id = store.getState().board.order[0];
     const card = store.getState().board.cards[id];
     store.startDrag('card', id, card.x, card.y);
@@ -129,5 +133,68 @@ describe('board sync', () => {
     store.renameBoard('After stop');
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes).toHaveLength(1);
+  });
+  it('does not send a change from another device back, even when saved with fields in another order', () => {
+    const { fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    // A card recoloured on the laptop: its saved fields are in a different order than a fresh load gives.
+    const card = { ...createCard('note', 'n1'), titleColor: 'lavender' as const };
+    const board = addCard(createBoard(), card, { type: 'loose', x: 0, y: 0 });
+    fake.send({ data: serializeBoard(board), client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a drop made after another device saved wins over that change, and is uploaded', () => {
+    const { store, fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const writesBefore = fake.writes.length;
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    store.moveDrag(card.x + 400, card.y + 400, null);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    store.dropDrag(null);
+    const moved = store.getState().board.cards[id];
+    expect(moved.x).toBeGreaterThan(card.x + 300);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes.length).toBe(writesBefore + 1);
+    expect(JSON.parse(fake.writes.at(-1)!.data).board.cards[id].x).toBe(moved.x);
+  });
+
+  it('a change not yet uploaded is kept and sent when another device saves meanwhile', () => {
+    const { store, fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.renameBoard('Typed here');
+    vi.advanceTimersByTime(SYNC_DELAY / 4);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    expect(store.getState().board.name).toBe('Typed here');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(JSON.parse(fake.writes[0].data).board.name).toBe('Typed here');
+  });
+
+  it('an online board it cannot read is never replaced or overwritten', () => {
+    const { store, fake, onError } = setup();
+    store.renameBoard('On this device');
+    fake.send({ data: '{corrupt', client: 'laptop' });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(store.getState().board.name).toBe('On this device');
+    store.renameBoard('Still typing');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a newer-version board from another device is not shown or overwritten', () => {
+    const { store, fake, onError } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    fake.send({ data: JSON.stringify({ version: 99, board: { name: 'Future' } }), client: 'phone' });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(store.getState().board.name).toBe('Start');
+    store.renameBoard('Local edit');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
   });
 });

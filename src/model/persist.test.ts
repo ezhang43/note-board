@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard, problems } from './board';
 import { createCard, createColumn } from './cards';
 import type { LinkCard, NoteCard } from './types';
-import { parseBoard, parseView, serializeBoard, serializeView } from './persist';
+import { parseBoard, parseView, readBoard, serializeBoard, serializeView } from './persist';
 import { createView } from './view';
 
 function sampleBoard() {
@@ -83,5 +83,16 @@ describe('saving the view', () => {
   it('falls back to defaults on damaged data and keeps zoom in range', () => {
     expect(parseView('garbage')).toEqual(createView());
     expect(parseView('{"panX":"a","panY":null,"zoom":99}')).toEqual({ ...createView(), zoom: 2.5 });
+  });
+});
+
+describe('reading a board that may be unreadable', () => {
+  it('gives the board for readable data, and nothing for damaged or newer data', () => {
+    const board = addCard(createBoard(), createCard('note', 'n1'), { type: 'loose', x: 0, y: 0 });
+    expect(readBoard(serializeBoard(board))).toEqual(parseBoard(serializeBoard(board)));
+    expect(readBoard('{corrupt')).toBeNull();
+    expect(readBoard(null)).toBeNull();
+    expect(readBoard(JSON.stringify({ version: 99, board: { name: 'From the future' } }))).toBeNull();
+    expect(readBoard(JSON.stringify({ version: 1, board: { name: 'Old', snap: false } }))?.name).toBe('Old');
   });
 });

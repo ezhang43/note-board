@@ -246,18 +246,39 @@ export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): T
   return next;
 }
 
-/** Copies of the selected items (with their sub-items), for the clipboard. */
+/**
+ * Copies of exactly the selected items, for the clipboard: each keeps only the sub-items that are
+ * selected too (sub-items that weren't highlighted are left out).
+ */
 export function copyItems(items: TodoItem[], ids: string[]): TodoItem[] {
-  return rootsOf(items, ids).map((id) => structuredClone(findItem(items, id)!.item));
+  const picked = new Set(ids);
+  const keep = (it: TodoItem): TodoItem => ({ ...structuredClone(it), children: it.children.filter((c) => picked.has(c.id)).map(keep) });
+  return rootsOf(items, ids).map((id) => keep(findItem(items, id)!.item));
 }
 
 /**
- * Copied items as plain text for other apps: one item per line, in order, each sub-item indented
- * two spaces per level below the copied item it is under.
+ * Cut: removes exactly the selected items. A sub-item that wasn't selected stays, moving up into
+ * the place of the removed item it was under. An emptied list gets one blank item.
  */
-export function itemsAsText(items: TodoItem[], depth = 0): string {
-  const lines = (list: TodoItem[], d: number): string[] => list.flatMap((it) => ['  '.repeat(d) + it.text, ...lines(it.children, d + 1)]);
-  return lines(items, depth).join('\n');
+export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId = newId): TodoItem[] {
+  const picked = new Set(ids);
+  const prune = (list: TodoItem[]): TodoItem[] =>
+    list.flatMap((it) => (picked.has(it.id) ? prune(it.children) : [{ ...it, children: prune(it.children) }]));
+  const next = prune(items);
+  return next.length ? next : [createItem(makeId('i'))];
+}
+
+/**
+ * The selected items as plain text for other apps, exactly as highlighted: one per line in the
+ * order shown, indented two spaces per level below the least-indented selected item.
+ */
+export function selectionAsText(items: TodoItem[], ids: string[]): string {
+  const picked = new Set(ids);
+  const rows = displayOrder(items)
+    .filter((id) => picked.has(id))
+    .map((id) => findItem(items, id)!);
+  const top = Math.min(...rows.map((r) => r.depth));
+  return rows.map((r) => '  '.repeat(r.depth - top) + r.item.text).join('\n');
 }
 
 /** Copies with brand-new ids throughout, ready to paste. */

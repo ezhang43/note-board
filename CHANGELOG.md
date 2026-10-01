@@ -1,5 +1,10 @@
 # Changelog
 
+## Fixes: selecting, copying and Tab (2026-10-02)
+
+- Copy and cut now take exactly the items you highlighted. Before, highlighting an item copied everything under it too. The copied text keeps the items' levels relative to each other. Cut leaves any sub-item you didn't highlight in the list.
+- Shift+click now selects from the item you're typing in to the one you click. Before, it only extended a selection you had already made, so Tab then moved just one item.
+
 ## Copy items as text (2026-10-02)
 
 - Copying several selected checklist items (Ctrl+C or Ctrl+X) now also copies their text, one item per line (sub-items indented), so you can paste them into an email, a document or another app.

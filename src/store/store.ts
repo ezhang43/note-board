@@ -421,10 +421,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   }
 
   /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
-  function deleteSelectedItems(keepChildren = true): boolean {
+  function deleteSelectedItems(): boolean {
     const sel = state.ui.itemSel;
     if (!sel) return false;
-    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids, undefined, keepChildren)), {
+    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), {
       ui: { itemSel: null },
     });
     return true;
@@ -450,7 +450,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
     if (!itemClipboard.length) return false;
-    copyText(C.itemsAsText(itemClipboard));
+    copyText(C.selectionAsText(card.items, sel.ids));
     return true;
   }
 
@@ -797,17 +797,27 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     // ---------- selecting several checklist items ----------
     selectItemRange,
     /** Shift+click: extend the item selection to here. Returns false if there is no selection in this list to extend. */
-    extendItemSelection(cardId: string, to: string): boolean {
+    /**
+     * Shift+click: extend the item selection to `to`. With no selection in this list yet, the range
+     * starts from `from` (the item being typed in), if given.
+     */
+    extendItemSelection(cardId: string, to: string, from?: string | null): boolean {
       const sel = state.ui.itemSel;
-      if (!sel || sel.cardId !== cardId) return false;
-      selectItemRange(cardId, sel.anchor, to);
+      const anchor = sel?.cardId === cardId ? sel.anchor : from;
+      if (!anchor) return false;
+      selectItemRange(cardId, anchor, to);
       return true;
     },
     clearItemSelection: () => updateUi({ itemSel: null }),
     copyItems,
     deleteSelectedItems: () => deleteSelectedItems(),
-    /** Cut removes sub-items too, even under a blank item: they were copied along with it. */
-    cutItems: (): boolean => copyItems() && deleteSelectedItems(false),
+    /** Cut removes exactly what was copied: the selected items. Unselected sub-items stay, moving up a level. */
+    cutItems(): boolean {
+      const sel = state.ui.itemSel;
+      if (!sel || !copyItems()) return false;
+      commit((b) => C.editItems(b, sel.cardId, (items) => C.removeExactly(items, sel.ids)), { ui: { itemSel: null } });
+      return true;
+    },
     /** Pastes copied items right after the selected items, and selects the pasted ones. */
     pasteItems(): boolean {
       const sel = state.ui.itemSel;

@@ -165,9 +165,9 @@ describe('ticking and deleting', () => {
 });
 
 describe('copy and paste items', () => {
-  it('copies roots with their sub-items and pastes fresh copies after the selection', () => {
+  it('copies exactly the selected items (a2 was not selected) and pastes fresh copies after the selection', () => {
     const copied = C.copyItems(sample(), ['a', 'a1', 'b']);
-    expect(ids(copied)).toBe('a(a1 a2) b');
+    expect(ids(copied)).toBe('a(a1) b');
     const fresh = C.freshCopies(copied, makeId);
     expect(C.flatIds(fresh).some((id) => ['a', 'a1', 'a2', 'b'].includes(id))).toBe(false);
     const out = C.pasteItemsAfter(sample(), 'b', fresh);
@@ -302,9 +302,31 @@ describe('sub-items all ticked tick their item (owner request)', () => {
   });
 });
 
-describe('copied items as text (owner request)', () => {
-  it('puts each item on its own line, sub-items indented', () => {
-    const t = (text: string, children: TodoItem[] = []): TodoItem => ({ id: text, text, done: false, children });
-    expect(C.itemsAsText([t('Pack', [t('shoes'), t('coat', [t('scarf')])]), t('Leave')])).toBe('Pack\n  shoes\n  coat\n    scarf\nLeave');
+describe('copying and cutting exactly what is highlighted (owner request)', () => {
+  const t = (text: string, children: TodoItem[] = []): TodoItem => ({ id: text, text, done: false, children });
+  /*
+    Pack
+      shoes
+      coat
+        scarf
+    Leave
+  */
+  const list = () => [t('Pack', [t('shoes'), t('coat', [t('scarf')])]), t('Leave')];
+
+  it('copies only the selected sub-items, not the whole sub-list', () => {
+    expect(ids(C.copyItems(list(), ['Pack', 'shoes']))).toBe('Pack(shoes)');
+    expect(ids(C.copyItems(list(), ['scarf', 'Leave']))).toBe('scarf Leave');
+  });
+
+  it('as text: one per line in the order shown, indented relative to the least-indented one', () => {
+    expect(C.selectionAsText(list(), ['Pack', 'shoes'])).toBe('Pack\n  shoes');
+    expect(C.selectionAsText(list(), ['coat', 'scarf', 'Leave'])).toBe('  coat\n    scarf\nLeave');
+    expect(C.selectionAsText(list(), ['shoes', 'coat'])).toBe('shoes\ncoat');
+  });
+
+  it('cut removes exactly the selected items; unselected sub-items stay, moving up', () => {
+    expect(ids(C.removeExactly(list(), ['Pack', 'shoes']))).toBe('coat(scarf) Leave');
+    expect(ids(C.removeExactly(list(), ['coat']))).toBe('Pack(shoes scarf) Leave');
+    expect(C.removeExactly([t('a')], ['a'], makeId)).toHaveLength(1); // never empties the list
   });
 });

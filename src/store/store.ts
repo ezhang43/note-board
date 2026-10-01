@@ -42,9 +42,9 @@ export interface Resize {
   labelAt: Point;
 }
 
-/** A new card being dragged from the toolbar onto the board (it doesn't exist until dropped). */
+/** A new card or column being dragged from the toolbar onto the board (it doesn't exist until dropped). */
 export interface NewDrag {
-  kind: CardKind;
+  kind: CardKind | 'column';
   /** Pointer position in screen pixels from the canvas's top-left; null while off the board. */
   at: Point | null;
   /** The column the pointer is over (the card will go into it), if any. */
@@ -266,6 +266,13 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     requestSettle([place.type === 'column' ? place.columnId : card.id]);
   }
 
+  /** Adds a new column at a spot and selects it. */
+  function addNewColumn(at: Point) {
+    const col = { ...createColumn(), ...at };
+    commit((b) => B.addColumn(b, col), { ui: { selection: [col.id], itemSel: null } });
+    requestSettle([col.id]);
+  }
+
   /** Select the checklist items shown from `anchor` to `to` in one list. */
   function selectItemRange(cardId: string, anchor: string, to: string) {
     const card = state.board.cards[cardId];
@@ -275,10 +282,12 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   }
 
   /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
-  function deleteSelectedItems(): boolean {
+  function deleteSelectedItems(keepChildren = true): boolean {
     const sel = state.ui.itemSel;
     if (!sel) return false;
-    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } });
+    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids, undefined, keepChildren)), {
+      ui: { itemSel: null },
+    });
     return true;
   }
 
@@ -426,38 +435,42 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       addNewCard(kind, place);
     },
 
-    // ---------- dragging a new card from the toolbar ----------
-    startNewDrag: (kind: CardKind) => updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
+    /** Clicking New column. */
+    addColumn() {
+      addNewColumn(spotForNewBlock(state.board, COLUMN_W, NEW_BLOCK_H.column, screenCentre(), measured));
+    },
+
+    // ---------- dragging a new card or column from the toolbar ----------
+    startNewDrag: (kind: NewDrag['kind']) => updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
     /**
      * The pointer moved: `at` is where it is on the canvas (null when off the board), `boardAt` the
-     * same point in board coordinates. On empty board the card would appear with its top edge
-     * just above the pointer, at the nearest free spot.
+     * same point in board coordinates. On empty board the block would appear with its top edge
+     * just above the pointer, at the nearest free spot. A new card over a column goes into it;
+     * a new column can't, so it just lands at the nearest free spot.
      */
     moveNewDrag(at: Point | null, boardAt: Point | null, overColumn: string | null) {
       const d = state.ui.newDrag;
       if (!d) return;
+      const intoColumn = d.kind !== 'column' && at ? overColumn : null;
       let land: Rect | null = null;
-      if (at && boardAt && !overColumn) {
-        const size = { w: CARD_W, h: NEW_BLOCK_H[d.kind] };
+      if (at && boardAt && !intoColumn) {
+        const size = d.kind === 'column' ? { w: COLUMN_W, h: NEW_BLOCK_H.column } : { w: CARD_W, h: NEW_BLOCK_H[d.kind] };
         const snap = state.board.snap ? snapToGrid : Math.round;
         const spot = landingSpot(state.board, '', snap(boardAt.x - size.w / 2), snap(boardAt.y - 18), size, measured);
         land = { ...spot, ...size };
       }
-      updateUi({ newDrag: { ...d, at, overColumn: at ? overColumn : null, land } });
+      updateUi({ newDrag: { ...d, at, overColumn: intoColumn, land } });
     },
     cancelNewDrag: () => updateUi({ newDrag: null }),
-    /** Let go: the card goes into the column under the pointer (at `index`), or onto the board at the landing spot. */
+    /** Let go: a card goes into the column under the pointer (at `index`); otherwise the block goes at the landing spot. */
     dropNewDrag(index: number | null) {
       const d = state.ui.newDrag;
       updateUi({ newDrag: null });
       if (!d) return;
-      if (d.overColumn && index != null) addNewCard(d.kind, { type: 'column', columnId: d.overColumn, index });
+      if (d.kind === 'column') {
+        if (d.land) addNewColumn({ x: d.land.x, y: d.land.y });
+      } else if (d.overColumn && index != null) addNewCard(d.kind, { type: 'column', columnId: d.overColumn, index });
       else if (d.land) addNewCard(d.kind, { type: 'loose', x: d.land.x, y: d.land.y });
-    },
-    addColumn() {
-      const col = createColumn();
-      const spot = spotForNewBlock(state.board, col.w, NEW_BLOCK_H.column, screenCentre(), measured);
-      commit((b) => B.addColumn(b, { ...col, ...spot }), { ui: { selection: [col.id] } });
     },
 
     // ---------- editing ----------
@@ -519,9 +532,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       return true;
     },
     clearItemSelection: () => updateUi({ itemSel: null }),
-    deleteSelectedItems,
     copyItems,
-    cutItems: (): boolean => copyItems() && deleteSelectedItems(),
+    deleteSelectedItems: () => deleteSelectedItems(),
+    /** Cut removes sub-items too, even under a blank item: they were copied along with it. */
+    cutItems: (): boolean => copyItems() && deleteSelectedItems(false),
     /** Pastes copied items right after the selected items, and selects the pasted ones. */
     pasteItems(): boolean {
       const sel = state.ui.itemSel;

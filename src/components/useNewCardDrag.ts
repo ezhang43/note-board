@@ -5,10 +5,10 @@ import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, columnUnder, dropIndex, isOverCanvas } from './canvasDom';
 
 /**
- * Props for a toolbar Add button: a click adds the card as usual; pressing and dragging onto the
- * board (at least 5px) places it where it is let go instead.
+ * Props for a toolbar Add button: a click adds the card or column as usual; pressing and dragging
+ * onto the board (at least 5px) places it where it is let go instead.
  */
-export function useNewCardDrag(kind: CardKind) {
+export function useNewCardDrag(kind: CardKind | 'column') {
   // Set when a drag just happened, so the click that may follow it doesn't add a second card.
   const dragged = useRef(false);
 
@@ -51,7 +51,8 @@ export function useNewCardDrag(kind: CardKind) {
       dragged.current = false;
       return;
     }
-    appStore.addCard(kind);
+    if (kind === 'column') appStore.addColumn();
+    else appStore.addCard(kind);
   }
 
   return { onPointerDown, onClick };

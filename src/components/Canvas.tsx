@@ -6,7 +6,7 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 
-const NEW_CARD_LABEL = { note: 'New note', todo: 'New to-do list', link: 'New link' } as const;
+const NEW_CARD_LABEL = { note: 'New note', todo: 'New to-do list', link: 'New link', column: 'New column' } as const;
 
 /** Wheel deltas can be in pixels, lines or pages; turn them into pixels. */
 function wheelPixels(e: WheelEvent, pageHeight: number) {

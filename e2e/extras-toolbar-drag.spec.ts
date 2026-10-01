@@ -73,6 +73,30 @@ test('dragging onto a column puts the card into it at the pointer', async ({ pag
   await expect(looseCards(page)).toHaveCount(0);
 });
 
+test('New column can be dragged from the toolbar too; over another column it lands beside it', async ({ page }) => {
+  const canvas = await box(page.getByTestId('canvas'));
+  const button = await box(page.locator('header.toolbar').getByRole('button', { name: 'New column' }));
+  const drag = async (to: { x: number; y: number }, during?: () => Promise<void>) => {
+    await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 15 });
+    if (during) await during();
+    await page.mouse.up();
+  };
+  await drag({ x: canvas.x + 300, y: canvas.y + 150 }, async () => {
+    await expect(page.getByTestId('new-card-ghost')).toHaveText('New column');
+  });
+  await expect(columns(page)).toHaveCount(1);
+  const r = await box(columns(page).first());
+  expect(Math.abs(r.x + r.width / 2 - (canvas.x + 300))).toBeLessThan(25);
+
+  await drag({ x: r.x + r.width / 2, y: r.y + 60 }, async () => {
+    await expect(columns(page).first()).not.toHaveClass(/drop-target/);
+  });
+  await expect(columns(page)).toHaveCount(2);
+  await expectNoOverlaps(page);
+});
+
 test('letting go off the board adds nothing, and the whole drag is one undo step', async ({ page }) => {
   const tb = await box(page.locator('header.toolbar'));
   await dragFromToolbar(page, 'Note', { x: tb.x + 300, y: tb.y + 30 });

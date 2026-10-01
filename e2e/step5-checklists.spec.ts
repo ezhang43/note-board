@@ -115,6 +115,36 @@ test('grip and trash show on hover on every item; trash deletes the item with it
   expect(await texts(list)).toEqual(['']);
 });
 
+test('deleting a blank item keeps its sub-items with text, moving them up a level', async ({ page }) => {
+  const list = await makeList(page, ['first', 'parent', 'child one', 'child two']);
+  await rowWithText(list, 'child one').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'child two').getByLabel('Item text').press('Tab');
+  expect(await depthOf(rowWithText(list, 'child one'))).toBe(1);
+
+  // Clear the parent's text, then trash it: the children stay, one level up.
+  await rowWithText(list, 'parent').getByLabel('Item text').fill('');
+  const blankRow = rows(list).nth(1);
+  await blankRow.hover();
+  await blankRow.getByRole('button', { name: 'Delete item' }).click();
+  expect(await texts(list)).toEqual(['first', 'child one', 'child two']);
+  expect(await depthOf(rowWithText(list, 'child one'))).toBe(0);
+  expect(await depthOf(rowWithText(list, 'child two'))).toBe(0);
+
+  // Same with Backspace in a blank item that has sub-items.
+  await rowWithText(list, 'child two').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'child one').getByLabel('Item text').fill('');
+  await rows(list).nth(1).getByLabel('Item text').press('Backspace');
+  expect(await texts(list)).toEqual(['first', 'child two']);
+  expect(await depthOf(rowWithText(list, 'child two'))).toBe(0);
+  await expect(rowWithText(list, 'first').getByLabel('Item text')).toBeFocused();
+
+  // An item with text still takes its sub-items with it.
+  await rowWithText(list, 'child two').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'first').hover();
+  await rowWithText(list, 'first').getByRole('button', { name: 'Delete item' }).click();
+  expect(await texts(list)).toEqual(['']);
+});
+
 test('drag an item before another (teal line), and nested under one (drop to the right)', async ({ page }) => {
   const list = await makeList(page, ['one', 'two', 'three']);
   await clickEmpty(page);

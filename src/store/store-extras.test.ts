@@ -53,6 +53,23 @@ describe('dragging a new card from the toolbar', () => {
     expect(s.getState().ui.focusItem).not.toBeNull(); // cursor goes into the new list's item
   });
 
+  it('a new column can be dragged too, but never goes inside another column', () => {
+    const s = store();
+    s.addColumn();
+    const first = s.getState().ui.selection[0];
+    s.setMeasuredHeight(first, 220);
+    const c = s.getState().board.columns[first];
+    s.startNewDrag('column');
+    s.moveNewDrag({ x: 1, y: 1 }, { x: c.x + 100, y: c.y + 40 }, first);
+    const d = s.getState().ui.newDrag!;
+    expect(d.overColumn).toBeNull();
+    expect(overlaps(d.land!, { x: c.x, y: c.y, w: c.w, h: 220 }, BLOCK_GAP)).toBe(false);
+    s.dropNewDrag(0);
+    expect(s.getState().board.order).toHaveLength(2);
+    const made = s.getState().board.columns[s.getState().ui.selection[0]];
+    expect(made).toMatchObject({ title: 'New column', x: d.land!.x, y: d.land!.y, cardIds: [] });
+  });
+
   it('let go off the board: nothing is added', () => {
     const s = store();
     s.startNewDrag('link');

@@ -125,28 +125,52 @@ export function outdentItem(items: TodoItem[], id: string): TodoItem[] | null {
   return next;
 }
 
+const isBlank = (it: TodoItem) => it.text.trim() === '';
+
+/** True if any of these items, or anything nested under them, has text. */
+function anyText(items: TodoItem[]): boolean {
+  return items.some((it) => !isBlank(it) || anyText(it.children));
+}
+
+/**
+ * Removes one item from a (cloned) list, in place. Normally its sub-items go with it; but when the
+ * item itself is blank and something under it has text, its sub-items are kept and move up one
+ * level into its place (owner's rule), unless `keepChildren` is false.
+ */
+function removeItemInPlace(items: TodoItem[], id: string, keepChildren = true) {
+  const loc = findItem(items, id);
+  if (!loc) return;
+  const promote = keepChildren && isBlank(loc.item) && anyText(loc.item.children);
+  loc.list.splice(loc.index, 1, ...(promote ? loc.item.children : []));
+}
+
 /**
  * Backspace in an empty item deletes it, and the cursor goes to the item shown above it.
- * Not for the list's last item, or an item with sub-items.
+ * Its sub-items stay (moving up a level) if any of them has text; otherwise they go too.
+ * Never empties the list: a list's last item can't be deleted this way.
  */
 export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoItem[]; focus: string | null } | null {
   const loc = findItem(items, id);
-  if (!loc || loc.item.text !== '' || loc.item.children.length || flatIds(items).length <= 1) return null;
-  const order = displayOrder(items);
-  const focus = order[order.indexOf(id) - 1] ?? order[order.indexOf(id) + 1] ?? null;
+  if (!loc || loc.item.text !== '') return null;
   const next = cloned(items);
-  const again = findItem(next, id)!;
-  again.list.splice(again.index, 1);
+  removeItemInPlace(next, id);
+  if (!next.length) return null;
+  const order = displayOrder(items);
+  const at = order.indexOf(id);
+  const left = new Set(flatIds(next));
+  // The nearest item above that is still there; failing that, the nearest one below.
+  const focus = order.slice(0, at).reverse().find((x) => left.has(x)) ?? order.slice(at + 1).find((x) => left.has(x)) ?? null;
   return { items: next, focus };
 }
 
-/** Deletes items and everything nested under them. An emptied list gets one blank item. */
-export function deleteItems(items: TodoItem[], ids: string[], makeId: MakeId = newId): TodoItem[] {
+/**
+ * Deletes items and everything nested under them (except that a blank item's sub-items with text
+ * are kept, moving up a level; pass keepChildren = false to remove them too, e.g. when cutting).
+ * An emptied list gets one blank item.
+ */
+export function deleteItems(items: TodoItem[], ids: string[], makeId: MakeId = newId, keepChildren = true): TodoItem[] {
   const next = cloned(items);
-  for (const id of ids) {
-    const loc = findItem(next, id);
-    if (loc) loc.list.splice(loc.index, 1);
-  }
+  for (const id of ids) removeItemInPlace(next, id, keepChildren);
   return next.length ? next : [createItem(makeId('i'))];
 }
 

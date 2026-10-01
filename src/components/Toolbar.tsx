@@ -16,6 +16,17 @@ function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   );
 }
 
+/** New column: click to add, or press and drag onto the board to place it. */
+function NewColumnButton() {
+  const drag = useNewCardDrag('column');
+  return (
+    <button type="button" className="tb-button add-column" title="Click to add a column, or drag it onto the board" {...drag}>
+      <PlusIcon />
+      New column
+    </button>
+  );
+}
+
 /** Colour button: recolours the selected block(s). Faded while nothing is selected. */
 function ColourControl() {
   const count = useAppState((s) => s.ui.selection.length);
@@ -139,10 +150,7 @@ export function Toolbar() {
       <AddCardButton kind="note" label="Note" />
       <AddCardButton kind="todo" label="To-do list" />
       <AddCardButton kind="link" label="Link" />
-      <button type="button" className="tb-button add-column" onClick={appStore.addColumn}>
-        <PlusIcon />
-        New column
-      </button>
+      <NewColumnButton />
     </header>
   );
 }

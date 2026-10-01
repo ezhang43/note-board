@@ -78,10 +78,65 @@ describe('Enter, Tab, Shift+Tab, Backspace', () => {
     expect(C.removeEmptyItem(list, 'empty')).toEqual({ items: [item('a'), item('b')], focus: 'a' });
   });
 
-  it("Backspace keeps a list's last item, items with text, and items with sub-items", () => {
+  it("Backspace keeps a list's last item and items with text", () => {
     expect(C.removeEmptyItem([{ ...item('only'), text: '' }], 'only')).toBeNull();
     expect(C.removeEmptyItem(sample(), 'b')).toBeNull();
-    expect(C.removeEmptyItem([{ ...item('p', [item('c')]), text: '' }, item('q')], 'p')).toBeNull();
+  });
+
+  it('Backspace in a blank item keeps its sub-items with text, moving them up a level', () => {
+    const list = [item('a'), { ...item('p', [item('c1', [item('c1x')]), item('c2')]), text: '' }, item('q')];
+    const out = C.removeEmptyItem(list, 'p')!;
+    expect(ids(out.items)).toBe('a c1(c1x) c2 q');
+    expect(out.items.find((i) => i.id === 'c1')!.text).toBe('c1');
+    expect(out.focus).toBe('a');
+  });
+
+  it('Backspace in a blank first item with sub-items puts the cursor on the first kept sub-item', () => {
+    const out = C.removeEmptyItem([{ ...item('p', [item('c')]), text: '' }], 'p')!;
+    expect(ids(out.items)).toBe('c');
+    expect(out.focus).toBe('c');
+  });
+});
+
+describe('deleting a blank item that has sub-items (owner rule)', () => {
+  const blank = (id: string, children: TodoItem[], done = false) => ({ ...item(id, children, done), text: '  ' });
+
+  it('trash on a blank item keeps its sub-items with text, one level up, in its place', () => {
+    const list = [item('a'), blank('p', [item('c1'), item('c2', [item('c2x')])]), item('b')];
+    expect(ids(C.deleteItems(list, ['p'], makeId))).toBe('a c1 c2(c2x) b');
+  });
+
+  it('a nested blank item hands its sub-items to its own parent', () => {
+    const list = [item('top', [blank('p', [item('c')]), item('s')])];
+    expect(ids(C.deleteItems(list, ['p'], makeId))).toBe('top(c s)');
+  });
+
+  it('sub-items keep their text and ticks', () => {
+    const list = [blank('p', [item('c1', [], true), item('c2')])];
+    const out = C.deleteItems(list, ['p'], makeId);
+    expect(out.map((i) => [i.text, i.done])).toEqual([
+      ['c1', true],
+      ['c2', false],
+    ]);
+  });
+
+  it('if nothing under a blank item has text, everything goes as before', () => {
+    const list = [item('a'), blank('p', [blank('c', [blank('d', [])])])];
+    expect(ids(C.deleteItems(list, ['p'], makeId))).toBe('a');
+  });
+
+  it('an item with text still deletes everything under it', () => {
+    expect(ids(C.deleteItems(sample(), ['a'], makeId))).toBe('b c(c1)');
+  });
+
+  it('selected sub-items are deleted along with their blank parent', () => {
+    const list = [blank('p', [item('c1'), item('c2')]), item('b')];
+    expect(ids(C.deleteItems(list, ['p', 'c1'], makeId))).toBe('c2 b');
+  });
+
+  it('cutting removes the sub-items too (they were copied with the parent)', () => {
+    const list = [blank('p', [item('c1')]), item('b')];
+    expect(ids(C.deleteItems(list, ['p'], makeId, false))).toBe('b');
   });
 });
 

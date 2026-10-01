@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BOARD_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
 import { screenToBoard } from '../model/view';
-import { createStore, VIEW_SAVE_DELAY } from './store';
+import { BOARD_SAVE_DELAY, createStore, VIEW_SAVE_DELAY } from './store';
 
 function memoryStorage(): StorageLike & { data: Record<string, string> } {
   const data: Record<string, string> = {};
@@ -18,12 +18,15 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('store', () => {
-  it('saves board changes straight away and loads them in a new session', () => {
+  it('saves board changes a moment after they stop, as one write, and loads them in a new session', () => {
     const storage = memoryStorage();
+    const writes = vi.spyOn(storage, 'setItem');
     const a = createStore(storage);
     a.renameBoard('Trip');
     a.toggleSnap();
-    expect(storage.data[BOARD_KEY]).toBeDefined();
+    expect(storage.data[BOARD_KEY]).toBeUndefined();
+    vi.advanceTimersByTime(BOARD_SAVE_DELAY);
+    expect(writes.mock.calls.filter(([k]) => k === BOARD_KEY)).toHaveLength(1);
     expect(createStore(storage).getState().board).toMatchObject({ name: 'Trip', snap: false });
   });
 
@@ -93,5 +96,33 @@ describe('store', () => {
     expect(s.getState().view.zoom).toBe(1);
     expect(after.x).toBeCloseTo(before.x);
     expect(after.y).toBeCloseTo(before.y);
+  });
+});
+
+describe('saving the board on the way out', () => {
+  it('flush saves a waiting board change straight away', () => {
+    const storage = memoryStorage();
+    const a = createStore(storage);
+    a.renameBoard('Closing');
+    a.flush();
+    expect(JSON.parse(storage.data[BOARD_KEY]).board.name).toBe('Closing');
+  });
+});
+
+describe('dragging', () => {
+  it('moving within the same grid square keeps the same preview (no clean-up rerun)', () => {
+    const s = createStore(null, (fn) => fn());
+    s.setViewportSize({ width: 1200, height: 800 });
+    s.addCard('note');
+    s.addCard('note');
+    const id = s.getState().ui.selection[0];
+    const card = s.getState().board.cards[id];
+    s.startDrag('card', id, card.x, card.y);
+    s.moveDrag(card.x - 300, card.y, null);
+    const before = s.getState().ui.drag!;
+    s.moveDrag(card.x - 299, card.y + 1, null);
+    const after = s.getState().ui.drag!;
+    expect(after.x).toBe(card.x - 299);
+    expect(after.bumped).toBe(before.bumped);
   });
 });

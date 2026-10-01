@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { TodoCard, TodoItem } from '../model/types';
@@ -54,7 +54,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
   );
 }
 
-function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
+const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
   const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
@@ -130,7 +130,7 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       </button>
     </div>
   );
-}
+});
 
 /** The cursor is at the very end of the text, with nothing selected. */
 function atEnd(el: HTMLTextAreaElement) {

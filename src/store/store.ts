@@ -2,12 +2,11 @@ import * as B from '../model/board';
 import { createCard, createColumn, createItem, newId } from '../model/cards';
 import * as C from '../model/checklist';
 import type { ItemDrop } from '../model/checklist';
-import { snapToGrid } from '../model/geometry';
+import { overlaps, snapIf } from '../model/geometry';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../model/clipboard';
 import { BLOCK_GAP, CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
 import { emptyHistory, recordChange, redo, undo, type History } from '../model/history';
 import { blockRect, blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
-import { overlaps } from '../model/geometry';
 import type { ColorKey } from '../model/palette';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../model/completed';
 import { addImported, estimateHeight, packInLanes, parseMilanote, placeCards } from '../model/milanote';
@@ -131,6 +130,8 @@ export interface AppState {
 
 /** Wait this long after the last pan/zoom before saving it, so scrolling doesn't write on every frame. */
 export const VIEW_SAVE_DELAY = 250;
+/** Wait this long after the last board change before saving, so typing doesn't save on every key. */
+export const BOARD_SAVE_DELAY = 150;
 /** How long a ticked item takes to leave for the Completed section, and to settle in there (ms). */
 export const COMPLETE_LEAVE_MS = 280;
 export const COMPLETE_ARRIVE_MS = 450;
@@ -195,6 +196,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   };
   const listeners = new Set<() => void>();
   let viewTimer: ReturnType<typeof setTimeout> | null = null;
+  let boardTimer: ReturnType<typeof setTimeout> | null = null;
   let viewportSize: Size = { width: 0, height: 0 };
   /** Last drawn heights of blocks, in board pixels. Not state: nothing re-renders when they change. */
   const heights = new Map<string, number>();
@@ -216,6 +218,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   const pushedBy = new Map<string, Map<string, { from: Point; to: Point }>>();
   /** The block just expanded, while its growth may still push others aside. */
   let expanding: { id: string; until: number } | null = null;
+  /** The last drag preview, kept while the pointer stays over the same grid spot. */
+  let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
   let applyingTick = false;
   /** A tick waiting for its leaving animation to finish before it is applied. */
   let pendingTick: { timer: ReturnType<typeof setTimeout>; apply: () => void } | null = null;
@@ -244,11 +248,21 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     write(VIEW_KEY, serializeView(state.view));
   }
 
+  function flushBoard() {
+    if (!boardTimer) return;
+    clearTimeout(boardTimer);
+    boardTimer = null;
+    write(BOARD_KEY, serializeBoard(state.board));
+  }
+
   function set(next: AppState) {
     if (next.board === state.board && next.view === state.view && next.ui === state.ui) return;
     const prev = state;
     state = next;
-    if (next.board !== prev.board) write(BOARD_KEY, serializeBoard(next.board));
+    if (next.board !== prev.board) {
+      if (boardTimer) clearTimeout(boardTimer);
+      boardTimer = setTimeout(flushBoard, BOARD_SAVE_DELAY);
+    }
     if (next.view.panX !== prev.view.panX || next.view.panY !== prev.view.panY || next.view.zoom !== prev.view.zoom) {
       if (viewTimer) clearTimeout(viewTimer);
       viewTimer = setTimeout(flushView, VIEW_SAVE_DELAY);
@@ -370,8 +384,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
    * the card takes the nearest free spot instead. `at` is where the dragged block ends up.
    */
   function dropResult(d: Drag): { board: Board; ids: string[]; at: Point } {
-    const snap = state.board.snap ? snapToGrid : (v: number) => v;
-    const target = { x: snap(d.x), y: snap(d.y) };
+    const target = { x: snapIf(state.board.snap, d.x), y: snapIf(state.board.snap, d.y) };
     const ids = [d.id, ...d.group];
     let b = state.board;
     let anchors = ids;
@@ -516,7 +529,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       };
     },
     /** Saves any pending pan/zoom now (used when the page is closed). */
-    flush: flushView,
+    flush() {
+      flushBoard();
+      flushView();
+    },
     setViewportSize(size: Size) {
       viewportSize = size;
     },
@@ -705,8 +721,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       let land: Rect | null = null;
       if (at && boardAt && !intoColumn) {
         const size = d.kind === 'column' ? { w: COLUMN_W, h: NEW_BLOCK_H.column } : { w: CARD_W, h: NEW_BLOCK_H[d.kind] };
-        const snap = state.board.snap ? snapToGrid : Math.round;
-        const spot = landingSpot(state.board, '', snap(boardAt.x - size.w / 2), snap(boardAt.y - 18), size, measured);
+        const at = (v: number) => snapIf(state.board.snap, v);
+        const spot = landingSpot(state.board, '', at(boardAt.x - size.w / 2), at(boardAt.y - 18), size, measured);
         land = { ...spot, ...size };
       }
       updateUi({ newDrag: { ...d, at, overColumn: intoColumn, land } });
@@ -893,9 +909,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (!h) return updateUi({ itemDrag: null });
       const keep = d.roots.length > 1 ? d.allIds : null;
       if ('newList' in h) {
-        const snap = state.board.snap ? snapToGrid : Math.round;
         const id = newId('k');
-        commit((b) => C.moveItems(b, d.cardId, d.roots, { newList: { id, x: snap(h.newList.x), y: snap(h.newList.y) } }), {
+        const at = (v: number) => snapIf(state.board.snap, v);
+        commit((b) => C.moveItems(b, d.cardId, d.roots, { newList: { id, x: at(h.newList.x), y: at(h.newList.y) } }), {
           ui: { itemDrag: null, itemSel: null, selection: [id] },
         });
         return requestSettle([id]);
@@ -987,6 +1003,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const topLevel = state.board.order.includes(id);
       // A selected block dragged together with other selected blocks moves them all.
       const group = topLevel && sel.includes(id) ? sel.filter((s) => s !== id && state.board.order.includes(s)) : [];
+      dragPreview = null;
       updateUi({ drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {} }, confirm: null });
     },
     moveDrag(x: number, y: number, overColumn: string | null) {
@@ -995,17 +1012,28 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       // Several blocks move as one: they don't drop into columns.
       const over = d.group.length ? null : overColumn;
       if (d.x === x && d.y === y && d.overColumn === over) return;
-      if (over) return updateUi({ drag: { ...d, x, y, overColumn: over, land: null, bumped: {} } });
+      if (over) {
+        dragPreview = null;
+        return updateUi({ drag: { ...d, x, y, overColumn: over, land: null, bumped: {} } });
+      }
       // The block follows the pointer exactly. It will land on the grid spot under it (dashed
       // outline), and takes priority there: blocks in the way are shown moving aside right away.
-      const result = dropResult({ ...d, x, y });
-      const bumped: Record<string, Point> = {};
-      for (const id of result.board.order) {
-        const was = state.board.columns[id] ?? state.board.cards[id];
-        const now = result.board.columns[id] ?? result.board.cards[id];
-        if (!result.ids.includes(id) && (was.x !== now.x || was.y !== now.y)) bumped[id] = { x: now.x, y: now.y };
+      // Within the same grid spot the preview is unchanged, so it isn't worked out again.
+      const tx = snapIf(state.board.snap, x);
+      const ty = snapIf(state.board.snap, y);
+      const p = dragPreview;
+      if (!p || p.board !== state.board || p.tx !== tx || p.ty !== ty) {
+        const result = dropResult({ ...d, x, y });
+        const bumped: Record<string, Point> = {};
+        for (const id of result.board.order) {
+          const was = state.board.columns[id] ?? state.board.cards[id];
+          const now = result.board.columns[id] ?? result.board.cards[id];
+          if (!result.ids.includes(id) && (was.x !== now.x || was.y !== now.y)) bumped[id] = { x: now.x, y: now.y };
+        }
+        dragPreview = { board: state.board, tx, ty, at: result.at, bumped };
       }
-      const land = !d.group.length && (result.at.x !== x || result.at.y !== y) ? { ...result.at, ...draggedSize(d) } : null;
+      const { at, bumped } = dragPreview!;
+      const land = !d.group.length && (at.x !== x || at.y !== y) ? { ...at, ...draggedSize(d) } : null;
       updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped } });
     },
     cancelDrag() {

@@ -1,5 +1,5 @@
 import { addCard, updateCard } from './board';
-import { createItem, newId } from './cards';
+import { createItem, newId, type MakeId } from './cards';
 import type { Board, TodoCard, TodoItem } from './types';
 
 // Checklist rules. Every function returns new data and never changes what it is given.
@@ -9,7 +9,10 @@ import type { Board, TodoCard, TodoItem } from './types';
 /** Deepest level an item can be at (0 = top level), so 6 levels in all. */
 export const MAX_DEPTH = 5;
 
-type MakeId = (prefix: string) => string;
+/** A list always has something to type in: an emptied list gets one blank item. */
+export function refill(items: TodoItem[], makeId: MakeId = newId): TodoItem[] {
+  return items.length ? items : [createItem(makeId('i'))];
+}
 
 export interface ItemLocation {
   /** The list the item is in (the card's items, or its parent's children). */
@@ -210,7 +213,7 @@ export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoIte
 export function deleteItems(items: TodoItem[], ids: string[], makeId: MakeId = newId, keepChildren = true): TodoItem[] {
   const next = cloned(items);
   for (const id of ids) removeItemInPlace(next, id, keepChildren);
-  return next.length ? next : [createItem(makeId('i'))];
+  return refill(next, makeId);
 }
 
 /** The items an item is nested in, outermost first. */
@@ -264,8 +267,7 @@ export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId =
   const picked = new Set(ids);
   const prune = (list: TodoItem[]): TodoItem[] =>
     list.flatMap((it) => (picked.has(it.id) ? prune(it.children) : [{ ...it, children: prune(it.children) }]));
-  const next = prune(items);
-  return next.length ? next : [createItem(makeId('i'))];
+  return refill(prune(items), makeId);
 }
 
 /**
@@ -364,7 +366,6 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
   if (!src || src.kind !== 'todo') return board;
   const { rest, moving } = extractItems(src.items, rootIds);
   if (!moving.length) return board;
-  const refill = (list: TodoItem[]) => (list.length ? list : [createItem(makeId('i'))]);
 
   if ('newList' in to) {
     const card: TodoCard = {
@@ -380,7 +381,7 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
       items: moving,
       completedOpen: true,
     };
-    const b = editItems(board, fromCardId, () => refill(rest));
+    const b = editItems(board, fromCardId, () => refill(rest, makeId));
     return addCard(b, card, { type: 'loose', x: card.x, y: card.y });
   }
 
@@ -392,5 +393,5 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
   if (!dst || dst.kind !== 'todo') return board;
   const items = insertItems(dst.items, to.drop, moving);
   if (!items) return board;
-  return editItems(editItems(board, fromCardId, () => refill(rest)), to.cardId, () => items);
+  return editItems(editItems(board, fromCardId, () => refill(rest, makeId)), to.cardId, () => items);
 }

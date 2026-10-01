@@ -1,5 +1,5 @@
 import { addCard } from './board';
-import { createCard, createItem, newId } from './cards';
+import { createCard, createItem, newId, type MakeId } from './cards';
 import { MAX_DEPTH } from './checklist';
 import { CARD_W, GRID, NEW_BLOCK_H } from './constants';
 import { snapToGrid } from './geometry';
@@ -14,8 +14,6 @@ import type { Board, Card, Point, TodoItem } from './types';
 //   between items starts a new list with no title.
 // - Any other text becomes a note; text that is only a web address becomes a link card (titled
 //   by a heading right above it).
-
-type MakeId = (prefix: string) => string;
 
 const ITEM = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
 // Closing #s only count after a space ("## Learn C#" keeps its #); a bare "##" has an empty title.

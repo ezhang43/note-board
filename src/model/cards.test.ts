@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapsedPreview, countItems, createCard, domainOf, hrefOf } from './cards';
+import { collapsedPreview, createCard, domainOf, hrefOf } from './cards';
 import type { LinkCard, NoteCard, TodoCard, TodoItem } from './types';
 
 const item = (done: boolean, children: TodoItem[] = []): TodoItem => ({ id: Math.random().toString(), text: 'x', done, children });
@@ -22,12 +22,6 @@ describe('links', () => {
   });
 });
 
-describe('to-do counts', () => {
-  it('counts nested items too', () => {
-    const items = [item(true), item(false, [item(true), item(false)]), item(true)];
-    expect(countItems(items)).toEqual({ total: 5, done: 3 });
-  });
-});
 
 describe('collapsed preview', () => {
   it('shows the first line of a note', () => {

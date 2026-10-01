@@ -250,15 +250,7 @@ export function setItemText(board: Board, cardId: string, itemId: string, text: 
   return updateItem(board, cardId, itemId, (it) => (it.text === text ? it : { ...it, text }));
 }
 
-export function toggleItemDone(board: Board, cardId: string, itemId: string): Board {
-  return updateItem(board, cardId, itemId, (it) => ({ ...it, done: !it.done }));
-}
-
 // ---------- reading ----------
-
-export function isColumn(board: Board, id: string): boolean {
-  return id in board.columns;
-}
 
 /**
  * Problems with the "every card in exactly one place" rule. Empty when the board is healthy.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnAt, freeSpot, insertIndex, overlaps, snapToGrid } from './geometry';
+import { columnAt, freeSpot, insertIndex, overlaps, snapIf, snapToGrid } from './geometry';
 
 describe('snapping', () => {
   it('rounds to the nearest 20px', () => {
@@ -67,5 +67,12 @@ describe('dropping into columns', () => {
     expect(insertIndex(250, middles)).toBe(2);
     expect(insertIndex(999, middles)).toBe(3);
     expect(insertIndex(10, [])).toBe(0);
+  });
+});
+
+describe('snapping only when it is on', () => {
+  it('snaps to the grid when on, and rounds to whole pixels when off', () => {
+    expect(snapIf(true, 33)).toBe(40);
+    expect(snapIf(false, 33.4)).toBe(33);
   });
 });

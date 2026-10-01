@@ -5,6 +5,11 @@ export function snapToGrid(v: number): number {
   return Math.round(v / GRID) * GRID;
 }
 
+/** On the grid when snapping is on; otherwise just whole pixels. */
+export function snapIf(on: boolean, v: number): number {
+  return on ? snapToGrid(v) : Math.round(v);
+}
+
 /** True when the rectangles overlap or are closer than `gap` to each other. */
 export function overlaps(a: Rect, b: Rect, gap = 0): boolean {
   return a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;

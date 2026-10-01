@@ -4,6 +4,9 @@ import { COLUMN_W } from './constants';
 
 export const DEFAULT_COLOR: Record<CardKind, ColorKey> = { note: 'butter', todo: 'mint', link: 'sky' };
 
+/** Makes a new id with the given prefix (tests pass a predictable one). */
+export type MakeId = (prefix: string) => string;
+
 export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
 }
@@ -26,19 +29,6 @@ export function createCard(kind: CardKind, id = newId('k')): Card {
 
 export function createColumn(id = newId('c')): Column {
   return { id, title: 'New column', x: 0, y: 0, w: COLUMN_W, h: null, color: null, collapsed: false, cardIds: [] };
-}
-
-export function countItems(items: TodoItem[]): { total: number; done: number } {
-  let total = 0;
-  let done = 0;
-  for (const it of items) {
-    total += 1;
-    if (it.done) done += 1;
-    const c = countItems(it.children);
-    total += c.total;
-    done += c.done;
-  }
-  return { total, done };
 }
 
 /** The address a link opens. Only http(s) links are ever opened; bare addresses get https://. */

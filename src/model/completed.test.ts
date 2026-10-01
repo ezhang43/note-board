@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createCard, createColumn } from './cards';
+import { editItems } from './checklist';
 import { copyBlocks } from './clipboard';
 import { cleanUp, completedCardOf, dayKey, dayLabel, hasTickedItems, restoreEntry } from './completed';
 import { parseBoard, serializeBoard } from './persist';
@@ -78,7 +79,9 @@ describe('Clean up', () => {
 
 /** Tick one item in a list. */
 function C_tick(b: Board, cardId: string, itemId: string): Board {
-  return B.toggleItemDone(b, cardId, itemId);
+  const flip = (items: TodoItem[]): TodoItem[] =>
+    items.map((i) => (i.id === itemId ? { ...i, done: !i.done } : { ...i, children: flip(i.children) }));
+  return editItems(b, cardId, flip);
 }
 
 describe('unticking in the Completed card', () => {

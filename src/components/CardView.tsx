@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react';
+import { memo, useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
 import { CARD_W } from '../model/constants';
 import { dayLabel } from '../model/completed';
@@ -16,7 +16,7 @@ import { useMeasuredHeight } from './useMeasure';
 const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed' } as const;
 
 /** A note, to-do list or link card, either loose on the board or inside a column. */
-export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
+export const CardView = memo(function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const card = useAppState((s) => s.board.cards[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
   const theme = useAppState((s) => s.view.theme);
@@ -93,7 +93,7 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
       )}
     </article>
   );
-}
+});
 
 function CardBody({ card }: { card: Card }) {
   switch (card.kind) {

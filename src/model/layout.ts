@@ -1,5 +1,5 @@
 import { BLOCK_GAP, BLOCK_MIN_H, CARD_MIN_W, CARD_W, COLUMN_MIN_W, GRID, NEW_BLOCK_H } from './constants';
-import { freeSpot, overlaps, snapToGrid } from './geometry';
+import { freeSpot, overlaps, snapIf, snapToGrid } from './geometry';
 import type { Board, Point, Rect } from './types';
 
 /** Height of a block as last drawn on screen, in board pixels (undefined if not drawn yet). */
@@ -40,7 +40,7 @@ export function blocksTouching(board: Board, rect: Rect, measured: MeasuredHeigh
 export function spotForNewBlock(board: Board, w: number, h: number, centre: Point, measured: MeasuredHeight): Point {
   const x = centre.x - w / 2;
   const y = centre.y - h / 2;
-  const start = board.snap ? { x: snapToGrid(x), y: snapToGrid(y) } : { x: Math.round(x), y: Math.round(y) };
+  const start = { x: snapIf(board.snap, x), y: snapIf(board.snap, y) };
   return freeSpot({ ...start, w, h }, topLevelRects(board, measured), BLOCK_GAP, stepFor(board));
 }
 

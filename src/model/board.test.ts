@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createCard, createColumn } from './cards';
+import { editItems, setItemsDone } from './checklist';
 import type { Board, TodoCard } from './types';
 
 /** Board with column c1 holding cards a, b, c (top to bottom), empty column c2, and loose card z. */
@@ -163,7 +164,7 @@ describe('collapse, colour and edit', () => {
     const nested = { id: 'n', text: 'inner', done: false, children: [] };
     b = B.updateCard(b, 't', () => ({ ...t, items: [{ ...t.items[0], children: [nested] }] }));
     b = B.setItemText(b, 't', 'n', 'changed');
-    b = B.toggleItemDone(b, 't', 'n');
+    b = editItems(b, 't', (items) => setItemsDone(items, ['n'], true));
     const inner = (b.cards.t as TodoCard).items[0].children[0];
     expect(inner).toMatchObject({ text: 'changed', done: true });
   });

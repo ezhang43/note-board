@@ -1,13 +1,12 @@
 import { addCard, type Placement } from './board';
-import { createItem, newId } from './cards';
-import { MAX_DEPTH, editItems, findItem, setItemsDone, subtreeHeight } from './checklist';
+import { newId, type MakeId } from './cards';
+import { MAX_DEPTH, editItems, findItem, refill, setItemsDone, subtreeHeight } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
 // Completed card, grouped by the day Clean up was clicked. The Completed card is never deleted.
 // Unticking an item there sends it back to the list it came from.
 
-type MakeId = (prefix: string) => string;
 
 /** The day as "YYYY-MM-DD", in local time. */
 export function dayKey(d: Date): string {
@@ -73,7 +72,7 @@ export function cleanUp(board: Board, day: string, place: Placement, makeId: Mak
     const { rest, taken } = takeTicked(card.items, null);
     if (!taken.length) continue;
     for (const t of taken) entries.push({ item: t.item, fromCardId: id, fromTitle: card.title, fromParentId: t.parentId });
-    b = editItems(b, id, () => (rest.length ? rest : [createItem(makeId('i'))]));
+    b = editItems(b, id, () => refill(rest, makeId));
   }
   if (!entries.length) return { board, count: 0, cardId: completedCardOf(board)?.id ?? null };
 

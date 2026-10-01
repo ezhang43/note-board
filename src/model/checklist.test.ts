@@ -341,3 +341,11 @@ describe('pasting items never goes past 6 levels', () => {
     expect(ids(out)).toBe('a(b(c(d(e(f) x(y)))))');
   });
 });
+
+describe('an emptied list', () => {
+  it('gets one blank item to type in', () => {
+    expect(C.refill([], makeId)).toMatchObject([{ text: '', done: false, children: [] }]);
+    const kept = [item('a')];
+    expect(C.refill(kept, makeId)).toBe(kept);
+  });
+});

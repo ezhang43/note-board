@@ -1,6 +1,7 @@
 import { addCard as addCardAt, addColumn, columnOf, type Placement } from './board';
-import { newId } from './cards';
-import type { Board, Card, Column, TodoItem } from './types';
+import { newId, type MakeId } from './cards';
+import { freshCopies } from './checklist';
+import type { Board, Card, Column } from './types';
 
 /** How far each paste is offset from the copied blocks (and from the previous paste). */
 export const PASTE_OFFSET = 40;
@@ -36,13 +37,9 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
   return entries;
 }
 
-function freshItems(items: TodoItem[], makeId: (p: string) => string): TodoItem[] {
-  return items.map((it) => ({ ...it, id: makeId('i'), children: freshItems(it.children, makeId) }));
-}
-
-function freshCard(card: Card, makeId: (p: string) => string): Card {
+function freshCard(card: Card, makeId: MakeId): Card {
   const copy = { ...structuredClone(card), id: makeId('k') };
-  return copy.kind === 'todo' ? { ...copy, items: freshItems(copy.items, makeId) } : copy;
+  return copy.kind === 'todo' ? { ...copy, items: freshCopies(copy.items, makeId) } : copy;
 }
 
 /**

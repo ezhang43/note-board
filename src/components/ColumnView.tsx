@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react';
+import { memo, useRef, type CSSProperties } from 'react';
 import { swatchFor } from '../model/theme';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
@@ -10,7 +10,7 @@ import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
 /** A column: a titled stack of cards. */
-export function ColumnView({ id }: { id: string }) {
+export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const col = useAppState((s) => s.board.columns[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
   const theme = useAppState((s) => s.view.theme);
@@ -130,4 +130,4 @@ export function ColumnView({ id }: { id: string }) {
       )}
     </section>
   );
-}
+});

@@ -1,5 +1,15 @@
 # Changelog
 
+## Tidy-up and speed (2026-10-02)
+
+Nothing should look or work differently; this makes big boards smoother and the code simpler.
+
+- The board is saved a moment (0.15s) after you stop changing it, instead of on every key press. It is also saved straight away when the window is hidden or closed.
+- Dragging a block works out where everything goes only when it reaches a new grid spot, not on every mouse movement.
+- Panning and zooming no longer redraw every card and checklist item.
+- All colours in the stylesheet are now named colour settings, defined once.
+- Removed unused code and merged repeated helpers (copying items, snapping, refilling an emptied list).
+
 ## Paste, import and keyboard fixes from the code review (2026-10-02)
 
 - Pasting checklist items never makes them deeper than 6 levels: if there is no room, they go after the nearest item higher up.

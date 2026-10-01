@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, box, clickEmpty, columns, dragPointer, freshBoardEachTest, grabPoint, looseCards } from './helpers';
 
-// Owner's additions: arrow keys move through cards in a column; Ctrl+arrows jump card to card.
+// Owner's additions: arrow keys move through cards in a column; Alt+arrows jump card to card.
 
 freshBoardEachTest();
 
@@ -68,7 +68,7 @@ test('collapsed cards are skipped; a loose card stays put at its last field', as
   await expect(loose.getByLabel('Note text')).toBeFocused();
 });
 
-test('Ctrl + arrows jump to the nearest card in that direction, select it, and put the cursor in it', async ({ page }) => {
+test('Alt + arrows jump to the nearest card in that direction, select it, and put the cursor in it', async ({ page }) => {
   const { col, note, link } = await columnOfThree(page);
   // A loose note to the right of the column.
   await clickEmpty(page);
@@ -81,24 +81,24 @@ test('Ctrl + arrows jump to the nearest card in that direction, select it, and p
 
   await note.getByLabel('Note text').click();
   await page.keyboard.type('typing here');
-  await page.keyboard.press('Control+ArrowRight');
+  await page.keyboard.press('Alt+ArrowRight');
   await expect(loose).toHaveClass(/selected/);
   await expect(loose.getByLabel('Note text')).toBeFocused();
   await page.keyboard.type('keep editing');
   await expect(loose.getByLabel('Note text')).toHaveValue('keep editing');
 
-  await page.keyboard.press('Control+ArrowLeft');
+  await page.keyboard.press('Alt+ArrowLeft');
   await expect(note).toHaveClass(/selected/);
   await expect(note.getByLabel('Note text')).toBeFocused();
   expect(await caret(note.getByLabel('Note text'))).toBe('typing here'.length);
 
-  await page.keyboard.press('Control+ArrowDown');
-  await page.keyboard.press('Control+ArrowDown');
+  await page.keyboard.press('Alt+ArrowDown');
+  await page.keyboard.press('Alt+ArrowDown');
   await expect(link).toHaveClass(/selected/);
   await expect(link.getByLabel('Link title')).toBeFocused();
 });
 
-test('Ctrl + arrows also work from a selected card, and with nothing selected start near the middle', async ({ page }) => {
+test('Alt + arrows also work from a selected card, and with nothing selected start near the middle', async ({ page }) => {
   await add(page, 'Note');
   const first = looseCards(page).first();
   await clickEmpty(page);
@@ -106,8 +106,8 @@ test('Ctrl + arrows also work from a selected card, and with nothing selected st
   const second = byId(page, await idOf(page.locator('.card.selected')));
   await clickEmpty(page);
 
-  // Nothing selected: Ctrl+arrow picks a card to start from.
-  await page.keyboard.press('Control+ArrowUp');
+  // Nothing selected: Alt+arrow picks a card to start from.
+  await page.keyboard.press('Alt+ArrowUp');
   await expect(page.locator('.card.selected')).toHaveCount(1);
 
   // From a selected (not edited) card.
@@ -115,12 +115,12 @@ test('Ctrl + arrows also work from a selected card, and with nothing selected st
   const a = await box(first);
   const b = await box(second);
   const dir = Math.abs(b.y - a.y) > Math.abs(b.x - a.x) ? (b.y > a.y ? 'ArrowDown' : 'ArrowUp') : b.x > a.x ? 'ArrowRight' : 'ArrowLeft';
-  await page.keyboard.press(`Control+${dir}`);
+  await page.keyboard.press(`Alt+${dir}`);
   await expect(second).toHaveClass(/selected/);
   await expect(second.getByLabel('Link title')).toBeFocused();
 });
 
-test('Ctrl + arrow pans the board to a card that is off-screen', async ({ page }) => {
+test('Alt + arrow pans the board to a card that is off-screen', async ({ page }) => {
   await add(page, 'Note');
   const first = looseCards(page).first();
   await clickEmpty(page);
@@ -135,19 +135,42 @@ test('Ctrl + arrow pans the board to a card that is off-screen', async ({ page }
   await expect.poll(async () => (await box(other)).x > canvas.x + canvas.width).toBe(true);
 
   await first.getByLabel('Note text').click();
-  await page.keyboard.press('Control+ArrowRight');
+  await page.keyboard.press('Alt+ArrowRight');
   await expect(other.getByLabel('Note text')).toBeFocused();
   const r = await box(other);
   expect(r.x + r.width).toBeLessThanOrEqual(canvas.x + canvas.width);
   expect(r.x).toBeGreaterThanOrEqual(canvas.x);
 });
 
-test('Ctrl + arrows in the board name still move word by word', async ({ page }) => {
+test('Ctrl + arrows move word by word in card text and the board name, without jumping cards', async ({ page }) => {
   await add(page, 'Note');
+  const note = looseCards(page).first();
+  await clickEmpty(page);
+  await add(page, 'Note');
+  const text = note.getByLabel('Note text');
+  await text.click();
+  await page.keyboard.type('one two three');
+  await page.keyboard.press('Control+ArrowLeft');
+  await expect(text).toBeFocused();
+  await expect(note).toHaveClass(/selected/);
+  expect(await caret(text)).toBe('one two '.length);
+  await page.keyboard.press('Control+ArrowRight');
+  expect(await caret(text)).toBe('one two three'.length);
+
   const name = page.getByLabel('Board name');
   await name.click();
   await page.keyboard.press('End');
   await page.keyboard.press('Control+ArrowLeft');
   await expect(name).toBeFocused();
   expect(await caret(name)).toBe('My first '.length);
+});
+
+test('Alt + arrows never send the browser back a page', async ({ page }) => {
+  const url = page.url();
+  await page.keyboard.press('Alt+ArrowLeft'); // nothing on the board yet
+  await add(page, 'Note');
+  await page.getByLabel('Board name').click();
+  await page.keyboard.press('Alt+ArrowLeft');
+  expect(page.url()).toBe(url);
+  await expect(page.getByLabel('Board name')).toBeVisible();
 });

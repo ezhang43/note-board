@@ -76,16 +76,13 @@ function arrowThroughFields(el: Field, step: -1 | 1): boolean {
 }
 
 /**
- * Ctrl+arrow: jump to the nearest card in that direction (loose or in a column), select it and put
+ * Alt+arrow: jump to the nearest card in that direction (loose or in a column), select it and put
  * the cursor in its first field. Starts from the card being typed in, else the selected block, else
- * picks the card nearest the middle of the screen. Returns whether the key was used.
+ * picks the card nearest the middle of the screen.
  */
-function ctrlArrow(dir: Direction): boolean {
+function jumpToCard(dir: Direction) {
   const active = document.activeElement;
   const typingIn = active instanceof HTMLElement ? active.closest<HTMLElement>('[data-card-id]') : null;
-  // Typing in the board name or a column title: leave Ctrl+arrows to the text box.
-  if (isTextField(active) && !typingIn) return false;
-
   const sel = appStore.getState().ui.selection;
   const selectedId = sel.length === 1 ? sel[0] : null;
   const from =
@@ -101,7 +98,7 @@ function ctrlArrow(dir: Direction): boolean {
     targetId = nearestInDirection(toRect(from.getBoundingClientRect()), candidates, dir);
   } else {
     const view = canvas()?.getBoundingClientRect();
-    if (!view) return false;
+    if (!view) return;
     const mid = { x: view.left + view.width / 2, y: view.top + view.height / 2 };
     const dist = (r: { x: number; y: number; w: number; h: number }) => Math.hypot(r.x + r.w / 2 - mid.x, r.y + r.h / 2 - mid.y);
     targetId = candidates.reduce<{ id: string; d: number } | null>((best, c) => {
@@ -111,17 +108,22 @@ function ctrlArrow(dir: Direction): boolean {
   }
   const target = targetId ? cards.find((c) => c.dataset.cardId === targetId)! : null;
   if (target) goToCard(target, fieldsOf(target)[0] ?? null, true);
-  // From a card, the key is used even at the edge of the board, so it never does something else.
-  return !!target || !!from;
 }
 
 const DIRECTIONS: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
-/** Arrow keys for moving between fields and cards. Returns true when it handled the key. */
+/**
+ * Arrow keys for moving between fields and cards. Returns true when it handled the key.
+ * Ctrl + arrows are left alone (word by word in text, as usual).
+ */
 export function handleArrowKey(e: KeyboardEvent): boolean {
   const dir = DIRECTIONS[e.key];
-  if (!dir || e.isComposing || e.altKey || e.metaKey || e.shiftKey) return false;
-  if (e.ctrlKey) return ctrlArrow(dir);
+  if (!dir || e.isComposing || e.metaKey || e.shiftKey || e.ctrlKey) return false;
+  if (e.altKey) {
+    // Alt + arrows always belong to the board, so Alt + ← / → never make the browser go back a page.
+    jumpToCard(dir);
+    return true;
+  }
   if (dir !== 'up' && dir !== 'down') return false;
   const el = e.target;
   if (!(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) || !isTextField(el)) return false;

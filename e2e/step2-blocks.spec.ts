@@ -228,17 +228,36 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
 });
 
-test('Colour is faded unless a column is selected, and recolours the selected column', async ({ page }) => {
+test("Colour is faded with nothing selected; it colours a card's title band (card stays white) and a column", async ({ page }) => {
   const colour = page.getByRole('button', { name: 'Colour of selected block' });
   await expect(colour).toHaveAttribute('aria-disabled', 'true');
   await colour.click({ force: true }); // clicking the faded button does nothing
   await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
 
-  // Cards are always white, so a selected card alone doesn't enable Colour.
-  await add(page, 'Note');
-  await expect(colour).toHaveAttribute('aria-disabled', 'true');
-  await expect(cards(page).first().getByLabel('Note text')).toHaveCSS('color', 'rgb(31, 29, 26)');
+  // A selected card: Colour tints its title band; the card stays white, text stays black.
+  await add(page, 'To-do list');
+  const list = cards(page).first();
+  const header = list.locator('.card-header');
+  const usual = await header.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect(colour).not.toHaveAttribute('aria-disabled');
+  await colour.click();
   const menu = page.getByRole('group', { name: 'Colours' });
+  await menu.getByRole('button', { name: 'Rose' }).click();
+  await expect(header).not.toHaveCSS('background-color', usual);
+  await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(list.getByLabel('Item text')).toHaveCSS('color', 'rgb(31, 29, 26)');
+  // Default puts the usual band back (the menu stays open after picking).
+  await menu.getByRole('button', { name: 'Default' }).click();
+  await expect(header).toHaveCSS('background-color', usual);
+
+  // A note has no title: a colour tints its header strip.
+  await clickEmpty(page);
+  await add(page, 'Note');
+  const note = page.locator('.card.selected');
+  await expect(note.locator('.card-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await colour.click();
+  await menu.getByRole('button', { name: 'Sky' }).click();
+  await expect(note.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await clickEmpty(page);
 
   await add(page, 'New column');
@@ -246,7 +265,7 @@ test('Colour is faded unless a column is selected, and recolours the selected co
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
   await expect(colour).not.toHaveAttribute('aria-disabled');
   await colour.click();
-  await expect(menu.getByRole('button')).toHaveCount(16);
+  await expect(menu.locator('.swatch')).toHaveCount(16);
   await menu.getByRole('button', { name: 'Teal' }).click();
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
 });

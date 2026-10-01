@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
 import { CARD_W } from '../model/constants';
 import { dayLabel } from '../model/completed';
+import { PALETTE } from '../model/palette';
 import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
@@ -32,7 +33,10 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   // Inside a column a card follows the column's width and fits its content.
   const w = resize?.liveW ?? card.w ?? CARD_W;
   const h = resize?.liveH ?? card.h;
+  // A colour picked for the title band: a deeper shade of it, like the bands inside columns.
+  const band = card.titleColor ? PALETTE[card.titleColor] : null;
   const style = {
+    ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})` } : {}),
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: card.collapsed ? undefined : (h ?? undefined) }),
   } as CSSProperties;
   const classes = [
@@ -44,7 +48,8 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
     (inGroupDrag || resize) && 'following',
     sizeMatch && 'size-match',
     card.collapsed && 'collapsed',
-    card.kind !== 'note' && 'titled',
+    // Notes have no title: a coloured note gets the band across its header instead.
+    (card.kind !== 'note' || band) && 'titled',
   ];
 
   return (

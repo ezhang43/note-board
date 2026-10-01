@@ -235,6 +235,16 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   border: 1.5px solid;
   cursor: pointer;
 }
+.swatch-default {
+  grid-column: 1 / -1;
+  height: 28px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.swatch-default[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
 .swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px currentColor; }
 
 /* ---------- blocks shared ---------- */

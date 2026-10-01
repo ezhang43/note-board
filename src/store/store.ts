@@ -577,13 +577,13 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     /** Click on empty board or Escape: clear the selection and close menus. */
     clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null }),
     toggleColourMenu() {
-      if (!state.ui.selection.some((id) => state.board.columns[id])) return;
+      if (!state.ui.selection.length) return;
       updateUi({ colourMenuOpen: !state.ui.colourMenuOpen });
     },
     closeColourMenu: () => updateUi({ colourMenuOpen: false }),
     /** Auto-colour: give every column its own colour. */
     autoColour: () => commit((b) => B.autoColour(b)),
-    recolourSelection: (color: ColorKey) => commit((b) => B.recolour(b, state.ui.selection, color)),
+    recolourSelection: (color: ColorKey | null) => commit((b) => B.recolour(b, state.ui.selection, color)),
 
     // ---------- selection box (Select tool) ----------
     /** Start a selection box. With `keep` (Ctrl held) the current selection is added to. */

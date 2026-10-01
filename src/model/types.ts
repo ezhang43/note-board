@@ -12,6 +12,11 @@ interface CardBase {
   /** Width and minimum height set by resizing; null = default width / fits its content. Ignored inside a column. */
   w: number | null;
   h: number | null;
+  /**
+   * Colour picked for the card's title band (Colour button); missing / null = the usual band.
+   * Cards themselves are always white.
+   */
+  titleColor?: ColorKey | null;
 }
 
 export interface NoteCard extends CardBase {

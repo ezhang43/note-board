@@ -77,6 +77,7 @@ function parseCard(id: string, c: unknown): Card | null {
     y: num(c.y, 0),
     w: size(c.w),
     h: size(c.h),
+    ...(isColorKey(c.titleColor) ? { titleColor: c.titleColor } : {}),
   };
   if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };

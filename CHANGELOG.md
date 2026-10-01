@@ -1,5 +1,9 @@
 # Changelog
 
+## Colour for cards' title bands (2026-10-02)
+
+- With a card selected, **Colour** now colours the card's title band (the card itself stays white). A note gets the colour across the strip at its top. **Default** at the bottom of the colour menu puts the usual band back (or a column back to grey).
+
 ## Easier-to-see title bands (2026-10-02)
 
 - Inside a column, a card's title band is now a slightly deeper shade of the column's colour, so it stands out from the column instead of blending into it.

@@ -1,5 +1,9 @@
 # Changelog
 
+## Hosting (2026-10-01)
+
+- The board is published at https://ezhang43.github.io/note-board/. Every push to `build/v1` runs the unit tests, builds the site and publishes it. Each browser keeps its own board; nothing is shared online.
+
 ## Owner additions (2026-10-01)
 
 - The block you drag now takes priority: it lands on the grid spot where you let go, and anything in the way slides aside to the nearest free spot (shown live while dragging). Blocks still never overlap. A dragged card never pushes a column (dropping a card on a column puts it inside); where it would cover one, the card lands beside it. Dragged columns and groups push everything.

@@ -59,6 +59,19 @@ export function displayOrder(items: TodoItem[]): string[] {
   return [...flatIds(open), ...flatIds(done)];
 }
 
+/** Items currently on screen, top to bottom: completed ones only while the Completed section is open. */
+export function visibleOrder(items: TodoItem[], completedOpen: boolean): string[] {
+  const { open, done } = sections(items);
+  return [...flatIds(open), ...(completedOpen ? flatIds(done) : [])];
+}
+
+/** The item on screen just above (step -1) or below (step 1) this one, or null at the top / bottom. */
+export function neighbourItem(items: TodoItem[], completedOpen: boolean, id: string, step: -1 | 1): string | null {
+  const order = visibleOrder(items, completedOpen);
+  const at = order.indexOf(id);
+  return at === -1 ? null : (order[at + step] ?? null);
+}
+
 /** Items shown from `a` to `b` inclusive (either way round), across open and completed items. */
 export function itemRange(items: TodoItem[], a: string, b: string): string[] {
   const order = displayOrder(items);

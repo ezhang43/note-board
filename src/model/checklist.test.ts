@@ -34,6 +34,16 @@ describe('reading a list', () => {
     expect(C.itemRange(sample(), 'c1', 'b')).toEqual(['b', 'c', 'c1']);
   });
 
+  it('Up / Down neighbours run through nested and completed items, skipping a collapsed Completed section', () => {
+    expect(C.neighbourItem(sample(), true, 'a', 1)).toBe('a1');
+    expect(C.neighbourItem(sample(), true, 'b', 1)).toBe('c');
+    expect(C.neighbourItem(sample(), true, 'c1', -1)).toBe('c');
+    expect(C.neighbourItem(sample(), true, 'a', -1)).toBeNull();
+    expect(C.neighbourItem(sample(), true, 'c1', 1)).toBeNull();
+    expect(C.neighbourItem(sample(), false, 'b', 1)).toBeNull();
+    expect(C.visibleOrder(sample(), false)).toEqual(['a', 'a1', 'a2', 'b']);
+  });
+
   it('roots skip items already inside another selected item', () => {
     expect(C.rootsOf(sample(), ['a1', 'a', 'b'])).toEqual(['a', 'b']);
   });

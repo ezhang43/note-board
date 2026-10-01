@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { sections } from '../model/checklist';
+import { neighbourItem, sections } from '../model/checklist';
+import { caretOnFirstLine, caretOnLastLine } from './caret';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -83,6 +84,8 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       appStore.itemTab(cardId, item.id, e.shiftKey);
     } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
       if (appStore.itemBackspace(cardId, item.id)) e.preventDefault();
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (moveToNeighbour(e.currentTarget, cardId, item.id, e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
     }
   }
 
@@ -113,6 +116,25 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       </button>
     </div>
   );
+}
+
+/**
+ * Up / Down arrows move through a list's items as if they were one long text: from the top line of
+ * an item, Up goes to the end of the item above; from the bottom line, Down goes to the start of
+ * the item below. Returns false (let the text box handle the key) otherwise.
+ */
+function moveToNeighbour(el: HTMLTextAreaElement, cardId: string, itemId: string, step: -1 | 1): boolean {
+  if (el.selectionStart !== el.selectionEnd) return false;
+  if (step === -1 ? !caretOnFirstLine(el) : !caretOnLastLine(el)) return false;
+  const card = appStore.getState().board.cards[cardId];
+  if (card?.kind !== 'todo') return false;
+  const target = neighbourItem(card.items, card.completedOpen, itemId, step);
+  const box = target && el.closest('[data-card-id]')?.querySelector<HTMLTextAreaElement>(`[data-item-id="${target}"] textarea`);
+  if (!box) return false;
+  box.focus();
+  const at = step === -1 ? box.value.length : 0;
+  box.setSelectionRange(at, at);
+  return true;
 }
 
 /**

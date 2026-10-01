@@ -62,6 +62,64 @@ test('Enter adds an item below; Tab nests it; Shift+Tab moves it out; Backspace 
   await expect(rows(single)).toHaveCount(1);
 });
 
+test('Up and Down arrows move between items, line by line inside multi-line items', async ({ page }) => {
+  const list = await makeList(page, ['one', 'two', 'three']);
+  await rowWithText(list, 'two').getByLabel('Item text').press('Tab');
+  const field = (t: string) => rowWithText(list, t).getByLabel('Item text');
+  const caret = (t: string) => field(t).evaluate((el) => (el as HTMLTextAreaElement).selectionStart);
+
+  await field('one').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(field('two')).toBeFocused(); // into a nested item
+  expect(await caret('two')).toBe(0);
+  await page.keyboard.press('ArrowDown');
+  await expect(field('three')).toBeFocused();
+  await page.keyboard.press('ArrowDown'); // already the last item: stays
+  await expect(field('three')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(field('two')).toBeFocused();
+  expect(await caret('two')).toBe(3); // at the end of its text
+
+  // A two-line item: Down first moves to its second line, then to the next item.
+  await field('two').press('End');
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('more');
+  await field('one').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows(list).nth(1).getByLabel('Item text')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows(list).nth(1).getByLabel('Item text')).toBeFocused(); // now on its second line
+  await page.keyboard.press('ArrowDown');
+  await expect(field('three')).toBeFocused();
+});
+
+test('arrows move line by line through long text that wraps, before leaving the item', async ({ page }) => {
+  const long = 'This item has quite a lot of text so that it wraps onto several lines in the card';
+  const list = await makeList(page, ['top', long, 'bottom']);
+  const field = rows(list).nth(1).getByLabel('Item text');
+  expect(await field.evaluate((el) => el.offsetHeight)).toBeGreaterThan(50); // it really wraps
+  await rowWithText(list, 'top').getByLabel('Item text').focus();
+  await page.keyboard.press('ArrowDown'); // into the long item, first line
+  await expect(field).toBeFocused();
+  await page.keyboard.press('ArrowDown'); // second line: still inside
+  await expect(field).toBeFocused();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
+  await expect(rowWithText(list, 'bottom').getByLabel('Item text')).toBeFocused();
+});
+
+test('arrows skip completed items while the Completed section is collapsed', async ({ page }) => {
+  const list = await makeList(page, ['open', 'finished']);
+  await rowWithText(list, 'finished').getByLabel('Done').click();
+  const open = rowWithText(list, 'open').getByLabel('Item text');
+  await open.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rowWithText(list, 'finished').getByLabel('Item text')).toBeFocused();
+  await list.getByRole('button', { name: 'Completed · 1' }).click();
+  await open.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(open).toBeFocused();
+});
+
 test('ticking a top-level item moves it to "Completed · N"; ticking a sub-item only strikes it', async ({ page }) => {
   const list = await makeList(page, ['A', 'A sub', 'B']);
   await rows(list).nth(1).getByLabel('Item text').press('Tab');

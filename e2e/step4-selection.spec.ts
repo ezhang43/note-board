@@ -22,7 +22,7 @@ async function threeNotes(page: Page) {
 
 const header = { position: { x: 30, y: 18 } };
 
-test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all of them', async ({ page }) => {
+test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all selected columns', async ({ page }) => {
   const [a, b, c] = await threeNotes(page);
   await a.click(header);
   await b.click({ ...header, modifiers: ['Control'] });
@@ -31,11 +31,23 @@ test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all
   await b.click({ ...header, modifiers: ['Control'] });
   await expect(b).not.toHaveClass(/selected/);
 
+  // Cards are always white: with only cards selected, Colour stays faded.
+  await expect(page.getByRole('button', { name: 'Colour of selected block' })).toHaveAttribute('aria-disabled', 'true');
+
+  // With columns in the selection, Colour recolours every selected column.
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await clickEmpty(page);
+  await add(page, 'New column');
+  const [c1, c2] = [columns(page).nth(0), columns(page).nth(1)];
+  await c1.click({ position: { x: 40, y: 80 } });
+  await c2.click({ position: { x: 40, y: 80 }, modifiers: ['Control'] });
+  await a.click({ ...header, modifiers: ['Control'] });
   await page.getByRole('button', { name: 'Colour of selected block' }).click();
   await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Sky' }).click();
-  await expect(a).toHaveCSS('background-color', 'rgb(230, 238, 252)');
-  await expect(c).toHaveCSS('background-color', 'rgb(230, 238, 252)');
-  await expect(b).toHaveCSS('background-color', 'rgb(255, 243, 207)');
+  await expect(c1).toHaveCSS('background-color', 'rgb(230, 238, 252)');
+  await expect(c2).toHaveCSS('background-color', 'rgb(230, 238, 252)');
+  await expect(a).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
 
 test('Select tool: dragging a box selects everything it touches, live; Ctrl adds to the selection', async ({ page }) => {
@@ -207,8 +219,8 @@ test('undo and redo buttons undo moves, colours and deletes', async ({ page }) =
 
 test('Escape clears the selection and closes the colour menu; Ctrl + A while typing selects text only', async ({ page }) => {
   const [a, b] = await threeNotes(page);
-  await a.click(header);
-  await b.click({ ...header, modifiers: ['Control'] });
+  await add(page, 'New column');
+  await a.click({ ...header, modifiers: ['Control'] });
   await page.getByRole('button', { name: 'Colour of selected block' }).click();
   await expect(page.getByRole('group', { name: 'Colours' })).toBeVisible();
   await page.keyboard.press('Escape');

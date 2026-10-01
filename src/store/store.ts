@@ -465,7 +465,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     /** Click on empty board or Escape: clear the selection and close menus. */
     clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null }),
     toggleColourMenu() {
-      if (!state.ui.selection.length) return;
+      if (!state.ui.selection.some((id) => state.board.columns[id])) return;
       updateUi({ colourMenuOpen: !state.ui.colourMenuOpen });
     },
     closeColourMenu: () => updateUi({ colourMenuOpen: false }),

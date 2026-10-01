@@ -150,12 +150,12 @@ export function moveBlocksBy(board: Board, ids: string[], dx: number, dy: number
   return { ...board, cards, columns, order: [...board.order.filter((id) => !top.includes(id)), ...top] };
 }
 
-/** Recolour every listed card and column. */
+/** Recolour every listed column. Cards are always white, so listed cards are left alone. */
 export function recolour(board: Board, ids: string[], color: ColorKey): Board {
   let next = board;
   for (const id of ids) {
-    if (next.columns[id]) next = { ...next, columns: { ...next.columns, [id]: { ...next.columns[id], color } } };
-    else next = updateCard(next, id, (c) => (c.color === color ? c : { ...c, color }));
+    const col = next.columns[id];
+    if (col && col.color !== color) next = { ...next, columns: { ...next.columns, [id]: { ...col, color } } };
   }
   return next;
 }

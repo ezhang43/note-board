@@ -134,7 +134,7 @@ test('ticking a top-level item moves it to "Completed · N"; ticking a sub-item 
   await expect(completed.getByRole('button', { name: 'Completed · 1' })).toBeVisible();
   await expect(completed.locator('[data-item-id]')).toHaveCount(2);
   expect(await texts(list)).toEqual(['B', 'A', 'A sub']);
-  await expect(list.locator('.card-meta')).toHaveText('2/3 done');
+  await expect(list.locator('.card-meta')).toHaveText(''); // no "2/3 done" (owner request)
 
   await completed.getByRole('button', { name: 'Completed · 1' }).click();
   await expect(completed.locator('[data-item-id]')).toHaveCount(0);
@@ -238,10 +238,8 @@ test('drag an item into another list, or onto empty list space to append', async
   expect(await texts(a)).toEqual(['']); // emptied list gets a blank item
 });
 
-test('dropping items on empty board makes a new list "New list" in the same colour', async ({ page }) => {
+test('dropping items on empty board makes a new list "New list"', async ({ page }) => {
   const list = await makeList(page, ['keep', 'move me']);
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
-  await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Peach' }).click();
   await clickEmpty(page);
   const canvas = await box(page.getByTestId('canvas'));
   await dragItem(page, rowWithText(list, 'move me'), { x: canvas.x + 120, y: canvas.y + 120 }, async () => {
@@ -250,7 +248,6 @@ test('dropping items on empty board makes a new list "New list" in the same colo
   await expect(looseCards(page)).toHaveCount(2);
   const made = page.locator('.card.selected');
   await expect(made.getByLabel('List title')).toHaveValue('New list');
-  await expect(made).toHaveCSS('background-color', 'rgb(253, 235, 221)');
   expect(await texts(made)).toEqual(['move me']);
   expect(await texts(list)).toEqual(['keep']);
 });

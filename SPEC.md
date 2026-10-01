@@ -50,21 +50,21 @@ Import (toolbar) opens a file picker for a Milanote board exported as Markdown (
 - Each heading becomes a to-do list with that title; a heading with nothing under it becomes an empty list. The board name line at the top of the file is ignored.
 - Checklist lines become the list's items, keeping sub-items (up to 6 levels) and ticks; ticked top-level items go into "Completed". A blank line between items starts a new list with no title.
 - Other text becomes a note (paragraphs kept; bold, strike-through and escape marks removed; links shown as "text (address)"). A note that is only a web address becomes a link card, titled by a heading right above it.
-- The export has no positions, sizes or colours: cards get their kind's default colour and are laid out loose in up to 4 lanes 20px apart (each card at the bottom of the shortest lane, in file order), starting at the top middle of the screen, or the nearest free space (the board then pans to show them). Once drawn, the lanes are tidied to the cards' real heights.
+- The export has no positions, sizes or colours: cards are laid out loose in up to 4 lanes 20px apart (each card at the bottom of the shortest lane, in file order), starting at the top middle of the screen, or the nearest free space (the board then pans to show them). Once drawn, the lanes are tidied to the cards' real heights.
 - The imported cards are selected, so they can be dragged or deleted together. One undo removes the whole import. A file with nothing in it adds nothing.
 
 ## Blocks: cards and columns
 
-The board holds three card types and columns that stack cards. Cards show no type label; the type is told by colour and content.
+The board holds three card types and columns that stack cards. Cards show no type label; the type is told by content. Cards are always white (loose or in a column); only columns are coloured.
 
-| Block | Content | Default colour |
+| Block | Content | Colour |
 | --- | --- | --- |
-| Note | Free text; grows taller as you type, never scrolls | Butter |
-| To-do list | Title plus checklist (next section) | Mint |
-| Link | Title, URL field, "Open <domain>" button in a new tab | Sky |
-| Column | Title (box sized to its text), card count, stacked cards | Neutral stone-grey |
+| Note | Free text; grows taller as you type, never scrolls | White |
+| To-do list | Title plus checklist (next section) | White |
+| Link | Title, URL field, "Open <domain>" button in a new tab | White |
+| Column | Title (box sized to its text), card count, stacked cards | Neutral stone-grey until recoloured |
 
-**Headers:** cards show a collapse arrow and × (and a to-do list shows "2/5 done"). Columns show the collapse arrow, title, count and ×. No move handles and no per-block palette icons.
+**Headers:** cards show a collapse arrow and × at the top right (no "2/5 done" count). Columns show the title and count on the left, and the collapse arrow next to the × on the right. No move handles and no per-block palette icons.
 
 **Moving**
 
@@ -86,10 +86,10 @@ The board holds three card types and columns that stack cards. Cards show no typ
 
 **Collapse, add, delete, colour**
 
-- Collapse arrow: a card shrinks to one line with a preview (first line, list title with count, or link title); a column hides its cards.
+- Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title); a column hides its cards.
 - Adding a card with a column selected puts it at the end of that column; with a card inside a column selected, directly below that card; otherwise loose on the board. A new to-do list starts with one blank item, cursor in it.
 - Column × opens a small confirmation ("Delete 'Ideas'?" · Cancel · red Delete column) and then deletes the column and all its cards.
-- Toolbar Colour recolours every selected block from 8 swatches: Butter, Peach, Rose, Lavender, Sky, Teal, Mint, Stone. It is faded with nothing selected.
+- Toolbar Colour recolours every selected column from 8 swatches: Butter, Peach, Rose, Lavender, Sky, Teal, Mint, Stone. Selected cards are left alone (cards are always white). It is faded unless a column is selected.
 
 ## Checklists
 
@@ -112,7 +112,7 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 **Dragging items**
 
 - Drag the grip to move an item and all its sub-items: before/after another item (teal line), nested under an item (drop slightly right; teal tint), into another list, or onto empty list space (appends).
-- Dropping on empty board space (or on a note, link or column) creates a new to-do list "New list" at that spot with the dragged items, in the source list's colour.
+- Dropping on empty board space (or on a note, link or column) creates a new to-do list "New list" at that spot with the dragged items.
 
 **Selecting several items**
 
@@ -157,12 +157,12 @@ Every block action works on one block or on a whole selection, and every change 
 
 ## Look and feel
 
-Professional but with colour: soft tinted cards on a warm neutral canvas, thin borders, soft shadows, one teal accent.
+Professional but with colour: white cards and soft-tinted columns on a warm neutral canvas, thin borders, soft shadows, one teal accent.
 
 - **Type:** IBM Plex Sans (400, 500, 600). Titles 14–17px semibold, body 14px.
 - **Canvas:** #F6F4F0 with #CFC8BC dots every 20px (fainter when snapping is off). Toolbar white with a #E2DDD4 bottom border.
 - **Accent:** teal #1F5F5B for selection, active tool, drop lines and New column. Destructive actions use #A3263F.
-- **Cards:** 10px radius, 1px border in the card colour's edge tone, shadow 0 1px 2px at 6%. Columns: 12px radius, #EFECE6 unless recoloured.
+- **Cards:** white (#FFFFFF), 10px radius, 1px #E2DDD4 border, shadow 0 1px 2px at 6%. Columns: 12px radius, #EFECE6 unless recoloured; the swatches below are for columns.
 - **States:** selection = 2px solid teal outline; size match = 2px dashed teal; dragging = 2.5px teal border with glow; no focus rectangles on text fields (buttons keep a keyboard focus ring).
 
 | Swatch | Background | Edge | Text |

@@ -8,6 +8,8 @@
   --ink: #1f1d1a;
   --ink-soft: #5f5a52;
   --ink-faint: #6b655c;
+  --card-bg: #ffffff;
+  --card-edge: #e2ddd4;
   --accent: #1f5f5b;
   --accent-soft: #e0f2f1;
   --accent-ink: #155e58;
@@ -276,7 +278,9 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   display: flex;
   flex-direction: column;
   padding: 0 12px 12px;
-  background: var(--bg);
+  /* Cards are always white; only columns are coloured. */
+  --edge: var(--card-edge);
+  background: var(--card-bg);
   border: 1px solid var(--edge);
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06);

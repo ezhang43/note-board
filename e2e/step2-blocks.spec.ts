@@ -56,12 +56,12 @@ function overlapping(a: { x: number; y: number; width: number; height: number },
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-test('Add Note puts a butter note on the board, selected, and it grows as you type', async ({ page }) => {
+test('Add Note puts a white note on the board, selected, and it grows as you type', async ({ page }) => {
   await add(page, 'Note');
   const note = cards(page).first();
   await expect(note).toHaveAttribute('data-kind', 'note');
   await expect(note).toHaveClass(/selected/);
-  await expect(note).toHaveCSS('background-color', 'rgb(255, 243, 207)');
+  await expect(note).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   const before = (await box(note)).height;
   await note.getByLabel('Note text').fill('one\ntwo\nthree\nfour\nfive\nsix\nseven');
   await expect.poll(async () => (await box(note)).height).toBeGreaterThan(before + 40);
@@ -70,21 +70,20 @@ test('Add Note puts a butter note on the board, selected, and it grows as you ty
 test('Add To-do list starts "New list" with one blank item and the cursor in it', async ({ page }) => {
   await add(page, 'To-do list');
   const list = cards(page).first();
-  await expect(list).toHaveCSS('background-color', 'rgb(227, 244, 234)');
+  await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(list.getByLabel('List title')).toHaveValue('New list');
   await expect(list.getByLabel('Item text')).toHaveCount(1);
   await expect(list.getByLabel('Item text')).toBeFocused();
-  await expect(list.locator('.card-meta')).toHaveText('0/1 done');
   await page.keyboard.type('Buy milk');
   await list.getByLabel('Done').click();
-  await expect(list.locator('.card-meta')).toHaveText('1/1 done');
+  await expect(list.locator('.card-meta')).toHaveText(''); // no "1/1 done" (owner request)
   await expect(list.getByLabel('Item text')).toHaveValue('Buy milk');
 });
 
 test('Link card opens the address in a new tab', async ({ page }) => {
   await add(page, 'Link');
   const link = cards(page).first();
-  await expect(link).toHaveCSS('background-color', 'rgb(230, 238, 252)');
+  await expect(link).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   const open = link.locator('.link-open');
   await expect(open).toHaveText('Open link');
   await expect(open).not.toHaveAttribute('href');
@@ -229,31 +228,25 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
 });
 
-test('Colour is faded with nothing selected and recolours the selected block', async ({ page }) => {
+test('Colour is faded unless a column is selected, and recolours the selected column', async ({ page }) => {
   const colour = page.getByRole('button', { name: 'Colour of selected block' });
   await expect(colour).toHaveAttribute('aria-disabled', 'true');
   await colour.click({ force: true }); // clicking the faded button does nothing
   await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
 
+  // Cards are always white, so a selected card alone doesn't enable Colour.
   await add(page, 'Note');
-  await expect(colour).not.toHaveAttribute('aria-disabled');
-  await colour.click();
-  const menu = page.getByRole('group', { name: 'Colours' });
-  await expect(menu.getByRole('button')).toHaveCount(8);
-  await expect(menu.getByRole('button', { name: 'Butter' })).toHaveAttribute('aria-pressed', 'true');
-  await menu.getByRole('button', { name: 'Lavender' }).click();
-  await expect(cards(page).first()).toHaveCSS('background-color', 'rgb(239, 234, 251)');
-  // Card text stays black whatever the card colour.
-  await expect(cards(page).first().getByLabel('Note text')).toHaveCSS('color', 'rgb(31, 29, 26)');
-
-  await clickEmpty(page);
-  await expect(menu).toHaveCount(0);
   await expect(colour).toHaveAttribute('aria-disabled', 'true');
+  await expect(cards(page).first().getByLabel('Note text')).toHaveCSS('color', 'rgb(31, 29, 26)');
+  const menu = page.getByRole('group', { name: 'Colours' });
+  await clickEmpty(page);
 
   await add(page, 'New column');
   const col = columns(page).first();
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
+  await expect(colour).not.toHaveAttribute('aria-disabled');
   await colour.click();
+  await expect(menu.getByRole('button')).toHaveCount(8);
   await menu.getByRole('button', { name: 'Teal' }).click();
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
 });
@@ -303,10 +296,12 @@ test('everything is kept after reload', async ({ page }) => {
   await add(page, 'To-do list');
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);
-  await add(page, 'Note');
-  await looseCards(page).first().getByLabel('Note text').fill('Loose thought');
+  await col.click({ position: { x: 200, y: 26 } });
   await page.getByRole('button', { name: 'Colour of selected block' }).click();
   await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Rose' }).click();
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await looseCards(page).first().getByLabel('Note text').fill('Loose thought');
   const noteBox = await box(looseCards(page).first());
 
   await page.reload();
@@ -315,6 +310,6 @@ test('everything is kept after reload', async ({ page }) => {
   await expect(columns(page).first().getByLabel('Item text')).toHaveValue('Pack bags');
   const note = looseCards(page).first();
   await expect(note.getByLabel('Note text')).toHaveValue('Loose thought');
-  await expect(note).toHaveCSS('background-color', 'rgb(252, 231, 236)');
+  await expect(columns(page).first()).toHaveCSS('background-color', 'rgb(252, 231, 236)');
   expect(await box(note)).toEqual(noteBox);
 });

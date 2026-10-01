@@ -120,12 +120,12 @@ describe('collapse, colour and edit', () => {
     expect(b.columns.c1.collapsed).toBe(false);
   });
 
-  it('recolours every listed card and column', () => {
-    const b = B.recolour(board(), ['a', 'c1', 'z'], 'lavender');
-    expect(b.cards.a.color).toBe('lavender');
-    expect(b.cards.z.color).toBe('lavender');
+  it('recolours every listed column and leaves cards alone (cards are always white)', () => {
+    const before = board();
+    const b = B.recolour(before, ['a', 'c1', 'z'], 'lavender');
     expect(b.columns.c1.color).toBe('lavender');
-    expect(b.cards.b.color).toBe('butter');
+    expect(b.cards).toBe(before.cards);
+    expect(B.recolour(before, ['a'], 'lavender')).toBe(before);
   });
 
   it('edits and ticks checklist items, including nested ones', () => {

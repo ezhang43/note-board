@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapsedPreview, countItems, createCard, domainOf, hrefOf, progressText } from './cards';
+import { collapsedPreview, countItems, createCard, domainOf, hrefOf } from './cards';
 import type { LinkCard, NoteCard, TodoCard, TodoItem } from './types';
 
 const item = (done: boolean, children: TodoItem[] = []): TodoItem => ({ id: Math.random().toString(), text: 'x', done, children });
@@ -27,12 +27,6 @@ describe('to-do counts', () => {
     const items = [item(true), item(false, [item(true), item(false)]), item(true)];
     expect(countItems(items)).toEqual({ total: 5, done: 3 });
   });
-
-  it('shows "2/5 done" in the header of a to-do list only', () => {
-    const t = { ...(createCard('todo') as TodoCard), items: [item(true), item(true), item(false), item(false), item(false)] };
-    expect(progressText(t)).toBe('2/5 done');
-    expect(progressText(createCard('note'))).toBe('');
-  });
 });
 
 describe('collapsed preview', () => {
@@ -40,9 +34,10 @@ describe('collapsed preview', () => {
     expect(collapsedPreview({ ...(createCard('note') as NoteCard), text: 'First line\nsecond' })).toBe('First line');
   });
 
-  it('shows a list title with its count', () => {
+  it('shows a list title, without a done count (owner request)', () => {
     const t = { ...(createCard('todo') as TodoCard), title: 'Groceries', items: [item(true), item(false)] };
-    expect(collapsedPreview(t)).toBe('Groceries · 1/2');
+    expect(collapsedPreview(t)).toBe('Groceries');
+    expect(collapsedPreview({ ...t, title: '' })).toBe('List');
   });
 
   it('shows a link title, or its domain when untitled', () => {

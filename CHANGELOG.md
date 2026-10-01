@@ -1,5 +1,12 @@
 # Changelog
 
+## Cleaner cards (2026-10-02)
+
+- Notes, to-do lists and links are now always white, loose or inside a column. Columns keep their colour.
+- The Colour button now recolours columns only, and is faded unless a column is selected.
+- To-do lists no longer show "3/6 done" in their header (a collapsed list shows just its title).
+- A column's collapse arrow has moved to the top right, next to its ×.
+
 ## Import from Milanote (2026-10-02)
 
 - New **Import** button at the end of the toolbar: pick a Milanote board exported as Markdown (.md) and its cards are added to your board. Nothing already on the board is changed.

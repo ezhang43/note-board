@@ -58,15 +58,6 @@ export function ColumnView({ id }: { id: string }) {
       onPointerDown={blockPointerDown('column', id)}
     >
       <div className="column-header">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
-          aria-expanded={!col.collapsed}
-          onClick={() => appStore.toggleCollapsed(id)}
-        >
-          <ChevronIcon collapsed={col.collapsed} />
-        </button>
         <AutoSizeInput
           className="column-title"
           aria-label="Column title"
@@ -78,6 +69,15 @@ export function ColumnView({ id }: { id: string }) {
           {cardIds.length}
         </span>
         <div className="toolbar-spacer" />
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
+          aria-expanded={!col.collapsed}
+          onClick={() => appStore.toggleCollapsed(id)}
+        >
+          <ChevronIcon collapsed={col.collapsed} />
+        </button>
         <button type="button" className="icon-button" aria-label="Delete column and its cards" onClick={() => appStore.askDeleteColumn(id)}>
           <CloseIcon />
         </button>

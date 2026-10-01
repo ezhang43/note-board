@@ -1,7 +1,6 @@
 import { useRef, type CSSProperties } from 'react';
-import { collapsedPreview, domainOf, hrefOf, progressText } from '../model/cards';
+import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
 import { CARD_W } from '../model/constants';
-import { PALETTE } from '../model/palette';
 import type { Card, LinkCard, NoteCard } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
@@ -28,14 +27,11 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   useMeasuredHeight(id, ref);
   if (!card) return null;
 
-  const colors = PALETTE[card.color];
   const pos = drag ?? dragPos;
   // Inside a column a card follows the column's width and fits its content.
   const w = resize?.liveW ?? card.w ?? CARD_W;
   const h = resize?.liveH ?? card.h;
   const style = {
-    '--bg': colors.bg,
-    '--edge': colors.edge,
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: card.collapsed ? undefined : (h ?? undefined) }),
   } as CSSProperties;
   const classes = [
@@ -60,7 +56,7 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
       onPointerDown={blockPointerDown('card', id)}
     >
       <div className="card-header">
-        <span className="card-meta">{card.collapsed ? collapsedPreview(card) : progressText(card)}</span>
+        <span className="card-meta">{card.collapsed ? collapsedPreview(card) : ''}</span>
         <button
           type="button"
           className="icon-button"

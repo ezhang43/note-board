@@ -57,15 +57,14 @@ function ImportButton() {
   );
 }
 
-/** Colour button: recolours the selected block(s). Faded while nothing is selected. */
+/** Colour button: recolours the selected column(s). Faded while no column is selected (cards are always white). */
 function ColourControl() {
-  const count = useAppState((s) => s.ui.selection.length);
-  const open = useAppState((s) => s.ui.colourMenuOpen && s.ui.selection.length > 0);
-  // The colour of the last selected block, shown on the button and ringed in the menu.
+  const count = useAppState((s) => s.ui.selection.filter((id) => s.board.columns[id]).length);
+  const open = useAppState((s) => s.ui.colourMenuOpen && count > 0);
+  // The colour of the last selected column, shown on the button and ringed in the menu.
   const current = useAppState((s): ColorKey | null | undefined => {
-    const id = s.ui.selection[s.ui.selection.length - 1];
-    if (!id) return undefined;
-    return s.board.columns[id] ? s.board.columns[id].color : s.board.cards[id]?.color;
+    const id = s.ui.selection.filter((x) => s.board.columns[x]).pop();
+    return id ? s.board.columns[id].color : undefined;
   });
   const shown = current ? PALETTE[current] : COLUMN_DEFAULT;
 
@@ -75,7 +74,7 @@ function ColourControl() {
         type="button"
         className="tb-button faded-colour"
         aria-label="Colour of selected block"
-        title={count ? 'Change the colour of the selected block' : 'Select a card or column first'}
+        title={count ? 'Change the colour of the selected column' : 'Select a column first'}
         aria-disabled={count ? undefined : true}
         aria-expanded={open}
         onClick={appStore.toggleColourMenu}

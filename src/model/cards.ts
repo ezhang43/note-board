@@ -59,22 +59,13 @@ export function domainOf(url: string): string | null {
   return href ? new URL(href).hostname.replace(/^www\./, '') : null;
 }
 
-/** "2/5 done" in a to-do list's header. Empty for other cards. */
-export function progressText(card: Card): string {
-  if (card.kind !== 'todo') return '';
-  const { total, done } = countItems(card.items);
-  return total ? `${done}/${total} done` : '';
-}
-
 /** The one-line preview a collapsed card shows. */
 export function collapsedPreview(card: Card): string {
   switch (card.kind) {
     case 'note':
       return card.text.split('\n')[0];
-    case 'todo': {
-      const { total, done } = countItems(card.items);
-      return `${card.title || 'List'} · ${done}/${total}`;
-    }
+    case 'todo':
+      return card.title || 'List';
     case 'link':
       return card.title || domainOf(card.url) || '';
   }

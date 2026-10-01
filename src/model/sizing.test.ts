@@ -3,7 +3,13 @@ import { resizeTo } from './sizing';
 
 describe('resizing', () => {
   it('snaps to the 20px grid when snapping is on and nothing matches', () => {
-    expect(resizeTo('card', { w: 251, h: 173 }, [], true)).toEqual({ w: 260, h: 180, matchIds: [], label: '260 × 180' });
+    expect(resizeTo('card', { w: 251, h: 173 }, [], true)).toEqual({ w: 260, h: 180, liveW: 251, liveH: 173, matchIds: [], label: '260 × 180' });
+  });
+
+  it('while dragging, the drawn size follows the pointer; it lands on the grid when let go', () => {
+    const r = resizeTo('card', { w: 263.4, h: 151 }, [], true);
+    expect([r.liveW, r.liveH]).toEqual([263, 151]);
+    expect([r.w, r.h]).toEqual([260, 160]);
   });
 
   it('keeps exact sizes when snapping is off', () => {
@@ -25,6 +31,8 @@ describe('resizing', () => {
     expect(resizeTo('card', { w: 240, h: 300 }, others, true)).toEqual({
       w: 247,
       h: 300,
+      liveW: 247, // a match clicks into place even while dragging
+      liveH: 300,
       matchIds: ['a', 'b'],
       label: '247 × 300 · same width as 2 blocks',
     });
@@ -47,6 +55,6 @@ describe('resizing', () => {
   });
 
   it('a column edge changes width only', () => {
-    expect(resizeTo('column', { w: 331, h: null }, [], true)).toEqual({ w: 340, h: null, matchIds: [], label: '340 wide' });
+    expect(resizeTo('column', { w: 331, h: null }, [], true)).toEqual({ w: 340, h: null, liveW: 331, liveH: null, matchIds: [], label: '340 wide' });
   });
 });

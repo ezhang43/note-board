@@ -22,6 +22,7 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const [groupDx, groupDy] = useGroupOffset(id);
+  const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!card) return null;
@@ -29,8 +30,8 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const colors = PALETTE[card.color];
   const pos = drag ?? { x: card.x + groupDx, y: card.y + groupDy };
   // Inside a column a card follows the column's width and fits its content.
-  const w = resize?.w ?? card.w ?? CARD_W;
-  const h = resize?.h ?? card.h;
+  const w = resize?.liveW ?? card.w ?? CARD_W;
+  const h = resize?.liveH ?? card.h;
   const style = {
     '--bg': colors.bg,
     '--edge': colors.edge,
@@ -41,6 +42,8 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
     inColumn ? 'in-column' : 'loose',
     selected && 'selected',
     drag && 'dragging',
+    // While following the pointer, don't glide (it would lag behind).
+    (inGroupDrag || resize) && 'following',
     sizeMatch && 'size-match',
     card.collapsed && 'collapsed',
   ];

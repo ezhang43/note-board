@@ -51,7 +51,7 @@ describe('undo and redo for everything', () => {
     s.select(col);
     s.recolourSelection('rose');
     s.toggleCollapsed(col);
-    s.showResize({ kind: 'column', id: col, w: 400, h: null, matchIds: [], label: '', labelAt: { x: 0, y: 0 } });
+    s.showResize({ kind: 'column', id: col, w: 400, h: null, liveW: 400, liveH: null, matchIds: [], label: '', labelAt: { x: 0, y: 0 } });
     s.commitResize();
     s.toggleSnap();
     s.startDrag('column', col, 0, 0);

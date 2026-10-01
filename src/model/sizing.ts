@@ -17,9 +17,13 @@ export interface SizeCandidate {
 }
 
 export interface ResizeResult {
+  /** The size the block gets when the pointer is let go (on the grid, or matched). */
   w: number;
   /** null when only the width is being changed. */
   h: number | null;
+  /** The size to draw while still dragging: follows the pointer, except that matches click into place. */
+  liveW: number;
+  liveH: number | null;
   /** Blocks whose width and/or height this size matches. */
   matchIds: string[];
   /** e.g. "240 × 180 · same width as 2 blocks". */
@@ -55,21 +59,22 @@ export function resizeTo(
   const matched: string[] = [];
   const ids = new Set<string>();
 
-  const fit = (v: number, key: 'w' | 'h', lo: number, hi: number) => {
+  /** [final size, size to draw while dragging] for one axis. */
+  const fit = (v: number, key: 'w' | 'h', lo: number, hi: number): [number, number] => {
     const clamped = clamp(v, lo, hi);
     const m = nearest(candidates, key, clamped);
     if (m) {
       matched.push(key === 'w' ? 'width' : 'height');
       m.ids.forEach((id) => ids.add(id));
-      return Math.round(m.value);
+      return [Math.round(m.value), Math.round(m.value)];
     }
-    return Math.round(snap ? clamp(snapToGrid(clamped), lo, hi) : clamped);
+    return [Math.round(snap ? clamp(snapToGrid(clamped), lo, hi) : clamped), Math.round(clamped)];
   };
 
-  const w = fit(raw.w, 'w', minW, maxW);
-  const h = raw.h == null ? null : fit(raw.h, 'h', BLOCK_MIN_H, BLOCK_MAX_H);
+  const [w, liveW] = fit(raw.w, 'w', minW, maxW);
+  const [h, liveH] = raw.h == null ? [null, null] : fit(raw.h, 'h', BLOCK_MIN_H, BLOCK_MAX_H);
   const sizeText = h == null ? `${w} wide` : `${w} × ${h}`;
   const n = ids.size;
   const label = matched.length ? `${sizeText} · same ${matched.join(' & ')} as ${n} ${n === 1 ? 'block' : 'blocks'}` : sizeText;
-  return { w, h, matchIds: [...ids], label };
+  return { w, h, liveW, liveH, matchIds: [...ids], label };
 }

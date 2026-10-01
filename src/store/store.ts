@@ -33,9 +33,13 @@ export interface Drag {
 export interface Resize {
   kind: 'card' | 'column';
   id: string;
+  /** The size it gets when let go. */
   w: number;
   /** null = width only (a column's right edge). */
   h: number | null;
+  /** The size drawn while dragging (follows the pointer smoothly). */
+  liveW: number;
+  liveH: number | null;
   matchIds: string[];
   label: string;
   /** Where to show the label, in screen pixels from the canvas's top-left. */
@@ -655,10 +659,13 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       // Several blocks move as one: they don't drop into columns and have no single landing spot.
       const over = d.group.length ? null : overColumn;
       if (d.x === x && d.y === y && d.overColumn === over) return;
+      // The block follows the pointer exactly; where it will land (on the grid, clear of other
+      // blocks) is shown as a dashed outline, and it glides there when let go.
       let land: Rect | null = null;
       if (!over && !d.group.length) {
         const size = draggedSize(d);
-        const spot = landingSpot(state.board, d.id, x, y, size, measured);
+        const snap = state.board.snap ? snapToGrid : (v: number) => v;
+        const spot = landingSpot(state.board, d.id, snap(x), snap(y), size, measured);
         if (spot.x !== x || spot.y !== y) land = { ...spot, ...size };
       }
       updateUi({ drag: { ...d, x, y, overColumn: over, land } });
@@ -675,8 +682,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const d = state.ui.drag;
       if (!d) return;
       if (d.group.length) {
+        // The whole group moves by the same amount, landing on the grid when snapping is on.
         const ids = [d.id, ...d.group];
-        commit((b) => B.moveBlocksBy(b, ids, d.x - d.startX, d.y - d.startY), { ui: { drag: null } });
+        const snap = state.board.snap ? snapToGrid : (v: number) => v;
+        commit((b) => B.moveBlocksBy(b, ids, snap(d.x) - d.startX, snap(d.y) - d.startY), { ui: { drag: null } });
         return requestSettle(ids);
       }
       const at = d.land ?? { x: d.x, y: d.y };

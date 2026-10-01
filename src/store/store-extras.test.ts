@@ -12,6 +12,52 @@ function store() {
   return s;
 }
 
+describe('smooth dragging', () => {
+  it('a dragged block follows the pointer exactly, shows its grid landing spot, and lands there', () => {
+    const s = store();
+    s.addCard('note');
+    const id = s.getState().ui.selection[0];
+    const c = s.getState().board.cards[id];
+    s.startDrag('card', id, c.x, c.y);
+    s.moveDrag(c.x + 613, c.y + 407, null);
+    const d = s.getState().ui.drag!;
+    expect([d.x, d.y]).toEqual([c.x + 613, c.y + 407]); // not jumping in 20px steps
+    expect(d.land).toMatchObject({ x: c.x + 620, y: c.y + 400 });
+    s.dropDrag(null);
+    expect(s.getState().board.cards[id]).toMatchObject({ x: c.x + 620, y: c.y + 400 });
+  });
+
+  it('with snap off, the block lands exactly where it was let go', () => {
+    const s = store();
+    s.toggleSnap();
+    s.addCard('note');
+    const id = s.getState().ui.selection[0];
+    const c = s.getState().board.cards[id];
+    s.startDrag('card', id, c.x, c.y);
+    s.moveDrag(c.x + 613, c.y + 407, null);
+    expect(s.getState().ui.drag!.land).toBeNull();
+    s.dropDrag(null);
+    expect(s.getState().board.cards[id]).toMatchObject({ x: c.x + 613, y: c.y + 407 });
+  });
+
+  it('a group dragged together lands on the grid, keeping its spacing', () => {
+    const s = store();
+    s.addCard('note');
+    const a = s.getState().ui.selection[0];
+    s.clearSelection();
+    s.addCard('note');
+    const b = s.getState().ui.selection[0];
+    s.selectAll();
+    const pa = { ...s.getState().board.cards[a] };
+    const pb = { ...s.getState().board.cards[b] };
+    s.startDrag('card', a, pa.x, pa.y);
+    s.moveDrag(pa.x + 133, pa.y + 47, null);
+    s.dropDrag(null);
+    expect(s.getState().board.cards[a]).toMatchObject({ x: pa.x + 140, y: pa.y + 40 });
+    expect(s.getState().board.cards[b]).toMatchObject({ x: pb.x + 140, y: pb.y + 40 });
+  });
+});
+
 describe('dragging a new card from the toolbar', () => {
   it('places it centred under the pointer, top edge just above it, on the grid', () => {
     const s = store();

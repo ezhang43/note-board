@@ -1,6 +1,5 @@
 import type React from 'react';
 import { DRAG_THRESHOLD } from '../model/constants';
-import { snapToGrid } from '../model/geometry';
 import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex } from './canvasDom';
 
@@ -44,8 +43,8 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
         appStore.startDrag(kind, id, saved?.x ?? topLeft.x, saved?.y ?? topLeft.y);
       }
       const p = clientToBoard(ev.clientX, ev.clientY);
-      const snap = appStore.getState().board.snap ? snapToGrid : Math.round;
-      appStore.moveDrag(snap(p.x - offset.x), snap(p.y - offset.y), kind === 'card' ? columnUnder(ev.clientX, ev.clientY) : null);
+      // Follow the pointer exactly; the store works out the grid spot it will land on.
+      appStore.moveDrag(Math.round(p.x - offset.x), Math.round(p.y - offset.y), kind === 'card' ? columnUnder(ev.clientX, ev.clientY) : null);
     };
 
     const finish = (ev: PointerEvent) => {

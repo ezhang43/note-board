@@ -45,15 +45,24 @@ test('dragging onto another block shows a dashed landing spot, and the drop land
   expect(Math.round(landed.y)).toBe(Math.round(spotBox.y));
 });
 
-test('no landing spot is shown when the spot under the block is already free', async ({ page }) => {
+test('a dragged block follows the pointer exactly; the outline shows the nearest grid spot, where it lands', async ({ page }) => {
   await add(page, 'Note');
   const note = looseCards(page).first();
+  const start = await boardPos(note);
   const g = await grabPoint(note);
   await page.mouse.move(g.x, g.y);
   await page.mouse.down();
   await page.mouse.move(g.x + 300, g.y + 200, { steps: 8 });
+  // Exactly on a grid spot that is free: nothing to show.
   await expect(page.getByTestId('landing-spot')).toHaveCount(0);
+  await page.mouse.move(g.x + 307, g.y + 193, { steps: 2 });
+  expect(await boardPos(note)).toEqual({ x: start.x + 307, y: start.y + 193 }); // no 20px jumps
+  const spot = page.getByTestId('landing-spot');
+  await expect(spot).toBeVisible();
+  const s = await spot.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
+  expect(s).toEqual({ x: start.x + 300, y: start.y + 200 });
   await page.mouse.up();
+  expect(await boardPos(note)).toEqual(s);
 });
 
 test('resizing a loose card from its corner snaps to the grid and shows the size', async ({ page }) => {

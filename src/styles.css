@@ -578,3 +578,38 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
 }
 .item-ghost-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-ghost-extra { flex-shrink: 0; font-size: 12px; color: var(--ink-soft); }
+
+/* ---------- smooth movement ---------- */
+
+/*
+ * Loose blocks glide to where they land: into the grid spot after a drag, to the grid size after a
+ * resize, and out of the way when something pushes them. Not while following the pointer.
+ */
+.card.loose,
+.column {
+  transition:
+    left 160ms ease-out,
+    top 160ms ease-out,
+    width 160ms ease-out;
+}
+.card.dragging,
+.column.dragging,
+.card.following,
+.column.following {
+  transition: none;
+}
+
+/* The landing outline slides between grid spots instead of jumping. */
+.landing-spot {
+  transition:
+    left 90ms ease-out,
+    top 90ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.loose,
+  .column,
+  .landing-spot {
+    transition: none;
+  }
+}

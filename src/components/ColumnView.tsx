@@ -23,6 +23,7 @@ export function ColumnView({ id }: { id: string }) {
     s.ui.confirm?.columnId === id ? s.ui.confirm.ids.filter((x) => s.board.columns[x]).length : 0,
   );
   const [groupDx, groupDy] = useGroupOffset(id);
+  const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const ref = useRef<HTMLElement>(null);
@@ -31,14 +32,16 @@ export function ColumnView({ id }: { id: string }) {
 
   const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
   const pos = drag ?? { x: col.x + groupDx, y: col.y + groupDy };
-  const w = resize?.w ?? col.w;
-  const minH = col.collapsed ? undefined : (resize?.h ?? col.h ?? COLUMN_MIN_H);
+  const w = resize?.liveW ?? col.w;
+  const minH = col.collapsed ? undefined : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
   // A card being dragged out is drawn on its own until it is dropped.
   const cardIds = col.cardIds.filter((c) => c !== draggedCard);
   const classes = [
     'column',
     selected && 'selected',
     drag && 'dragging',
+    // While following the pointer, don't glide (it would lag behind).
+    (inGroupDrag || resize) && 'following',
     sizeMatch && 'size-match',
     dropTarget && 'drop-target',
     col.collapsed && 'collapsed',

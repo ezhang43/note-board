@@ -1,5 +1,11 @@
 # Changelog
 
+## Import from Milanote (2026-10-02)
+
+- New **Import** button at the end of the toolbar: pick a Milanote board exported as Markdown (.md) and its cards are added to your board. Nothing already on the board is changed.
+- Each heading becomes a to-do list with that title (an empty heading gives an empty list); items keep their sub-items and ticks; a blank line between items starts a new untitled list; other text becomes a note, and a lone web address becomes a link card.
+- Milanote's export has no positions or colours, so the cards come in tidy lanes at the top of the screen in default colours, all selected so you can drag them somewhere as a group. One Ctrl+Z removes the whole import.
+
 ## Install as an app (2026-10-02)
 
 - The published board can be installed as an app from Edge or Chrome: it gets its own window (no address bar), a Note Board icon in the Start menu and taskbar, and opens offline. Sign-in and sync work exactly as on the website, and the app updates itself whenever the site does.

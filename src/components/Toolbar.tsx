@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE, type ColorKey } from '../model/palette';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
@@ -24,6 +25,35 @@ function NewColumnButton() {
       <PlusIcon />
       New column
     </button>
+  );
+}
+
+/** Import: pick a Milanote board exported as Markdown; its cards are added to this board. */
+function ImportButton() {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        type="button"
+        className="tb-button"
+        title="Add the cards from a Milanote board exported as Markdown (.md)"
+        onClick={() => input.current?.click()}
+      >
+        Import
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept=".md,.markdown,.txt,text/markdown,text/plain"
+        aria-label="Milanote Markdown file"
+        hidden
+        onChange={async (e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = ''; // so picking the same file again imports it again
+          if (file) appStore.importMilanote(await file.text());
+        }}
+      />
+    </>
   );
 }
 
@@ -151,6 +181,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <AddCardButton kind="todo" label="To-do list" />
       <AddCardButton kind="link" label="Link" />
       <NewColumnButton />
+      <ImportButton />
 
       {onSignOut && (
         <>

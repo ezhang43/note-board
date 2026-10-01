@@ -4,10 +4,11 @@ import * as C from '../model/checklist';
 import type { ItemDrop } from '../model/checklist';
 import { snapToGrid } from '../model/geometry';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../model/clipboard';
-import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../model/constants';
+import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
 import { emptyHistory, recordChange, redo, undo, type History } from '../model/history';
 import { blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
 import type { ColorKey } from '../model/palette';
+import { addImported, estimateHeight, packInLanes, parseMilanote, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import type { Board, CardKind, Point, Rect, Size, TodoItem, Tool, View } from '../model/types';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../model/view';
@@ -123,6 +124,8 @@ export interface AppState {
 
 /** Wait this long after the last pan/zoom before saving it, so scrolling doesn't write on every frame. */
 export const VIEW_SAVE_DELAY = 250;
+/** Imported cards start this far (screen pixels) below the top of the board area. */
+export const IMPORT_TOP_MARGIN = 40;
 
 const emptyUi: Ui = {
   selection: [],
@@ -166,6 +169,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   let marqueeBase: string[] = [];
   /** Copied checklist items. */
   let itemClipboard: TodoItem[] | null = null;
+  /** Just-imported cards, laid out again in their lanes once their real heights are known. */
+  let importLayout: { ids: string[]; origin: Point } | null = null;
 
   function read(key: string): string | null {
     try {
@@ -304,6 +309,22 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     requestSettle([col.id]);
   }
 
+  /**
+   * Imported cards are first laid out with guessed heights. Once every one has been drawn, lay the
+   * lanes out again with the real heights, so cards sit 20px apart. Part of the import, not a
+   * separate undo step.
+   */
+  function relayoutImport() {
+    if (!importLayout) return;
+    const ids = importLayout.ids.filter((id) => state.board.cards[id] && state.board.order.includes(id));
+    if (!ids.length) importLayout = null;
+    if (!importLayout || !ids.every((id) => heights.has(id))) return;
+    const { spots } = packInLanes(ids, (id) => heights.get(id)!, importLayout.origin);
+    importLayout = null;
+    set({ ...state, board: placeCards(state.board, spots) });
+    requestSettle(ids);
+  }
+
   /** Select the checklist items shown from `anchor` to `to` in one list. */
   function selectItemRange(cardId: string, anchor: string, to: string) {
     const card = state.board.cards[cardId];
@@ -384,6 +405,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     setMeasuredHeight(id: string, h: number) {
       if (heights.get(id) === h) return;
       heights.set(id, h);
+      relayoutImport();
       // A loose block or column that grew may now cover something: move that out of its way.
       if (state.board.order.includes(id)) requestSettle([id]);
     },
@@ -473,6 +495,30 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         B.placementForNewCard(state.board, selected) ??
         ({ type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H[kind], screenCentre(), measured) } as const);
       addNewCard(kind, place);
+    },
+
+    /**
+     * Import a board exported from Milanote as Markdown: its cards are added loose to this board,
+     * in lanes, at the top middle of the screen (or the nearest free space), and selected.
+     * One undo removes them all. Returns how many cards were added.
+     */
+    importMilanote(markdown: string): number {
+      const cards = parseMilanote(markdown);
+      if (!cards.length) return 0;
+      const ids = cards.map((c) => c.id);
+      const guess = new Map(cards.map((c) => [c.id, estimateHeight(c)]));
+      const size = packInLanes(ids, (id) => guess.get(id)!, { x: 0, y: 0 });
+      const top = screenToBoard(state.view, { x: 0, y: IMPORT_TOP_MARGIN }).y;
+      const want = { x: screenCentre().x - size.w / 2, y: top };
+      const origin = spotForNewBlock(state.board, size.w, size.h, { x: screenCentre().x, y: top + size.h / 2 }, measured);
+      const { spots } = packInLanes(ids, (id) => guess.get(id)!, origin);
+      commit((b) => addImported(b, cards, spots), { ui: { selection: ids, itemSel: null, colourMenuOpen: false, confirm: null } });
+      importLayout = { ids, origin };
+      // If free space was found elsewhere, bring it to where the cards were meant to appear.
+      const z = state.view.zoom;
+      if (Math.abs(want.x - origin.x) > GRID || Math.abs(want.y - origin.y) > GRID)
+        updateView((v) => panBy(v, Math.round((want.x - origin.x) * z), Math.round((want.y - origin.y) * z)));
+      return cards.length;
     },
 
     /** Clicking New column. */

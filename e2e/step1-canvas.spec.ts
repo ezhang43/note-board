@@ -48,6 +48,8 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'To-do list',
     'Link',
     'New column',
+    'Import',
+    'Milanote Markdown file',
   ]);
   await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'true');

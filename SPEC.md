@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Add Note · Add To-do list · Add Link · New column; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Add Note · Add To-do list · Add Link · New column · Import; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |
@@ -42,6 +42,16 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 - New cards and columns never appear on top of existing blocks. From a toolbar click they appear at the free spot nearest the middle of the screen.
 - Add Note, Add To-do list, Add Link and New column can also be dragged from the toolbar onto the board. A dashed outline shows where the block will appear (the free spot nearest the pointer); a new card dragged over a column goes into the column at the pointer (a new column never does). Letting go off the board adds nothing.
 - Pan and zoom are remembered between visits; the tool always starts as Hand.
+
+### Importing from Milanote
+
+Import (toolbar) opens a file picker for a Milanote board exported as Markdown (.md). Its cards are added to the current board; nothing already there is changed or replaced.
+
+- Each heading becomes a to-do list with that title; a heading with nothing under it becomes an empty list. The board name line at the top of the file is ignored.
+- Checklist lines become the list's items, keeping sub-items (up to 6 levels) and ticks; ticked top-level items go into "Completed". A blank line between items starts a new list with no title.
+- Other text becomes a note (paragraphs kept; bold, strike-through and escape marks removed; links shown as "text (address)"). A note that is only a web address becomes a link card, titled by a heading right above it.
+- The export has no positions, sizes or colours: cards get their kind's default colour and are laid out loose in up to 4 lanes 20px apart (each card at the bottom of the shortest lane, in file order), starting at the top middle of the screen, or the nearest free space (the board then pans to show them). Once drawn, the lanes are tidied to the cards' real heights.
+- The imported cards are selected, so they can be dragged or deleted together. One undo removes the whole import. A file with nothing in it adds nothing.
 
 ## Blocks: cards and columns
 
@@ -176,7 +186,7 @@ Build in this order, each step tested and working before the next.
 4. Selection, rectangle select, clipboard, delete, and undo/redo for everything
 5. Checklists: items, nesting, Completed section, item drag, multi-select and drop-to-board
 
-After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, and the published site with sign-in, sync, offline use and installing as an app.
+After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, and the published site with sign-in, sync, offline use and installing as an app.
 
 **Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards, mobile layout.
 

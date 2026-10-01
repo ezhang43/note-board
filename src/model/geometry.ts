@@ -33,6 +33,45 @@ export function freeSpot(rect: Rect, others: Rect[], gap: number, step: number):
   return { x: rect.x, y: rect.y };
 }
 
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
+/**
+ * The block nearest to `from` in a direction (for Ctrl+arrow keys). A candidate must start past
+ * the middle of `from` in that direction. Closest wins, where sideways distance counts double, so
+ * a block straight ahead beats one that is nearer but off to the side.
+ */
+export function nearestInDirection(from: Rect, candidates: { id: string; rect: Rect }[], dir: Direction): string | null {
+  const midX = from.x + from.w / 2;
+  const midY = from.y + from.h / 2;
+  const gap = (a0: number, a1: number, b0: number, b1: number) => Math.max(0, b0 - a1, a0 - b1);
+  let best: { id: string; score: number; d: number } | null = null;
+  for (const { id, rect: r } of candidates) {
+    let ahead: number;
+    let side: number;
+    if (dir === 'down') {
+      if (r.y < midY) continue;
+      ahead = Math.max(0, r.y - (from.y + from.h));
+      side = gap(from.x, from.x + from.w, r.x, r.x + r.w);
+    } else if (dir === 'up') {
+      if (r.y + r.h > midY) continue;
+      ahead = Math.max(0, from.y - (r.y + r.h));
+      side = gap(from.x, from.x + from.w, r.x, r.x + r.w);
+    } else if (dir === 'right') {
+      if (r.x < midX) continue;
+      ahead = Math.max(0, r.x - (from.x + from.w));
+      side = gap(from.y, from.y + from.h, r.y, r.y + r.h);
+    } else {
+      if (r.x + r.w > midX) continue;
+      ahead = Math.max(0, from.x - (r.x + r.w));
+      side = gap(from.y, from.y + from.h, r.y, r.y + r.h);
+    }
+    const score = ahead + 2 * side;
+    const d = Math.hypot(r.x + r.w / 2 - midX, r.y + r.h / 2 - midY);
+    if (!best || score < best.score || (score === best.score && d < best.d)) best = { id, score, d };
+  }
+  return best?.id ?? null;
+}
+
 /** Which of the given column rectangles (screen coordinates) the pointer is over, if any. */
 export function columnAt(p: Point, columns: { id: string; rect: Rect }[], reachBelow: number): string | null {
   let found: string | null = null;

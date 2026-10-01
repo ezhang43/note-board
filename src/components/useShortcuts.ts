@@ -1,12 +1,8 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
 import { appStore } from '../store/appStore';
-
-export function isTextField(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
-  return target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'checkbox';
-}
+import { handleArrowKey } from './keyboardNav';
+import { isTextField } from './textField';
 
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */
 export function useShortcuts() {
@@ -24,6 +20,9 @@ export function useShortcuts() {
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
+
+      // Arrows move between a card's fields and between cards; Ctrl+arrows jump card to card.
+      if (handleArrowKey(e)) return e.preventDefault();
 
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;

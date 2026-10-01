@@ -27,22 +27,26 @@ async function twoNotes(page: import('@playwright/test').Page) {
   return [looseCards(page).nth(0), looseCards(page).nth(1)] as const;
 }
 
-test('dragging onto another block shows a dashed landing spot, and the drop lands there', async ({ page }) => {
+test('dragging onto another block: the dragged block takes the spot and the other moves aside, live', async ({ page }) => {
   const [a, b] = await twoNotes(page);
-  const target = await box(a);
+  const aStart = await boardPos(a);
+  const bStart = await boardPos(b);
   const g = await grabPoint(b);
   await page.mouse.move(g.x, g.y);
   await page.mouse.down();
-  await page.mouse.move(target.x + 40, target.y + 30, { steps: 12 });
+  // Move b so its top-left sits just off a's top-left.
+  const z = Number(await page.getByTestId('canvas').getAttribute('data-zoom'));
+  await page.mouse.move(g.x + (aStart.x - bStart.x + 7) * z, g.y + (aStart.y - bStart.y - 6) * z, { steps: 12 });
   const spot = page.getByTestId('landing-spot');
   await expect(spot).toBeVisible();
-  const spotBox = await box(spot);
+  const s = await spot.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
+  expect(s).toEqual(aStart); // the outline is on a's spot: b takes priority
+  await expect.poll(async () => boardPos(a)).not.toEqual(aStart); // a is already moving aside
   await page.mouse.up();
   await expect(spot).toHaveCount(0);
+  expect(await boardPos(b)).toEqual(aStart);
+  expect(await boardPos(a)).not.toEqual(aStart);
   await expectNoOverlaps(page);
-  const landed = await box(b);
-  expect(Math.round(landed.x)).toBe(Math.round(spotBox.x));
-  expect(Math.round(landed.y)).toBe(Math.round(spotBox.y));
 });
 
 test('a dragged block follows the pointer exactly; the outline shows the nearest grid spot, where it lands', async ({ page }) => {

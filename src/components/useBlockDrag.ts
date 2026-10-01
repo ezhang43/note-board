@@ -67,6 +67,18 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
   };
 }
 
+/**
+ * Where to draw a block while another block is being dragged: its preview spot if it is being
+ * pushed out of the way, otherwise its own position (moved along if it is part of a group drag).
+ */
+export function useDragPosition(id: string, own: { x: number; y: number }): { x: number; y: number } {
+  const [dx, dy] = useGroupOffset(id);
+  const bx = useAppState((s) => s.ui.drag?.bumped[id]?.x);
+  const by = useAppState((s) => s.ui.drag?.bumped[id]?.y);
+  if (bx !== undefined && by !== undefined) return { x: bx, y: by };
+  return { x: own.x + dx, y: own.y + dy };
+}
+
 /** How far this block is being moved as part of a group drag (0, 0 when it isn't). */
 export function useGroupOffset(id: string): [number, number] {
   const dx = useAppState((s) => (s.ui.drag?.group.includes(id) ? s.ui.drag.x - s.ui.drag.startX : 0));

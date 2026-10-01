@@ -5,7 +5,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
-import { blockPointerDown, useGroupOffset } from './useBlockDrag';
+import { blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -22,7 +22,8 @@ export function ColumnView({ id }: { id: string }) {
   const confirmColumns = useAppState((s) =>
     s.ui.confirm?.columnId === id ? s.ui.confirm.ids.filter((x) => s.board.columns[x]).length : 0,
   );
-  const [groupDx, groupDy] = useGroupOffset(id);
+  // Where to draw it while something is being dragged (pushed aside, or moving with a group).
+  const dragPos = useDragPosition(id, col ?? { x: 0, y: 0 });
   const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
@@ -31,7 +32,7 @@ export function ColumnView({ id }: { id: string }) {
   if (!col) return null;
 
   const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
-  const pos = drag ?? { x: col.x + groupDx, y: col.y + groupDy };
+  const pos = drag ?? dragPos;
   const w = resize?.liveW ?? col.w;
   const minH = col.collapsed ? undefined : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
   // A card being dragged out is drawn on its own until it is dropped.

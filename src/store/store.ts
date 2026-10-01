@@ -27,6 +27,8 @@ export interface Drag {
   overColumn: string | null;
   /** Where the block will land if dropped now, when that differs from x / y (shown as a dashed outline). */
   land: Rect | null;
+  /** Blocks pushed out of the way to make room, and where they would go (shown live while dragging). */
+  bumped: Record<string, Point>;
 }
 
 /** A block being resized: its size so far, which blocks it matches, and the size label by the pointer. */
@@ -254,6 +256,31 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   }
 
   const measured = (id: string) => heights.get(id);
+
+  /**
+   * The board as it would be if the dragged block(s) were dropped now: placed on the grid spot
+   * under the pointer (moving a group by the same amount), with every other block that is in the
+   * way moved to the nearest free spot, so the dragged blocks take priority.
+   * One exception: a single dragged card never pushes a column (dropping a card on a column puts it
+   * inside, and a column sliding away would make that impossible). Where it would cover a column,
+   * the card takes the nearest free spot instead. `at` is where the dragged block ends up.
+   */
+  function dropResult(d: Drag): { board: Board; ids: string[]; at: Point } {
+    const snap = state.board.snap ? snapToGrid : (v: number) => v;
+    const target = { x: snap(d.x), y: snap(d.y) };
+    const ids = [d.id, ...d.group];
+    let b = state.board;
+    let anchors = ids;
+    if (d.group.length) b = B.moveBlocksBy(b, ids, target.x - d.startX, target.y - d.startY);
+    else if (d.kind === 'column') b = B.moveColumn(b, d.id, target.x, target.y);
+    else {
+      b = B.moveCard(b, d.id, { type: 'loose', ...target });
+      anchors = [...b.order.filter((id) => b.columns[id]), d.id];
+    }
+    const board = settle(b, measured, anchors);
+    const self = board.columns[d.id] ?? board.cards[d.id];
+    return { board, ids, at: { x: self.x, y: self.y } };
+  }
 
   /** Size of a block being dragged, as it will be once dropped loose on the board. */
   function draggedSize(d: Drag) {
@@ -651,24 +678,26 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const topLevel = state.board.order.includes(id);
       // A selected block dragged together with other selected blocks moves them all.
       const group = topLevel && sel.includes(id) ? sel.filter((s) => s !== id && state.board.order.includes(s)) : [];
-      updateUi({ drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null }, confirm: null });
+      updateUi({ drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {} }, confirm: null });
     },
     moveDrag(x: number, y: number, overColumn: string | null) {
       const d = state.ui.drag;
       if (!d) return;
-      // Several blocks move as one: they don't drop into columns and have no single landing spot.
+      // Several blocks move as one: they don't drop into columns.
       const over = d.group.length ? null : overColumn;
       if (d.x === x && d.y === y && d.overColumn === over) return;
-      // The block follows the pointer exactly; where it will land (on the grid, clear of other
-      // blocks) is shown as a dashed outline, and it glides there when let go.
-      let land: Rect | null = null;
-      if (!over && !d.group.length) {
-        const size = draggedSize(d);
-        const snap = state.board.snap ? snapToGrid : (v: number) => v;
-        const spot = landingSpot(state.board, d.id, snap(x), snap(y), size, measured);
-        if (spot.x !== x || spot.y !== y) land = { ...spot, ...size };
+      if (over) return updateUi({ drag: { ...d, x, y, overColumn: over, land: null, bumped: {} } });
+      // The block follows the pointer exactly. It will land on the grid spot under it (dashed
+      // outline), and takes priority there: blocks in the way are shown moving aside right away.
+      const result = dropResult({ ...d, x, y });
+      const bumped: Record<string, Point> = {};
+      for (const id of result.board.order) {
+        const was = state.board.columns[id] ?? state.board.cards[id];
+        const now = result.board.columns[id] ?? result.board.cards[id];
+        if (!result.ids.includes(id) && (was.x !== now.x || was.y !== now.y)) bumped[id] = { x: now.x, y: now.y };
       }
-      updateUi({ drag: { ...d, x, y, overColumn: over, land } });
+      const land = !d.group.length && (result.at.x !== x || result.at.y !== y) ? { ...result.at, ...draggedSize(d) } : null;
+      updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped } });
     },
     cancelDrag() {
       updateUi({ drag: null });
@@ -676,27 +705,18 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     /**
      * Finish a drag. `index` is where a card dropped on a column goes in it; otherwise the block
-     * lands at the nearest free spot to where it was let go.
+     * lands on the grid spot where it was let go, and anything in the way moves aside.
      */
     dropDrag(index: number | null) {
       const d = state.ui.drag;
       if (!d) return;
-      if (d.group.length) {
-        // The whole group moves by the same amount, landing on the grid when snapping is on.
-        const ids = [d.id, ...d.group];
-        const snap = state.board.snap ? snapToGrid : (v: number) => v;
-        commit((b) => B.moveBlocksBy(b, ids, snap(d.x) - d.startX, snap(d.y) - d.startY), { ui: { drag: null } });
-        return requestSettle(ids);
+      if (d.overColumn && index != null) {
+        commit((b) => B.moveCard(b, d.id, { type: 'column', columnId: d.overColumn!, index }), { ui: { drag: null } });
+        return requestSettle([d.overColumn]);
       }
-      const at = d.land ?? { x: d.x, y: d.y };
-      if (d.kind === 'column') {
-        commit((b) => B.moveColumn(b, d.id, at.x, at.y), { ui: { drag: null } });
-        return requestSettle([d.id]);
-      }
-      const intoColumn = d.overColumn && index != null;
-      const place: B.Placement = intoColumn ? { type: 'column', columnId: d.overColumn!, index: index! } : { type: 'loose', ...at };
-      commit((b) => B.moveCard(b, d.id, place), { ui: { drag: null } });
-      requestSettle([intoColumn ? d.overColumn! : d.id]);
+      const result = dropResult(d);
+      commit(() => result.board, { ui: { drag: null } });
+      requestSettle(result.ids);
     },
 
     // ---------- resizing ----------

@@ -8,7 +8,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
-import { blockPointerDown, useGroupOffset } from './useBlockDrag';
+import { blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -21,14 +21,15 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
-  const [groupDx, groupDy] = useGroupOffset(id);
+  // Where to draw it while something is being dragged (pushed aside, or moving with a group).
+  const dragPos = useDragPosition(id, card ?? { x: 0, y: 0 });
   const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!card) return null;
 
   const colors = PALETTE[card.color];
-  const pos = drag ?? { x: card.x + groupDx, y: card.y + groupDy };
+  const pos = drag ?? dragPos;
   // Inside a column a card follows the column's width and fits its content.
   const w = resize?.liveW ?? card.w ?? CARD_W;
   const h = resize?.liveH ?? card.h;

@@ -111,23 +111,26 @@ export function toggleCollapsed(board: Board, id: string): Board {
   return updateCard(board, id, (c) => ({ ...c, collapsed: !c.collapsed }));
 }
 
+/** Deletes a card. The Completed card is never deleted (owner's rule). */
 export function deleteCard(board: Board, cardId: string): Board {
-  if (!board.cards[cardId]) return board;
+  if (!board.cards[cardId] || board.cards[cardId].kind === 'completed') return board;
   const detached = detach(board, cardId);
   const cards = { ...detached.cards };
   delete cards[cardId];
   return { ...detached, cards };
 }
 
-/** Deletes a column and every card in it. */
+/** Deletes a column and every card in it, except the Completed card, which is left loose where the column was. */
 export function deleteColumn(board: Board, columnId: string): Board {
   const col = board.columns[columnId];
   if (!col) return board;
   const cards = { ...board.cards };
-  for (const id of col.cardIds) delete cards[id];
+  const kept = col.cardIds.filter((id) => cards[id]?.kind === 'completed');
+  for (const id of col.cardIds) if (!kept.includes(id)) delete cards[id];
+  for (const id of kept) cards[id] = { ...cards[id], x: col.x, y: col.y };
   const columns = { ...board.columns };
   delete columns[columnId];
-  return { ...board, cards, columns, order: board.order.filter((id) => id !== columnId) };
+  return { ...board, cards, columns, order: [...board.order.filter((id) => id !== columnId), ...kept] };
 }
 
 /** Deletes every listed card and column (columns go with their cards). */

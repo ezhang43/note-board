@@ -146,7 +146,8 @@ export function estimateHeight(card: Card): number {
     case 'note':
       return snapToGrid(40 + card.text.split('\n').reduce((n, p) => n + lines(p, 30), 0) * 22 + GRID / 2);
     case 'link':
-      return NEW_BLOCK_H.link;
+    case 'completed':
+      return NEW_BLOCK_H[card.kind];
     case 'todo': {
       const rows = (items: TodoItem[], depth: number): number =>
         items.reduce((n, it) => n + 30 + (lines(it.text, Math.max(10, 24 - depth * 3)) - 1) * 20 + rows(it.children, depth + 1), 0);

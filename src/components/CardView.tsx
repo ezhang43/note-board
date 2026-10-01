@@ -1,7 +1,8 @@
 import { useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
 import { CARD_W } from '../model/constants';
-import type { Card, LinkCard, NoteCard } from '../model/types';
+import { dayLabel } from '../model/completed';
+import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
@@ -11,7 +12,7 @@ import { blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
-const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link' } as const;
+const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed' } as const;
 
 /** A note, to-do list or link card, either loose on the board or inside a column. */
 export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
@@ -66,9 +67,12 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
         >
           <ChevronIcon collapsed={card.collapsed} />
         </button>
-        <button type="button" className="icon-button" aria-label="Delete card" onClick={() => appStore.deleteCard(id)}>
-          <CloseIcon />
-        </button>
+        {/* The Completed card can never be deleted, so it has no ×. */}
+        {card.kind !== 'completed' && (
+          <button type="button" className="icon-button" aria-label="Delete card" onClick={() => appStore.deleteCard(id)}>
+            <CloseIcon />
+          </button>
+        )}
       </div>
       {!card.collapsed && <CardBody card={card} />}
       {!inColumn && !card.collapsed && (
@@ -88,7 +92,59 @@ function CardBody({ card }: { card: Card }) {
       return <TodoBody card={card} />;
     case 'link':
       return <LinkBody card={card} />;
+    case 'completed':
+      return <CompletedBody card={card} />;
   }
+}
+
+/** The master Completed card: items moved here by Clean up, grouped by day, newest first. */
+function CompletedBody({ card }: { card: CompletedCard }) {
+  return (
+    <div className="completed-card-body">
+      <div className="completed-card-title">Completed</div>
+      {!card.groups.length && <div className="completed-empty">Nothing cleaned up yet</div>}
+      {card.groups.map((g) => (
+        <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>
+          <h3 className="completed-date">{dayLabel(g.date)}</h3>
+          {g.entries.map((e) => (
+            <CompletedRow key={e.item.id} entry={e} />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
+function CompletedRow({ entry }: { entry: CompletedEntry }) {
+  return (
+    <div className="completed-entry" data-entry-id={entry.item.id}>
+      <div className="completed-row">
+        <input
+          type="checkbox"
+          aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
+          title="Untick to send it back to its list"
+          checked
+          onChange={() => appStore.restoreCompleted(entry.item.id)}
+        />
+        <span className="completed-text">{entry.item.text}</span>
+        <span className="completed-from">{entry.fromTitle || 'List'}</span>
+      </div>
+      <CompletedChildren items={entry.item.children} depth={1} />
+    </div>
+  );
+}
+
+function CompletedChildren({ items, depth }: { items: TodoItem[]; depth: number }) {
+  return items.map((it) => (
+    <div key={it.id}>
+      <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
+        <input type="checkbox" aria-label="Done" checked={it.done} disabled />
+        <span className="completed-text">{it.text}</span>
+      </div>
+      <CompletedChildren items={it.children} depth={depth + 1} />
+    </div>
+  ));
 }
 
 function NoteBody({ card }: { card: NoteCard }) {

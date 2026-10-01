@@ -43,4 +43,4 @@ export const COLUMN_DROP_REACH = 60;
  * Heights to assume for a brand-new block before it has been drawn and measured,
  * so it can be placed where it won't cover anything.
  */
-export const NEW_BLOCK_H = { note: 160, todo: 120, link: 160, column: COLUMN_MIN_H } as const;
+export const NEW_BLOCK_H = { note: 160, todo: 120, link: 160, completed: 160, column: COLUMN_MIN_H } as const;

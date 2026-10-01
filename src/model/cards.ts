@@ -66,6 +66,8 @@ export function collapsedPreview(card: Card): string {
       return card.text.split('\n')[0];
     case 'todo':
       return card.title || 'List';
+    case 'completed':
+      return 'Completed';
     case 'link':
       return card.title || domainOf(card.url) || '';
   }

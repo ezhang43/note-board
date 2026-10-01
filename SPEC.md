@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Add Note · Add To-do list · Add Link · New column · Import; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Add Note · Add To-do list · Add Link · New column · Import · Clean up; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |
@@ -121,6 +121,13 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 - Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range. Selected items get a teal text highlight and a lighter row tint. No action bar.
 - With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection; Tab / Shift+Tab move them all in or out one level together (if any of them can't move, none do) and they stay selected; Escape clears.
 
+### Clean up and the Completed card
+
+- Toolbar **Clean up** moves every ticked checklist item on the board into the board's one **Completed** card: ticked top-level items (the Completed sections) and ticked sub-items under open items, each with everything nested under it. Lists left empty get one blank item. It is faded when nothing is ticked, and is one undo step.
+- The first Clean up makes the Completed card (white, at the free spot nearest the middle of the screen). Items are grouped under the date Clean up was clicked ("2 Oct 2026"), newest date on top; cleaning up again on the same day adds to that day. Each item shows the list it came from, and its sub-items as they were.
+- The Completed card can never be deleted: it has no ×, the Delete key skips it, and deleting a column it sits in leaves it loose where the column was. It is never copied. It can be moved, collapsed, resized and put in a column like any card.
+- Unticking an item in the Completed card sends it back, unticked, to the list it came from: under the item it was nested in if that is still there, otherwise at the end of the list. If that list is gone, a new list with the old title is made next to the Completed card. An emptied day disappears.
+
 ## Selection, clipboard and undo
 
 Every block action works on one block or on a whole selection, and every change can be undone.
@@ -196,7 +203,7 @@ Build in this order, each step tested and working before the next.
 4. Selection, rectangle select, clipboard, delete, and undo/redo for everything
 5. Checklists: items, nesting, Completed section, item drag, multi-select and drop-to-board
 
-After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, and the published site with sign-in, sync, offline use and installing as an app.
+After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, white cards with 16 column colours and Auto-colour, Clean up with the Completed card, Delete joining checklist items, Tab on several items, collapse returning pushed blocks, and the published site with sign-in, sync, offline use and installing as an app.
 
 **Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards, mobile layout.
 

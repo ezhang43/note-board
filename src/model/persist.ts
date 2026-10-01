@@ -2,7 +2,7 @@ import { createBoard } from './board';
 import { COLUMN_W } from './constants';
 import { isColorKey } from './palette';
 import { clampZoom, createView } from './view';
-import type { Board, Card, Column, TodoItem, View } from './types';
+import type { Board, Card, Column, CompletedGroup, TodoItem, View } from './types';
 import { DEFAULT_COLOR } from './cards';
 
 export const BOARD_KEY = 'note-board:v1';
@@ -50,13 +50,28 @@ function parseItems(v: unknown, depth = 0): TodoItem[] {
   );
 }
 
+/** The Completed card's day groups. Entries without a readable item are dropped. */
+function parseGroups(v: unknown): CompletedGroup[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(isObject).flatMap((g) => {
+    if (typeof g.date !== 'string' || !Array.isArray(g.entries)) return [];
+    const entries = g.entries.filter(isObject).flatMap((e) => {
+      const [item] = parseItems([e.item]);
+      if (!item) return [];
+      const fromParentId = typeof e.fromParentId === 'string' ? e.fromParentId : null;
+      return [{ item, fromCardId: str(e.fromCardId, ''), fromTitle: str(e.fromTitle, ''), fromParentId }];
+    });
+    return entries.length ? [{ date: g.date, entries }] : [];
+  });
+}
+
 function parseCard(id: string, c: unknown): Card | null {
   if (!isObject(c)) return null;
   const kind = c.kind;
-  if (kind !== 'note' && kind !== 'todo' && kind !== 'link') return null;
+  if (kind !== 'note' && kind !== 'todo' && kind !== 'link' && kind !== 'completed') return null;
   const base = {
     id,
-    color: isColorKey(c.color) ? c.color : DEFAULT_COLOR[kind],
+    color: isColorKey(c.color) ? c.color : kind === 'completed' ? 'stone' : DEFAULT_COLOR[kind],
     collapsed: bool(c.collapsed, false),
     x: num(c.x, 0),
     y: num(c.y, 0),
@@ -65,6 +80,7 @@ function parseCard(id: string, c: unknown): Card | null {
   };
   if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
+  if (kind === 'completed') return { ...base, kind, groups: parseGroups(c.groups) };
   const items = parseItems(c.items);
   return {
     ...base,

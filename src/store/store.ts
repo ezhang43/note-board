@@ -9,6 +9,7 @@ import { emptyHistory, recordChange, redo, undo, type History } from '../model/h
 import { blockRect, blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
 import { overlaps } from '../model/geometry';
 import type { ColorKey } from '../model/palette';
+import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../model/completed';
 import { addImported, estimateHeight, packInLanes, parseMilanote, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import type { Board, CardKind, Point, Rect, Size, TodoItem, Tool, View } from '../model/types';
@@ -584,6 +585,35 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       return cards.length;
     },
 
+    /**
+     * Clean up: every ticked checklist item moves into the board's Completed card, under today's
+     * date. The first Clean up makes that card, at the free spot nearest the middle of the screen.
+     * One undo step. Returns how many items moved.
+     */
+    cleanUp(now: Date = new Date()): number {
+      const place = { type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H.completed, screenCentre(), measured) } as const;
+      const result = cleanUp(state.board, dayKey(now), place);
+      if (!result.count) return 0;
+      const made = !completedCardOf(state.board);
+      commit(() => result.board, { ui: { selection: result.cardId ? [result.cardId] : [], itemSel: null, confirm: null } });
+      if (made && result.cardId) requestSettle([result.cardId]);
+      return result.count;
+    },
+
+    /** Unticking an item in the Completed card sends it back to its list (or a new list, if that's gone). */
+    restoreCompleted(itemId: string) {
+      const done = completedCardOf(state.board);
+      if (!done) return;
+      // If its list is gone, the new list goes next to the Completed card.
+      const near = blockRect(state.board, B.columnOf(state.board, done.id)?.id ?? done.id, measured);
+      const centre = near ? { x: near.x + near.w + CARD_W / 2 + 20, y: near.y + NEW_BLOCK_H.todo / 2 } : screenCentre();
+      const place = { type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H.todo, centre, measured) } as const;
+      const result = restoreEntry(state.board, itemId, place);
+      if (!result.cardId) return;
+      commit(() => result.board);
+      if (state.board.order.includes(result.cardId)) requestSettle([result.cardId]);
+    },
+
     /** Clicking New column. */
     addColumn() {
       addNewColumn(spotForNewBlock(state.board, COLUMN_W, NEW_BLOCK_H.column, screenCentre(), measured));
@@ -626,7 +656,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     setNoteText: (id: string, text: string) =>
       commit((b) => B.updateCard(b, id, (c) => (c.kind === 'note' && c.text !== text ? { ...c, text } : c)), { merge: `text:${id}` }),
     setCardTitle: (id: string, title: string) =>
-      commit((b) => B.updateCard(b, id, (c) => (c.kind !== 'note' && c.title !== title ? { ...c, title } : c)), { merge: `title:${id}` }),
+      commit((b) => B.updateCard(b, id, (c) => ((c.kind === 'todo' || c.kind === 'link') && c.title !== title ? { ...c, title } : c)), { merge: `title:${id}` }),
     setLinkUrl: (id: string, url: string) =>
       commit((b) => B.updateCard(b, id, (c) => (c.kind === 'link' && c.url !== url ? { ...c, url } : c)), { merge: `url:${id}` }),
     setItemText: (cardId: string, itemId: string, text: string) =>

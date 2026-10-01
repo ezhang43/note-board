@@ -18,13 +18,15 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
   const selectedColumns = new Set(ids.filter((id) => board.columns[id]));
   const entries: ClipEntry[] = [];
   for (const id of ids) {
+    // The Completed card is one of a kind: it is never copied.
     const col = board.columns[id];
     if (col) {
-      entries.push({ kind: 'column', column: structuredClone(col), cards: col.cardIds.map((cid) => structuredClone(board.cards[cid])) });
+      const cardIds = col.cardIds.filter((cid) => board.cards[cid].kind !== 'completed');
+      entries.push({ kind: 'column', column: { ...structuredClone(col), cardIds }, cards: cardIds.map((cid) => structuredClone(board.cards[cid])) });
       continue;
     }
     const card = board.cards[id];
-    if (!card) continue;
+    if (!card || card.kind === 'completed') continue;
     const parent = columnOf(board, id);
     if (parent && selectedColumns.has(parent.id)) continue;
     entries.push({ kind: 'card', card: structuredClone(card), columnId: parent?.id ?? null });

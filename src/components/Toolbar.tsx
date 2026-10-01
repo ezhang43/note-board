@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE, type ColorKey } from '../model/palette';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
@@ -103,6 +104,22 @@ function ColourControl() {
   );
 }
 
+/** Clean up: moves every ticked item into the Completed card. Faded when nothing is ticked. */
+function CleanUpButton() {
+  const any = useAppState((s) => hasTickedItems(s.board));
+  return (
+    <button
+      type="button"
+      className="tb-button faded-colour"
+      title={any ? "Move every ticked item into the Completed card, under today's date" : 'Nothing is ticked yet'}
+      aria-disabled={any ? undefined : true}
+      onClick={() => any && appStore.cleanUp()}
+    >
+      Clean up
+    </button>
+  );
+}
+
 /** Auto-colour: gives every column a different colour. Faded when there are no columns. */
 function AutoColourButton() {
   const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
@@ -198,6 +215,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <AddCardButton kind="link" label="Link" />
       <NewColumnButton />
       <ImportButton />
+      <CleanUpButton />
 
       {onSignOut && (
         <>

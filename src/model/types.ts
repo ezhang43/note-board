@@ -40,7 +40,33 @@ export interface LinkCard extends CardBase {
   url: string;
 }
 
-export type Card = NoteCard | TodoCard | LinkCard;
+/** A ticked item moved into the Completed card by Clean up, with where it came from. */
+export interface CompletedEntry {
+  /** The item as it was (ticked), with its sub-items. */
+  item: TodoItem;
+  /** The list it came from, and its title then (used if that list is gone when it's restored). */
+  fromCardId: string;
+  fromTitle: string;
+  /** The item it was nested under, or null if it was a top-level item. */
+  fromParentId: string | null;
+}
+
+/** Items cleaned up on one day ("YYYY-MM-DD", the day Clean up was clicked). */
+export interface CompletedGroup {
+  date: string;
+  entries: CompletedEntry[];
+}
+
+/**
+ * The board's master Completed card (owner request): made by the first Clean up, and never deleted.
+ * Groups are newest first.
+ */
+export interface CompletedCard extends CardBase {
+  kind: 'completed';
+  groups: CompletedGroup[];
+}
+
+export type Card = NoteCard | TodoCard | LinkCard | CompletedCard;
 
 export interface Column {
   id: string;

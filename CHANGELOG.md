@@ -1,5 +1,12 @@
 # Changelog
 
+## Clean up (2026-10-02)
+
+- New **Clean up** button at the end of the toolbar: it moves every ticked item on the board (with anything under it) into a **Completed** card, grouped under today's date. The first time, it makes the Completed card in the middle of the screen.
+- The Completed card can't be deleted (it has no ×, and the Delete key leaves it alone). Each item shows which list it came from.
+- Untick an item in the Completed card to send it back to its list. If the list has been deleted, a new list with the same name is made next to the Completed card.
+- The toolbar is a little more compact so all its buttons fit on a laptop screen.
+
 ## Collapse puts things back (2026-10-02)
 
 - When expanding a card or column pushes other blocks out of the way, collapsing it again moves them back to where they were. A block you've moved yourself in the meantime stays where you put it.

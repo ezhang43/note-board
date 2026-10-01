@@ -100,8 +100,9 @@ export interface Ui {
   selection: string[];
   itemSel: ItemSelection | null;
   itemDrag: ItemDrag | null;
-  /** A checklist item whose text box should get the cursor (at the end of its text). */
+  /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where). */
   focusItem: string | null;
+  focusOffset: number | null;
   colourMenuOpen: boolean;
   confirm: ConfirmDelete | null;
   drag: Drag | null;
@@ -132,6 +133,7 @@ const emptyUi: Ui = {
   itemSel: null,
   itemDrag: null,
   focusItem: null,
+  focusOffset: null,
   colourMenuOpen: false,
   confirm: null,
   drag: null,
@@ -343,6 +345,13 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     return true;
   }
 
+  /** Tab / Shift+Tab with several items selected: they all move in (or out) one level together. */
+  function tabSelectedItems(outdent: boolean) {
+    const sel = state.ui.itemSel;
+    if (!sel) return;
+    commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
+  }
+
   function copyItems(): boolean {
     const sel = state.ui.itemSel;
     const card = sel && state.board.cards[sel.cardId];
@@ -411,7 +420,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     /** The checklist item that was asked to take the cursor has taken it. */
     focusTaken: (itemId: string) => {
-      if (state.ui.focusItem === itemId) updateUi({ focusItem: null });
+      if (state.ui.focusItem === itemId) updateUi({ focusItem: null, focusOffset: null });
     },
 
     /**
@@ -579,11 +588,23 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const item = createItem();
       commit((b) => C.editItems(b, cardId, (items) => C.addItemAfter(items, itemId, item)), { ui: { focusItem: item.id, itemSel: null } });
     },
-    /** Tab nests the item under the one above; Shift+Tab moves it out a level. */
+    /** Tab nests the item under the one above; Shift+Tab moves it out a level. With several items selected, they all move. */
     itemTab(cardId: string, itemId: string, outdent: boolean) {
+      const sel = state.ui.itemSel;
+      if (sel?.cardId === cardId && sel.ids.includes(itemId) && sel.ids.length > 1) return tabSelectedItems(outdent);
       commit((b) => C.editItems(b, cardId, (items) => (outdent ? C.outdentItem(items, itemId) : C.indentItem(items, itemId))), {
         ui: { focusItem: itemId },
       });
+    },
+    tabSelectedItems,
+    /** Delete at the end of an item pulls the item below up into it. Returns whether it did. */
+    itemDeleteAtEnd(cardId: string, itemId: string): boolean {
+      const card = state.board.cards[cardId];
+      if (card?.kind !== 'todo') return false;
+      const result = C.mergeNextItem(card.items, itemId);
+      if (!result) return false;
+      commit((b) => C.editItems(b, cardId, () => result.items), { ui: { focusItem: itemId, focusOffset: result.caret, itemSel: null } });
+      return true;
     },
     /** Backspace in an empty item deletes it (not the list's last item). Returns whether it did. */
     itemBackspace(cardId: string, itemId: string): boolean {

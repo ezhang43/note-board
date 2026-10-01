@@ -100,7 +100,7 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 
 - Item text is edited in place and wraps onto new lines at a fixed width; no focus rectangle.
 - Enter adds a new item below at the same level. There is no "Add an item" field and no add or sub-item buttons.
-- Tab nests an item under the one above; Shift+Tab moves it out a level. Backspace on an empty item deletes it (a list's last item cannot be deleted this way).
+- Tab nests an item under the one above; Shift+Tab moves it out a level. Backspace on an empty item deletes it (a list's last item cannot be deleted this way). Delete with the cursor at the very end of an item pulls the item shown below it up into it: its text is joined on (cursor stays at the join) and its sub-items move up one level into its place. It never pulls an item across from the open list into Completed.
 - On hover, each item shows a small drag grip and a trash can on its right. Neither shows otherwise.
 - Up / Down arrows move between items as if the list were one long text: Up goes to the end of the item above, Down to the start of the item below. Inside a multi-line item they move line by line first. Items hidden in a collapsed Completed section are skipped.
 
@@ -118,7 +118,7 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 **Selecting several items**
 
 - Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range. Selected items get a teal text highlight and a lighter row tint. No action bar.
-- With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection; Escape clears.
+- With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection; Tab / Shift+Tab move them all in or out one level together (if any of them can't move, none do) and they stay selected; Escape clears.
 
 ## Selection, clipboard and undo
 

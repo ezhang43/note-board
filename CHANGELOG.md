@@ -1,5 +1,10 @@
 # Changelog
 
+## Checklist keys (2026-10-02)
+
+- Pressing Delete at the end of a checklist item pulls the item below up into it (like joining two lines). The cursor stays where the two were joined; the pulled-up item's sub-items move up a level.
+- With several items selected, Tab moves them all in one level together and Shift+Tab moves them all out. They stay selected, so you can press Tab again.
+
 ## More colours and Auto-colour (2026-10-02)
 
 - The colour menu now has 16 colours (new: Sand, Coral, Orchid, Periwinkle, Aqua, Sage, Lime, Slate), in two rows.

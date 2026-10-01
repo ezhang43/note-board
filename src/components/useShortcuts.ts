@@ -31,6 +31,7 @@ export function useShortcuts() {
       if (appStore.getState().ui.itemSel) {
         if (key === 'delete' || key === 'backspace') return run(e, appStore.deleteSelectedItems);
         if (key === 'escape') return appStore.clearItemSelection();
+        if (key === 'tab') return run(e, () => appStore.tabSelectedItems(e.shiftKey));
         if (mod && key === 'c') return run(e, appStore.copyItems);
         if (mod && key === 'x') return run(e, appStore.cutItems);
         if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();

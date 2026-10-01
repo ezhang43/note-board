@@ -57,6 +57,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
 function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
+  const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
   const picked = useAppState((s) => !!s.ui.itemSel && s.ui.itemSel.cardId === cardId && s.ui.itemSel.ids.includes(item.id));
   const mark = useAppState((s) => {
     const h = s.ui.itemDrag?.hint;
@@ -64,14 +65,16 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
   });
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
 
-  // Put the cursor at the end of this item's text when asked (new item, Tab, Backspace).
+  // Put the cursor in this item's text when asked: at the end (new item, Tab, Backspace) or at a
+  // given spot (where two items were joined by Delete).
   useEffect(() => {
     const el = ref.current;
     if (!wantsFocus || !el) return;
     el.focus({ preventScroll: true });
-    el.setSelectionRange(el.value.length, el.value.length);
+    const at = focusOffset ?? el.value.length;
+    el.setSelectionRange(at, at);
     appStore.focusTaken(item.id);
-  }, [wantsFocus, item.id]);
+  }, [wantsFocus, focusOffset, item.id]);
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing) return;
@@ -83,6 +86,8 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       appStore.itemTab(cardId, item.id, e.shiftKey);
     } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
       if (appStore.itemBackspace(cardId, item.id)) e.preventDefault();
+    } else if (e.key === 'Delete' && !e.shiftKey && atEnd(e.currentTarget)) {
+      if (appStore.itemDeleteAtEnd(cardId, item.id)) e.preventDefault();
     }
     // Up / Down arrows are handled board-wide (keyboardNav.ts), across items and cards.
   }
@@ -114,6 +119,11 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       </button>
     </div>
   );
+}
+
+/** The cursor is at the very end of the text, with nothing selected. */
+function atEnd(el: HTMLTextAreaElement) {
+  return el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
 }
 
 /**

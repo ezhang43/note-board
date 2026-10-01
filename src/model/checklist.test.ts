@@ -229,3 +229,48 @@ describe('dragging items', () => {
     expect((b.cards.L1 as TodoCard).completedOpen).toBe(false);
   });
 });
+
+describe('several selected items with Tab / Shift+Tab (owner request)', () => {
+  it('Tab moves every selected item in one level together, keeping their order', () => {
+    const items = [item('a'), item('b', [item('b1')]), item('c'), item('d')];
+    expect(ids(C.indentItems(items, ['b', 'b1', 'c'])!)).toBe('a(b(b1) c) d');
+  });
+
+  it('Shift+Tab moves them all out one level, keeping their order', () => {
+    const items = [item('a', [item('x'), item('y'), item('z')])];
+    expect(ids(C.outdentItems(items, ['x', 'y'])!)).toBe('a(z) x y');
+  });
+
+  it('does nothing if any of them cannot move', () => {
+    expect(C.indentItems([item('a'), item('b')], ['a', 'b'])).toBeNull(); // nothing above a
+    expect(C.outdentItems([item('a', [item('x')]), item('b')], ['x', 'b'])).toBeNull(); // b is already top level
+  });
+});
+
+describe('Delete at the end of an item (owner request)', () => {
+  const t = (id: string, text: string, children: TodoItem[] = [], done = false): TodoItem => ({ id, text, done, children });
+
+  it('pulls the next item up into this one, cursor at the join', () => {
+    const r = C.mergeNextItem([t('a', 'Buy '), t('b', 'milk'), t('c', 'eggs')], 'a')!;
+    expect(r.items.map((i) => i.text)).toEqual(['Buy milk', 'eggs']);
+    expect(r.caret).toBe(4);
+  });
+
+  it("the next item's sub-items move up one level into its place", () => {
+    const r = C.mergeNextItem([t('a', 'A'), t('b', 'B', [t('b1', 'B1')]), t('c', 'C')], 'a')!;
+    expect(ids(r.items)).toBe('a b1 c');
+    expect(r.items[0].text).toBe('AB');
+  });
+
+  it('pulls up a first sub-item too (the item shown right below)', () => {
+    const r = C.mergeNextItem([t('a', 'A', [t('a1', 'one', [t('a11', 'deep')]), t('a2', 'two')])], 'a')!;
+    expect(ids(r.items)).toBe('a(a11 a2)');
+    expect(r.items[0].text).toBe('Aone');
+  });
+
+  it('does nothing at the end of the list, or from the last open item into Completed', () => {
+    expect(C.mergeNextItem([t('a', 'A'), t('b', 'B')], 'b')).toBeNull();
+    expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true)], 'a')).toBeNull();
+    expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true), t('e', 'E', [], true)], 'd')!.items.map((i) => i.text)).toEqual(['A', 'DE']);
+  });
+});

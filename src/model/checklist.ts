@@ -125,6 +125,44 @@ export function outdentItem(items: TodoItem[], id: string): TodoItem[] | null {
   return next;
 }
 
+/**
+ * Tab with several items selected: every selected item (with its sub-items) moves in one level,
+ * each as Tab would move it. All or nothing: if any of them can't move, none do.
+ */
+export function indentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
+  let next: TodoItem[] | null = items;
+  for (const id of rootsOf(items, ids)) next = next && indentItem(next, id);
+  return next === items ? null : next;
+}
+
+/** Shift+Tab with several items selected: every selected item moves out one level (all or nothing). */
+export function outdentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
+  let next: TodoItem[] | null = items;
+  // Bottom one first, so items that end up side by side keep their order.
+  for (const id of rootsOf(items, ids).reverse()) next = next && outdentItem(next, id);
+  return next === items ? null : next;
+}
+
+/**
+ * Delete at the very end of an item: the item shown below it is pulled up into it. Its text is added
+ * to the end of this item's text, and its sub-items move up one level into its place (as when a
+ * blank item is deleted). Nothing happens at the end of the list, or from the last open item into
+ * the Completed section. Returns the new items and where the cursor goes (the join point).
+ */
+export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[]; caret: number } | null {
+  const { open, done } = sections(items);
+  const section = [flatIds(open), flatIds(done)].find((ids) => ids.includes(id));
+  const nextId = section?.[section.indexOf(id) + 1];
+  if (!nextId) return null;
+  const next = cloned(items);
+  const cur = findItem(next, id)!.item;
+  const below = findItem(next, nextId)!;
+  const caret = cur.text.length;
+  cur.text += below.item.text;
+  below.list.splice(below.index, 1, ...below.item.children);
+  return { items: next, caret };
+}
+
 const isBlank = (it: TodoItem) => it.text.trim() === '';
 
 /** True if any of these items, or anything nested under them, has text. */

@@ -6,6 +6,8 @@
 - A card or column you drop no longer jumps back if another device saved while you were dragging.
 - Devices no longer send each other's changes back and forth (this could undo newer typing and clear Ctrl+Z history).
 - If the online board can't be read (damaged, or saved by a newer version of the app), it is left untouched and the page says the board couldn't be loaded, instead of showing an empty board and saving that over everything.
+- If saving online fails (for example the board is too big), a small red note at the bottom says "Couldn't save online. Changes are on this device only." Your next change tries again, and the note disappears once it works.
+- Changes are sent online the moment you minimise or switch away from the window, so closing the app right after typing no longer loses that text.
 
 ## Dark mode (2026-10-02)
 

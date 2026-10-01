@@ -1,5 +1,5 @@
 import { DEFAULT_BOARD_NAME } from './constants';
-import type { ColorKey } from './palette';
+import { AUTO_COLOUR_ORDER, type ColorKey } from './palette';
 import type { Board, Card, Column, TodoItem } from './types';
 
 // Every function here takes a board and returns a new one (or the same one when nothing changes).
@@ -157,6 +157,21 @@ export function recolour(board: Board, ids: string[], color: ColorKey): Board {
     const col = next.columns[id];
     if (col && col.color !== color) next = { ...next, columns: { ...next.columns, [id]: { ...col, color } } };
   }
+  return next;
+}
+
+/**
+ * Auto-colour: every column gets a different colour. Columns are taken left to right (top to
+ * bottom where they start at the same x), and colours are handed out in AUTO_COLOUR_ORDER, so
+ * no two columns share a colour until there are more than 16.
+ */
+export function autoColour(board: Board): Board {
+  const cols = Object.values(board.columns).sort((a, b) => a.x - b.x || a.y - b.y);
+  let next = board;
+  cols.forEach((col, i) => {
+    const color = AUTO_COLOUR_ORDER[i % AUTO_COLOUR_ORDER.length];
+    if (col.color !== color) next = { ...next, columns: { ...next.columns, [col.id]: { ...col, color } } };
+  });
   return next;
 }
 

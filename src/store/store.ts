@@ -469,6 +469,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       updateUi({ colourMenuOpen: !state.ui.colourMenuOpen });
     },
     closeColourMenu: () => updateUi({ colourMenuOpen: false }),
+    /** Auto-colour: give every column its own colour. */
+    autoColour: () => commit((b) => B.autoColour(b)),
     recolourSelection: (color: ColorKey) => commit((b) => B.recolour(b, state.ui.selection, color)),
 
     // ---------- selection box (Select tool) ----------

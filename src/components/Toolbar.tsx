@@ -103,6 +103,22 @@ function ColourControl() {
   );
 }
 
+/** Auto-colour: gives every column a different colour. Faded when there are no columns. */
+function AutoColourButton() {
+  const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
+  return (
+    <button
+      type="button"
+      className="tb-button faded-colour"
+      title={hasColumns ? 'Give every column a different colour' : 'Add a column first'}
+      aria-disabled={hasColumns ? undefined : true}
+      onClick={() => hasColumns && appStore.autoColour()}
+    >
+      Auto-colour
+    </button>
+  );
+}
+
 export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   const name = useAppState((s) => s.board.name);
   const snap = useAppState((s) => s.board.snap);
@@ -172,6 +188,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       </button>
 
       <ColourControl />
+      <AutoColourButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
       <span className="toolbar-label">Add</span>

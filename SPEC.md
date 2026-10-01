@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Add Note · Add To-do list · Add Link · New column · Import; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Add Note · Add To-do list · Add Link · New column · Import; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |
@@ -89,7 +89,8 @@ The board holds three card types and columns that stack cards. Cards show no typ
 - Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title); a column hides its cards.
 - Adding a card with a column selected puts it at the end of that column; with a card inside a column selected, directly below that card; otherwise loose on the board. A new to-do list starts with one blank item, cursor in it.
 - Column × opens a small confirmation ("Delete 'Ideas'?" · Cancel · red Delete column) and then deletes the column and all its cards.
-- Toolbar Colour recolours every selected column from 8 swatches: Butter, Peach, Rose, Lavender, Sky, Teal, Mint, Stone. Selected cards are left alone (cards are always white). It is faded unless a column is selected.
+- Toolbar Colour recolours every selected column from 16 swatches (two rows of 8, table below). Selected cards are left alone (cards are always white). It is faded unless a column is selected.
+- Toolbar Auto-colour gives every column on the board a different colour in one step (undoable). Columns are taken left to right, and colours handed out in this order so neighbours differ clearly: Sky, Peach, Mint, Lavender, Butter, Teal, Rose, Lime, Periwinkle, Coral, Aqua, Orchid, Sage, Sand, Slate, Stone. Colours repeat only beyond 16 columns. Faded when there are no columns.
 
 ## Checklists
 
@@ -168,12 +169,20 @@ Professional but with colour: white cards and soft-tinted columns on a warm neut
 | Swatch | Background | Edge | Text |
 | --- | --- | --- | --- |
 | Butter | #FFF3CF | #EED9A0 | #6B4600 |
+| Sand | #F4ECDF | #E3D3B9 | #5E4724 |
 | Peach | #FDEBDD | #F2CDB0 | #7A3A0E |
+| Coral | #FDE4DC | #F4C4B5 | #8A2F17 |
 | Rose | #FCE7EC | #F2C4CF | #8A1F3D |
+| Orchid | #F7E6F6 | #E8C5E5 | #7A2A73 |
 | Lavender | #EFEAFB | #D5CAF2 | #4B2E8A |
+| Periwinkle | #E4E7FC | #C5CBF3 | #2F3C8A |
 | Sky | #E6EEFC | #C3D4F2 | #1F4A8A |
+| Aqua | #DCF2F7 | #B3DDE8 | #135A6B |
 | Teal | #E0F2F1 | #B7DEDB | #155E58 |
 | Mint | #E3F4EA | #BFE0CC | #1B5A3C |
+| Sage | #E8EEE4 | #CCD8C3 | #3D5233 |
+| Lime | #EEF6D6 | #D3E3A6 | #4A5C12 |
+| Slate | #E7EBEF | #CBD3DC | #36424F |
 | Stone | #F7F5F1 | #E2DDD4 | #3F3B35 |
 
 ## Out of scope and build order

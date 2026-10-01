@@ -1,5 +1,10 @@
 # Changelog
 
+## More colours and Auto-colour (2026-10-02)
+
+- The colour menu now has 16 colours (new: Sand, Coral, Orchid, Periwinkle, Aqua, Sage, Lime, Slate), in two rows.
+- New **Auto-colour** button next to Colour: one click gives every column its own, different colour (neighbouring columns get clearly different ones). Ctrl+Z undoes it.
+
 ## Cleaner cards (2026-10-02)
 
 - Notes, to-do lists and links are now always white, loose or inside a column. Columns keep their colour.

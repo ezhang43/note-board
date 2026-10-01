@@ -246,7 +246,7 @@ test('Colour is faded unless a column is selected, and recolours the selected co
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
   await expect(colour).not.toHaveAttribute('aria-disabled');
   await colour.click();
-  await expect(menu.getByRole('button')).toHaveCount(8);
+  await expect(menu.getByRole('button')).toHaveCount(16);
   await menu.getByRole('button', { name: 'Teal' }).click();
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
 });
@@ -287,6 +287,22 @@ test('clicking empty space or pressing Escape clears the selection', async ({ pa
   await expect(note).toHaveClass(/selected/);
   await page.keyboard.press('Escape');
   await expect(note).not.toHaveClass(/selected/);
+});
+
+test('Auto-colour gives every column its own colour, and can be undone', async ({ page }) => {
+  const auto = page.getByRole('button', { name: 'Auto-colour' });
+  await expect(auto).toHaveAttribute('aria-disabled', 'true');
+  for (let i = 0; i < 3; i++) {
+    await add(page, 'New column');
+    await clickEmpty(page);
+  }
+  await expect(auto).not.toHaveAttribute('aria-disabled');
+  await auto.click();
+  const bgs = await columns(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
+  expect(new Set(bgs).size).toBe(3);
+  expect(bgs).not.toContain('rgb(239, 236, 230)');
+  await page.keyboard.press('Control+z');
+  for (const c of await columns(page).all()) await expect(c).toHaveCSS('background-color', 'rgb(239, 236, 230)');
 });
 
 test('everything is kept after reload', async ({ page }) => {

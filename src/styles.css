@@ -209,7 +209,8 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   top: 48px;
   left: 0;
   z-index: 3;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(8, 26px);
   gap: 8px;
   padding: 10px 12px;
   background: #fff;

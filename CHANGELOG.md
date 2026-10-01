@@ -1,5 +1,9 @@
 # Changelog
 
+## Easier-to-see title bands (2026-10-02)
+
+- Inside a column, a card's title band is now a slightly deeper shade of the column's colour, so it stands out from the column instead of blending into it.
+
 ## Fixes: selecting, copying and Tab (2026-10-02)
 
 - Copy and cut now take exactly the items you highlighted. Before, highlighting an item copied everything under it too. The copied text keeps the items' levels relative to each other. Cut leaves any sub-item you didn't highlight in the list.

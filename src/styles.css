@@ -299,10 +299,11 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
 
 /*
  * Titled cards (to-do lists, links, Completed) get a tinted band across the top, behind the header
- * and title: soft teal when loose, the column's colour inside a column.
+ * and title: soft teal when loose; inside a column, a deeper shade of the column's colour (mixed
+ * from its background and border tones) so the band stands out from the column without clashing.
  */
 .card { --band: var(--accent-soft); }
-.card.in-column { --band: var(--bg); }
+.card.in-column { --band: color-mix(in srgb, var(--col-edge) 70%, var(--bg)); }
 .card.titled .card-header {
   margin: 0 -12px;
   padding: 0 6px 0 12px;

@@ -56,7 +56,7 @@ export function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={`Column ${col.title}`}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge } as CSSProperties}
+      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
     >
       {/* Title and count centred; collapse arrow and × on the right. */}

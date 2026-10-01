@@ -523,6 +523,7 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   cursor: ew-resize;
   touch-action: none;
 }
+.card .resize-edge { top: 4px; bottom: 4px; }
 .resize-edge:hover { background: rgba(31, 95, 91, 0.28); }
 
 .card.size-match, .column.size-match { outline: 2px dashed var(--accent); }

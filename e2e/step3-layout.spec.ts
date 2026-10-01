@@ -117,7 +117,7 @@ test('within 8px of another block, the size matches it and both show dashed outl
   await expectNoOverlaps(page);
 });
 
-test('column edge sets width only and the cards inside follow; corner sets minimum height', async ({ page }) => {
+test('column edge sets width only and the cards inside follow; a column with cards fits them, an empty one gets its height from the corner', async ({ page }) => {
   await add(page, 'New column');
   const col = columns(page).first();
   await add(page, 'Note');
@@ -132,9 +132,35 @@ test('column edge sets width only and the cards inside follow; corner sets minim
   expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBe(h0);
   expect(await card.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(w - 32 - 2);
 
-  const corner = await box(col.getByRole('button', { name: 'Resize column', exact: true }));
+  // With cards in it, the column is exactly as tall as its cards: the corner only changes the width.
+  let corner = await box(col.getByRole('button', { name: 'Resize column', exact: true }));
   await dragPointer(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9, y: corner.y + 9 + 200 });
-  expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThan(h0 + 150);
+  expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBe(h0);
+
+  // Collapsing its card shrinks the column to fit.
+  await card.getByRole('button', { name: 'Collapse card' }).click();
+  await expect.poll(() => col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeLessThan(h0 - 100);
+
+  // An empty column keeps a minimum height, set by the corner.
+  await card.getByRole('button', { name: 'Delete card' }).click();
+  const e0 = await col.evaluate((el) => (el as HTMLElement).offsetHeight);
+  corner = await box(col.getByRole('button', { name: 'Resize column', exact: true }));
+  await dragPointer(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9, y: corner.y + 9 + 200 });
+  expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThan(e0 + 150);
+});
+
+test('a collapsed card can still be resized, from its right edge', async ({ page }) => {
+  await add(page, 'Note');
+  const note = looseCards(page).first();
+  await note.getByRole('button', { name: 'Collapse card' }).click();
+  await expect(note.getByRole('button', { name: 'Resize card', exact: true })).toHaveCount(0);
+  const edge = await box(note.getByRole('button', { name: 'Resize card width' }));
+  const w0 = (await box(note)).width;
+  await dragPointer(page, { x: edge.x + 5, y: edge.y + 5 }, { x: edge.x + 5 + 100, y: edge.y + 5 });
+  expect(await note.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(340);
+  expect((await box(note)).width).toBeGreaterThan(w0 + 90);
+  await note.getByRole('button', { name: 'Expand card' }).click();
+  expect(await note.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(340);
 });
 
 test('a note growing as you type pushes the block under it out of the way', async ({ page }) => {

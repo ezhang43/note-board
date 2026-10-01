@@ -34,9 +34,11 @@ export function ColumnView({ id }: { id: string }) {
   const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
   const pos = drag ?? dragPos;
   const w = resize?.liveW ?? col.w;
-  const minH = col.collapsed ? undefined : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
   // A card being dragged out is drawn on its own until it is dropped.
   const cardIds = col.cardIds.filter((c) => c !== draggedCard);
+  // A column with cards is exactly as tall as its cards (no blank space when they collapse);
+  // only an empty column keeps a minimum height, which its corner handle sets.
+  const minH = col.collapsed ? undefined : cardIds.length ? 0 : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
   const classes = [
     'column',
     selected && 'selected',
@@ -109,7 +111,12 @@ export function ColumnView({ id }: { id: string }) {
       {!col.collapsed && (
         <>
           <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} />
-          <button type="button" className="resize-corner" aria-label="Resize column" onPointerDown={resizePointerDown('column', id, 'both')}>
+          <button
+            type="button"
+            className="resize-corner"
+            aria-label="Resize column"
+            onPointerDown={resizePointerDown('column', id, cardIds.length ? 'width' : 'both')}
+          >
             <ResizeIcon />
           </button>
         </>

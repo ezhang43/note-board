@@ -75,6 +75,10 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
         )}
       </div>
       {!card.collapsed && <CardBody card={card} />}
+      {/* A collapsed card can still be made wider or narrower, from its right edge. */}
+      {!inColumn && card.collapsed && (
+        <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} />
+      )}
       {!inColumn && !card.collapsed && (
         <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')}>
           <ResizeIcon />

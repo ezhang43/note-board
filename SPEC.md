@@ -73,12 +73,12 @@ The board holds three card types and columns that stack cards. Cards show no typ
 - Dropping a card fully onto a column inserts it at the pointer position; the column opens if collapsed. Dragging a card out of a column makes it loose.
 - While dragging, the block follows the pointer exactly; a dashed teal outline shows the grid spot it will land on, and on release it glides there (160ms). Blocks pushed aside also glide. No gliding when the computer is set to reduce motion.
 - **The dragged block takes priority:** it lands on the grid spot under the pointer, and blocks in its way move to the nearest free spot, previewed live while dragging. A single dragged card never pushes a column: over a column it drops in, and where it would otherwise cover one it takes the nearest free spot. Dragged columns and groups push everything.
-- **No overlap, ever:** loose blocks keep at least a 10px gap. When a column grows, a block is pasted or a size changes, anything it would cover moves to the nearest free spot.
+- **No overlap, ever:** loose blocks keep at least a 10px gap. When a column grows, a block is pasted or a size changes, anything it would cover moves to the nearest free spot. When a block grows (expanding, typing, a column filling up), blocks below it (their top level with or lower than its top) are pushed straight down instead, and so are blocks below those; blocks beside it still take the nearest free spot.
 
 **Resizing**
 
-- Loose cards: bottom-right corner handle sets width and minimum height (content taller than that still grows the card).
-- Columns: corner handle (width and minimum height) and right-edge strip (width only). Cards inside follow the column width.
+- Loose cards: bottom-right corner handle sets width and minimum height (content taller than that still grows the card). A collapsed loose card can still be resized: a right-edge strip sets its width.
+- Columns: corner handle and right-edge strip set the width; cards inside follow it. A column with cards is always exactly as tall as its cards (so collapsing cards shrinks it); only an empty column has a minimum height, which the corner handle also sets.
 - Cards inside a column cannot be resized and size to their content.
 - While resizing, the edge follows the pointer and eases to the grid size on release; the size label shows the final size.
 - Size limits: cards 200–640 wide, columns 240–640 wide, heights 100–700.

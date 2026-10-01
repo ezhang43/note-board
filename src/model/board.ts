@@ -94,7 +94,7 @@ export function updateColumn(board: Board, columnId: string, change: Partial<Pic
 }
 
 /** Set a loose card's width and minimum height (from resizing). */
-export function resizeCard(board: Board, cardId: string, w: number, h: number): Board {
+export function resizeCard(board: Board, cardId: string, w: number, h: number | null): Board {
   return updateCard(board, cardId, (c) => (c.w === w && c.h === h ? c : { ...c, w, h }));
 }
 

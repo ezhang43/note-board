@@ -1,5 +1,11 @@
 # Changelog
 
+## Tidier columns and pushing (2026-10-02)
+
+- A column is now always exactly as tall as the cards in it, so collapsing cards inside shrinks it instead of leaving blank space. Its corner handle sets the width (and the height of an empty column).
+- A collapsed card can still be made wider or narrower: drag its right edge.
+- When something grows (expanding a card, typing, a column filling up), the blocks below it are pushed straight down instead of off to the side.
+
 ## Fix: Tab on selected items (2026-10-02)
 
 - Tab on several selected items now works when the selection starts at the first item of a list: the first item stays and the others move in under it. Before, nothing happened.

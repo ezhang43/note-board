@@ -57,8 +57,10 @@ export function landingSpot(board: Board, id: string, x: number, y: number, size
  * `anchors` (the blocks just moved, resized, grown, pasted or dropped into, most important first)
  * stay put; everything else that is in the way moves to the nearest free spot. Columns are moved
  * before loose cards. Returns the same board when nothing needs to move.
+ * With `pushDown` (used when blocks grow), a block that is below the one in its way (its top is
+ * level with or lower than that block's top) is pushed straight down instead, never sideways.
  */
-export function settle(board: Board, measured: MeasuredHeight, anchors: string[] = []): Board {
+export function settle(board: Board, measured: MeasuredHeight, anchors: string[] = [], pushDown = false): Board {
   const rank = (id: string) => {
     const a = anchors.indexOf(id);
     return a >= 0 ? a : anchors.length + (board.columns[id] ? 0 : 1);
@@ -72,8 +74,9 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
   for (const b of blocks) {
     let rect = b.rect;
     // One pixel of slack so rounding never makes blocks exactly 10px apart look "too close".
-    if (placed.some((o) => overlaps(rect, o, BLOCK_GAP - 1))) {
-      const spot = freeSpot(rect, placed, BLOCK_GAP, stepFor(board));
+    const hit = placed.filter((o) => overlaps(rect, o, BLOCK_GAP - 1));
+    if (hit.length) {
+      const spot = pushDown && hit.every((o) => rect.y >= o.y) ? pushedDown(board, rect, placed) : freeSpot(rect, placed, BLOCK_GAP, stepFor(board));
       moves.set(b.id, spot);
       rect = { ...rect, ...spot };
     }
@@ -88,6 +91,18 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
     else cards[id] = { ...cards[id], ...p };
   }
   return { ...board, cards, columns };
+}
+
+/** Straight down from `rect` to the first spot clear of every placed block (on the grid when snapping). */
+function pushedDown(board: Board, rect: Rect, placed: Rect[]): Point {
+  let y = rect.y;
+  for (;;) {
+    const r = { ...rect, y };
+    const hit = placed.filter((o) => overlaps(r, o, BLOCK_GAP - 1));
+    if (!hit.length) return { x: rect.x, y };
+    const below = Math.max(...hit.map((o) => o.y + o.h)) + BLOCK_GAP;
+    y = board.snap ? Math.ceil(below / GRID) * GRID : below;
+  }
 }
 
 const snapSize = (v: number | null, min: number) => (v == null ? v : Math.max(min, snapToGrid(v)));

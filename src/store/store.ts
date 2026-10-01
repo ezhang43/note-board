@@ -265,7 +265,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       // The most recent change wins when two anchored blocks are in each other's way.
       const a = [...settleAnchors].reverse();
       settleAnchors.clear();
-      const board = settle(state.board, measured, a);
+      // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
+      const board = settle(state.board, measured, a, true);
       if (expanding && Date.now() <= expanding.until) rememberPushes(expanding.id, state.board, board);
       set({ ...state, board });
     });
@@ -906,7 +907,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const r = state.ui.resize;
       if (!r) return;
       commit(
-        (b) => (r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? b.cards[r.id]?.h ?? 0) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined)),
+        (b) => (r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? b.cards[r.id]?.h ?? null) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined)),
         { ui: { resize: null } },
       );
       requestSettle([r.id]);

@@ -119,3 +119,29 @@ describe('resizing data', () => {
     expect(B.resizeColumn(b, 'c', 380, 400)).toBe(b);
   });
 });
+
+describe('growing blocks push what is below them straight down (owner request)', () => {
+  it('a block below goes straight down, and so does the one below that', () => {
+    let b = loose(B.createBoard(), 'top', 0, 0, 400); // grew to 400 tall
+    b = loose(b, 'mid', 20, 200, 100);
+    b = loose(b, 'low', 0, 320, 100);
+    const out = settle(b, measured, ['top'], true);
+    expect(out.cards.mid).toMatchObject({ x: 20, y: 420 });
+    expect(out.cards.low).toMatchObject({ x: 0, y: 540 });
+    noOverlaps(out);
+  });
+
+  it('a block beside it still takes the nearest free spot', () => {
+    let b = loose(B.createBoard(), 'top', 0, 100, 300);
+    b = loose(b, 'side', 200, 0, 200); // starts above the grown block's top
+    const out = settle(b, measured, ['top'], true);
+    expect(out.cards.side.y).toBeLessThan(100);
+    noOverlaps(out);
+  });
+
+  it('without pushDown, the nearest free spot is used as before', () => {
+    let b = loose(B.createBoard(), 'top', 0, 0, 400);
+    b = loose(b, 'mid', 200, 200, 100);
+    expect(settle(b, measured, ['top']).cards.mid.y).toBe(200); // moved sideways, not down
+  });
+});

@@ -167,6 +167,15 @@ export function moveBlocksBy(board: Board, ids: string[], dx: number, dy: number
   return { ...board, cards, columns, order: [...board.order.filter((id) => !top.includes(id)), ...top] };
 }
 
+/** Moves a card inside a column one place up (-1) or down (1). Same board at either end or when loose. */
+export function shiftInColumn(board: Board, cardId: string, step: -1 | 1): Board {
+  const col = columnOf(board, cardId);
+  if (!col) return board;
+  const index = col.cardIds.indexOf(cardId) + step;
+  if (index < 0 || index >= col.cardIds.length) return board;
+  return moveCard(board, cardId, { type: 'column', columnId: col.id, index });
+}
+
 /**
  * Colour button: listed columns get the colour; listed cards (always white) get it on their title
  * band. null puts them back to normal (stone-grey column, usual band).

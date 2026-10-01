@@ -1,5 +1,11 @@
 # Changelog
 
+## Arrow keys move blocks; centred titles on collapsed cards (2026-10-02)
+
+- With a card or column selected (or several), the arrow keys move them one grid square at a time; hold Shift to move five. A card inside a column moves up or down its column instead. Ctrl+Z undoes a quick run of presses in one go.
+- While typing in a card, the arrows still move through the text. Press Escape to leave the text (the card stays selected), then use the arrows to move it.
+- A collapsed loose card now shows its title in the middle of the card.
+
 ## Collapse all, and resizing collapsed blocks (2026-10-02)
 
 - New **Collapse all** button (next to Auto-colour): collapses every card and column at once. When everything is collapsed it becomes **Expand all**. Ctrl+Z undoes it.

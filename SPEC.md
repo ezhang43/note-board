@@ -86,7 +86,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 
 **Collapse, add, delete, colour**
 
-- Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title); a column hides its cards.
+- Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title), shown in the middle of the card when it is loose; a column hides its cards.
 - Toolbar Collapse all (icon button): if any card or column is open, collapses every card and column; when everything is collapsed it reads Expand all and opens them all. One undo step. Faded on an empty board.
 - Expanding a card or column can push nearby blocks aside. Collapsing it again puts those blocks back where they were (in the same undo step), unless one has been moved since or its old spot is now taken. This is remembered until the page is reloaded.
 - Adding a card with a column selected puts it at the end of that column; with a card inside a column selected, directly below that card; otherwise loose on the board. A new to-do list starts with one blank item, cursor in it.
@@ -144,9 +144,10 @@ Every block action works on one block or on a whole selection, and every change 
 | Ctrl + D | Duplicate the selection |
 | Delete / Backspace | Delete the selection; if it includes a column, the same confirmation as the column × appears first, then columns go with their cards |
 | Drag a selected block | Moves the whole selection together |
+| Arrow keys | Move the selected loose cards and columns one grid step (20px); Shift + arrow moves five. Like a drag, they keep their spot and whatever is in the way moves. A single selected card inside a column moves up / down its column instead (← / → do nothing). Presses in quick succession are one undo step |
 | Ctrl + Z | Undo, up to 100 steps, from anywhere including inside text fields; a burst of typing counts as one step |
 | Ctrl + Y | Redo (Ctrl + Shift + Z does nothing) |
-| Escape | Clear the selection and close menus |
+| Escape | Clear the selection and close menus. While typing in a card or column, Escape leaves the text field and keeps the block selected, so the arrow keys then move it |
 
 - Undo and Redo buttons in the toolbar fade when there is nothing to undo or redo.
 - Keyboard shortcuts for blocks do not fire while typing in a text field, except undo, redo and zoom.

@@ -931,6 +931,28 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       return true;
     },
 
+    /**
+     * Arrow keys: the selected loose blocks and columns move by `dx`, `dy` grid steps, keeping their
+     * spot like a drag (whatever is in the way moves). A single selected card inside a column moves
+     * up / down its column instead. Presses in quick succession are one undo step.
+     */
+    nudgeSelection(dx: number, dy: number): boolean {
+      const sel = liveSelection(state.board);
+      if (!sel.length) return false;
+      const b0 = state.board;
+      if (sel.length === 1 && !b0.order.includes(sel[0])) {
+        if (dy === 0) return true;
+        const id = sel[0];
+        commit((b) => B.shiftInColumn(b, id, dy < 0 ? -1 : 1), { merge: `nudge:${id}` });
+        requestSettle([B.columnOf(state.board, id)?.id ?? id]);
+        return true;
+      }
+      const ids = sel.filter((id) => b0.order.includes(id));
+      if (!ids.length) return true;
+      commit((b) => settle(B.moveBlocksBy(b, ids, dx * GRID, dy * GRID), measured, ids), { merge: `nudge:${ids.join(',')}` });
+      return true;
+    },
+
     // ---------- dragging ----------
     startDrag(kind: Drag['kind'], id: string, x: number, y: number) {
       const sel = state.ui.selection;

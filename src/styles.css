@@ -362,6 +362,9 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   text-overflow: ellipsis;
 }
 .card.collapsed .card-meta { font-size: 13px; font-weight: 500; }
+/* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right. */
+.card.loose.collapsed .card-meta { padding-left: 58px; text-align: center; }
+.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: 26px; }
 
 .note-text { font-size: 14px; line-height: 1.55; }
 .note-text > textarea { min-height: 104px; }

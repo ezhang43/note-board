@@ -4,9 +4,10 @@ import * as C from '../model/checklist';
 import type { ItemDrop } from '../model/checklist';
 import { snapToGrid } from '../model/geometry';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../model/clipboard';
-import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
+import { BLOCK_GAP, CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
 import { emptyHistory, recordChange, redo, undo, type History } from '../model/history';
-import { blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
+import { blockRect, blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
+import { overlaps } from '../model/geometry';
 import type { ColorKey } from '../model/palette';
 import { addImported, estimateHeight, packInLanes, parseMilanote, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
@@ -125,6 +126,8 @@ export interface AppState {
 
 /** Wait this long after the last pan/zoom before saving it, so scrolling doesn't write on every frame. */
 export const VIEW_SAVE_DELAY = 250;
+/** After expanding a block, blocks it pushes aside within this long (ms) are remembered, to go back when it collapses. */
+export const EXPAND_WATCH_MS = 1500;
 /** Imported cards start this far (screen pixels) below the top of the board area. */
 export const IMPORT_TOP_MARGIN = 40;
 
@@ -171,6 +174,14 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   let marqueeBase: string[] = [];
   /** Copied checklist items. */
   let itemClipboard: TodoItem[] | null = null;
+  /**
+   * Blocks pushed aside when a card or column was expanded, by the expanded block's id: where each
+   * pushed block was, and where it was pushed to. Collapsing the block again puts them back.
+   * Not board data: forgotten on reload.
+   */
+  const pushedBy = new Map<string, Map<string, { from: Point; to: Point }>>();
+  /** The block just expanded, while its growth may still push others aside. */
+  let expanding: { id: string; until: number } | null = null;
   /** Just-imported cards, laid out again in their lanes once their real heights are known. */
   let importLayout: { ids: string[]; origin: Point } | null = null;
 
@@ -253,8 +264,49 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       // The most recent change wins when two anchored blocks are in each other's way.
       const a = [...settleAnchors].reverse();
       settleAnchors.clear();
-      set({ ...state, board: settle(state.board, measured, a) });
+      const board = settle(state.board, measured, a);
+      if (expanding && Date.now() <= expanding.until) rememberPushes(expanding.id, state.board, board);
+      set({ ...state, board });
     });
+  }
+
+  /** Note which top-level blocks moved between two boards, as pushed aside by expanding `id`. */
+  function rememberPushes(id: string, before: Board, after: Board) {
+    const pushes = pushedBy.get(id) ?? new Map<string, { from: Point; to: Point }>();
+    for (const bid of after.order) {
+      const was = before.columns[bid] ?? before.cards[bid];
+      const now = after.columns[bid] ?? after.cards[bid];
+      if (!was || !now || (was.x === now.x && was.y === now.y)) continue;
+      pushes.set(bid, { from: pushes.get(bid)?.from ?? { x: was.x, y: was.y }, to: { x: now.x, y: now.y } });
+    }
+    if (pushes.size) pushedBy.set(id, pushes);
+  }
+
+  /**
+   * Collapsing `id`: blocks it pushed aside when it was expanded go back to where they were, if they
+   * haven't been moved since and their old spot is free. `top` is the collapsing block's column (or itself).
+   */
+  function returnPushed(board: Board, id: string, top: string): Board {
+    const pushes = pushedBy.get(id);
+    pushedBy.delete(id);
+    if (!pushes) return board;
+    const back = [...pushes].filter(([bid, p]) => {
+      const blk = board.columns[bid] ?? board.cards[bid];
+      return blk && board.order.includes(bid) && blk.x === p.to.x && blk.y === p.to.y;
+    });
+    const going = new Set([top, ...back.map(([bid]) => bid)]);
+    const others = board.order.filter((bid) => !going.has(bid)).map((bid) => blockRect(board, bid, measured)!);
+    const cards = { ...board.cards };
+    const columns = { ...board.columns };
+    let moved = false;
+    for (const [bid, p] of back) {
+      const r = blockRect(board, bid, measured)!;
+      if (others.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
+      if (columns[bid]) columns[bid] = { ...columns[bid], ...p.from };
+      else cards[bid] = { ...cards[bid], ...p.from };
+      moved = true;
+    }
+    return moved ? { ...board, cards, columns } : board;
   }
 
   /** Middle of what's on screen, in board coordinates. */
@@ -580,7 +632,23 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     setItemText: (cardId: string, itemId: string, text: string) =>
       commit((b) => B.setItemText(b, cardId, itemId, text), { merge: `item:${itemId}` }),
     setColumnTitle: (id: string, title: string) => commit((b) => B.updateColumn(b, id, { title }), { merge: `coltitle:${id}` }),
-    toggleCollapsed: (id: string) => commit((b) => B.toggleCollapsed(b, id)),
+    /**
+     * Collapse arrow. Expanding starts remembering which blocks the growing block pushes aside;
+     * collapsing puts them back (part of the same undo step).
+     */
+    toggleCollapsed(id: string) {
+      const blk = state.board.columns[id] ?? state.board.cards[id];
+      if (!blk) return;
+      if (blk.collapsed) {
+        pushedBy.delete(id);
+        expanding = { id, until: Date.now() + EXPAND_WATCH_MS };
+        commit((b) => B.toggleCollapsed(b, id));
+        return;
+      }
+      if (expanding?.id === id) expanding = null;
+      const top = state.board.columns[id] ? id : (B.columnOf(state.board, id)?.id ?? id);
+      commit((b) => returnPushed(B.toggleCollapsed(b, id), id, top));
+    },
 
     // ---------- checklists ----------
     /** Enter: a new item below, at the same level, with the cursor in it. */

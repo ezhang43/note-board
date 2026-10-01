@@ -1,5 +1,9 @@
 # Changelog
 
+## Collapse puts things back (2026-10-02)
+
+- When expanding a card or column pushes other blocks out of the way, collapsing it again moves them back to where they were. A block you've moved yourself in the meantime stays where you put it.
+
 ## Checklist keys (2026-10-02)
 
 - Pressing Delete at the end of a checklist item pulls the item below up into it (like joining two lines). The cursor stays where the two were joined; the pulled-up item's sub-items move up a level.

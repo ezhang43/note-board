@@ -87,6 +87,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 **Collapse, add, delete, colour**
 
 - Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title); a column hides its cards.
+- Expanding a card or column can push nearby blocks aside. Collapsing it again puts those blocks back where they were (in the same undo step), unless one has been moved since or its old spot is now taken. This is remembered until the page is reloaded.
 - Adding a card with a column selected puts it at the end of that column; with a card inside a column selected, directly below that card; otherwise loose on the board. A new to-do list starts with one blank item, cursor in it.
 - Column × opens a small confirmation ("Delete 'Ideas'?" · Cancel · red Delete column) and then deletes the column and all its cards.
 - Toolbar Colour recolours every selected column from 16 swatches (two rows of 8, table below). Selected cards are left alone (cards are always white). It is faded unless a column is selected.

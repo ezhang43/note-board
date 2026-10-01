@@ -168,6 +168,15 @@ export type Store = ReturnType<typeof createStore>;
 type Schedule = (fn: () => void) => void;
 const later: Schedule = (fn) => setTimeout(fn, 0);
 
+/** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). */
+function copyText(text: string) {
+  try {
+    void globalThis.navigator?.clipboard?.writeText(text).catch(() => {});
+  } catch {
+    // No clipboard access: copying within the board still works.
+  }
+}
+
 export function createStore(storage: StorageLike | null, schedule: Schedule = later) {
   let state: AppState = {
     board: parseBoard(read(BOARD_KEY)),
@@ -440,7 +449,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     const card = sel && state.board.cards[sel.cardId];
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
-    return itemClipboard.length > 0;
+    if (!itemClipboard.length) return false;
+    copyText(C.itemsAsText(itemClipboard));
+    return true;
   }
 
   /** The selected checklist items, if `itemId` in `cardId` is one of several selected; otherwise null. */

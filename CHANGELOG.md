@@ -1,5 +1,9 @@
 # Changelog
 
+## Copy items as text (2026-10-02)
+
+- Copying several selected checklist items (Ctrl+C or Ctrl+X) now also copies their text, one item per line (sub-items indented), so you can paste them into an email, a document or another app.
+
 ## Titles stand out (2026-10-02)
 
 - To-do lists and links now have a soft tinted band behind their title at the top of the card: teal when loose, the column's colour inside a column.

@@ -301,3 +301,10 @@ describe('sub-items all ticked tick their item (owner request)', () => {
     expect(doneIds(out)).toEqual([]);
   });
 });
+
+describe('copied items as text (owner request)', () => {
+  it('puts each item on its own line, sub-items indented', () => {
+    const t = (text: string, children: TodoItem[] = []): TodoItem => ({ id: text, text, done: false, children });
+    expect(C.itemsAsText([t('Pack', [t('shoes'), t('coat', [t('scarf')])]), t('Leave')])).toBe('Pack\n  shoes\n  coat\n    scarf\nLeave');
+  });
+});

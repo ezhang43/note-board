@@ -407,3 +407,20 @@ test.describe('with motion allowed', () => {
     expect(await texts(list)).toEqual(['second', 'first']);
   });
 });
+
+test('copying several items also copies their text, one item per line (owner request)', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const list = await makeList(page, ['one', 'two', 'two a', 'three']);
+  await rowWithText(list, 'two a').getByLabel('Item text').press('Tab');
+  await clickEmpty(page);
+  const from = await center(rows(list).nth(0).getByLabel('Item text'));
+  const to = await center(rows(list).nth(2).getByLabel('Item text'));
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.press('Control+c');
+  // Windows' clipboard turns line breaks into \r\n.
+  const copied = () => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'));
+  await expect.poll(copied).toBe('one\ntwo\n  two a');
+});

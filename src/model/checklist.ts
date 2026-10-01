@@ -251,6 +251,15 @@ export function copyItems(items: TodoItem[], ids: string[]): TodoItem[] {
   return rootsOf(items, ids).map((id) => structuredClone(findItem(items, id)!.item));
 }
 
+/**
+ * Copied items as plain text for other apps: one item per line, in order, each sub-item indented
+ * two spaces per level below the copied item it is under.
+ */
+export function itemsAsText(items: TodoItem[], depth = 0): string {
+  const lines = (list: TodoItem[], d: number): string[] => list.flatMap((it) => ['  '.repeat(d) + it.text, ...lines(it.children, d + 1)]);
+  return lines(items, depth).join('\n');
+}
+
 /** Copies with brand-new ids throughout, ready to paste. */
 export function freshCopies(items: TodoItem[], makeId: MakeId = newId): TodoItem[] {
   return items.map((it) => ({ ...it, id: makeId('i'), children: freshCopies(it.children, makeId) }));

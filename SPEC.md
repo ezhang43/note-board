@@ -120,7 +120,7 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 **Selecting several items**
 
 - Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range. Selected items get a teal text highlight and a lighter row tint. No action bar.
-- With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection; Tab / Shift+Tab move them all in or out one level together (one that can't move, such as the first item of a list, stays and the ones after it nest under it) and they stay selected; Escape clears.
+- With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection (copy and cut also put their text on the computer's clipboard for other apps: one item per line, sub-items indented two spaces per level); Tab / Shift+Tab move them all in or out one level together (one that can't move, such as the first item of a list, stays and the ones after it nest under it) and they stay selected; Escape clears.
 
 ### Clean up and the Completed card
 

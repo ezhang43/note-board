@@ -44,6 +44,7 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
     (inGroupDrag || resize) && 'following',
     sizeMatch && 'size-match',
     card.collapsed && 'collapsed',
+    card.kind !== 'note' && 'titled',
   ];
 
   return (

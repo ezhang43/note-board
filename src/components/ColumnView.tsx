@@ -59,30 +59,35 @@ export function ColumnView({ id }: { id: string }) {
       style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
     >
+      {/* Title and count centred; collapse arrow and × on the right. */}
       <div className="column-header">
-        <AutoSizeInput
-          className="column-title"
-          aria-label="Column title"
-          placeholder="Untitled"
-          value={col.title}
-          onChange={(title) => appStore.setColumnTitle(id, title)}
-        />
-        <span className="column-count" aria-label={`${cardIds.length} cards`}>
-          {cardIds.length}
-        </span>
-        <div className="toolbar-spacer" />
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
-          aria-expanded={!col.collapsed}
-          onClick={() => appStore.toggleCollapsed(id)}
-        >
-          <ChevronIcon collapsed={col.collapsed} />
-        </button>
-        <button type="button" className="icon-button" aria-label="Delete column and its cards" onClick={() => appStore.askDeleteColumn(id)}>
-          <CloseIcon />
-        </button>
+        <div aria-hidden="true" />
+        <div className="column-heading">
+          <AutoSizeInput
+            className="column-title"
+            aria-label="Column title"
+            placeholder="Untitled"
+            value={col.title}
+            onChange={(title) => appStore.setColumnTitle(id, title)}
+          />
+          <span className="column-count" aria-label={`${cardIds.length} cards`}>
+            {cardIds.length}
+          </span>
+        </div>
+        <div className="column-actions">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
+            aria-expanded={!col.collapsed}
+            onClick={() => appStore.toggleCollapsed(id)}
+          >
+            <ChevronIcon collapsed={col.collapsed} />
+          </button>
+          <button type="button" className="icon-button" aria-label="Delete column and its cards" onClick={() => appStore.askDeleteColumn(id)}>
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
       {confirmColumns > 0 && (

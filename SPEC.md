@@ -64,7 +64,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 | Link | Title, URL field, "Open <domain>" button in a new tab | White |
 | Column | Title (box sized to its text), card count, stacked cards | Neutral stone-grey until recoloured |
 
-**Headers:** cards show a collapse arrow and × at the top right (no "2/5 done" count). Columns show the title and count on the left, and the collapse arrow next to the × on the right. No move handles and no per-block palette icons.
+**Headers:** cards show a collapse arrow and × at the top right (no "2/5 done" count). To-do lists, links and the Completed card have a tinted title band across the top (header and title): soft teal (#E0F2F1) when loose, the column's colour inside a column. Columns show the title and count centred, and the collapse arrow next to the × on the right. No move handles and no per-block palette icons.
 
 **Moving**
 

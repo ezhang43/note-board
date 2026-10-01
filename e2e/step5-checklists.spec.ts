@@ -232,7 +232,7 @@ test('drag an item into another list, or onto empty list space to append', async
   expect(await texts(a)).toEqual(['a2']);
 
   const title = await box(b.getByLabel('List title'));
-  await dragItem(page, rowWithText(a, 'a2'), { x: title.x + title.width + 30, y: title.y + 10 }, async () => {
+  await dragItem(page, rowWithText(a, 'a2'), { x: title.x + title.width - 20, y: title.y + 10 } /* the title band, past the text */, async () => {
     await expect(b.locator('.todo-body')).toHaveClass(/append-target/);
   });
   expect(await texts(b)).toEqual(['b1', 'a1', 'a2']);

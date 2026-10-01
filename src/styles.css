@@ -296,6 +296,29 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   font-size: 14px;
 }
 .card.loose { position: absolute; }
+
+/*
+ * Titled cards (to-do lists, links, Completed) get a tinted band across the top, behind the header
+ * and title: soft teal when loose, the column's colour inside a column.
+ */
+.card { --band: var(--accent-soft); }
+.card.in-column { --band: var(--bg); }
+.card.titled .card-header {
+  margin: 0 -12px;
+  padding: 0 6px 0 12px;
+  background: var(--band);
+  border-radius: 9px 9px 0 0;
+}
+.card.titled.collapsed .card-header { border-radius: 9px; }
+.card.titled .todo-body > .card-title:first-child,
+.card.titled .link-body > .card-title:first-child,
+.card.titled .completed-card-title {
+  align-self: stretch;
+  max-width: none;
+  margin: 0 -12px 4px;
+  padding: 0 12px 8px;
+  background: var(--band);
+}
 .card.in-column { width: auto; margin: 0 16px 10px; }
 .card.collapsed { padding-bottom: 0; }
 
@@ -435,10 +458,13 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
 .column-header {
   height: 52px;
   padding: 8px 8px 6px;
-  display: flex;
+  display: grid;
+  /* Equal sides keep the title truly centred; each side has room for the two buttons. */
+  grid-template-columns: minmax(60px, 1fr) minmax(0, auto) minmax(60px, 1fr);
   align-items: center;
-  gap: 2px;
 }
+.column-heading { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
+.column-actions { display: flex; justify-content: flex-end; gap: 2px; }
 .column-title { --pad: 4px 6px; font-weight: 600; font-size: 14px; max-width: 100%; flex-shrink: 1; min-width: 32px; }
 .column-count {
   flex-shrink: 0;

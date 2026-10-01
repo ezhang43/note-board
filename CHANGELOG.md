@@ -1,5 +1,10 @@
 # Changelog
 
+## Titles stand out (2026-10-02)
+
+- To-do lists and links now have a soft tinted band behind their title at the top of the card: teal when loose, the column's colour inside a column.
+- Column titles are centred.
+
 ## Gentler completing (2026-10-02)
 
 - Ticking the last open sub-item of a list item now ticks the item too, so it moves into Completed. Unticking a sub-item brings its item back.

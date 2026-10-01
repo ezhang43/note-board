@@ -213,12 +213,35 @@ export function deleteItems(items: TodoItem[], ids: string[], makeId: MakeId = n
   return next.length ? next : [createItem(makeId('i'))];
 }
 
-/** Tick or untick items. A ticked top-level item moves (with its sub-items) to the Completed section. */
+/** The items an item is nested in, outermost first. */
+function ancestorsOf(items: TodoItem[], id: string): TodoItem[] {
+  for (const it of items) {
+    if (it.id === id) return [];
+    const inner = ancestorsOf(it.children, id);
+    if (inner.length || it.children.some((c) => c.id === id)) return [it, ...inner];
+  }
+  return [];
+}
+
+/**
+ * Tick or untick items. A ticked top-level item moves (with its sub-items) to the Completed section.
+ * Owner's rule: when ticking leaves every sub-item of an item ticked, that item is ticked too (and so
+ * on upwards), so a list item whose sub-items are all done moves to Completed. Unticking a sub-item
+ * unticks the items it is nested in.
+ */
 export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): TodoItem[] {
   const next = cloned(items);
   for (const id of ids) {
     const loc = findItem(next, id);
     if (loc) loc.item.done = done;
+  }
+  for (const id of ids) {
+    const above = ancestorsOf(next, id).reverse(); // innermost first
+    for (const it of above) {
+      if (!done) it.done = false;
+      else if (it.children.every((c) => c.done)) it.done = true;
+      else break;
+    }
   }
   return next;
 }

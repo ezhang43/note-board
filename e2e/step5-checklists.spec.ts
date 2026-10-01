@@ -114,32 +114,33 @@ test('arrows skip completed items while the Completed section is collapsed', asy
   await open.focus();
   await page.keyboard.press('ArrowDown');
   await expect(rowWithText(list, 'finished').getByLabel('Item text')).toBeFocused();
-  await list.getByRole('button', { name: 'Completed · 1' }).click();
+  await list.getByRole('button', { name: 'Completed', exact: true }).click();
   await open.focus();
   await page.keyboard.press('ArrowDown');
   await expect(open).toBeFocused();
 });
 
-test('ticking a top-level item moves it to "Completed · N"; ticking a sub-item only strikes it', async ({ page }) => {
-  const list = await makeList(page, ['A', 'A sub', 'B']);
+test('ticking a top-level item moves it to "Completed"; ticking a sub-item only strikes it', async ({ page }) => {
+  const list = await makeList(page, ['A', 'A sub', 'A sub 2', 'B']);
   await rows(list).nth(1).getByLabel('Item text').press('Tab');
+  await rows(list).nth(2).getByLabel('Item text').press('Tab');
 
-  await rowWithText(list, 'A sub').getByLabel('Done').click(); // sub-item
+  await rowWithText(list, 'A sub').getByLabel('Done').click(); // sub-item (A still has an open one)
   await expect(list.locator('.completed')).toHaveCount(0);
   await expect(rows(list).nth(1).getByLabel('Item text')).toHaveCSS('text-decoration-line', 'line-through');
 
   // Click (not check): ticking moves the row, so the test must not re-check whatever row takes its place.
-  await rowWithText(list, 'A').getByLabel('Done').click(); // top-level A (with its sub-item)
+  await rowWithText(list, 'A').getByLabel('Done').click(); // top-level A (with its sub-items)
   const completed = list.locator('.completed');
-  await expect(completed.getByRole('button', { name: 'Completed · 1' })).toBeVisible();
-  await expect(completed.locator('[data-item-id]')).toHaveCount(2);
-  expect(await texts(list)).toEqual(['B', 'A', 'A sub']);
+  await expect(completed.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
+  await expect(completed.locator('[data-item-id]')).toHaveCount(3);
+  expect(await texts(list)).toEqual(['B', 'A', 'A sub', 'A sub 2']);
   await expect(list.locator('.card-meta')).toHaveText(''); // no "2/3 done" (owner request)
 
-  await completed.getByRole('button', { name: 'Completed · 1' }).click();
+  await completed.getByRole('button', { name: 'Completed', exact: true }).click();
   await expect(completed.locator('[data-item-id]')).toHaveCount(0);
-  await completed.getByRole('button', { name: 'Completed · 1' }).click();
-  await expect(completed.locator('[data-item-id]')).toHaveCount(2);
+  await completed.getByRole('button', { name: 'Completed', exact: true }).click();
+  await expect(completed.locator('[data-item-id]')).toHaveCount(3);
 
   // Unticking brings it back.
   await rowWithText(list, 'A').getByLabel('Done').click();
@@ -298,7 +299,7 @@ test('with several items selected, ticking one ticks all, and dragging one moves
   await expect(list.locator('.todo-item.picked')).toHaveCount(2);
   await rowWithText(list, 'three').getByLabel('Done').click();
   await expect(list.locator('.completed [data-item-id]')).toHaveCount(2);
-  await expect(list.getByRole('button', { name: 'Completed · 2' })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
 });
 
 test('Ctrl+C / Ctrl+V pastes copied items after the selection; Ctrl+X cuts; Ctrl+Z undoes', async ({ page }) => {
@@ -368,4 +369,41 @@ test('Delete at the end of an item pulls the next item up into it (owner request
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
   expect(await texts(list)).toEqual(['Buy ', 'milk', 'eggs']);
+});
+
+test('ticking every sub-item ticks the item too, moving it to Completed; unticking one brings it back (owner request)', async ({ page }) => {
+  const list = await makeList(page, ['Pack', 'shoes', 'coat', 'Other']);
+  await rowWithText(list, 'shoes').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'coat').getByLabel('Item text').press('Tab');
+  await rowWithText(list, 'shoes').getByLabel('Done').click();
+  await expect(list.locator('.completed')).toHaveCount(0); // coat is still open
+  await rowWithText(list, 'coat').getByLabel('Done').click();
+  await expect(list.locator('.completed [data-item-id]')).toHaveCount(3);
+  await expect(rowWithText(list, 'Pack').getByLabel('Done')).toBeChecked();
+  await expect(list.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // no count
+
+  await rowWithText(list, 'coat').getByLabel('Done').click();
+  await expect(list.locator('.completed')).toHaveCount(0);
+  await expect(rowWithText(list, 'Pack').getByLabel('Done')).not.toBeChecked();
+});
+
+test.describe('with motion allowed', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+  test('a ticked item eases out and into the Completed section, and Ctrl+Z undoes it', async ({ page }) => {
+    const list = await makeList(page, ['first', 'second']);
+    await rowWithText(list, 'first').getByLabel('Done').click();
+    // Briefly still in the list, ticked and fading.
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
+    await expect(list.locator('.todo-item.leaving').getByLabel('Done')).toBeChecked();
+    // Then in Completed, arriving.
+    await expect(list.locator('.completed .todo-item.arrived')).toHaveCount(1);
+    await expect(list.locator('.todo-item.arrived')).toHaveCount(0);
+    expect(await texts(list)).toEqual(['second', 'first']);
+
+    await rowWithText(list, 'second').getByLabel('Done').click();
+    await page.keyboard.press('Control+z'); // straight away, while it is still leaving
+    await expect(list.locator('.completed [data-item-id]')).toHaveCount(1);
+    expect(await texts(list)).toEqual(['second', 'first']);
+  });
 });

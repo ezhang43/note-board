@@ -279,3 +279,25 @@ describe('Delete at the end of an item (owner request)', () => {
     expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true), t('e', 'E', [], true)], 'd')!.items.map((i) => i.text)).toEqual(['A', 'DE']);
   });
 });
+
+describe('sub-items all ticked tick their item (owner request)', () => {
+  const t = (id: string, done = false, children: TodoItem[] = []): TodoItem => ({ id, text: id, done, children });
+  const doneIds = (items: TodoItem[]): string[] => items.flatMap((i) => [...(i.done ? [i.id] : []), ...doneIds(i.children)]);
+
+  it('ticking the last open sub-item ticks the item (and upwards), so it moves to Completed', () => {
+    const items = [t('a', false, [t('a1', true), t('a2', false, [t('x', true), t('y')])]), t('b')];
+    const out = C.setItemsDone(items, ['y'], true);
+    expect(doneIds(out)).toEqual(['a', 'a1', 'a2', 'x', 'y']);
+    expect(C.sections(out).done.map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('stops where an item still has open sub-items', () => {
+    const out = C.setItemsDone([t('a', false, [t('a1'), t('a2')])], ['a1'], true);
+    expect(doneIds(out)).toEqual(['a1']);
+  });
+
+  it('unticking a sub-item unticks the items it is in', () => {
+    const out = C.setItemsDone([t('a', true, [t('a1', true, [t('z', true)])])], ['z'], false);
+    expect(doneIds(out)).toEqual([]);
+  });
+});

@@ -105,6 +105,9 @@ export interface Ui {
   /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where). */
   focusItem: string | null;
   focusOffset: number | null;
+  /** Checklist items on their way to the Completed section (shown ticked, fading) and the ones that just arrived. */
+  completing: string[];
+  arrived: string[];
   colourMenuOpen: boolean;
   confirm: ConfirmDelete | null;
   drag: Drag | null;
@@ -127,6 +130,15 @@ export interface AppState {
 
 /** Wait this long after the last pan/zoom before saving it, so scrolling doesn't write on every frame. */
 export const VIEW_SAVE_DELAY = 250;
+/** How long a ticked item takes to leave for the Completed section, and to settle in there (ms). */
+export const COMPLETE_LEAVE_MS = 280;
+export const COMPLETE_ARRIVE_MS = 450;
+
+/** True when the computer is set to reduce motion (or there is no screen, as in unit tests). */
+function reducedMotion(): boolean {
+  return typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 /** After expanding a block, blocks it pushes aside within this long (ms) are remembered, to go back when it collapses. */
 export const EXPAND_WATCH_MS = 1500;
 /** Imported cards start this far (screen pixels) below the top of the board area. */
@@ -138,6 +150,8 @@ const emptyUi: Ui = {
   itemDrag: null,
   focusItem: null,
   focusOffset: null,
+  completing: [],
+  arrived: [],
   colourMenuOpen: false,
   confirm: null,
   drag: null,
@@ -183,6 +197,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   const pushedBy = new Map<string, Map<string, { from: Point; to: Point }>>();
   /** The block just expanded, while its growth may still push others aside. */
   let expanding: { id: string; until: number } | null = null;
+  let applyingTick = false;
+  /** A tick waiting for its leaving animation to finish before it is applied. */
+  let pendingTick: { timer: ReturnType<typeof setTimeout>; apply: () => void } | null = null;
   /** Just-imported cards, laid out again in their lanes once their real heights are known. */
   let importLayout: { ids: string[]; origin: Point } | null = null;
 
@@ -232,6 +249,11 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
    * `merge` names a text field: a burst of typing in it is one undo step.
    */
   function commit(fn: (b: Board) => Board, opts: { ui?: Partial<Ui>; merge?: string } = {}) {
+    if (pendingTick && !applyingTick) {
+      applyingTick = true;
+      flushPendingTick();
+      applyingTick = false;
+    }
     const before = state.board;
     const board = fn(before);
     if (board !== before) history = recordChange(history, before, opts.merge ?? null, Date.now());
@@ -399,6 +421,13 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     return true;
   }
 
+  /** Apply a tick that is still waiting for its animation (before any other change, so nothing is lost). */
+  function flushPendingTick() {
+    if (!pendingTick) return;
+    clearTimeout(pendingTick.timer);
+    pendingTick.apply();
+  }
+
   /** Tab / Shift+Tab with several items selected: they all move in (or out) one level together. */
   function tabSelectedItems(outdent: boolean) {
     const sel = state.ui.itemSel;
@@ -447,6 +476,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         marquee: null,
         itemSel: null,
         itemDrag: null,
+        completing: [],
+        arrived: [],
       }),
     });
     requestSettle();
@@ -487,8 +518,15 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
 
     // ---------- undo ----------
-    undo: () => restore(undo(history, state.board)),
-    redo: () => restore(redo(history, state.board)),
+    // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
+    undo: () => {
+      flushPendingTick();
+      restore(undo(history, state.board));
+    },
+    redo: () => {
+      flushPendingTick();
+      restore(redo(history, state.board));
+    },
 
     // ---------- board ----------
     renameBoard: (name: string) => commit((b) => B.renameBoard(b, name), { merge: 'board-name' }),
@@ -716,12 +754,27 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     /** Tick / untick. With several items selected, ticking any one ticks (or unticks) them all. */
     toggleItem(cardId: string, itemId: string) {
+      flushPendingTick();
       const card = state.board.cards[cardId];
       if (card?.kind !== 'todo') return;
       const item = C.findItem(card.items, itemId)?.item;
       if (!item) return;
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+      const next = C.setItemsDone(card.items, ids, !item.done);
+      const apply = () => commit((b) => C.editItems(b, cardId, () => next));
+      // Top-level items this tick sends to the Completed section get a short leaving animation first.
+      const leaving = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done).flatMap(C.subtreeIds);
+      if (!leaving.length || reducedMotion()) return apply();
+      updateUi({ completing: leaving });
+      const finish = () => {
+        pendingTick = null;
+        apply();
+        updateUi({ completing: [], arrived: leaving });
+        setTimeout(() => {
+          if (state.ui.arrived === leaving || state.ui.arrived.every((x) => leaving.includes(x))) updateUi({ arrived: [] });
+        }, COMPLETE_ARRIVE_MS);
+      };
+      pendingTick = { timer: setTimeout(finish, COMPLETE_LEAVE_MS), apply: finish };
     },
     /** Trash can: deletes the item and everything under it (or every selected item, if it is one of them). */
     trashItem(cardId: string, itemId: string) {

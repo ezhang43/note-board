@@ -27,7 +27,7 @@ test('importing a Milanote export adds its cards to the board, selected and not 
   await expect(titles.nth(0)).toHaveValue('Follow Up');
   await expect(titles.nth(1)).toHaveValue('Groceries');
   const groceries = cards(page).filter({ has: page.locator('input[value="Groceries"]') });
-  await expect(groceries.getByText('Completed · 1')).toBeVisible();
+  await expect(groceries.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
   await expect(groceries.locator('textarea')).toHaveCount(5);
   await expect(page.getByLabel('Note text').nth(1)).toHaveValue(/^Dear \[Name\],\n\nThis is important/);
   await expect(page.getByLabel('Link title')).toHaveValue('Reading');

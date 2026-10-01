@@ -575,6 +575,17 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
 .todo-item.mark-nest { box-shadow: inset 0 -2px 0 #2a9d93; background: rgba(42, 157, 147, 0.14); }
 .todo-item.dimmed { opacity: 0.35; }
 
+/* Ticked items ease out of the list and into the Completed section (only with motion allowed). */
+.todo-item.leaving { animation: item-leave 280ms ease-in forwards; pointer-events: none; }
+.todo-item.arrived { animation: item-arrive 450ms ease-out; }
+@keyframes item-leave {
+  to { opacity: 0; transform: translateY(8px); }
+}
+@keyframes item-arrive {
+  from { opacity: 0; transform: translateY(-8px); background: var(--accent-soft); }
+  to { opacity: 1; transform: none; background: transparent; }
+}
+
 /* Grip and trash only show while the pointer is over the row. */
 .item-grip,
 .item-trash {

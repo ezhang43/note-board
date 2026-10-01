@@ -1,5 +1,11 @@
 # Changelog
 
+## Gentler completing (2026-10-02)
+
+- Ticking the last open sub-item of a list item now ticks the item too, so it moves into Completed. Unticking a sub-item brings its item back.
+- An item that's ticked no longer just vanishes: it eases out of the list and gently fades into the Completed section (not when your computer is set to reduce motion).
+- The Completed section's header no longer shows a count.
+
 ## Tidier columns and pushing (2026-10-02)
 
 - A column is now always exactly as tall as the cards in it, so collapsing cards inside shrinks it instead of leaving blank space. Its corner handle sets the width (and the height of an empty column).

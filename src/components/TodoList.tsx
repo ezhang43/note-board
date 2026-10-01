@@ -13,7 +13,7 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
   return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
 }
 
-/** A to-do list's body: title, open items, and the "Completed · N" section. */
+/** A to-do list's body: title, open items, and the "Completed" section. */
 export function TodoBody({ card }: { card: TodoCard }) {
   const appendTarget = useAppState((s) => {
     const h = s.ui.itemDrag?.hint;
@@ -44,7 +44,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
             onClick={() => appStore.toggleCompletedSection(card.id)}
           >
             <ChevronIcon collapsed={!card.completedOpen} />
-            Completed · {done.length}
+            Completed
           </button>
           {card.completedOpen &&
             flatten(done).map(({ item, depth }) => <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />)}
@@ -64,6 +64,9 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
     return h && 'markId' in h && h.markId === item.id ? h.markMode : null;
   });
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
+  // Just ticked and about to move to Completed, or just arrived there (a short animation).
+  const leaving = useAppState((s) => s.ui.completing.includes(item.id));
+  const arrived = useAppState((s) => s.ui.arrived.includes(item.id));
 
   // Put the cursor in this item's text when asked: at the end (new item, Tab, Backspace) or at a
   // given spot (where two items were joined by Delete).
@@ -92,7 +95,15 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
     // Up / Down arrows are handled board-wide (keyboardNav.ts), across items and cards.
   }
 
-  const classes = ['todo-item', item.done && 'done', picked && 'picked', mark && `mark-${mark}`, dimmed && 'dimmed'];
+  const classes = [
+    'todo-item',
+    (item.done || leaving) && 'done',
+    picked && 'picked',
+    mark && `mark-${mark}`,
+    dimmed && 'dimmed',
+    leaving && 'leaving',
+    arrived && 'arrived',
+  ];
   return (
     <div
       className={classes.filter(Boolean).join(' ')}
@@ -100,7 +111,7 @@ function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; dept
       style={{ paddingLeft: depth * 22 }}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
-      <input type="checkbox" aria-label="Done" checked={item.done} onChange={() => appStore.toggleItem(cardId, item.id)} />
+      <input type="checkbox" aria-label="Done" checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
       <GrowTextarea
         ref={ref}
         className="item-text"

@@ -107,7 +107,8 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 
 **Completed section**
 
-- Ticking a top-level item moves it and its sub-items into "Completed · N" at the bottom; the header collapses and expands the section. Ticking a sub-item only strikes it through.
+- Ticking a top-level item moves it and its sub-items into the "Completed" section at the bottom (its header shows no count, and collapses and expands the section). Ticking a sub-item only strikes it through, except that ticking the last open sub-item of an item ticks that item too (and so on upwards), so a list item whose sub-items are all done moves to Completed. Unticking a sub-item unticks the items it is nested in.
+- With motion allowed, an item on its way to Completed shows ticked and eases down and out (280ms) before moving, then fades in at its new place with a brief teal tint (450ms). With reduced motion it moves at once. Undo right after ticking undoes the tick.
 - Trash deletes that item and everything nested under it. If a list becomes empty, a blank item replaces it.
 - Exception: deleting an item with no text (trash, Backspace or Delete) keeps its sub-items if any of them has text; they move up one level into its place. Cut (Ctrl+X) always takes sub-items with the parent.
 

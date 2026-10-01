@@ -106,6 +106,20 @@ export function resizeColumn(board: Board, columnId: string, w: number, h?: numb
   return next.w === col.w && next.h === col.h ? board : { ...board, columns: { ...board.columns, [columnId]: next } };
 }
 
+/** True if any card or column is open (not collapsed). */
+export function anyExpanded(board: Board): boolean {
+  return Object.values(board.cards).some((c) => !c.collapsed) || Object.values(board.columns).some((c) => !c.collapsed);
+}
+
+/** Collapse (or expand) every card and column on the board. */
+export function setAllCollapsed(board: Board, collapsed: boolean): Board {
+  const blocks = [...Object.values(board.cards), ...Object.values(board.columns)];
+  if (blocks.every((b) => b.collapsed === collapsed)) return board;
+  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
+  const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
+  return { ...board, cards, columns };
+}
+
 export function toggleCollapsed(board: Board, id: string): Board {
   if (board.columns[id]) return updateColumn(board, id, { collapsed: !board.columns[id].collapsed });
   return updateCard(board, id, (c) => ({ ...c, collapsed: !c.collapsed }));

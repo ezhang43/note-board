@@ -246,3 +246,32 @@ test('saved boards with overlapping blocks are tidied on load', async ({ page })
   }).toBe(3);
   await expectNoOverlaps(page);
 });
+
+test('a collapsed column can still be resized (width), from its right edge', async ({ page }) => {
+  await add(page, 'New column');
+  const col = columns(page).first();
+  await col.getByRole('button', { name: 'Collapse column' }).click();
+  const edge = await box(col.getByRole('button', { name: 'Resize column width' }));
+  await dragPointer(page, { x: edge.x + 5, y: edge.y + 5 }, { x: edge.x + 5 + 120, y: edge.y + 5 });
+  await expect.poll(() => col.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(400);
+  await col.getByRole('button', { name: 'Expand column' }).click();
+  expect(await col.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(400);
+});
+
+test('Collapse all collapses every card and column; the same button then expands them all; one undo step', async ({ page }) => {
+  await add(page, 'New column');
+  await add(page, 'Note');
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await clickEmpty(page);
+  const button = () => page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await expect(button()).toHaveAccessibleName('Collapse all');
+  await button().click();
+  await expect(page.locator('.card:not(.collapsed), .column:not(.collapsed)')).toHaveCount(0);
+  await expect(button()).toHaveAccessibleName('Expand all');
+  await button().click();
+  await expect(page.locator('.card.collapsed, .column.collapsed')).toHaveCount(0);
+  await button().click();
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.card.collapsed, .column.collapsed')).toHaveCount(0);
+});

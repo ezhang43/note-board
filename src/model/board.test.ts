@@ -132,6 +132,18 @@ describe('collapse, colour and edit', () => {
     expect(out.cards).toBe(b.cards);
   });
 
+  it('collapse all / expand all covers every card and column', () => {
+    const b = board();
+    expect(B.anyExpanded(b)).toBe(true);
+    const shut = B.setAllCollapsed(b, true);
+    expect(Object.values(shut.cards).every((c) => c.collapsed)).toBe(true);
+    expect(Object.values(shut.columns).every((c) => c.collapsed)).toBe(true);
+    expect(B.anyExpanded(shut)).toBe(false);
+    expect(B.setAllCollapsed(shut, true)).toBe(shut);
+    const open = B.setAllCollapsed(shut, false);
+    expect([...Object.values(open.cards), ...Object.values(open.columns)].every((c) => !c.collapsed)).toBe(true);
+  });
+
   it("recolours listed columns, and listed cards' title bands (cards stay white); null resets", () => {
     const before = board();
     const b = B.recolour(before, ['a', 'c1', 'z'], 'lavender');

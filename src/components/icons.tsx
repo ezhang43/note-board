@@ -70,6 +70,15 @@ export function PlusIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** Collapse all (arrows pointing in) or expand all (arrows pointing out). */
+export function CollapseAllIcon({ expand }: { expand: boolean }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      {expand ? <path d="M7 9l5-5 5 5M7 15l5 5 5-5" /> : <path d="M7 4l5 5 5-5M7 20l5-5 5 5" />}
+    </svg>
+  );
+}
+
 export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg

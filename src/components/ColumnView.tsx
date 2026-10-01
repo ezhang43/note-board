@@ -113,9 +113,10 @@ export function ColumnView({ id }: { id: string }) {
           <div className="column-empty">Drop cards here</div>
         ))}
 
+      {/* The width can be changed even when the column is collapsed. */}
+      <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} />
       {!col.collapsed && (
         <>
-          <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} />
           <button
             type="button"
             className="resize-corner"

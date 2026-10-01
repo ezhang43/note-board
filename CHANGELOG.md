@@ -1,5 +1,10 @@
 # Changelog
 
+## Collapse all, and resizing collapsed blocks (2026-10-02)
+
+- New **Collapse all** button (next to Auto-colour): collapses every card and column at once. When everything is collapsed it becomes **Expand all**. Ctrl+Z undoes it.
+- Collapsed columns can now be resized too: drag the right edge. On collapsed cards and columns the right edge lights up when you hover, so the handle is easy to find.
+
 ## Colour for cards' title bands (2026-10-02)
 
 - With a card selected, **Colour** now colours the card's title band (the card itself stays white). A note gets the colour across the strip at its top. **Default** at the bottom of the colour menu puts the usual band back (or a column back to grey).

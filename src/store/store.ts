@@ -712,6 +712,14 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     setItemText: (cardId: string, itemId: string, text: string) =>
       commit((b) => B.setItemText(b, cardId, itemId, text), { merge: `item:${itemId}` }),
     setColumnTitle: (id: string, title: string) => commit((b) => B.updateColumn(b, id, { title }), { merge: `coltitle:${id}` }),
+    /** Collapse all / Expand all: if anything is open, collapse everything; otherwise open everything. One undo step. */
+    toggleAllCollapsed() {
+      const collapse = B.anyExpanded(state.board);
+      pushedBy.clear();
+      expanding = null;
+      commit((b) => B.setAllCollapsed(b, collapse));
+    },
+
     /**
      * Collapse arrow. Expanding starts remembering which blocks the growing block pushes aside;
      * collapsing puts them back (part of the same undo step).

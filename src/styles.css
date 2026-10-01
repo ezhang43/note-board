@@ -560,7 +560,10 @@ input::placeholder, textarea::placeholder { color: #8a8378; }
   cursor: ew-resize;
   touch-action: none;
 }
-.card .resize-edge { top: 4px; bottom: 4px; }
+.card .resize-edge, .column.collapsed .resize-edge { top: 4px; bottom: 4px; }
+/* On a collapsed block the edge is the only resize handle, so hint at it on hover. */
+.card.collapsed:hover .resize-edge, .column.collapsed:hover .resize-edge { background: rgba(31, 95, 91, 0.14); }
+.card.collapsed .resize-edge:hover, .column.collapsed .resize-edge:hover { background: rgba(31, 95, 91, 0.28); }
 .resize-edge:hover { background: rgba(31, 95, 91, 0.28); }
 
 .card.size-match, .column.size-match { outline: 2px dashed var(--accent); }

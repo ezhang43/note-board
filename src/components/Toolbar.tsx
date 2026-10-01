@@ -1,11 +1,12 @@
 import { useRef } from 'react';
+import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE, type ColorKey } from '../model/palette';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
-import { CaretIcon, GridIcon, HandIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
+import { CollapseAllIcon, CaretIcon, GridIcon, HandIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
 
 /** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -111,6 +112,25 @@ function ColourControl() {
   );
 }
 
+/** Collapse all / Expand all: collapses every card and column, or (when all are collapsed) opens them all. */
+function CollapseAllButton() {
+  const any = useAppState((s) => Object.keys(s.board.cards).length + Object.keys(s.board.columns).length > 0);
+  const expand = useAppState((s) => any && !anyExpanded(s.board));
+  const label = expand ? 'Expand all' : 'Collapse all';
+  return (
+    <button
+      type="button"
+      className="tb-button icon-only faded-colour"
+      aria-label={label}
+      title={any ? `${label} cards and columns` : 'Nothing to collapse yet'}
+      aria-disabled={any ? undefined : true}
+      onClick={() => any && appStore.toggleAllCollapsed()}
+    >
+      <CollapseAllIcon expand={expand} />
+    </button>
+  );
+}
+
 /** Clean up: moves every ticked item into the Completed card. Faded when nothing is ticked. */
 function CleanUpButton() {
   const any = useAppState((s) => hasTickedItems(s.board));
@@ -213,6 +233,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
 
       <ColourControl />
       <AutoColourButton />
+      <CollapseAllButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
       <span className="toolbar-label">Add</span>

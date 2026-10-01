@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Add Note · Add To-do list · Add Link · New column · Import · Clean up; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Collapse all · Add Note · Add To-do list · Add Link · New column · Import · Clean up; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |
@@ -78,7 +78,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 **Resizing**
 
 - Loose cards: bottom-right corner handle sets width and minimum height (content taller than that still grows the card). A collapsed loose card can still be resized: a right-edge strip sets its width.
-- Columns: corner handle and right-edge strip set the width; cards inside follow it. A column with cards is always exactly as tall as its cards (so collapsing cards shrinks it); only an empty column has a minimum height, which the corner handle also sets.
+- Columns: corner handle and right-edge strip set the width; cards inside follow it. A collapsed column keeps its right-edge strip, so its width can still be changed. On collapsed cards and columns the strip is tinted on hover, as it is their only handle. A column with cards is always exactly as tall as its cards (so collapsing cards shrinks it); only an empty column has a minimum height, which the corner handle also sets.
 - Cards inside a column cannot be resized and size to their content.
 - While resizing, the edge follows the pointer and eases to the grid size on release; the size label shows the final size.
 - Size limits: cards 200–640 wide, columns 240–640 wide, heights 100–700.
@@ -87,6 +87,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 **Collapse, add, delete, colour**
 
 - Collapse arrow: a card shrinks to one line with a preview (first line, list title, or link title); a column hides its cards.
+- Toolbar Collapse all (icon button): if any card or column is open, collapses every card and column; when everything is collapsed it reads Expand all and opens them all. One undo step. Faded on an empty board.
 - Expanding a card or column can push nearby blocks aside. Collapsing it again puts those blocks back where they were (in the same undo step), unless one has been moved since or its old spot is now taken. This is remembered until the page is reloaded.
 - Adding a card with a column selected puts it at the end of that column; with a card inside a column selected, directly below that card; otherwise loose on the board. A new to-do list starts with one blank item, cursor in it.
 - Column × opens a small confirmation ("Delete 'Ideas'?" · Cancel · red Delete column) and then deletes the column and all its cards.

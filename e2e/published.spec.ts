@@ -26,3 +26,25 @@ test('opens without internet after one visit online', async ({ page, context }) 
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   await context.setOffline(false);
 });
+
+test('can be installed as an app (manifest and icons)', async ({ page, request }) => {
+  await page.goto('./');
+  const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+  const manifestUrl = new URL(href!, page.url()).href;
+  expect(manifestUrl).toBe(new URL('manifest.webmanifest', page.url()).href);
+
+  const manifest = await (await request.get(manifestUrl)).json();
+  expect(manifest.name).toBe('Note Board');
+  expect(manifest.display).toBe('standalone');
+  expect(new URL(manifest.start_url, manifestUrl).href).toBe(page.url());
+
+  // Windows needs a 192px and a 512px icon; each must load as a picture.
+  for (const icon of manifest.icons) {
+    const res = await request.get(new URL(icon.src, manifestUrl).href);
+    expect(res.ok()).toBe(true);
+    expect(res.headers()['content-type']).toContain('image/png');
+  }
+  expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(
+    expect.arrayContaining(['192x192', '512x512']),
+  );
+});

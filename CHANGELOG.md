@@ -1,5 +1,10 @@
 # Changelog
 
+## Install as an app (2026-10-02)
+
+- The published board can be installed as an app from Edge or Chrome: it gets its own window (no address bar), a Note Board icon in the Start menu and taskbar, and opens offline. Sign-in and sync work exactly as on the website, and the app updates itself whenever the site does.
+- The browser tab now shows the Note Board icon too.
+
 ## Spec brought up to date (2026-10-02)
 
 - `SPEC.md` now describes the app as it is: sign-in, sync and offline use on the published site, dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, the dragged block taking priority, and the checklist changes. Accounts and cloud sync are no longer listed as "not in version 1".

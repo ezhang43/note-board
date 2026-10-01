@@ -142,6 +142,7 @@ Every block action works on one block or on a whole selection, and every change 
 - The board is stored in Firebase (project `note-board-a672a`) as one document per user, holding the same data as the browser save. Firestore security rules (`firestore.rules`, pasted into the Firebase console by the owner) allow only the owner's account to read or write it.
 - First sign-in: the online board wins; if there is none, this device's board is uploaded. After that, changes reach other devices within a second or two, and the most recent change wins. A change from another device clears undo history and waits for any drag in progress to finish.
 - Works offline: once visited online, the page opens without internet; edits are kept on the device and uploaded when the connection returns.
+- Installable as an app: in Edge or Chrome the site can be installed (address-bar Install button), giving Note Board its own window without an address bar, a Start menu and taskbar icon (three cards on teal), and the same sign-in, sync and offline behaviour. It updates itself whenever the site does.
 - Running the app locally (`npm run dev`) and the tests stay browser-only, with no sign-in.
 
 ## Look and feel
@@ -175,7 +176,7 @@ Build in this order, each step tested and working before the next.
 4. Selection, rectangle select, clipboard, delete, and undo/redo for everything
 5. Checklists: items, nesting, Completed section, item drag, multi-select and drop-to-board
 
-After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, and the published site with sign-in, sync and offline use.
+After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, and the published site with sign-in, sync, offline use and installing as an app.
 
 **Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards, mobile layout.
 

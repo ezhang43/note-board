@@ -74,7 +74,7 @@ function ColourControl() {
   );
 }
 
-export function Toolbar() {
+export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   const name = useAppState((s) => s.board.name);
   const snap = useAppState((s) => s.board.snap);
   const tool = useAppState((s) => s.view.tool);
@@ -151,6 +151,15 @@ export function Toolbar() {
       <AddCardButton kind="todo" label="To-do list" />
       <AddCardButton kind="link" label="Link" />
       <NewColumnButton />
+
+      {onSignOut && (
+        <>
+          <div className="toolbar-divider" aria-hidden="true" />
+          <button type="button" className="tb-button" onClick={onSignOut}>
+            Sign out
+          </button>
+        </>
+      )}
     </header>
   );
 }

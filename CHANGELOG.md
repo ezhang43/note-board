@@ -2,7 +2,10 @@
 
 ## Hosting (2026-10-01)
 
-- The board is published at https://ezhang43.github.io/note-board/. Every push to `build/v1` runs the unit tests, builds the site and publishes it. Each browser keeps its own board; nothing is shared online.
+- The board is published at https://ezhang43.github.io/note-board/. Every push to `build/v1` runs the unit tests, builds the site and publishes it.
+- The published board now needs a Google sign-in and is saved to your account (Firebase), so the same board shows on your phone and laptop. Changes reach the other device within a second or two; if both are edited at once, the most recent save wins. Signing in is remembered on each device. Anyone else sees only the sign-in screen; another Google account gets "This Google account can't open this board". A Sign out button sits at the right of the toolbar.
+- Works offline: once visited online, the page opens without internet, edits are kept on the device and uploaded when the connection returns.
+- `npm run dev` and the tests still use the local-only board with no sign-in.
 
 ## Owner additions (2026-10-01)
 

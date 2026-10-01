@@ -1,0 +1,73 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import {
+  doc,
+  initializeFirestore,
+  onSnapshot,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  serverTimestamp,
+  setDoc,
+} from 'firebase/firestore';
+import type { Remote } from '../store/sync';
+
+// Not secret: these only say which Firebase project to talk to. The rules in
+// firestore.rules decide who may read or write the board.
+const app = initializeApp({
+  apiKey: 'AIzaSyBHun-34SrmkErUqS25OJax0JCzl2xe4Wo',
+  authDomain: 'note-board-a672a.firebaseapp.com',
+  projectId: 'note-board-a672a',
+  storageBucket: 'note-board-a672a.firebasestorage.app',
+  messagingSenderId: '1016497512471',
+  appId: '1:1016497512471:web:8b68c1ed7d063aa39cbc52',
+});
+
+const auth = getAuth(app);
+// Keeps a copy on the device, so the board opens and can be edited offline;
+// changes made offline are uploaded when the connection returns.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
+
+export type { User };
+
+export function watchUser(onChange: (user: User | null) => void) {
+  return onAuthStateChanged(auth, onChange);
+}
+
+export function signInWithGoogle() {
+  return signInWithPopup(auth, new GoogleAuthProvider());
+}
+
+export function signOutUser() {
+  return signOut(auth);
+}
+
+/** The signed-in person's board, stored as one Firestore document: boards/{uid}. */
+export function boardRemote(uid: string): Remote {
+  const ref = doc(db, 'boards', uid);
+  return {
+    watch(onChange, onError) {
+      return onSnapshot(
+        ref,
+        { includeMetadataChanges: true },
+        (snap) => {
+          // Our own write, not yet confirmed by the server.
+          if (snap.metadata.hasPendingWrites) return;
+          if (!snap.exists()) {
+            // "No board" from the offline copy may just mean it hasn't been downloaded yet.
+            if (!snap.metadata.fromCache) onChange(null);
+            return;
+          }
+          const d = snap.data();
+          onChange(typeof d.data === 'string' ? { data: d.data, client: String(d.client ?? '') } : null);
+        },
+        onError,
+      );
+    },
+    write({ data, client }) {
+      // Offline, this is queued and sent later; failures surface through watch's onError.
+      setDoc(ref, { data, client, updatedAt: serverTimestamp() }).catch(() => {});
+    },
+  };
+}

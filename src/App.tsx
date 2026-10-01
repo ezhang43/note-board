@@ -3,11 +3,12 @@ import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { useShortcuts } from './components/useShortcuts';
 
-export function App() {
+/** `onSignOut` is given on the published site, where the board is synced to its owner's account. */
+export function App({ onSignOut }: { onSignOut?: () => void }) {
   useShortcuts();
   return (
     <div className="app">
-      <Toolbar />
+      <Toolbar onSignOut={onSignOut} />
       <Canvas />
       <ZoomControl />
     </div>

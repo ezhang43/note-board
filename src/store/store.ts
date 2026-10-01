@@ -392,6 +392,15 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (state.ui.focusItem === itemId) updateUi({ focusItem: null });
     },
 
+    /**
+     * Swap in a board that came from elsewhere (the online copy). Not a change the user made here,
+     * so undo history starts over rather than undoing into the old board.
+     */
+    replaceBoard(board: Board) {
+      history = emptyHistory;
+      restore({ history, board });
+    },
+
     // ---------- undo ----------
     undo: () => restore(undo(history, state.board)),
     redo: () => restore(redo(history, state.board)),

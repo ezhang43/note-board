@@ -66,8 +66,9 @@ export function boardRemote(uid: string): Remote {
       );
     },
     write({ data, client }) {
-      // Offline, this is queued and sent later; failures surface through watch's onError.
-      setDoc(ref, { data, client, updatedAt: serverTimestamp() }).catch(() => {});
+      // Offline, this is queued and resolves once sent; it rejects if Firestore refuses it
+      // (too big, or not allowed by the rules).
+      return setDoc(ref, { data, client, updatedAt: serverTimestamp() });
     },
   };
 }

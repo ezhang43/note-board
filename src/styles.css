@@ -213,6 +213,22 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 /* ---------- zoom control ---------- */
 
+/* Shown on the published site when the last upload was refused (e.g. the board is too big). */
+.save-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 3;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
 .zoom-control {
   position: fixed;
   right: 24px;

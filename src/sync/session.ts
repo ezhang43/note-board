@@ -1,6 +1,7 @@
 import { appStore } from '../store/appStore';
 import { startSync } from '../store/sync';
 import { boardRemote, signInWithGoogle, signOutUser, watchUser } from './firebase';
+import { flushWhenHidden } from './pageHide';
 
 /**
  * checking: finding out whether someone is signed in on this device.
@@ -11,6 +12,8 @@ export type SessionStatus = 'checking' | 'signed-out' | 'loading' | 'ready' | 'n
 
 let status: SessionStatus = 'checking';
 let signInError = '';
+/** The last upload was refused, so changes are only on this device for now. */
+let saveFailed = false;
 const listeners = new Set<() => void>();
 let sync: ReturnType<typeof startSync> | null = null;
 /** Identifies this open page, so it can ignore its own uploads when they come back. */
@@ -33,15 +36,20 @@ watchUser((user) => {
   sync = startSync(appStore, boardRemote(user.uid), {
     client,
     onReady: () => update('ready'),
+    onSaveFailed: (failed) => {
+      saveFailed = failed;
+      listeners.forEach((l) => l());
+    },
     onError: (e) => update((e as { code?: string }).code === 'permission-denied' ? 'no-access' : 'error'),
   });
 });
 
-window.addEventListener('pagehide', () => sync?.flush());
+flushWhenHidden(document, window, () => sync?.flush());
 
 export const session = {
   getStatus: () => status,
   getSignInError: () => signInError,
+  getSaveFailed: () => saveFailed,
   subscribe(listener: () => void) {
     listeners.add(listener);
     return () => {

@@ -9,6 +9,8 @@ import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 function fakeRemote() {
   let listener: ((doc: RemoteDoc | null) => void) | null = null;
   const writes: RemoteDoc[] = [];
+  /** When true, uploads fail (as Firestore does past its size limit or when rules refuse). */
+  const control = { fail: false };
   const remote: Remote = {
     watch(onChange) {
       listener = onChange;
@@ -16,13 +18,21 @@ function fakeRemote() {
         listener = null;
       };
     },
-    write: (doc) => writes.push(doc),
+    write: (doc) => {
+      writes.push(doc);
+      return control.fail ? Promise.reject(new Error('refused')) : Promise.resolve();
+    },
   };
-  return { remote, writes, send: (doc: RemoteDoc | null) => listener?.(doc), watching: () => listener !== null };
+  return { remote, writes, control, send: (doc: RemoteDoc | null) => listener?.(doc), watching: () => listener !== null };
 }
 
 function boardJson(name: string) {
   return serializeBoard({ ...createBoard(), name });
+}
+
+/** Lets a finished or failed upload be noticed. */
+async function settled() {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 
 function setup() {
@@ -30,8 +40,9 @@ function setup() {
   const fake = fakeRemote();
   const onReady = vi.fn();
   const onError = vi.fn();
-  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError });
-  return { store, fake, onReady, onError, sync };
+  const onSaveFailed = vi.fn();
+  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError, onSaveFailed });
+  return { store, fake, onReady, onError, onSaveFailed, sync };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -196,5 +207,34 @@ describe('board sync', () => {
     store.renameBoard('Local edit');
     vi.advanceTimersByTime(SYNC_DELAY * 2);
     expect(fake.writes).toEqual([]);
+  });
+
+  it('reports a failed upload, retries with the next change, and clears the report once saved', async () => {
+    const { store, fake, onSaveFailed } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    fake.control.fail = true;
+    store.renameBoard('Too big');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveFailed).toHaveBeenLastCalledWith(true);
+    fake.control.fail = false;
+    store.renameBoard('Smaller');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(fake.writes).toHaveLength(2);
+    expect(JSON.parse(fake.writes[1].data).board.name).toBe('Smaller');
+    expect(onSaveFailed).toHaveBeenLastCalledWith(false);
+  });
+
+  it('while an upload has failed, a version from another device does not replace the unsaved board', async () => {
+    const { store, fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    fake.control.fail = true;
+    store.renameBoard('Only here');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    // Firestore puts its copy back after a refused write; that must not wipe this device's board.
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Only here');
   });
 });

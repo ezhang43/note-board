@@ -7,6 +7,17 @@ import { session } from './session';
 export function SyncedApp() {
   const status = useSyncExternalStore(session.subscribe, session.getStatus);
   const error = useSyncExternalStore(session.subscribe, session.getSignInError);
-  if (status === 'ready') return <App onSignOut={session.signOut} />;
+  const saveFailed = useSyncExternalStore(session.subscribe, session.getSaveFailed);
+  if (status === 'ready')
+    return (
+      <>
+        <App onSignOut={session.signOut} />
+        {saveFailed && (
+          <p className="save-banner" role="status">
+            Couldn’t save online. Changes are on this device only.
+          </p>
+        )}
+      </>
+    );
   return <SignInScreen status={status} error={error} onSignIn={session.signIn} onSignOut={session.signOut} />;
 }

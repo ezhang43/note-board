@@ -15,7 +15,8 @@ export interface Remote {
    * there is none yet. Returns a function that stops watching.
    */
   watch(onChange: (doc: RemoteDoc | null) => void, onError: (e: unknown) => void): () => void;
-  write(doc: RemoteDoc): void;
+  /** Resolves once saved online; rejects if the save was refused (stays pending while offline). */
+  write(doc: RemoteDoc): Promise<void>;
 }
 
 /** Wait this long after the last board change before uploading, so typing isn't sent on every key. */
@@ -32,7 +33,13 @@ export const SYNC_DELAY = 800;
 export function startSync(
   store: Store,
   remote: Remote,
-  opts: { client: string; onReady: () => void; onError: (e: unknown) => void },
+  opts: {
+    client: string;
+    onReady: () => void;
+    onError: (e: unknown) => void;
+    /** Told true when an upload is refused, and false once a later upload is saved. */
+    onSaveFailed?: (failed: boolean) => void;
+  },
 ) {
   let ready = false;
   /** Set when the online copy can't be read: nothing more is sent or applied. */
@@ -46,6 +53,11 @@ export function startSync(
   let waiting: Board | null = null;
   let lastBoard = store.getState().board;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * The last upload was refused: this device's board is newer than the online copy until a later
+   * upload succeeds, so versions from elsewhere (including Firestore putting its copy back) are not applied.
+   */
+  let failed = false;
 
   const busy = () => {
     const ui = store.getState().ui;
@@ -59,7 +71,19 @@ export function startSync(
     const data = serializeBoard(store.getState().board);
     if (data === lastSynced) return;
     lastSynced = data;
-    remote.write({ data, client: opts.client });
+    remote.write({ data, client: opts.client }).then(
+      () => {
+        if (!failed || lastSynced !== data) return;
+        failed = false;
+        opts.onSaveFailed?.(false);
+      },
+      () => {
+        // Not saved online: the next change tries again.
+        if (lastSynced === data) lastSynced = null;
+        failed = true;
+        opts.onSaveFailed?.(true);
+      },
+    );
   }
 
   const unsubscribe = store.subscribe(() => {
@@ -104,8 +128,8 @@ export function startSync(
       store.replaceBoard(board);
       return opts.onReady();
     }
-    // Ignore our own uploads coming back.
-    if (!doc || doc.client === opts.client) return;
+    // Ignore our own uploads coming back, and everything while this device has unsaved changes.
+    if (!doc || doc.client === opts.client || failed) return;
     const board = read(doc.data);
     if (!board) return;
     const data = serializeBoard(board);

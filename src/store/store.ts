@@ -266,6 +266,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   /**
    * Every user change to board data goes through here, so every change can be undone.
    * `merge` names a text field: a burst of typing in it is one undo step.
+   * A tick still animating is applied first. `fn` should build on the board it is given; an action
+   * that works out its new board beforehand must call flushPendingTick() before reading state.board.
    */
   function commit(fn: (b: Board) => Board, opts: { ui?: Partial<Ui>; merge?: string } = {}) {
     if (pendingTick && !applyingTick) {
@@ -477,6 +479,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
 
   /** Put newly pasted / duplicated blocks on the board and select them. */
   function placeCopies(entries: ClipEntry[], times: number) {
+    flushPendingTick();
     const { board, ids } = pasteBlocks(state.board, entries, times);
     commit(() => board, { ui: { selection: ids, confirm: null } });
     // Pasted blocks keep their spot; whatever they would cover moves out of the way.
@@ -589,7 +592,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       else updateUi({ itemSel: null });
     },
     /** Ctrl+A: every column and loose card. */
-    selectAll: () => updateUi({ selection: [...state.board.order] }),
+    selectAll: () => updateUi({ selection: [...state.board.order], itemSel: null }),
     /** Click on empty board or Escape: clear the selection and close menus. */
     clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null }),
     toggleColourMenu() {
@@ -605,7 +608,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     /** Start a selection box. With `keep` (Ctrl held) the current selection is added to. */
     startMarquee(at: Point, keep: boolean) {
       marqueeBase = keep ? state.ui.selection : [];
-      updateUi({ marquee: { x: at.x, y: at.y, w: 0, h: 0 }, selection: marqueeBase, colourMenuOpen: false, confirm: null });
+      updateUi({ marquee: { x: at.x, y: at.y, w: 0, h: 0 }, selection: marqueeBase, itemSel: null, colourMenuOpen: false, confirm: null });
     },
     /** The box now runs from `from` to `to` (canvas pixels): select everything it touches, live. */
     updateMarquee(from: Point, to: Point) {
@@ -657,6 +660,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
      * One undo step. Returns how many items moved.
      */
     cleanUp(now: Date = new Date()): number {
+      flushPendingTick();
       const place = { type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H.completed, screenCentre(), measured) } as const;
       const result = cleanUp(state.board, dayKey(now), place);
       if (!result.count) return 0;
@@ -668,6 +672,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
 
     /** Unticking an item in the Completed card sends it back to its list (or a new list, if that's gone). */
     restoreCompleted(itemId: string) {
+      flushPendingTick();
       const done = completedCardOf(state.board);
       if (!done) return;
       // If its list is gone, the new list goes next to the Completed card.
@@ -771,6 +776,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     tabSelectedItems,
     /** Delete at the end of an item pulls the item below up into it. Returns whether it did. */
     itemDeleteAtEnd(cardId: string, itemId: string): boolean {
+      flushPendingTick();
       const card = state.board.cards[cardId];
       if (card?.kind !== 'todo') return false;
       const result = C.mergeNextItem(card.items, itemId);
@@ -780,6 +786,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     /** Backspace in an empty item deletes it (not the list's last item). Returns whether it did. */
     itemBackspace(cardId: string, itemId: string): boolean {
+      flushPendingTick();
       const card = state.board.cards[cardId];
       if (card?.kind !== 'todo') return false;
       const result = C.removeEmptyItem(card.items, itemId);
@@ -796,7 +803,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (!item) return;
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
       const next = C.setItemsDone(card.items, ids, !item.done);
-      const apply = () => commit((b) => C.editItems(b, cardId, () => next));
+      // Applied to the list as it is then (another device's change may have arrived meanwhile).
+      const apply = () => commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
       // Top-level items this tick sends to the Completed section get a short leaving animation first.
       const leaving = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done).flatMap(C.subtreeIds);
       if (!leaving.length || reducedMotion()) return apply();
@@ -906,6 +914,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     confirmDelete() {
       const c = state.ui.confirm;
       if (!c) return;
+      flushPendingTick();
       const next = B.deleteBlocks(state.board, c.ids);
       commit(() => next, { ui: { confirm: null, selection: liveSelection(next) } });
     },
@@ -914,6 +923,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
      * the column's × appears first. Returns false when nothing is selected.
      */
     deleteSelection(): boolean {
+      // Not while a block is being dragged or resized: it would vanish from under the pointer.
+      if (state.ui.drag || state.ui.resize) return true;
+      flushPendingTick();
       const ids = liveSelection(state.board);
       if (!ids.length) return false;
       const firstColumn = ids.find((id) => state.board.columns[id]);
@@ -1007,6 +1019,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     dropDrag(index: number | null) {
       const d = state.ui.drag;
       if (!d) return;
+      flushPendingTick();
       if (d.overColumn && index != null) {
         commit((b) => B.moveCard(b, d.id, { type: 'column', columnId: d.overColumn!, index }), { ui: { drag: null } });
         return requestSettle([d.overColumn]);

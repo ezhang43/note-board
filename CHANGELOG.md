@@ -1,5 +1,12 @@
 # Changelog
 
+## Ticking, dragging and selecting fixes from the code review (2026-10-02)
+
+- Ticking an item and then quickly deleting, pasting, dropping a block, pressing Backspace or pressing Clean up no longer un-ticks the item.
+- A tick that is still animating no longer undoes a change from another device that arrives at the same moment.
+- Pressing Delete while dragging a card or column does nothing (it used to break the drag).
+- Ctrl+A, or a selection box with Ctrl held, now drops any highlighted checklist items, so Delete and Ctrl+C act on the selected blocks.
+
 ## Sync fixes from the code review (2026-10-02)
 
 - Typing or other changes not yet sent online are no longer thrown away when another device saves at the same moment: your change is kept and sent.

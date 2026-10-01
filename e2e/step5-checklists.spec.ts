@@ -97,7 +97,7 @@ test('arrows move line by line through long text that wraps, before leaving the 
   const long = 'This item has quite a lot of text so that it wraps onto several lines in the card';
   const list = await makeList(page, ['top', long, 'bottom']);
   const field = rows(list).nth(1).getByLabel('Item text');
-  expect(await field.evaluate((el) => el.offsetHeight)).toBeGreaterThan(50); // it really wraps
+  expect(await field.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThan(50); // it really wraps
   await rowWithText(list, 'top').getByLabel('Item text').focus();
   await page.keyboard.press('ArrowDown'); // into the long item, first line
   await expect(field).toBeFocused();

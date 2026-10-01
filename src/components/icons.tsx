@@ -56,7 +56,7 @@ export function GridIcon() {
 
 export function CaretIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" strokeWidth="1.8" {...common} stroke="#6B655C">
+    <svg width="12" height="12" viewBox="0 0 12 12" strokeWidth="1.8" {...common} style={{ stroke: 'var(--ink-faint)' }}>
       <path d="M3 4.5l3 3 3-3" />
     </svg>
   );
@@ -66,6 +66,15 @@ export function PlusIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" strokeWidth="1.8" {...common}>
       <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+/** Dark mode toggle: a moon. */
+export function MoonIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
     </svg>
   );
 }
@@ -87,8 +96,7 @@ export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
       viewBox="0 0 12 12"
       strokeWidth="1.8"
       {...common}
-      stroke="#6B655C"
-      style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms ease' }}
+      style={{ stroke: 'var(--ink-faint)', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms ease' }}
     >
       <path d="M3 4.5l3 3 3-3" />
     </svg>
@@ -97,7 +105,7 @@ export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
 
 export function CloseIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" strokeWidth="1.8" {...common} stroke="#8A8378">
+    <svg width="12" height="12" viewBox="0 0 14 14" strokeWidth="1.8" {...common} style={{ stroke: 'var(--placeholder)' }}>
       <path d="M3 3l8 8M11 3l-8 8" />
     </svg>
   );
@@ -113,7 +121,7 @@ export function ExternalIcon() {
 
 export function ResizeIcon() {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" strokeWidth="1.4" {...common} stroke="#8A8378">
+    <svg width="10" height="10" viewBox="0 0 10 10" strokeWidth="1.4" {...common} style={{ stroke: 'var(--placeholder)' }}>
       <path d="M9 3L3 9M9 6.5L6.5 9" />
     </svg>
   );
@@ -129,7 +137,7 @@ export function TrashIcon() {
 
 export function GripIcon() {
   return (
-    <svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true">
+    <svg width="8" height="12" viewBox="0 0 12 18" style={{ fill: 'var(--placeholder)' }} aria-hidden="true">
       {[3, 9, 15].flatMap((cy) => [3, 9].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.7" />))}
     </svg>
   );

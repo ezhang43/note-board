@@ -13,6 +13,7 @@ import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../model/complet
 import { addImported, estimateHeight, packInLanes, parseMilanote, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import type { Board, CardKind, Point, Rect, Size, TodoItem, Tool, View } from '../model/types';
+import { THEME_KEY, startingTheme } from '../model/theme';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../model/view';
 
 /** A block being dragged. x / y are its top-left on the board while it follows the pointer. */
@@ -177,10 +178,19 @@ function copyText(text: string) {
   }
 }
 
+/** Whether the computer is set to dark mode (false where there is no browser, as in unit tests). */
+function prefersDark(): boolean {
+  try {
+    return globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export function createStore(storage: StorageLike | null, schedule: Schedule = later) {
   let state: AppState = {
     board: parseBoard(read(BOARD_KEY)),
-    view: parseView(read(VIEW_KEY)),
+    view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()) },
     ui: emptyUi,
   };
   const listeners = new Set<() => void>();
@@ -550,6 +560,12 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
 
     // ---------- view ----------
     setTool: (tool: Tool) => updateView((v) => (v.tool === tool ? v : { ...v, tool })),
+    /** Light / dark toggle: switches the look and remembers the choice on this device. */
+    toggleTheme() {
+      const theme = state.view.theme === 'dark' ? 'light' : 'dark';
+      updateView((v) => ({ ...v, theme }));
+      write(THEME_KEY, theme);
+    },
     panBy: (dx: number, dy: number) => updateView((v) => panBy(v, dx, dy)),
     zoomAt: (at: Point, factor: number) => updateView((v) => zoomBy(v, at, factor)),
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(viewportSize), factor)),

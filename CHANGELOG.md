@@ -1,5 +1,11 @@
 # Changelog
 
+## Dark mode (2026-10-02)
+
+- New moon button at the right end of the toolbar switches between light and dark mode.
+- The first time you open the app on a device, it matches your computer's light / dark setting. After you press the button, that device remembers your choice. Each device keeps its own, and Ctrl+Z doesn't change it.
+- In dark mode the board, toolbar and cards turn dark grey with light text, and each column colour becomes a deep shade of itself, so columns still look clearly different.
+
 ## Tests first (2026-10-02)
 
 - New working rule: for every change, the tests are written first and seen to fail, then the change is built until they pass.

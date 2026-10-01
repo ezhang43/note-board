@@ -1,12 +1,13 @@
 import { useRef } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
-import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE, type ColorKey } from '../model/palette';
+import { COLOR_KEYS, type ColorKey } from '../model/palette';
+import { swatchFor } from '../model/theme';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
-import { CollapseAllIcon, CaretIcon, GridIcon, HandIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
+import { CollapseAllIcon, CaretIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
 
 /** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -72,7 +73,8 @@ function ColourControl() {
     if (!id) return undefined;
     return s.board.columns[id] ? s.board.columns[id].color : (s.board.cards[id]?.titleColor ?? null);
   });
-  const shown = current ? PALETTE[current] : COLUMN_DEFAULT;
+  const theme = useAppState((s) => s.view.theme);
+  const shown = swatchFor(current ?? null, theme);
 
   return (
     <div className="colour-control">
@@ -91,18 +93,21 @@ function ColourControl() {
       </button>
       {open && (
         <div className="colour-menu" role="group" aria-label="Colours">
-          {COLOR_KEYS.map((key) => (
+          {COLOR_KEYS.map((key) => {
+            const sw = swatchFor(key, theme);
+            return (
             <button
               key={key}
               type="button"
               className="swatch"
-              aria-label={PALETTE[key].label}
-              title={PALETTE[key].label}
+              aria-label={sw.label}
+              title={sw.label}
               aria-pressed={key === current}
-              style={{ background: PALETTE[key].bg, borderColor: key === current ? PALETTE[key].text : PALETTE[key].edge, color: PALETTE[key].text }}
+              style={{ background: sw.bg, borderColor: key === current ? sw.text : sw.edge, color: sw.text }}
               onClick={() => appStore.recolourSelection(key)}
             />
-          ))}
+            );
+          })}
           <button type="button" className="swatch-default" aria-pressed={current === null} onClick={() => appStore.recolourSelection(null)}>
             Default
           </button>
@@ -127,6 +132,23 @@ function CollapseAllButton() {
       onClick={() => any && appStore.toggleAllCollapsed()}
     >
       <CollapseAllIcon expand={expand} />
+    </button>
+  );
+}
+
+/** Light / dark toggle (pressed = dark). The choice is remembered on this device only. */
+function DarkModeButton() {
+  const dark = useAppState((s) => s.view.theme === 'dark');
+  return (
+    <button
+      type="button"
+      className="tb-button icon-only"
+      aria-label="Dark mode"
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-pressed={dark}
+      onClick={appStore.toggleTheme}
+    >
+      <MoonIcon />
     </button>
   );
 }
@@ -244,6 +266,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <NewColumnButton />
       <ImportButton />
       <CleanUpButton />
+      <DarkModeButton />
 
       {onSignOut && (
         <>

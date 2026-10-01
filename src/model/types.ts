@@ -1,4 +1,5 @@
 import type { ColorKey } from './palette';
+import type { Theme } from './theme';
 
 export type CardKind = 'note' | 'todo' | 'link';
 
@@ -114,6 +115,8 @@ export interface View {
   panY: number;
   zoom: number;
   tool: Tool;
+  /** Light or dark look: remembered per device under its own key, never undone or synced. */
+  theme: Theme;
 }
 
 export interface Point {

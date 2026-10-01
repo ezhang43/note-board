@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
-import { COLUMN_DEFAULT, PALETTE } from '../model/palette';
+import { swatchFor } from '../model/theme';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { CardView } from './CardView';
@@ -13,6 +13,7 @@ import { useMeasuredHeight } from './useMeasure';
 export function ColumnView({ id }: { id: string }) {
   const col = useAppState((s) => s.board.columns[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
+  const theme = useAppState((s) => s.view.theme);
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
   const dropTarget = useAppState(
     (s) => (s.ui.drag?.kind === 'card' && s.ui.drag.overColumn === id) || s.ui.newDrag?.overColumn === id,
@@ -31,7 +32,7 @@ export function ColumnView({ id }: { id: string }) {
   useMeasuredHeight(id, ref);
   if (!col) return null;
 
-  const colors = col.color ? PALETTE[col.color] : COLUMN_DEFAULT;
+  const colors = swatchFor(col.color, theme);
   const pos = drag ?? dragPos;
   const w = resize?.liveW ?? col.w;
   // A card being dragged out is drawn on its own until it is dropped.

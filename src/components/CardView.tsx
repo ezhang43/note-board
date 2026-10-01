@@ -2,7 +2,7 @@ import { useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
 import { CARD_W } from '../model/constants';
 import { dayLabel } from '../model/completed';
-import { PALETTE } from '../model/palette';
+import { swatchFor } from '../model/theme';
 import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
@@ -19,6 +19,7 @@ const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 
 export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const card = useAppState((s) => s.board.cards[id]);
   const selected = useAppState((s) => s.ui.selection.includes(id));
+  const theme = useAppState((s) => s.view.theme);
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
@@ -34,7 +35,7 @@ export function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const w = resize?.liveW ?? card.w ?? CARD_W;
   const h = resize?.liveH ?? card.h;
   // A colour picked for the title band: a deeper shade of it, like the bands inside columns.
-  const band = card.titleColor ? PALETTE[card.titleColor] : null;
+  const band = card.titleColor ? swatchFor(card.titleColor, theme) : null;
   const style = {
     ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})` } : {}),
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: card.collapsed ? undefined : (h ?? undefined) }),

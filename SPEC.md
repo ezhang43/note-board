@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Collapse all · Add Note · Add To-do list · Add Link · New column · Import · Clean up; on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Collapse all · Add Note · Add To-do list · Add Link · New column · Import · Clean up · Dark mode (moon icon); on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |
@@ -175,6 +175,7 @@ Professional but with colour: white cards and soft-tinted columns on a warm neut
 - **Canvas:** #F6F4F0 with #CFC8BC dots every 20px (fainter when snapping is off). Toolbar white with a #E2DDD4 bottom border.
 - **Accent:** teal #1F5F5B for selection, active tool, drop lines and New column. Destructive actions use #A3263F.
 - **Cards:** white (#FFFFFF), 10px radius, 1px #E2DDD4 border, shadow 0 1px 2px at 6%. Columns: 12px radius, #EFECE6 unless recoloured; the swatches below are for columns.
+- **Dark mode:** the toolbar's moon button switches between light and dark (pressed = dark). A first visit on a device follows the computer's light / dark setting; once the button is pressed, that device remembers the choice (it is not synced, not saved with the board, and not undone by Ctrl+Z). Dark mode changes only colours: canvas #1C1B19 with #45413B dots, toolbar #232220, cards #2B2926 with a #3D3A35 border and #ECE8E1 text, accent teal #5FB3AB. Columns use a deep, muted shade of each swatch (`DARK_PALETTE` in `src/model/theme.ts`, same names; uncoloured columns #2A2825), and the Colour menu shows those shades. Every dark column colour keeps at least 7:1 contrast with the text.
 - **States:** selection = 2px solid teal outline; size match = 2px dashed teal; dragging = 2.5px teal border with glow; no focus rectangles on text fields (buttons keep a keyboard focus ring).
 
 | Swatch | Background | Edge | Text |

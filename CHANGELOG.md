@@ -1,5 +1,10 @@
 # Changelog
 
+## Spec brought up to date (2026-10-02)
+
+- `SPEC.md` now describes the app as it is: sign-in, sync and offline use on the published site, dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, the dragged block taking priority, and the checklist changes. Accounts and cloud sync are no longer listed as "not in version 1".
+- From now on the spec is updated together with every new feature or decision.
+
 ## Hosting (2026-10-01)
 
 - The board is published at https://ezhang43.github.io/note-board/. Every push to `build/v1` runs the unit tests, builds the site and publishes it.

@@ -30,6 +30,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 5. **Changelog.** Add a short, plain-English entry to `CHANGELOG.md` for every step.
 6. **Look.** Use the colours, sizes and states in the spec's "Look and feel" section, defined once as CSS variables. No focus rectangles on text fields; buttons keep a keyboard focus ring. Cursor stays the normal arrow on the canvas and blocks.
 7. **Keyboard.** Block shortcuts don't fire while typing in a text field; undo/redo always do.
+8. **Spec stays current.** Whenever the owner asks for a new feature or change, or a decision is recorded below, update `SPEC.md` in the same commit so it always describes the app as built. No need to ask first.
 
 ## Commands
 

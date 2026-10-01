@@ -19,7 +19,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 1. **Stack:** a web app in TypeScript with React, built with Vite. Claude Code may propose an alternative once, with reasons, before writing code; the choice is then recorded in `CLAUDE.md`.
 2. **Saving:** the board saves automatically to the browser (localStorage) after every change and loads on start. The published site also syncs it to Firebase (see "Sign-in, sync and offline"); running the app locally stays browser-only.
 3. **One source of truth:** all board data (cards, columns, items, positions, sizes, colours) lives in one state object, so undo, copy-paste and saving work the same way for everything.
-4. **Tests:** automated tests for the logic (overlap, snapping, checklist moves, undo) plus browser tests for the main flows. All tests pass before a change is accepted.
+4. **Tests:** automated tests for the logic (overlap, snapping, checklist moves, undo) plus browser tests for the main flows. All tests pass before a change is accepted. Tests are written first: for each change, write its tests, see them fail, then build it.
 5. **Small steps:** build one section of this spec at a time, show it working, then move on. Keep a short changelog in the repo.
 6. **No surprises:** do not add features that aren't in this spec without asking first.
 7. **Keep this spec current:** whenever the owner asks for a new feature or change, or a decision is made, update this spec in the same step so it always describes the app as it is.

@@ -1,5 +1,9 @@
 # Changelog
 
+## Tests first (2026-10-02)
+
+- New working rule: for every change, the tests are written first and seen to fail, then the change is built until they pass.
+
 ## Arrow keys move blocks; centred titles on collapsed cards (2026-10-02)
 
 - With a card or column selected (or several), the arrow keys move them one grid square at a time; hold Shift to move five. A card inside a column moves up or down its column instead. Ctrl+Z undoes a quick run of presses in one go.

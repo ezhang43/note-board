@@ -72,3 +72,28 @@ test('cards in an uncoloured column use the usual teal title band', async ({ pag
   const inColumn = columns(page).first().locator('.card').first();
   expect(await style(inColumn, '--band')).toBe(looseBand);
 });
+
+test('Add Note / To-do list / Link are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
+  const plain = await style(toolbarButton(page, 'Undo (Ctrl+Z)'), 'background-color');
+  for (const name of ['Note', 'To-do list', 'Link']) {
+    const b = toolbarButton(page, name);
+    expect(await style(b, 'background-color')).toBe(plain);
+    await expect(b.locator('.add-dot')).toHaveCount(0);
+  }
+  expect(await style(toolbarButton(page, 'New column'), 'background-color')).not.toBe(plain);
+});
+
+test('the toolbar is grouped by dividers, and rarely used buttons are quiet until hovered', async ({ page }) => {
+  await expect(page.locator('header.toolbar .toolbar-divider')).toHaveCount(3);
+  const importButton = toolbarButton(page, 'Import');
+  expect(await style(importButton, 'border-top-color')).toBe('rgba(0, 0, 0, 0)');
+  await importButton.hover();
+  expect(await style(importButton, 'border-top-color')).not.toBe('rgba(0, 0, 0, 0)');
+});
+
+test('the board name keeps at least 140px in a narrower window', async ({ page }) => {
+  await page.setViewportSize({ width: 1180, height: 800 });
+  await page.getByLabel('Board name').fill('My first board for the summer');
+  const name = await page.locator('header.toolbar .board-name').boundingBox();
+  expect(name!.width).toBeGreaterThanOrEqual(140);
+});

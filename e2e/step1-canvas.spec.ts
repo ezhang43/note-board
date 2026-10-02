@@ -63,7 +63,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
   await expect(zoomLabel(page)).toHaveText('100%');
 });
 
-test('board name box grows and shrinks with its text', async ({ page }) => {
+test('board name box grows and shrinks with its text (never below 140px, so it stays readable)', async ({ page }) => {
   const input = page.getByLabel('Board name');
   const start = (await input.boundingBox())!.width;
   await input.fill('A much, much longer board name than before');
@@ -71,7 +71,8 @@ test('board name box grows and shrinks with its text', async ({ page }) => {
   await input.fill('Hi');
   const shorter = (await input.boundingBox())!.width;
   expect(longer).toBeGreaterThan(start + 100);
-  expect(shorter).toBeLessThan(start);
+  expect(shorter).toBeLessThan(longer - 100);
+  expect(shorter).toBeGreaterThanOrEqual(139);
 });
 
 test('zoom buttons step by 20%, stop at 30% and 250%, and the percentage resets', async ({ page }) => {

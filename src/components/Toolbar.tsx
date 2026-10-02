@@ -14,7 +14,6 @@ function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   const drag = useNewCardDrag(kind);
   return (
     <button type="button" className={`tb-button add-${kind}`} title={`Click to add a ${label.toLowerCase()}, or drag it onto the board`} {...drag}>
-      <span className="add-dot" aria-hidden="true" />
       {label}
     </button>
   );
@@ -38,7 +37,7 @@ function ImportButton() {
     <>
       <button
         type="button"
-        className="tb-button"
+        className="tb-button quiet"
         title="Add the cards from a Milanote board exported as Markdown (.md)"
         onClick={() => input.current?.click()}
       >
@@ -125,7 +124,7 @@ function CollapseAllButton() {
   return (
     <button
       type="button"
-      className="tb-button icon-only faded-colour"
+      className="tb-button icon-only faded-colour quiet"
       aria-label={label}
       title={any ? `${label} cards and columns` : 'Nothing to collapse yet'}
       aria-disabled={any ? undefined : true}
@@ -159,7 +158,7 @@ function CleanUpButton() {
   return (
     <button
       type="button"
-      className="tb-button faded-colour"
+      className="tb-button faded-colour quiet"
       title={any ? "Move every ticked item into the Completed card, under today's date" : 'Nothing is ticked yet'}
       aria-disabled={any ? undefined : true}
       onClick={() => any && appStore.cleanUp()}
@@ -175,7 +174,7 @@ function AutoColourButton() {
   return (
     <button
       type="button"
-      className="tb-button faded-colour"
+      className="tb-button faded-colour quiet"
       title={hasColumns ? 'Give every column a different colour' : 'Add a column first'}
       aria-disabled={hasColumns ? undefined : true}
       onClick={() => hasColumns && appStore.autoColour()}
@@ -248,6 +247,8 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
         <RedoIcon />
       </button>
 
+      <div className="toolbar-divider" aria-hidden="true" />
+
       <button type="button" className="tb-button snap" aria-pressed={snap} onClick={appStore.toggleSnap}>
         <GridIcon />
         Snap to grid
@@ -264,6 +265,8 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <AddCardButton kind="todo" label="To-do list" />
       <AddCardButton kind="link" label="Link" />
       <NewColumnButton />
+
+      <div className="toolbar-divider" aria-hidden="true" />
       <ImportButton />
       <CleanUpButton />
       <DarkModeButton />

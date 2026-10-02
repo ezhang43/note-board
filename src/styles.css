@@ -24,19 +24,6 @@
   --nest-mark: #2a9d93;
   --nest-mark-bg: rgba(42, 157, 147, 0.14);
   --colour-dot: #efece6;
-  /* Toolbar Add buttons: background, edge, text, dot. */
-  --add-note-bg: #fff3cf;
-  --add-note-edge: #f2d98c;
-  --add-note-ink: #6b4600;
-  --add-note-dot: #d99a12;
-  --add-todo-bg: #e3f4ea;
-  --add-todo-edge: #b9dfc9;
-  --add-todo-ink: #1b5a3c;
-  --add-todo-dot: #2f9a68;
-  --add-link-bg: #e6eefc;
-  --add-link-edge: #bdd0f0;
-  --add-link-ink: #1f4a8a;
-  --add-link-dot: #3a6fd0;
   --toolbar-height: 64px;
   --font: 'IBM Plex Sans', system-ui, sans-serif;
 }
@@ -68,15 +55,6 @@
   --on-accent: #10201f;
   --drop-bg: #1f3533;
   --link-url-bg: rgba(0, 0, 0, 0.22);
-  --add-note-bg: #3b3420;
-  --add-note-edge: #5a4e2c;
-  --add-note-ink: #f5dfa0;
-  --add-todo-bg: #1f3328;
-  --add-todo-edge: #315040;
-  --add-todo-ink: #addcc1;
-  --add-link-bg: #212c3e;
-  --add-link-edge: #344662;
-  --add-link-ink: #b4cbf0;
 }
 
 * { box-sizing: border-box; }
@@ -153,7 +131,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .board-name {
   font-weight: 600;
   font-size: 17px;
+  min-width: 140px;
   max-width: 460px;
+  flex-shrink: 0;
 }
 
 .tool-group {
@@ -209,13 +189,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 .colour-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--colour-dot); border: 1.5px solid var(--grid-dot); }
 
-.add-dot { width: 8px; height: 8px; border-radius: 50%; }
-.tb-button.add-note { background: var(--add-note-bg); border-color: var(--add-note-edge); color: var(--add-note-ink); }
-.tb-button.add-note .add-dot { background: var(--add-note-dot); }
-.tb-button.add-todo { background: var(--add-todo-bg); border-color: var(--add-todo-edge); color: var(--add-todo-ink); }
-.tb-button.add-todo .add-dot { background: var(--add-todo-dot); }
-.tb-button.add-link { background: var(--add-link-bg); border-color: var(--add-link-edge); color: var(--add-link-ink); }
-.tb-button.add-link .add-dot { background: var(--add-link-dot); }
+/* Rarely used buttons (Auto-colour, Collapse all, Import, Clean up): no border until hovered. */
+.tb-button.quiet { border-color: transparent; background: transparent; }
+.tb-button.quiet:hover:not([aria-disabled='true']) { border-color: var(--control-edge); background: var(--surface); filter: none; }
+
 .tb-button.add-column { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* ---------- canvas ---------- */

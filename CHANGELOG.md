@@ -1,5 +1,12 @@
 # Changelog
 
+## Design fixes 3: a calmer toolbar (2026-10-02)
+
+- Thin dividers now group the toolbar: tools and undo · editing (Snap, Colour, Auto-colour, Collapse all) · adding · board (Import, Clean up, dark mode).
+- Add Note, To-do list and Link are plain buttons now. Their yellow, green and blue matched old card colours that no longer exist.
+- Auto-colour, Collapse all, Import and Clean up are quieter (no border until you hover), so the everyday buttons stand out.
+- The board name never shrinks below 140px in narrower windows.
+
 ## Design fixes 2: easier to read (2026-10-02)
 
 - The dark-mode button now looks pressed while dark mode is on, like Snap to grid.

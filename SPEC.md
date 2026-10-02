@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text) · Hand / Select tool toggle · Undo · Redo · Snap to grid · Colour · Auto-colour · Collapse all · Add Note · Add To-do list · Add Link · New column · Import · Clean up · Dark mode (moon icon); on the published site, Sign out at the far right. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
+**Toolbar, left to right:** board name (editable, box sized to its text, never narrower than 140px) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · | · Add Note · Add To-do list · Add Link · New column · | · Import · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid teal button. Rarely used buttons (Auto-colour, Collapse all, Import, Clean up) have no border until hovered. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen.
 
 | Action | How |
 | --- | --- |

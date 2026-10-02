@@ -52,6 +52,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     sizeMatch && 'size-match',
     dropTarget && 'drop-target',
     col.collapsed && 'collapsed',
+    col.color === null && 'uncoloured',
   ];
 
   return (

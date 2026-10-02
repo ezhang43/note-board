@@ -16,7 +16,7 @@
   --danger: #a3263f;
   --surface: #ffffff;
   --hover: rgba(31, 29, 26, 0.07);
-  --placeholder: #8a8378;
+  --placeholder: #736c62;
   --on-accent: #ffffff;
   --drop-bg: #e7efee;
   --link-url-bg: rgba(255, 255, 255, 0.75);
@@ -64,7 +64,7 @@
   --danger: #f08a9c;
   --surface: #2b2926;
   --hover: rgba(236, 232, 225, 0.09);
-  --placeholder: #8f897f;
+  --placeholder: #a39d93;
   --on-accent: #10201f;
   --drop-bg: #1f3533;
   --link-url-bg: rgba(0, 0, 0, 0.22);
@@ -200,8 +200,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .tb-button[aria-disabled='true'] { cursor: default; }
 .tb-button.faded-undo[aria-disabled='true'] { opacity: 0.4; }
 .tb-button.faded-colour[aria-disabled='true'] { opacity: 0.45; }
+/* Faded buttons are harder to see on the dark toolbar, so they fade a little less there. */
+:root[data-theme='dark'] .tb-button.faded-undo[aria-disabled='true'] { opacity: 0.5; }
+:root[data-theme='dark'] .tb-button.faded-colour[aria-disabled='true'] { opacity: 0.55; }
 
-.tb-button.snap[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+/* On / off buttons (Snap to grid, Dark mode) look pressed while on. */
+.tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 
 .colour-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--colour-dot); border: 1.5px solid var(--grid-dot); }
 
@@ -391,6 +395,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  */
 .card { --band: var(--accent-soft); }
 .card.in-column { --band: color-mix(in srgb, var(--col-edge) 70%, var(--bg)); }
+/* In an uncoloured column the mixed shade comes out a dull khaki, so cards keep the usual band. */
+.column.uncoloured .card.in-column { --band: var(--accent-soft); }
 .card.titled .card-header {
   margin: 0 -12px;
   padding: 0 6px 0 12px;

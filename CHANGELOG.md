@@ -1,5 +1,12 @@
 # Changelog
 
+## Design fixes 2: easier to read (2026-10-02)
+
+- The dark-mode button now looks pressed while dark mode is on, like Snap to grid.
+- Placeholder text ("Title", "Write something…", "Paste a URL") is darker, so it is easier to read.
+- Faded toolbar buttons are a little easier to see in dark mode.
+- Cards in an uncoloured column now have the usual soft teal title band instead of a dull khaki one.
+
 ## Design fixes 1: typing goes into the block you just added (2026-10-02)
 
 - After adding a note, link or column, you can start typing straight away: the text goes into the new note, the link's title, or the column's title (replacing "New column"). Before, it went into whatever card you were last typing in.

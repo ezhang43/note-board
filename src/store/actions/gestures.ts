@@ -1,0 +1,140 @@
+import * as B from '../../model/board';
+import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
+import { snapIf } from '../../model/geometry';
+import { landingSpot } from '../../model/layout';
+import { dropBoard } from '../../model/placement';
+import type { Board, Point, Rect } from '../../model/types';
+import type { StoreContext } from '../core';
+import type { Drag, NewDrag, Resize } from '../types';
+import { addNewCard, addNewColumn } from './blocks';
+
+// Pointer gestures on blocks: dragging a block, dragging a new block from the toolbar, resizing.
+
+export function gestureActions(ctx: StoreContext) {
+  const { commit, updateUi, requestSettle, measured, heights } = ctx;
+  /** The last drag preview, kept while the pointer stays over the same grid spot. */
+  let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
+
+  /** Size of a block being dragged, as it will be once dropped loose on the board. */
+  function draggedSize(d: Drag) {
+    const { board } = ctx.state;
+    const h = heights.get(d.id) ?? NEW_BLOCK_H.column;
+    if (d.kind === 'column') return { w: board.columns[d.id]?.w ?? COLUMN_W, h };
+    return { w: board.cards[d.id]?.w ?? CARD_W, h };
+  }
+
+  return {
+    // ---------- dragging a new card or column from the toolbar ----------
+    startNewDrag: (kind: NewDrag['kind']) => updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
+    /**
+     * The pointer moved: `at` is where it is on the canvas (null when off the board), `boardAt` the
+     * same point in board coordinates. On empty board the block would appear with its top edge
+     * just above the pointer, at the nearest free spot. A new card over a column goes into it;
+     * a new column can't, so it just lands at the nearest free spot.
+     */
+    moveNewDrag(at: Point | null, boardAt: Point | null, overColumn: string | null) {
+      const d = ctx.state.ui.newDrag;
+      if (!d) return;
+      const { board } = ctx.state;
+      const intoColumn = d.kind !== 'column' && at ? overColumn : null;
+      let land: Rect | null = null;
+      if (at && boardAt && !intoColumn) {
+        const size = d.kind === 'column' ? { w: COLUMN_W, h: NEW_BLOCK_H.column } : { w: CARD_W, h: NEW_BLOCK_H[d.kind] };
+        const snap = (v: number) => snapIf(board.snap, v);
+        const spot = landingSpot(board, '', snap(boardAt.x - size.w / 2), snap(boardAt.y - 18), size, measured);
+        land = { ...spot, ...size };
+      }
+      updateUi({ newDrag: { ...d, at, overColumn: intoColumn, land } });
+    },
+    cancelNewDrag: () => updateUi({ newDrag: null }),
+    /** Let go: a card goes into the column under the pointer (at `index`); otherwise the block goes at the landing spot. */
+    dropNewDrag(index: number | null) {
+      const d = ctx.state.ui.newDrag;
+      updateUi({ newDrag: null });
+      if (!d) return;
+      if (d.kind === 'column') {
+        if (d.land) addNewColumn(ctx, { x: d.land.x, y: d.land.y });
+      } else if (d.overColumn && index != null) addNewCard(ctx, d.kind, { type: 'column', columnId: d.overColumn, index });
+      else if (d.land) addNewCard(ctx, d.kind, { type: 'loose', x: d.land.x, y: d.land.y });
+    },
+
+    // ---------- dragging blocks ----------
+    startDrag(kind: Drag['kind'], id: string, x: number, y: number) {
+      const { board, ui } = ctx.state;
+      const sel = ui.selection;
+      const topLevel = board.order.includes(id);
+      // A selected block dragged together with other selected blocks moves them all.
+      const group = topLevel && sel.includes(id) ? sel.filter((s) => s !== id && board.order.includes(s)) : [];
+      dragPreview = null;
+      updateUi({ drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {} }, confirm: null });
+    },
+    moveDrag(x: number, y: number, overColumn: string | null) {
+      const d = ctx.state.ui.drag;
+      if (!d) return;
+      const { board } = ctx.state;
+      // Several blocks move as one: they don't drop into columns.
+      const over = d.group.length ? null : overColumn;
+      if (d.x === x && d.y === y && d.overColumn === over) return;
+      if (over) {
+        dragPreview = null;
+        return updateUi({ drag: { ...d, x, y, overColumn: over, land: null, bumped: {} } });
+      }
+      // The block follows the pointer exactly. It will land on the grid spot under it (dashed
+      // outline), and takes priority there: blocks in the way are shown moving aside right away.
+      // Within the same grid spot the preview is unchanged, so it isn't worked out again.
+      const tx = snapIf(board.snap, x);
+      const ty = snapIf(board.snap, y);
+      const p = dragPreview;
+      if (!p || p.board !== board || p.tx !== tx || p.ty !== ty) {
+        const { at, bumped } = dropBoard(board, { ...d, x, y }, measured);
+        dragPreview = { board, tx, ty, at, bumped };
+      }
+      const { at, bumped } = dragPreview!;
+      const land = !d.group.length && (at.x !== x || at.y !== y) ? { ...at, ...draggedSize(d) } : null;
+      updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped } });
+    },
+    cancelDrag() {
+      updateUi({ drag: null });
+      requestSettle();
+    },
+    /**
+     * Finish a drag. `index` is where a card dropped on a column goes in it; otherwise the block
+     * lands on the grid spot where it was let go, and anything in the way moves aside.
+     */
+    dropDrag(index: number | null) {
+      const d = ctx.state.ui.drag;
+      if (!d) return;
+      if (d.overColumn && index != null) {
+        commit((b) => B.moveCard(b, d.id, { type: 'column', columnId: d.overColumn!, index }), { ui: { drag: null } });
+        return requestSettle([d.overColumn]);
+      }
+      let ids: string[] = [];
+      commit(
+        (b) => {
+          const result = dropBoard(b, d, measured);
+          ids = result.ids;
+          return result.board;
+        },
+        { ui: { drag: null } },
+      );
+      requestSettle(ids);
+    },
+
+    // ---------- resizing ----------
+    /** Show a resize in progress (the board itself only changes when the pointer is released). */
+    showResize: (resize: Resize) => updateUi({ resize, confirm: null }),
+    cancelResize() {
+      updateUi({ resize: null });
+      requestSettle();
+    },
+    commitResize() {
+      const r = ctx.state.ui.resize;
+      if (!r) return;
+      commit(
+        (b) => (r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? b.cards[r.id]?.h ?? null) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined)),
+        { ui: { resize: null } },
+      );
+      requestSettle([r.id]);
+    },
+  };
+}

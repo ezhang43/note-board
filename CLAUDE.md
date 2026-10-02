@@ -17,7 +17,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 ## Code layout
 
 - `src/model/` — types, constants (grid 20, zoom 30–250%, palette) and pure functions: no React, no DOM. All logic tests live here.
-- `src/store/` — the single board state object, the change function, saving and loading.
+- `src/store/` — the single board state object, the change function, saving and loading. `core.ts` holds state, saving, undo, `commit` and the settle queue; actions live in `actions/` (blocks, gestures, checklist) and get the core through a `StoreContext`; `store.ts` puts them together.
 - `src/components/` — React components. They display state and call store actions; no geometry or rules logic inside them.
 - `e2e/` — Playwright tests of real flows in a browser.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Restructure 5: the store split into smaller files (2026-10-02)
+
+- Behind the scenes only. The store, one 1,029-line file, is now: `core.ts` (state, saving, undo, overlap clean-up), `types.ts`, `env.ts` (browser helpers), and three action files by topic in `src/store/actions/` (blocks, gestures, checklist). The largest file is now 322 lines.
+
 ## Restructure 4: shared lookups and one Completed-card rule (2026-10-02)
 
 - Behind the scenes only. "Find this card or column" and "which block on the board holds this card" are now one helper each, and the rule that the Completed card can never be deleted or copied lives in one place (`isPermanent`).

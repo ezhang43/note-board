@@ -4,6 +4,7 @@ import { gridStyle, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point } from '../model/types';
 import { clientToCanvas, setCanvasElement } from './canvasDom';
+import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 
@@ -73,6 +74,8 @@ export function Canvas() {
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
   // Shows the closed glove while the Hand tool drags the board.
   const [panning, setPanning] = useState(false);
+  // The selection box keeps moving the board at the screen edge (owner request).
+  const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
   const itemDrag = useAppState((s) => s.ui.itemDrag);
 
@@ -90,13 +93,25 @@ export function Canvas() {
     drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
     if (mode === 'pan') setPanning(true);
     // Select tool: drag a box; everything it touches is selected (Ctrl adds to the selection).
-    if (mode === 'marquee') appStore.startMarquee(at, keep);
+    if (mode === 'marquee') {
+      appStore.startMarquee(at, keep);
+      edges.current = followEdges((p, moved) => {
+        const d = drag.current;
+        if (!d) return;
+        // The box's starting corner stays on the same spot of the board as the board moves.
+        d.start = { x: d.start.x + moved.dx, y: d.start.y + moved.dy };
+        appStore.updateMarquee(d.start, clientToCanvas(p.clientX, p.clientY));
+      });
+    }
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
-    if (d.mode === 'marquee') return appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
+    if (d.mode === 'marquee') {
+      edges.current?.track(e);
+      return appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
+    }
     appStore.panBy(e.clientX - d.x, e.clientY - d.y);
     d.x = e.clientX;
     d.y = e.clientY;
@@ -105,6 +120,8 @@ export function Canvas() {
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
     if (drag.current?.id !== e.pointerId) return;
     if (drag.current.mode === 'marquee') appStore.endMarquee();
+    edges.current?.stop();
+    edges.current = null;
     drag.current = null;
     setPanning(false);
   }

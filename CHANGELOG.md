@@ -1,5 +1,9 @@
 # Changelog
 
+## BusyAnts, part 5: the board follows you to the edge (2026-10-03)
+
+- When you drag a card, drag checklist items, select items or draw a selection box and hold the pointer near the edge of the screen, the board keeps moving that way, and keeps selecting or carrying what you are dragging.
+
 ## BusyAnts, part 4: alignment guides (2026-10-03)
 
 - When you drag a card or column near another one, it snaps into line with that block's edge or middle, and a thin teal line shows where they line up, like in Google Slides.

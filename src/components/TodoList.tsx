@@ -9,6 +9,7 @@ import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, GripIcon, TrashIcon } from './icons';
 import { itemHintAt, rowUnder } from './itemDom';
+import { followEdges } from './edgeFollow';
 
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
   return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
@@ -166,7 +167,7 @@ function rowPointerDown(cardId: string, itemId: string) {
     appStore.clearItemSelection();
 
     let selecting = false;
-    const onMove = (ev: PointerEvent) => {
+    const onMove = (ev: { clientX: number; clientY: number }) => {
       const over = rowUnder(ev.clientX, ev.clientY, cardId);
       if (!selecting) {
         if (!over || over === itemId) return;
@@ -177,12 +178,19 @@ function rowPointerDown(cardId: string, itemId: string) {
       window.getSelection()?.removeAllRanges();
       if (over) appStore.selectItemRange(cardId, itemId, over);
     };
+    // At the edge of the screen the board keeps moving and the selection keeps growing (owner request).
+    const edges = followEdges((p) => selecting && onMove(p));
+    const onPointerMove = (ev: PointerEvent) => {
+      edges.track(ev);
+      onMove(ev);
+    };
     const finish = () => {
-      window.removeEventListener('pointermove', onMove);
+      edges.stop();
+      window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
     };
-    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
   };
@@ -199,7 +207,7 @@ function gripPointerDown(cardId: string, itemId: string) {
     const start = { x: e.clientX, y: e.clientY };
     let started = false;
 
-    const onMove = (ev: PointerEvent) => {
+    const onMove = (ev: { clientX: number; clientY: number }) => {
       if (!started) {
         if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
         started = true;
@@ -208,15 +216,21 @@ function gripPointerDown(cardId: string, itemId: string) {
       const d = appStore.getState().ui.itemDrag;
       if (d) appStore.moveItemDrag(clientToCanvas(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d));
     };
+    const edges = followEdges((p) => started && onMove(p));
+    const onPointerMove = (ev: PointerEvent) => {
+      edges.track(ev);
+      onMove(ev);
+    };
     const finish = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onMove);
+      edges.stop();
+      window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
       if (!started) return;
       if (ev.type === 'pointercancel') appStore.cancelItemDrag();
       else appStore.dropItems();
     };
-    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
   };

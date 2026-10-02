@@ -3,6 +3,7 @@ import { blockOf } from '../model/board';
 import { DRAG_THRESHOLD } from '../model/constants';
 import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex } from './canvasDom';
+import { followEdges } from './edgeFollow';
 
 const INTERACTIVE = 'input, textarea, button, a, select, label';
 
@@ -31,7 +32,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     const start = { x: e.clientX, y: e.clientY };
     let offset: { x: number; y: number } | null = null;
 
-    const onMove = (ev: PointerEvent) => {
+    const onMove = (ev: { clientX: number; clientY: number }) => {
       if (!offset) {
         if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
         const r = el.getBoundingClientRect();
@@ -48,8 +49,15 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
       appStore.moveDrag(Math.round(p.x - offset.x), Math.round(p.y - offset.y), kind === 'card' ? columnUnder(ev.clientX, ev.clientY) : null);
     };
 
+    // At the edge of the screen the board keeps moving, and the block with it (owner request).
+    const edges = followEdges((p) => offset && onMove(p));
+    const onPointerMove = (ev: PointerEvent) => {
+      edges.track(ev);
+      onMove(ev);
+    };
     const finish = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onMove);
+      edges.stop();
+      window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
       if (!offset) {
@@ -62,7 +70,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
       appStore.dropDrag(over ? dropIndex(over, ev.clientY) : null);
     };
 
-    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
   };

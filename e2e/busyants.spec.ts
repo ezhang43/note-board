@@ -103,3 +103,35 @@ test('dragging a card near another shows an alignment guide', async ({ page }) =
   await expect(page.locator('.align-guide')).toHaveCount(0);
   expect(Math.round((await second.boundingBox())!.x)).toBe(Math.round(a.x));
 });
+
+const panOf = async (page: import('@playwright/test').Page) => {
+  const c = page.getByTestId('canvas');
+  return { x: Number(await c.getAttribute('data-pan-x')), y: Number(await c.getAttribute('data-pan-y')) };
+};
+
+test('dragging a card to the edge of the screen keeps moving the board', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const card = (await page.locator('.card.loose').first().boundingBox())!;
+  const canvas = (await page.getByTestId('canvas').boundingBox())!;
+  const start = await panOf(page);
+  await page.mouse.move(card.x + 30, card.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + canvas.width - 4, card.y + 10, { steps: 10 });
+  await expect.poll(async () => (await panOf(page)).x).toBeLessThan(start.x - 50);
+  await page.mouse.up();
+});
+
+test('a selection box at the bottom edge keeps moving the board and selecting', async ({ page }) => {
+  await page.getByRole('button', { name: 'Select (V)' }).click();
+  const canvas = (await page.getByTestId('canvas').boundingBox())!;
+  const start = await panOf(page);
+  await page.mouse.move(canvas.x + 40, canvas.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 300, canvas.y + canvas.height - 3, { steps: 10 });
+  await expect.poll(async () => (await panOf(page)).y).toBeLessThan(start.y - 50);
+  // The box still starts where it was first pressed on the board, so it has grown taller than the screen.
+  await expect.poll(async () => (await page.getByTestId('marquee').boundingBox())?.height ?? 0).toBeGreaterThan(canvas.height - 80);
+  await page.mouse.up();
+});

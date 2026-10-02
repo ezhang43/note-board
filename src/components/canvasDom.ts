@@ -24,6 +24,11 @@ export function clientToCanvas(clientX: number, clientY: number) {
 }
 
 /** True if the point is over the board (not the toolbar or outside the window). */
+/** Where the board area is on screen (null before it is drawn). */
+export function canvasRect(): DOMRect | null {
+  return canvasEl?.getBoundingClientRect() ?? null;
+}
+
 export function isOverCanvas(clientX: number, clientY: number) {
   const r = canvasEl?.getBoundingClientRect();
   return !!r && clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;

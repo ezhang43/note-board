@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
@@ -74,6 +74,9 @@ function ColourControl() {
   });
   const theme = useAppState((s) => s.view.theme);
   const shown = swatchFor(current ?? null, theme);
+  // The swatch under the pointer (or keyboard focus), named under the grid: several are close in tone.
+  const [hovered, setHovered] = useState<string | null>(null);
+  const named = hovered ?? (current ? swatchFor(current, theme).label : current === null ? 'Default' : '');
 
   return (
     <div className="colour-control">
@@ -104,9 +107,16 @@ function ColourControl() {
               aria-pressed={key === current}
               style={{ background: sw.bg, borderColor: key === current ? sw.text : sw.edge, color: sw.text }}
               onClick={() => appStore.recolourSelection(key)}
+              onPointerEnter={() => setHovered(sw.label)}
+              onPointerLeave={() => setHovered(null)}
+              onFocus={() => setHovered(sw.label)}
+              onBlur={() => setHovered(null)}
             />
             );
           })}
+          <div className="swatch-name" aria-live="polite">
+            {named}
+          </div>
           <button type="button" className="swatch-default" aria-pressed={current === null} onClick={() => appStore.recolourSelection(null)}>
             Default
           </button>

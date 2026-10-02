@@ -290,9 +290,11 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   flex-shrink: 0;
   padding: 0;
   border-radius: 50%;
-  border: 1.5px solid;
+  border: 2px solid;
   cursor: pointer;
 }
+/* Name of the swatch under the pointer: several swatches are close in tone. */
+.swatch-name { grid-column: 1 / -1; min-height: 18px; font-size: 12px; color: var(--ink-soft); text-align: center; }
 .swatch-default {
   grid-column: 1 / -1;
   height: 28px;

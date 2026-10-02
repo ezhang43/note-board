@@ -97,3 +97,25 @@ test('the board name keeps at least 140px in a narrower window', async ({ page }
   const name = await page.locator('header.toolbar .board-name').boundingBox();
   expect(name!.width).toBeGreaterThanOrEqual(140);
 });
+
+test('collapse and × buttons on cards and columns say what they do when hovered', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await expect(page.getByRole('button', { name: 'Collapse card' })).toHaveAttribute('title', 'Collapse card');
+  await expect(page.getByRole('button', { name: 'Delete card' })).toHaveAttribute('title', 'Delete card (Ctrl+Z brings it back)');
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await expect(page.getByRole('button', { name: 'Collapse column' })).toHaveAttribute('title', 'Collapse column');
+  await expect(page.getByRole('button', { name: 'Delete column and its cards' })).toHaveAttribute('title', 'Delete column and its cards');
+});
+
+test('the Colour menu names the swatch under the pointer, and rings each swatch in its own edge colour', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  const menu = page.locator('.colour-menu');
+  const sky = menu.getByRole('button', { name: 'Sky' });
+  await sky.hover();
+  await expect(menu.locator('.swatch-name')).toHaveText('Sky');
+  expect(await style(sky, 'border-top-width')).toBe('2px');
+});

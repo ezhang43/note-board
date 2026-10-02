@@ -85,12 +85,19 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             type="button"
             className="icon-button"
             aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
+            title={col.collapsed ? 'Expand column' : 'Collapse column'}
             aria-expanded={!col.collapsed}
             onClick={() => appStore.toggleCollapsed(id)}
           >
             <ChevronIcon collapsed={col.collapsed} />
           </button>
-          <button type="button" className="icon-button" aria-label="Delete column and its cards" onClick={() => appStore.askDeleteColumn(id)}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Delete column and its cards"
+            title="Delete column and its cards"
+            onClick={() => appStore.askDeleteColumn(id)}
+          >
             <CloseIcon />
           </button>
         </div>

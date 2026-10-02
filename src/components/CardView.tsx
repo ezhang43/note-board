@@ -70,6 +70,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
           type="button"
           className="icon-button"
           aria-label={card.collapsed ? 'Expand card' : 'Collapse card'}
+          title={card.collapsed ? 'Expand card' : 'Collapse card'}
           aria-expanded={!card.collapsed}
           onClick={() => appStore.toggleCollapsed(id)}
         >
@@ -77,7 +78,13 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         </button>
         {/* The Completed card can never be deleted, so it has no ×. */}
         {!isPermanent(card) && (
-          <button type="button" className="icon-button" aria-label="Delete card" onClick={() => appStore.deleteCard(id)}>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Delete card"
+            title="Delete card (Ctrl+Z brings it back)"
+            onClick={() => appStore.deleteCard(id)}
+          >
             <CloseIcon />
           </button>
         )}

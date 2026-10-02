@@ -1,5 +1,10 @@
 # Changelog
 
+## Design fixes 4: clearer buttons and colours (2026-10-02)
+
+- Hovering a card's or column's collapse arrow or × now says what it does. The card's × reminds you that Ctrl+Z brings the card back.
+- In the Colour menu, each swatch has a clearer ring in its own colour, and the name of the colour under the pointer shows below the swatches, since some of them look alike.
+
 ## Design fixes 3: a calmer toolbar (2026-10-02)
 
 - Thin dividers now group the toolbar: tools and undo · editing (Snap, Colour, Auto-colour, Collapse all) · adding · board (Import, Clean up, dark mode).

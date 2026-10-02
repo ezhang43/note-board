@@ -1,6 +1,6 @@
 import { memo, useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
-import { CARD_W } from '../model/constants';
+import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { dayLabel } from '../model/completed';
 import { swatchFor } from '../model/theme';
 import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
@@ -39,7 +39,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   const band = card.titleColor ? swatchFor(card.titleColor, theme) : null;
   const style = {
     ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})` } : {}),
-    ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: card.collapsed ? undefined : (h ?? undefined) }),
+    ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
   const classes = [
     'card',
@@ -90,9 +90,14 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         )}
       </div>
       {!card.collapsed && <CardBody card={card} />}
-      {/* A collapsed card can still be made wider or narrower, from its right edge. */}
+      {/* A collapsed card can still be resized: wider or narrower from its right edge, or taller from its corner. */}
       {!inColumn && card.collapsed && (
-        <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} />
+        <>
+          <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} />
+          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both', COLLAPSED_MIN_H)}>
+            <ResizeIcon />
+          </button>
+        </>
       )}
       {!inColumn && !card.collapsed && (
         <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')}>

@@ -7,7 +7,7 @@ import { clientToBoard, clientToCanvas, otherBlockSizes } from './canvasDom';
  * Pointer handling for a resize handle. `axes` is 'both' for a corner handle (width and
  * minimum height) or 'width' for a column's right-edge strip.
  */
-export function resizePointerDown(kind: 'card' | 'column', id: string, axes: 'both' | 'width') {
+export function resizePointerDown(kind: 'card' | 'column', id: string, axes: 'both' | 'width', minH?: number) {
   return (e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -29,7 +29,7 @@ export function resizePointerDown(kind: 'card' | 'column', id: string, axes: 'bo
       const p = clientToBoard(ev.clientX, ev.clientY);
       const raw = { w: w0 + p.x - start.x, h: axes === 'both' ? h0 + p.y - start.y : null };
       const at = clientToCanvas(ev.clientX, ev.clientY);
-      appStore.showResize({ kind, id, ...resizeTo(kind, raw, candidates, snap), labelAt: { x: at.x + 16, y: at.y + 16 } });
+      appStore.showResize({ kind, id, ...resizeTo(kind, raw, candidates, snap, minH), labelAt: { x: at.x + 16, y: at.y + 16 } });
     };
 
     const finish = (ev: PointerEvent) => {

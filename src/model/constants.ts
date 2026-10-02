@@ -25,6 +25,8 @@ export const CARD_MAX_W = 640;
 export const COLUMN_MIN_W = 240;
 export const COLUMN_MAX_W = 640;
 export const BLOCK_MIN_H = 100;
+/** A collapsed card can be resized down to just its header. */
+export const COLLAPSED_MIN_H = 40;
 export const BLOCK_MAX_H = 700;
 
 /** While resizing, a width or height this close to another block's snaps to match it. */

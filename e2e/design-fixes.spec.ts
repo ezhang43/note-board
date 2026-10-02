@@ -157,3 +157,24 @@ test('Enter in a checklist item works like a text editor (owner request)', async
   await page.keyboard.type('last');
   expect(await values()).toEqual(['Buy milk', '', 'X and bread', 'last']);
 });
+
+test('a collapsed to-do list can be made taller from its corner; expanding it keeps its open height (owner request)', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await page.keyboard.type('one');
+  const card = page.locator('.card.selected');
+  const openHeight = (await card.boundingBox())!.height;
+  await card.getByRole('button', { name: 'Collapse card' }).click();
+  const collapsed = (await card.boundingBox())!;
+  const corner = (await card.getByRole('button', { name: 'Resize card', exact: true }).boundingBox())!;
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 40, corner.y + 120, { steps: 8 });
+  await page.mouse.up();
+  const taller = (await card.boundingBox())!;
+  expect(taller.height).toBeGreaterThan(collapsed.height + 80);
+  await card.getByRole('button', { name: 'Expand card' }).click();
+  expect(Math.abs((await card.boundingBox())!.height - openHeight)).toBeLessThan(2);
+  await card.getByRole('button', { name: 'Collapse card' }).click();
+  expect(Math.abs((await card.boundingBox())!.height - taller.height)).toBeLessThan(2);
+});

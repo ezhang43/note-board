@@ -104,9 +104,19 @@ export function updateColumn(board: Board, columnId: string, change: Partial<Pic
   return { ...board, columns: { ...board.columns, [columnId]: { ...col, ...change } } };
 }
 
-/** Set a loose card's width and minimum height (from resizing). */
-export function resizeCard(board: Board, cardId: string, w: number, h: number | null): Board {
-  return updateCard(board, cardId, (c) => (c.w === w && c.h === h ? c : { ...c, w, h }));
+/**
+ * Set a loose card's width and minimum height (from resizing); `h` left out keeps the height (right
+ * edge: width only). A collapsed card keeps its own height (`collapsedH`), apart from its open one.
+ */
+export function resizeCard(board: Board, cardId: string, w: number, h?: number | null): Board {
+  return updateCard(board, cardId, (c) => {
+    if (c.collapsed) {
+      const collapsedH = h === undefined ? c.collapsedH : h;
+      return c.w === w && c.collapsedH === collapsedH ? c : { ...c, w, collapsedH };
+    }
+    const nextH = h === undefined ? c.h : h;
+    return c.w === w && c.h === nextH ? c : { ...c, w, h: nextH };
+  });
 }
 
 /** Set a column's width, and its minimum height unless `h` is undefined (edge strip: width only). */

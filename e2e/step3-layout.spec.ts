@@ -153,7 +153,7 @@ test('a collapsed card can still be resized, from its right edge', async ({ page
   await add(page, 'Note');
   const note = looseCards(page).first();
   await note.getByRole('button', { name: 'Collapse card' }).click();
-  await expect(note.getByRole('button', { name: 'Resize card', exact: true })).toHaveCount(0);
+  await expect(note.getByRole('button', { name: 'Resize card', exact: true })).toHaveCount(1); // and taller from its corner (owner request)
   const edge = await box(note.getByRole('button', { name: 'Resize card width' }));
   const w0 = (await box(note)).width;
   await dragPointer(page, { x: edge.x + 5, y: edge.y + 5 }, { x: edge.x + 5 + 100, y: edge.y + 5 });

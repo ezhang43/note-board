@@ -96,3 +96,12 @@ describe('reading a board that may be unreadable', () => {
     expect(readBoard(JSON.stringify({ version: 1, board: { name: 'Old', snap: false } }))?.name).toBe('Old');
   });
 });
+
+describe("saving a collapsed card's height", () => {
+  it('keeps it, and ignores an unreadable one', () => {
+    const board = addCard(createBoard(), { ...createCard('todo', 't'), collapsed: true, collapsedH: 140 }, { type: 'loose', x: 0, y: 0 });
+    expect(parseBoard(serializeBoard(board)).cards.t.collapsedH).toBe(140);
+    const bad = addCard(createBoard(), { ...createCard('todo', 't'), collapsedH: -5 }, { type: 'loose', x: 0, y: 0 });
+    expect(parseBoard(serializeBoard(bad)).cards.t.collapsedH).toBeUndefined();
+  });
+});

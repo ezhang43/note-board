@@ -18,6 +18,8 @@ interface CardBase {
    * Cards themselves are always white.
    */
   titleColor?: ColorKey | null;
+  /** Height while collapsed, if resized then (owner request); its open height (h) is kept apart. */
+  collapsedH?: number | null;
 }
 
 export interface NoteCard extends CardBase {

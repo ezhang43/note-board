@@ -1,5 +1,9 @@
 # Changelog
 
+## Collapsed cards can be made taller (2026-10-02)
+
+- A collapsed card on the board now has a corner handle too: drag it to make the collapsed card taller (or wider). Expanding the card gives back its normal size, and collapsing it again gives back the collapsed size you chose.
+
 ## Enter in checklists works like a text editor (2026-10-02)
 
 - Enter in the middle of an item splits it: the rest of the text moves into a new item just below.

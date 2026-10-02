@@ -394,6 +394,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .card.in-column { width: auto; margin: 0 16px 10px; }
 .card.collapsed { padding-bottom: 0; }
+/* A collapsed card made taller keeps its header in the middle. */
+.card.loose.collapsed { justify-content: center; }
 
 .card.selected, .column.selected { outline: 2px solid var(--accent); }
 .card.selected { outline-offset: 2px; }

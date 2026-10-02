@@ -54,6 +54,8 @@ export function resizeTo(
   raw: { w: number; h: number | null },
   candidates: SizeCandidate[],
   snap: boolean,
+  /** Shortest allowed height (a collapsed card can be as short as its header). */
+  minH = BLOCK_MIN_H,
 ): ResizeResult {
   const [minW, maxW] = kind === 'column' ? [COLUMN_MIN_W, COLUMN_MAX_W] : [CARD_MIN_W, CARD_MAX_W];
   const matched: string[] = [];
@@ -72,7 +74,7 @@ export function resizeTo(
   };
 
   const [w, liveW] = fit(raw.w, 'w', minW, maxW);
-  const [h, liveH] = raw.h == null ? [null, null] : fit(raw.h, 'h', BLOCK_MIN_H, BLOCK_MAX_H);
+  const [h, liveH] = raw.h == null ? [null, null] : fit(raw.h, 'h', minH, BLOCK_MAX_H);
   const sizeText = h == null ? `${w} wide` : `${w} × ${h}`;
   const n = ids.size;
   const label = matched.length ? `${sizeText} · same ${matched.join(' & ')} as ${n} ${n === 1 ? 'block' : 'blocks'}` : sizeText;

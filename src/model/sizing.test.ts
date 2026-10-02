@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { COLLAPSED_MIN_H } from './constants';
 import { resizeTo } from './sizing';
 
 describe('resizing', () => {
@@ -56,5 +57,12 @@ describe('resizing', () => {
 
   it('a column edge changes width only', () => {
     expect(resizeTo('column', { w: 331, h: null }, [], true)).toEqual({ w: 340, h: null, liveW: 331, liveH: null, matchIds: [], label: '340 wide' });
+  });
+});
+
+describe('resizing a collapsed card', () => {
+  it('can be as short as its header', () => {
+    expect(resizeTo('card', { w: 240, h: 40 }, [], false, COLLAPSED_MIN_H).h).toBe(COLLAPSED_MIN_H);
+    expect(resizeTo('card', { w: 240, h: 40 }, [], false).h).toBe(100);
   });
 });

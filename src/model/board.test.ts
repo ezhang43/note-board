@@ -205,3 +205,15 @@ describe('finding blocks', () => {
     expect(B.topLevelOf(b, 'col')).toBe('col');
   });
 });
+
+describe('resizing a collapsed card (owner request)', () => {
+  it('sets its collapsed height, leaving the height it has when open', () => {
+    let b = B.addCard(B.createBoard(), { ...createCard('todo', 't'), h: 300 }, { type: 'loose', x: 0, y: 0 });
+    b = B.toggleCollapsed(b, 't');
+    b = B.resizeCard(b, 't', 320, 120);
+    expect(b.cards.t).toMatchObject({ w: 320, h: 300, collapsedH: 120 });
+    // Width only (right edge): the collapsed height stays.
+    b = B.resizeCard(b, 't', 360);
+    expect(b.cards.t).toMatchObject({ w: 360, h: 300, collapsedH: 120 });
+  });
+});

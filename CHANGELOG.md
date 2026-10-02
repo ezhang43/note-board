@@ -1,5 +1,9 @@
 # Changelog
 
+## Design fixes 1: typing goes into the block you just added (2026-10-02)
+
+- After adding a note, link or column, you can start typing straight away: the text goes into the new note, the link's title, or the column's title (replacing "New column"). Before, it went into whatever card you were last typing in.
+
 ## Restructure 5: the store split into smaller files (2026-10-02)
 
 - Behind the scenes only. The store, one 1,029-line file, is now: `core.ts` (state, saving, undo, overlap clean-up), `types.ts`, `env.ts` (browser helpers), and three action files by topic in `src/store/actions/` (blocks, gestures, checklist). The largest file is now 322 lines.

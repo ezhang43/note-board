@@ -134,6 +134,7 @@ test('Ctrl + C, Ctrl + V pastes copies 40px further each time; a column copies w
 
   await clickEmpty(page);
   await add(page, 'Link');
+  await page.keyboard.press('Escape'); // leave the new link's title (it takes the cursor), keeping it selected
   const link = page.locator('.card.loose.selected');
   const p0 = await boardPos(link);
   await page.keyboard.press('Control+c');

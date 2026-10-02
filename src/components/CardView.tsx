@@ -7,6 +7,7 @@ import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem 
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
+import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
 import { blockPointerDown, useDragPosition } from './useBlockDrag';
@@ -159,8 +160,11 @@ function CompletedChildren({ items, depth }: { items: TodoItem[]; depth: number 
 }
 
 function NoteBody({ card }: { card: NoteCard }) {
+  const text = useRef<HTMLTextAreaElement>(null);
+  useTakeFocus(card.id, text);
   return (
     <GrowTextarea
+      ref={text}
       className="note-text"
       aria-label="Note text"
       placeholder="Write something…"
@@ -172,9 +176,12 @@ function NoteBody({ card }: { card: NoteCard }) {
 
 function LinkBody({ card }: { card: LinkCard }) {
   const href = hrefOf(card.url);
+  const title = useRef<HTMLInputElement>(null);
+  useTakeFocus(card.id, title);
   return (
     <div className="link-body">
       <AutoSizeInput
+        ref={title}
         className="card-title"
         aria-label="Link title"
         placeholder="Title"

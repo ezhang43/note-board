@@ -93,6 +93,8 @@ export interface Ui {
   /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where). */
   focusItem: string | null;
   focusOffset: number | null;
+  /** A new note, link or column whose first text field should get the cursor. */
+  focusBlock: string | null;
   /** Checklist items on their way to the Completed section (shown ticked, fading) and the ones that just arrived. */
   completing: string[];
   arrived: string[];
@@ -122,6 +124,7 @@ export const emptyUi: Ui = {
   itemDrag: null,
   focusItem: null,
   focusOffset: null,
+  focusBlock: null,
   completing: [],
   arrived: [],
   colourMenuOpen: false,

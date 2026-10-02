@@ -19,9 +19,11 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   const { ctx, api } = createCore(storage, schedule);
   return {
     ...api,
-    /** The checklist item that was asked to take the cursor has taken it. */
-    focusTaken: (itemId: string) => {
-      if (ctx.state.ui.focusItem === itemId) ctx.updateUi({ focusItem: null, focusOffset: null });
+    /** The checklist item or new block that was asked to take the cursor has taken it. */
+    focusTaken: (id: string) => {
+      const { focusItem, focusBlock } = ctx.state.ui;
+      if (focusItem === id) ctx.updateUi({ focusItem: null, focusOffset: null });
+      if (focusBlock === id) ctx.updateUi({ focusBlock: null });
     },
     ...blockActions(ctx),
     ...gestureActions(ctx),

@@ -2,6 +2,7 @@ import { memo, useRef, type CSSProperties } from 'react';
 import { swatchFor } from '../model/theme';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
+import { useTakeFocus } from './useTakeFocus';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
@@ -29,6 +30,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const resize = useAppState((s) => (s.ui.resize?.id === id ? s.ui.resize : null));
   const sizeMatch = useAppState((s) => !!s.ui.resize?.matchIds.includes(id));
   const ref = useRef<HTMLElement>(null);
+  const title = useRef<HTMLInputElement>(null);
+  useTakeFocus(id, title, true);
   useMeasuredHeight(id, ref);
   if (!col) return null;
 
@@ -65,6 +68,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         <div aria-hidden="true" />
         <div className="column-heading">
           <AutoSizeInput
+            ref={title}
             className="column-title"
             aria-label="Column title"
             placeholder="Untitled"

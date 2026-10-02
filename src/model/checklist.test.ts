@@ -349,3 +349,32 @@ describe('an emptied list', () => {
     expect(C.refill(kept, makeId)).toBe(kept);
   });
 });
+
+describe('dropping dragged items on a row', () => {
+  // a(a1 a2) b c(c1): x is how far right of the row's left edge the pointer is, in board pixels.
+  const at = (x: number, lowerHalf: boolean) => ({ xInRow: x, lowerHalf });
+  const dragging = (ids: string[], height = 0) => ({ ids, height });
+
+  it('top half: before the row; bottom half: after it', () => {
+    expect(C.dropOnRow(sample(), 'b', at(10, false), dragging(['x']))).toEqual({ drop: { mode: 'before', targetId: 'b' }, markId: 'b', markMode: 'before' });
+    expect(C.dropOnRow(sample(), 'b', at(10, true), dragging(['x']))).toEqual({ drop: { mode: 'after', targetId: 'b' }, markId: 'b', markMode: 'after' });
+  });
+
+  it('bottom half, far enough right: nested under the row', () => {
+    const nestFrom = C.ITEM_INDENT * 0 + C.NEST_ZONE;
+    expect(C.dropOnRow(sample(), 'b', at(nestFrom + 1, true), dragging(['x']))).toEqual({ drop: { mode: 'nest', targetId: 'b' }, markId: 'b', markMode: 'nest' });
+    // a1 is one level in, so its nest zone starts one indent further right.
+    expect(C.dropOnRow(sample(), 'a1', at(nestFrom + 1, true), dragging(['x']))?.drop.mode).toBe('after');
+  });
+
+  it('after an item with sub-items, the mark shows under its last sub-item', () => {
+    expect(C.dropOnRow(sample(), 'a', at(10, true), dragging(['x']))).toEqual({ drop: { mode: 'after', targetId: 'a' }, markId: 'a2', markMode: 'after' });
+  });
+
+  it('never onto the dragged items themselves, or past 6 levels', () => {
+    expect(C.dropOnRow(sample(), 'b', at(10, true), dragging(['b']))).toBeNull();
+    expect(C.dropOnRow(sample(), 'a1', at(10, true), dragging(['x'], 5))).toBeNull();
+    // Too deep to nest, but fine next to it.
+    expect(C.dropOnRow(sample(), 'b', at(500, true), dragging(['x'], 5))?.drop.mode).toBe('after');
+  });
+});

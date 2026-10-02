@@ -1,7 +1,7 @@
-import { findItem, lastVisible, MAX_DEPTH } from '../model/checklist';
+import { dropOnRow } from '../model/checklist';
 import type { ItemDrag, ItemHint } from '../store/store';
 import { appStore } from '../store/appStore';
-import { clientToBoard } from './canvasDom';
+import { clientToBoard, isOverCanvas } from './canvasDom';
 
 // Reading checklist rows from the screen while selecting or dragging items.
 
@@ -27,30 +27,19 @@ export function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemH
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     const row = el.closest<HTMLElement>('[data-item-id]');
     if (row) {
-      const targetId = row.dataset.itemId!;
-      if (d.allIds.includes(targetId)) return null;
       const cardId = row.closest<HTMLElement>('[data-card-id]')!.dataset.cardId!;
       const card = board.cards[cardId];
-      const t = card?.kind === 'todo' ? findItem(card.items, targetId) : null;
-      if (!t) return null;
+      if (card?.kind !== 'todo') return null;
       const r = row.getBoundingClientRect();
-      const before = clientY < r.top + r.height / 2;
-      const nestFrom = r.left + (t.depth * 22 + 56) * view.zoom;
-      if (!before && clientX > nestFrom && t.depth + 1 + d.height <= MAX_DEPTH) {
-        return { cardId, drop: { mode: 'nest', targetId }, markId: targetId, markMode: 'nest' };
-      }
-      if (t.depth + d.height > MAX_DEPTH) return null;
-      if (!before && t.item.children.length) {
-        return { cardId, drop: { mode: 'after', targetId }, markId: lastVisible(t.item).id, markMode: 'after' };
-      }
-      return { cardId, drop: { mode: before ? 'before' : 'after', targetId }, markId: targetId, markMode: before ? 'before' : 'after' };
+      const at = { xInRow: (clientX - r.left) / view.zoom, lowerHalf: clientY >= r.top + r.height / 2 };
+      const result = dropOnRow(card.items, row.dataset.itemId!, at, { ids: d.allIds, height: d.height });
+      return result && { cardId, ...result };
     }
     const list = el.closest<HTMLElement>('[data-todo-of]');
     if (list) return { cardId: list.dataset.todoOf!, drop: { mode: 'append' }, markId: null, markMode: null };
     if (el.closest('[data-card-id], [data-col-id], [data-testid="canvas"]')) break;
   }
-  const canvas = document.querySelector('[data-testid="canvas"]')?.getBoundingClientRect();
-  if (!canvas || clientX < canvas.left || clientX > canvas.right || clientY < canvas.top || clientY > canvas.bottom) return null;
+  if (!isOverCanvas(clientX, clientY)) return null;
   const p = clientToBoard(clientX, clientY);
   return { newList: { x: p.x - 20, y: p.y - 20 } };
 }

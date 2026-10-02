@@ -305,6 +305,36 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
 /** Where dragged items go in a list: before / after / nested under an item, or at the end. */
 export type ItemDrop = { mode: 'before' | 'after' | 'nest'; targetId: string } | { mode: 'append' };
 
+/** How far each level of sub-items is indented (board pixels). */
+export const ITEM_INDENT = 22;
+/** Dropping this far right of a row's own indent (board pixels) nests under it. */
+export const NEST_ZONE = 56;
+
+/**
+ * Where dragged items go when dropped on a row: before it (top half), after it (bottom half), or
+ * nested under it (bottom half, far enough right). `xInRow` is how far right of the row's left edge
+ * the pointer is. The teal mark shows where they will go: after an item with sub-items, under its
+ * last sub-item. Null (dropping does nothing) over the dragged items themselves, or past 6 levels.
+ */
+export function dropOnRow(
+  items: TodoItem[],
+  targetId: string,
+  at: { xInRow: number; lowerHalf: boolean },
+  dragged: { ids: string[]; height: number },
+): { drop: ItemDrop; markId: string; markMode: 'before' | 'after' | 'nest' } | null {
+  if (dragged.ids.includes(targetId)) return null;
+  const t = findItem(items, targetId);
+  if (!t) return null;
+  const inNestZone = at.xInRow > t.depth * ITEM_INDENT + NEST_ZONE;
+  if (at.lowerHalf && inNestZone && t.depth + 1 + dragged.height <= MAX_DEPTH) {
+    return { drop: { mode: 'nest', targetId }, markId: targetId, markMode: 'nest' };
+  }
+  if (t.depth + dragged.height > MAX_DEPTH) return null;
+  const mode = at.lowerHalf ? 'after' : 'before';
+  const markId = at.lowerHalf && t.item.children.length ? lastVisible(t.item).id : targetId;
+  return { drop: { mode, targetId }, markId, markMode: mode };
+}
+
 /** Take items (with their sub-items) out of a list. */
 export function extractItems(items: TodoItem[], rootIds: string[]): { rest: TodoItem[]; moving: TodoItem[] } {
   const rest = cloned(items);

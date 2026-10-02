@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { sections } from '../model/checklist';
+import { ITEM_INDENT, sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -108,7 +108,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     <div
       className={classes.filter(Boolean).join(' ')}
       data-item-id={item.id}
-      style={{ paddingLeft: depth * 22 }}
+      style={{ paddingLeft: depth * ITEM_INDENT }}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       <input type="checkbox" aria-label="Done" checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />

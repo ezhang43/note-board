@@ -1,5 +1,9 @@
 # Changelog
 
+## Restructure 3: checklist drop rules in the model (2026-10-02)
+
+- Behind the scenes only. Where dragged checklist items land (before, after or nested under an item, and never past 6 levels) is now decided by `dropOnRow` in `src/model/checklist.ts`, with its own tests; the screen code only reports where the pointer is.
+
 ## Restructure 2: placement rules in one module (2026-10-02)
 
 - Behind the scenes only. The rules for where a dragged block lands, which blocks it pushes aside, and putting pushed blocks back when a block collapses now live together in `src/model/placement.ts`, with their own tests.

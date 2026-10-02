@@ -1,5 +1,9 @@
 # Changelog
 
+## Design fixes 5: checklist text uses the whole card (2026-10-02)
+
+- Checklist items no longer wrap early: the text uses the full width of the card. The grip and trash still appear when you hover an item, now over the end of its first line with a soft fade behind them.
+
 ## Design fixes 4: clearer buttons and colours (2026-10-02)
 
 - Hovering a card's or column's collapse arrow or × now says what it does. The card's × reminds you that Ctrl+Z brings the card back.

@@ -119,3 +119,19 @@ test('the Colour menu names the swatch under the pointer, and rings each swatch 
   await expect(menu.locator('.swatch-name')).toHaveText('Sky');
   expect(await style(sky, 'border-top-width')).toBe('2px');
 });
+
+test('checklist text uses the width of the card; grip and trash appear over the row on hover', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await page.keyboard.type('Call the plumber about the leaking kitchen tap');
+  const card = page.locator('.card.selected');
+  const row = card.locator('[data-item-id]').first();
+  const field = row.getByLabel('Item text');
+  const cardWidth = (await card.boundingBox())!.width;
+  expect((await field.boundingBox())!.width).toBeGreaterThan(cardWidth - 70);
+  await row.hover();
+  const trash = (await row.getByRole('button', { name: 'Delete item' }).boundingBox())!;
+  const rowBox = (await row.boundingBox())!;
+  expect(trash.x + trash.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  await expect(row.getByRole('button', { name: 'Delete item' })).toBeVisible();
+});

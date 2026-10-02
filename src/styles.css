@@ -691,9 +691,27 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   to { opacity: 1; transform: none; background: transparent; }
 }
 
-/* Grip and trash only show while the pointer is over the row. */
+/*
+ * Grip and trash only show while the pointer is over the row. They sit over the right end of its
+ * first line (with a fade behind them) rather than taking room, so the text uses the full width.
+ */
+.todo-item::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 56px;
+  height: 28px;
+  background: linear-gradient(to right, transparent, var(--card-bg) 45%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+.todo-item:hover::after { opacity: 1; }
 .item-grip,
 .item-trash {
+  position: absolute;
+  z-index: 1;
   flex-shrink: 0;
   padding: 0;
   border: none;
@@ -708,8 +726,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-item:hover .item-trash,
 .item-grip:focus-visible,
 .item-trash:focus-visible { opacity: 1; }
-.item-grip { width: 14px; height: 24px; margin-top: 3px; margin-left: 2px; cursor: default; touch-action: none; }
-.item-trash { width: 24px; height: 24px; margin-top: 2px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
+.item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
 .item-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 
 .completed {

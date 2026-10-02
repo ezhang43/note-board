@@ -1,5 +1,12 @@
 # Changelog
 
+## Design fixes 6: from the second Impeccable review (2026-10-03)
+
+- A long board name no longer pushes buttons off the toolbar: the name shrinks first and ends in "…".
+- "Open link" is faded until the link has an address.
+- The soft fade behind a hovered item's grip and trash is wider, so the text under them no longer shows through.
+- Splitting an item with Enter at a space no longer leaves the new item starting with a space.
+
 ## Collapsed cards can be made taller (2026-10-02)
 
 - A collapsed card on the board now has a corner handle too: drag it to make the collapsed card taller (or wider). Expanding the card gives back its normal size, and collapsing it again gives back the collapsed size you chose.

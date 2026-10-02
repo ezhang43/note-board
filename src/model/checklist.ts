@@ -90,7 +90,8 @@ function cloned(items: TodoItem[]): TodoItem[] {
  * Enter in an item, like a text editor (owner request). `start`–`end` is the cursor or selection in
  * its text (a selection is removed first). `blank` is the new item to add.
  * - At the start of an item with text: `blank` goes right above it; the cursor stays with the text.
- * - Anywhere else: the text after the cursor moves into `blank`, directly below: as the item's first
+ * - Anywhere else: the text after the cursor moves into `blank` (one space at the split is dropped),
+ *   directly below: as the item's first
  *   sub-item when it has sub-items (they stay where they are), otherwise right after it. A split
  *   ticked item stays ticked in both halves; an empty new item is never ticked.
  * Returns the new items and where the cursor goes (item id and offset).
@@ -112,8 +113,13 @@ export function enterItem(
     loc.list.splice(loc.index, 0, blank);
     return { items: next, focus: id, offset: 0 };
   }
-  loc.item.text = text.slice(0, start);
-  const added = { ...blank, text: after, done: after !== '' && loc.item.done };
+  let before = text.slice(0, start);
+  let rest = after;
+  // Splitting at a word gap: the gap's space is dropped, rather than starting the new item with it.
+  if (rest.startsWith(' ')) rest = rest.slice(1);
+  else if (rest && before.endsWith(' ')) before = before.slice(0, -1);
+  loc.item.text = before;
+  const added = { ...blank, text: rest, done: after !== '' && loc.item.done };
   if (loc.item.children.length) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
   return { items: next, focus: added.id, offset: 0 };

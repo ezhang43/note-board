@@ -64,6 +64,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
 });
 
 test('board name box grows and shrinks with its text (never below 140px, so it stays readable)', async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 800 }); // room to grow without squeezing the buttons
   const input = page.getByLabel('Board name');
   const start = (await input.boundingBox())!.width;
   await input.fill('A much, much longer board name than before');

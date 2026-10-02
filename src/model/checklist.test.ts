@@ -389,13 +389,16 @@ describe('Enter, like a text editor (owner request)', () => {
 
   it('in the middle: the rest of the text moves to a new item directly below', () => {
     const r = C.enterItem([item('Buy milk and bread')], 'Buy milk and bread', 8, 8, { ...blank, text: '' })!;
-    expect(r.items.map((i) => i.text)).toEqual(['Buy milk', ' and bread']);
+    expect(r.items.map((i) => i.text)).toEqual(['Buy milk', 'and bread']);
     expect(r).toMatchObject({ focus: 'n', offset: 0 });
+    // Split just after a space: the space is dropped from the first half instead.
+    const r2 = C.enterItem([item('Buy milk and bread')], 'Buy milk and bread', 9, 9, { ...blank, text: '' })!;
+    expect(r2.items.map((i) => i.text)).toEqual(['Buy milk', 'and bread']);
   });
 
   it('in the middle of an item with sub-items: the rest becomes its first sub-item; the sub-items stay', () => {
     const r = C.enterItem([item('fruit and veg', [item('apples')])], 'fruit and veg', 5, 5, { ...blank, text: '' })!;
-    expect(texts(r.items)).toBe('fruit( and veg apples)');
+    expect(texts(r.items)).toBe('fruit(and veg apples)');
   });
 
   it('at the start of an item with text: a new blank item right above; the cursor stays with the text', () => {
@@ -406,7 +409,7 @@ describe('Enter, like a text editor (owner request)', () => {
 
   it('with text selected, the selection is replaced by the split', () => {
     const r = C.enterItem([item('Buy milk and bread')], 'Buy milk and bread', 3, 8, { ...blank, text: '' })!;
-    expect(r.items.map((i) => i.text)).toEqual(['Buy', ' and bread']);
+    expect(r.items.map((i) => i.text)).toEqual(['Buy', 'and bread']);
   });
 
   it('a ticked item split in two keeps both halves ticked; a new blank item is never ticked', () => {

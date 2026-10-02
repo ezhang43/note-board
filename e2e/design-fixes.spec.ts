@@ -145,11 +145,11 @@ test('Enter in a checklist item works like a text editor (owner request)', async
   // Middle: the rest moves to a new item below, cursor at its start.
   for (let i = 0; i < ' and bread'.length; i++) await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('Enter');
-  expect(await values()).toEqual(['Buy milk', ' and bread']);
+  expect(await values()).toEqual(['Buy milk', 'and bread']); // the space at the split is dropped
   // Start of an item: a blank item above; the cursor stays with the text.
   await page.keyboard.press('Enter');
-  expect(await values()).toEqual(['Buy milk', '', ' and bread']);
-  await page.keyboard.type('X');
+  expect(await values()).toEqual(['Buy milk', '', 'and bread']);
+  await page.keyboard.type('X ');
   expect(await values()).toEqual(['Buy milk', '', 'X and bread']);
   // End: a new item directly below.
   await page.keyboard.press('End');
@@ -177,4 +177,39 @@ test('a collapsed to-do list can be made taller from its corner; expanding it ke
   expect(Math.abs((await card.boundingBox())!.height - openHeight)).toBeLessThan(2);
   await card.getByRole('button', { name: 'Collapse card' }).click();
   expect(Math.abs((await card.boundingBox())!.height - taller.height)).toBeLessThan(2);
+});
+
+test('a long board name shrinks (with …) instead of pushing buttons off a 1280px toolbar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByLabel('Board name').fill('Kitchen and bathroom renovation plans for the whole summer of 2027');
+  await clickEmpty(page);
+  const toolbar = page.locator('header.toolbar');
+  expect(await toolbar.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  const moon = (await toolbarButton(page, 'Dark mode').boundingBox())!;
+  expect(moon.x + moon.width).toBeLessThanOrEqual(1280);
+  expect((await page.locator('header.toolbar .board-name').boundingBox())!.width).toBeGreaterThanOrEqual(140);
+  expect(await style(page.getByLabel('Board name'), 'text-overflow')).toBe('ellipsis');
+});
+
+test('"Open link" is faded until the link has an address', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Link');
+  const open = page.locator('.link-open');
+  expect(await style(open, 'opacity')).toBe('0.45');
+  await page.getByLabel('Link address').fill('https://example.com');
+  expect(await style(open, 'opacity')).toBe('1');
+});
+
+test('the fade behind a hovered item\'s grip and trash covers the text under them', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await page.keyboard.type('Call the plumber about the leaking kitchen tap');
+  const row = page.locator('.card.selected [data-item-id]').first();
+  await row.hover();
+  await expect.poll(() => style(row, 'opacity', '::after')).toBe('1'); // after its short fade-in
+  const fadeWidth = parseFloat(await style(row, 'width', '::after'));
+  const trash = (await row.getByRole('button', { name: 'Delete item' }).boundingBox())!;
+  const rowBox = (await row.boundingBox())!;
+  // The fully covered part reaches past the trash can's left edge.
+  expect(rowBox.x + rowBox.width - (fadeWidth - 24)).toBeLessThanOrEqual(trash.x);
 });

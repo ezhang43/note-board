@@ -3,19 +3,25 @@ import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import { MinusIcon, PlusIcon } from './icons';
 
+/** Bottom-right corner: the keyboard shortcuts (?) button and the zoom control. */
 export function ZoomControl() {
   const zoom = useAppState((s) => s.view.zoom);
   return (
-    <div className="zoom-control" role="group" aria-label="Zoom">
-      <button type="button" aria-label="Zoom out" title="Zoom out (Ctrl+−)" onClick={() => appStore.zoomAtCentre(1 / ZOOM_STEP)}>
-        <MinusIcon />
+    <div className="corner-controls">
+      <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
+        ?
       </button>
-      <button type="button" className="zoom-label" aria-label="Reset zoom" title="Reset zoom (Ctrl+0)" onClick={appStore.resetZoom}>
-        {zoomLabel(zoom)}
-      </button>
-      <button type="button" aria-label="Zoom in" title="Zoom in (Ctrl+=)" onClick={() => appStore.zoomAtCentre(ZOOM_STEP)}>
-        <PlusIcon />
-      </button>
+      <div className="zoom-control" role="group" aria-label="Zoom">
+        <button type="button" aria-label="Zoom out" title="Zoom out (Ctrl+−)" onClick={() => appStore.zoomAtCentre(1 / ZOOM_STEP)}>
+          <MinusIcon />
+        </button>
+        <button type="button" className="zoom-label" aria-label="Reset zoom" title="Reset zoom (Ctrl+0)" onClick={appStore.resetZoom}>
+          {zoomLabel(zoom)}
+        </button>
+        <button type="button" aria-label="Zoom in" title="Zoom in (Ctrl+=)" onClick={() => appStore.zoomAtCentre(ZOOM_STEP)}>
+          <PlusIcon />
+        </button>
+      </div>
     </div>
   );
 }

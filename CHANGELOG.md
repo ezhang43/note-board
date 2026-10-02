@@ -1,5 +1,10 @@
 # Changelog
 
+## Bigger colour chips and a shortcuts list (2026-10-03)
+
+- The Colour menu has bigger chips, and if it opens over the card or column you are colouring, the board moves down so you can still see it.
+- New ? button at the bottom right (or press ?) opens a list of every keyboard shortcut. Escape closes it.
+
 ## Design fixes 6: from the second Impeccable review (2026-10-03)
 
 - A long board name no longer pushes buttons off the toolbar: the name shrinks first and ends in "…".

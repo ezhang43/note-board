@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, cards, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
 
 // Design fixes from the 2026-10-02 Impeccable review.
 
@@ -212,4 +212,39 @@ test('the fade behind a hovered item\'s grip and trash covers the text under the
   const rowBox = (await row.boundingBox())!;
   // The fully covered part reaches past the trash can's left edge.
   expect(rowBox.x + rowBox.width - (fadeWidth - 24)).toBeLessThanOrEqual(trash.x);
+});
+
+test('the Colour menu has bigger swatches and never covers the block being coloured', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  const col = columns(page).first();
+  const button = (await page.getByRole('button', { name: 'Colour of selected block' }).boundingBox())!;
+  // Put the column right under the Colour button, where the menu opens.
+  await dragTo(page, col, { x: button.x + 200, y: button.y + button.height + 40 });
+  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  const menu = page.locator('.colour-menu');
+  expect((await menu.getByRole('button', { name: 'Sky' }).boundingBox())!.width).toBeGreaterThanOrEqual(32);
+  await expect.poll(async () => (await col.boundingBox())!.y).toBeGreaterThan((await menu.boundingBox())!.y + (await menu.boundingBox())!.height);
+});
+
+test('a keyboard shortcuts panel opens from the ? button or the ? key, and closes with Escape', async ({ page }) => {
+  const panel = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(panel).toHaveCount(0);
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Ctrl+Z');
+  await expect(panel).toContainText('Alt+arrows');
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await clickEmpty(page);
+  await page.keyboard.press('?');
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect(panel).toHaveCount(0);
+  // Typing ? in a card is just text.
+  await add(page, 'Note');
+  await page.keyboard.type('Why?');
+  await expect(page.getByLabel('Note text')).toHaveValue('Why?');
+  await expect(panel).toHaveCount(0);
 });

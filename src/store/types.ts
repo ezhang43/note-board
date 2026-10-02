@@ -99,6 +99,8 @@ export interface Ui {
   completing: string[];
   arrived: string[];
   colourMenuOpen: boolean;
+  /** The keyboard shortcuts panel (? button or ? key). */
+  shortcutsOpen: boolean;
   confirm: ConfirmDelete | null;
   drag: Drag | null;
   /** A new card being dragged from a toolbar Add button. */
@@ -128,6 +130,7 @@ export const emptyUi: Ui = {
   completing: [],
   arrived: [],
   colourMenuOpen: false,
+  shortcutsOpen: false,
   confirm: null,
   drag: null,
   newDrag: null,

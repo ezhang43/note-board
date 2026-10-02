@@ -33,8 +33,12 @@ export function useShortcuts() {
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
 
-      // Several checklist items selected: these keys act on the items.
       const state = appStore.getState();
+      // ? opens the keyboard shortcuts panel; Escape closes it.
+      if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
+      if (key === 'escape' && state.ui.shortcutsOpen) return appStore.closeShortcuts();
+
+      // Several checklist items selected: these keys act on the items.
       if (state.ui.itemSel) {
         if (key === 'delete' || key === 'backspace') return run(e, appStore.deleteSelectedItems);
         if (key === 'escape') return appStore.clearItemSelection();

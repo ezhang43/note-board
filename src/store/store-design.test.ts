@@ -32,3 +32,14 @@ describe('a new block takes the cursor', () => {
     expect(s.getState().ui.focusBlock).toBeNull();
   });
 });
+
+describe('the keyboard shortcuts panel', () => {
+  it('opens and closes; it is not board data, so undo ignores it', () => {
+    const s = setup();
+    s.toggleShortcuts();
+    expect(s.getState().ui.shortcutsOpen).toBe(true);
+    expect(s.getState().ui.canUndo).toBe(false);
+    s.toggleShortcuts();
+    expect(s.getState().ui.shortcutsOpen).toBe(false);
+  });
+});

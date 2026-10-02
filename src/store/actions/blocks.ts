@@ -104,6 +104,9 @@ export function blockActions(ctx: StoreContext) {
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });
     },
     closeColourMenu: () => updateUi({ colourMenuOpen: false }),
+    /** The keyboard shortcuts panel. */
+    toggleShortcuts: () => updateUi({ shortcutsOpen: !ctx.state.ui.shortcutsOpen }),
+    closeShortcuts: () => updateUi({ shortcutsOpen: false }),
     /** Auto-colour: give every column its own colour. */
     autoColour: () => commit((b) => B.autoColour(b)),
     recolourSelection: (color: ColorKey | null) => commit((b) => B.recolour(b, ctx.state.ui.selection, color)),

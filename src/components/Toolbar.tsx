@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
@@ -76,6 +76,18 @@ function ColourControl() {
   const shown = swatchFor(current ?? null, theme);
   // The swatch under the pointer (or keyboard focus), named under the grid: several are close in tone.
   const [hovered, setHovered] = useState<string | null>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const lastSelected = useAppState((s) => s.ui.selection[s.ui.selection.length - 1] ?? null);
+  // When the menu opens over the block being coloured, move the board down so the block stays in view.
+  useEffect(() => {
+    if (!open || !lastSelected || !menu.current) return;
+    const block = document.querySelector(`[data-card-id="${lastSelected}"], [data-col-id="${lastSelected}"]`);
+    if (!block) return;
+    const m = menu.current.getBoundingClientRect();
+    const b = block.getBoundingClientRect();
+    const covered = b.top < m.bottom && b.bottom > m.top && b.left < m.right && b.right > m.left;
+    if (covered) appStore.panBy(0, Math.round(m.bottom - b.top + 16));
+  }, [open, lastSelected]);
   const named = hovered ?? (current ? swatchFor(current, theme).label : current === null ? 'Default' : '');
 
   return (
@@ -94,7 +106,7 @@ function ColourControl() {
         <CaretIcon />
       </button>
       {open && (
-        <div className="colour-menu" role="group" aria-label="Colours">
+        <div ref={menu} className="colour-menu" role="group" aria-label="Colours">
           {COLOR_KEYS.map((key) => {
             const sw = swatchFor(key, theme);
             return (

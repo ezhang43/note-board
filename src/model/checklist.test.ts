@@ -200,10 +200,10 @@ describe('dragging items', () => {
     expect(ids(itemsOf(b, 'L1'))).toBe('c(c1)');
   });
 
-  it('dropping on the board makes a "New list" in the source colour; an emptied source gets a blank item', () => {
+  it('dropping on the board makes an untitled list in the source colour; an emptied source gets a blank item', () => {
     const b = C.moveItems(twoLists(), 'L2', ['x'], { newList: { id: 'N', x: 800, y: 40 } }, makeId);
     const list = b.cards.N as TodoCard;
-    expect(list).toMatchObject({ title: 'New list', x: 800, y: 40, color: 'mint' });
+    expect(list).toMatchObject({ title: '', x: 800, y: 40, color: 'mint' });
     expect(ids(list.items)).toBe('x');
     expect(itemsOf(b, 'L2')).toHaveLength(1);
     expect(itemsOf(b, 'L2')[0].text).toBe('');

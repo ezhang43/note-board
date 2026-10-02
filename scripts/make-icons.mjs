@@ -5,10 +5,10 @@ import { chromium } from '@playwright/test';
 
 const svg = readFileSync(new URL('../public/icon.svg', import.meta.url), 'utf8');
 // "Maskable" icon: Windows and Android may crop it to a circle or squircle, so the
-// background fills the whole square and the cards shrink into the safe middle area.
+// background fills the whole square and the ant shrinks into the safe middle area.
 const maskable = svg
   .replace('rx="112"', 'rx="0"')
-  .replace('<g id="cards">', '<g id="cards" transform="translate(51.2 51.2) scale(0.8)">');
+  .replace('<g id="art" ', '<g id="art" transform="translate(51.2 51.2) scale(0.8)" ');
 
 const browser = await chromium.launch();
 const page = await browser.newPage();

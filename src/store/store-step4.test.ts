@@ -208,9 +208,10 @@ describe('copy, paste, duplicate', () => {
   it('duplicate copies the selection once, and each duplicate is one undo step', () => {
     const s = store();
     s.addColumn();
+    s.setColumnTitle(only(s), 'Ideas');
     s.duplicate();
     expect(board(s).order).toHaveLength(2);
-    expect(board(s).columns[only(s)].title).toBe('New column copy');
+    expect(board(s).columns[only(s)].title).toBe('Ideas copy');
     s.undo();
     expect(board(s).order).toHaveLength(1);
   });

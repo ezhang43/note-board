@@ -1,5 +1,11 @@
 # Changelog
 
+## BusyAnts, part 1: name, icon and a friendlier start (2026-10-03)
+
+- The app is now called BusyAnts, with a friendly ant on yellow as its icon (browser tab, installed app and sign-in screen). The website address is unchanged.
+- An empty board shows a short hint on how to start.
+- New to-do lists and columns start untitled (with a grey "List title" / "Column title" placeholder) instead of rows of "New list" and "New column". A new list puts your cursor in its title; press Enter to move on to its first item.
+
 ## Bigger colour chips and a shortcuts list (2026-10-03)
 
 - The Colour menu has bigger chips, and if it opens over the card or column you are colouring, the board moves down so you can still see it.

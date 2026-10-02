@@ -21,14 +21,14 @@ export function createCard(kind: CardKind, id = newId('k')): Card {
     case 'note':
       return { ...base, kind, text: '' };
     case 'todo':
-      return { ...base, kind, title: 'New list', items: [createItem()], completedOpen: true };
+      return { ...base, kind, title: '', items: [createItem()], completedOpen: true };
     case 'link':
       return { ...base, kind, title: '', url: '' };
   }
 }
 
 export function createColumn(id = newId('c')): Column {
-  return { id, title: 'New column', x: 0, y: 0, w: COLUMN_W, h: null, color: null, collapsed: false, cardIds: [] };
+  return { id, title: '', x: 0, y: 0, w: COLUMN_W, h: null, color: null, collapsed: false, cardIds: [] };
 }
 
 /** A card that can never be deleted or copied: the board's one Completed card (owner rule). */

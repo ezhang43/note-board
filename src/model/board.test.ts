@@ -56,9 +56,9 @@ describe('adding', () => {
     expect(B.problems(b)).toEqual([]);
   });
 
-  it('a new to-do list starts titled "New list" with one blank item', () => {
+  it('a new to-do list starts untitled with one blank item', () => {
     const t = createCard('todo') as TodoCard;
-    expect(t.title).toBe('New list');
+    expect(t.title).toBe('');
     expect(t.items).toHaveLength(1);
     expect(t.items[0]).toMatchObject({ text: '', done: false, children: [] });
   });

@@ -34,7 +34,7 @@ test('can be installed as an app (manifest and icons)', async ({ page, request }
   expect(manifestUrl).toBe(new URL('manifest.webmanifest', page.url()).href);
 
   const manifest = await (await request.get(manifestUrl)).json();
-  expect(manifest.name).toBe('Note Board');
+  expect(manifest.name).toBe('BusyAnts');
   expect(manifest.display).toBe('standalone');
   expect(new URL(manifest.start_url, manifestUrl).href).toBe(page.url());
 

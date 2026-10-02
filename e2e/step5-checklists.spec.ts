@@ -239,7 +239,7 @@ test('drag an item into another list, or onto empty list space to append', async
   expect(await texts(a)).toEqual(['']); // emptied list gets a blank item
 });
 
-test('dropping items on empty board makes a new list "New list"', async ({ page }) => {
+test('dropping items on empty board makes a new untitled list', async ({ page }) => {
   const list = await makeList(page, ['keep', 'move me']);
   await clickEmpty(page);
   const canvas = await box(page.getByTestId('canvas'));
@@ -248,7 +248,7 @@ test('dropping items on empty board makes a new list "New list"', async ({ page 
   });
   await expect(looseCards(page)).toHaveCount(2);
   const made = page.locator('.card.selected');
-  await expect(made.getByLabel('List title')).toHaveValue('New list');
+  await expect(made.getByLabel('List title')).toHaveValue('');
   expect(await texts(made)).toEqual(['move me']);
   expect(await texts(list)).toEqual(['keep']);
 });

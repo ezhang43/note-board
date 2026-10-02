@@ -123,6 +123,9 @@ export function Canvas() {
         backgroundPosition: `${grid.offsetX}px ${grid.offsetY}px`,
       }}
     >
+      {order.length === 0 && (
+        <p className="empty-hint">Add a note, a to-do list or a column from the toolbar, or drag one onto the board</p>
+      )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         {order.map((id) => {
           if (id === draggedCard || id === draggedColumn) return null;

@@ -58,6 +58,13 @@ export function checklistActions(ctx: StoreContext) {
 
   return {
     // ---------- editing items ----------
+    /** Enter in a list's title: the cursor moves to its first item. */
+    focusFirstItem(cardId: string) {
+      const card = ctx.state.board.cards[cardId];
+      if (card?.kind !== 'todo') return;
+      const first = C.displayOrder(card.items)[0];
+      if (first) updateUi({ focusItem: first, focusOffset: null });
+    },
     /**
      * Enter, like a text editor: splits the item at the cursor (`start`–`end`; the end of its text if
      * not given), or adds a blank item above when the cursor is at the start of its text.

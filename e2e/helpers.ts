@@ -19,8 +19,17 @@ export const cards = (page: Page) => page.locator('[data-card-id]');
 export const looseCards = (page: Page) => page.locator('.card.loose');
 export const columns = (page: Page) => page.locator('[data-col-id]');
 
-export const add = (page: Page, name: 'Note' | 'To-do list' | 'Link' | 'New column') =>
-  page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
+/**
+ * Clicks a toolbar Add button. A new to-do list takes the cursor in its title; unless `stayInTitle`,
+ * Enter then moves it to the first item, so typing straight after adds items.
+ */
+export async function add(page: Page, name: 'Note' | 'To-do list' | 'Link' | 'New column', opts: { stayInTitle?: boolean } = {}) {
+  await page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
+  if (name === 'To-do list' && !opts.stayInTitle) {
+    await expect(page.locator('.card.selected').getByLabel('List title')).toBeFocused();
+    await page.keyboard.press('Enter');
+  }
+}
 
 export async function box(l: Locator) {
   const b = await l.boundingBox();

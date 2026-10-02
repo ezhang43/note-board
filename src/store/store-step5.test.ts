@@ -72,7 +72,7 @@ describe('checklist editing in the store', () => {
     s.dropItems();
     const newId = s.getState().ui.selection[0];
     const made = s.getState().board.cards[newId] as TodoCard;
-    expect(made).toMatchObject({ kind: 'todo', title: 'New list', color: list().color, x: 900, y: 520 });
+    expect(made).toMatchObject({ kind: 'todo', title: '', color: list().color, x: 900, y: 520 });
     expect(made.items.map((i) => i.text)).toEqual(['two']);
     expect(list().items.map((i) => i.text)).toEqual(['one', 'three']);
     s.undo();

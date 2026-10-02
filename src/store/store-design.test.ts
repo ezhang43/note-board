@@ -18,11 +18,16 @@ describe('a new block takes the cursor', () => {
     expect(s.getState().ui.focusBlock).toBe(s.getState().ui.selection[0]);
   });
 
-  it('a new to-do list puts the cursor in its first item instead', () => {
+  it('a new to-do list puts the cursor in its (empty) title; Enter there moves to its first item', () => {
     const s = setup();
     s.addCard('todo');
-    expect(s.getState().ui.focusBlock).toBeNull();
-    expect(s.getState().ui.focusItem).not.toBeNull();
+    const id = s.getState().ui.selection[0];
+    expect(s.getState().ui.focusBlock).toBe(id);
+    expect(s.getState().ui.focusItem).toBeNull();
+    s.focusFirstItem(id);
+    const card = s.getState().board.cards[id];
+    expect(card.kind === 'todo' && card.title).toBe('');
+    expect(s.getState().ui.focusItem).toBe(card.kind === 'todo' ? card.items[0].id : null);
   });
 
   it('once the field has the cursor, the request is cleared', () => {

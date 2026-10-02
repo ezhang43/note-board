@@ -67,12 +67,14 @@ test('Add Note puts a white note on the board, selected, and it grows as you typ
   await expect.poll(async () => (await box(note)).height).toBeGreaterThan(before + 40);
 });
 
-test('Add To-do list starts "New list" with one blank item and the cursor in it', async ({ page }) => {
+test('Add To-do list starts untitled with one blank item; the cursor is in the title, and Enter moves it to the item', async ({ page }) => {
   await add(page, 'To-do list');
   const list = cards(page).first();
   await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await expect(list.getByLabel('List title')).toHaveValue('New list');
+  await expect(list.getByLabel('List title')).toHaveValue('');
   await expect(list.getByLabel('Item text')).toHaveCount(1);
+  await expect(list.getByLabel('List title')).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(list.getByLabel('Item text')).toBeFocused();
   await page.keyboard.type('Buy milk');
   await list.getByLabel('Done').click();
@@ -109,7 +111,7 @@ test('adding with a column selected puts the card at the end; with a card in a c
   await add(page, 'New column');
   const col = columns(page).first();
   await expect(col).toHaveClass(/selected/);
-  await expect(col.getByLabel('Column title')).toHaveValue('New column');
+  await expect(col.getByLabel('Column title')).toHaveValue('');
   await expect(col.locator('.column-empty')).toHaveText('Drop cards here');
 
   await add(page, 'Note'); // column selected → end of column
@@ -329,6 +331,7 @@ test('everything is kept after reload', async ({ page }) => {
   const col = columns(page).first();
   await col.getByLabel('Column title').fill('This week');
   await add(page, 'To-do list');
+  await page.keyboard.press('Enter'); // from the new list's title to its first item
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);
   await col.click({ position: { x: 200, y: 26 } });

@@ -12,7 +12,7 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
   return (
     <main className="sign-in">
       <div className="sign-in-panel">
-        <h1 className="sign-in-title">Note Board</h1>
+        <h1 className="sign-in-title">BusyAnts</h1>
         {(status === 'checking' || status === 'loading') && <p className="sign-in-text">Opening your board…</p>}
         {status === 'signed-out' && (
           <>

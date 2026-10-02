@@ -204,7 +204,7 @@ describe('dragging a new card from the toolbar', () => {
     const ids = s.getState().board.columns[col].cardIds;
     expect(ids).toHaveLength(2);
     expect(s.getState().board.cards[ids[0]].kind).toBe('todo');
-    expect(s.getState().ui.focusItem).not.toBeNull(); // cursor goes into the new list's item
+    expect(s.getState().ui.focusBlock).toBe(ids[0]); // cursor goes into the new list's title
   });
 
   it('a new column can be dragged too, but never goes inside another column', () => {
@@ -221,7 +221,7 @@ describe('dragging a new card from the toolbar', () => {
     s.dropNewDrag(0);
     expect(s.getState().board.order).toHaveLength(2);
     const made = s.getState().board.columns[s.getState().ui.selection[0]];
-    expect(made).toMatchObject({ title: 'New column', x: d.land!.x, y: d.land!.y, cardIds: [] });
+    expect(made).toMatchObject({ title: '', x: d.land!.x, y: d.land!.y, cardIds: [] });
   });
 
   it('let go off the board: nothing is added', () => {

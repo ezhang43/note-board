@@ -893,3 +893,18 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border-radius: 5px;
   background: var(--canvas);
 }
+
+/* Shown on an empty board only. */
+.empty-hint {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(420px, calc(100% - 32px));
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-soft);
+  pointer-events: none;
+}

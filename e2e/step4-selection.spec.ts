@@ -94,7 +94,7 @@ test('Ctrl + A then Delete asks about the column, then deletes everything select
   await expect(looseCards(page).first()).toHaveClass(/selected/);
   await page.keyboard.press('Delete');
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toContainText('Delete “New column”?');
+  await expect(dialog).toContainText('Delete “Untitled”?');
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(cards(page)).toHaveCount(2);
 

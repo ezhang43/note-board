@@ -6,6 +6,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { clientToCanvas } from './canvasDom';
 import { GrowTextarea } from './GrowTextarea';
+import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, GripIcon, TrashIcon } from './icons';
 import { itemHintAt, rowUnder } from './itemDom';
 
@@ -20,15 +21,23 @@ export function TodoBody({ card }: { card: TodoCard }) {
     return !!h && 'cardId' in h && h.cardId === card.id && h.drop.mode === 'append';
   });
   const { open, done } = sections(card.items);
+  const title = useRef<HTMLInputElement>(null);
+  useTakeFocus(card.id, title);
 
   return (
     <div className={`todo-body${appendTarget ? ' append-target' : ''}`} data-todo-of={card.id}>
       <AutoSizeInput
         className="card-title"
+        ref={title}
         aria-label="List title"
-        placeholder="List"
+        placeholder="List title"
         value={card.title}
-        onChange={(title) => appStore.setCardTitle(card.id, title)}
+        onChange={(text) => appStore.setCardTitle(card.id, text)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          appStore.focusFirstItem(card.id);
+        }}
       />
       <div className="todo-items">
         {flatten(open).map(({ item, depth }) => (

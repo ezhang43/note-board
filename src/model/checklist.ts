@@ -418,7 +418,7 @@ export type ItemDestination = { cardId: string; drop: ItemDrop } | { newList: { 
 
 /**
  * Moves items (with their sub-items) from one list to a drop position, possibly in another list,
- * or onto empty board as a new "New list" in the source list's colour. A list left empty gets one
+ * or onto empty board as a new untitled list in the source list's colour. A list left empty gets one
  * blank item. Returns the same board if the move isn't allowed.
  */
 export function moveItems(board: Board, fromCardId: string, rootIds: string[], to: ItemDestination, makeId: MakeId = newId): Board {
@@ -437,7 +437,7 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
       y: to.newList.y,
       w: null,
       h: null,
-      title: 'New list',
+      title: '',
       items: moving,
       completedOpen: true,
     };

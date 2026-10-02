@@ -72,7 +72,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             ref={title}
             className="column-title"
             aria-label="Column title"
-            placeholder="Untitled"
+            placeholder="Column title"
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}
           />

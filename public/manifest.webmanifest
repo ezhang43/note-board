@@ -1,6 +1,6 @@
 {
-  "name": "Note Board",
-  "short_name": "Note Board",
+  "name": "BusyAnts",
+  "short_name": "BusyAnts",
   "description": "A board for notes, to-do lists and links.",
   "start_url": "./",
   "scope": "./",

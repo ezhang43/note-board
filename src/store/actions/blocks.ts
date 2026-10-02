@@ -20,16 +20,14 @@ export const EXPAND_WATCH_MS = 1500;
 /** Imported cards start this far (screen pixels) below the top of the board area. */
 export const IMPORT_TOP_MARGIN = 40;
 
-/** Adds a new card and selects it with the cursor in it (a new to-do list: in its first item). */
+/** Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). */
 export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement) {
   const card = createCard(kind);
-  const focusItem = card.kind === 'todo' ? card.items[0].id : null;
-  const focusBlock = card.kind === 'todo' ? null : card.id;
-  ctx.commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusItem, focusBlock } });
+  ctx.commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusBlock: card.id } });
   ctx.requestSettle([place.type === 'column' ? place.columnId : card.id]);
 }
 
-/** Adds a new column at a spot and selects it, with its title ready to type over. */
+/** Adds a new column at a spot and selects it, with the cursor in its (empty) title. */
 export function addNewColumn(ctx: StoreContext, at: Point) {
   const col = { ...createColumn(), ...at };
   ctx.commit((b) => B.addColumn(b, col), { ui: { selection: [col.id], itemSel: null, focusBlock: col.id } });

@@ -45,7 +45,7 @@ test('a plain click on an Add button still adds one card, and a drag adds only o
   await expect(cards(page)).toHaveCount(2);
 });
 
-test('dragging a to-do list onto another card lands it at the nearest free spot, cursor in its first item', async ({ page }) => {
+test('dragging a to-do list onto another card lands it at the nearest free spot, cursor in its title', async ({ page }) => {
   await add(page, 'Note');
   await clickEmpty(page);
   const note = await box(looseCards(page).first());
@@ -54,7 +54,7 @@ test('dragging a to-do list onto another card lands it at the nearest free spot,
   await expectNoOverlaps(page);
   const list = page.locator('.card.selected');
   await expect(list).toHaveAttribute('data-kind', 'todo');
-  await expect(list.getByLabel('Item text')).toBeFocused();
+  await expect(list.getByLabel('List title')).toBeFocused();
 });
 
 test('dragging onto a column puts the card into it at the pointer', async ({ page }) => {

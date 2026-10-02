@@ -88,6 +88,17 @@ export function CollapseAllIcon({ expand }: { expand: boolean }) {
   );
 }
 
+/** Same width: two bars of equal length between two upright lines. */
+export function SameWidthIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4 4v16M20 4v16" />
+      <rect x="7" y="6" width="10" height="4" rx="1" />
+      <rect x="7" y="14" width="10" height="4" rx="1" />
+    </svg>
+  );
+}
+
 export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg

@@ -4,6 +4,7 @@ import { settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import { recordPushes, type Pushes } from '../model/placement';
+import type { LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
@@ -62,6 +63,8 @@ export interface StoreContext {
     pushedBy: Map<string, Pushes>;
     expanding: { id: string; until: number } | null;
     importLayout: { ids: string[]; origin: Point } | null;
+    /** The layout before and right after Collapse all, so Expand all can give it back. */
+    collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot } | null;
   };
   /** Saves a value in the browser (does nothing if storage is unavailable). */
   write(key: string, value: string): void;
@@ -99,7 +102,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let settleQueued = false;
   let history: History = emptyHistory;
   const pending: StoreContext['pending'] = { tick: null };
-  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null };
+  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null };
   const measured: MeasuredHeight = (id) => heights.get(id);
 
   function flushView() {

@@ -87,3 +87,63 @@ describe('collapsing puts pushed blocks back (owner request)', () => {
     expect(pos(s, b)).toEqual({ x: 0, y: 200 });
   });
 });
+
+describe('Collapse all, then Expand all, gives back the same layout (owner request)', () => {
+  it('cards that were collapsed before stay collapsed, so nothing below gets pushed', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0, 200);
+    const b = noteAt(s, 0, 220, 40); // already collapsed before Collapse all
+    const c = noteAt(s, 0, 280, 160);
+    s.toggleCollapsed(b);
+    s.setMeasuredHeight(b, 40);
+    vi.runAllTimers();
+    const before = { a: pos(s, a), b: pos(s, b), c: pos(s, c) };
+
+    s.toggleAllCollapsed(); // collapse all
+    [a, b, c].forEach((id) => s.setMeasuredHeight(id, 40));
+    vi.runAllTimers();
+    s.toggleAllCollapsed(); // expand all
+    s.setMeasuredHeight(a, 200);
+    s.setMeasuredHeight(c, 160);
+    vi.runAllTimers();
+
+    expect(s.getState().board.cards[b].collapsed).toBe(true);
+    expect(s.getState().board.cards[a].collapsed).toBe(false);
+    expect({ a: pos(s, a), b: pos(s, b), c: pos(s, c) }).toEqual(before);
+  });
+
+  it('a block moved while everything was collapsed stays where it was put', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0, 200);
+    s.toggleAllCollapsed();
+    s.setMeasuredHeight(a, 40);
+    vi.runAllTimers();
+    s.startDrag('card', a, 0, 0);
+    s.moveDrag(600, 0, null);
+    s.dropDrag(null);
+    s.toggleAllCollapsed();
+    expect(pos(s, a)).toEqual({ x: 600, y: 0 });
+    expect(s.getState().board.cards[a].collapsed).toBe(false);
+  });
+});
+
+describe('Same width (owner request)', () => {
+  it('every selected loose card and column takes the width of the first selected; one undo step', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0);
+    const b = noteAt(s, 0, 400);
+    s.addColumn();
+    const col = s.getState().ui.selection[0];
+    s.select(a);
+    s.showResize({ kind: 'card', id: a, w: 360, h: null, liveW: 360, liveH: null, matchIds: [], label: '', labelAt: { x: 0, y: 0 } });
+    s.commitResize();
+    s.select(a);
+    s.pressBlock(b, true);
+    s.pressBlock(col, true);
+    s.matchWidths();
+    expect(s.getState().board.cards[b].w).toBe(360);
+    expect(s.getState().board.columns[col].w).toBe(360);
+    s.undo();
+    expect(s.getState().board.cards[b].w).toBeNull();
+  });
+});

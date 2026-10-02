@@ -227,7 +227,17 @@ export function blockActions(ctx: StoreContext) {
       const collapse = B.anyExpanded(ctx.state.board);
       layout.pushedBy.clear();
       layout.expanding = null;
-      commit((b) => B.setAllCollapsed(b, collapse));
+      if (collapse) {
+        const before = B.layoutSnapshot(ctx.state.board);
+        commit((b) => B.setAllCollapsed(b, true));
+        layout.collapseAll = { before, after: B.layoutSnapshot(ctx.state.board) };
+        return;
+      }
+      // Expand all right after Collapse all gives back the layout from before it (owner request).
+      const saved = layout.collapseAll;
+      layout.collapseAll = null;
+      commit((b) => (saved ? B.restoreLayout(b, saved.before, saved.after) : B.setAllCollapsed(b, false)));
+      requestSettle();
     },
     /**
      * Collapse arrow. Expanding starts remembering which blocks the growing block pushes aside;
@@ -247,6 +257,14 @@ export function blockActions(ctx: StoreContext) {
       const pushes = layout.pushedBy.get(id);
       layout.pushedBy.delete(id);
       commit((b) => (pushes ? returnPushes(B.toggleCollapsed(b, id), pushes, top, measured) : B.toggleCollapsed(b, id)));
+    },
+
+    /** Same width: the selected loose cards and columns take the first one's width. One undo step. */
+    matchWidths() {
+      const ids = liveSelection(ctx.state.board).filter((id) => ctx.state.board.order.includes(id));
+      if (ids.length < 2) return;
+      commit((b) => B.matchWidths(b, ids));
+      requestSettle(ids);
     },
 
     // ---------- deleting ----------

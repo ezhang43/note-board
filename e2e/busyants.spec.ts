@@ -65,3 +65,21 @@ test('the Hand tool shows a glove over empty board, and the normal arrow over ca
   await page.keyboard.press('v'); // Select tool
   expect(await css(canvas, 'cursor')).toBe('default');
 });
+
+test('Same width makes the selected blocks as wide as the first one selected', async ({ page }) => {
+  const sameWidth = page.locator('header.toolbar').getByRole('button', { name: 'Same width' });
+  await expect(sameWidth).toHaveAttribute('aria-disabled', 'true');
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const note = page.locator('.card.loose').first();
+  const col = columns(page).first();
+  await note.click({ position: { x: 30, y: 10 } });
+  await col.click({ position: { x: 20, y: 20 }, modifiers: ['Control'] });
+  await expect(sameWidth).not.toHaveAttribute('aria-disabled', 'true');
+  await sameWidth.click();
+  await expect.poll(async () => (await col.boundingBox())!.width).toBeCloseTo((await note.boundingBox())!.width, 0);
+});

@@ -1,34 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- BusyAnts app icon: a friendly ant on warm yellow. -->
+  <!-- BusyAnts app icon: a simple chibi ant silhouette on warm yellow. -->
   <rect width="512" height="512" rx="112" fill="#FFCF3F"/>
-  <g id="art" stroke-linecap="round" stroke-linejoin="round">
+  <g id="art" fill="#3A2614" stroke="#3A2614" stroke-linecap="round">
     <!-- antennae -->
-    <path d="M150 182 C130 130 112 112 90 112" fill="none" stroke="#3A2614" stroke-width="12"/>
-    <path d="M196 172 C206 118 228 98 252 96" fill="none" stroke="#3A2614" stroke-width="12"/>
-    <circle cx="88" cy="112" r="14" fill="#3A2614"/>
-    <circle cx="254" cy="96" r="14" fill="#3A2614"/>
-    <!-- legs -->
-    <g fill="none" stroke="#3A2614" stroke-width="13">
-      <path d="M230 322 L196 372 L172 404"/>
-      <path d="M256 330 L250 386 L238 420"/>
-      <path d="M282 324 L312 376 L336 404"/>
-      <path d="M222 300 L176 300 L150 282"/>
-      <path d="M292 300 L338 290 L360 268"/>
-    </g>
-    <!-- body: abdomen, thorax, head -->
-    <ellipse cx="350" cy="312" rx="92" ry="78" fill="#3A2614"/>
-    <ellipse cx="368" cy="290" rx="34" ry="20" fill="#5A3E24" transform="rotate(-20 368 290)"/>
-    <ellipse cx="256" cy="306" rx="46" ry="40" fill="#3A2614"/>
-    <circle cx="178" cy="240" r="76" fill="#3A2614"/>
-    <!-- face -->
-    <circle cx="150" cy="232" r="25" fill="#FFFFFF"/>
-    <circle cx="208" cy="226" r="25" fill="#FFFFFF"/>
-    <circle cx="156" cy="236" r="12" fill="#1A120A"/>
-    <circle cx="214" cy="230" r="12" fill="#1A120A"/>
-    <circle cx="160" cy="231" r="4.5" fill="#FFFFFF"/>
-    <circle cx="218" cy="225" r="4.5" fill="#FFFFFF"/>
-    <circle cx="136" cy="270" r="11" fill="#F28B82" opacity=".75"/>
-    <circle cx="226" cy="266" r="11" fill="#F28B82" opacity=".75"/>
-    <path d="M162 276 Q182 294 204 274" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+    <path d="M160 160 Q150 112 116 96" fill="none" stroke-width="14"/>
+    <path d="M214 156 Q228 108 264 94" fill="none" stroke-width="14"/>
+    <circle cx="114" cy="94" r="16" stroke="none"/>
+    <circle cx="266" cy="92" r="16" stroke="none"/>
+    <!-- stubby legs -->
+    <path d="M250 334 L240 380 M292 338 L298 384 M346 362 L364 400" fill="none" stroke-width="20"/>
+    <!-- body: big round head, small middle, round back -->
+    <circle cx="350" cy="306" r="76" stroke="none"/>
+    <circle cx="268" cy="300" r="34" stroke="none"/>
+    <circle cx="186" cy="244" r="94" stroke="none"/>
   </g>
 </svg>

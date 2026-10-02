@@ -217,3 +217,35 @@ describe('resizing a collapsed card (owner request)', () => {
     expect(b.cards.t).toMatchObject({ w: 360, h: 300, collapsedH: 120 });
   });
 });
+
+describe('Collapse all and back (owner request)', () => {
+  it('gives back which blocks were open and where loose blocks were, unless moved since', () => {
+    let b = B.addCard(B.createBoard(), createCard('note', 'a'), { type: 'loose', x: 0, y: 0 });
+    b = B.addCard(b, { ...createCard('note', 'z'), collapsed: true }, { type: 'loose', x: 0, y: 300 });
+    b = B.addCard(b, createCard('note', 'm'), { type: 'loose', x: 400, y: 0 });
+    const before = B.layoutSnapshot(b);
+    let collapsed = B.setAllCollapsed(b, true);
+    const after = B.layoutSnapshot(collapsed);
+    collapsed = B.moveCard(collapsed, 'm', { type: 'loose', x: 900, y: 0 });
+    const back = B.restoreLayout(collapsed, before, after);
+    expect(back.cards.a).toMatchObject({ collapsed: false, x: 0, y: 0 });
+    expect(back.cards.z).toMatchObject({ collapsed: true, x: 0, y: 300 });
+    expect(back.cards.m).toMatchObject({ collapsed: false, x: 900, y: 0 });
+  });
+});
+
+describe('Same width (owner request)', () => {
+  it('loose cards and columns take the first one\'s width (within their limits); cards in columns are left alone', () => {
+    let b = B.addCard(B.createBoard(), { ...createCard('note', 'a'), w: 360 }, { type: 'loose', x: 0, y: 0 });
+    b = B.addCard(b, createCard('note', 'b'), { type: 'loose', x: 0, y: 400 });
+    b = B.addColumn(b, { ...createColumn('col'), x: 600 });
+    b = B.addCard(b, createCard('note', 'in'), { type: 'column', columnId: 'col', index: 0 });
+    const out = B.matchWidths(b, ['in', 'a', 'b', 'col']);
+    expect(out.cards.b.w).toBe(360);
+    expect(out.columns.col.w).toBe(360);
+    expect(out.cards.in.w).toBe(b.cards.in.w);
+    // A narrow first card can't make a column narrower than a column may be.
+    const narrow = B.matchWidths(B.resizeCard(b, 'a', 200), ['a', 'col']);
+    expect(narrow.columns.col.w).toBe(240);
+  });
+});

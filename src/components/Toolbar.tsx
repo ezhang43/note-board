@@ -7,7 +7,7 @@ import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
-import { CollapseAllIcon, CaretIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
+import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
 
 /** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -157,6 +157,23 @@ function CollapseAllButton() {
   );
 }
 
+/** Same width: the selected loose cards and columns take the first one's width. Faded with fewer than two selected. */
+function SameWidthButton() {
+  const ready = useAppState((s) => s.ui.selection.filter((id) => s.board.order.includes(id)).length >= 2);
+  return (
+    <button
+      type="button"
+      className="tb-button icon-only faded-colour quiet"
+      aria-label="Same width"
+      title={ready ? "Make the selected cards and columns as wide as the first one you selected" : 'Select two or more cards or columns first'}
+      aria-disabled={ready ? undefined : true}
+      onClick={() => ready && appStore.matchWidths()}
+    >
+      <SameWidthIcon />
+    </button>
+  );
+}
+
 /** Light / dark toggle (pressed = dark). The choice is remembered on this device only. */
 function DarkModeButton() {
   const dark = useAppState((s) => s.view.theme === 'dark');
@@ -279,6 +296,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <ColourControl />
       <AutoColourButton />
       <CollapseAllButton />
+      <SameWidthButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
       <span className="toolbar-label">Add</span>

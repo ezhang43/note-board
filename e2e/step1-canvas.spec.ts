@@ -46,6 +46,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Colour of selected block',
     'Auto-colour',
     'Collapse all',
+    'Same width',
     'Note',
     'To-do list',
     'Link',

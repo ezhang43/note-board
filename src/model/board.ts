@@ -1,7 +1,7 @@
 import { isPermanent } from './cards';
-import { DEFAULT_BOARD_NAME } from './constants';
+import { CARD_MAX_W, CARD_MIN_W, CARD_W, COLUMN_MAX_W, COLUMN_MIN_W, DEFAULT_BOARD_NAME } from './constants';
 import { AUTO_COLOUR_ORDER, type ColorKey } from './palette';
-import type { Board, Card, Column, TodoItem } from './types';
+import type { Board, Card, Column, Point, TodoItem } from './types';
 
 // Every function here takes a board and returns a new one (or the same one when nothing changes).
 // None of them change the board they are given.
@@ -139,6 +139,56 @@ export function setAllCollapsed(board: Board, collapsed: boolean): Board {
   const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
   const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
   return { ...board, cards, columns };
+}
+
+/** Which blocks are collapsed, and where the loose blocks and columns are. */
+export interface LayoutSnapshot {
+  collapsed: Record<string, boolean>;
+  at: Record<string, Point>;
+}
+
+export function layoutSnapshot(board: Board): LayoutSnapshot {
+  const blocks = [...Object.values(board.cards), ...Object.values(board.columns)];
+  return {
+    collapsed: Object.fromEntries(blocks.map((b) => [b.id, b.collapsed])),
+    at: Object.fromEntries(board.order.map((id) => [id, { x: blockOf(board, id)!.x, y: blockOf(board, id)!.y }])),
+  };
+}
+
+/**
+ * Expand all after Collapse all (owner request): every block gets back whether it was open
+ * (`before`), and blocks still where Collapse all left them (`after`) go back to where they were.
+ * Blocks moved in between stay put; blocks added since are opened.
+ */
+export function restoreLayout(board: Board, before: LayoutSnapshot, after: LayoutSnapshot): Board {
+  const place = <T extends Card | Column>(b: T): T => {
+    const collapsed = before.collapsed[b.id] ?? false;
+    const was = before.at[b.id];
+    const left = after.at[b.id];
+    const unmoved = was && left && b.x === left.x && b.y === left.y && board.order.includes(b.id);
+    const next = unmoved ? { ...b, collapsed, x: was.x, y: was.y } : { ...b, collapsed };
+    return next.collapsed === b.collapsed && next.x === b.x && next.y === b.y ? b : next;
+  };
+  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, place(c)]));
+  const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, place(c)]));
+  return { ...board, cards, columns };
+}
+
+/**
+ * Same width (owner request): every selected loose card and column takes the width of the first
+ * one of them, kept within its own kind's limits. Cards inside columns follow their column.
+ */
+export function matchWidths(board: Board, ids: string[]): Board {
+  const top = ids.filter((id) => board.order.includes(id));
+  if (top.length < 2) return board;
+  const first = blockOf(board, top[0])!;
+  const w = board.columns[top[0]] ? (first as Column).w : ((first as Card).w ?? CARD_W);
+  let next = board;
+  for (const id of top.slice(1)) {
+    if (next.columns[id]) next = resizeColumn(next, id, Math.min(COLUMN_MAX_W, Math.max(COLUMN_MIN_W, w)));
+    else next = resizeCard(next, id, Math.min(CARD_MAX_W, Math.max(CARD_MIN_W, w)));
+  }
+  return next;
 }
 
 export function toggleCollapsed(board: Board, id: string): Board {

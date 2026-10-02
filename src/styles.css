@@ -98,7 +98,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* Narrower windows: tighter still, so every button fits. */
 @media (max-width: 1320px) {
   .toolbar { gap: 4px; padding: 0 10px; }
-  .tb-button { padding: 0 8px; font-size: 13px; }
+  /* (.toolbar raises it above the plain .tb-button rule further down; icon-only buttons stay square.) */
+  .toolbar .tb-button:not(.icon-only) { padding: 0 6px; font-size: 13px; }
   .toolbar-label { display: none; }
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## BusyAnts, part 3: Same width, and Expand all keeps your layout (2026-10-03)
+
+- New Same width button (next to Collapse all): select two or more cards or columns, press it, and they all become as wide as the first one you selected.
+- Collapse all then Expand all now gives you back exactly the layout you had: cards that were already collapsed stay collapsed, and everything goes back to its place.
+- The ant icon is simpler and rounder (no face), as asked.
+
 ## BusyAnts, part 2: text size, glove cursor, save status (2026-10-03)
 
 - A− / A+ at the bottom right make the text on cards and columns smaller or bigger (4 sizes). Each device remembers its own choice.

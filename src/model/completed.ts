@@ -21,7 +21,7 @@ export function dayLabel(day: string): string {
 }
 
 export function completedCardOf(board: Board): CompletedCard | null {
-  return (Object.values(board.cards).find((c) => c.kind === 'completed') as CompletedCard | undefined) ?? null;
+  return Object.values(board.cards).find((c): c is CompletedCard => c.kind === 'completed') ?? null;
 }
 
 /** To-do lists in the order they appear: loose ones and columns back to front, cards in a column top to bottom. */

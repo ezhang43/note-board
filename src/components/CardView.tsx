@@ -1,5 +1,5 @@
 import { memo, useRef, type CSSProperties } from 'react';
-import { collapsedPreview, domainOf, hrefOf } from '../model/cards';
+import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W } from '../model/constants';
 import { dayLabel } from '../model/completed';
 import { swatchFor } from '../model/theme';
@@ -75,7 +75,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
           <ChevronIcon collapsed={card.collapsed} />
         </button>
         {/* The Completed card can never be deleted, so it has no ×. */}
-        {card.kind !== 'completed' && (
+        {!isPermanent(card) && (
           <button type="button" className="icon-button" aria-label="Delete card" onClick={() => appStore.deleteCard(id)}>
             <CloseIcon />
           </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapsedPreview, createCard, domainOf, hrefOf } from './cards';
+import { collapsedPreview, createCard, domainOf, hrefOf, isPermanent } from './cards';
 import type { LinkCard, NoteCard, TodoCard, TodoItem } from './types';
 
 const item = (done: boolean, children: TodoItem[] = []): TodoItem => ({ id: Math.random().toString(), text: 'x', done, children });
@@ -38,5 +38,13 @@ describe('collapsed preview', () => {
     const l = createCard('link') as LinkCard;
     expect(collapsedPreview({ ...l, title: 'Docs', url: 'a.com' })).toBe('Docs');
     expect(collapsedPreview({ ...l, title: '', url: 'www.a.com' })).toBe('a.com');
+  });
+});
+
+describe('cards that can never be deleted or copied', () => {
+  it('is only the Completed card', () => {
+    expect(isPermanent({ ...createCard('note', 'n') })).toBe(false);
+    expect(isPermanent({ ...createCard('todo', 't') })).toBe(false);
+    expect(isPermanent({ ...createCard('note', 'c'), kind: 'completed', groups: [] } as never)).toBe(true);
   });
 });

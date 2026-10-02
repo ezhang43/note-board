@@ -1,5 +1,5 @@
 import { addCard as addCardAt, addColumn, columnOf, type Placement } from './board';
-import { newId, type MakeId } from './cards';
+import { isPermanent, newId, type MakeId } from './cards';
 import { freshCopies } from './checklist';
 import type { Board, Card, Column } from './types';
 
@@ -22,12 +22,12 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
     // The Completed card is one of a kind: it is never copied.
     const col = board.columns[id];
     if (col) {
-      const cardIds = col.cardIds.filter((cid) => board.cards[cid].kind !== 'completed');
+      const cardIds = col.cardIds.filter((cid) => !isPermanent(board.cards[cid]));
       entries.push({ kind: 'column', column: { ...structuredClone(col), cardIds }, cards: cardIds.map((cid) => structuredClone(board.cards[cid])) });
       continue;
     }
     const card = board.cards[id];
-    if (!card || card.kind === 'completed') continue;
+    if (!card || isPermanent(card)) continue;
     const parent = columnOf(board, id);
     if (parent && selectedColumns.has(parent.id)) continue;
     // A card in a column has no position of its own: remember the column's, in case it is gone by the paste.

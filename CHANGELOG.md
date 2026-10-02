@@ -1,5 +1,9 @@
 # Changelog
 
+## Restructure 4: shared lookups and one Completed-card rule (2026-10-02)
+
+- Behind the scenes only. "Find this card or column" and "which block on the board holds this card" are now one helper each, and the rule that the Completed card can never be deleted or copied lives in one place (`isPermanent`).
+
 ## Restructure 3: checklist drop rules in the model (2026-10-02)
 
 - Behind the scenes only. Where dragged checklist items land (before, after or nested under an item, and never past 6 levels) is now decided by `dropOnRow` in `src/model/checklist.ts`, with its own tests; the screen code only reports where the pointer is.

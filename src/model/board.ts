@@ -1,3 +1,4 @@
+import { isPermanent } from './cards';
 import { DEFAULT_BOARD_NAME } from './constants';
 import { AUTO_COLOUR_ORDER, type ColorKey } from './palette';
 import type { Board, Card, Column, TodoItem } from './types';
@@ -26,6 +27,16 @@ export function columnOf(board: Board, cardId: string): Column | null {
     if (col && col.cardIds.includes(cardId)) return col;
   }
   return null;
+}
+
+/** The card or column with this id. */
+export function blockOf(board: Board, id: string): Card | Column | undefined {
+  return board.columns[id] ?? board.cards[id];
+}
+
+/** The block on the board itself for this id: the column a card is in, or the block itself. */
+export function topLevelOf(board: Board, id: string): string {
+  return columnOf(board, id)?.id ?? id;
 }
 
 /** Take a card out of wherever it is (the loose layer or its column), keeping the card itself. */
@@ -127,7 +138,7 @@ export function toggleCollapsed(board: Board, id: string): Board {
 
 /** Deletes a card. The Completed card is never deleted (owner's rule). */
 export function deleteCard(board: Board, cardId: string): Board {
-  if (!board.cards[cardId] || board.cards[cardId].kind === 'completed') return board;
+  if (!board.cards[cardId] || isPermanent(board.cards[cardId])) return board;
   const detached = detach(board, cardId);
   const cards = { ...detached.cards };
   delete cards[cardId];
@@ -139,7 +150,7 @@ export function deleteColumn(board: Board, columnId: string): Board {
   const col = board.columns[columnId];
   if (!col) return board;
   const cards = { ...board.cards };
-  const kept = col.cardIds.filter((id) => cards[id]?.kind === 'completed');
+  const kept = col.cardIds.filter((id) => cards[id] && isPermanent(cards[id]));
   for (const id of col.cardIds) if (!kept.includes(id)) delete cards[id];
   for (const id of kept) cards[id] = { ...cards[id], x: col.x, y: col.y };
   const columns = { ...board.columns };

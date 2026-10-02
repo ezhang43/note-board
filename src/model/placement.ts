@@ -23,8 +23,8 @@ export function movedBlocks(before: Board, after: Board, except: string[] = []):
   const moved = new Map<string, Move>();
   for (const id of after.order) {
     if (except.includes(id)) continue;
-    const was = before.columns[id] ?? before.cards[id];
-    const now = after.columns[id] ?? after.cards[id];
+    const was = B.blockOf(before, id);
+    const now = B.blockOf(after, id);
     if (!was || !now || (was.x === now.x && was.y === now.y)) continue;
     moved.set(id, { from: { x: was.x, y: was.y }, to: { x: now.x, y: now.y } });
   }
@@ -44,7 +44,7 @@ export function recordPushes(pushes: Pushes | undefined, before: Board, after: B
  */
 export function returnPushes(board: Board, pushes: Pushes, top: string, measured: MeasuredHeight): Board {
   const back = [...pushes].filter(([id, p]) => {
-    const blk = board.columns[id] ?? board.cards[id];
+    const blk = B.blockOf(board, id);
     return blk && board.order.includes(id) && blk.x === p.to.x && blk.y === p.to.y;
   });
   const going = new Set([top, ...back.map(([id]) => id)]);
@@ -98,7 +98,7 @@ export function dropBoard(
     anchors = [...b.order.filter((id) => b.columns[id]), d.id];
   }
   const board = settle(b, measured, anchors);
-  const self = board.columns[d.id] ?? board.cards[d.id];
+  const self = B.blockOf(board, d.id)!;
   const bumped = Object.fromEntries([...movedBlocks(from, board, ids)].map(([id, m]) => [id, m.to]));
   return { board, ids, at: { x: self.x, y: self.y }, bumped };
 }

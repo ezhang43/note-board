@@ -440,7 +440,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       return { board: pasted.board, ui: { selection: ids, confirm: null } };
     })!;
     // Pasted blocks keep their spot; whatever they would cover moves out of the way.
-    requestSettle(ids.map((id) => (board.order.includes(id) ? id : B.columnOf(board, id)?.id ?? id)));
+    requestSettle(ids.map((id) => B.topLevelOf(board, id)));
   }
 
   function restore(result: { history: History; board: Board } | null) {
@@ -641,7 +641,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         const done = completedCardOf(b);
         if (!done) return null;
         // If its list is gone, the new list goes next to the Completed card.
-        const near = blockRect(b, B.columnOf(b, done.id)?.id ?? done.id, measured);
+        const near = blockRect(b, B.topLevelOf(b, done.id), measured);
         const centre = near ? { x: near.x + near.w + CARD_W / 2 + 20, y: near.y + NEW_BLOCK_H.todo / 2 } : screenCentre();
         const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, centre, measured) } as const;
         const result = restoreEntry(b, itemId, place);
@@ -712,7 +712,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
      * collapsing puts them back (part of the same undo step).
      */
     toggleCollapsed(id: string) {
-      const blk = state.board.columns[id] ?? state.board.cards[id];
+      const blk = B.blockOf(state.board, id);
       if (!blk) return;
       if (blk.collapsed) {
         pushedBy.delete(id);
@@ -721,7 +721,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         return;
       }
       if (expanding?.id === id) expanding = null;
-      const top = state.board.columns[id] ? id : (B.columnOf(state.board, id)?.id ?? id);
+      const top = B.topLevelOf(state.board, id);
       const pushes = pushedBy.get(id);
       pushedBy.delete(id);
       commit((b) => (pushes ? returnPushes(B.toggleCollapsed(b, id), pushes, top, measured) : B.toggleCollapsed(b, id)));
@@ -940,7 +940,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         if (dy === 0) return true;
         const id = sel[0];
         commit((b) => B.shiftInColumn(b, id, dy < 0 ? -1 : 1), { merge: `nudge:${id}` });
-        requestSettle([B.columnOf(state.board, id)?.id ?? id]);
+        requestSettle([B.topLevelOf(state.board, id)]);
         return true;
       }
       const ids = sel.filter((id) => b0.order.includes(id));

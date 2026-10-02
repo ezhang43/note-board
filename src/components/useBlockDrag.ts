@@ -1,4 +1,5 @@
 import type React from 'react';
+import { blockOf } from '../model/board';
 import { DRAG_THRESHOLD } from '../model/constants';
 import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex } from './canvasDom';
@@ -39,7 +40,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
         offset = { x: grab.x - topLeft.x, y: grab.y - topLeft.y };
         // Start from the block's saved position when it has one, so a group keeps its spacing exactly.
         const s = appStore.getState().board;
-        const saved = s.order.includes(id) ? (s.columns[id] ?? s.cards[id]) : null;
+        const saved = s.order.includes(id) ? blockOf(s, id) : null;
         appStore.startDrag(kind, id, saved?.x ?? topLeft.x, saved?.y ?? topLeft.y);
       }
       const p = clientToBoard(ev.clientX, ev.clientY);

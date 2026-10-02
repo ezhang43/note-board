@@ -191,3 +191,17 @@ describe('deleting', () => {
     expect(B.problems(b)).toEqual([]);
   });
 });
+
+describe('finding blocks', () => {
+  it('blockOf finds a card or a column; topLevelOf gives the column holding a card, or the block itself', () => {
+    let b = B.addColumn(B.createBoard(), createColumn('col'));
+    b = B.addCard(b, createCard('note', 'in'), { type: 'column', columnId: 'col', index: 0 });
+    b = B.addCard(b, createCard('note', 'out'), { type: 'loose', x: 400, y: 0 });
+    expect(B.blockOf(b, 'col')?.id).toBe('col');
+    expect(B.blockOf(b, 'in')?.id).toBe('in');
+    expect(B.blockOf(b, 'gone')).toBeUndefined();
+    expect(B.topLevelOf(b, 'in')).toBe('col');
+    expect(B.topLevelOf(b, 'out')).toBe('out');
+    expect(B.topLevelOf(b, 'col')).toBe('col');
+  });
+});

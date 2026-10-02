@@ -31,6 +31,11 @@ export function createColumn(id = newId('c')): Column {
   return { id, title: 'New column', x: 0, y: 0, w: COLUMN_W, h: null, color: null, collapsed: false, cardIds: [] };
 }
 
+/** A card that can never be deleted or copied: the board's one Completed card (owner rule). */
+export function isPermanent(card: Card): boolean {
+  return card.kind === 'completed';
+}
+
 /** The address a link opens. Only http(s) links are ever opened; bare addresses get https://. */
 export function hrefOf(url: string): string | null {
   const u = url.trim();

@@ -1,3 +1,4 @@
+import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
 
@@ -20,6 +21,10 @@ export interface Drag {
   land: Rect | null;
   /** Blocks pushed out of the way to make room, and where they would go (shown live while dragging). */
   bumped: Record<string, Point>;
+  /** Alignment guides to show, and which axes are lined up (those land exactly there, not on the grid). */
+  guides: Guide[];
+  exactX: boolean;
+  exactY: boolean;
 }
 
 /** A block being resized: its size so far, which blocks it matches, and the size label by the pointer. */

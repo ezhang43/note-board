@@ -1,5 +1,9 @@
 # Changelog
 
+## BusyAnts, part 4: alignment guides (2026-10-03)
+
+- When you drag a card or column near another one, it snaps into line with that block's edge or middle, and a thin teal line shows where they line up, like in Google Slides.
+
 ## BusyAnts, part 3: Same width, and Expand all keeps your layout (2026-10-03)
 
 - New Same width button (next to Collapse all): select two or more cards or columns, press it, and they all become as wide as the first one you selected.

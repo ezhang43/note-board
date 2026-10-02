@@ -71,6 +71,9 @@ export interface DraggedBlocks {
   startX: number;
   startY: number;
   group: string[];
+  /** Axes lined up with another block by an alignment guide: they land exactly there, not on the grid. */
+  exactX?: boolean;
+  exactY?: boolean;
 }
 
 /**
@@ -87,7 +90,7 @@ export function dropBoard(
   d: DraggedBlocks,
   measured: MeasuredHeight,
 ): { board: Board; ids: string[]; at: Point; bumped: Record<string, Point> } {
-  const target = { x: snapIf(from.snap, d.x), y: snapIf(from.snap, d.y) };
+  const target = { x: d.exactX ? d.x : snapIf(from.snap, d.x), y: d.exactY ? d.y : snapIf(from.snap, d.y) };
   const ids = [d.id, ...d.group];
   let b = from;
   let anchors = ids;

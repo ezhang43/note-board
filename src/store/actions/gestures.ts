@@ -1,7 +1,8 @@
 import * as B from '../../model/board';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
-import { snapIf } from '../../model/geometry';
-import { landingSpot } from '../../model/layout';
+import { overlaps, snapIf } from '../../model/geometry';
+import { alignTo } from '../../model/align';
+import { landingSpot, topLevelRects } from '../../model/layout';
 import { dropBoard } from '../../model/placement';
 import type { Board, Point, Rect } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -66,32 +67,43 @@ export function gestureActions(ctx: StoreContext) {
       // A selected block dragged together with other selected blocks moves them all.
       const group = topLevel && sel.includes(id) ? sel.filter((s) => s !== id && board.order.includes(s)) : [];
       dragPreview = null;
-      updateUi({ drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {} }, confirm: null });
+      updateUi({
+        drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {}, guides: [], exactX: false, exactY: false },
+        confirm: null,
+      });
     },
-    moveDrag(x: number, y: number, overColumn: string | null) {
+    moveDrag(px: number, py: number, overColumn: string | null) {
       const d = ctx.state.ui.drag;
       if (!d) return;
       const { board } = ctx.state;
       // Several blocks move as one: they don't drop into columns.
       const over = d.group.length ? null : overColumn;
-      if (d.x === x && d.y === y && d.overColumn === over) return;
       if (over) {
         dragPreview = null;
-        return updateUi({ drag: { ...d, x, y, overColumn: over, land: null, bumped: {} } });
+        if (d.x === px && d.y === py && d.overColumn === over) return;
+        return updateUi({ drag: { ...d, x: px, y: py, overColumn: over, land: null, bumped: {}, guides: [], exactX: false, exactY: false } });
       }
+      // A single dragged block lines up with nearby blocks' edges and middles (alignment guides),
+      // leaving out blocks it is on top of: those are about to move out of its way.
+      const rect = { x: px, y: py, ...draggedSize(d) };
+      const aligned = d.group.length
+        ? { x: px, y: py, alignedX: false, alignedY: false, guides: [] }
+        : alignTo(rect, topLevelRects(board, measured, [d.id]).filter((o) => !overlaps(rect, o)));
+      const { x, y } = aligned;
+      if (d.x === x && d.y === y && d.overColumn === null && d.guides.length === aligned.guides.length) return;
       // The block follows the pointer exactly. It will land on the grid spot under it (dashed
       // outline), and takes priority there: blocks in the way are shown moving aside right away.
       // Within the same grid spot the preview is unchanged, so it isn't worked out again.
-      const tx = snapIf(board.snap, x);
-      const ty = snapIf(board.snap, y);
+      const tx = aligned.alignedX ? x : snapIf(board.snap, x);
+      const ty = aligned.alignedY ? y : snapIf(board.snap, y);
       const p = dragPreview;
       if (!p || p.board !== board || p.tx !== tx || p.ty !== ty) {
-        const { at, bumped } = dropBoard(board, { ...d, x, y }, measured);
+        const { at, bumped } = dropBoard(board, { ...d, x, y, exactX: aligned.alignedX, exactY: aligned.alignedY }, measured);
         dragPreview = { board, tx, ty, at, bumped };
       }
       const { at, bumped } = dragPreview!;
       const land = !d.group.length && (at.x !== x || at.y !== y) ? { ...at, ...draggedSize(d) } : null;
-      updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped } });
+      updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped, guides: aligned.guides, exactX: aligned.alignedX, exactY: aligned.alignedY } });
     },
     cancelDrag() {
       updateUi({ drag: null });

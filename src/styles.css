@@ -917,3 +917,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .save-note { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
 .zoom-control button.text-size { min-width: 36px; font-weight: 600; font-size: 13px; }
 .zoom-control button.text-size[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+
+/* Alignment guides while dragging a block (thin teal lines across the blocks that line up). */
+.align-guide { position: absolute; pointer-events: none; z-index: 5; background: var(--accent); }
+.align-guide.x { width: 1.5px; margin-left: -0.75px; }
+.align-guide.y { height: 1.5px; margin-top: -0.75px; }

@@ -18,7 +18,7 @@ test('opens without internet after one visit online', async ({ page, context }) 
   // Wait until the offline copy is running and has saved this visit's files.
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect
-    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v2')).keys()).length))
+    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v3')).keys()).length))
     .toBeGreaterThan(2);
 
   await context.setOffline(true);

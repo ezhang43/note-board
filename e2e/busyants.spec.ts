@@ -83,3 +83,23 @@ test('Same width makes the selected blocks as wide as the first one selected', a
   await sameWidth.click();
   await expect.poll(async () => (await col.boundingBox())!.width).toBeCloseTo((await note.boundingBox())!.width, 0);
 });
+
+test('dragging a card near another shows an alignment guide', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const [first, second] = [page.locator('.card.loose').nth(0), page.locator('.card.loose').nth(1)];
+  const a = (await first.boundingBox())!;
+  const b = (await second.boundingBox())!;
+  // Grab the second note and bring its left edge to 3px right of the first's, well below it.
+  await page.mouse.move(b.x + 30, b.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 3 + 30, a.y + a.height + 200 + 10, { steps: 10 });
+  await expect(page.locator('.align-guide').first()).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator('.align-guide')).toHaveCount(0);
+  expect(Math.round((await second.boundingBox())!.x)).toBe(Math.round(a.x));
+});

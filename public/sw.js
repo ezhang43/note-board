@@ -2,7 +2,7 @@
 // The board's data is kept offline separately, by Firebase.
 // Bump the version when files without a unique name (icons, manifest) change: the new worker
 // then starts a fresh copy and deletes the old ones, so returning visitors get the new files.
-const CACHE = 'busyants-v2';
+const CACHE = 'busyants-v3';
 const SCOPE = self.registration.scope;
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 

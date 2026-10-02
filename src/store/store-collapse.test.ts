@@ -147,3 +147,21 @@ describe('Same width (owner request)', () => {
     expect(s.getState().board.cards[b].w).toBeNull();
   });
 });
+
+describe('alignment guides while dragging (owner request)', () => {
+  it('a dragged card lines up with a nearby block\'s edge, shows a guide, and lands there (the guide wins over the grid)', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0);
+    s.showResize({ kind: 'card', id: a, w: 250, h: null, liveW: 250, liveH: null, matchIds: [], label: '', labelAt: { x: 0, y: 0 } });
+    s.commitResize();
+    const b = noteAt(s, 600, 400);
+    s.startDrag('card', b, 600, 400);
+    s.moveDrag(12, 400, null); // b is 240 wide: its right edge (252) is 2px from a's (250)
+    const d = s.getState().ui.drag!;
+    expect(d.x).toBe(10);
+    expect(d.guides.some((g) => g.axis === 'x' && g.at === 250)).toBe(true);
+    s.dropDrag(null);
+    expect(pos(s, b)).toEqual({ x: 10, y: 400 });
+    expect(s.getState().ui.drag).toBeNull();
+  });
+});

@@ -7,6 +7,7 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 
+const NO_GUIDES: never[] = [];
 const NEW_CARD_LABEL = { note: 'New note', todo: 'New to-do list', link: 'New link', column: 'New column' } as const;
 
 /** Wheel deltas can be in pixels, lines or pages; turn them into pixels. */
@@ -25,6 +26,7 @@ export function Canvas() {
   const draggedColumn = useAppState((s) => (s.ui.drag?.kind === 'column' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
   const land = useAppState((s) => s.ui.drag?.land ?? s.ui.newDrag?.land ?? null);
+  const guides = useAppState((s) => s.ui.drag?.guides ?? NO_GUIDES);
   const newDrag = useAppState((s) => s.ui.newDrag);
   const resizeLabel = useAppState((s) => s.ui.resize);
 
@@ -141,6 +143,14 @@ export function Canvas() {
         {/* The block being dragged is drawn last so it stays on top. */}
         {draggedColumn && <ColumnView key={draggedColumn} id={draggedColumn} />}
         {draggedCard && <CardView key={draggedCard} id={draggedCard} inColumn={false} />}
+        {/* Alignment guides: where the dragged block lines up with another (owner request). */}
+        {guides.map((g) => (
+          <div
+            key={`${g.axis}${g.at}:${g.from}`}
+            className={`align-guide ${g.axis}`}
+            style={g.axis === 'x' ? { left: g.at, top: g.from, height: g.to - g.from } : { top: g.at, left: g.from, width: g.to - g.from }}
+          />
+        ))}
         {land && (
           <div
             className="landing-spot"

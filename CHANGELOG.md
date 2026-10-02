@@ -1,5 +1,11 @@
 # Changelog
 
+## Enter in checklists works like a text editor (2026-10-02)
+
+- Enter in the middle of an item splits it: the rest of the text moves into a new item just below.
+- Enter at the very start of an item adds a blank item above it; your cursor stays with the text.
+- Enter at the end of an item always adds the new item directly below it: as its first sub-item when it has sub-items.
+
 ## Design fixes 5: checklist text uses the whole card (2026-10-02)
 
 - Checklist items no longer wrap early: the text uses the full width of the card. The grip and trash still appear when you hover an item, now over the end of its first line with a soft fade behind them.

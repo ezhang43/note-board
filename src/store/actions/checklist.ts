@@ -58,10 +58,20 @@ export function checklistActions(ctx: StoreContext) {
 
   return {
     // ---------- editing items ----------
-    /** Enter: a new item below, at the same level, with the cursor in it. */
-    itemEnter(cardId: string, itemId: string) {
-      const item = createItem();
-      commit((b) => C.editItems(b, cardId, (items) => C.addItemAfter(items, itemId, item)), { ui: { focusItem: item.id, itemSel: null } });
+    /**
+     * Enter, like a text editor: splits the item at the cursor (`start`–`end`; the end of its text if
+     * not given), or adds a blank item above when the cursor is at the start of its text.
+     */
+    itemEnter(cardId: string, itemId: string, start?: number, end?: number) {
+      commit((b) => {
+        const card = b.cards[cardId];
+        if (card?.kind !== 'todo') return null;
+        const text = C.findItem(card.items, itemId)?.item.text ?? '';
+        const from = start ?? text.length;
+        const r = C.enterItem(card.items, itemId, from, end ?? from, createItem());
+        if (!r) return null;
+        return { board: C.editItems(b, cardId, () => r.items), ui: { focusItem: r.focus, focusOffset: r.offset, itemSel: null } };
+      });
     },
     /** Tab nests the item under the one above; Shift+Tab moves it out a level. With several items selected, they all move. */
     itemTab(cardId: string, itemId: string, outdent: boolean) {

@@ -135,3 +135,25 @@ test('checklist text uses the width of the card; grip and trash appear over the 
   expect(trash.x + trash.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   await expect(row.getByRole('button', { name: 'Delete item' })).toBeVisible();
 });
+
+test('Enter in a checklist item works like a text editor (owner request)', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  const list = page.locator('.card.selected');
+  const values = () => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
+  await page.keyboard.type('Buy milk and bread');
+  // Middle: the rest moves to a new item below, cursor at its start.
+  for (let i = 0; i < ' and bread'.length; i++) await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Enter');
+  expect(await values()).toEqual(['Buy milk', ' and bread']);
+  // Start of an item: a blank item above; the cursor stays with the text.
+  await page.keyboard.press('Enter');
+  expect(await values()).toEqual(['Buy milk', '', ' and bread']);
+  await page.keyboard.type('X');
+  expect(await values()).toEqual(['Buy milk', '', 'X and bread']);
+  // End: a new item directly below.
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('last');
+  expect(await values()).toEqual(['Buy milk', '', 'X and bread', 'last']);
+});

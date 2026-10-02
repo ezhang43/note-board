@@ -83,7 +83,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      appStore.itemEnter(cardId, item.id);
+      const el = e.currentTarget;
+      appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       appStore.itemTab(cardId, item.id, e.shiftKey);

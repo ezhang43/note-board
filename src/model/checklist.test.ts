@@ -40,11 +40,6 @@ describe('reading a list', () => {
 });
 
 describe('Enter, Tab, Shift+Tab, Backspace', () => {
-  it('Enter adds a new item right after, at the same level', () => {
-    expect(ids(C.addItemAfter(sample(), 'a1', item('new'))!)).toBe('a(a1 new a2) b c(c1)');
-    expect(ids(C.addItemAfter(sample(), 'a', item('new'))!)).toBe('a(a1 a2) new b c(c1)');
-  });
-
   it('Tab nests an item (with its sub-items) under the one above', () => {
     expect(ids(C.indentItem(sample(), 'b')!)).toBe('a(a1 a2 b) c(c1)');
     expect(ids(C.indentItem(sample(), 'a2')!)).toBe('a(a1(a2)) b c(c1)');
@@ -376,5 +371,47 @@ describe('dropping dragged items on a row', () => {
     expect(C.dropOnRow(sample(), 'a1', at(10, true), dragging(['x'], 5))).toBeNull();
     // Too deep to nest, but fine next to it.
     expect(C.dropOnRow(sample(), 'b', at(500, true), dragging(['x'], 5))?.drop.mode).toBe('after');
+  });
+});
+
+describe('Enter, like a text editor (owner request)', () => {
+  const texts = (items: TodoItem[]): string => items.map((i) => (i.children.length ? `${i.text}(${texts(i.children)})` : i.text)).join(' ');
+  const list = () => [item('milk'), item('fruit', [item('apples')]), item('bread')];
+  const blank = item('n');
+
+  it('at the end: a new item directly below (as the first sub-item when it has sub-items)', () => {
+    const r1 = C.enterItem(list(), 'milk', 4, 4, { ...blank, text: '' })!;
+    expect(texts(r1.items)).toBe('milk  fruit(apples) bread');
+    expect(r1).toMatchObject({ focus: 'n', offset: 0 });
+    const r2 = C.enterItem(list(), 'fruit', 5, 5, { ...blank, text: '' })!;
+    expect(ids(r2.items)).toBe('milk fruit(n apples) bread');
+  });
+
+  it('in the middle: the rest of the text moves to a new item directly below', () => {
+    const r = C.enterItem([item('Buy milk and bread')], 'Buy milk and bread', 8, 8, { ...blank, text: '' })!;
+    expect(r.items.map((i) => i.text)).toEqual(['Buy milk', ' and bread']);
+    expect(r).toMatchObject({ focus: 'n', offset: 0 });
+  });
+
+  it('in the middle of an item with sub-items: the rest becomes its first sub-item; the sub-items stay', () => {
+    const r = C.enterItem([item('fruit and veg', [item('apples')])], 'fruit and veg', 5, 5, { ...blank, text: '' })!;
+    expect(texts(r.items)).toBe('fruit( and veg apples)');
+  });
+
+  it('at the start of an item with text: a new blank item right above; the cursor stays with the text', () => {
+    const r = C.enterItem(list(), 'bread', 0, 0, { ...blank, text: '' })!;
+    expect(texts(r.items)).toBe('milk fruit(apples)  bread');
+    expect(r).toMatchObject({ focus: 'bread', offset: 0 });
+  });
+
+  it('with text selected, the selection is replaced by the split', () => {
+    const r = C.enterItem([item('Buy milk and bread')], 'Buy milk and bread', 3, 8, { ...blank, text: '' })!;
+    expect(r.items.map((i) => i.text)).toEqual(['Buy', ' and bread']);
+  });
+
+  it('a ticked item split in two keeps both halves ticked; a new blank item is never ticked', () => {
+    const done = [item('a b', [], true)];
+    expect(C.enterItem(done, 'a b', 1, 1, { ...blank, text: '' })!.items.map((i) => i.done)).toEqual([true, true]);
+    expect(C.enterItem(done, 'a b', 3, 3, { ...blank, text: '' })!.items.map((i) => i.done)).toEqual([true, false]);
   });
 });

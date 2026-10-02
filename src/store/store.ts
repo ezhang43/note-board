@@ -2,9 +2,9 @@ import * as B from '../model/board';
 import { createCard, createColumn, createItem, newId } from '../model/cards';
 import * as C from '../model/checklist';
 import type { ItemDrop } from '../model/checklist';
-import { overlaps, snapIf } from '../model/geometry';
+import { snapIf } from '../model/geometry';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../model/clipboard';
-import { BLOCK_GAP, CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
+import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../model/constants';
 import { emptyHistory, recordChange, redo, undo, type History } from '../model/history';
 import { blockRect, blocksTouching, landingSpot, settle, snapAll, spotForNewBlock } from '../model/layout';
 import type { ColorKey } from '../model/palette';
@@ -14,6 +14,7 @@ import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeVi
 import type { Board, CardKind, Point, Rect, Size, TodoItem, Tool, View } from '../model/types';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../model/view';
+import { dropBoard, recordPushes, returnPushes, type Pushes } from '../model/placement';
 
 /** A block being dragged. x / y are its top-left on the board while it follows the pointer. */
 export interface Drag {
@@ -215,7 +216,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
    * pushed block was, and where it was pushed to. Collapsing the block again puts them back.
    * Not board data: forgotten on reload.
    */
-  const pushedBy = new Map<string, Map<string, { from: Point; to: Point }>>();
+  const pushedBy = new Map<string, Pushes>();
   /** The block just expanded, while its growth may still push others aside. */
   let expanding: { id: string; until: number } | null = null;
   /** The last drag preview, kept while the pointer stays over the same grid spot. */
@@ -327,48 +328,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       settleAnchors.clear();
       // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
       const board = settle(state.board, measured, a, true);
-      if (expanding && Date.now() <= expanding.until) rememberPushes(expanding.id, state.board, board);
+      if (expanding && Date.now() <= expanding.until) pushedBy.set(expanding.id, recordPushes(pushedBy.get(expanding.id), state.board, board));
       set({ ...state, board });
     });
-  }
-
-  /** Note which top-level blocks moved between two boards, as pushed aside by expanding `id`. */
-  function rememberPushes(id: string, before: Board, after: Board) {
-    const pushes = pushedBy.get(id) ?? new Map<string, { from: Point; to: Point }>();
-    for (const bid of after.order) {
-      const was = before.columns[bid] ?? before.cards[bid];
-      const now = after.columns[bid] ?? after.cards[bid];
-      if (!was || !now || (was.x === now.x && was.y === now.y)) continue;
-      pushes.set(bid, { from: pushes.get(bid)?.from ?? { x: was.x, y: was.y }, to: { x: now.x, y: now.y } });
-    }
-    if (pushes.size) pushedBy.set(id, pushes);
-  }
-
-  /**
-   * Collapsing `id`: blocks it pushed aside when it was expanded go back to where they were, if they
-   * haven't been moved since and their old spot is free. `top` is the collapsing block's column (or itself).
-   */
-  function returnPushed(board: Board, id: string, top: string): Board {
-    const pushes = pushedBy.get(id);
-    pushedBy.delete(id);
-    if (!pushes) return board;
-    const back = [...pushes].filter(([bid, p]) => {
-      const blk = board.columns[bid] ?? board.cards[bid];
-      return blk && board.order.includes(bid) && blk.x === p.to.x && blk.y === p.to.y;
-    });
-    const going = new Set([top, ...back.map(([bid]) => bid)]);
-    const others = board.order.filter((bid) => !going.has(bid)).map((bid) => blockRect(board, bid, measured)!);
-    const cards = { ...board.cards };
-    const columns = { ...board.columns };
-    let moved = false;
-    for (const [bid, p] of back) {
-      const r = blockRect(board, bid, measured)!;
-      if (others.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
-      if (columns[bid]) columns[bid] = { ...columns[bid], ...p.from };
-      else cards[bid] = { ...cards[bid], ...p.from };
-      moved = true;
-    }
-    return moved ? { ...board, cards, columns } : board;
   }
 
   /** Middle of what's on screen, in board coordinates. */
@@ -377,30 +339,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   }
 
   const measured = (id: string) => heights.get(id);
-
-  /**
-   * The board as it would be if the dragged block(s) were dropped now: placed on the grid spot
-   * under the pointer (moving a group by the same amount), with every other block that is in the
-   * way moved to the nearest free spot, so the dragged blocks take priority.
-   * One exception: a single dragged card never pushes a column (dropping a card on a column puts it
-   * inside, and a column sliding away would make that impossible). Where it would cover a column,
-   * the card takes the nearest free spot instead. `at` is where the dragged block ends up.
-   */
-  function dropResult(d: Drag, from: Board = state.board): { board: Board; ids: string[]; at: Point } {
-    const target = { x: snapIf(from.snap, d.x), y: snapIf(from.snap, d.y) };
-    const ids = [d.id, ...d.group];
-    let b = from;
-    let anchors = ids;
-    if (d.group.length) b = B.moveBlocksBy(b, ids, target.x - d.startX, target.y - d.startY);
-    else if (d.kind === 'column') b = B.moveColumn(b, d.id, target.x, target.y);
-    else {
-      b = B.moveCard(b, d.id, { type: 'loose', ...target });
-      anchors = [...b.order.filter((id) => b.columns[id]), d.id];
-    }
-    const board = settle(b, measured, anchors);
-    const self = board.columns[d.id] ?? board.cards[d.id];
-    return { board, ids, at: { x: self.x, y: self.y } };
-  }
 
   /** Size of a block being dragged, as it will be once dropped loose on the board. */
   function draggedSize(d: Drag) {
@@ -784,7 +722,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       }
       if (expanding?.id === id) expanding = null;
       const top = state.board.columns[id] ? id : (B.columnOf(state.board, id)?.id ?? id);
-      commit((b) => returnPushed(B.toggleCollapsed(b, id), id, top));
+      const pushes = pushedBy.get(id);
+      pushedBy.delete(id);
+      commit((b) => (pushes ? returnPushes(B.toggleCollapsed(b, id), pushes, top, measured) : B.toggleCollapsed(b, id)));
     },
 
     // ---------- checklists ----------
@@ -1035,14 +975,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       const ty = snapIf(state.board.snap, y);
       const p = dragPreview;
       if (!p || p.board !== state.board || p.tx !== tx || p.ty !== ty) {
-        const result = dropResult({ ...d, x, y });
-        const bumped: Record<string, Point> = {};
-        for (const id of result.board.order) {
-          const was = state.board.columns[id] ?? state.board.cards[id];
-          const now = result.board.columns[id] ?? result.board.cards[id];
-          if (!result.ids.includes(id) && (was.x !== now.x || was.y !== now.y)) bumped[id] = { x: now.x, y: now.y };
-        }
-        dragPreview = { board: state.board, tx, ty, at: result.at, bumped };
+        const { at, bumped } = dropBoard(state.board, { ...d, x, y }, measured);
+        dragPreview = { board: state.board, tx, ty, at, bumped };
       }
       const { at, bumped } = dragPreview!;
       const land = !d.group.length && (at.x !== x || at.y !== y) ? { ...at, ...draggedSize(d) } : null;
@@ -1066,7 +1000,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       let ids: string[] = [];
       commit(
         (b) => {
-          const result = dropResult(d, b);
+          const result = dropBoard(b, d, measured);
           ids = result.ids;
           return result.board;
         },

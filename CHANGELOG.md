@@ -1,5 +1,9 @@
 # Changelog
 
+## Restructure 2: placement rules in one module (2026-10-02)
+
+- Behind the scenes only. The rules for where a dragged block lands, which blocks it pushes aside, and putting pushed blocks back when a block collapses now live together in `src/model/placement.ts`, with their own tests.
+
 ## Restructure 1: one place for the waiting tick (2026-10-02)
 
 - Behind the scenes only. Every change now works from the board as it is at that moment, so a tick that is still animating can never be lost by a new action again.

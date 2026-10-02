@@ -7,6 +7,7 @@ import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock } from '../
 import { addImported, estimateHeight, packInLanes, parseMilanote } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
+import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
 import type { CardKind, Point, Tool } from '../../model/types';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../../model/view';
@@ -70,6 +71,12 @@ export function blockActions(ctx: StoreContext) {
       const theme = ctx.state.view.theme === 'dark' ? 'light' : 'dark';
       updateView((v) => ({ ...v, theme }));
       ctx.write(THEME_KEY, theme);
+    },
+    /** A+ / A−: text on cards and columns one size bigger or smaller, remembered on this device. */
+    changeFontSize(step: 1 | -1) {
+      const fontSize = nextFontSize(ctx.state.view.fontSize, step);
+      updateView((v) => (v.fontSize === fontSize ? v : { ...v, fontSize }));
+      ctx.write(FONT_KEY, fontSize);
     },
     panBy: (dx: number, dy: number) => updateView((v) => panBy(v, dx, dy)),
     zoomAt: (at: Point, factor: number) => updateView((v) => zoomBy(v, at, factor)),

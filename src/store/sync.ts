@@ -19,6 +19,9 @@ export interface Remote {
   write(doc: RemoteDoc): Promise<void>;
 }
 
+/** How saving online is going (see startSync's onSaveState). */
+export type SaveState = 'saving' | 'saved' | 'failed';
+
 /** Wait this long after the last board change before uploading, so typing isn't sent on every key. */
 export const SYNC_DELAY = 800;
 
@@ -37,8 +40,11 @@ export function startSync(
     client: string;
     onReady: () => void;
     onError: (e: unknown) => void;
-    /** Told true when an upload is refused, and false once a later upload is saved. */
-    onSaveFailed?: (failed: boolean) => void;
+    /**
+     * How saving online is going: 'saving' while a change waits to upload, 'saved' once it is
+     * online, 'failed' when an upload was refused (until a later one is saved).
+     */
+    onSaveState?: (state: SaveState) => void;
   },
 ) {
   let ready = false;
@@ -69,19 +75,23 @@ export function startSync(
     timer = null;
     if (stopped) return;
     const data = serializeBoard(store.getState().board);
-    if (data === lastSynced) return;
+    if (data === lastSynced) {
+      if (!failed) opts.onSaveState?.('saved');
+      return;
+    }
     lastSynced = data;
     remote.write({ data, client: opts.client }).then(
       () => {
-        if (!failed || lastSynced !== data) return;
+        // Saved, unless a newer change has started waiting since.
+        if (lastSynced !== data || timer) return;
         failed = false;
-        opts.onSaveFailed?.(false);
+        opts.onSaveState?.('saved');
       },
       () => {
         // Not saved online: the next change tries again.
         if (lastSynced === data) lastSynced = null;
         failed = true;
-        opts.onSaveFailed?.(true);
+        opts.onSaveState?.('failed');
       },
     );
   }
@@ -99,6 +109,7 @@ export function startSync(
     if (!ready || stopped) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(upload, SYNC_DELAY);
+    if (!failed) opts.onSaveState?.('saving');
   });
 
   /** Reads an online version; if it can't be read, stops syncing and reports it. */

@@ -1,4 +1,5 @@
 import type { ColorKey } from './palette';
+import type { FontSize } from './font';
 import type { Theme } from './theme';
 
 export type CardKind = 'note' | 'todo' | 'link';
@@ -119,6 +120,8 @@ export interface View {
   tool: Tool;
   /** Light or dark look: remembered per device under its own key, never undone or synced. */
   theme: Theme;
+  /** Text size on cards and columns: per device, like the theme. */
+  fontSize: FontSize;
 }
 
 export interface Point {

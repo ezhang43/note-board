@@ -48,3 +48,16 @@ describe('the keyboard shortcuts panel', () => {
     expect(s.getState().ui.shortcutsOpen).toBe(false);
   });
 });
+
+describe('text size', () => {
+  it('A+ / A− change it, it is remembered on this device, and undo ignores it', () => {
+    const data = new Map<string, string>();
+    const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };
+    const s = createStore(storage, (fn) => fn());
+    expect(s.getState().view.fontSize).toBe('normal');
+    s.changeFontSize(1);
+    expect(s.getState().view.fontSize).toBe('large');
+    expect(s.getState().ui.canUndo).toBe(false);
+    expect(createStore(storage).getState().view.fontSize).toBe('large');
+  });
+});

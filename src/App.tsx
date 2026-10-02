@@ -4,14 +4,17 @@ import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { useShortcuts } from './components/useShortcuts';
 
-/** `onSignOut` is given on the published site, where the board is synced to its owner's account. */
-export function App({ onSignOut }: { onSignOut?: () => void }) {
+/**
+ * `onSignOut` and `saveNote` ("Saving…" / "Saved" / offline) are given on the published site, where
+ * the board is synced to its owner's account.
+ */
+export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?: string | null }) {
   useShortcuts();
   return (
     <div className="app">
       <Toolbar onSignOut={onSignOut} />
       <Canvas />
-      <ZoomControl />
+      <ZoomControl saveNote={saveNote} />
       <ShortcutsPanel />
     </div>
   );

@@ -40,9 +40,9 @@ function setup() {
   const fake = fakeRemote();
   const onReady = vi.fn();
   const onError = vi.fn();
-  const onSaveFailed = vi.fn();
-  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError, onSaveFailed });
-  return { store, fake, onReady, onError, onSaveFailed, sync };
+  const onSaveState = vi.fn();
+  const sync = startSync(store, fake.remote, { client: 'me', onReady, onError, onSaveState });
+  return { store, fake, onReady, onError, onSaveState, sync };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -210,20 +210,20 @@ describe('board sync', () => {
   });
 
   it('reports a failed upload, retries with the next change, and clears the report once saved', async () => {
-    const { store, fake, onSaveFailed } = setup();
+    const { store, fake, onSaveState } = setup();
     fake.send({ data: boardJson('Start'), client: 'laptop' });
     fake.control.fail = true;
     store.renameBoard('Too big');
     vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
-    expect(onSaveFailed).toHaveBeenLastCalledWith(true);
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
     fake.control.fail = false;
     store.renameBoard('Smaller');
     vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
     expect(fake.writes).toHaveLength(2);
     expect(JSON.parse(fake.writes[1].data).board.name).toBe('Smaller');
-    expect(onSaveFailed).toHaveBeenLastCalledWith(false);
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
   });
 
   it('while an upload has failed, a version from another device does not replace the unsaved board', async () => {
@@ -236,5 +236,15 @@ describe('board sync', () => {
     // Firestore puts its copy back after a refused write; that must not wipe this device's board.
     fake.send({ data: boardJson('Start'), client: 'laptop' });
     expect(store.getState().board.name).toBe('Only here');
+  });
+
+  it('reports saving while a change waits to upload, and saved once it is online', async () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.renameBoard('Typing');
+    expect(onSaveState).toHaveBeenLastCalledWith('saving');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
   });
 });

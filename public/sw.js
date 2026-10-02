@@ -1,6 +1,8 @@
 // Offline copy of the published board, so it opens without internet once visited online.
 // The board's data is kept offline separately, by Firebase.
-const CACHE = 'note-board-v1';
+// Bump the version when files without a unique name (icons, manifest) change: the new worker
+// then starts a fresh copy and deletes the old ones, so returning visitors get the new files.
+const CACHE = 'busyants-v2';
 const SCOPE = self.registration.scope;
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -21,7 +23,14 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (event) =>
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  ),
+);
 
 // The page lists the files it loaded before this worker was running.
 self.addEventListener('message', (event) => {

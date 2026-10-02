@@ -18,7 +18,7 @@ test('opens without internet after one visit online', async ({ page, context }) 
   // Wait until the offline copy is running and has saved this visit's files.
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect
-    .poll(() => page.evaluate(async () => (await (await caches.open('note-board-v1')).keys()).length))
+    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v2')).keys()).length))
     .toBeGreaterThan(2);
 
   await context.setOffline(true);
@@ -47,4 +47,17 @@ test('can be installed as an app (manifest and icons)', async ({ page, request }
   expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(
     expect.arrayContaining(['192x192', '512x512']),
   );
+});
+
+test('a new version of the offline copy clears out the old one (so new icons show)', async ({ page }) => {
+  await page.goto('./');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // An old version's offline copy is still there when a new version of the worker starts.
+  await page.evaluate(async () => {
+    await (await caches.open('note-board-v1')).put('/old', new Response('old'));
+    await (await navigator.serviceWorker.getRegistration())?.unregister();
+  });
+  await page.reload();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).includes('note-board-v1'))).toBe(false);
 });

@@ -34,3 +34,34 @@ test('new lists and columns start untitled; a new list takes the cursor in its t
   await expect(title).toHaveValue('');
   await expect(title).toHaveAttribute('placeholder', 'Column title');
 });
+
+const css = (l: import('@playwright/test').Locator, prop: string) => l.evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
+
+test('A+ / A− change the text size on cards and columns (not the toolbar), and it is remembered', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await page.keyboard.type('milk');
+  const item = page.getByLabel('Item text').first();
+  const before = parseFloat(await css(item, 'font-size'));
+  const toolbarBefore = await css(page.getByLabel('Board name'), 'font-size');
+  await page.getByRole('button', { name: 'Larger text' }).click();
+  await expect.poll(async () => parseFloat(await css(item, 'font-size'))).toBeGreaterThan(before);
+  expect(await css(page.getByLabel('Board name'), 'font-size')).toBe(toolbarBefore);
+  await page.reload();
+  await expect.poll(async () => parseFloat(await css(page.getByLabel('Item text').first(), 'font-size'))).toBeGreaterThan(before);
+  // Down to the smallest size, where A− fades.
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Smaller text' }).click(); // Large → Normal → Small
+  await expect(page.getByRole('button', { name: 'Smaller text' })).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('the Hand tool shows a glove over empty board, and the normal arrow over cards', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  const canvas = page.getByTestId('canvas');
+  expect(await css(canvas, 'cursor')).toContain('url(');
+  expect(await css(page.locator('.card').first(), 'cursor')).toBe('default');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('v'); // Select tool
+  expect(await css(canvas, 'cursor')).toBe('default');
+});

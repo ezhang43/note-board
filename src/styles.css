@@ -209,6 +209,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   user-select: none;
   touch-action: none;
 }
+/* Hand tool (owner request): an open glove over empty board, a closed one while dragging the board. */
+.canvas.tool-hand { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V6a2%202%200%200%200-4%200v5%20M14%2010V4a2%202%200%200%200-4%200v6%20M10%2010.5V6a2%202%200%200%200-4%200v8%20M18%208a2%202%200%201%201%204%200v6a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V6a2%202%200%200%200-4%200v5%20M14%2010V4a2%202%200%200%200-4%200v6%20M10%2010.5V6a2%202%200%200%200-4%200v8%20M18%208a2%202%200%201%201%204%200v6a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grab; }
+.canvas.tool-hand.panning { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grabbing; }
 
 .world {
   position: absolute;
@@ -386,7 +389,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06);
   color: var(--ink);
-  font-size: 14px;
+  font-size: calc(14px * var(--fs, 1));
 }
 .card.loose { position: absolute; }
 
@@ -443,20 +446,20 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   flex-grow: 1;
   min-width: 0;
   padding-left: 2px;
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.card.collapsed .card-meta { font-size: 13px; font-weight: 500; }
+.card.collapsed .card-meta { font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
 /* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right. */
 .card.loose.collapsed .card-meta { padding-left: 58px; text-align: center; }
 .card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: 26px; }
 
-.note-text { font-size: 14px; line-height: 1.55; }
+.note-text { font-size: calc(14px * var(--fs, 1)); line-height: 1.55; }
 .note-text > textarea { min-height: 104px; }
 
-.card-title { --pad: 2px 4px; font-weight: 600; font-size: 15px; max-width: 100%; align-self: flex-start; }
+.card-title { --pad: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1)); max-width: 100%; align-self: flex-start; }
 
 .todo-body, .link-body { display: flex; flex-direction: column; gap: 6px; }
 
@@ -470,7 +473,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   accent-color: var(--checkbox);
   cursor: pointer;
 }
-.item-text { flex-grow: 1; font-size: 14px; line-height: 20px; --pad: 4px; }
+.item-text { flex-grow: 1; font-size: calc(14px * var(--fs, 1)); line-height: calc(20px * var(--fs, 1)); --pad: 4px; }
 .todo-item.done .item-text > textarea { text-decoration: line-through; }
 
 .link-url {
@@ -479,7 +482,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border: 1px solid var(--edge);
   border-radius: 6px;
   background: var(--link-url-bg);
-  font-size: 13px;
+  font-size: calc(13px * var(--fs, 1));
 }
 .link-open {
   height: 32px;
@@ -492,7 +495,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   background: var(--surface);
   color: inherit;
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--fs, 1));
   text-decoration: none;
 }
 .link-open span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -502,13 +505,13 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* ---------- the Completed card (Clean up) ---------- */
 
 .completed-card-body { display: flex; flex-direction: column; gap: 6px; }
-.completed-card-title { padding: 2px 4px; font-weight: 600; font-size: 15px; }
-.completed-empty { padding: 4px; font-size: 13px; color: var(--ink-faint); }
+.completed-card-title { padding: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1)); }
+.completed-empty { padding: 4px; font-size: calc(13px * var(--fs, 1)); color: var(--ink-faint); }
 .completed-day { display: flex; flex-direction: column; }
 .completed-date {
   margin: 6px 0 2px;
   padding: 0 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   font-weight: 600;
   color: var(--ink-soft);
 }
@@ -526,8 +529,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   flex-grow: 1;
   min-width: 0;
   padding: 4px 0;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: calc(14px * var(--fs, 1));
+  line-height: calc(20px * var(--fs, 1));
   text-decoration: line-through;
   overflow-wrap: anywhere;
 }
@@ -536,7 +539,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   flex-shrink: 0;
   max-width: 40%;
   padding: 6px 0 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   color: var(--ink-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -566,13 +569,13 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .column-heading { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
 .column-actions { display: flex; justify-content: flex-end; gap: 2px; }
-.column-title { --pad: 4px 6px; font-weight: 600; font-size: 14px; max-width: 100%; flex-shrink: 1; min-width: 32px; }
+.column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
 .column-count {
   flex-shrink: 0;
   padding: 1px 8px;
   border-radius: 999px;
   background: var(--hover);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   font-weight: 500;
   color: var(--ink-soft);
 }
@@ -585,7 +588,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   justify-content: center;
   border: 1.5px dashed var(--grid-dot);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--fs, 1));
   color: var(--ink-soft);
 }
 
@@ -908,3 +911,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   color: var(--ink-soft);
   pointer-events: none;
 }
+
+/* Bottom-right corner: save note and text size. */
+.save-note { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.zoom-control button.text-size { min-width: 36px; font-weight: 600; font-size: 13px; }
+.zoom-control button.text-size[aria-disabled='true'] { opacity: 0.4; cursor: default; }

@@ -28,7 +28,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 3. **Tests pass first.** `npm test` and `npm run test:e2e` both pass before a step is reported done. Logic that the spec names (overlap, snapping, checklist moves, undo) always gets unit tests. Write the tests before the code: write the unit and browser tests for a change, run them and see them fail, then implement until they pass.
 4. **No surprises.** Nothing that isn't in `SPEC.md`. If the spec is unclear or silent, ask instead of guessing; record the answer under "Decisions" below.
 5. **Changelog.** Add a short, plain-English entry to `CHANGELOG.md` for every step.
-6. **Look.** Use the colours, sizes and states in the spec's "Look and feel" section, defined once as CSS variables. No focus rectangles on text fields; buttons keep a keyboard focus ring. Cursor stays the normal arrow on the canvas and blocks.
+6. **Look.** Use the colours, sizes and states in the spec's "Look and feel" section, defined once as CSS variables. No focus rectangles on text fields; buttons keep a keyboard focus ring. Cursor stays the normal arrow on the canvas and blocks, except the Hand tool's glove over empty board (owner request, 2026-10-03).
 7. **Keyboard.** Block shortcuts don't fire while typing in a text field; undo/redo always do.
 8. **Spec stays current.** Whenever the owner asks for a new feature or change, or a decision is recorded below, update `SPEC.md` in the same commit so it always describes the app as built. No need to ask first.
 

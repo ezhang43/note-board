@@ -1,5 +1,12 @@
 # Changelog
 
+## BusyAnts, part 2: text size, glove cursor, save status (2026-10-03)
+
+- A− / A+ at the bottom right make the text on cards and columns smaller or bigger (4 sizes). Each device remembers its own choice.
+- With the Hand tool, the cursor is a glove over empty board, and closes into a fist while you drag the board.
+- On the published site, a small note at the bottom right says "Saving…", "Saved", or that you are offline and it will save when you are back.
+- The site's offline copy now refreshes with each new version, so returning visitors see the new ant icon.
+
 ## BusyAnts, part 1: name, icon and a friendlier start (2026-10-03)
 
 - The app is now called BusyAnts, with a friendly ant on yellow as its icon (browser tab, installed app and sign-in screen). The website address is unchanged.

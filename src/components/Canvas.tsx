@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { FONT_SCALE } from '../model/font';
 import { gridStyle, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point } from '../model/types';
@@ -68,6 +69,8 @@ export function Canvas() {
 
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
+  // Shows the closed glove while the Hand tool drags the board.
+  const [panning, setPanning] = useState(false);
   const marquee = useAppState((s) => s.ui.marquee);
   const itemDrag = useAppState((s) => s.ui.itemDrag);
 
@@ -83,6 +86,7 @@ export function Canvas() {
     const at = clientToCanvas(e.clientX, e.clientY);
     const mode = appStore.getState().view.tool === 'hand' ? 'pan' : 'marquee';
     drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
+    if (mode === 'pan') setPanning(true);
     // Select tool: drag a box; everything it touches is selected (Ctrl adds to the selection).
     if (mode === 'marquee') appStore.startMarquee(at, keep);
   }
@@ -100,6 +104,7 @@ export function Canvas() {
     if (drag.current?.id !== e.pointerId) return;
     if (drag.current.mode === 'marquee') appStore.endMarquee();
     drag.current = null;
+    setPanning(false);
   }
 
   const grid = gridStyle(view);
@@ -108,7 +113,7 @@ export function Canvas() {
   return (
     <div
       ref={ref}
-      className="canvas"
+      className={`canvas tool-${view.tool}${panning ? ' panning' : ''}`}
       data-testid="canvas"
       data-pan-x={view.panX}
       data-pan-y={view.panY}
@@ -118,10 +123,12 @@ export function Canvas() {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       style={{
+        // Text size on cards and columns (A− / A+).
+        '--fs': FONT_SCALE[view.fontSize],
         backgroundImage: `radial-gradient(${dot} ${grid.dotRadius}px, transparent ${grid.dotRadius + 0.2}px)`,
         backgroundSize: `${grid.size}px ${grid.size}px`,
         backgroundPosition: `${grid.offsetX}px ${grid.offsetY}px`,
-      }}
+      } as CSSProperties}
     >
       {order.length === 0 && (
         <p className="empty-hint">Add a note, a to-do list or a column from the toolbar, or drag one onto the board</p>

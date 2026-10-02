@@ -2,7 +2,7 @@ import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Size, View } from './types';
 
 export function createView(): View {
-  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light' };
+  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', fontSize: 'normal' };
 }
 
 export function clampZoom(zoom: number): number {

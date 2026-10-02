@@ -8,10 +8,11 @@ export function SyncedApp() {
   const status = useSyncExternalStore(session.subscribe, session.getStatus);
   const error = useSyncExternalStore(session.subscribe, session.getSignInError);
   const saveFailed = useSyncExternalStore(session.subscribe, session.getSaveFailed);
+  const saveNote = useSyncExternalStore(session.subscribe, session.getSaveNote);
   if (status === 'ready')
     return (
       <>
-        <App onSignOut={session.signOut} />
+        <App onSignOut={session.signOut} saveNote={saveNote} />
         {saveFailed && (
           <p className="save-banner" role="status">
             Couldn’t save online. Changes are on this device only.

@@ -4,6 +4,7 @@ import { settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import { recordPushes, type Pushes } from '../model/placement';
+import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
 import { prefersDark, type Schedule } from './env';
@@ -85,7 +86,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
 
   let state: AppState = {
     board: parseBoard(read(BOARD_KEY)),
-    view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()) },
+    view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()), fontSize: startingFontSize(read(FONT_KEY)) },
     ui: emptyUi,
   };
   const listeners = new Set<() => void>();

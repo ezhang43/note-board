@@ -220,7 +220,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   let expanding: { id: string; until: number } | null = null;
   /** The last drag preview, kept while the pointer stays over the same grid spot. */
   let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
-  let applyingTick = false;
   /** A tick waiting for its leaving animation to finish before it is applied. */
   let pendingTick: { timer: ReturnType<typeof setTimeout>; apply: () => void } | null = null;
   /** Just-imported cards, laid out again in their lanes once their real heights are known. */
@@ -280,19 +279,23 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   /**
    * Every user change to board data goes through here, so every change can be undone.
    * `merge` names a text field: a burst of typing in it is one undo step.
-   * A tick still animating is applied first. `fn` should build on the board it is given; an action
-   * that works out its new board beforehand must call flushPendingTick() before reading state.board.
+   * A tick still animating is applied first, so actions must work out their change inside `fn`, from
+   * the board it is given (never from state.board read beforehand). `fn` returns the new board, or
+   * the new board with ui changes that depend on it, or null for "nothing to do" (then nothing
+   * changes and commit returns null; otherwise it returns the new board).
    */
-  function commit(fn: (b: Board) => Board, opts: { ui?: Partial<Ui>; merge?: string } = {}) {
-    if (pendingTick && !applyingTick) {
-      applyingTick = true;
-      flushPendingTick();
-      applyingTick = false;
-    }
+  function commit(
+    fn: (b: Board) => Board | { board: Board; ui?: Partial<Ui> } | null,
+    opts: { ui?: Partial<Ui>; merge?: string } = {},
+  ): Board | null {
+    flushPendingTick();
     const before = state.board;
-    const board = fn(before);
+    const result = fn(before);
+    if (!result) return null;
+    const { board, ui } = 'board' in result ? result : { board: result, ui: undefined };
     if (board !== before) history = recordChange(history, before, opts.merge ?? null, Date.now());
-    set({ ...state, board, ui: uiWith(opts.ui ?? {}) });
+    set({ ...state, board, ui: uiWith({ ...opts.ui, ...ui }) });
+    return board;
   }
 
   function updateView(fn: (v: View) => View) {
@@ -383,10 +386,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
    * inside, and a column sliding away would make that impossible). Where it would cover a column,
    * the card takes the nearest free spot instead. `at` is where the dragged block ends up.
    */
-  function dropResult(d: Drag): { board: Board; ids: string[]; at: Point } {
-    const target = { x: snapIf(state.board.snap, d.x), y: snapIf(state.board.snap, d.y) };
+  function dropResult(d: Drag, from: Board = state.board): { board: Board; ids: string[]; at: Point } {
+    const target = { x: snapIf(from.snap, d.x), y: snapIf(from.snap, d.y) };
     const ids = [d.id, ...d.group];
-    let b = state.board;
+    let b = from;
     let anchors = ids;
     if (d.group.length) b = B.moveBlocksBy(b, ids, target.x - d.startX, target.y - d.startY);
     else if (d.kind === 'column') b = B.moveColumn(b, d.id, target.x, target.y);
@@ -492,9 +495,12 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
 
   /** Put newly pasted / duplicated blocks on the board and select them. */
   function placeCopies(entries: ClipEntry[], times: number) {
-    flushPendingTick();
-    const { board, ids } = pasteBlocks(state.board, entries, times);
-    commit(() => board, { ui: { selection: ids, confirm: null } });
+    let ids: string[] = [];
+    const board = commit((b) => {
+      const pasted = pasteBlocks(b, entries, times);
+      ids = pasted.ids;
+      return { board: pasted.board, ui: { selection: ids, confirm: null } };
+    })!;
     // Pasted blocks keep their spot; whatever they would cover moves out of the way.
     requestSettle(ids.map((id) => (board.order.includes(id) ? id : B.columnOf(board, id)?.id ?? id)));
   }
@@ -676,29 +682,35 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
      * One undo step. Returns how many items moved.
      */
     cleanUp(now: Date = new Date()): number {
-      flushPendingTick();
-      const place = { type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H.completed, screenCentre(), measured) } as const;
-      const result = cleanUp(state.board, dayKey(now), place);
-      if (!result.count) return 0;
-      const made = !completedCardOf(state.board);
-      commit(() => result.board, { ui: { selection: result.cardId ? [result.cardId] : [], itemSel: null, confirm: null } });
-      if (made && result.cardId) requestSettle([result.cardId]);
-      return result.count;
+      let count = 0;
+      let made: string | null = null;
+      commit((b) => {
+        const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.completed, screenCentre(), measured) } as const;
+        const result = cleanUp(b, dayKey(now), place);
+        if (!result.count) return null;
+        count = result.count;
+        if (!completedCardOf(b)) made = result.cardId;
+        return { board: result.board, ui: { selection: result.cardId ? [result.cardId] : [], itemSel: null, confirm: null } };
+      });
+      if (made) requestSettle([made]);
+      return count;
     },
 
     /** Unticking an item in the Completed card sends it back to its list (or a new list, if that's gone). */
     restoreCompleted(itemId: string) {
-      flushPendingTick();
-      const done = completedCardOf(state.board);
-      if (!done) return;
-      // If its list is gone, the new list goes next to the Completed card.
-      const near = blockRect(state.board, B.columnOf(state.board, done.id)?.id ?? done.id, measured);
-      const centre = near ? { x: near.x + near.w + CARD_W / 2 + 20, y: near.y + NEW_BLOCK_H.todo / 2 } : screenCentre();
-      const place = { type: 'loose', ...spotForNewBlock(state.board, CARD_W, NEW_BLOCK_H.todo, centre, measured) } as const;
-      const result = restoreEntry(state.board, itemId, place);
-      if (!result.cardId) return;
-      commit(() => result.board);
-      if (state.board.order.includes(result.cardId)) requestSettle([result.cardId]);
+      let cardId: string | null = null;
+      const board = commit((b) => {
+        const done = completedCardOf(b);
+        if (!done) return null;
+        // If its list is gone, the new list goes next to the Completed card.
+        const near = blockRect(b, B.columnOf(b, done.id)?.id ?? done.id, measured);
+        const centre = near ? { x: near.x + near.w + CARD_W / 2 + 20, y: near.y + NEW_BLOCK_H.todo / 2 } : screenCentre();
+        const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, centre, measured) } as const;
+        const result = restoreEntry(b, itemId, place);
+        cardId = result.cardId;
+        return cardId ? result.board : null;
+      });
+      if (board && cardId && board.order.includes(cardId)) requestSettle([cardId]);
     },
 
     /** Clicking New column. */
@@ -792,23 +804,21 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     tabSelectedItems,
     /** Delete at the end of an item pulls the item below up into it. Returns whether it did. */
     itemDeleteAtEnd(cardId: string, itemId: string): boolean {
-      flushPendingTick();
-      const card = state.board.cards[cardId];
-      if (card?.kind !== 'todo') return false;
-      const result = C.mergeNextItem(card.items, itemId);
-      if (!result) return false;
-      commit((b) => C.editItems(b, cardId, () => result.items), { ui: { focusItem: itemId, focusOffset: result.caret, itemSel: null } });
-      return true;
+      return !!commit((b) => {
+        const card = b.cards[cardId];
+        const result = card?.kind === 'todo' ? C.mergeNextItem(card.items, itemId) : null;
+        if (!result) return null;
+        return { board: C.editItems(b, cardId, () => result.items), ui: { focusItem: itemId, focusOffset: result.caret, itemSel: null } };
+      });
     },
     /** Backspace in an empty item deletes it (not the list's last item). Returns whether it did. */
     itemBackspace(cardId: string, itemId: string): boolean {
-      flushPendingTick();
-      const card = state.board.cards[cardId];
-      if (card?.kind !== 'todo') return false;
-      const result = C.removeEmptyItem(card.items, itemId);
-      if (!result) return false;
-      commit((b) => C.editItems(b, cardId, () => result.items), { ui: { focusItem: result.focus } });
-      return true;
+      return !!commit((b) => {
+        const card = b.cards[cardId];
+        const result = card?.kind === 'todo' ? C.removeEmptyItem(card.items, itemId) : null;
+        if (!result) return null;
+        return { board: C.editItems(b, cardId, () => result.items), ui: { focusItem: result.focus } };
+      });
     },
     /** Tick / untick. With several items selected, ticking any one ticks (or unticks) them all. */
     toggleItem(cardId: string, itemId: string) {
@@ -930,9 +940,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     confirmDelete() {
       const c = state.ui.confirm;
       if (!c) return;
-      flushPendingTick();
-      const next = B.deleteBlocks(state.board, c.ids);
-      commit(() => next, { ui: { confirm: null, selection: liveSelection(next) } });
+      commit((b) => {
+        const next = B.deleteBlocks(b, c.ids);
+        return { board: next, ui: { confirm: null, selection: liveSelection(next) } };
+      });
     },
     /**
      * Delete / Backspace: delete the selection. If it includes a column, the same confirmation as
@@ -941,7 +952,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     deleteSelection(): boolean {
       // Not while a block is being dragged or resized: it would vanish from under the pointer.
       if (state.ui.drag || state.ui.resize) return true;
-      flushPendingTick();
       const ids = liveSelection(state.board);
       if (!ids.length) return false;
       const firstColumn = ids.find((id) => state.board.columns[id]);
@@ -949,8 +959,10 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         updateUi({ confirm: { columnId: firstColumn, ids } });
         return true;
       }
-      const next = B.deleteBlocks(state.board, ids);
-      commit(() => next, { ui: { selection: liveSelection(next), colourMenuOpen: false } });
+      commit((b) => {
+        const next = B.deleteBlocks(b, ids);
+        return { board: next, ui: { selection: liveSelection(next), colourMenuOpen: false } };
+      });
       return true;
     },
 
@@ -1047,14 +1059,20 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     dropDrag(index: number | null) {
       const d = state.ui.drag;
       if (!d) return;
-      flushPendingTick();
       if (d.overColumn && index != null) {
         commit((b) => B.moveCard(b, d.id, { type: 'column', columnId: d.overColumn!, index }), { ui: { drag: null } });
         return requestSettle([d.overColumn]);
       }
-      const result = dropResult(d);
-      commit(() => result.board, { ui: { drag: null } });
-      requestSettle(result.ids);
+      let ids: string[] = [];
+      commit(
+        (b) => {
+          const result = dropResult(d, b);
+          ids = result.ids;
+          return result.board;
+        },
+        { ui: { drag: null } },
+      );
+      requestSettle(ids);
     },
 
     // ---------- resizing ----------

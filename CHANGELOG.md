@@ -1,5 +1,9 @@
 # Changelog
 
+## Restructure 1: one place for the waiting tick (2026-10-02)
+
+- Behind the scenes only. Every change now works from the board as it is at that moment, so a tick that is still animating can never be lost by a new action again.
+
 ## Tidy-up and speed (2026-10-02)
 
 Nothing should look or work differently; this makes big boards smoother and the code simpler.

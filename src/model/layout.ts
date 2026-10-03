@@ -123,3 +123,51 @@ export function snapAll(board: Board): Board {
   );
   return { ...board, cards, columns };
 }
+
+/**
+ * Collapsing closes the gaps (owner request), the mirror of growth pushing blocks straight down:
+ * each block moves straight up by as much as the block above it shrank, so it keeps the spacing it
+ * had under that block when it was open. Worked out from where blocks were before collapsing
+ * (`before`) and their open heights (`openH`), with their heights now (`measured`), so it can run
+ * again as heights arrive. Only blocks that `canMove` are moved; nothing ever moves down.
+ */
+export function closeGaps(
+  board: Board,
+  before: Record<string, Point>,
+  openH: Record<string, number>,
+  measured: MeasuredHeight,
+  canMove: (id: string) => boolean = () => true,
+): Board {
+  const blocks = board.order.flatMap((id) => {
+    const at = before[id];
+    const r = blockRect(board, id, measured);
+    return at && r ? [{ id, x: at.x, y: at.y, w: r.w, openH: openH[id] ?? r.h, nowH: r.h }] : [];
+  });
+  blocks.sort((a, b) => a.y - b.y);
+  const newY = new Map<string, number>();
+  for (const b of blocks) {
+    let y = b.y;
+    if (canMove(b.id)) {
+      // The blocks right above it (with no other block in between), as it was before collapsing.
+      const above = blocks.filter((a) => a.y + a.openH <= b.y && a.x < b.x + b.w && b.x < a.x + a.w);
+      const direct = above.filter((a) => !above.some((c) => c !== a && c.y >= a.y + a.openH));
+      let reach = -Infinity;
+      for (const a of direct) {
+        if (newY.has(a.id)) reach = Math.max(reach, newY.get(a.id)! + a.nowH + (b.y - (a.y + a.openH)));
+      }
+      if (reach > -Infinity) y = Math.min(b.y, reach);
+    } else {
+      y = board.cards[b.id]?.y ?? board.columns[b.id]?.y ?? b.y;
+    }
+    newY.set(b.id, y);
+  }
+  let out = board;
+  for (const [id, y] of newY) {
+    if (!canMove(id)) continue;
+    const col = out.columns[id];
+    if (col && col.y !== y) out = { ...out, columns: { ...out.columns, [id]: { ...col, x: before[id].x, y } } };
+    const card = out.cards[id];
+    if (card && card.y !== y) out = { ...out, cards: { ...out.cards, [id]: { ...card, x: before[id].x, y } } };
+  }
+  return out;
+}

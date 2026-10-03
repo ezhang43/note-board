@@ -99,6 +99,7 @@ describe('Collapse all, then Expand all, gives back the same layout (owner reque
     vi.runAllTimers();
     const before = { a: pos(s, a), b: pos(s, b), c: pos(s, c) };
 
+    s.clearSelection(); // nothing selected: everything
     s.toggleAllCollapsed(); // collapse all
     [a, b, c].forEach((id) => s.setMeasuredHeight(id, 40));
     vi.runAllTimers();
@@ -166,5 +167,41 @@ describe('alignment guides while dragging (owner request)', () => {
     s.dropDrag(null);
     expect(pos(s, b)).toEqual({ x: 10, y: 400 });
     expect(s.getState().ui.drag).toBeNull();
+  });
+});
+
+describe('Collapse all closes the gaps (owner request)', () => {
+  it('blocks below move straight up under the collapsed ones; Expand all puts them back', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0, 300);
+    const b = noteAt(s, 0, 320, 100);
+    s.clearSelection();
+    s.toggleAllCollapsed();
+    s.setMeasuredHeight(a, 40);
+    s.setMeasuredHeight(b, 40);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 0, y: 60 });
+    s.toggleAllCollapsed();
+    s.setMeasuredHeight(a, 300);
+    s.setMeasuredHeight(b, 100);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 0, y: 320 });
+  });
+});
+
+describe('Collapse all / Expand all with blocks selected (owner request)', () => {
+  it('acts on the selected blocks only', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0);
+    const b = noteAt(s, 600, 0);
+    s.select(a);
+    s.toggleAllCollapsed();
+    expect(s.getState().board.cards[a].collapsed).toBe(true);
+    expect(s.getState().board.cards[b].collapsed).toBe(false);
+    s.toggleAllCollapsed(); // everything selected is collapsed: expands them
+    expect(s.getState().board.cards[a].collapsed).toBe(false);
+    s.clearSelection();
+    s.toggleAllCollapsed();
+    expect([s.getState().board.cards[a].collapsed, s.getState().board.cards[b].collapsed]).toEqual([true, true]);
   });
 });

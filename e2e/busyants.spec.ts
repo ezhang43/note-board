@@ -267,9 +267,59 @@ test('Expand all opens everything, including cards and columns that were closed 
   await add(page, 'Note');
   await page.keyboard.press('Escape');
   const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await clickEmpty(page); // nothing selected: everything
   await expect(toggle).toHaveAccessibleName('Collapse all');
   await toggle.click();
   await expect(page.locator('.card.loose:not(.collapsed), .column:not(.collapsed)')).toHaveCount(0);
   await toggle.click();
   await expect(page.locator('.card.loose.collapsed, .column.collapsed')).toHaveCount(0);
+});
+
+test('with cards selected, Collapse all / Expand all act on just those', async ({ page }) => {
+  for (let i = 0; i < 2; i++) {
+    await clickEmpty(page);
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+  }
+  const [a, b] = [page.locator('.card.loose').nth(0), page.locator('.card.loose').nth(1)];
+  await page.keyboard.press('Escape');
+  await a.click({ position: { x: 30, y: 10 } });
+  const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await expect(toggle).toHaveAttribute('title', 'Collapse the selected cards and columns');
+  await toggle.click();
+  await expect(a).toHaveClass(/collapsed/);
+  await expect(b).not.toHaveClass(/collapsed/);
+  await toggle.click();
+  await expect(a).not.toHaveClass(/collapsed/);
+});
+
+test('Collapse all closes the gaps: a card under a column moves up to sit right below it', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  const col = columns(page).first();
+  for (let i = 0; i < 3; i++) {
+    await col.click({ position: { x: 20, y: 20 } });
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+  }
+  // A note dropped straight under the column.
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const note = page.locator('.card.loose').first();
+  const c = (await col.boundingBox())!;
+  const n = (await note.boundingBox())!;
+  await page.mouse.move(n.x + 30, n.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 30, c.y + c.height + 40 + 10, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.press('Escape');
+  const gap = async () => (await note.boundingBox())!.y - ((await col.boundingBox())!.y + (await col.boundingBox())!.height);
+  const gapBefore = await gap();
+  expect((await col.boundingBox())!.height).toBeGreaterThan(300); // open, with its cards
+  await clickEmpty(page); // nothing selected: everything
+  await page.locator('header.toolbar').getByRole('button', { name: 'Collapse all' }).click();
+  await expect.poll(async () => (await col.boundingBox())!.height).toBeLessThan(100);
+  await expect.poll(gap).toBeCloseTo(gapBefore, 0);
 });

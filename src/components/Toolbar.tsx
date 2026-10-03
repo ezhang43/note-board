@@ -138,17 +138,22 @@ function ColourControl() {
   );
 }
 
-/** Collapse all / Expand all: collapses every card and column, or (when all are collapsed) opens them all. */
+/**
+ * Collapse all / Expand all: collapses every card and column, or (when all are collapsed) opens them
+ * all. With blocks selected, only those (owner request).
+ */
 function CollapseAllButton() {
   const any = useAppState((s) => Object.keys(s.board.cards).length + Object.keys(s.board.columns).length > 0);
-  const expand = useAppState((s) => any && !anyExpanded(s.board));
+  const selected = useAppState((s) => s.ui.selection.length > 0);
+  const expand = useAppState((s) => any && !anyExpanded(s.board, s.ui.selection.length ? s.ui.selection : undefined));
   const label = expand ? 'Expand all' : 'Collapse all';
+  const title = selected ? `${expand ? 'Expand' : 'Collapse'} the selected cards and columns` : `${label} cards and columns`;
   return (
     <button
       type="button"
       className="tb-button icon-only faded-colour quiet"
       aria-label={label}
-      title={any ? `${label} cards and columns` : 'Nothing to collapse yet'}
+      title={any ? title : 'Nothing to collapse yet'}
       aria-disabled={any ? undefined : true}
       onClick={() => any && appStore.toggleAllCollapsed()}
     >

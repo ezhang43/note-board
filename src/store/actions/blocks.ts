@@ -230,21 +230,34 @@ export function blockActions(ctx: StoreContext) {
 
     // ---------- collapsing ----------
     /** Collapse all / Expand all: if anything is open, collapse everything; otherwise open everything. One undo step. */
+    /**
+     * Collapse all / Expand all: on the selected blocks if any are selected, else on everything
+     * (owner request). Collapsing closes the gaps below; expanding straight after gives back the
+     * layout from before.
+     */
     toggleAllCollapsed() {
-      const collapse = B.anyExpanded(ctx.state.board);
+      const board = ctx.state.board;
+      const sel = liveSelection(board);
+      const scope = sel.length ? sel : null;
+      const collapse = B.anyExpanded(board, scope ?? undefined);
       layout.pushedBy.clear();
       layout.expanding = null;
       if (collapse) {
-        const before = B.layoutSnapshot(ctx.state.board);
-        commit((b) => B.setAllCollapsed(b, true));
-        layout.collapseAll = { before, after: B.layoutSnapshot(ctx.state.board) };
+        const before = B.layoutSnapshot(board);
+        const openH = Object.fromEntries(board.order.flatMap((id) => (measured(id) == null ? [] : [[id, measured(id)!]])));
+        commit((b) => (scope ? B.setCollapsedFor(b, scope, true) : B.setAllCollapsed(b, true)));
+        layout.collapseAll = { before, after: B.layoutSnapshot(ctx.state.board), openH, until: Date.now() + EXPAND_WATCH_MS, scope };
+        requestSettle();
         return;
       }
-      // Expand all right after Collapse all gives back the layout from before it (owner request).
+      // Expanding the same blocks right after collapsing them gives back the layout from before.
       const saved = layout.collapseAll;
+      const same = saved && String(saved.scope) === String(scope);
       layout.collapseAll = null;
       layout.expandAllUntil = Date.now() + EXPAND_WATCH_MS;
-      commit((b) => (saved ? B.restoreLayout(b, saved.before, saved.after) : B.setAllCollapsed(b, false)));
+      commit((b) =>
+        same ? B.restoreLayout(b, saved.before, saved.after, scope ?? undefined) : scope ? B.setCollapsedFor(b, scope, false) : B.setAllCollapsed(b, false),
+      );
       requestSettle();
     },
     /**

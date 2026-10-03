@@ -1,10 +1,10 @@
 import { centreOf, screenToBoard } from '../model/view';
 import { emptyHistory, recordChange, redo as redoStep, undo as undoStep, type History } from '../model/history';
-import { settle, type MeasuredHeight } from '../model/layout';
+import { closeGaps, settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import { recordPushes, type Pushes } from '../model/placement';
-import { blockOf, type LayoutSnapshot } from '../model/board';
+import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
@@ -63,8 +63,12 @@ export interface StoreContext {
     pushedBy: Map<string, Pushes>;
     expanding: { id: string; until: number } | null;
     importLayout: { ids: string[]; origin: Point } | null;
-    /** The layout before and right after Collapse all, so Expand all can give it back. */
-    collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot } | null;
+    /**
+     * The layout before and right after Collapse all, so Expand all can give it back; the open
+     * heights, to close the gaps while the collapsed heights come in (until `until`); and which
+     * blocks it was for (`scope`: the selected ids, or null for everything).
+     */
+    collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot; openH: Record<string, number>; until: number; scope: string[] | null } | null;
     /** Until when (ms) blocks opened by Expand all are still growing; meanwhile higher blocks win. */
     expandAllUntil: number;
   };
@@ -176,7 +180,21 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       // After Expand all, everything grows at once: the higher block wins, so blocks only move down.
       if (Date.now() <= layout.expandAllUntil) a.sort((p, q) => (blockOf(state.board, p)?.y ?? 0) - (blockOf(state.board, q)?.y ?? 0));
       // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
-      const board = settle(state.board, measured, a, true);
+      let board = state.board;
+      // Just after Collapse all: blocks below the collapsed ones move straight up (owner request).
+      // Only blocks still where Collapse all (or this) left them.
+      const ca = layout.collapseAll;
+      if (ca && Date.now() <= ca.until) {
+        const still = (id: string) => {
+          const b = blockOf(board, id);
+          const was = ca.before.at[id];
+          const left = ca.after.at[id];
+          return !!b && ((was && b.x === was.x && b.y === was.y) || (left && b.x === left.x && b.y === left.y));
+        };
+        board = closeGaps(board, ca.before.at, ca.openH, measured, still);
+        ca.after = layoutSnapshot(board);
+      }
+      board = settle(board, measured, a, true);
       const exp = layout.expanding;
       if (exp && Date.now() <= exp.until) layout.pushedBy.set(exp.id, recordPushes(layout.pushedBy.get(exp.id), state.board, board));
       set({ ...state, board });

@@ -16,6 +16,7 @@ describe('Collapse all (owner bug report: loose cards stayed open)', () => {
     s.clearSelection();
     for (const kind of ['note', 'todo', 'link'] as const) s.addCard(kind);
     const loose = Object.keys(s.getState().board.cards).filter((id) => id !== inCol);
+    s.clearSelection(); // nothing selected: everything
     s.toggleAllCollapsed();
     vi.runAllTimers();
     const b = s.getState().board;

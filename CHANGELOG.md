@@ -1,5 +1,10 @@
 # Changelog
 
+## Collapse all: closes the gaps, and works on a selection (2026-10-04)
+
+- Collapse all now pulls the blocks below straight up, so collapsed cards and columns sit right under one another with the same spacing as before, instead of leaving big empty gaps. Expand all puts them back.
+- With cards or columns selected, Collapse all / Expand all only act on those. With nothing selected, they act on everything.
+
 ## Text formatting (2026-10-04)
 
 - Any text box (a card title, a note, a checklist item, a column title) can be made Small / Normal / Large, bold, italic, and set in one of five fonts: Plex Sans, Serif, Rounded, Handwritten or Typewriter. The whole box changes, not single words.

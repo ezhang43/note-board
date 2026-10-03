@@ -365,6 +365,26 @@ export function dropOnRow(
   return { drop: { mode, targetId }, markId, markMode: mode };
 }
 
+/**
+ * Ctrl+Shift+Up / Down: move an item (with its sub-items) past the item above (`dir` -1) or below
+ * (1) at the same level. At the top level it only passes items in the same section (open or
+ * Completed). Null when there is nothing to pass.
+ */
+export function moveItemBy(items: TodoItem[], id: string, dir: -1 | 1): TodoItem[] | null {
+  const next = cloned(items);
+  const loc = findItem(next, id);
+  if (!loc) return null;
+  const { list, index, item } = loc;
+  let j = index + dir;
+  while (j >= 0 && j < list.length && !loc.parent && list[j].done !== item.done) j += dir;
+  if (j < 0 || j >= list.length) return null;
+  const passed = list[j];
+  list.splice(index, 1);
+  const k = list.indexOf(passed);
+  list.splice(dir < 0 ? k : k + 1, 0, item);
+  return next;
+}
+
 /** Take items (with their sub-items) out of a list. */
 export function extractItems(items: TodoItem[], rootIds: string[]): { rest: TodoItem[]; moving: TodoItem[] } {
   const rest = cloned(items);

@@ -101,6 +101,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       e.preventDefault();
       const el = e.currentTarget;
       appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation(); // not the board's Up / Down
+      appStore.moveItem(cardId, item.id, e.key === 'ArrowUp' ? -1 : 1, e.currentTarget.selectionStart);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       appStore.itemTab(cardId, item.id, e.shiftKey);
@@ -128,12 +132,15 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       style={{ paddingLeft: depth * ITEM_INDENT }}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
-      <input type="checkbox" aria-label="Done" checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
+      {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
+      <label className="tick">
+        <input type="checkbox" aria-label="Done" checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
+      </label>
       <GrowTextarea
         ref={ref}
         className="item-text"
         aria-label="Item text"
-        placeholder="Item"
+        placeholder="Add an item"
         value={item.text}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
@@ -160,7 +167,7 @@ function atEnd(el: HTMLTextAreaElement) {
  */
 function rowPointerDown(cardId: string, itemId: string) {
   return (e: ReactPointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || (e.target as Element).closest('button, input[type="checkbox"]')) return;
+    if (e.button !== 0 || (e.target as Element).closest('button, .tick, input[type="checkbox"]')) return;
     e.stopPropagation(); // pressing a row never drags the card
     appStore.select(cardId);
     // Shift+click extends the selection, or starts one from the item being typed in.

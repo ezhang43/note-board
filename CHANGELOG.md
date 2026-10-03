@@ -1,5 +1,12 @@
 # Changelog
 
+## Accessibility and wording fixes (2026-10-04)
+
+- Keyboard: tick boxes now show the teal ring when you reach them with Tab; a resize handle reached with Tab resizes with the arrow keys (Shift for big steps); Ctrl+Shift+Up / Down move a checklist item up or down.
+- Touch: tick boxes, resize handles and the item grip are easier to hit (the drawn handles look the same).
+- Screen readers now hear each card's and column's title, and "Untitled" when there is none.
+- Clearer wording: deleting a column says how many cards go with it ("Keep column" instead of "Cancel"); "Add an item"; "Paste a link address"; "Drop to make a new list"; the empty-board hint mentions the ? shortcuts list; the save-failed and wrong-account messages say what happens or what to do next.
+
 ## BusyAnts, part 7: pinch zoom on touch screens (2026-10-03)
 
 - On a touch screen (a tablet, or a touch laptop), put two fingers on the board and spread or pinch them to zoom; move them together to move the board. It works over cards too, and never drags the card you started on.

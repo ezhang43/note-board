@@ -119,6 +119,10 @@ export function checklistActions(ctx: StoreContext) {
     },
 
     // ---------- editing items ----------
+    /** Ctrl+Shift+Up / Down: move the item past its neighbour; the cursor stays in it at `caret`. */
+    moveItem(cardId: string, itemId: string, dir: -1 | 1, caret: number) {
+      commit((b) => C.editItems(b, cardId, (items) => C.moveItemBy(items, itemId, dir)), { ui: { focusItem: itemId, focusOffset: caret } });
+    },
     /** Enter in a list's title: the cursor moves to its first item. */
     focusFirstItem(cardId: string) {
       const card = ctx.state.board.cards[cardId];

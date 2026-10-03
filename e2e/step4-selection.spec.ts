@@ -32,7 +32,7 @@ test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all
   await expect(b).not.toHaveClass(/selected/);
 
   // Cards selected: Colour is available (it colours their title bands).
-  await expect(page.getByRole('button', { name: 'Colour of selected block' })).not.toHaveAttribute('aria-disabled');
+  await expect(page.getByRole('button', { name: 'Colour of selected cards and columns' })).not.toHaveAttribute('aria-disabled');
 
   // With columns in the selection, Colour recolours every selected column.
   await clickEmpty(page);
@@ -43,7 +43,7 @@ test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all
   await c1.click({ position: { x: 40, y: 80 } });
   await c2.click({ position: { x: 40, y: 80 }, modifiers: ['Control'] });
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Sky' }).click();
   await expect(c1).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(c2).toHaveCSS('background-color', 'rgb(230, 238, 252)');
@@ -94,8 +94,8 @@ test('Ctrl + A then Delete asks about the column, then deletes everything select
   await expect(looseCards(page).first()).toHaveClass(/selected/);
   await page.keyboard.press('Delete');
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toContainText('Delete “Untitled”?');
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toContainText('Delete “Untitled” and its card?');
+  await dialog.getByRole('button', { name: 'Keep column' }).click();
   await expect(cards(page)).toHaveCount(2);
 
   await page.keyboard.press('Control+a');
@@ -197,7 +197,7 @@ test('undo and redo buttons undo moves, colours and deletes', async ({ page }) =
   await dragBy(page, col, 200, 100);
   const p1 = await boardPos(col);
   expect(p1).not.toEqual(p0);
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Peach' }).click();
   await col.getByRole('button', { name: 'Delete column and its cards' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete column' }).click();
@@ -223,7 +223,7 @@ test('Escape clears the selection and closes the colour menu; Ctrl + A while typ
   const [a, b] = await threeNotes(page);
   await add(page, 'New column');
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   await expect(page.getByRole('group', { name: 'Colours' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);

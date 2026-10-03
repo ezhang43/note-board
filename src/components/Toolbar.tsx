@@ -95,7 +95,7 @@ function ColourControl() {
       <button
         type="button"
         className="tb-button faded-colour"
-        aria-label="Colour of selected block"
+        aria-label="Colour of selected cards and columns"
         title={count ? "Colour the selected columns, or the selected cards' title bands" : 'Select a card or column first'}
         aria-disabled={count ? undefined : true}
         aria-expanded={open}
@@ -256,7 +256,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
           type="button"
           className="tool-button"
           aria-label="Select (V)"
-          title="Select (V): drag a rectangle to select several blocks"
+          title="Select (V): drag a rectangle to select several cards and columns"
           aria-pressed={tool === 'select'}
           onClick={() => appStore.setTool('select')}
         >

@@ -418,3 +418,23 @@ describe('Enter, like a text editor (owner request)', () => {
     expect(C.enterItem(done, 'a b', 3, 3, { ...blank, text: '' })!.items.map((i) => i.done)).toEqual([true, false]);
   });
 });
+
+describe('Ctrl+Shift+Up / Down: moving an item past its neighbour', () => {
+  it('swaps with the item above or below at the same level, taking its sub-items', () => {
+    expect(ids(C.moveItemBy(sample(), 'b', -1)!)).toBe('b a(a1 a2) c(c1)');
+    expect(ids(C.moveItemBy(sample(), 'a', 1)!)).toBe('b a(a1 a2) c(c1)');
+    expect(ids(C.moveItemBy(sample(), 'a2', -1)!)).toBe('a(a2 a1) b c(c1)');
+  });
+
+  it('does nothing at the top or bottom of its level', () => {
+    expect(C.moveItemBy(sample(), 'a', -1)).toBeNull();
+    expect(C.moveItemBy(sample(), 'a2', 1)).toBeNull();
+  });
+
+  it('never moves an open item into the Completed section, or the other way', () => {
+    expect(C.moveItemBy(sample(), 'b', 1)).toBeNull();
+    expect(C.moveItemBy(sample(), 'c', -1)).toBeNull();
+    const mixed = [item('x'), item('d', [], true), item('y')];
+    expect(ids(C.moveItemBy(mixed, 'x', 1)!)).toBe('d y x'); // past the hidden-in-Completed one, onto y's far side
+  });
+});

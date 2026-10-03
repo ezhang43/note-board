@@ -11,10 +11,16 @@ import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
 import { blockPointerDown, useDragPosition } from './useBlockDrag';
-import { resizePointerDown } from './useResize';
+import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
 const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed' } as const;
+
+/** What a screen reader calls a card: its kind, and its title where it has one. */
+function cardName(card: Card): string {
+  if (card.kind === 'todo' || card.kind === 'link') return `${KIND_LABEL[card.kind]}: ${card.title || 'Untitled'}`;
+  return KIND_LABEL[card.kind];
+}
 
 /** A note, to-do list or link card, either loose on the board or inside a column. */
 export const CardView = memo(function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
@@ -59,7 +65,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       ref={ref}
       data-card-id={id}
       data-kind={card.kind}
-      aria-label={`${KIND_LABEL[card.kind]} card`}
+      aria-label={cardName(card)}
       className={classes.filter(Boolean).join(' ')}
       style={style}
       onPointerDown={blockPointerDown('card', id)}
@@ -93,14 +99,14 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       {/* A collapsed card can still be resized: wider or narrower from its right edge, or taller from its corner. */}
       {!inColumn && card.collapsed && (
         <>
-          <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} />
-          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both', COLLAPSED_MIN_H)}>
+          <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} onKeyDown={resizeKeyDown('card', id, 'width')} />
+          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both', COLLAPSED_MIN_H)} onKeyDown={resizeKeyDown('card', id, 'both', COLLAPSED_MIN_H)}>
             <ResizeIcon />
           </button>
         </>
       )}
       {!inColumn && !card.collapsed && (
-        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')}>
+        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')} onKeyDown={resizeKeyDown('card', id, 'both')}>
           <ResizeIcon />
         </button>
       )}
@@ -144,13 +150,15 @@ function CompletedRow({ entry }: { entry: CompletedEntry }) {
   return (
     <div className="completed-entry" data-entry-id={entry.item.id}>
       <div className="completed-row">
-        <input
-          type="checkbox"
-          aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
-          title="Untick to send it back to its list"
-          checked
-          onChange={() => appStore.restoreCompleted(entry.item.id)}
-        />
+        <label className="tick">
+          <input
+            type="checkbox"
+            aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
+            title="Untick to send it back to its list"
+            checked
+            onChange={() => appStore.restoreCompleted(entry.item.id)}
+          />
+        </label>
         <span className="completed-text">{entry.item.text}</span>
         <span className="completed-from">{entry.fromTitle || 'List'}</span>
       </div>
@@ -203,7 +211,7 @@ function LinkBody({ card }: { card: LinkCard }) {
       <input
         className="link-url"
         aria-label="Link address"
-        placeholder="Paste a URL"
+        placeholder="Paste a link address"
         spellCheck={false}
         value={card.url}
         onChange={(e) => appStore.setLinkUrl(card.id, e.target.value)}

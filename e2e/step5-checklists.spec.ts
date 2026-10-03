@@ -244,7 +244,7 @@ test('dropping items on empty board makes a new untitled list', async ({ page })
   await clickEmpty(page);
   const canvas = await box(page.getByTestId('canvas'));
   await dragItem(page, rowWithText(list, 'move me'), { x: canvas.x + 120, y: canvas.y + 120 }, async () => {
-    await expect(page.getByTestId('item-ghost')).toContainText('New list');
+    await expect(page.getByTestId('item-ghost')).toContainText('Drop to make a new list');
   });
   await expect(looseCards(page)).toHaveCount(2);
   const made = page.locator('.card.selected');

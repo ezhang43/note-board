@@ -10,7 +10,7 @@ test('the app is called BusyAnts', async ({ page }) => {
 });
 
 test('an empty board shows a hint, which goes once anything is on the board', async ({ page }) => {
-  const hint = page.getByText('Add a note, a to-do list or a column from the toolbar, or drag one onto the board');
+  const hint = page.getByText('Add a note, a to-do list or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
   await expect(hint).toBeVisible();
   await add(page, 'Note');
   await expect(hint).toHaveCount(0);

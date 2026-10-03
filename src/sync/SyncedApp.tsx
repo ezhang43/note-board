@@ -15,7 +15,7 @@ export function SyncedApp() {
         <App onSignOut={session.signOut} saveNote={saveNote} />
         {saveFailed && (
           <p className="save-banner" role="status">
-            Couldn’t save online. Changes are on this device only.
+            Couldn’t save online. Changes are on this device only. They’ll be sent with your next change.
           </p>
         )}
       </>

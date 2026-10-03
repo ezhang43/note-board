@@ -29,7 +29,7 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
         )}
         {status === 'no-access' && (
           <>
-            <p className="sign-in-text">This Google account can’t open this board.</p>
+            <p className="sign-in-text">This Google account can’t open this board. Sign out and use the account that owns it.</p>
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out
             </button>

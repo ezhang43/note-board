@@ -55,7 +55,7 @@ test('placeholder text is dark enough to read (light and dark mode)', async ({ p
 });
 
 test('faded toolbar buttons are a little stronger in dark mode', async ({ page }) => {
-  const colour = page.getByRole('button', { name: 'Colour of selected block' });
+  const colour = page.getByRole('button', { name: 'Colour of selected cards and columns' });
   expect(await style(colour, 'opacity')).toBe('0.45');
   await toolbarButton(page, 'Dark mode').click();
   expect(await style(colour, 'opacity')).toBe('0.55');
@@ -112,7 +112,7 @@ test('collapse and × buttons on cards and columns say what they do when hovered
 test('the Colour menu names the swatch under the pointer, and rings each swatch in its own edge colour', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'New column');
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   const menu = page.locator('.colour-menu');
   const sky = menu.getByRole('button', { name: 'Sky' });
   await sky.hover();
@@ -219,10 +219,10 @@ test('the Colour menu has bigger swatches and never covers the block being colou
   await add(page, 'New column');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
-  const button = (await page.getByRole('button', { name: 'Colour of selected block' }).boundingBox())!;
+  const button = (await page.getByRole('button', { name: 'Colour of selected cards and columns' }).boundingBox())!;
   // Put the column right under the Colour button, where the menu opens.
   await dragTo(page, col, { x: button.x + 200, y: button.y + button.height + 40 });
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   const menu = page.locator('.colour-menu');
   expect((await menu.getByRole('button', { name: 'Sky' }).boundingBox())!.width).toBeGreaterThanOrEqual(32);
   await expect.poll(async () => (await col.boundingBox())!.y).toBeGreaterThan((await menu.boundingBox())!.y + (await menu.boundingBox())!.height);

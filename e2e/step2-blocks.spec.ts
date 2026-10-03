@@ -231,7 +231,7 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
 });
 
 test("Colour is faded with nothing selected; it colours a card's title band (card stays white) and a column", async ({ page }) => {
-  const colour = page.getByRole('button', { name: 'Colour of selected block' });
+  const colour = page.getByRole('button', { name: 'Colour of selected cards and columns' });
   await expect(colour).toHaveAttribute('aria-disabled', 'true');
   await colour.click({ force: true }); // clicking the faded button does nothing
   await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
@@ -286,8 +286,8 @@ test('card × deletes it; column × asks first, then deletes the column and its 
 
   await col.getByRole('button', { name: 'Delete column and its cards' }).click();
   const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toContainText('Delete “Ideas”?');
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toContainText('Delete “Ideas” and its 2 cards?');
+  await dialog.getByRole('button', { name: 'Keep column' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(columns(page)).toHaveCount(1);
 
@@ -335,7 +335,7 @@ test('everything is kept after reload', async ({ page }) => {
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);
   await col.click({ position: { x: 200, y: 26 } });
-  await page.getByRole('button', { name: 'Colour of selected block' }).click();
+  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
   await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Rose' }).click();
   await clickEmpty(page);
   await add(page, 'Note');

@@ -7,7 +7,7 @@ import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
 import { blockPointerDown, useDragPosition } from './useBlockDrag';
-import { resizePointerDown } from './useResize';
+import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
 /** A column: a titled stack of cards. */
@@ -23,6 +23,10 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   // How many columns the "Delete …?" shown on this column would delete (0 = not shown here).
   const confirmColumns = useAppState((s) =>
     s.ui.confirm?.columnId === id ? s.ui.confirm.ids.filter((x) => s.board.columns[x]).length : 0,
+  );
+  // …and how many cards go with them.
+  const confirmCards = useAppState((s) =>
+    s.ui.confirm?.columnId === id ? s.ui.confirm.ids.reduce((n, x) => n + (s.board.columns[x]?.cardIds.length ?? 0), 0) : 0,
   );
   // Where to draw it while something is being dragged (pushed aside, or moving with a group).
   const dragPos = useDragPosition(id, col ?? { x: 0, y: 0 });
@@ -59,7 +63,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     <section
       ref={ref}
       data-col-id={id}
-      aria-label={`Column ${col.title}`}
+      aria-label={col.title ? `Column: ${col.title}` : 'Untitled column'}
       className={classes.filter(Boolean).join(' ')}
       style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
@@ -106,11 +110,11 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       {confirmColumns > 0 && (
         <div className="confirm" role="alertdialog" aria-label="Delete column?">
           <div className="confirm-title">
-            {confirmColumns === 1 ? `Delete “${col.title || 'Untitled'}”?` : `Delete ${confirmColumns} columns?`}
+            {confirmQuestion(confirmColumns, col.title, confirmCards)}
           </div>
           <div className="confirm-actions">
             <button type="button" className="confirm-cancel" autoFocus onClick={appStore.cancelDelete}>
-              Cancel
+              {confirmColumns === 1 ? 'Keep column' : 'Keep columns'}
             </button>
             <button type="button" className="confirm-delete" onClick={appStore.confirmDelete}>
               {confirmColumns === 1 ? 'Delete column' : 'Delete columns'}
@@ -127,7 +131,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         ))}
 
       {/* The width can be changed even when the column is collapsed. */}
-      <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} />
+      <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} onKeyDown={resizeKeyDown('column', id, 'width')} />
       {!col.collapsed && (
         <>
           <button
@@ -135,6 +139,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             className="resize-corner"
             aria-label="Resize column"
             onPointerDown={resizePointerDown('column', id, cardIds.length ? 'width' : 'both')}
+            onKeyDown={resizeKeyDown('column', id, cardIds.length ? 'width' : 'both')}
           >
             <ResizeIcon />
           </button>
@@ -143,3 +148,11 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     </section>
   );
 });
+
+/** "Delete “Week” and its 2 cards?", or for several columns "Delete 3 columns and their 5 cards?". */
+function confirmQuestion(columns: number, title: string, cards: number): string {
+  const what = columns === 1 ? `“${title || 'Untitled'}”` : `${columns} columns`;
+  if (!cards) return `Delete ${what}?`;
+  const their = columns === 1 ? 'its' : 'their';
+  return `Delete ${what} and ${their} ${cards === 1 ? 'card' : `${cards} cards`}?`;
+}

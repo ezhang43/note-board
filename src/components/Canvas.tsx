@@ -191,6 +191,8 @@ export function Canvas() {
       ref={ref}
       className={`canvas tool-${view.tool}${panning ? ' panning' : ''}`}
       data-testid="canvas"
+      role="main"
+      aria-label="Board"
       data-pan-x={view.panX}
       data-pan-y={view.panY}
       data-zoom={view.zoom}
@@ -207,7 +209,7 @@ export function Canvas() {
       } as CSSProperties}
     >
       {order.length === 0 && (
-        <p className="empty-hint">Add a note, a to-do list or a column from the toolbar, or drag one onto the board</p>
+        <p className="empty-hint">Add a note, a to-do list or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
       )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         {order.map((id) => {
@@ -243,7 +245,7 @@ export function Canvas() {
         <div className="item-ghost" data-testid="item-ghost" style={{ left: itemDrag.at.x + 14, top: itemDrag.at.y + 10 }}>
           <span className="item-ghost-label">{itemDrag.label}</span>
           {itemDrag.hint && 'newList' in itemDrag.hint ? (
-            <span className="item-ghost-extra">New list</span>
+            <span className="item-ghost-extra">Drop to make a new list</span>
           ) : (
             itemDrag.extra && <span className="item-ghost-extra">{itemDrag.extra}</span>
           )}

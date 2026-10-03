@@ -33,6 +33,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Backspace in an empty item', 'Delete it'],
       ['Delete at the end', 'Join the next item into this one'],
       ['Up / Down', 'Move between items and cards'],
+      ['Ctrl+Shift+Up / Down', 'Move the item up / down past its neighbour'],
       ['Shift+click, or press and drag', 'Select several items (drag on into the next cards of a column)'],
       ['Ctrl+A again and again', "Select the item text, the list, the column's lists, then the whole board"],
       ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste selected items'],

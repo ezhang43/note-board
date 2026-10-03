@@ -763,6 +763,15 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
 .item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
 .item-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+/*
+ * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
+ * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
+ */
+@media (hover: none) {
+  .item-grip, .item-trash { visibility: hidden; }
+  .todo-item:hover .item-grip, .todo-item:hover .item-trash { opacity: 0; }
+  .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
+}
 
 .completed {
   display: flex;

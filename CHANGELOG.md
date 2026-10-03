@@ -1,5 +1,9 @@
 # Changelog
 
+## Phone and tablet, part 1: touch controls for checklist items (2026-10-04)
+
+- On a touch screen, tap into a checklist item to show its grip and trash. Only that item shows them, and the hidden ones on other items can no longer be tapped by accident. Tapping the trash deletes the item; the grip drags it with your finger.
+
 ## Clearer outline when dragging an item into another list (2026-10-04)
 
 - When you drag a checklist item onto another list to add it at the end, the whole card now gets a dashed outline, top included. Before, the top of the outline was hidden under the list's title band, so it was hard to tell where the item would go.

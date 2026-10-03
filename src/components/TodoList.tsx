@@ -149,7 +149,15 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onKeyDown={onKeyDown}
       />
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
-      <button type="button" className="item-trash" aria-label="Delete item" title="Delete item" onClick={() => appStore.trashItem(cardId, item.id)}>
+      {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}
+      <button
+        type="button"
+        className="item-trash"
+        aria-label="Delete item"
+        title="Delete item"
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => appStore.trashItem(cardId, item.id)}
+      >
         <TrashIcon />
       </button>
       <button type="button" className="item-grip" aria-label="Drag item" onPointerDown={gripPointerDown(cardId, item.id)}>

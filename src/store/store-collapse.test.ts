@@ -205,3 +205,24 @@ describe('Collapse all / Expand all with blocks selected (owner request)', () =>
     expect([s.getState().board.cards[a].collapsed, s.getState().board.cards[b].collapsed]).toEqual([true, true]);
   });
 });
+
+describe('a board from another device is not re-arranged with this device\'s old heights (owner bug report)', () => {
+  it('blocks stay where the other device put them until they are drawn again here', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0, 300); // drawn open and tall here
+    const b = noteAt(s, 0, 320, 100);
+    // The other device collapsed everything and closed the gap.
+    const theirs = structuredClone(s.getState().board);
+    theirs.cards[a].collapsed = true;
+    theirs.cards[b].collapsed = true;
+    theirs.cards[b].y = 60;
+    s.replaceBoard(theirs);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 0, y: 60 }); // not pushed back below a's old 300px height
+    // Once drawn here at their real heights, still nothing moves.
+    s.setMeasuredHeight(a, 40);
+    s.setMeasuredHeight(b, 40);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 0, y: 60 });
+  });
+});

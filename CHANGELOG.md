@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: blocks no longer move by themselves after Collapse all (2026-10-04)
+
+- With BusyAnts open in more than one place (the app and a browser tab, say), the other copy could push your collapsed blocks back apart using out-of-date sizes and send that back a few seconds later. A board arriving from another device is now left exactly as it was sent.
+
 ## Collapse all: closes the gaps, and works on a selection (2026-10-04)
 
 - Collapse all now pulls the blocks below straight up, so collapsed cards and columns sit right under one another with the same spacing as before, instead of leaving big empty gaps. Expand all puts them back.

@@ -222,8 +222,13 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return state.ui.selection.filter((id) => (board.cards[id] || board.columns[id]) && !gone.includes(id));
   }
 
-  /** Swap in a board (from undo, redo or elsewhere), clearing anything in progress on screen. */
-  function restore(result: { history: History; board: Board } | null) {
+  /**
+   * Swap in a board (from undo, redo or elsewhere), clearing anything in progress on screen.
+   * `tidy` false: don't re-arrange it now (a board from another device, already tidied there; the
+   * heights known here are from before it and would move blocks wrongly). Blocks that change size
+   * here are tidied once they have been drawn.
+   */
+  function restore(result: { history: History; board: Board } | null, tidy = true) {
     if (!result) return;
     history = result.history;
     set({
@@ -241,7 +246,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         arrived: [],
       }),
     });
-    requestSettle();
+    if (tidy) requestSettle();
   }
 
   const ctx: StoreContext = {
@@ -294,7 +299,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
      */
     replaceBoard(board: Board) {
       history = emptyHistory;
-      restore({ history, board });
+      restore({ history, board }, false);
     },
     // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
     undo() {

@@ -1,0 +1,163 @@
+// Small inline icons used by the toolbar and zoom control.
+
+const common = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+export function HandIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
+      <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+      <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+      <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+    </svg>
+  );
+}
+
+export function SelectIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M12 4h2M18 4h1a1 1 0 0 1 1 1v1M4 12v2M4 18v1a1 1 0 0 0 1 1h1M12 20h-1" />
+      <path d="M13 13l7.5 2.5-3.2 1.3-1.3 3.2z" />
+    </svg>
+  );
+}
+
+export function UndoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" strokeWidth="1.6" {...common}>
+      <path d="M5.5 3L2.5 6l3 3" />
+      <path d="M2.5 6h7a4 4 0 0 1 0 8H7" />
+    </svg>
+  );
+}
+
+export function RedoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" strokeWidth="1.6" {...common}>
+      <path d="M10.5 3l3 3-3 3" />
+      <path d="M13.5 6h-7a4 4 0 0 0 0 8H9" />
+    </svg>
+  );
+}
+
+export function GridIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
+      <path d="M1.5 5.5h13M1.5 10.5h13M5.5 1.5v13M10.5 1.5v13" />
+    </svg>
+  );
+}
+
+export function CaretIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" strokeWidth="1.8" {...common} style={{ stroke: 'var(--ink-faint)' }}>
+      <path d="M3 4.5l3 3 3-3" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" strokeWidth="1.8" {...common}>
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+/** Dark mode toggle: a moon. */
+export function MoonIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+    </svg>
+  );
+}
+
+/** Collapse all (arrows pointing in) or expand all (arrows pointing out). */
+export function CollapseAllIcon({ expand }: { expand: boolean }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      {expand ? <path d="M7 9l5-5 5 5M7 15l5 5 5-5" /> : <path d="M7 4l5 5 5-5M7 20l5-5 5 5" />}
+    </svg>
+  );
+}
+
+/** Same width: two bars of equal length between two upright lines. */
+export function SameWidthIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4 4v16M20 4v16" />
+      <rect x="7" y="6" width="10" height="4" rx="1" />
+      <rect x="7" y="14" width="10" height="4" rx="1" />
+    </svg>
+  );
+}
+
+export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      strokeWidth="1.8"
+      {...common}
+      style={{ stroke: 'var(--ink-faint)', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms ease' }}
+    >
+      <path d="M3 4.5l3 3 3-3" />
+    </svg>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 14 14" strokeWidth="1.8" {...common} style={{ stroke: 'var(--placeholder)' }}>
+      <path d="M3 3l8 8M11 3l-8 8" />
+    </svg>
+  );
+}
+
+export function ExternalIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" strokeWidth="1.8" {...common}>
+      <path d="M9 3h4v4M13 3L7 9M11 10v3H3V5h3" />
+    </svg>
+  );
+}
+
+export function ResizeIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" strokeWidth="1.4" {...common} style={{ stroke: 'var(--placeholder)' }}>
+      <path d="M9 3L3 9M9 6.5L6.5 9" />
+    </svg>
+  );
+}
+
+export function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
+      <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4" />
+    </svg>
+  );
+}
+
+export function GripIcon() {
+  return (
+    <svg width="8" height="12" viewBox="0 0 12 18" style={{ fill: 'var(--placeholder)' }} aria-hidden="true">
+      {[3, 9, 15].flatMap((cy) => [3, 9].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.7" />))}
+    </svg>
+  );
+}
+
+export function MinusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.8" {...common}>
+      <path d="M3 8h10" />
+    </svg>
+  );
+}

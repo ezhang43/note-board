@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- BusyAnts app icon: a simple chibi ant silhouette on warm yellow. -->
+  <rect width="512" height="512" rx="112" fill="#FFCF3F"/>
+  <g id="art" fill="#3A2614" stroke="#3A2614" stroke-linecap="round">
+    <!-- antennae -->
+    <path d="M160 160 Q150 112 116 96" fill="none" stroke-width="14"/>
+    <path d="M214 156 Q228 108 264 94" fill="none" stroke-width="14"/>
+    <circle cx="114" cy="94" r="16" stroke="none"/>
+    <circle cx="266" cy="92" r="16" stroke="none"/>
+    <!-- stubby legs -->
+    <path d="M250 334 L240 380 M292 338 L298 384 M346 362 L364 400" fill="none" stroke-width="20"/>
+    <!-- body: big round head, small middle, round back -->
+    <circle cx="350" cy="306" r="76" stroke="none"/>
+    <circle cx="268" cy="300" r="34" stroke="none"/>
+    <circle cx="186" cy="244" r="94" stroke="none"/>
+  </g>
+</svg>

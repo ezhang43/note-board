@@ -1,0 +1,61 @@
+import { ZOOM_STEP } from '../model/constants';
+import { FONT_SIZES } from '../model/font';
+import { zoomLabel } from '../model/view';
+import { appStore, useAppState } from '../store/appStore';
+import { MinusIcon, PlusIcon } from './icons';
+
+/**
+ * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
+ * (A− / A+), the keyboard shortcuts (?) button and the zoom control.
+ */
+export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
+  const zoom = useAppState((s) => s.view.zoom);
+  const fontSize = useAppState((s) => s.view.fontSize);
+  const smallest = fontSize === FONT_SIZES[0];
+  const largest = fontSize === FONT_SIZES[FONT_SIZES.length - 1];
+  return (
+    <div className="corner-controls">
+      {saveNote && (
+        <span className="save-note" role="status">
+          {saveNote}
+        </span>
+      )}
+      <div className="zoom-control" role="group" aria-label="Text size">
+        <button
+          type="button"
+          className="text-size"
+          aria-label="Smaller text"
+          title="Smaller text on cards and columns"
+          aria-disabled={smallest ? true : undefined}
+          onClick={() => appStore.changeFontSize(-1)}
+        >
+          A−
+        </button>
+        <button
+          type="button"
+          className="text-size"
+          aria-label="Larger text"
+          title="Larger text on cards and columns"
+          aria-disabled={largest ? true : undefined}
+          onClick={() => appStore.changeFontSize(1)}
+        >
+          A+
+        </button>
+      </div>
+      <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
+        ?
+      </button>
+      <div className="zoom-control" role="group" aria-label="Zoom">
+        <button type="button" aria-label="Zoom out" title="Zoom out (Ctrl+−)" onClick={() => appStore.zoomAtCentre(1 / ZOOM_STEP)}>
+          <MinusIcon />
+        </button>
+        <button type="button" className="zoom-label" aria-label="Reset zoom" title="Reset zoom (Ctrl+0)" onClick={appStore.resetZoom}>
+          {zoomLabel(zoom)}
+        </button>
+        <button type="button" aria-label="Zoom in" title="Zoom in (Ctrl+=)" onClick={() => appStore.zoomAtCentre(ZOOM_STEP)}>
+          <PlusIcon />
+        </button>
+      </div>
+    </div>
+  );
+}

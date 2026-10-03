@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Paste this into Firebase console → Firestore Database → Rules, then Publish.
+// Only the board owner's Google account can read or write, and only their own board.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /boards/{uid} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.email == "ezhang43@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+  }
+}

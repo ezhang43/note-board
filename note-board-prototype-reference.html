@@ -1,0 +1,1839 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Note board</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1F1D1A;background:#F6F4F0}
+a{color:#1F5F5B}a:hover{color:#15433F}
+input,textarea,button{font-family:inherit;color:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid #1F5F5B;outline-offset:2px}
+input:focus,input:focus-visible,textarea:focus,textarea:focus-visible{outline:none!important;box-shadow:none!important}
+textarea::placeholder,input::placeholder{color:#8A8378}
+button:hover{filter:brightness(0.96)}
+textarea[data-item-input]:focus,textarea[data-item-input]:focus-visible{outline:none!important;box-shadow:none!important}
+[data-card-id],[data-col-id]{cursor:default}
+[data-card-id] textarea,[data-card-id] input:not([type=checkbox]),[data-col-id] input{cursor:text}
+.it-grip,.it-trash{opacity:0;transition:opacity 120ms}
+.it-row:hover .it-grip,.it-row:hover .it-trash{opacity:1}
+.it-trash:hover{background:rgba(138,31,61,0.10)!important;color:#8A1F3D!important}
+.it-add:hover{background:rgba(31,29,26,0.08)!important}
+.rz:hover{background:rgba(31,95,91,0.14)!important}
+.rzc:hover{background:rgba(31,95,91,0.28)!important}
+</style>
+</helmet>
+<div data-board="1" tabIndex="0" aria-label="Board" onKeyDown="{{onKey}}" onPointerDown="{{onBoardDown}}" onPointerEnter="{{hookBoard}}" style="outline: none; width: 1440px; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; background-color: #F6F4F0; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1F1D1A; user-select: {{userSelect}}">
+
+<header style="position: absolute; left: 0; top: 0; width: 1440px; height: 64px; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 10px; background: #FFFFFF; border-bottom: 1px solid #E2DDD4; z-index: 20000">
+<div aria-hidden="true" style="width: 26px; height: 26px; border-radius: 6px; background: #1F1D1A; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+<div style="width: 10px; height: 10px; border-radius: 2px; background: #F6F4F0"></div>
+</div>
+<input aria-label="Board name" value="{{boardName}}" onChange="{{setBoardName}}" style="font-weight: 600; font-size: 17px; border: none; background: transparent; width: {{boardW}}px; max-width: 460px; box-sizing: border-box; padding: 6px 8px; border-radius: 6px">
+<div style="flex-grow: 1"></div>
+<div role="group" aria-label="Board tool" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #D9D4CA; border-radius: 10px; background: #FFFFFF">
+<button type="button" aria-label="Hand: drag empty space to move the board (H)" title="Hand (H): drag empty space to move the board" aria-pressed="{{handPressed}}" onClick="{{useHand}}" style="width: 36px; height: 34px; padding: 0; border: none; border-radius: 7px; background: {{toolHandBg}}; color: {{toolHandInk}}; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v5"></path><path d="M14 10V4a2 2 0 0 0-4 0v6"></path><path d="M10 10.5V6a2 2 0 0 0-4 0v8"></path><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path></svg></button>
+<button type="button" aria-label="Select: drag a rectangle to select blocks (V)" title="Select (V): drag a rectangle to select several blocks" aria-pressed="{{selPressed}}" onClick="{{useSelect}}" style="width: 36px; height: 34px; padding: 0; border: none; border-radius: 7px; background: {{toolSelBg}}; color: {{toolSelInk}}; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M12 4h2M18 4h1a1 1 0 0 1 1 1v1M4 12v2M4 18v1a1 1 0 0 0 1 1h1M12 20h-1"></path><path d="M13 13l7.5 2.5-3.2 1.3-1.3 3.2z"></path></svg></button>
+</div>
+<button type="button" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" onClick="{{undo}}" style="width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid #D9D4CA; border-radius: 8px; background: #FFFFFF; cursor: pointer; opacity: {{canUndo}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1F1D1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3L2.5 6l3 3"></path><path d="M2.5 6h7a4 4 0 0 1 0 8H7"></path></svg></button>
+<button type="button" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" onClick="{{redo}}" style="width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid #D9D4CA; border-radius: 8px; background: #FFFFFF; cursor: pointer; opacity: {{canRedo}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1F1D1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 3l3 3-3 3"></path><path d="M13.5 6h-7a4 4 0 0 0 0 8H9"></path></svg></button>
+<button type="button" aria-pressed="{{snapPressed}}" onClick="{{toggleSnap}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid {{snapEdge}}; background: {{snapBg}}; color: {{snapInk}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1.5 5.5h13M1.5 10.5h13M5.5 1.5v13M10.5 1.5v13"></path></svg>Snap to grid</button>
+<div style="position: relative">
+<button type="button" aria-label="Colour of selected block" title="{{colourTitle}}" aria-expanded="{{colourExpanded}}" onClick="{{toggleColour}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid #D9D4CA; background: #FFFFFF; color: #1F1D1A; opacity: {{colourOpacity}}">
+<span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 50%; background: {{selBg}}; border: 1.5px solid {{selEdge}}"></span>Colour
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"></path></svg>
+</button>
+<sc-if value="{{colourOpen}}" hint-placeholder-val="{{ false }}">
+<div role="group" aria-label="Colours" style="position: absolute; top: 48px; left: 0; z-index: 20001; display: flex; gap: 8px; padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2DDD4; border-radius: 10px; box-shadow: 0 10px 28px rgba(31,29,26,0.14)">
+<sc-for list="{{colourSwatches}}" as="sw" hint-placeholder-count="8">
+<button type="button" aria-label="{{sw.label}}" aria-pressed="{{sw.pressed}}" title="{{sw.label}}" onClick="{{sw.pick}}" style="width: 26px; height: 26px; flex-shrink: 0; padding: 0; border-radius: 50%; border: 1.5px solid {{sw.edge}}; background: {{sw.bg}}; box-shadow: {{sw.ring}}; cursor: pointer"></button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+<div aria-hidden="true" style="width: 1px; height: 24px; background: #E2DDD4; margin: 0 4px"></div>
+<span style="font-size: 13px; color: #5F5A52; margin-right: 2px">Add</span>
+<button type="button" onClick="{{addNote}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid #F2D98C; background: #FFF3CF; color: #6B4600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #D99A12"></span>Note</button>
+<button type="button" onClick="{{addTodo}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid #B9DFC9; background: #E3F4EA; color: #1B5A3C"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #2F9A68"></span>To-do list</button>
+<button type="button" onClick="{{addLink}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid #BDD0F0; background: #E6EEFC; color: #1F4A8A"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #3A6FD0"></span>Link</button>
+<button type="button" onClick="{{addColumn}}" style="height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; border: none; background: #1F5F5B; color: #FFFFFF"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>New column</button>
+</header>
+
+<div data-viewport="1" style="cursor: {{panCursor}}; position: absolute; left: 0; top: 64px; width: 1440px; height: 836px; overflow: hidden; background-color: #F6F4F0; background-image: radial-gradient({{gridDot}} {{dotR}}px, transparent {{dotR2}}px); background-size: {{gridSize}}px {{gridSize}}px; background-position: {{gridPos}}">
+<div style="position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; transform: {{worldTransform}}">
+<sc-if value="{{hasLand}}" hint-placeholder-val="{{ false }}">
+<div aria-hidden="true" style="position: absolute; left: {{land.x}}px; top: {{land.y}}px; width: {{land.w}}px; height: {{land.h}}px; box-sizing: border-box; border: 2px dashed #1F5F5B; border-radius: 10px; background: rgba(31,95,91,0.06); pointer-events: none"></div>
+</sc-if>
+<sc-for list="{{columns}}" as="c" hint-placeholder-count="2">
+<section data-col-id="{{c.id}}" aria-label="Column" onPointerDown="{{c.select}}" style="outline: {{c.outline}}; outline-offset: 3px; position: absolute; left: {{c.left}}px; top: {{c.top}}px; width: {{c.w}}px; min-height: {{c.minH}}; box-sizing: border-box; padding-bottom: 6px; border-radius: 12px; background: {{c.bg}}; border: {{c.border}}; box-shadow: {{c.shadow}}; z-index: {{c.z}}">
+<div style="height: 52px; box-sizing: border-box; padding: 8px 8px 6px 8px; display: flex; align-items: center; gap: 2px">
+<button type="button" aria-label="Collapse or expand column" aria-expanded="{{c.expandedAttr}}" onClick="{{c.toggleCollapse}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{c.chevRot}}; transition: transform 150ms ease"><path d="M3 4.5l3 3 3-3"></path></svg></button>
+<input aria-label="Column title" value="{{c.title}}" onChange="{{c.setTitle}}" style="width: {{c.titleW}}px; max-width: 100%; flex-shrink: 1; min-width: 32px; box-sizing: border-box; font-weight: 600; font-size: 14px; border: none; background: transparent; padding: 4px 6px; border-radius: 6px">
+<span style="font-size: 12px; font-weight: 500; color: #5F5A52; padding: 1px 8px; border-radius: 999px; background: rgba(31,29,26,0.08); flex-shrink: 0">{{c.count}}</span>
+<div style="flex-grow: 1"></div>
+<button type="button" aria-label="Delete column and its cards" onClick="{{c.remove}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#8A8378" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"></path></svg></button>
+</div>
+<sc-if value="{{c.confirming}}" hint-placeholder-val="{{ false }}">
+<div role="alertdialog" aria-label="Delete column?" style="margin: 0 12px 10px; padding: 12px; background: #FFFFFF; border: 1px solid #E2DDD4; border-radius: 10px; box-shadow: 0 8px 22px rgba(31,29,26,0.14); display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 14px; font-weight: 600">Delete “{{c.title}}”?</div>
+<div style="display: flex; gap: 8px; justify-content: flex-end">
+<button type="button" onClick="{{c.cancelDelete}}" style="height: 34px; padding: 0 12px; border: 1px solid #D9D4CA; border-radius: 7px; background: #FFFFFF; font-size: 13px; font-weight: 500; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{c.confirmDelete}}" style="height: 34px; padding: 0 12px; border: none; border-radius: 7px; background: #A3263F; color: #FFFFFF; font-size: 13px; font-weight: 500; cursor: pointer">Delete column</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{c.expanded}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{c.isEmpty}}" hint-placeholder-val="{{ false }}">
+<div style="margin: 2px 16px 10px; height: 120px; box-sizing: border-box; border: 1.5px dashed #CFC8BC; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #5F5A52">Drop cards here</div>
+</sc-if>
+<sc-for list="{{c.cards}}" as="k" hint-placeholder-count="2">
+<article data-card-id="{{k.id}}" aria-label="{{k.tag}} card" onPointerDown="{{k.select}}" style="position: relative; margin: 0 16px 10px; outline: {{k.outline}}; outline-offset: 2px; width: {{k.wCss}}; min-height: {{k.hCss}}; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 12px 12px; background: {{k.bg}}; border: 1px solid {{k.edge}}; border-radius: 10px; box-shadow: {{k.shadow}}; overflow: hidden">
+<div style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; margin-right: -6px">
+<span style="flex-grow: 1; min-width: 0; padding-left: 2px; font-size: 12px; color: {{k.metaColor}}; font-weight: {{k.metaWeight}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{k.meta}}</span>
+<button type="button" aria-label="Collapse or expand card" aria-expanded="{{k.expandedAttr}}" onClick="{{k.toggleCollapse}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{k.chevRot}}; transition: transform 150ms ease"><path d="M3 4.5l3 3 3-3"></path></svg></button>
+<button type="button" aria-label="Delete card" onClick="{{k.remove}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#8A8378" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"></path></svg></button>
+</div>
+<sc-if value="{{k.expanded}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{k.isNote}}" hint-placeholder-val="{{ true }}">
+<textarea data-autosize="1" aria-label="Note text" placeholder="Write something…" value="{{k.text}}" onChange="{{k.setText}}" style="min-height: {{k.taH}}; overflow: hidden; width: 100%; box-sizing: border-box; resize: none; border: none; background: transparent; font-size: 14px; line-height: 1.55; padding: 2px 4px; border-radius: 6px"></textarea>
+</sc-if>
+<sc-if value="{{k.isTodo}}" hint-placeholder-val="{{ false }}">
+<div data-scroll="1" data-todo-of="{{k.id}}" style="display: flex; flex-direction: column; gap: 6px; overflow: visible; border-radius: 6px; box-shadow: {{k.dropAppend}}">
+<input aria-label="List title" value="{{k.title}}" onChange="{{k.setTitle}}" style="width: {{k.titleW}}px; max-width: 100%; align-self: flex-start; height: 30px; flex-shrink: 0; box-sizing: border-box; font-weight: 600; font-size: 15px; border: none; background: transparent; padding: 2px 4px; border-radius: 6px">
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{k.openItems}}" as="it" hint-placeholder-count="2">
+<div class="it-row" data-item-id="{{it.id}}" data-depth="{{it.depth}}" onPointerDown="{{it.down}}" style="min-height: 30px; display: flex; align-items: flex-start; gap: 6px; padding-left: {{it.pad}}px; box-shadow: {{it.mark}}; background: {{it.tint}}; opacity: {{it.opacity}}; border-radius: 4px">
+<input type="checkbox" aria-label="Done" checked="{{it.done}}" onChange="{{it.toggle}}" style="width: 16px; height: 16px; margin: 7px 0 0; accent-color: #2F7D5B; flex-shrink: 0; cursor: pointer">
+<textarea data-item-input="{{it.id}}" rows="1" aria-label="Item text" placeholder="Item" value="{{it.text}}" onChange="{{it.setText}}" onKeyDown="{{it.onKey}}" style="flex-grow: 1; min-width: 0; min-height: 28px; box-sizing: border-box; border: none; background: {{it.hl}}; font-size: 14px; line-height: 20px; padding: 4px 4px; border-radius: 4px; resize: none; overflow: hidden; field-sizing: content; white-space: pre-wrap; overflow-wrap: anywhere; text-decoration: {{it.strike}}; color: {{it.color}}"></textarea>
+<sc-if value="{{it.showTrash}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="it-trash" aria-label="Delete item" title="Delete item" onClick="{{it.trash}}" style="width: 24px; height: 24px; margin-top: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6B655C"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4"></path></svg></button>
+</sc-if>
+<button type="button" class="it-grip" aria-label="Drag item" onPointerDown="{{it.grab}}" style="width: 14px; height: 24px; margin-top: 3px; margin-left: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; cursor: default; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true"><circle cx="3" cy="3" r="1.7"></circle><circle cx="9" cy="3" r="1.7"></circle><circle cx="3" cy="9" r="1.7"></circle><circle cx="9" cy="9" r="1.7"></circle><circle cx="3" cy="15" r="1.7"></circle><circle cx="9" cy="15" r="1.7"></circle></svg></button>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{k.hasDone}}" hint-placeholder-val="{{ false }}">
+<div style="border-top: 1px solid {{k.edge}}; padding-top: 4px; display: flex; flex-direction: column">
+<button type="button" aria-expanded="{{k.doneExpandedAttr}}" onClick="{{k.toggleDoneList}}" style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; border: none; background: transparent; padding: 0 4px; font-size: 12px; font-weight: 600; color: #5F5A52; cursor: pointer; border-radius: 6px"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{k.doneChevRot}}"><path d="M3 4.5l3 3 3-3"></path></svg>Completed · {{k.doneCount}}</button>
+<sc-if value="{{k.showDone}}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{k.doneItems}}" as="it" hint-placeholder-count="2">
+<div class="it-row" data-item-id="{{it.id}}" data-depth="{{it.depth}}" onPointerDown="{{it.down}}" style="min-height: 30px; display: flex; align-items: flex-start; gap: 6px; padding-left: {{it.pad}}px; box-shadow: {{it.mark}}; background: {{it.tint}}; opacity: {{it.opacity}}; border-radius: 4px">
+<input type="checkbox" aria-label="Done" checked="{{it.done}}" onChange="{{it.toggle}}" style="width: 16px; height: 16px; margin: 7px 0 0; accent-color: #2F7D5B; flex-shrink: 0; cursor: pointer">
+<textarea data-item-input="{{it.id}}" rows="1" aria-label="Item text" placeholder="Item" value="{{it.text}}" onChange="{{it.setText}}" onKeyDown="{{it.onKey}}" style="flex-grow: 1; min-width: 0; min-height: 28px; box-sizing: border-box; border: none; background: {{it.hl}}; font-size: 14px; line-height: 20px; padding: 4px 4px; border-radius: 4px; resize: none; overflow: hidden; field-sizing: content; white-space: pre-wrap; overflow-wrap: anywhere; text-decoration: {{it.strike}}; color: {{it.color}}"></textarea>
+<sc-if value="{{it.showTrash}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="it-trash" aria-label="Delete item" title="Delete item" onClick="{{it.trash}}" style="width: 24px; height: 24px; margin-top: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6B655C"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4"></path></svg></button>
+</sc-if>
+<button type="button" class="it-grip" aria-label="Drag item" onPointerDown="{{it.grab}}" style="width: 14px; height: 24px; margin-top: 3px; margin-left: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; cursor: default; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true"><circle cx="3" cy="3" r="1.7"></circle><circle cx="9" cy="3" r="1.7"></circle><circle cx="3" cy="9" r="1.7"></circle><circle cx="9" cy="9" r="1.7"></circle><circle cx="3" cy="15" r="1.7"></circle><circle cx="9" cy="15" r="1.7"></circle></svg></button>
+</div>
+</sc-for>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{k.isLink}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<input aria-label="Link title" placeholder="Title" value="{{k.title}}" onChange="{{k.setTitle}}" style="width: {{k.titleW}}px; max-width: 100%; align-self: flex-start; height: 30px; box-sizing: border-box; font-weight: 600; font-size: 15px; border: none; background: transparent; padding: 2px 4px; border-radius: 6px">
+<input aria-label="Link address" placeholder="Paste a URL" value="{{k.url}}" onChange="{{k.setUrl}}" style="height: 30px; box-sizing: border-box; border: 1px solid {{k.edge}}; border-radius: 6px; background: rgba(255,255,255,0.75); padding: 0 10px; font-size: 13px; color: #5F5A52">
+<a href="{{k.href}}" target="_blank" rel="noopener noreferrer" style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 6px; border: 1px solid {{k.edge}}; background: #FFFFFF; color: #1F4A8A; font-weight: 600; font-size: 13px; text-decoration: none">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4v4M13 3L7 9M11 10v3H3V5h3"></path></svg>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Open {{k.domain}}</span>
+</a>
+</div>
+</sc-if>
+<sc-if value="{{k.canResize}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="rz" aria-label="Resize card" onPointerDown="{{k.startResize}}" style="position: absolute; right: 1px; bottom: 1px; width: 18px; height: 18px; padding: 0; border: none; background: transparent; border-radius: 4px; cursor: nwse-resize; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#8A8378" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M9 3L3 9M9 6.5L6.5 9"></path></svg></button>
+</sc-if>
+</sc-if>
+</article>
+</sc-for>
+<button type="button" class="rzc" aria-label="Resize column width" onPointerDown="{{c.startResize}}" style="position: absolute; right: -5px; top: 52px; bottom: 22px; width: 10px; padding: 0; border: none; background: transparent; border-radius: 5px; cursor: ew-resize; touch-action: none"></button>
+<button type="button" class="rz" aria-label="Resize column" onPointerDown="{{c.startResizeCorner}}" style="position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; padding: 0; border: none; background: transparent; border-radius: 4px; cursor: nwse-resize; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#8A8378" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M9 3L3 9M9 6.5L6.5 9"></path></svg></button>
+</sc-if>
+</section>
+</sc-for>
+
+<sc-for list="{{loose}}" as="k" hint-placeholder-count="2">
+<article data-card-id="{{k.id}}" aria-label="{{k.tag}} card" onPointerDown="{{k.select}}" style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; transform: {{k.tilt}}; z-index: {{k.z}}; outline: {{k.outline}}; outline-offset: 2px; width: {{k.wCss}}; min-height: {{k.hCss}}; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 12px 12px; background: {{k.bg}}; border: 1px solid {{k.edge}}; border-radius: 10px; box-shadow: {{k.shadow}}; overflow: hidden">
+<div style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; margin-right: -6px">
+<span style="flex-grow: 1; min-width: 0; padding-left: 2px; font-size: 12px; color: {{k.metaColor}}; font-weight: {{k.metaWeight}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{k.meta}}</span>
+<button type="button" aria-label="Collapse or expand card" aria-expanded="{{k.expandedAttr}}" onClick="{{k.toggleCollapse}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{k.chevRot}}; transition: transform 150ms ease"><path d="M3 4.5l3 3 3-3"></path></svg></button>
+<button type="button" aria-label="Delete card" onClick="{{k.remove}}" style="width: 28px; height: 28px; flex-shrink: 0; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; background: transparent"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#8A8378" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"></path></svg></button>
+</div>
+<sc-if value="{{k.expanded}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{k.isNote}}" hint-placeholder-val="{{ true }}">
+<textarea data-autosize="1" aria-label="Note text" placeholder="Write something…" value="{{k.text}}" onChange="{{k.setText}}" style="min-height: {{k.taH}}; overflow: hidden; width: 100%; box-sizing: border-box; resize: none; border: none; background: transparent; font-size: 14px; line-height: 1.55; padding: 2px 4px; border-radius: 6px"></textarea>
+</sc-if>
+<sc-if value="{{k.isTodo}}" hint-placeholder-val="{{ false }}">
+<div data-scroll="1" data-todo-of="{{k.id}}" style="display: flex; flex-direction: column; gap: 6px; overflow: visible; border-radius: 6px; box-shadow: {{k.dropAppend}}">
+<input aria-label="List title" value="{{k.title}}" onChange="{{k.setTitle}}" style="width: {{k.titleW}}px; max-width: 100%; align-self: flex-start; height: 30px; flex-shrink: 0; box-sizing: border-box; font-weight: 600; font-size: 15px; border: none; background: transparent; padding: 2px 4px; border-radius: 6px">
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{k.openItems}}" as="it" hint-placeholder-count="2">
+<div class="it-row" data-item-id="{{it.id}}" data-depth="{{it.depth}}" onPointerDown="{{it.down}}" style="min-height: 30px; display: flex; align-items: flex-start; gap: 6px; padding-left: {{it.pad}}px; box-shadow: {{it.mark}}; background: {{it.tint}}; opacity: {{it.opacity}}; border-radius: 4px">
+<input type="checkbox" aria-label="Done" checked="{{it.done}}" onChange="{{it.toggle}}" style="width: 16px; height: 16px; margin: 7px 0 0; accent-color: #2F7D5B; flex-shrink: 0; cursor: pointer">
+<textarea data-item-input="{{it.id}}" rows="1" aria-label="Item text" placeholder="Item" value="{{it.text}}" onChange="{{it.setText}}" onKeyDown="{{it.onKey}}" style="flex-grow: 1; min-width: 0; min-height: 28px; box-sizing: border-box; border: none; background: {{it.hl}}; font-size: 14px; line-height: 20px; padding: 4px 4px; border-radius: 4px; resize: none; overflow: hidden; field-sizing: content; white-space: pre-wrap; overflow-wrap: anywhere; text-decoration: {{it.strike}}; color: {{it.color}}"></textarea>
+<sc-if value="{{it.showTrash}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="it-trash" aria-label="Delete item" title="Delete item" onClick="{{it.trash}}" style="width: 24px; height: 24px; margin-top: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6B655C"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4"></path></svg></button>
+</sc-if>
+<button type="button" class="it-grip" aria-label="Drag item" onPointerDown="{{it.grab}}" style="width: 14px; height: 24px; margin-top: 3px; margin-left: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; cursor: default; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true"><circle cx="3" cy="3" r="1.7"></circle><circle cx="9" cy="3" r="1.7"></circle><circle cx="3" cy="9" r="1.7"></circle><circle cx="9" cy="9" r="1.7"></circle><circle cx="3" cy="15" r="1.7"></circle><circle cx="9" cy="15" r="1.7"></circle></svg></button>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{k.hasDone}}" hint-placeholder-val="{{ false }}">
+<div style="border-top: 1px solid {{k.edge}}; padding-top: 4px; display: flex; flex-direction: column">
+<button type="button" aria-expanded="{{k.doneExpandedAttr}}" onClick="{{k.toggleDoneList}}" style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; border: none; background: transparent; padding: 0 4px; font-size: 12px; font-weight: 600; color: #5F5A52; cursor: pointer; border-radius: 6px"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6B655C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{k.doneChevRot}}"><path d="M3 4.5l3 3 3-3"></path></svg>Completed · {{k.doneCount}}</button>
+<sc-if value="{{k.showDone}}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{k.doneItems}}" as="it" hint-placeholder-count="2">
+<div class="it-row" data-item-id="{{it.id}}" data-depth="{{it.depth}}" onPointerDown="{{it.down}}" style="min-height: 30px; display: flex; align-items: flex-start; gap: 6px; padding-left: {{it.pad}}px; box-shadow: {{it.mark}}; background: {{it.tint}}; opacity: {{it.opacity}}; border-radius: 4px">
+<input type="checkbox" aria-label="Done" checked="{{it.done}}" onChange="{{it.toggle}}" style="width: 16px; height: 16px; margin: 7px 0 0; accent-color: #2F7D5B; flex-shrink: 0; cursor: pointer">
+<textarea data-item-input="{{it.id}}" rows="1" aria-label="Item text" placeholder="Item" value="{{it.text}}" onChange="{{it.setText}}" onKeyDown="{{it.onKey}}" style="flex-grow: 1; min-width: 0; min-height: 28px; box-sizing: border-box; border: none; background: {{it.hl}}; font-size: 14px; line-height: 20px; padding: 4px 4px; border-radius: 4px; resize: none; overflow: hidden; field-sizing: content; white-space: pre-wrap; overflow-wrap: anywhere; text-decoration: {{it.strike}}; color: {{it.color}}"></textarea>
+<sc-if value="{{it.showTrash}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="it-trash" aria-label="Delete item" title="Delete item" onClick="{{it.trash}}" style="width: 24px; height: 24px; margin-top: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6B655C"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4"></path></svg></button>
+</sc-if>
+<button type="button" class="it-grip" aria-label="Drag item" onPointerDown="{{it.grab}}" style="width: 14px; height: 24px; margin-top: 3px; margin-left: 2px; flex-shrink: 0; padding: 0; border: none; background: transparent; cursor: default; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="8" height="12" viewBox="0 0 12 18" fill="#8A8378" aria-hidden="true"><circle cx="3" cy="3" r="1.7"></circle><circle cx="9" cy="3" r="1.7"></circle><circle cx="3" cy="9" r="1.7"></circle><circle cx="9" cy="9" r="1.7"></circle><circle cx="3" cy="15" r="1.7"></circle><circle cx="9" cy="15" r="1.7"></circle></svg></button>
+</div>
+</sc-for>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{k.isLink}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<input aria-label="Link title" placeholder="Title" value="{{k.title}}" onChange="{{k.setTitle}}" style="width: {{k.titleW}}px; max-width: 100%; align-self: flex-start; height: 30px; box-sizing: border-box; font-weight: 600; font-size: 15px; border: none; background: transparent; padding: 2px 4px; border-radius: 6px">
+<input aria-label="Link address" placeholder="Paste a URL" value="{{k.url}}" onChange="{{k.setUrl}}" style="height: 30px; box-sizing: border-box; border: 1px solid {{k.edge}}; border-radius: 6px; background: rgba(255,255,255,0.75); padding: 0 10px; font-size: 13px; color: #5F5A52">
+<a href="{{k.href}}" target="_blank" rel="noopener noreferrer" style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 6px; border: 1px solid {{k.edge}}; background: #FFFFFF; color: #1F4A8A; font-weight: 600; font-size: 13px; text-decoration: none">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4v4M13 3L7 9M11 10v3H3V5h3"></path></svg>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Open {{k.domain}}</span>
+</a>
+</div>
+</sc-if>
+<sc-if value="{{k.canResize}}" hint-placeholder-val="{{ true }}">
+<button type="button" class="rz" aria-label="Resize card" onPointerDown="{{k.startResize}}" style="position: absolute; right: 1px; bottom: 1px; width: 18px; height: 18px; padding: 0; border: none; background: transparent; border-radius: 4px; cursor: nwse-resize; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#8A8378" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M9 3L3 9M9 6.5L6.5 9"></path></svg></button>
+</sc-if>
+</sc-if>
+</article>
+</sc-for>
+</div>
+</div>
+
+<sc-if value="{{hasMarquee}}" hint-placeholder-val="{{ false }}">
+<div aria-hidden="true" style="position: absolute; left: {{marquee.x}}px; top: {{marquee.y}}px; width: {{marquee.w}}px; height: {{marquee.h}}px; box-sizing: border-box; border: 1.5px solid #1F5F5B; background: rgba(31,95,91,0.10); border-radius: 3px; z-index: 19000; pointer-events: none"></div>
+</sc-if>
+
+<sc-if value="{{hasGhost}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: {{ghost.x}}px; top: {{ghost.y}}px; z-index: 30000; max-width: 260px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #FFFFFF; border: 2px solid #1F5F5B; border-radius: 8px; box-shadow: 0 0 0 4px rgba(31,95,91,0.14), 0 10px 24px rgba(31,29,26,0.16); font-size: 13px; color: #1F1D1A; pointer-events: none">
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ghost.label}}</span>
+<sc-if value="{{ghost.hasExtra}}" hint-placeholder-val="{{ false }}"><span style="flex-shrink: 0; font-size: 12px; color: #5F5A52">{{ghost.extra}}</span></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{hasGuide}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: {{guide.x}}px; top: {{guide.y}}px; z-index: 30000; background: #1F1D1A; color: #FFFFFF; font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 6px; white-space: nowrap; pointer-events: none">{{guide.text}}</div>
+</sc-if>
+
+<div style="position: absolute; right: 24px; bottom: 16px; z-index: 20000; display: flex; align-items: center; gap: 2px; padding: 3px; background: #FFFFFF; border: 1px solid #E2DDD4; border-radius: 10px; box-shadow: 0 1px 3px rgba(31,29,26,0.08)">
+<button type="button" aria-label="Zoom out" onClick="{{zoomOut}}" style="width: 32px; height: 32px; padding: 0; border: none; background: transparent; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#1F1D1A" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 8h10"></path></svg></button>
+<button type="button" aria-label="Reset zoom" title="Reset zoom (Ctrl+0)" onClick="{{zoomReset}}" style="min-width: 56px; height: 32px; padding: 0 6px; border: none; background: transparent; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 500; color: #1F1D1A">{{zoomLabel}}</button>
+<button type="button" aria-label="Zoom in" onClick="{{zoomIn}}" style="width: 32px; height: 32px; padding: 0; border: none; background: transparent; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#1F1D1A" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg></button>
+</div>
+
+<p style="position: absolute; left: 28px; bottom: 14px; margin: 0; padding: 4px 8px; border-radius: 6px; background: rgba(246,244,240,0.9); font-size: 13px; color: #5F5A52; z-index: 20000">Drag a block to move it; drag a card's corner or a column's edge to resize. Hand (H) drags the board, Select (V) draws a selection box. Scroll to pan, Ctrl+scroll to zoom. Ctrl+click to select several. Ctrl+C / Ctrl+V copy, Ctrl+Z undo (⌘ on Mac).</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+var BOARD_W = 1440, BOARD_H = 900, VIEW_TOP = 64, VIEW_H = 836, MIN_Z = 0.3, MAX_Z = 2.5, TOP = -100000, GRID = 20, SNAP_TOL = 8;
+var CARD_W = 240, COL_W = 280, MIN_W = 200, MAX_W = 640, MIN_H = 100, MAX_H = 700, MIN_COL_W = 240;
+var PALETTE = {
+  butter:   { label: 'Butter',   bg: '#FFF3CF', edge: '#EED9A0', pill: '#F6DD93', ink: '#6B4600', dot: '#D99A12' },
+  peach:    { label: 'Peach',    bg: '#FDEBDD', edge: '#F2CDB0', pill: '#F8D4B8', ink: '#7A3A0E', dot: '#E07A2E' },
+  rose:     { label: 'Rose',     bg: '#FCE7EC', edge: '#F2C4CF', pill: '#F7CCD7', ink: '#8A1F3D', dot: '#D6456B' },
+  lavender: { label: 'Lavender', bg: '#EFEAFB', edge: '#D5CAF2', pill: '#DCD1F7', ink: '#4B2E8A', dot: '#7D5BD6' },
+  sky:      { label: 'Sky',      bg: '#E6EEFC', edge: '#C3D4F2', pill: '#C9DBF8', ink: '#1F4A8A', dot: '#3A6FD0' },
+  teal:     { label: 'Teal',     bg: '#E0F2F1', edge: '#B7DEDB', pill: '#BCE3E0', ink: '#155E58', dot: '#2A9D93' },
+  mint:     { label: 'Mint',     bg: '#E3F4EA', edge: '#BFE0CC', pill: '#BFE6CF', ink: '#1B5A3C', dot: '#2F9A68' },
+  stone:    { label: 'Stone',    bg: '#F7F5F1', edge: '#E2DDD4', pill: '#E7E3DC', ink: '#3F3B35', dot: '#8A8378' }
+};
+var PALETTE_KEYS = ['butter', 'peach', 'rose', 'lavender', 'sky', 'teal', 'mint', 'stone'];
+var DEFAULT_COLOR = { note: 'butter', todo: 'mint', link: 'sky' };
+var TAGS = { note: 'Note', todo: 'To-do', link: 'Link' };
+var SEL_OUTLINE = '2px solid #1F5F5B';
+var DRAG_OUTLINE = '2.5px solid #1F5F5B';
+var DRAG_SHADOW = '0 0 0 5px rgba(31,95,91,0.16), 0 14px 30px rgba(31,29,26,0.16)';
+var BLOCK_GAP = 10;
+function overlaps(a, b, g) { return a.x < b.x + b.w + g && b.x < a.x + a.w + g && a.y < b.y + b.h + g && b.y < a.y + a.h + g; }
+var MATCH_OUTLINE = '2px dashed #1F5F5B';
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function gsnap(v) { return Math.round(v / GRID) * GRID; }
+function hrefOf(u) {
+  u = (u || '').trim();
+  if (!u) return '#';
+  return /^https?:\/\//i.test(u) ? u : 'https://' + u;
+}
+function domainOf(u) {
+  try { return new URL(hrefOf(u)).hostname.replace(/^www\./, ''); } catch (e) { return 'link'; }
+}
+var measureCtx = null;
+function textW(text, size, pad) {
+  try {
+    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = '600 ' + size + "px 'IBM Plex Sans', system-ui, sans-serif";
+    return Math.ceil(measureCtx.measureText(text || ' ').width) + pad;
+  } catch (e) {
+    return Math.ceil((text || ' ').length * size * 0.6) + pad;
+  }
+}
+var MAX_DEPTH = 5;
+function findItem(items, id, parent, depth) {
+  depth = depth || 0;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].id === id) return { list: items, index: i, parent: parent || null, item: items[i], depth: depth };
+    var f = findItem(items[i].children || [], id, items[i], depth + 1);
+    if (f) return f;
+  }
+  return null;
+}
+function countItems(items) {
+  var n = 0, d = 0;
+  (items || []).forEach(function (it) {
+    n += 1; if (it.done) d += 1;
+    var c = countItems(it.children);
+    n += c.n; d += c.d;
+  });
+  return { n: n, d: d };
+}
+function subtreeIds(it, out) {
+  out = out || [];
+  out.push(it.id);
+  (it.children || []).forEach(function (c) { subtreeIds(c, out); });
+  return out;
+}
+function subtreeHeight(it) {
+  var h = 0;
+  (it.children || []).forEach(function (c) { h = Math.max(h, 1 + subtreeHeight(c)); });
+  return h;
+}
+function lastVisible(it) {
+  var ch = it.children || [];
+  return ch.length ? lastVisible(ch[ch.length - 1]) : it;
+}
+function flatIds(items, out) {
+  out = out || [];
+  (items || []).forEach(function (it) { out.push(it.id); flatIds(it.children, out); });
+  return out;
+}
+function rootsOf(items, ids) {
+  return ids.filter(function (id) {
+    var loc = findItem(items, id);
+    if (!loc) return false;
+    var anc = loc.parent;
+    while (anc) {
+      if (ids.indexOf(anc.id) !== -1) return false;
+      var al = findItem(items, anc.id);
+      anc = al ? al.parent : null;
+    }
+    return true;
+  });
+}
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.seq = 100;
+    this.zTop = 10;
+    this.clip = null;
+    this.past = [];
+    this.future = [];
+    this.lastKey = null;
+    this.lastAt = 0;
+    this.state = {
+      boardName: 'My first board',
+      drag: null,
+      resize: null,
+      guide: null,
+      hoverCol: null,
+      picker: null,
+      selected: null,
+      sel: [],
+      snap: true,
+      panning: false,
+      tool: 'hand',
+      confirmCol: null,
+      itemSel: null,
+      marquee: null,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      columns: [
+        { id: 'c1', x: 40, y: 40, w: COL_W, title: 'Ideas', color: null, collapsed: false },
+        { id: 'c2', x: 360, y: 40, w: COL_W, title: 'This week', color: null, collapsed: false }
+      ],
+      cards: [
+        { id: 'k1', type: 'note', col: 'c1', order: 0, x: 0, y: 0, z: 1, w: null, h: null, collapsed: false, text: 'Drag a card from any blank spot to move it, or from its bottom-right corner to resize it.' },
+        { id: 'k2', type: 'note', col: 'c1', order: 1, x: 0, y: 0, z: 1, w: null, h: null, collapsed: false, text: 'Use the arrow in a card or column header to collapse it.' },
+        { id: 'k3', type: 'todo', col: 'c2', order: 0, x: 0, y: 0, z: 1, w: null, h: null, collapsed: false, hideDone: false, title: 'Prototype v1', draft: '', items: [
+          { id: 'i1', text: 'Board with draggable cards', done: true, children: [] },
+          { id: 'i2', text: 'Columns that stack cards', done: true, children: [] },
+          { id: 'i3', text: 'Save boards between visits', done: false, children: [
+            { id: 'i4', text: 'Save in this browser', done: false, children: [] },
+            { id: 'i5', text: 'Sync to the cloud', done: false, children: [] }
+          ] }
+        ] },
+        { id: 'k4', type: 'link', col: null, order: 0, x: 720, y: 60, z: 2, w: null, h: null, collapsed: false, title: 'Inspiration', url: 'https://milanote.com' },
+        { id: 'k5', type: 'note', col: null, order: 0, x: 1020, y: 120, z: 3, w: null, h: null, collapsed: false, text: 'A loose card that is not in any column.' }
+      ]
+    };
+    this.onMove = this.onMove.bind(this);
+    this.onUp = this.onUp.bind(this);
+    this.onWheel = this.onWheel.bind(this);
+  }
+
+  componentWillUnmount() {
+    this.unlisten();
+    if (this.hooked) this.hooked.removeEventListener('wheel', this.onWheel);
+  }
+
+  // ---------- zoom & pan ----------
+  hookBoard(el) {
+    if (!el || this.hooked === el) return;
+    if (this.hooked) this.hooked.removeEventListener('wheel', this.onWheel);
+    el.addEventListener('wheel', this.onWheel, { passive: false });
+    this.hooked = el;
+    this.boardEl = el;
+  }
+  viewPt(e) {
+    var br = this.boardEl.getBoundingClientRect();
+    var sc = this.scale();
+    return { x: (e.clientX - br.left) / sc, y: (e.clientY - br.top) / sc - VIEW_TOP };
+  }
+  zoomAt(v, f) {
+    var z1 = this.state.zoom;
+    var z2 = clamp(z1 * f, MIN_Z, MAX_Z);
+    if (z2 === z1) return;
+    var k = z2 / z1;
+    this.setState({ zoom: z2, panX: v.x - (v.x - this.state.panX) * k, panY: v.y - (v.y - this.state.panY) * k });
+  }
+  zoomCenter(f) { this.zoomAt({ x: BOARD_W / 2, y: VIEW_H / 2 }, f); }
+  onWheel(e) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      this.zoomAt(this.viewPt(e), Math.exp(-e.deltaY * 0.0025));
+      return;
+    }
+    var t = e.target;
+    if (t && t.closest) {
+      if (t.closest('textarea,input')) return;
+      var sc = t.closest('[data-scroll]');
+      if (sc && sc.scrollHeight > sc.clientHeight + 1) return;
+      if (!t.closest('[data-viewport]')) return;
+    }
+    e.preventDefault();
+    this.setState({ panX: this.state.panX - e.deltaX, panY: this.state.panY - e.deltaY });
+  }
+
+  nextId(p) { this.seq += 1; return p + this.seq; }
+
+  // ---------- history ----------
+  snapshot() {
+    return clone({ cards: this.state.cards, columns: this.state.columns, boardName: this.state.boardName });
+  }
+  remember(key) {
+    var now = Date.now();
+    if (key && key === this.lastKey && now - this.lastAt < 1200) { this.lastAt = now; return; }
+    this.lastKey = key || null;
+    this.lastAt = now;
+    this.past.push(this.snapshot());
+    if (this.past.length > 100) this.past.shift();
+    this.future = [];
+  }
+  restore(snap) {
+    this.lastKey = null;
+    this.setState({ cards: snap.cards, columns: snap.columns, boardName: snap.boardName, selected: null, sel: [], itemSel: null, confirmCol: null, picker: null, drag: null, resize: null, guide: null });
+  }
+  undo() {
+    var cur = JSON.stringify(this.snapshot());
+    while (this.past.length) {
+      var snap = this.past.pop();
+      if (JSON.stringify(snap) === cur) continue;
+      this.future.push(JSON.parse(cur));
+      this.restore(snap);
+      return true;
+    }
+    this.forceUpdate();
+    return false;
+  }
+  redo() {
+    if (!this.future.length) return false;
+    this.past.push(this.snapshot());
+    this.restore(this.future.pop());
+    return true;
+  }
+
+  // ---------- geometry ----------
+  scale() {
+    if (!this.boardEl) return 1;
+    return this.boardEl.getBoundingClientRect().width / BOARD_W || 1;
+  }
+  wscale() { return this.scale() * this.state.zoom; }
+  toBoard(e) {
+    if (!this.boardEl) return { x: e.clientX, y: e.clientY };
+    var v = this.viewPt(e);
+    return { x: (v.x - this.state.panX) / this.state.zoom, y: (v.y - this.state.panY) / this.state.zoom };
+  }
+  rectToBoard(r) {
+    return this.toBoard({ clientX: r.left, clientY: r.top });
+  }
+  colAt(e) {
+    if (!this.boardEl) return null;
+    var sc = this.scale();
+    var found = null;
+    this.boardEl.querySelectorAll('[data-col-id]').forEach(function (el) {
+      var r = el.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom + 60 * sc) {
+        found = el.getAttribute('data-col-id');
+      }
+    });
+    return found;
+  }
+  colCardEls(colId) {
+    var col = null;
+    this.boardEl.querySelectorAll('[data-col-id]').forEach(function (el) {
+      if (el.getAttribute('data-col-id') === colId) col = el;
+    });
+    return col ? Array.prototype.slice.call(col.querySelectorAll('[data-card-id]')) : [];
+  }
+
+  listen() {
+    window.addEventListener('pointermove', this.onMove);
+    window.addEventListener('pointerup', this.onUp);
+    window.addEventListener('pointercancel', this.onUp);
+  }
+  unlisten() {
+    window.removeEventListener('pointermove', this.onMove);
+    window.removeEventListener('pointerup', this.onUp);
+    window.removeEventListener('pointercancel', this.onUp);
+  }
+  maybeSnap(v) { return this.state.snap ? gsnap(v) : v; }
+
+  // ---------- moving ----------
+  isInteractive(t) {
+    return !!(t && t.closest && t.closest('input,textarea,button,a,label,select'));
+  }
+  armDrag(e, kind, id) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (this.isInteractive(e.target)) return;
+    if (e.target.closest && e.target.closest('[data-item-id]')) return;
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    this.pending = { kind: kind, id: id, x: e.clientX, y: e.clientY, el: e.currentTarget };
+    this.listen();
+  }
+  startCardDrag(e, id) {
+    e.preventDefault();
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    this.beginCardDrag(id, e.currentTarget.closest('[data-card-id]'), e.clientX, e.clientY);
+    this.listen();
+  }
+  beginCardDrag(id, art, cx, cy) {
+    var pt = { clientX: cx, clientY: cy };
+    try { window.getSelection().removeAllRanges(); } catch (err) {}
+    var p = this.toBoard(pt);
+    var cur = this.rectToBoard(art.getBoundingClientRect());
+    var ws = this.wscale();
+    var kk = this.state.cards.find(function (x) { return x.id === id; });
+    this.dragOthers = this.blockRects(id, null);
+    this.dragSize = { w: kk.w || CARD_W, h: art.getBoundingClientRect().height / ws };
+    this.remember('move');
+    this.zTop += 1;
+    var z = this.zTop;
+    var cards = this.state.cards.map(function (k) {
+      return k.id === id ? Object.assign({}, k, { col: null, x: cur.x, y: cur.y, z: z }) : k;
+    });
+    var group = this.groupFor('card', id);
+    this.dragOthers = this.blockRects(id, null).filter(function (b) { return !group.some(function (g) { return g.id === b.id; }); });
+    this.setState({ cards: cards, drag: { kind: 'card', id: id, dx: p.x - cur.x, dy: p.y - cur.y, sx: cur.x, sy: cur.y, group: group }, hoverCol: this.colAt(pt), selected: { kind: 'card', id: id }, sel: this.keepSel('card', id) });
+  }
+
+  startColDrag(e, id) {
+    e.preventDefault();
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    this.beginColDrag(id, e.clientX, e.clientY);
+    this.listen();
+  }
+  beginColDrag(id, cx, cy) {
+    try { window.getSelection().removeAllRanges(); } catch (err) {}
+    var p = this.toBoard({ clientX: cx, clientY: cy });
+    var c = this.state.columns.find(function (x) { return x.id === id; });
+    var colEl = null;
+    this.boardEl.querySelectorAll('[data-col-id]').forEach(function (el) { if (el.getAttribute('data-col-id') === id) colEl = el; });
+    var ws = this.wscale();
+    this.dragOthers = this.blockRects(null, id);
+    this.dragSize = colEl ? { w: colEl.getBoundingClientRect().width / ws, h: colEl.getBoundingClientRect().height / ws } : { w: c.w, h: 220 };
+    this.remember('move');
+    var group = this.groupFor('col', id);
+    this.dragOthers = (this.dragOthers || []).filter(function (b) { return !group.some(function (g) { return g.id === b.id; }); });
+    this.setState({ drag: { kind: 'col', id: id, dx: p.x - c.x, dy: p.y - c.y, sx: c.x, sy: c.y, group: group }, selected: { kind: 'col', id: id }, sel: this.keepSel('col', id) });
+  }
+
+  // ---------- no-overlap layout ----------
+  blockRects(exCard, exCol) {
+    var out = [];
+    if (!this.boardEl) return out;
+    var ws = this.wscale();
+    var self = this;
+    this.boardEl.querySelectorAll('[data-col-id]').forEach(function (el) {
+      var id = el.getAttribute('data-col-id');
+      if (id === exCol) return;
+      var r = el.getBoundingClientRect();
+      var p = self.rectToBoard(r);
+      out.push({ kind: 'col', id: id, x: p.x, y: p.y, w: r.width / ws, h: r.height / ws });
+    });
+    this.boardEl.querySelectorAll('[data-card-id]').forEach(function (el) {
+      if (el.parentElement && el.parentElement.closest('[data-col-id]')) return;
+      var id = el.getAttribute('data-card-id');
+      if (id === exCard) return;
+      var r = el.getBoundingClientRect();
+      var p = self.rectToBoard(r);
+      out.push({ kind: 'card', id: id, x: p.x, y: p.y, w: r.width / ws, h: r.height / ws });
+    });
+    return out;
+  }
+  freeSpot(rect, others) {
+    var hit = function (c) { return others.some(function (o) { return overlaps(c, o, BLOCK_GAP); }); };
+    if (!hit(rect)) return { x: rect.x, y: rect.y };
+    var step = this.state.snap ? GRID : 10;
+    var bx = this.state.snap ? gsnap(rect.x) : Math.round(rect.x);
+    var by = this.state.snap ? gsnap(rect.y) : Math.round(rect.y);
+    for (var ring = 1; ring <= 120; ring++) {
+      var best = null;
+      for (var dx = -ring; dx <= ring; dx++) {
+        for (var dy = -ring; dy <= ring; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+          var c = { x: bx + dx * step, y: by + dy * step, w: rect.w, h: rect.h };
+          if (c.y < Math.min(0, rect.y) || c.x < Math.min(0, rect.x)) continue;
+          if (hit(c)) continue;
+          var dd = (c.x - rect.x) * (c.x - rect.x) + (c.y - rect.y) * (c.y - rect.y);
+          if (!best || dd < best.d) best = { x: c.x, y: c.y, d: dd };
+        }
+      }
+      if (best) return { x: best.x, y: best.y };
+    }
+    return { x: rect.x, y: rect.y };
+  }
+  settle() {
+    if (!this.boardEl || this.state.drag || this.state.resize || this.pending) return;
+    var anchors = [].concat(this.anchor || []);
+    var movables = [].concat(this.movable || []);
+    var blocks = this.blockRects(null, null).map(function (b, i) { b.i = i; return b; });
+    var rank = function (b) {
+      if (anchors.indexOf(b.id) !== -1) return 0;
+      if (movables.indexOf(b.id) !== -1) return 4;
+      return b.kind === 'col' ? 1 : 2;
+    };
+    blocks.sort(function (a, b) { return rank(a) - rank(b) || a.i - b.i; });
+    var placed = [];
+    var moves = {};
+    var self = this;
+    blocks.forEach(function (b) {
+      if (placed.some(function (o) { return overlaps(b, o, BLOCK_GAP - 1); })) {
+        var f = self.freeSpot(b, placed);
+        moves[b.id] = { kind: b.kind, x: Math.round(f.x), y: Math.round(f.y) };
+        b = Object.assign({}, b, f);
+      }
+      placed.push(b);
+    });
+    if (!Object.keys(moves).length) return;
+    this.setState({
+      cards: this.state.cards.map(function (k) { var m = moves[k.id]; return m && m.kind === 'card' ? Object.assign({}, k, { x: m.x, y: m.y }) : k; }),
+      columns: this.state.columns.map(function (c) { var m = moves[c.id]; return m && m.kind === 'col' ? Object.assign({}, c, { x: m.x, y: m.y }) : c; })
+    });
+  }
+
+  // ---------- resizing ----------
+  startResize(e, kind, id, corner) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    var el = e.currentTarget.closest(kind === 'card' ? '[data-card-id]' : '[data-col-id]');
+    var sc = this.wscale();
+    var r = el.getBoundingClientRect();
+    var p = this.toBoard(e);
+    var cands = [];
+    this.boardEl.querySelectorAll('[data-card-id]').forEach(function (x) {
+      var xid = x.getAttribute('data-card-id');
+      if (kind === 'card' && xid === id) return;
+      if (kind === 'col' && x.closest('[data-col-id]') === el) return;
+      var rr = x.getBoundingClientRect();
+      cands.push({ id: xid, w: Math.round(rr.width / sc), h: Math.round(rr.height / sc) });
+    });
+    this.boardEl.querySelectorAll('[data-col-id]').forEach(function (x) {
+      var xid = x.getAttribute('data-col-id');
+      if (kind === 'col' && xid === id) return;
+      var rr = x.getBoundingClientRect();
+      cands.push({ id: xid, w: Math.round(rr.width / sc), h: Math.round(rr.height / sc) });
+    });
+    this.remember('resize');
+    var inCol = null;
+    if (kind === 'card') {
+      var k = this.state.cards.find(function (x) { return x.id === id; });
+      inCol = k.col || null;
+    }
+    this.anchor = inCol || id;
+    this.movable = null;
+    this.setState({
+      resize: { kind: kind, id: id, sx: p.x, sy: p.y, w0: r.width / sc, h0: r.height / sc, cands: cands, inCol: inCol, corner: !!corner },
+      selected: { kind: kind, id: id }, sel: [{ kind: kind, id: id }], picker: null
+    });
+    this.listen();
+  }
+
+  nearest(cands, key, v) {
+    var best = null;
+    cands.forEach(function (c) {
+      if (c[key] == null) return;
+      var d = Math.abs(c[key] - v);
+      if (d <= SNAP_TOL && (!best || d < best.d)) best = { d: d, v: c[key] };
+    });
+    if (!best) return null;
+    var ids = cands.filter(function (c) { return c[key] != null && Math.abs(c[key] - best.v) <= 1; }).map(function (c) { return c.id; });
+    return { v: best.v, ids: ids };
+  }
+
+  onResizeMove(e) {
+    var R = this.state.resize;
+    var p = this.toBoard(e);
+    var allowW = true;
+    var allowH = R.kind === 'card' || R.corner;
+    var w = R.w0 + (p.x - R.sx);
+    var h = R.h0 + (p.y - R.sy);
+    var ids = [];
+    var matched = [];
+    if (allowW) {
+      w = clamp(w, R.kind === 'col' ? MIN_COL_W : (R.inCol ? MIN_COL_W - 32 : MIN_W), MAX_W);
+      var mw = this.nearest(R.cands, 'w', w);
+      if (mw) { w = mw.v; ids = ids.concat(mw.ids); matched.push('width'); }
+      else w = this.maybeSnap(w);
+      w = Math.round(w);
+    }
+    if (allowH) {
+      h = clamp(h, MIN_H, MAX_H);
+      var mh = this.nearest(R.cands, 'h', h);
+      if (mh) { h = mh.v; ids = ids.concat(mh.ids); matched.push('height'); }
+      else h = this.maybeSnap(h);
+      h = Math.round(h);
+    }
+    var uniq = ids.filter(function (x, i) { return ids.indexOf(x) === i; });
+    var sizeText = allowW && allowH ? w + ' × ' + h : (allowW ? w + ' wide' : h + ' tall');
+    var text = matched.length
+      ? sizeText + ' · same ' + matched.join(' & ') + ' as ' + uniq.length + (uniq.length === 1 ? ' block' : ' blocks')
+      : sizeText;
+    var vp = this.viewPt(e);
+    var guide = { x: Math.min(vp.x + 16, BOARD_W - 320), y: Math.min(vp.y + VIEW_TOP + 16, BOARD_H - 40), text: text, ids: uniq };
+    if (R.kind === 'card' && R.inCol) {
+      this.setState({
+        cards: this.state.cards.map(function (k) { return k.id === R.id ? Object.assign({}, k, { h: h }) : k; }),
+        columns: this.state.columns.map(function (c) { return c.id === R.inCol ? Object.assign({}, c, { w: w + 32 }) : c; }),
+        guide: guide
+      });
+    } else if (R.kind === 'card') {
+      this.setState({ cards: this.state.cards.map(function (k) { return k.id === R.id ? Object.assign({}, k, { h: h, w: w }) : k; }), guide: guide });
+    } else {
+      var cpatch = R.corner ? { w: w, h: h } : { w: w };
+      this.setState({ columns: this.state.columns.map(function (c) { return c.id === R.id ? Object.assign({}, c, cpatch) : c; }), guide: guide });
+    }
+  }
+
+  // ---------- pointer loop ----------
+  marqueeSel(m) {
+    var z = this.state.zoom, px = this.state.panX, py = this.state.panY;
+    var wr = { x: (m.x - px) / z, y: (m.y - py) / z, w: m.w / z, h: m.h / z };
+    var hits = this.blockRects(null, null).filter(function (b) { return overlaps(wr, b, 0); })
+      .map(function (b) { return { kind: b.kind, id: b.id }; });
+    var base = this.marq ? this.marq.base : [];
+    var out = base.slice();
+    hits.forEach(function (h) { if (!out.some(function (o) { return o.kind === h.kind && o.id === h.id; })) out.push(h); });
+    return out;
+  }
+  onMove(e) {
+    if (this.itemPress) { this.itemPressMove(e); return; }
+    if (this.marq) {
+      var v = this.viewPt(e);
+      var M = this.marq;
+      var m = { x: Math.min(M.x0, v.x), y: Math.min(M.y0, v.y), w: Math.abs(v.x - M.x0), h: Math.abs(v.y - M.y0) };
+      var sel = this.marqueeSel(m);
+      this.setState({ marquee: m, sel: sel, selected: sel.length ? sel[sel.length - 1] : null });
+      return;
+    }
+    if (this.panDrag) {
+      var sc = this.scale();
+      var pd0 = this.panDrag;
+      this.setState({ panX: pd0.px + (e.clientX - pd0.x) / sc, panY: pd0.py + (e.clientY - pd0.y) / sc });
+      return;
+    }
+    if (this.pending) {
+      var pd = this.pending;
+      var dist = Math.abs(e.clientX - pd.x) + Math.abs(e.clientY - pd.y);
+      if (dist < 5) return;
+      this.pending = null;
+      if (pd.kind === 'card') this.beginCardDrag(pd.id, pd.el, pd.x, pd.y);
+      else this.beginColDrag(pd.id, pd.x, pd.y);
+      return;
+    }
+    if (this.state.resize) { this.onResizeMove(e); return; }
+    var d = this.state.drag;
+    if (!d) return;
+    if (d.kind === 'item') {
+      var vp = this.viewPt(e);
+      this.setState({ drag: Object.assign({}, d, { vx: vp.x, vy: vp.y, hint: this.itemHint(e, d) }) });
+      return;
+    }
+    var p = this.toBoard(e);
+    if (d.kind === 'card') {
+      var k0 = this.state.cards.find(function (k) { return k.id === d.id; });
+      var cw = k0.w || CARD_W;
+      var x = this.maybeSnap(p.x - d.dx);
+      var y = this.maybeSnap(p.y - d.dy);
+      var gdx = x - d.sx, gdy = y - d.sy;
+      var gmap = {};
+      (d.group || []).forEach(function (g) { gmap[g.id] = g; });
+      var cards = this.state.cards.map(function (k) {
+        if (k.id === d.id) return Object.assign({}, k, { x: x, y: y });
+        var g = gmap[k.id];
+        return g && g.kind === 'card' ? Object.assign({}, k, { x: g.x + gdx, y: g.y + gdy }) : k;
+      });
+      if ((d.group || []).length) {
+        var gcols = this.state.columns.map(function (c) { var g = gmap[c.id]; return g && g.kind === 'col' ? Object.assign({}, c, { x: g.x + gdx, y: g.y + gdy }) : c; });
+        this.setState({ cards: cards, columns: gcols, hoverCol: null });
+        return;
+      }
+      var hc = this.colAt(e);
+      var land = hc ? null : this.freeSpot({ x: x, y: y, w: this.dragSize.w, h: this.dragSize.h }, this.dragOthers || []);
+      if (land && land.x === x && land.y === y) land = null;
+      this.setState({ cards: cards, hoverCol: hc, drag: Object.assign({}, d, { land: land ? { x: land.x, y: land.y, w: this.dragSize.w, h: this.dragSize.h } : null }) });
+    } else {
+      var c0 = this.state.columns.find(function (c) { return c.id === d.id; });
+      var cx = this.maybeSnap(p.x - d.dx);
+      var cy = this.maybeSnap(p.y - d.dy);
+      var cdx = cx - d.sx, cdy = cy - d.sy;
+      var cmap = {};
+      (d.group || []).forEach(function (g) { cmap[g.id] = g; });
+      var columns = this.state.columns.map(function (c) {
+        if (c.id === d.id) return Object.assign({}, c, { x: cx, y: cy });
+        var g = cmap[c.id];
+        return g && g.kind === 'col' ? Object.assign({}, c, { x: g.x + cdx, y: g.y + cdy }) : c;
+      });
+      if ((d.group || []).length) {
+        var ccards = this.state.cards.map(function (k) { var g = cmap[k.id]; return g && g.kind === 'card' ? Object.assign({}, k, { x: g.x + cdx, y: g.y + cdy }) : k; });
+        this.setState({ columns: columns, cards: ccards });
+        return;
+      }
+      var cland = this.freeSpot({ x: cx, y: cy, w: this.dragSize.w, h: this.dragSize.h }, this.dragOthers || []);
+      if (cland.x === cx && cland.y === cy) cland = null;
+      this.setState({ columns: columns, drag: Object.assign({}, d, { land: cland ? { x: cland.x, y: cland.y, w: this.dragSize.w, h: this.dragSize.h } : null }) });
+    }
+  }
+
+  onUp(e) {
+    this.unlisten();
+    if (this.itemPress) {
+      var wasActive = this.itemPress.active;
+      this.itemPress = null;
+      if (wasActive && this.boardEl) this.boardEl.focus({ preventScroll: true });
+      return;
+    }
+    if (this.marq) { this.marq = null; this.setState({ marquee: null }); return; }
+    if (this.panDrag) { this.panDrag = null; this.setState({ panning: false }); return; }
+    if (this.pending) { this.pending = null; return; }
+    if (this.state.resize) { this.setState({ resize: null, guide: null }); return; }
+    var d = this.state.drag;
+    if (!d) return;
+    if (d.kind === 'item') {
+      this.setState({ drag: null });
+      this.dropItem(Object.assign({}, d, { hint: this.itemHint(e, d) }));
+      return;
+    }
+    if ((d.group || []).length) {
+      this.anchor = [d.id].concat(d.group.map(function (g) { return g.id; }));
+      this.movable = null;
+      this.setState({ drag: null, hoverCol: null });
+      return;
+    }
+    if (d.kind === 'card') {
+      var target = this.colAt(e);
+      if (target) {
+        var els = this.colCardEls(target);
+        var ids = [];
+        var idx = 0;
+        els.forEach(function (el) {
+          var id = el.getAttribute('data-card-id');
+          if (id === d.id) return;
+          ids.push(id);
+          var r = el.getBoundingClientRect();
+          if (e.clientY > r.top + r.height / 2) idx += 1;
+        });
+        ids.splice(idx, 0, d.id);
+        var cards = this.state.cards.map(function (k) {
+          var i = ids.indexOf(k.id);
+          return i === -1 ? k : Object.assign({}, k, { col: target, order: i });
+        });
+        var columns = this.state.columns.map(function (c) { return c.id === target ? Object.assign({}, c, { collapsed: false }) : c; });
+        this.anchor = target;
+        this.movable = null;
+        this.setState({ cards: cards, columns: columns, drag: null, hoverCol: null });
+        return;
+      }
+      var L = d.land;
+      this.anchor = d.id;
+      this.movable = null;
+      this.setState({
+        cards: L ? this.state.cards.map(function (k) { return k.id === d.id ? Object.assign({}, k, { x: L.x, y: L.y }) : k; }) : this.state.cards,
+        drag: null, hoverCol: null
+      });
+      return;
+    }
+    var CL = d.land;
+    this.anchor = d.id;
+    this.movable = null;
+    this.setState({
+      columns: CL ? this.state.columns.map(function (c) { return c.id === d.id ? Object.assign({}, c, { x: CL.x, y: CL.y }) : c; }) : this.state.columns,
+      drag: null, hoverCol: null
+    });
+  }
+
+  // ---------- selection & shortcuts ----------
+  focusBoard(e) {
+    var board = e.currentTarget.closest('[data-board]');
+    this.hookBoard(board);
+    var t = e.target;
+    var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea') return;
+    if (board && document.activeElement !== board) board.focus({ preventScroll: true });
+  }
+  isSel(kind, id) {
+    return (this.state.sel || []).some(function (m) { return m.kind === kind && m.id === id; });
+  }
+  keepSel(kind, id) {
+    return this.isSel(kind, id) ? this.state.sel : [{ kind: kind, id: id }];
+  }
+  groupFor(kind, id) {
+    if (!this.isSel(kind, id) || this.state.sel.length < 2) return [];
+    var s = this.state;
+    var out = [];
+    s.sel.forEach(function (m) {
+      if (m.kind === kind && m.id === id) return;
+      if (m.kind === 'card') {
+        var k = s.cards.find(function (x) { return x.id === m.id; });
+        if (k && !k.col) out.push({ kind: 'card', id: k.id, x: k.x, y: k.y });
+      } else {
+        var c = s.columns.find(function (x) { return x.id === m.id; });
+        if (c) out.push({ kind: 'col', id: c.id, x: c.x, y: c.y });
+      }
+    });
+    return out;
+  }
+  select(kind, id, add) {
+    var list = this.state.sel || [];
+    var has = this.isSel(kind, id);
+    if (add) {
+      list = has ? list.filter(function (m) { return !(m.kind === kind && m.id === id); }) : list.concat([{ kind: kind, id: id }]);
+      this.setState({ sel: list, selected: list.length ? list[list.length - 1] : null });
+      return;
+    }
+    if (has && list.length > 1) { this.setState({ selected: { kind: kind, id: id } }); return; }
+    if (has) return;
+    this.setState({ sel: [{ kind: kind, id: id }], selected: { kind: kind, id: id } });
+  }
+  onBoardDown(e) {
+    var t = e.target;
+    var onView = t.getAttribute && t.getAttribute('data-viewport');
+    if ((t === e.currentTarget || onView) && !(e.ctrlKey || e.metaKey)) this.setState({ selected: null, sel: [], picker: null, itemSel: null });
+    if (onView && (e.button === undefined || e.button === 0)) {
+      e.preventDefault();
+      this.boardEl = e.currentTarget;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      e.currentTarget.focus({ preventScroll: true });
+      if (this.state.tool === 'select') {
+        var v0 = this.viewPt(e);
+        this.marq = { x0: v0.x, y0: v0.y, add: e.ctrlKey || e.metaKey || e.shiftKey, base: (e.ctrlKey || e.metaKey || e.shiftKey) ? (this.state.sel || []) : [] };
+        this.setState({ marquee: { x: v0.x, y: v0.y, w: 0, h: 0 } });
+        this.listen();
+        return;
+      }
+      this.panDrag = { x: e.clientX, y: e.clientY, px: this.state.panX, py: this.state.panY };
+      this.setState({ panning: true });
+      this.listen();
+    }
+  }
+  onKey(e) {
+    var t = e.target;
+    var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+    var mod = e.ctrlKey || e.metaKey;
+    var key = (e.key || '').toLowerCase();
+    // undo / redo always go through the board's history, even from inside a text field or checkbox
+    if (mod && key === 'z' && !e.shiftKey) { this.undo(); e.preventDefault(); return; }
+    if (mod && key === 'y') { this.redo(); e.preventDefault(); return; }
+    if (mod && key === 'z' && e.shiftKey) { e.preventDefault(); return; }
+    var textField = tag === 'textarea' || (t && t.isContentEditable) || (tag === 'input' && (t.type || 'text') !== 'checkbox');
+    if (textField) return;
+    var IS = this.state.itemSel;
+    if (IS && IS.ids.length) {
+      if (key === 'delete' || key === 'backspace') { this.deleteItems(IS.cardId, IS.ids); e.preventDefault(); return; }
+      if (mod && key === 'c') { this.copyItems(); e.preventDefault(); return; }
+      if (mod && key === 'x') { if (this.copyItems()) this.deleteItems(IS.cardId, IS.ids); e.preventDefault(); return; }
+      if (mod && key === 'v') { this.pasteItems(); e.preventDefault(); return; }
+      if (key === 'escape') { this.setState({ itemSel: null }); return; }
+    }
+    if (mod && key === 'v' && this.itemClip && this.state.selected && this.state.selected.kind === 'card') {
+      var tk = this.state.cards.find(function (c) { return c.id === this.state.selected.id; }, this);
+      if (tk && tk.type === 'todo' && !this.clipNewer) {
+        var fresh = this.freshItems(this.itemClip);
+        this.editItems(tk.id, null, function (items) { fresh.forEach(function (it) { items.push(it); }); });
+        e.preventDefault();
+        return;
+      }
+    }
+    if (mod && key === 'z' && !e.shiftKey) { this.undo(); e.preventDefault(); return; }
+    if (mod && key === 'y') { this.redo(); e.preventDefault(); return; }
+    if (mod && key === 'z' && e.shiftKey) { e.preventDefault(); return; }
+    if (mod && (key === '=' || key === '+')) { this.zoomCenter(1.2); e.preventDefault(); return; }
+    if (mod && key === '-') { this.zoomCenter(1 / 1.2); e.preventDefault(); return; }
+    if (mod && key === '0') { this.setState({ zoom: 1, panX: 0, panY: 0 }); e.preventDefault(); return; }
+    if (mod && key === 'c') { if (this.copySelected()) e.preventDefault(); }
+    else if (mod && key === 'v') { if (this.paste()) e.preventDefault(); }
+    else if (!mod && key === 'h') { this.setState({ tool: 'hand' }); }
+    else if (!mod && key === 'v') { this.setState({ tool: 'select' }); }
+    else if (mod && key === 'a') { this.selectAll(); e.preventDefault(); }
+    else if (mod && key === 'd') { if (this.copySelected()) { this.paste(); e.preventDefault(); } }
+    else if (key === 'delete' || key === 'backspace') { if (this.deleteSelected()) e.preventDefault(); }
+    else if (key === 'escape') { this.setState({ selected: null, sel: [], picker: null, confirmCol: null }); }
+  }
+  selectAll() {
+    var sel = this.state.columns.map(function (c) { return { kind: 'col', id: c.id }; })
+      .concat(this.state.cards.filter(function (k) { return !k.col; }).map(function (k) { return { kind: 'card', id: k.id }; }));
+    this.setState({ sel: sel, selected: sel.length ? sel[sel.length - 1] : null });
+  }
+  copySelected() {
+    var s = this.state;
+    var list = s.sel || [];
+    if (!list.length) return false;
+    var colIds = list.filter(function (m) { return m.kind === 'col'; }).map(function (m) { return m.id; });
+    var entries = [];
+    list.forEach(function (m) {
+      if (m.kind === 'card') {
+        var k = s.cards.find(function (x) { return x.id === m.id; });
+        if (k && colIds.indexOf(k.col) === -1) entries.push({ kind: 'card', card: clone(k) });
+      } else {
+        var c = s.columns.find(function (x) { return x.id === m.id; });
+        if (c) entries.push({ kind: 'col', col: clone(c), cards: clone(s.cards.filter(function (x) { return x.col === c.id; })) });
+      }
+    });
+    if (!entries.length) return false;
+    this.clip = { entries: entries, n: 0 };
+    this.clipNewer = true;
+    return true;
+  }
+  freshItems(items) {
+    var self = this;
+    return (items || []).map(function (it) {
+      return Object.assign({}, it, { id: self.nextId('i'), children: self.freshItems(it.children || []) });
+    });
+  }
+  paste() {
+    var clip = this.clip;
+    if (!clip || !clip.entries) return false;
+    var self = this;
+    this.remember('paste');
+    clip.n += 1;
+    var off = this.state.snap ? GRID * 2 : 28;
+    var cards = this.state.cards;
+    var columns = this.state.columns;
+    var newSel = [];
+    clip.entries.forEach(function (en) {
+      if (en.kind === 'card') {
+        var src = en.card;
+        var copy = clone(src);
+        copy.id = self.nextId('k');
+        if (copy.items) copy.items = self.freshItems(copy.items);
+        var colAlive = src.col && columns.some(function (c) { return c.id === src.col; });
+        if (colAlive) {
+          copy.order = src.order + clip.n * 0.001;
+          cards = cards.concat([copy]);
+          var mine = cards.filter(function (k) { return k.col === src.col; }).sort(function (a, b) { return a.order - b.order; });
+          var ids = mine.map(function (k) { return k.id; });
+          cards = cards.map(function (k) { var i = ids.indexOf(k.id); return i === -1 ? k : Object.assign({}, k, { order: i }); });
+        } else {
+          self.zTop += 1;
+          copy.col = null;
+          copy.x = src.x + off * clip.n;
+          copy.y = src.y + off * clip.n;
+          copy.z = self.zTop;
+          cards = cards.concat([copy]);
+        }
+        newSel.push({ kind: 'card', id: copy.id });
+      } else {
+        var nc = clone(en.col);
+        nc.id = self.nextId('c');
+        nc.x = en.col.x + off * clip.n;
+        nc.y = en.col.y + off * clip.n;
+        if (nc.title) nc.title = nc.title + ' copy';
+        var newCards = en.cards.map(function (k) {
+          var cp = clone(k);
+          cp.id = self.nextId('k');
+          cp.col = nc.id;
+          if (cp.items) cp.items = self.freshItems(cp.items);
+          return cp;
+        });
+        columns = columns.concat([nc]);
+        cards = cards.concat(newCards);
+        newSel.push({ kind: 'col', id: nc.id });
+      }
+    });
+    this.anchor = null;
+    this.movable = newSel.map(function (m) { return m.id; });
+    this.setState({ cards: cards, columns: columns, sel: newSel, selected: newSel[newSel.length - 1] || null });
+    return true;
+  }
+  deleteSelected() {
+    var list = this.state.sel || [];
+    if (!list.length) return false;
+    this.remember('delete');
+    var cardIds = list.filter(function (m) { return m.kind === 'card'; }).map(function (m) { return m.id; });
+    var colIds = list.filter(function (m) { return m.kind === 'col'; }).map(function (m) { return m.id; });
+    this.setState({
+      cards: this.state.cards.filter(function (k) { return cardIds.indexOf(k.id) === -1 && colIds.indexOf(k.col) === -1; }),
+      columns: this.state.columns.filter(function (c) { return colIds.indexOf(c.id) === -1; }),
+      selected: null, sel: [], picker: null
+    });
+    return true;
+  }
+
+  // ---------- edits ----------
+  togglePicker(id) { this.setState({ picker: this.state.picker === id ? null : id }); }
+  swatches(current, onPick) {
+    return PALETTE_KEYS.map(function (key) {
+      var p = PALETTE[key];
+      var on = key === current;
+      return {
+        key: key, label: p.label, bg: p.bg, edge: on ? p.ink : p.edge,
+        pressed: on ? 'true' : 'false',
+        ring: on ? '0 0 0 2px #FFFFFF, 0 0 0 3.5px ' + p.ink : 'none',
+        pick: function () { onPick(key); }
+      };
+    });
+  }
+  patch(id, obj) {
+    var keys = Object.keys(obj);
+    if (!(keys.length === 1 && keys[0] === 'draft')) {
+      var texty = keys.every(function (x) { return x === 'text' || x === 'title' || x === 'url'; });
+      this.remember(texty ? 'type:' + id + ':' + keys.join() : null);
+    }
+    this.setState({ cards: this.state.cards.map(function (k) { return k.id === id ? Object.assign({}, k, obj) : k; }) });
+  }
+  patchCol(id, obj) {
+    this.remember(Object.keys(obj).join() === 'title' ? 'type:' + id + ':title' : null);
+    this.setState({ columns: this.state.columns.map(function (c) { return c.id === id ? Object.assign({}, c, obj) : c; }) });
+  }
+  addCard(type) {
+    this.remember('add');
+    var n = this.state.cards.filter(function (k) { return !k.col; }).length;
+    this.zTop += 1;
+    var base = { id: this.nextId('k'), type: type, col: null, order: 0, x: 700 + (n % 6) * 40, y: 320 + (n % 6) * 40, z: this.zTop, w: null, h: null, collapsed: false };
+    if (type === 'note') base.text = '';
+    if (type === 'todo') { var fid = this.nextId('i'); base.title = 'New list'; base.items = [{ id: fid, text: '', done: false, children: [] }]; base.draft = ''; base.hideDone = false; this.focusId = fid; }
+    if (type === 'link') { base.title = ''; base.url = ''; }
+    // a selected column (or a card inside one) receives the new card
+    var s = this.state;
+    var targetCol = null, afterOrder = null;
+    if (s.selected && s.selected.kind === 'col' && s.columns.some(function (c) { return c.id === s.selected.id; })) {
+      targetCol = s.selected.id;
+    } else if (s.selected && s.selected.kind === 'card') {
+      var sk = s.cards.find(function (x) { return x.id === s.selected.id; });
+      if (sk && sk.col) { targetCol = sk.col; afterOrder = sk.order; }
+    }
+    var cards = s.cards;
+    var columns = s.columns;
+    if (targetCol) {
+      base.col = targetCol;
+      var mine = cards.filter(function (k) { return k.col === targetCol; }).sort(function (a, b2) { return a.order - b2.order; });
+      var ids = mine.map(function (k) { return k.id; });
+      var at = afterOrder === null ? ids.length : ids.indexOf(s.selected.id) + 1;
+      ids.splice(at, 0, base.id);
+      cards = cards.concat([base]).map(function (k) { var i = ids.indexOf(k.id); return i === -1 ? k : Object.assign({}, k, { order: i }); });
+      columns = columns.map(function (c) { return c.id === targetCol ? Object.assign({}, c, { collapsed: false }) : c; });
+      this.anchor = targetCol; this.movable = null;
+    } else {
+      cards = cards.concat([base]);
+      this.anchor = null; this.movable = base.id;
+    }
+    this.setState({ cards: cards, columns: columns, selected: { kind: 'card', id: base.id }, sel: [{ kind: 'card', id: base.id }] });
+  }
+  addColumn() {
+    this.remember('add');
+    var cols = this.state.columns;
+    var right = cols.reduce(function (m, c) { return Math.max(m, c.x + c.w); }, 0);
+    var x = Math.min(gsnap(right + 40), BOARD_W - COL_W - 40);
+    var ncid = this.nextId('c');
+    this.anchor = null; this.movable = ncid;
+    this.setState({ columns: cols.concat([{ id: ncid, x: x, y: 40, w: COL_W, title: 'New column', color: null, collapsed: false }]) });
+  }
+  removeColumn(e, id) {
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    this.remember('delete');
+    var self = this;
+    var where = {};
+    this.colCardEls(id).forEach(function (el) {
+      where[el.getAttribute('data-card-id')] = self.rectToBoard(el.getBoundingClientRect());
+    });
+    var cards = this.state.cards.map(function (k) {
+      if (k.col !== id) return k;
+      self.zTop += 1;
+      var w = where[k.id] || { x: k.x, y: k.y };
+      return Object.assign({}, k, { col: null, x: w.x, y: w.y, z: self.zTop });
+    });
+    this.setState({ cards: cards, columns: this.state.columns.filter(function (c) { return c.id !== id; }) });
+  }
+  addItem(id) {
+    var k = this.state.cards.find(function (c) { return c.id === id; });
+    var t = (k.draft || '').trim();
+    if (!t) return;
+    this.remember(null);
+    var items = clone(k.items || []);
+    items.push({ id: this.nextId('i'), text: t, done: false, children: [] });
+    this.setCard(id, { items: items, draft: '' });
+  }
+  setCard(id, obj) {
+    this.setState({ cards: this.state.cards.map(function (k) { return k.id === id ? Object.assign({}, k, obj) : k; }) });
+  }
+  editItems(cardId, key, fn) {
+    var k = this.state.cards.find(function (c) { return c.id === cardId; });
+    if (!k) return;
+    var items = clone(k.items || []);
+    if (fn(items) === false) return;
+    this.remember(key);
+    this.setCard(cardId, { items: items });
+  }
+  toggleItem(cardId, itemId) {
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc) return false;
+      loc.item.done = !loc.item.done;
+    });
+  }
+  setItemText(cardId, itemId, v) {
+    this.editItems(cardId, 'type:' + itemId, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc) return false;
+      loc.item.text = v;
+    });
+  }
+  newItemAfter(cardId, itemId) {
+    var self = this;
+    var nid = this.nextId('i');
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc) return false;
+      loc.list.splice(loc.index + 1, 0, { id: nid, text: '', done: false, children: [] });
+    });
+    this.focusId = nid;
+  }
+  addChild(cardId, itemId) {
+    var nid = this.nextId('i');
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc || loc.depth >= MAX_DEPTH) return false;
+      loc.item.children = loc.item.children || [];
+      loc.item.children.push({ id: nid, text: '', done: false, children: [] });
+    });
+    this.focusId = nid;
+  }
+  indentItem(cardId, itemId) {
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc) return false;
+      if (loc.depth + 1 + subtreeHeight(loc.item) > MAX_DEPTH) return false;
+      var prev = null;
+      for (var i = loc.index - 1; i >= 0; i--) {
+        if (loc.parent || !!loc.list[i].done === !!loc.item.done) { prev = loc.list[i]; break; }
+      }
+      if (!prev) return false;
+      loc.list.splice(loc.index, 1);
+      prev.children = prev.children || [];
+      prev.children.push(loc.item);
+    });
+    this.focusId = itemId;
+  }
+  outdentItem(cardId, itemId) {
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc || !loc.parent) return false;
+      var ploc = findItem(items, loc.parent.id);
+      loc.list.splice(loc.index, 1);
+      ploc.list.splice(ploc.index + 1, 0, loc.item);
+    });
+    this.focusId = itemId;
+  }
+  deleteItem(cardId, itemId) {
+    var k = this.state.cards.find(function (c) { return c.id === cardId; });
+    var flat = flatIds(k.items || []);
+    if (flat.length <= 1) return;
+    var prevId = flat[flat.indexOf(itemId) - 1] || null;
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc || (loc.item.children || []).length) return false;
+      loc.list.splice(loc.index, 1);
+    });
+    if (prevId) this.focusId = prevId;
+  }
+  trashItem(cardId, itemId) {
+    var self = this;
+    this.editItems(cardId, null, function (items) {
+      var loc = findItem(items, itemId);
+      if (!loc) return false;
+      loc.list.splice(loc.index, 1);
+      if (!items.length) items.push({ id: self.nextId('i'), text: '', done: false, children: [] });
+    });
+  }
+  itemKey(e, cardId, itemId) {
+    if (e.key === 'Enter') { e.preventDefault(); this.newItemAfter(cardId, itemId); }
+    else if (e.key === 'Tab') { e.preventDefault(); if (e.shiftKey) this.outdentItem(cardId, itemId); else this.indentItem(cardId, itemId); }
+    else if (e.key === 'Backspace' && e.target.value === '') { e.preventDefault(); this.deleteItem(cardId, itemId); }
+  }
+  componentDidUpdate() {
+    this.autosizeItems();
+    this.settle();
+    if (!this.focusId) return;
+    var root = this.boardEl || document;
+    var el = root.querySelector('[data-item-input="' + this.focusId + '"]');
+    if (el) {
+      this.focusId = null;
+      el.focus();
+      try { var n = el.value.length; el.setSelectionRange(n, n); } catch (err) {}
+    }
+  }
+
+  autosizeItems() {
+    var root = this.boardEl || document;
+    root.querySelectorAll('textarea[data-item-input],textarea[data-autosize]').forEach(function (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    });
+  }
+  componentDidMount() { this.autosizeItems(); }
+
+  // ---------- selecting several checklist items ----------
+  displayOrder(card) {
+    var top = card.items || [];
+    return flatIds(top.filter(function (it) { return !it.done; })).concat(flatIds(top.filter(function (it) { return it.done; })));
+  }
+  itemRange(cardId, a, b) {
+    var card = this.state.cards.find(function (c) { return c.id === cardId; });
+    if (!card) return [];
+    var order = this.displayOrder(card);
+    var i = order.indexOf(a), j = order.indexOf(b);
+    if (i === -1 || j === -1) return [];
+    return order.slice(Math.min(i, j), Math.max(i, j) + 1);
+  }
+  itemDown(e, cardId, itemId) {
+    if (e.button !== undefined && e.button !== 0) return;
+    var t = e.target;
+    if (t.closest && t.closest('button,input[type=checkbox]')) return;
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    this.hookBoard(this.boardEl);
+    if (e.shiftKey && this.state.itemSel && this.state.itemSel.cardId === cardId) {
+      e.preventDefault();
+      var ids = this.itemRange(cardId, this.state.itemSel.anchor, itemId);
+      this.setState({ itemSel: { cardId: cardId, anchor: this.state.itemSel.anchor, ids: ids } });
+      this.boardEl.focus({ preventScroll: true });
+      return;
+    }
+    this.itemPress = { cardId: cardId, id: itemId, active: false };
+    if (this.state.itemSel) this.setState({ itemSel: null });
+    this.listen();
+  }
+  itemPressMove(e) {
+    var P = this.itemPress;
+    var els = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
+    var overId = null;
+    for (var i = 0; i < els.length; i++) {
+      var row = els[i].closest && els[i].closest('[data-item-id]');
+      if (row) {
+        var cardEl = row.closest('[data-card-id]');
+        if (cardEl && cardEl.getAttribute('data-card-id') === P.cardId) overId = row.getAttribute('data-item-id');
+        break;
+      }
+    }
+    if (!P.active) {
+      if (!overId || overId === P.id) return;
+      P.active = true;
+      try { window.getSelection().removeAllRanges(); } catch (err) {}
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+    e.preventDefault();
+    try { window.getSelection().removeAllRanges(); } catch (err2) {}
+    if (!overId) return;
+    this.setState({ itemSel: { cardId: P.cardId, anchor: P.id, ids: this.itemRange(P.cardId, P.id, overId) } });
+  }
+  deleteItems(cardId, ids) {
+    var self = this;
+    this.editItems(cardId, null, function (items) {
+      ids.forEach(function (id) {
+        var loc = findItem(items, id);
+        if (loc) loc.list.splice(loc.index, 1);
+      });
+      if (!items.length) items.push({ id: self.nextId('i'), text: '', done: false, children: [] });
+    });
+    this.setState({ itemSel: null });
+  }
+  setItemsDone(cardId, ids, done) {
+    this.editItems(cardId, null, function (items) {
+      ids.forEach(function (id) { var loc = findItem(items, id); if (loc) loc.item.done = done; });
+    });
+  }
+  copyItems() {
+    var S = this.state.itemSel;
+    if (!S) return false;
+    var card = this.state.cards.find(function (c) { return c.id === S.cardId; });
+    var picked = [];
+    S.ids.forEach(function (id) {
+      var loc = findItem(card.items || [], id);
+      if (!loc) return;
+      // skip items whose ancestor is also picked (it travels with the ancestor)
+      var anc = loc.parent, covered = false;
+      while (anc) { if (S.ids.indexOf(anc.id) !== -1) { covered = true; break; } var al = findItem(card.items || [], anc.id); anc = al ? al.parent : null; }
+      if (!covered) picked.push(clone(loc.item));
+    });
+    this.itemClip = picked;
+    this.clipNewer = false;
+    return picked.length > 0;
+  }
+  pasteItems() {
+    var clipItems = this.itemClip;
+    var S = this.state.itemSel;
+    if (!clipItems || !clipItems.length || !S) return false;
+    var self = this;
+    var lastId = S.ids[S.ids.length - 1];
+    var fresh = self.freshItems(clipItems);
+    this.editItems(S.cardId, null, function (items) {
+      var loc = findItem(items, lastId);
+      if (!loc) { fresh.forEach(function (it) { items.push(it); }); return; }
+      var args = [loc.index + 1, 0].concat(fresh);
+      Array.prototype.splice.apply(loc.list, args);
+    });
+    this.setState({ itemSel: { cardId: S.cardId, anchor: fresh[0].id, ids: fresh.map(function (x) { return x.id; }) } });
+    return true;
+  }
+
+  // ---------- dragging checklist items ----------
+  startItemDrag(e, cardId, itemId) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.boardEl = e.currentTarget.closest('[data-board]');
+    var k = this.state.cards.find(function (c) { return c.id === cardId; });
+    var items = k.items || [];
+    var loc = findItem(items, itemId);
+    if (!loc) return;
+    var S = this.state.itemSel;
+    var multi = S && S.cardId === cardId && S.ids.length > 1 && S.ids.indexOf(itemId) !== -1;
+    var roots = multi ? rootsOf(items, this.displayOrder(k).filter(function (id) { return S.ids.indexOf(id) !== -1; })) : [itemId];
+    var all = [];
+    var height = 0;
+    roots.forEach(function (id) { var l = findItem(items, id); subtreeIds(l.item, all); height = Math.max(height, subtreeHeight(l.item)); });
+    var vp = this.viewPt(e);
+    var label, extra;
+    if (roots.length > 1) { label = all.length + ' items'; extra = ''; }
+    else {
+      var kids = all.length - 1;
+      label = loc.item.text || 'Untitled item';
+      extra = kids ? '+ ' + kids + (kids === 1 ? ' sub-item' : ' sub-items') : '';
+    }
+    this.setState({ drag: { kind: 'item', cardId: cardId, itemId: itemId, roots: roots, allIds: all, hasKids: all.length > 1, height: height, label: label, extra: extra, vx: vp.x, vy: vp.y, hint: null } });
+    this.listen();
+  }
+  itemHint(e, d) {
+    var sc = this.wscale();
+    var els = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
+    var draggedIds = d.allIds || [d.itemId];
+    var h = d.height || 0;
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var row = el.closest && el.closest('[data-item-id]');
+      if (row) {
+        var tid = row.getAttribute('data-item-id');
+        if (draggedIds.indexOf(tid) !== -1) continue;
+        var cardEl = row.closest('[data-card-id]');
+        var cardId = cardEl.getAttribute('data-card-id');
+        var card = this.state.cards.find(function (c) { return c.id === cardId; });
+        var tloc = findItem(card.items || [], tid);
+        if (!tloc) continue;
+        var r = row.getBoundingClientRect();
+        var before = e.clientY < r.top + r.height / 2;
+        var indentPx = (tloc.depth * 22 + 56) * sc;
+        if (!before && e.clientX > r.left + indentPx && tloc.depth + 1 + h <= MAX_DEPTH) {
+          return { cardId: cardId, targetId: tid, mode: 'nest', markId: tid, markMode: 'nest' };
+        }
+        if (tloc.depth + h > MAX_DEPTH) continue;
+        if (!before && (tloc.item.children || []).length) {
+          return { cardId: cardId, targetId: tid, mode: 'after', markId: lastVisible(tloc.item).id, markMode: 'after' };
+        }
+        return { cardId: cardId, targetId: tid, mode: before ? 'before' : 'after', markId: tid, markMode: before ? 'before' : 'after' };
+      }
+      var body = el.closest && el.closest('[data-todo-of]');
+      if (body) return { cardId: body.getAttribute('data-todo-of'), targetId: null, mode: 'append', markId: null, markMode: null };
+      if (el.closest && (el.closest('[data-card-id]') || el.closest('[data-col-id]'))) break;
+      if (el.getAttribute && el.getAttribute('data-viewport')) break;
+    }
+    if (this.boardEl) {
+      var br = this.boardEl.getBoundingClientRect();
+      var inView = e.clientY > br.top + VIEW_TOP * this.scale() && e.clientY < br.bottom && e.clientX > br.left && e.clientX < br.right;
+      if (inView) {
+        var wp = this.toBoard(e);
+        return { cardId: null, targetId: null, mode: 'newcard', x: wp.x - 20, y: wp.y - 20, markId: null, markMode: null };
+      }
+    }
+    return null;
+  }
+  dropItem(d) {
+    var h = d.hint;
+    if (!h) return;
+    var src = this.state.cards.find(function (c) { return c.id === d.cardId; });
+    var srcItems = clone(src.items || []);
+    var moving = [];
+    (d.roots || [d.itemId]).forEach(function (id) {
+      var loc = findItem(srcItems, id);
+      if (!loc) return;
+      loc.list.splice(loc.index, 1);
+      loc.item.children = loc.item.children || [];
+      moving.push(loc.item);
+    });
+    if (!moving.length) return;
+    if (h.mode === 'newcard') {
+      if (!srcItems.length) srcItems.push({ id: this.nextId('i'), text: '', done: false, children: [] });
+      this.remember(null);
+      this.zTop += 1;
+      var nk = { id: this.nextId('k'), type: 'todo', col: null, order: 0, x: this.maybeSnap(h.x), y: this.maybeSnap(h.y), z: this.zTop, w: null, h: null, collapsed: false, title: 'New list', items: moving, draft: '', hideDone: false, color: src.color || null };
+      this.anchor = nk.id; this.movable = null;
+      var ncards = this.state.cards.map(function (k) { return k.id === d.cardId ? Object.assign({}, k, { items: srcItems }) : k; }).concat([nk]);
+      this.setState({ cards: ncards, itemSel: null, selected: { kind: 'card', id: nk.id }, sel: [{ kind: 'card', id: nk.id }] });
+      return;
+    }
+    var sameCard = h.cardId === d.cardId;
+    var dstCard = this.state.cards.find(function (c) { return c.id === h.cardId; });
+    var dstItems = sameCard ? srcItems : clone(dstCard.items || []);
+    if (h.mode === 'append') {
+      moving.forEach(function (m) { dstItems.push(m); });
+    } else {
+      var t = findItem(dstItems, h.targetId);
+      if (!t) return;
+      if (h.mode === 'nest') {
+        t.item.children = t.item.children || [];
+        Array.prototype.unshift.apply(t.item.children, moving);
+      } else {
+        Array.prototype.splice.apply(t.list, [t.index + (h.mode === 'after' ? 1 : 0), 0].concat(moving));
+      }
+    }
+    if (!sameCard && !dstItems.length) return;
+    if (!srcItems.length) srcItems.push({ id: this.nextId('i'), text: '', done: false, children: [] });
+    this.remember(null);
+    var cards = this.state.cards.map(function (k) {
+      if (k.id === d.cardId && sameCard) return Object.assign({}, k, { items: dstItems });
+      if (k.id === d.cardId) return Object.assign({}, k, { items: srcItems });
+      if (k.id === h.cardId) return Object.assign({}, k, { items: dstItems, collapsed: false });
+      return k;
+    });
+    var keepSel = d.roots && d.roots.length > 1 ? { cardId: h.cardId, anchor: d.roots[0], ids: d.allIds } : null;
+    this.setState({ cards: cards, itemSel: keepSel });
+  }
+
+  // ---------- render ----------
+  mkCard(k) {
+    var self = this;
+    var s = this.state;
+    var d = s.drag;
+    var R = s.resize;
+    var dragging = d && d.kind === 'card' && d.id === k.id;
+    var inCol = !!k.col;
+    var colorKey = k.color || DEFAULT_COLOR[k.type];
+    var P = PALETTE[colorKey];
+    var hint = d && d.kind === 'item' && d.hint && d.hint.cardId === k.id ? d.hint : null;
+    var draggingItem = d && d.kind === 'item' && d.cardId === k.id ? d.itemId : null;
+    var isel = s.itemSel && s.itemSel.cardId === k.id ? s.itemSel.ids : null;
+    var dimIds = [];
+    if (draggingItem) dimIds = d.allIds || [];
+    var mkRow = function (it, depth, parent) {
+      var mark = 'none';
+      var tint = 'transparent';
+      if (hint && hint.markId === it.id) {
+        if (hint.markMode === 'before') mark = 'inset 0 2px 0 #1F5F5B';
+        else if (hint.markMode === 'after') mark = 'inset 0 -2px 0 #1F5F5B';
+        else if (hint.markMode === 'nest') { mark = 'inset 0 -2px 0 #2A9D93'; tint = 'rgba(42,157,147,0.14)'; }
+      }
+      var dim = draggingItem && dimIds.indexOf(it.id) !== -1;
+      var picked = !!(isel && isel.length > 1 && isel.indexOf(it.id) !== -1);
+      if (picked && tint === 'transparent') tint = 'rgba(31,95,91,0.10)';
+      return {
+        id: it.id, depth: String(depth), pad: depth * 22,
+        text: it.text || '', done: !!it.done,
+        strike: it.done ? 'line-through' : 'none',
+        color: it.done ? '#6B655C' : '#1F1D1A',
+        mark: mark, tint: tint, opacity: dim ? '0.35' : '1',
+        hl: picked ? 'rgba(31,95,91,0.26)' : 'transparent',
+        canAddChild: depth < MAX_DEPTH,
+        showTrash: !!it.done,
+        trash: function () {
+          var cur = self.state.itemSel;
+          if (cur && cur.cardId === k.id && cur.ids.length > 1 && cur.ids.indexOf(it.id) !== -1) self.deleteItems(k.id, cur.ids);
+          else self.trashItem(k.id, it.id);
+        },
+        down: function (e) { self.itemDown(e, k.id, it.id); },
+        toggle: function () {
+          var cur = self.state.itemSel;
+          if (cur && cur.cardId === k.id && cur.ids.length > 1 && cur.ids.indexOf(it.id) !== -1) self.setItemsDone(k.id, cur.ids, !it.done);
+          else self.toggleItem(k.id, it.id);
+        },
+        setText: function (e) { self.setItemText(k.id, it.id, e.target.value); },
+        onKey: function (e) { self.itemKey(e, k.id, it.id); },
+        addChild: function () { self.addChild(k.id, it.id); },
+        grab: function (e) { self.startItemDrag(e, k.id, it.id); }
+      };
+    };
+    var flatten = function (list, depth, rows) {
+      rows = rows || [];
+      depth = depth || 0;
+      list.forEach(function (it) {
+        rows.push(mkRow(it, depth, null));
+        flatten(it.children || [], depth + 1, rows);
+      });
+      return rows;
+    };
+    var top = k.items || [];
+    var cnt = countItems(top);
+    var openTop = top.filter(function (it) { return !it.done; });
+    var doneTop = top.filter(function (it) { return it.done; });
+    var openItems = flatten(openTop);
+    var doneItems = flatten(doneTop);
+    var all = { length: cnt.n };
+    var pickerOpen = false;
+    var hasH = !!k.h && !k.collapsed && !inCol;
+    var inner = hasH ? Math.max(40, k.h - 36 - 14 - (pickerOpen ? 34 : 0)) : 0;
+    var isSel = self.isSel('card', k.id);
+    var isMatch = s.guide && s.guide.ids.indexOf(k.id) !== -1;
+    var preview = '';
+    if (k.type === 'note') preview = (k.text || '').split('\n')[0];
+    if (k.type === 'todo') preview = (k.title || 'List') + ' · ' + cnt.d + '/' + cnt.n;
+    if (k.type === 'link') preview = k.title || (k.url ? domainOf(k.url) : '');
+    var progress = k.type === 'todo' && cnt.n ? cnt.d + '/' + cnt.n + ' done' : '';
+    var showDone = !k.hideDone;
+    return {
+      titleW: textW(k.title || (k.type === 'link' ? 'Title' : ' '), 15, 14),
+      id: k.id, text: k.text || '', title: k.title || '', url: k.url || '', draft: k.draft || '',
+      openItems: openItems, doneItems: doneItems,
+      hasDone: doneTop.length > 0, noOpen: false,
+      doneCount: String(doneTop.length),
+      hasItemSel: !!(isel && isel.length > 1),
+      itemSelCount: isel ? String(isel.length) : '0',
+      itemSelDoneLabel: isel && isel.every(function (id) { var l = findItem(k.items || [], id); return l && l.item.done; }) ? 'Mark not done' : 'Mark done',
+      itemSelToggle: function () {
+        var ids = self.state.itemSel.ids;
+        var allDone = ids.every(function (id) { var l = findItem(k.items || [], id); return l && l.item.done; });
+        self.setItemsDone(k.id, ids, !allDone);
+      },
+      itemSelDelete: function () { self.deleteItems(k.id, self.state.itemSel.ids); },
+      itemSelClear: function () { self.setState({ itemSel: null }); },
+      dropAppend: hint && hint.mode === 'append' ? 'inset 0 0 0 2px #1F5F5B' : 'none',
+      showDone: showDone, doneExpandedAttr: showDone ? 'true' : 'false', doneChevRot: showDone ? 'none' : 'rotate(-90deg)',
+      toggleDoneList: function () { self.patch(k.id, { hideDone: !k.hideDone }); },
+      tag: TAGS[k.type],
+      dot: P.dot, bg: P.bg, edge: P.edge, pill: P.pill, ink: P.ink,
+      isNote: k.type === 'note', isTodo: k.type === 'todo', isLink: k.type === 'link',
+      expanded: !k.collapsed, expandedAttr: k.collapsed ? 'false' : 'true', chevRot: k.collapsed ? 'rotate(-90deg)' : 'none',
+      meta: k.collapsed ? preview : progress,
+      metaColor: k.collapsed ? '#1F1D1A' : '#5F5A52', metaWeight: k.collapsed ? '500' : '400',
+      toggleCollapse: function () { self.patch(k.id, { collapsed: !k.collapsed }); },
+      href: hrefOf(k.url), domain: k.url ? domainOf(k.url) : 'link',
+      left: k.x, top: k.y,
+      canResize: !inCol,
+      wCss: inCol ? 'auto' : (k.w || CARD_W) + 'px',
+      hCss: hasH ? k.h + 'px' : 'auto',
+      taH: hasH ? inner + 'px' : '104px',
+      bodyMax: hasH ? inner + 'px' : 'none',
+      z: dragging ? 10000 : 100 + (k.z || 1),
+      shadow: dragging ? DRAG_SHADOW : '0 1px 2px rgba(31,29,26,0.06)',
+      tilt: 'none',
+      outline: dragging ? DRAG_OUTLINE : (isMatch ? MATCH_OUTLINE : (isSel ? SEL_OUTLINE : 'none')),
+      showPicker: pickerOpen, pickerOpen: pickerOpen ? 'true' : 'false',
+      pickerBtnBg: pickerOpen ? 'rgba(31,29,26,0.08)' : 'transparent',
+      togglePicker: function () { self.togglePicker(k.id); },
+      swatches: self.swatches(colorKey, function (key) { self.patch(k.id, { color: key }); }),
+      select: function (e) { self.focusBoard(e); var add = e.ctrlKey || e.metaKey || e.shiftKey; self.select('card', k.id, add); if (!add) self.armDrag(e, 'card', k.id); },
+      grab: function (e) { self.startCardDrag(e, k.id); },
+      startResize: function (e) { self.startResize(e, 'card', k.id); },
+      remove: function () { self.remember('delete'); self.setState({ cards: self.state.cards.filter(function (x) { return x.id !== k.id; }) }); },
+      setText: function (e) { self.patch(k.id, { text: e.target.value }); },
+      setTitle: function (e) { self.patch(k.id, { title: e.target.value }); },
+      setUrl: function (e) { self.patch(k.id, { url: e.target.value }); },
+      setDraft: function (e) { self.patch(k.id, { draft: e.target.value }); },
+      draftKey: function (e) { if (e.key === 'Enter') { e.preventDefault(); self.addItem(k.id); } },
+      addItem: function () { self.addItem(k.id); }
+    };
+  }
+
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var d = s.drag;
+
+    var columns = s.columns.map(function (c) {
+      var mine = s.cards.filter(function (k) { return k.col === c.id; })
+        .sort(function (a, b) { return a.order - b.order; });
+      var hover = s.hoverCol === c.id;
+      var moving = d && d.kind === 'col' && d.id === c.id;
+      var pickerOpen = s.picker === c.id;
+      var isSel = self.isSel('col', c.id);
+      var isMatch = s.guide && s.guide.ids.indexOf(c.id) !== -1;
+      return {
+        titleW: textW(c.title, 14, 16),
+        id: c.id, title: c.title, left: c.x, top: c.y, w: c.w || COL_W,
+        cards: mine.map(function (k) { return self.mkCard(k); }),
+        count: String(mine.length),
+        isEmpty: mine.length === 0,
+        expanded: !c.collapsed, expandedAttr: c.collapsed ? 'false' : 'true', chevRot: c.collapsed ? 'rotate(-90deg)' : 'none',
+        minH: c.collapsed ? '0px' : Math.max(220, c.h || 0) + 'px',
+        toggleCollapse: function () { self.patchCol(c.id, { collapsed: !c.collapsed }); },
+        bg: hover ? '#E7EFEE' : (c.color ? PALETTE[c.color].bg : '#EFECE6'),
+        border: hover ? '1.5px dashed #1F5F5B' : ('1px solid ' + (c.color ? PALETTE[c.color].edge : '#E2DDD4')),
+        shadow: moving ? DRAG_SHADOW : 'none',
+        z: moving ? 9000 : 1,
+        outline: moving ? DRAG_OUTLINE : (isMatch ? MATCH_OUTLINE : (isSel ? SEL_OUTLINE : 'none')),
+        showPicker: pickerOpen, pickerOpen: pickerOpen ? 'true' : 'false',
+        pickerBtnBg: pickerOpen ? 'rgba(31,29,26,0.08)' : 'transparent',
+        togglePicker: function () { self.togglePicker(c.id); },
+        swatches: self.swatches(c.color || null, function (key) { self.patchCol(c.id, { color: key }); }),
+        select: function (e) {
+          if (e.target.closest && e.target.closest('[data-card-id]')) return;
+          self.focusBoard(e);
+          var add = e.ctrlKey || e.metaKey || e.shiftKey;
+          self.select('col', c.id, add);
+          if (!add) self.armDrag(e, 'col', c.id);
+        },
+        grab: function (e) { self.startColDrag(e, c.id); },
+        startResize: function (e) { self.startResize(e, 'col', c.id); },
+        startResizeCorner: function (e) { self.startResize(e, 'col', c.id, true); },
+        remove: function () { self.setState({ confirmCol: c.id }); },
+        confirming: s.confirmCol === c.id,
+        cardWord: mine.length === 1 ? 'card' : 'cards',
+        confirmDelete: function () {
+          self.remember('delete');
+          self.setState({
+            confirmCol: null, selected: null, sel: [],
+            cards: self.state.cards.filter(function (k) { return k.col !== c.id; }),
+            columns: self.state.columns.filter(function (x) { return x.id !== c.id; })
+          });
+        },
+        cancelDelete: function () { self.setState({ confirmCol: null }); },
+        setTitle: function (e) { self.patchCol(c.id, { title: e.target.value }); }
+      };
+    });
+
+    var loose = s.cards.filter(function (k) { return !k.col; }).map(function (k) { return self.mkCard(k); });
+
+    var selInfo = null;
+    if (s.selected && s.selected.kind === 'card') {
+      var sk = s.cards.find(function (x) { return x.id === s.selected.id; });
+      if (sk) selInfo = { key: sk.color || DEFAULT_COLOR[sk.type] };
+    } else if (s.selected && s.selected.kind === 'col') {
+      var sc0 = s.columns.find(function (x) { return x.id === s.selected.id; });
+      if (sc0) selInfo = { key: sc0.color || null };
+    }
+
+    return {
+      boardName: s.boardName,
+      boardW: textW(s.boardName, 17, 20),
+      setBoardName: function (e) { self.remember('type:board'); self.setState({ boardName: e.target.value }); },
+      onKey: function (e) { self.onKey(e); },
+      onBoardDown: function (e) { self.hookBoard(e.currentTarget); self.onBoardDown(e); },
+      hookBoard: function (e) { self.hookBoard(e.currentTarget); },
+      worldTransform: 'translate(' + s.panX + 'px, ' + s.panY + 'px) scale(' + s.zoom + ')',
+      gridSize: String(GRID * s.zoom),
+      gridPos: (s.panX - GRID * s.zoom / 2) + 'px ' + (s.panY - GRID * s.zoom / 2) + 'px',
+      dotR: String(Math.max(0.6, s.zoom)),
+      dotR2: String(Math.max(0.6, s.zoom) + 0.2),
+      zoomLabel: Math.round(s.zoom * 100) + '%',
+      zoomIn: function () { self.zoomCenter(1.2); },
+      zoomOut: function () { self.zoomCenter(1 / 1.2); },
+      zoomReset: function () { self.setState({ zoom: 1, panX: 0, panY: 0 }); },
+      userSelect: ((d && d.kind !== 'item') || s.resize || (s.itemSel && s.itemSel.ids.length > 1)) ? 'none' : 'auto',
+      gridDot: s.snap ? '#CFC8BC' : '#E4E0D8',
+      snapPressed: s.snap ? 'true' : 'false',
+      snapBg: s.snap ? '#E0F2F1' : '#FFFFFF',
+      snapEdge: s.snap ? '#1F5F5B' : '#D9D4CA',
+      snapInk: s.snap ? '#155E58' : '#1F1D1A',
+      toggleSnap: function () {
+        if (self.state.snap) { self.setState({ snap: false }); return; }
+        self.remember(null);
+        var sz = function (v) { return v ? Math.max(GRID * 5, gsnap(v)) : v; };
+        self.anchor = null; self.movable = null;
+        self.setState({
+          snap: true,
+          cards: self.state.cards.map(function (k) {
+            return k.col ? Object.assign({}, k, { h: sz(k.h) }) : Object.assign({}, k, { x: gsnap(k.x), y: gsnap(k.y), w: sz(k.w), h: sz(k.h) });
+          }),
+          columns: self.state.columns.map(function (c) { return Object.assign({}, c, { x: gsnap(c.x), y: gsnap(c.y), w: Math.max(MIN_COL_W, gsnap(c.w || COL_W)) }); })
+        });
+      },
+      colourOpen: s.picker === 'toolbar' && !!selInfo,
+      colourExpanded: s.picker === 'toolbar' && selInfo ? 'true' : 'false',
+      colourOpacity: selInfo ? '1' : '0.45',
+      colourTitle: selInfo ? ((s.sel || []).length > 1 ? 'Change the colour of ' + s.sel.length + ' selected blocks' : 'Change the colour of the selected block') : 'Select a card or column first',
+      selBg: selInfo && selInfo.key ? PALETTE[selInfo.key].bg : '#EFECE6',
+      selEdge: selInfo && selInfo.key ? PALETTE[selInfo.key].ink : '#CFC8BC',
+      toggleColour: function () { if (!selInfo) return; self.setState({ picker: self.state.picker === 'toolbar' ? null : 'toolbar' }); },
+      colourSwatches: self.swatches(selInfo ? selInfo.key : null, function (key) {
+        var list = self.state.sel || [];
+        if (!list.length) return;
+        self.remember(null);
+        var cids = list.filter(function (m) { return m.kind === 'card'; }).map(function (m) { return m.id; });
+        var lids = list.filter(function (m) { return m.kind === 'col'; }).map(function (m) { return m.id; });
+        self.setState({
+          cards: self.state.cards.map(function (k) { return cids.indexOf(k.id) !== -1 ? Object.assign({}, k, { color: key }) : k; }),
+          columns: self.state.columns.map(function (c) { return lids.indexOf(c.id) !== -1 ? Object.assign({}, c, { color: key }) : c; })
+        });
+      }),
+      panCursor: 'default',
+      toolHandBg: s.tool === 'hand' ? '#1F5F5B' : 'transparent',
+      toolHandInk: s.tool === 'hand' ? '#FFFFFF' : '#1F1D1A',
+      toolSelBg: s.tool === 'select' ? '#1F5F5B' : 'transparent',
+      toolSelInk: s.tool === 'select' ? '#FFFFFF' : '#1F1D1A',
+      handPressed: s.tool === 'hand' ? 'true' : 'false',
+      selPressed: s.tool === 'select' ? 'true' : 'false',
+      useHand: function () { self.setState({ tool: 'hand' }); },
+      useSelect: function () { self.setState({ tool: 'select' }); },
+      hasMarquee: !!s.marquee,
+      marquee: s.marquee ? { x: s.marquee.x, y: s.marquee.y + VIEW_TOP, w: s.marquee.w, h: s.marquee.h } : { x: 0, y: 0, w: 0, h: 0 },
+      hasLand: !!(d && d.land),
+      land: d && d.land ? d.land : { x: 0, y: 0, w: 0, h: 0 },
+      hasGhost: !!(d && d.kind === 'item'),
+      ghost: d && d.kind === 'item' ? { x: d.vx + 14, y: d.vy + VIEW_TOP + 10, label: d.label, extra: d.hint && d.hint.mode === 'newcard' ? 'New list' : d.extra, hasExtra: !!(d.extra || (d.hint && d.hint.mode === 'newcard')) } : { x: 0, y: 0, label: '', extra: '', hasExtra: false },
+      hasGuide: !!s.guide,
+      guide: s.guide || { x: 0, y: 0, text: '' },
+      columns: columns,
+      loose: loose,
+      addNote: function () { self.addCard('note'); },
+      addTodo: function () { self.addCard('todo'); },
+      addLink: function () { self.addCard('link'); },
+      addColumn: function () { self.addColumn(); },
+      undo: function () { self.undo(); },
+      redo: function () { self.redo(); },
+      canUndo: self.past.length ? '1' : '0.4',
+      canRedo: self.future.length ? '1' : '0.4'
+    };
+  }
+}
+</script>
+</body>
+</html>

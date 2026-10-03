@@ -1,0 +1,988 @@
+:root {
+  --canvas: #f6f4f0;
+  --grid-dot: #cfc8bc;
+  --grid-dot-faint: #e4e0d8;
+  --toolbar-bg: #ffffff;
+  --line: #e2ddd4;
+  --control-edge: #d9d4ca;
+  --ink: #1f1d1a;
+  --ink-soft: #5f5a52;
+  --ink-faint: #6b655c;
+  --card-bg: #ffffff;
+  --card-edge: #e2ddd4;
+  --accent: #1f5f5b;
+  --accent-soft: #e0f2f1;
+  --accent-ink: #155e58;
+  --danger: #a3263f;
+  --surface: #ffffff;
+  --hover: rgba(31, 29, 26, 0.07);
+  --placeholder: #736c62;
+  --on-accent: #ffffff;
+  --drop-bg: #e7efee;
+  --link-url-bg: rgba(255, 255, 255, 0.75);
+  --checkbox: #2f7d5b;
+  --nest-mark: #2a9d93;
+  --nest-mark-bg: rgba(42, 157, 147, 0.14);
+  --colour-dot: #efece6;
+  --toolbar-height: 64px;
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Typefaces a text box can be given (text formatting, owner request). */
+  --font-serif: 'Lora', Georgia, serif;
+  --font-rounded: 'Nunito', system-ui, sans-serif;
+  --font-hand: 'Caveat', 'Segoe Print', cursive;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+}
+
+/*
+ * Dark mode (toolbar toggle; <html data-theme="dark">). Only the colours change: cards become dark
+ * grey with light text, and columns use deep shades of their colours (set inline from the palette).
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #1c1b19;
+  --grid-dot: #45413b;
+  --grid-dot-faint: #2c2a27;
+  --toolbar-bg: #232220;
+  --line: #3a3733;
+  --control-edge: #4a463f;
+  --ink: #ece8e1;
+  --ink-soft: #c2bcb2;
+  --ink-faint: #a8a298;
+  --card-bg: #2b2926;
+  --card-edge: #3d3a35;
+  --accent: #5fb3ab;
+  --accent-soft: #1f3533;
+  --accent-ink: #9fdcd5;
+  --danger: #f08a9c;
+  --surface: #2b2926;
+  --hover: rgba(236, 232, 225, 0.09);
+  --placeholder: #a39d93;
+  --on-accent: #10201f;
+  --drop-bg: #1f3533;
+  --link-url-bg: rgba(0, 0, 0, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--canvas);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+input, textarea, button { font-family: inherit; color: inherit; }
+input:focus, input:focus-visible, textarea:focus, textarea:focus-visible { outline: none; box-shadow: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Tick boxes are controls, not text fields: they keep the keyboard focus ring. */
+input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: var(--toolbar-height) 1fr;
+}
+
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.toolbar-spacer { flex-grow: 1; }
+
+/* Narrower windows: tighter still, so every button fits. */
+@media (max-width: 1320px) {
+  .toolbar { gap: 4px; padding: 0 10px; }
+  /* (.toolbar raises it above the plain .tb-button rule further down; icon-only buttons stay square.) */
+  .toolbar .tb-button:not(.icon-only) { padding: 0 6px; font-size: 13px; }
+  .toolbar-label { display: none; }
+}
+
+.toolbar-divider { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+
+.toolbar-label { font-size: 13px; color: var(--ink-soft); margin-right: 2px; }
+
+/* Text box that is exactly as wide as its text: an invisible copy of the text sets the width. */
+.autosize {
+  display: inline-grid;
+  min-width: 0;
+}
+.autosize::after,
+.autosize > input {
+  grid-area: 1 / 1;
+  font: inherit;
+  padding: var(--pad, 6px 8px);
+  border: none;
+  min-width: 2ch;
+  width: auto;
+}
+.autosize::after {
+  content: attr(data-value) ' ';
+  visibility: hidden;
+  white-space: pre;
+  overflow: hidden;
+}
+.autosize > input { background: transparent; border-radius: 6px; }
+
+.board-name {
+  font-weight: 600;
+  font-size: 17px;
+  /* Shrinks before any button does (down to 140px), ending in … when the name doesn't fit. */
+  min-width: 140px;
+  max-width: 460px;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.board-name > input { text-overflow: ellipsis; }
+.toolbar > :not(.board-name):not(.toolbar-spacer) { flex-shrink: 0; }
+
+.tool-group {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--control-edge);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.tool-button {
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tool-button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+
+.tb-button {
+  height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--control-edge);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-button:hover:not([aria-disabled='true']) { filter: brightness(0.96); }
+.tb-button.icon-only { width: 40px; padding: 0; justify-content: center; }
+.tb-button[aria-disabled='true'] { cursor: default; }
+.tb-button.faded-undo[aria-disabled='true'] { opacity: 0.4; }
+.tb-button.faded-colour[aria-disabled='true'] { opacity: 0.45; }
+/* Faded buttons are harder to see on the dark toolbar, so they fade a little less there. */
+:root[data-theme='dark'] .tb-button.faded-undo[aria-disabled='true'] { opacity: 0.5; }
+:root[data-theme='dark'] .tb-button.faded-colour[aria-disabled='true'] { opacity: 0.55; }
+
+/* On / off buttons (Snap to grid, Dark mode) look pressed while on. */
+.tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+
+.colour-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--colour-dot); border: 1.5px solid var(--grid-dot); }
+
+/* Rarely used buttons (Auto-colour, Collapse all, Import, Clean up): no border until hovered. */
+.tb-button.quiet { border-color: transparent; background: transparent; }
+.tb-button.quiet:hover:not([aria-disabled='true']) { border-color: var(--control-edge); background: var(--surface); filter: none; }
+
+.tb-button.add-column { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* ---------- canvas ---------- */
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--canvas);
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+/* Hand tool (owner request): an open glove over empty board, a closed one while dragging the board. */
+.canvas.tool-hand { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V6a2%202%200%200%200-4%200v5%20M14%2010V4a2%202%200%200%200-4%200v6%20M10%2010.5V6a2%202%200%200%200-4%200v8%20M18%208a2%202%200%201%201%204%200v6a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V6a2%202%200%200%200-4%200v5%20M14%2010V4a2%202%200%200%200-4%200v6%20M10%2010.5V6a2%202%200%200%200-4%200v8%20M18%208a2%202%200%201%201%204%200v6a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grab; }
+.canvas.tool-hand.panning { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grabbing; }
+
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  transform-origin: 0 0;
+}
+
+/* ---------- zoom control ---------- */
+
+/* Shown on the published site when the last upload was refused (e.g. the board is too big). */
+.save-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 3;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.corner-controls {
+  position: fixed;
+  right: 24px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.help-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+.help-button:hover { color: var(--ink); }
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+
+.zoom-control button {
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+.zoom-control button:hover { background: var(--hover); }
+.zoom-control .zoom-label { min-width: 56px; padding: 0 6px; }
+
+/* ---------- colour menu ---------- */
+
+.colour-control { position: relative; }
+
+.colour-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid;
+  cursor: pointer;
+}
+/* Name of the swatch under the pointer: several swatches are close in tone. */
+.swatch-name { grid-column: 1 / -1; min-height: 18px; font-size: 12px; color: var(--ink-soft); text-align: center; }
+.swatch-default {
+  grid-column: 1 / -1;
+  height: 28px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+.swatch-default[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
+.swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor; }
+
+/* ---------- blocks shared ---------- */
+
+.icon-button {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-button:hover { background: var(--hover); }
+
+.card, .column { cursor: default; }
+.card input:not([type='checkbox']), .card textarea, .column input { cursor: text; }
+
+/* Text box that grows taller with its text: an invisible copy of the text sets the height. */
+.grow { display: grid; min-width: 0; }
+.grow::after,
+.grow > textarea {
+  grid-area: 1 / 1;
+  font: inherit;
+  line-height: inherit;
+  padding: var(--pad, 2px 4px);
+  border: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.grow::after { content: attr(data-value) ' '; visibility: hidden; }
+.grow > textarea {
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border-radius: 6px;
+  color: inherit;
+  min-height: 0;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
+  /* Cards are always white; only columns are coloured. */
+  --edge: var(--card-edge);
+  background: var(--card-bg);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06);
+  color: var(--ink);
+  font-size: calc(14px * var(--fs, 1));
+}
+.card.loose { position: absolute; }
+
+/*
+ * Titled cards (to-do lists, links, Completed) get a tinted band across the top, behind the header
+ * and title: soft teal when loose; inside a column, a deeper shade of the column's colour (mixed
+ * from its background and border tones) so the band stands out from the column without clashing.
+ */
+.card { --band: var(--accent-soft); }
+.card.in-column { --band: color-mix(in srgb, var(--col-edge) 70%, var(--bg)); }
+/* In an uncoloured column the mixed shade comes out a dull khaki, so cards keep the usual band. */
+.column.uncoloured .card.in-column { --band: var(--accent-soft); }
+.card.titled .card-header {
+  margin: 0 -12px;
+  padding: 0 6px 0 12px;
+  background: var(--band);
+  border-radius: 9px 9px 0 0;
+}
+.card.titled.collapsed .card-header { border-radius: 9px; }
+.card.titled .todo-body > .card-title:first-child,
+.card.titled .link-body > .card-title:first-child,
+.card.titled .completed-card-title {
+  align-self: stretch;
+  max-width: none;
+  margin: 0 -12px 4px;
+  padding: 0 12px 8px;
+  background: var(--band);
+}
+.card.in-column { width: auto; margin: 0 16px 10px; }
+.card.collapsed { padding-bottom: 0; }
+/* A collapsed card made taller keeps its header in the middle. */
+.card.loose.collapsed { justify-content: center; }
+
+.card.selected, .column.selected { outline: 2px solid var(--accent); }
+.card.selected { outline-offset: 2px; }
+.column.selected { outline-offset: 3px; }
+
+.card.dragging, .column.dragging {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent), 0 14px 30px rgba(31, 29, 26, 0.16);
+  z-index: 10;
+}
+
+.card-header {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: -6px;
+}
+.card-meta {
+  flex-grow: 1;
+  min-width: 0;
+  padding-left: 2px;
+  font-size: calc(12px * var(--fs, 1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card.collapsed .card-meta { font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
+/* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right. */
+.card.loose.collapsed .card-meta { padding-left: 58px; text-align: center; }
+.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: 26px; }
+
+.note-text { font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: 1.55; }
+.note-text > textarea { min-height: 104px; }
+
+.card-title { --pad: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; align-self: flex-start; }
+
+.todo-body, .link-body { display: flex; flex-direction: column; gap: 6px; }
+
+.todo-items { display: flex; flex-direction: column; }
+.todo-item { min-height: 30px; display: flex; align-items: flex-start; gap: 6px; border-radius: 4px; }
+/* A tick box's pressable area: 4px of padding around the 16px box (24px), taken back by the margin. */
+.tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: 4px; margin: -4px; cursor: pointer; }
+.todo-item input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 7px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--checkbox);
+  cursor: pointer;
+}
+.item-text { flex-grow: 1; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: calc(20px * var(--fs, 1) * var(--ts, 1)); --pad: 4px; }
+.todo-item.done .item-text > textarea { text-decoration: line-through; }
+
+.link-url {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--link-url-bg);
+  font-size: calc(13px * var(--fs, 1));
+}
+.link-open {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: var(--surface);
+  color: inherit;
+  font-weight: 600;
+  font-size: calc(13px * var(--fs, 1));
+  text-decoration: none;
+}
+.link-open span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-open[aria-disabled='true'] { cursor: default; opacity: 0.45; }
+.link-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- the Completed card (Clean up) ---------- */
+
+.completed-card-body { display: flex; flex-direction: column; gap: 6px; }
+.completed-card-title { padding: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1)); }
+.completed-empty { padding: 4px; font-size: calc(13px * var(--fs, 1)); color: var(--ink-faint); }
+.completed-day { display: flex; flex-direction: column; }
+.completed-date {
+  margin: 6px 0 2px;
+  padding: 0 4px;
+  font-size: calc(12px * var(--fs, 1));
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.completed-row { min-height: 28px; display: flex; align-items: flex-start; gap: 6px; padding-right: 2px; }
+.completed-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 6px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--checkbox);
+  cursor: pointer;
+}
+.completed-row input[type='checkbox']:disabled { cursor: default; }
+.completed-text {
+  flex-grow: 1;
+  min-width: 0;
+  padding: 4px 0;
+  font-size: calc(14px * var(--fs, 1) * var(--ts, 1));
+  line-height: calc(20px * var(--fs, 1) * var(--ts, 1));
+  text-decoration: line-through;
+  overflow-wrap: anywhere;
+}
+.completed-row.sub:not(.done) .completed-text { text-decoration: none; }
+.completed-from {
+  flex-shrink: 0;
+  max-width: 40%;
+  padding: 6px 0 0;
+  font-size: calc(12px * var(--fs, 1));
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- columns ---------- */
+
+.column {
+  position: absolute;
+  min-height: 220px;
+  padding-bottom: 6px;
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+.column.collapsed { min-height: 0; }
+.column.drop-target { background: var(--drop-bg); border: 1.5px dashed var(--accent); }
+
+.column-header {
+  height: 52px;
+  padding: 8px 8px 6px;
+  display: grid;
+  /* Equal sides keep the title truly centred; each side has room for the two buttons. */
+  grid-template-columns: minmax(60px, 1fr) minmax(0, auto) minmax(60px, 1fr);
+  align-items: center;
+}
+.column-heading { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
+.column-actions { display: flex; justify-content: flex-end; gap: 2px; }
+.column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
+.column-count {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--hover);
+  font-size: calc(12px * var(--fs, 1));
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.column-empty {
+  margin: 2px 16px 10px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--grid-dot);
+  border-radius: 8px;
+  font-size: calc(13px * var(--fs, 1));
+  color: var(--ink-soft);
+}
+
+.confirm {
+  margin: 0 12px 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(31, 29, 26, 0.14);
+}
+.confirm-title { font-size: 14px; font-weight: 600; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-actions button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.confirm-cancel { border: 1px solid var(--control-edge); background: var(--surface); }
+.confirm-delete { border: none; background: var(--danger); color: var(--on-accent); }
+
+/* ---------- layout and resizing (step 3) ---------- */
+
+/* A resized card's note area fills the extra height, so the whole card is writable. */
+.card.loose .note-text { flex-grow: 1; }
+
+.resize-corner {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: nwse-resize;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.column .resize-corner { right: 2px; bottom: 2px; }
+.resize-corner:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+.resize-edge {
+  position: absolute;
+  right: -5px;
+  top: 52px;
+  bottom: 22px;
+  width: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.card .resize-edge, .column.collapsed .resize-edge { top: 4px; bottom: 4px; }
+/* On a collapsed block the edge is the only resize handle, so hint at it on hover. */
+.card.collapsed:hover .resize-edge, .column.collapsed:hover .resize-edge { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.card.collapsed .resize-edge:hover, .column.collapsed .resize-edge:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+/* Bigger invisible areas to press (at least 24px, for touch screens); the drawn handles stay small. */
+.resize-corner::before, .resize-edge::before, .item-grip::before { content: ''; position: absolute; }
+.resize-corner::before { inset: -3px; }
+.resize-edge::before { top: 0; bottom: 0; left: -7px; right: -7px; }
+.item-grip::before { top: 0; bottom: 0; left: -5px; right: -5px; }
+.resize-edge:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+.card.size-match, .column.size-match { outline: 2px dashed var(--accent); }
+.card.size-match { outline-offset: 2px; }
+.column.size-match { outline-offset: 3px; }
+
+.landing-spot {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  pointer-events: none;
+}
+
+.size-label {
+  position: absolute;
+  z-index: 3;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------- selection box (step 4) ---------- */
+
+.marquee {
+  position: absolute;
+  z-index: 3;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+}
+
+/* ---------- checklists (step 5) ---------- */
+
+.todo-body { border-radius: 6px; }
+.todo-body.append-target { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.todo-item { position: relative; }
+.todo-item.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.todo-item.picked .item-text > textarea { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.todo-item.mark-before { box-shadow: inset 0 2px 0 var(--accent); }
+.todo-item.mark-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.todo-item.mark-nest { box-shadow: inset 0 -2px 0 var(--nest-mark); background: var(--nest-mark-bg); }
+.todo-item.dimmed { opacity: 0.35; }
+
+/* Ticked items ease out of the list and into the Completed section (only with motion allowed). */
+.todo-item.leaving { animation: item-leave 280ms ease-in forwards; pointer-events: none; }
+.todo-item.arrived { animation: item-arrive 450ms ease-out; }
+@keyframes item-leave {
+  to { opacity: 0; transform: translateY(8px); }
+}
+@keyframes item-arrive {
+  from { opacity: 0; transform: translateY(-8px); background: var(--accent-soft); }
+  to { opacity: 1; transform: none; background: transparent; }
+}
+
+/*
+ * Grip and trash only show while the pointer is over the row. They sit over the right end of its
+ * first line (with a fade behind them) rather than taking room, so the text uses the full width.
+ */
+.todo-item::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 28px;
+  background: linear-gradient(to right, transparent, var(--card-bg) 24px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+.todo-item:hover::after { opacity: 1; }
+.item-grip,
+.item-trash {
+  position: absolute;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.todo-item:hover .item-grip,
+.todo-item:hover .item-trash,
+.item-grip:focus-visible,
+.item-trash:focus-visible { opacity: 1; }
+.item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
+.item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+
+.completed {
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+  border-top: 1px solid var(--edge);
+}
+.completed-toggle {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.completed-toggle:hover { background: var(--hover); }
+
+.item-ghost {
+  position: absolute;
+  z-index: 4;
+  max-width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 10px 24px rgba(31, 29, 26, 0.16);
+  font-size: 13px;
+  pointer-events: none;
+}
+.item-ghost-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-ghost-extra { flex-shrink: 0; font-size: 12px; color: var(--ink-soft); }
+
+/* ---------- smooth movement ---------- */
+
+/*
+ * Loose blocks glide to where they land: into the grid spot after a drag, to the grid size after a
+ * resize, and out of the way when something pushes them. Not while following the pointer.
+ */
+.card.loose,
+.column {
+  transition:
+    left 160ms ease-out,
+    top 160ms ease-out,
+    width 160ms ease-out;
+}
+.card.dragging,
+.column.dragging,
+.card.following,
+.column.following {
+  transition: none;
+}
+
+/* The landing outline slides between grid spots instead of jumping. */
+.landing-spot {
+  transition:
+    left 90ms ease-out,
+    top 90ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.loose,
+  .column,
+  .landing-spot {
+    transition: none;
+  }
+}
+
+/* ---------- sign-in screen (published site only) ---------- */
+
+.sign-in {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.sign-in-panel {
+  width: 100%;
+  max-width: 360px;
+  padding: 28px 24px;
+  background: var(--toolbar-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.sign-in-title { margin: 0; font-size: 20px; font-weight: 600; }
+.sign-in-text { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.sign-in-error { margin: 0; font-size: 13px; color: var(--danger); }
+.tb-button.sign-in-button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* ---------- keyboard shortcuts panel (? button or ? key) ---------- */
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.shortcuts-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(31, 29, 26, 0.2);
+}
+.shortcuts-header { display: flex; align-items: center; justify-content: space-between; }
+.shortcuts-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.shortcuts-group dl { margin: 0; }
+.shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
+.shortcut dd { margin: 0; color: var(--ink-soft); }
+.shortcut kbd {
+  font: inherit;
+  font-size: 13px;
+  padding: 1px 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: 5px;
+  background: var(--canvas);
+}
+
+/* Shown on an empty board only. */
+.empty-hint {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(420px, calc(100% - 32px));
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+/* Bottom-right corner: save note and text size. */
+.save-note { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.zoom-control button.text-size { min-width: 36px; font-weight: 600; font-size: 13px; }
+.zoom-control button.text-size[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+
+/* Alignment guides while dragging a block (thin teal lines across the blocks that line up). */
+.align-guide { position: absolute; pointer-events: none; z-index: 5; background: var(--accent); }
+.align-guide.x { width: 1.5px; margin-left: -0.75px; }
+.align-guide.y { height: 1.5px; margin-top: -0.75px; }
+
+/* Text format bar (owner request): above highlighted text or selected checklist items. */
+.format-bar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.format-bar button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.format-bar button:hover { background: var(--hover); }
+.format-bar button[aria-pressed='true'],
+.format-bar .fb-font-menu button[aria-checked='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.format-bar .fb-bold { font-weight: 700; }
+.format-bar .fb-italic { font-style: italic; font-family: Georgia, serif; }
+.fb-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
+.fb-font { position: relative; }
+.fb-font > button { white-space: nowrap; }
+.fb-font-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.fb-font-menu button { justify-content: flex-start; text-align: left; height: 32px; font-size: 16px; }
+/* While the bar is hovered: the text boxes it will change. */
+.format-target { outline: 1.5px dashed var(--accent); outline-offset: 1px; border-radius: 4px; }

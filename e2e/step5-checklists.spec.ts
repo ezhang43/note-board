@@ -234,6 +234,9 @@ test('drag an item into another list, or onto empty list space to append', async
   const title = await box(b.getByLabel('List title'));
   await dragItem(page, rowWithText(a, 'a2'), { x: title.x + title.width - 20, y: title.y + 10 } /* the title band, past the text */, async () => {
     await expect(b.locator('.todo-body')).toHaveClass(/append-target/);
+    // The whole card is outlined, top included, so you can tell the item goes into it (owner request).
+    const ring = await b.evaluate((el) => { const s = getComputedStyle(el); return [s.outlineStyle, s.outlineWidth]; });
+    expect(ring).toEqual(['dashed', '2px']);
   });
   expect(await texts(b)).toEqual(['b1', 'a1', 'a2']);
   expect(await texts(a)).toEqual(['']); // emptied list gets a blank item

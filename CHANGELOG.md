@@ -1,5 +1,9 @@
 # Changelog
 
+## Clearer outline when dragging an item into another list (2026-10-04)
+
+- When you drag a checklist item onto another list to add it at the end, the whole card now gets a dashed outline, top included. Before, the top of the outline was hidden under the list's title band, so it was hard to tell where the item would go.
+
 ## Fix: alignment guide lines no longer stay on the board (2026-10-04)
 
 - When a dragged card lined up with two cards at once, some guide lines could be left behind on the board after the drag. They now always go away.

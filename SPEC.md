@@ -128,7 +128,7 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 
 **Dragging items**
 
-- Drag the grip to move an item and all its sub-items: before/after another item (teal line), nested under an item (drop slightly right; teal tint), into another list, or onto empty list space (appends).
+- Drag the grip to move an item and all its sub-items: before/after another item (teal line), nested under an item (drop slightly right; teal tint), into another list, or onto empty list space (appends; the whole card, top included, gets a dashed teal outline).
 - Dropping on empty board space (or on a note, link or column) creates a new untitled to-do list at that spot with the dragged items (the dragged label says "Drop to make a new list").
 
 **Selecting several items**
@@ -192,7 +192,7 @@ Professional but with colour: white cards and soft-tinted columns on a warm neut
 - **Accent:** teal #1F5F5B for selection, active tool, drop lines and New column. Destructive actions use #A3263F.
 - **Cards:** white (#FFFFFF), 10px radius, 1px #E2DDD4 border, shadow 0 1px 2px at 6%. Columns: 12px radius, #EFECE6 unless recoloured; the swatches below are for columns.
 - **Dark mode:** the toolbar's moon button switches between light and dark (pressed = dark; it shows the same pressed look as Snap to grid: soft teal with a teal border). A first visit on a device follows the computer's light / dark setting; once the button is pressed, that device remembers the choice (it is not synced, not saved with the board, and not undone by Ctrl+Z). Dark mode changes only colours: canvas #1C1B19 with #45413B dots, toolbar #232220, cards #2B2926 with a #3D3A35 border and #ECE8E1 text, accent teal #5FB3AB. Columns use a deep, muted shade of each swatch (`DARK_PALETTE` in `src/model/theme.ts`, same names; uncoloured columns #2A2825), and the Colour menu shows those shades. Every dark column colour keeps at least 7:1 contrast with the text. Faded toolbar buttons fade a little less in dark mode (55% instead of 45%; Undo/Redo 50% instead of 40%). Placeholder text is #736C62 in light mode and #A39D93 in dark mode, readable at about 4.5:1.
-- **States:** selection = 2px solid teal outline; size match = 2px dashed teal; dragging = 2.5px teal border with glow; no focus rectangles on text fields (buttons and tick boxes keep a keyboard focus ring).
+- **States:** selection = 2px solid teal outline; size match = 2px dashed teal; a list about to take dragged items at its end = 2px dashed teal around the whole card; dragging = 2.5px teal border with glow; no focus rectangles on text fields (buttons and tick boxes keep a keyboard focus ring).
 - **Accessibility:** tick boxes, resize handles and the item grip can be pressed within at least 24×24px (the drawn handles stay small). Screen readers hear cards as "To-do list: Groceries" / "Link: …" / "Note" and columns as "Column: Week" ("Untitled …" when there is no title); the board area is called "Board". Placeholders: "Add an item" for a blank checklist item, "Paste a link address" for a link's address.
 
 | Swatch | Background | Edge | Text |

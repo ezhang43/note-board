@@ -323,3 +323,30 @@ test('Collapse all closes the gaps: a card under a column moves up to sit right 
   await expect.poll(async () => (await col.boundingBox())!.height).toBeLessThan(100);
   await expect.poll(gap).toBeCloseTo(gapBefore, 0);
 });
+
+test('collapsing one column with its arrow pulls the block below up, leaving no empty space', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  const col = columns(page).first();
+  for (let i = 0; i < 3; i++) {
+    await col.click({ position: { x: 20, y: 20 } });
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+  }
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const note = page.locator('.card.loose').first();
+  const n = (await note.boundingBox())!;
+  const c = (await col.boundingBox())!;
+  await page.mouse.move(n.x + 30, n.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 30, c.y + c.height + 30, { steps: 10 });
+  await page.mouse.up();
+  const gap = async () => (await note.boundingBox())!.y - ((await col.boundingBox())!.y + (await col.boundingBox())!.height);
+  const before = await gap();
+  await col.getByRole('button', { name: 'Collapse column' }).click();
+  await expect.poll(async () => (await col.boundingBox())!.height).toBeLessThan(100);
+  await expect.poll(gap).toBeCloseTo(before, 0);
+});

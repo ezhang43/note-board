@@ -244,10 +244,8 @@ export function blockActions(ctx: StoreContext) {
       layout.expanding = null;
       if (collapse) {
         const before = B.layoutSnapshot(board);
-        const openH = Object.fromEntries(board.order.flatMap((id) => (measured(id) == null ? [] : [[id, measured(id)!]])));
-        commit((b) => (scope ? B.setCollapsedFor(b, scope, true) : B.setAllCollapsed(b, true)));
-        layout.collapseAll = { before, after: B.layoutSnapshot(ctx.state.board), openH, until: Date.now() + EXPAND_WATCH_MS, scope };
-        requestSettle();
+        ctx.startClosing(() => commit((b) => (scope ? B.setCollapsedFor(b, scope, true) : B.setAllCollapsed(b, true))));
+        layout.collapseAll = { before, after: B.layoutSnapshot(ctx.state.board), scope };
         return;
       }
       // Expanding the same blocks right after collapsing them gives back the layout from before.
@@ -277,7 +275,10 @@ export function blockActions(ctx: StoreContext) {
       const top = B.topLevelOf(ctx.state.board, id);
       const pushes = layout.pushedBy.get(id);
       layout.pushedBy.delete(id);
-      commit((b) => (pushes ? returnPushes(B.toggleCollapsed(b, id), pushes, top, measured) : B.toggleCollapsed(b, id)));
+      // Whatever is below then moves straight up, so no empty space is left (owner request).
+      ctx.startClosing(() =>
+        commit((b) => (pushes ? returnPushes(B.toggleCollapsed(b, id), pushes, top, measured) : B.toggleCollapsed(b, id))),
+      );
     },
 
     /** Same width: the selected loose cards and columns take the first one's width. One undo step. */

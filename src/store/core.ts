@@ -18,6 +18,8 @@ import { emptyUi, type AppState, type Ui } from './types';
 export const VIEW_SAVE_DELAY = 250;
 /** Wait this long after the last board change before saving, so typing doesn't save on every key. */
 export const BOARD_SAVE_DELAY = 150;
+/** How long after a collapse the gaps below keep closing as the new heights come in (ms). */
+const CLOSING_MS = 1500;
 
 /** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
 export type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
@@ -41,6 +43,8 @@ export interface StoreContext {
    * Waits while a drag or resize is in progress. Part of the change that caused it, not a separate undo step.
    */
   requestSettle(anchors?: string[]): void;
+  /** Collapse something (`collapse` makes the change), then close the gaps it leaves below. */
+  startClosing(collapse: () => void): void;
   /** Last drawn heights of blocks, in board pixels. Not state: nothing re-renders when they change. */
   heights: Map<string, number>;
   measured: MeasuredHeight;
@@ -68,7 +72,13 @@ export interface StoreContext {
      * heights, to close the gaps while the collapsed heights come in (until `until`); and which
      * blocks it was for (`scope`: the selected ids, or null for everything).
      */
-    collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot; openH: Record<string, number>; until: number; scope: string[] | null } | null;
+    collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot; scope: string[] | null } | null;
+    /**
+     * Just after something collapsed: where blocks were and how tall they were drawn before, so the
+     * gaps below can be closed while the collapsed heights come in (until `until`). `after` is
+     * where that left them.
+     */
+    closing: { before: LayoutSnapshot; after: LayoutSnapshot; openH: Record<string, number>; until: number } | null;
     /** Until when (ms) blocks opened by Expand all are still growing; meanwhile higher blocks win. */
     expandAllUntil: number;
   };
@@ -108,7 +118,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let settleQueued = false;
   let history: History = emptyHistory;
   const pending: StoreContext['pending'] = { tick: null };
-  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, expandAllUntil: 0 };
+  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, closing: null, expandAllUntil: 0 };
   const measured: MeasuredHeight = (id) => heights.get(id);
 
   function flushView() {
@@ -163,6 +173,18 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return board;
   };
 
+  /**
+   * Call before collapsing (`collapse` does it): remembers the heights drawn now, then after the
+   * change closes the gaps below as the new heights come in (owner request).
+   */
+  function startClosing(collapse: () => void) {
+    const openH = Object.fromEntries(state.board.order.flatMap((id) => (measured(id) == null ? [] : [[id, measured(id)!]])));
+    collapse();
+    const at = layoutSnapshot(state.board);
+    layout.closing = { before: at, after: at, openH, until: Date.now() + CLOSING_MS };
+    requestSettle();
+  }
+
   function requestSettle(anchors: string[] = []) {
     // Re-adding moves a block to the end, so the most recent change is last.
     anchors.forEach((a) => {
@@ -181,9 +203,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       if (Date.now() <= layout.expandAllUntil) a.sort((p, q) => (blockOf(state.board, p)?.y ?? 0) - (blockOf(state.board, q)?.y ?? 0));
       // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
       let board = state.board;
-      // Just after Collapse all: blocks below the collapsed ones move straight up (owner request).
-      // Only blocks still where Collapse all (or this) left them.
-      const ca = layout.collapseAll;
+      // Just after collapsing: blocks below the collapsed ones move straight up (owner request).
+      // Only blocks still where the collapse (or this) left them.
+      const ca = layout.closing;
       if (ca && Date.now() <= ca.until) {
         const still = (id: string) => {
           const b = blockOf(board, id);
@@ -193,6 +215,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         };
         board = closeGaps(board, ca.before.at, ca.openH, measured, still);
         ca.after = layoutSnapshot(board);
+        // Expand all compares with where Collapse all left blocks: that now includes this.
+        if (layout.collapseAll) layout.collapseAll.after = ca.after;
       }
       board = settle(board, measured, a, true);
       const exp = layout.expanding;
@@ -258,6 +282,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     updateUi: (change) => set({ ...state, ui: uiWith(change) }),
     updateView: (fn) => set({ ...state, view: fn(state.view) }),
     requestSettle,
+    startClosing,
     heights,
     measured,
     screenCentre: () => screenToBoard(state.view, centreOf(viewportSize)),

@@ -45,13 +45,21 @@ describe('collapsing puts pushed blocks back (owner request)', () => {
     const s = store();
     const a = noteAt(s, 0, 0);
     const b = noteAt(s, 0, 200);
-    collapseThenExpand(s, a, 400);
-    expect(pos(s, b)).not.toEqual({ x: 0, y: 200 }); // pushed out of the way
+    // Collapsing a closes the space below it (owner request), so b moves up to sit under it.
     s.toggleCollapsed(a);
-    expect(pos(s, b)).toEqual({ x: 0, y: 200 });
     s.setMeasuredHeight(a, 40);
     vi.runAllTimers();
-    expect(pos(s, b)).toEqual({ x: 0, y: 200 });
+    const underA = pos(s, b);
+    expect(underA).toEqual({ x: 0, y: 80 });
+    s.toggleCollapsed(a);
+    s.setMeasuredHeight(a, 400);
+    vi.runAllTimers();
+    expect(pos(s, b)).not.toEqual(underA); // pushed out of the way
+    s.toggleCollapsed(a);
+    expect(pos(s, b)).toEqual(underA); // straight back
+    s.setMeasuredHeight(a, 40);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual(underA);
   });
 
   it('collapsing and its return are one undo step', () => {
@@ -224,5 +232,34 @@ describe('a board from another device is not re-arranged with this device\'s old
     s.setMeasuredHeight(b, 40);
     vi.runAllTimers();
     expect(pos(s, b)).toEqual({ x: 0, y: 60 });
+  });
+});
+
+describe('collapsing one block closes the gap below it too (owner request)', () => {
+  it('a loose card: what is below moves straight up', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0, 300);
+    const b = noteAt(s, 0, 320, 100);
+    s.toggleCollapsed(a);
+    s.setMeasuredHeight(a, 40);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 0, y: 60 });
+  });
+
+  it('a column: what is below moves straight up', () => {
+    const s = store();
+    s.addColumn();
+    const col = s.getState().ui.selection[0];
+    const c = s.getState().board.columns[col];
+    s.startDrag('column', col, c.x, c.y);
+    s.moveDrag(0, 0, null);
+    s.dropDrag(null);
+    s.setMeasuredHeight(col, 500);
+    vi.runAllTimers();
+    const b = noteAt(s, 20, 520, 100);
+    s.toggleCollapsed(col);
+    s.setMeasuredHeight(col, 52);
+    vi.runAllTimers();
+    expect(pos(s, b)).toEqual({ x: 20, y: 72 });
   });
 });

@@ -1,5 +1,9 @@
 # Changelog
 
+## Collapsing one card or column closes the space below too (2026-10-04)
+
+- Collapsing a single card or column with its arrow now pulls whatever is below it straight up, so no empty space is left, the same as Collapse all.
+
 ## Fix: blocks no longer move by themselves after Collapse all (2026-10-04)
 
 - With BusyAnts open in more than one place (the app and a browser tab, say), the other copy could push your collapsed blocks back apart using out-of-date sizes and send that back a few seconds later. A board arriving from another device is now left exactly as it was sent.

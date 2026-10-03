@@ -120,20 +120,26 @@ test('the Colour menu names the swatch under the pointer, and rings each swatch 
   expect(await style(sky, 'border-top-width')).toBe('2px');
 });
 
-test('checklist text uses the width of the card; grip and trash appear over the row on hover', async ({ page }) => {
+test('checklist text stops before the grip and trash, so hovering never covers it (owner request)', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'To-do list');
   await page.keyboard.type('Call the plumber about the leaking kitchen tap');
   const card = page.locator('.card.selected');
   const row = card.locator('[data-item-id]').first();
   const field = row.getByLabel('Item text');
-  const cardWidth = (await card.boundingBox())!.width;
-  expect((await field.boundingBox())!.width).toBeGreaterThan(cardWidth - 70);
+  const before = (await field.boundingBox())!;
+  expect(before.width).toBeGreaterThan((await card.boundingBox())!.width - 110);
   await row.hover();
-  const trash = (await row.getByRole('button', { name: 'Delete item' }).boundingBox())!;
+  const trash = row.getByRole('button', { name: 'Delete item' });
+  await expect(trash).toBeVisible();
+  const after = (await field.boundingBox())!;
+  expect(after.width).toBe(before.width); // the text doesn't re-wrap on hover
+  const t = (await trash.boundingBox())!;
+  const g = (await row.getByRole('button', { name: 'Drag item' }).boundingBox())!;
   const rowBox = (await row.boundingBox())!;
-  expect(trash.x + trash.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
-  await expect(row.getByRole('button', { name: 'Delete item' })).toBeVisible();
+  expect(after.x + after.width).toBeLessThanOrEqual(t.x);
+  expect(after.x + after.width).toBeLessThanOrEqual(g.x);
+  expect(g.x + g.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
 });
 
 test('Enter in a checklist item works like a text editor (owner request)', async ({ page }) => {
@@ -198,20 +204,6 @@ test('"Open link" is faded until the link has an address', async ({ page }) => {
   expect(await style(open, 'opacity')).toBe('0.45');
   await page.getByLabel('Link address').fill('https://example.com');
   expect(await style(open, 'opacity')).toBe('1');
-});
-
-test('the fade behind a hovered item\'s grip and trash covers the text under them', async ({ page }) => {
-  await clickEmpty(page);
-  await add(page, 'To-do list');
-  await page.keyboard.type('Call the plumber about the leaking kitchen tap');
-  const row = page.locator('.card.selected [data-item-id]').first();
-  await row.hover();
-  await expect.poll(() => style(row, 'opacity', '::after')).toBe('1'); // after its short fade-in
-  const fadeWidth = parseFloat(await style(row, 'width', '::after'));
-  const trash = (await row.getByRole('button', { name: 'Delete item' }).boundingBox())!;
-  const rowBox = (await row.boundingBox())!;
-  // The fully covered part reaches past the trash can's left edge.
-  expect(rowBox.x + rowBox.width - (fadeWidth - 24)).toBeLessThanOrEqual(trash.x);
 });
 
 test('the Colour menu has bigger swatches and never covers the block being coloured', async ({ page }) => {

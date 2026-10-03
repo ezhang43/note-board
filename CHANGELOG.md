@@ -1,5 +1,9 @@
 # Changelog
 
+## Checklist text is never covered by the grip and trash (2026-10-04)
+
+- Every checklist item now keeps a narrow empty strip on its right where the grip and trash appear on hover, so they never cover the text. Long items wrap a little earlier than before, but nothing moves when you hover.
+
 ## Collapsing one card or column closes the space below too (2026-10-04)
 
 - Collapsing a single card or column with its arrow now pulls whatever is below it straight up, so no empty space is left, the same as Collapse all.

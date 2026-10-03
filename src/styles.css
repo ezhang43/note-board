@@ -735,22 +735,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 
 /*
- * Grip and trash only show while the pointer is over the row. They sit over the right end of its
- * first line (with a fade behind them) rather than taking room, so the text uses the full width.
+ * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
+ * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
  */
-.todo-item::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 72px;
-  height: 28px;
-  background: linear-gradient(to right, transparent, var(--card-bg) 24px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms;
-}
-.todo-item:hover::after { opacity: 1; }
+.todo-item { padding-right: 40px; }
 .item-grip,
 .item-trash {
   position: absolute;

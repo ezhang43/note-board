@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
 
 // BusyAnts: the agreed features from the 2026-10-03 owner interview.
 
@@ -102,6 +102,41 @@ test('dragging a card near another shows an alignment guide', async ({ page }) =
   await page.mouse.up();
   await expect(page.locator('.align-guide')).toHaveCount(0);
   expect(Math.round((await second.boundingBox())!.x)).toBe(Math.round(a.x));
+});
+
+test('guide lines all go away once the card no longer lines up, even when it lined up with two cards at once (owner bug report)', async ({ page }) => {
+  for (let i = 0; i < 3; i++) {
+    await clickEmpty(page);
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+  }
+  const ids = await page.locator('.card.loose').evaluateAll((els) => els.map((e) => e.getAttribute('data-card-id')!));
+  const [b, c, a] = ids.map((id) => page.locator(`[data-card-id="${id}"]`));
+  // Guides that look alike once confused React, which left old lines on the board.
+  const keyErrors: string[] = [];
+  page.on('console', (m) => { if (/same key/.test(m.text())) keyErrors.push(m.text()); });
+  const canvas = (await page.getByTestId('canvas').boundingBox())!;
+  const y = canvas.y + 120;
+  // Two notes side by side in a row, the third well below and to the left of them.
+  await dragTo(page, b, { x: canvas.x + 600, y });
+  await dragTo(page, c, { x: canvas.x + 1000, y });
+  await dragTo(page, a, { x: canvas.x + 100, y: y + 400 });
+  const from = (await a.boundingBox())!;
+  const row = (await b.boundingBox())!;
+  // Bring the third note up level with the row, a few px off: it lines up with both notes at once.
+  await page.mouse.move(from.x + 30, from.y + 18);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 30, row.y + 3 + 18, { steps: 10 });
+  await expect(page.locator('.align-guide').first()).toBeVisible();
+  // Slide along the row: it keeps lining up with both, with the guides changing as it goes.
+  for (let k = 0; k < 6; k++) await page.mouse.move(from.x + 30 + k * 7, row.y + 18 + 3 - (k % 3), { steps: 3 });
+  await expect(page.locator('.align-guide').first()).toBeVisible();
+  // Then down to where it lines up with nothing.
+  await page.mouse.move(from.x + 30, row.y + 300 + 18, { steps: 10 });
+  await expect(page.locator('.align-guide')).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.locator('.align-guide')).toHaveCount(0);
+  expect(keyErrors).toEqual([]);
 });
 
 const panOf = async (page: import('@playwright/test').Page) => {

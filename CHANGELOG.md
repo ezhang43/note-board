@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: alignment guide lines no longer stay on the board (2026-10-04)
+
+- When a dragged card lined up with two cards at once, some guide lines could be left behind on the board after the drag. They now always go away.
+
 ## Checklist text is never covered by the grip and trash (2026-10-04)
 
 - Every checklist item now keeps a narrow empty strip on its right where the grip and trash appear on hover, so they never cover the text. Long items wrap a little earlier than before, but nothing moves when you hover.

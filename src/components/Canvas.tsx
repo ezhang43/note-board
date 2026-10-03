@@ -220,9 +220,11 @@ export function Canvas() {
         {draggedColumn && <ColumnView key={draggedColumn} id={draggedColumn} />}
         {draggedCard && <CardView key={draggedCard} id={draggedCard} inColumn={false} />}
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}
-        {guides.map((g) => (
+        {/* Keyed by place in the list: two guides can share axis, line and start (the block lined up
+            with two others at once), and repeated keys made React leave old lines on the board. */}
+        {guides.map((g, i) => (
           <div
-            key={`${g.axis}${g.at}:${g.from}`}
+            key={i}
             className={`align-guide ${g.axis}`}
             style={g.axis === 'x' ? { left: g.at, top: g.from, height: g.to - g.from } : { top: g.at, left: g.from, width: g.to - g.from }}
           />

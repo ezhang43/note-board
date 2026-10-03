@@ -184,6 +184,33 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* The colour swatches sit in the sheet, below the Colour button, and fit its width. */
 .phone-more .colour-menu { position: static; margin-top: 6px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; box-shadow: none; }
 .phone-more .swatch { width: 100%; height: auto; aspect-ratio: 1; }
+.item-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  background: var(--toolbar-bg);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 12px rgba(31, 29, 26, 0.06);
+}
+.item-bar > button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.item-bar > button:active { background: var(--hover); }
+.item-bar > button[aria-label='Delete item'] { color: var(--danger); }
 .app.phone ~ .save-banner, .app.phone .save-banner { bottom: calc(76px + env(safe-area-inset-bottom)); }
 .app.phone .corner-controls { bottom: calc(76px + env(safe-area-inset-bottom)); right: 12px; }
 

@@ -109,4 +109,45 @@ test.describe('on a phone-sized screen', () => {
     await page.mouse.click(200, 70); // just under the top bar, above the menu
     await expect(menu).toBeHidden();
   });
+
+  test('while typing in a checklist item, a bar of item actions shows: indent, outdent, move, tick, delete', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.keyboard.press('Enter'); // from the title to the first item
+    for (const [i, t] of ['one', 'two', 'three'].entries()) {
+      if (i) await page.keyboard.press('Enter');
+      await page.keyboard.type(t);
+    }
+    const list = page.locator('[data-card-id]').first();
+    const texts = () => list.getByLabel('Item text').evaluateAll((els) => els.map((e) => (e as HTMLTextAreaElement).value));
+    const depth = (n: number) => list.locator('[data-item-id]').nth(n).evaluate((el) => parseFloat((el as HTMLElement).style.paddingLeft) || 0);
+    const items = page.getByRole('toolbar', { name: 'Item actions' });
+    await list.getByLabel('Item text').nth(1).tap();
+    await expect(items).toBeVisible();
+    const box = (await items.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(800);
+
+    await items.getByRole('button', { name: 'Indent' }).tap();
+    expect(await depth(1)).toBeGreaterThan(0);
+    await expect(list.getByLabel('Item text').nth(1)).toBeFocused(); // still typing in it
+    await items.getByRole('button', { name: 'Outdent' }).tap();
+    expect(await depth(1)).toBe(0);
+    await items.getByRole('button', { name: 'Move up' }).tap();
+    expect(await texts()).toEqual(['two', 'one', 'three']);
+    await items.getByRole('button', { name: 'Move down' }).tap();
+    expect(await texts()).toEqual(['one', 'two', 'three']);
+    await items.getByRole('button', { name: 'Delete item' }).tap();
+    expect(await texts()).toEqual(['one', 'three']);
+
+    await list.getByLabel('Item text').nth(0).tap();
+    await items.getByRole('button', { name: 'Tick' }).tap();
+    // Ticked, it moves down into the Completed section.
+    await expect(list.getByRole('button', { name: /Completed/ })).toBeVisible();
+    await expect(list.getByLabel('Item text').first()).toHaveValue('three');
+
+    // Gone once nothing is being typed in.
+    await page.mouse.click(200, 70);
+    await expect(items).toBeHidden();
+  });
 });

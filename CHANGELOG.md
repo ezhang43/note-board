@@ -1,5 +1,9 @@
 # Changelog
 
+## Phone and tablet, part 3: item buttons above the keyboard (2026-10-04)
+
+- On a phone, while you type in a checklist item, a row of buttons appears just above the keyboard: outdent, indent, move up, move down, tick and delete. The keyboard stays up while you use them.
+
 ## Phone and tablet, part 2: a phone layout (2026-10-04)
 
 - On a phone, the top bar shows just the board name, and a new bar along the bottom holds Undo, Redo, a big + (Note, To-do list, Link, Column) and ⋯ for everything else (Hand / Select, text size, Snap, Colour, Collapse all, Dark mode, Import, Sign out…).

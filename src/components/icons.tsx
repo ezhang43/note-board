@@ -170,3 +170,31 @@ export function MoreIcon() {
     </svg>
   );
 }
+
+/** Phone item bar: indent (lines with an arrow pointing right) or outdent (pointing left). */
+export function IndentIcon({ out = false }: { out?: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M11 6h9M11 12h9M11 18h9" />
+      {out ? <path d="M7 9l-3 3 3 3" /> : <path d="M4 9l3 3-3 3" />}
+    </svg>
+  );
+}
+
+/** Phone item bar: move up (or down). */
+export function ArrowIcon({ down = false }: { down?: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      {down ? <path d="M12 5v14M6 13l6 6 6-6" /> : <path d="M12 19V5M6 11l6-6 6 6" />}
+    </svg>
+  );
+}
+
+/** Phone item bar: tick. */
+export function CheckIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" {...common}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { FONT_SCALE } from '../model/font';
 import { gridStyle, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import type { Point } from '../model/types';
+import type { Point, View } from '../model/types';
 import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
@@ -78,6 +78,63 @@ export function Canvas() {
   const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
   const itemDrag = useAppState((s) => s.ui.itemDrag);
+
+  // Touch screens (owner request): two fingers pinch to zoom and move together to pan, over cards
+  // too. Listens before the blocks do; once a second finger lands, whatever the first one started
+  // (a pan, a selection box, a block or item drag) is cancelled and the touches belong to the pinch
+  // until every finger has lifted.
+  useEffect(() => {
+    const el = ref.current!;
+    const fingers = new Map<number, Point>();
+    // The view and the two fingers (relative to the canvas) when the pinch began.
+    let pinch: { view: View; from: [Point, Point] } | null = null;
+    const pair = (): [Point, Point] => {
+      const r = el.getBoundingClientRect();
+      const [a, b] = [...fingers.values()];
+      return [{ x: a.x - r.left, y: a.y - r.top }, { x: b.x - r.left, y: b.y - r.top }];
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch) {
+        // A finger put back down after one lifted: carry on from the new pair.
+        if (fingers.size === 2) pinch = { view: appStore.getState().view, from: pair() };
+        return e.stopPropagation();
+      }
+      if (fingers.size < 2) return;
+      pinch = { view: appStore.getState().view, from: pair() };
+      e.stopPropagation();
+      e.preventDefault();
+      if (drag.current?.mode === 'marquee') appStore.endMarquee();
+      edges.current?.stop();
+      edges.current = null;
+      drag.current = null;
+      setPanning(false);
+      for (const id of fingers.keys()) if (id !== e.pointerId) window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: id, pointerType: 'touch' }));
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!pinch || !fingers.has(e.pointerId)) return;
+      e.stopPropagation();
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // A third finger is ignored; the first two steer. One finger left over does nothing.
+      if (fingers.size >= 2) appStore.pinchTo(pinch.view, pinch.from, pair());
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!fingers.delete(e.pointerId) || !pinch) return;
+      e.stopPropagation();
+      if (!fingers.size) pinch = null;
+    };
+    el.addEventListener('pointerdown', onDown, true);
+    el.addEventListener('pointermove', onMove, true);
+    el.addEventListener('pointerup', onUp, true);
+    el.addEventListener('pointercancel', onUp, true);
+    return () => {
+      el.removeEventListener('pointerdown', onDown, true);
+      el.removeEventListener('pointermove', onMove, true);
+      el.removeEventListener('pointerup', onUp, true);
+      el.removeEventListener('pointercancel', onUp, true);
+    };
+  }, []);
 
   // Blocks stop their own presses, so these handle presses on empty board.
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {

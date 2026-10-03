@@ -33,7 +33,7 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 | Action | How |
 | --- | --- |
 | Pan the board | Hand tool: drag empty space. Any tool: scroll or trackpad swipe |
-| Zoom | Ctrl + scroll or trackpad pinch, centred on the cursor; Ctrl + = / Ctrl + − / Ctrl + 0 to reset (these also work while typing, so the browser never zooms the page instead). Range 30%–250% |
+| Zoom | Ctrl + scroll or trackpad pinch, centred on the cursor; Ctrl + = / Ctrl + − / Ctrl + 0 to reset (these also work while typing, so the browser never zooms the page instead). On a touch screen, two fingers pinch to zoom and move together to pan, anywhere on the board including over cards; a pinch cancels whatever the first finger had started (such as dragging a card). No phone layout in version 1. Range 30%–250% |
 | Rectangle select | Select tool (V): drag on empty space; anything the rectangle touches is selected live |
 | Switch tools | H for Hand, V for Select |
 | Snap to grid | Toggle, on by default. Moves, resizes and pastes land on 20px steps. Snapping happens where a block lands, not while it moves (see Moving). Turning it back on moves every block (position and resized sizes) to the nearest grid point |

@@ -1,5 +1,9 @@
 # Changelog
 
+## BusyAnts, part 7: pinch zoom on touch screens (2026-10-03)
+
+- On a touch screen (a tablet, or a touch laptop), put two fingers on the board and spread or pinch them to zoom; move them together to move the board. It works over cards too, and never drags the card you started on.
+
 ## BusyAnts, part 6: selecting items across lists (2026-10-03)
 
 - Press Ctrl+A again and again in a checklist item to select more each time: the item's text, the whole list, every list in the same column, then every item on the board (only ones you can see). Escape clears.

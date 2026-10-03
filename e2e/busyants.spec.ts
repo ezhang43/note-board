@@ -196,3 +196,60 @@ test('press and drag from an item into the next card of the column selects acros
   await page.keyboard.press('Delete');
   await expect(col.getByLabel('Item text')).toHaveCount(2); // milk, and a blank item left in Chores
 });
+
+/**
+ * Real touches on the page (through Chrome's DevTools protocol): each step puts finger 1 at `a[i]`
+ * and finger 2 at `b[i]` (screen points), both together; `a` may start a step before `b`.
+ */
+async function touches(page: import('@playwright/test').Page, a: [number, number][], b: [number, number][], firstAlone = 0) {
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', pts: [number, number][]) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+  for (let i = 0; i < firstAlone; i++) await send(i ? 'touchMove' : 'touchStart', [a[i]]);
+  for (let i = firstAlone; i < a.length; i++) await send(i === firstAlone ? 'touchStart' : 'touchMove', [a[i], b[i]]);
+  await send('touchEnd', []);
+}
+
+test.describe('on a touch screen', () => {
+  test.use({ hasTouch: true });
+
+  test('two fingers pinch to zoom and move together to pan', async ({ page }) => {
+    const c = (await page.getByTestId('canvas').boundingBox())!;
+    const m = { x: c.x + c.width / 2, y: c.y + c.height / 2 };
+    const zoom = async () => Number(await page.getByTestId('canvas').getAttribute('data-zoom'));
+    const before = await zoom();
+    await touches(page, [[m.x - 50, m.y], [m.x - 75, m.y], [m.x - 100, m.y]], [[m.x + 50, m.y], [m.x + 75, m.y], [m.x + 100, m.y]]);
+    await expect.poll(zoom).toBeCloseTo(before * 2, 1);
+    const start = await panOf(page);
+    await touches(page, [[m.x - 50, m.y], [m.x - 50, m.y + 40], [m.x - 50, m.y + 80]], [[m.x + 50, m.y], [m.x + 50, m.y + 40], [m.x + 50, m.y + 80]]);
+    await expect.poll(async () => (await panOf(page)).y).toBeCloseTo(start.y + 80, 0);
+    expect(await zoom()).toBeCloseTo(before * 2, 1);
+  });
+
+  test('a pinch that starts on a card zooms the board and leaves the card where it was', async ({ page }) => {
+    await clickEmpty(page);
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+    const card = page.locator('.card.loose').first();
+    const id = (await card.getAttribute('data-card-id'))!;
+    const spot = () => page.evaluate((id) => {
+      const c = JSON.parse(localStorage.getItem('note-board:v1') ?? 'null')?.board.cards[id];
+      return c ? { x: c.x, y: c.y } : null;
+    }, id);
+    await expect.poll(spot).not.toBeNull(); // saving waits a moment
+    const before = await spot();
+    const b = (await card.boundingBox())!;
+    const p = { x: b.x + 30, y: b.y + 10 };
+    // Finger 1 presses the card and moves far enough to start dragging it; then finger 2 lands.
+    await touches(
+      page,
+      [[p.x, p.y], [p.x + 20, p.y], [p.x + 10, p.y - 10], [p.x, p.y - 20], [p.x - 10, p.y - 30]],
+      [[0, 0], [0, 0], [p.x + 200, p.y + 150], [p.x + 210, p.y + 160], [p.x + 220, p.y + 170]],
+      2,
+    );
+    await expect.poll(async () => Number(await page.getByTestId('canvas').getAttribute('data-zoom'))).toBeGreaterThan(1);
+    await expect(page.locator('.card.dragging')).toHaveCount(0);
+    await page.waitForTimeout(500); // let any save land
+    expect(await spot()).toEqual(before);
+  });
+});

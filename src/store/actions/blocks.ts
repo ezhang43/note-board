@@ -9,7 +9,8 @@ import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
-import type { CardKind, Point, Tool } from '../../model/types';
+import type { CardKind, Point, Tool, View } from '../../model/types';
+import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../../model/view';
 import type { StoreContext } from '../core';
 
@@ -80,6 +81,12 @@ export function blockActions(ctx: StoreContext) {
     },
     panBy: (dx: number, dy: number) => updateView((v) => panBy(v, dx, dy)),
     zoomAt: (at: Point, factor: number) => updateView((v) => zoomBy(v, at, factor)),
+    /** Two-finger pinch: the view for fingers now at `to`, from the view and fingers when it began. */
+    pinchTo: (start: View, from: [Point, Point], to: [Point, Point]) =>
+      updateView((v) => {
+        const p = pinchView(start, from, to);
+        return { ...v, zoom: p.zoom, panX: p.panX, panY: p.panY };
+      }),
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(ctx.viewportSize()), factor)),
     resetZoom: () => updateView((v) => resetZoom(v, ctx.viewportSize())),
 

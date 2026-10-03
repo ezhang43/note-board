@@ -15,6 +15,16 @@ export function rowUnder(clientX: number, clientY: number, cardId: string): stri
   return null;
 }
 
+/** The checklist row under the pointer in any list, if any. */
+export function rowAt(clientX: number, clientY: number): { cardId: string; itemId: string } | null {
+  for (const el of document.elementsFromPoint(clientX, clientY)) {
+    const row = el.closest<HTMLElement>('[data-item-id]');
+    const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
+    if (row && cardId) return { cardId, itemId: row.dataset.itemId! };
+  }
+  return null;
+}
+
 /**
  * Where dragged items would go if dropped at this point:
  * - on a row: before it (top half), after it (bottom half), or nested under it (bottom half, a bit to the right);

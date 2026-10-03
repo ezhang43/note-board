@@ -1,5 +1,7 @@
 import { createItem, newId } from '../../model/cards';
+import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
+import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDoneAcross, visibleItems, type ListSelection } from '../../model/multiSelect';
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -25,16 +27,35 @@ export function checklistActions(ctx: StoreContext) {
     if (ids.length) updateUi({ itemSel: { cardId, anchor, ids }, selection: [cardId] });
   }
 
-  /** The selected checklist items, if `itemId` in `cardId` is one of several selected; otherwise null. */
+  /** The selected checklist items, if `itemId` in `cardId` is one of several selected in that one list; otherwise null. */
   function selectedItemsIncluding(cardId: string, itemId: string): string[] | null {
     const sel = ctx.state.ui.itemSel;
-    return sel && sel.cardId === cardId && sel.ids.length > 1 && sel.ids.includes(itemId) ? sel.ids : null;
+    return sel && !sel.lists && sel.cardId === cardId && sel.ids.length > 1 && sel.ids.includes(itemId) ? sel.ids : null;
+  }
+
+  /** The selection across several lists, if `itemId` in `cardId` is part of it. */
+  function listsIncluding(cardId: string, itemId: string): ListSelection[] | null {
+    const lists = ctx.state.ui.itemSel?.lists;
+    return lists?.some((l) => l.cardId === cardId && l.ids.includes(itemId)) ? lists : null;
+  }
+
+  /** Select items in several lists (or one, which is then a plain item selection). */
+  function selectLists(lists: ListSelection[], level?: 'column' | 'board', anchor?: { cardId: string; itemId: string }) {
+    if (!lists.length) return;
+    const first = anchor ? (lists.find((l) => l.cardId === anchor.cardId) ?? lists[0]) : lists[0];
+    const sel = { cardId: first.cardId, anchor: anchor?.itemId ?? first.ids[0], ids: first.ids };
+    updateUi({ itemSel: lists.length > 1 || level ? { ...sel, lists, level } : sel, selection: [first.cardId] });
   }
 
   /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
     if (!sel) return false;
+    if (sel.lists) {
+      const lists = sel.lists;
+      commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } });
+      return true;
+    }
     commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } });
     return true;
   }
@@ -42,12 +63,22 @@ export function checklistActions(ctx: StoreContext) {
   /** Tab / Shift+Tab with several items selected: they all move in (or out) one level together. */
   function tabSelectedItems(outdent: boolean) {
     const sel = ctx.state.ui.itemSel;
-    if (!sel) return;
+    // Tab doesn't apply across several lists (owner's choice).
+    if (!sel || sel.lists) return;
     commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
   }
 
   function copyItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    if (sel?.lists) {
+      const board = ctx.state.board;
+      itemClipboard = sel.lists.flatMap((l) => {
+        const card = board.cards[l.cardId];
+        return card?.kind === 'todo' ? C.copyItems(card.items, l.ids) : [];
+      });
+      copyText(multiAsText(board, sel.lists));
+      return itemClipboard.length > 0;
+    }
     const card = sel && ctx.state.board.cards[sel.cardId];
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
@@ -57,6 +88,36 @@ export function checklistActions(ctx: StoreContext) {
   }
 
   return {
+    // ---------- selecting items in one list or several (Ctrl+A ladder, owner request) ----------
+    /** Ctrl+A in an item whose text is all selected: every item shown in that list. */
+    selectWholeList(cardId: string) {
+      const card = ctx.state.board.cards[cardId];
+      if (card?.kind !== 'todo') return;
+      selectLists([{ cardId, ids: visibleItems(card) }]);
+    },
+    /**
+     * Ctrl+A with items selected: the next step. Some of a list → the whole list → every list in its
+     * column (a loose list skips this) → every item on the board, where it stays.
+     */
+    selectAllStep() {
+      const sel = ctx.state.ui.itemSel;
+      if (!sel || sel.level === 'board') return;
+      const board = ctx.state.board;
+      // Only some of one list's items: the whole list comes first.
+      const card = board.cards[sel.cardId];
+      if (!sel.lists && card?.kind === 'todo') {
+        const all = visibleItems(card);
+        if (all.some((id) => !sel.ids.includes(id))) return selectLists([{ cardId: sel.cardId, ids: all }]);
+      }
+      const col = sel.level ? null : columnOf(board, sel.cardId);
+      if (col && !col.collapsed) selectLists(columnLists(board, col.id), 'column');
+      else selectLists(boardLists(board), 'board');
+    },
+    /** Press-and-drag from an item into another card of the same column: everything between. */
+    selectAcross(columnId: string, from: { cardId: string; itemId: string }, to: { cardId: string; itemId: string }) {
+      selectLists(rangeAcross(ctx.state.board, columnId, from, to), undefined, from);
+    },
+
     // ---------- editing items ----------
     /** Enter in a list's title: the cursor moves to its first item. */
     focusFirstItem(cardId: string) {
@@ -113,6 +174,9 @@ export function checklistActions(ctx: StoreContext) {
       if (card?.kind !== 'todo') return;
       const item = C.findItem(card.items, itemId)?.item;
       if (!item) return;
+      // One of the items selected across several lists: tick (or untick) them all at once.
+      const lists = listsIncluding(cardId, itemId);
+      if (lists) return void commit((b) => setDoneAcross(b, lists, !item.done));
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
       const next = C.setItemsDone(card.items, ids, !item.done);
       // Applied to the list as it is then (another device's change may have arrived meanwhile).
@@ -134,6 +198,8 @@ export function checklistActions(ctx: StoreContext) {
     },
     /** Trash can: deletes the item and everything under it (or every selected item, if it is one of them). */
     trashItem(cardId: string, itemId: string) {
+      const lists = listsIncluding(cardId, itemId);
+      if (lists) return void commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } });
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
       commit((b) => C.editItems(b, cardId, (items) => C.deleteItems(items, ids)), { ui: { itemSel: null } });
     },
@@ -158,7 +224,7 @@ export function checklistActions(ctx: StoreContext) {
     /** Cut removes exactly what was copied: the selected items. Unselected sub-items stay, moving up a level. */
     cutItems(): boolean {
       const sel = ctx.state.ui.itemSel;
-      if (!sel || !copyItems()) return false;
+      if (!sel || sel.lists || !copyItems()) return false;
       commit((b) => C.editItems(b, sel.cardId, (items) => C.removeExactly(items, sel.ids)), { ui: { itemSel: null } });
       return true;
     },
@@ -166,7 +232,7 @@ export function checklistActions(ctx: StoreContext) {
     pasteItems(): boolean {
       const sel = ctx.state.ui.itemSel;
       const card = sel && ctx.state.board.cards[sel.cardId];
-      if (!sel || card?.kind !== 'todo' || !itemClipboard?.length) return false;
+      if (!sel || sel.lists || card?.kind !== 'todo' || !itemClipboard?.length) return false;
       const order = C.displayOrder(card.items).filter((id) => sel.ids.includes(id));
       const fresh = C.freshCopies(itemClipboard);
       commit((b) => C.editItems(b, sel.cardId, (items) => C.pasteItemsAfter(items, order[order.length - 1], fresh)), {

@@ -16,7 +16,7 @@ async function makeList(page: Page, texts: string[]) {
   return page.locator(`[data-card-id="${id}"]`);
 }
 
-test('Ctrl+A after selecting checklist items selects the blocks, so Delete deletes the blocks', async ({ page }) => {
+test('Ctrl+A with some checklist items selected steps up the ladder; after Escape it selects the blocks', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Note');
   const list = await makeList(page, ['one', 'two', 'three']);
@@ -29,8 +29,12 @@ test('Ctrl+A after selecting checklist items selects the blocks, so Delete delet
   await page.mouse.move(to.x + 20, to.y + to.height / 2, { steps: 6 });
   await page.mouse.up();
   await expect(list.locator('.todo-item.picked')).toHaveCount(2);
-  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+a'); // the whole list
+  await expect(list.locator('.todo-item.picked')).toHaveCount(3);
+  await page.keyboard.press('Escape');
   await expect(list.locator('.todo-item.picked')).toHaveCount(0);
+  await clickEmpty(page);
+  await page.keyboard.press('Control+a'); // no items selected: the blocks
   await page.keyboard.press('Delete');
   await expect(cards(page)).toHaveCount(0);
 });

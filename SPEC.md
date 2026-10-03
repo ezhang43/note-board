@@ -125,6 +125,9 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 
 - Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range; with no range yet, Shift+click selects from the item being typed in to the one clicked. A range can span items at different levels. Selected items get a teal text highlight and a lighter row tint. No action bar.
 - With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection. Copy and cut take exactly the highlighted items (a sub-item that isn't highlighted is left out, and cut leaves it in the list, moved up into its parent's place), and also put their text on the computer's clipboard for other apps: one item per line in the order shown, indented two spaces per level below the least-indented highlighted item; Tab / Shift+Tab move them all in or out one level together (one that can't move, such as the first item of a list, stays and the ones after it nest under it) and they stay selected; Escape clears.
+- Ctrl+A, pressed again and again, selects more each time: first the text of the item being typed in; then every item in that list (from some of a list's items, the whole list); then every item in every list in the same column (skipped for a loose list); then every item on the board. Only items you can see are taken: none from collapsed cards or columns, nor from a closed Completed section. Escape or clicking empty board clears.
+- Pressing on an item and dragging down or up into another card of the same column carries the selection on through those cards (never into other columns or loose cards).
+- With items selected in several lists: Delete / Backspace, ticking and the trash work on all of them (a list left empty keeps one blank item); Ctrl+C copies them, putting each list's title on its own line with its items indented two spaces under it, in board order (columns left to right, each top to bottom, then loose lists top to bottom, left to right). Tab, Ctrl+X, Ctrl+V and dragging do nothing then.
 
 ### Clean up and the Completed card
 
@@ -142,7 +145,7 @@ Every block action works on one block or on a whole selection, and every change 
 | Click | Select one block (teal outline); click empty space to clear |
 | Ctrl + click (or Shift + click) | Add or remove a block from the selection |
 | Select tool drag | Rectangle selection; hold Ctrl to add to the current selection |
-| Ctrl + A | Select every column and loose card |
+| Ctrl + A | Select every column and loose card (with checklist items selected, selects more items instead; see "Selecting several items") |
 | Ctrl + C, then Ctrl + V | Copy and paste the selection (a column copies with its cards, titled "… copy"); pastes offset by 40px each time |
 | Ctrl + D | Duplicate the selection |
 | Delete / Backspace | Delete the selection; if it includes a column, the same confirmation as the column × appears first, then columns go with their cards |

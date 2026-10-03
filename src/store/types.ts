@@ -1,5 +1,6 @@
 import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
+import type { ListSelection } from '../model/multiSelect';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
 
 // The shapes of the store's state: board data, view, and what is on screen (ui).
@@ -67,6 +68,13 @@ export interface ItemSelection {
   /** The item the range started from. */
   anchor: string;
   ids: string[];
+  /**
+   * Items selected in several lists (Ctrl+A step 3 or 4, or a drag into the next cards of a column):
+   * every list's selected items, in board order. Then only Copy, Delete and ticking apply.
+   */
+  lists?: ListSelection[];
+  /** Which Ctrl+A step made it: every list in the column, or the whole board. */
+  level?: 'column' | 'board';
 }
 
 /** Where dragged checklist items would go if dropped now, and which row shows the drop mark. */

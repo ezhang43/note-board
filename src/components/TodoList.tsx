@@ -8,7 +8,8 @@ import { clientToCanvas } from './canvasDom';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, GripIcon, TrashIcon } from './icons';
-import { itemHintAt, rowUnder } from './itemDom';
+import { itemHintAt, rowAt, rowUnder } from './itemDom';
+import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
@@ -68,7 +69,12 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   const ref = useRef<HTMLTextAreaElement>(null);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
   const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
-  const picked = useAppState((s) => !!s.ui.itemSel && s.ui.itemSel.cardId === cardId && s.ui.itemSel.ids.includes(item.id));
+  const picked = useAppState((s) => {
+    const sel = s.ui.itemSel;
+    if (!sel) return false;
+    if (sel.lists) return sel.lists.some((l) => l.cardId === cardId && l.ids.includes(item.id));
+    return sel.cardId === cardId && sel.ids.includes(item.id);
+  });
   const mark = useAppState((s) => {
     const h = s.ui.itemDrag?.hint;
     return h && 'markId' in h && h.markId === item.id ? h.markMode : null;
@@ -169,6 +175,15 @@ function rowPointerDown(cardId: string, itemId: string) {
     let selecting = false;
     const onMove = (ev: { clientX: number; clientY: number }) => {
       const over = rowUnder(ev.clientX, ev.clientY, cardId);
+      // Into another card of the same column: the selection carries on across the cards (owner request).
+      const elsewhere = over ? null : rowAt(ev.clientX, ev.clientY);
+      const col = elsewhere && columnOf(appStore.getState().board, cardId);
+      if (elsewhere && col && col.id === columnOf(appStore.getState().board, elsewhere.cardId)?.id) {
+        if (!selecting && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        selecting = true;
+        window.getSelection()?.removeAllRanges();
+        return appStore.selectAcross(col.id, { cardId, itemId }, elsewhere);
+      }
       if (!selecting) {
         if (!over || over === itemId) return;
         selecting = true;

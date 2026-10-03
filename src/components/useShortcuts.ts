@@ -30,6 +30,17 @@ export function useShortcuts() {
         return (e.target as HTMLElement).blur();
       }
 
+      // Ctrl+A in a checklist item whose text is already all selected: every item in that list
+      // (step 2 of the Ctrl+A ladder; step 1 is the browser selecting the text).
+      if (mod && key === 'a' && e.target instanceof HTMLTextAreaElement) {
+        const field = e.target;
+        const cardId = field.closest('[data-item-id]') && field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
+        if (cardId && field.selectionStart === 0 && field.selectionEnd === field.value.length) {
+          field.blur();
+          return run(e, () => appStore.selectWholeList(cardId));
+        }
+      }
+
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
 
@@ -42,6 +53,8 @@ export function useShortcuts() {
       if (state.ui.itemSel) {
         if (key === 'delete' || key === 'backspace') return run(e, appStore.deleteSelectedItems);
         if (key === 'escape') return appStore.clearItemSelection();
+        // Ctrl+A again: every list in the column, then every item on the board.
+        if (mod && key === 'a') return run(e, appStore.selectAllStep);
         if (key === 'tab') return run(e, () => appStore.tabSelectedItems(e.shiftKey));
         if (mod && key === 'c') return run(e, appStore.copyItems);
         if (mod && key === 'x') return run(e, appStore.cutItems);

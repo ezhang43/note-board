@@ -135,3 +135,64 @@ test('a selection box at the bottom edge keeps moving the board and selecting', 
   await expect.poll(async () => (await page.getByTestId('marquee').boundingBox())?.height ?? 0).toBeGreaterThan(canvas.height - 80);
   await page.mouse.up();
 });
+
+/** A column holding two lists (Groceries: milk, eggs / Chores: sweep), and a loose list (Ideas: paint). */
+async function columnWithLists(page: import('@playwright/test').Page) {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  const col = columns(page).first();
+  const listIn = async (title: string, items: string[]) => {
+    await col.click({ position: { x: 20, y: 20 } });
+    await add(page, 'To-do list', { stayInTitle: true });
+    await page.keyboard.type(title);
+    await page.keyboard.press('Enter');
+    for (const [i, t] of items.entries()) {
+      if (i) await page.keyboard.press('Enter');
+      await page.keyboard.type(t);
+    }
+    await page.keyboard.press('Escape');
+  };
+  await listIn('Groceries', ['milk', 'eggs']);
+  await listIn('Chores', ['sweep']);
+  await clickEmpty(page);
+  await add(page, 'To-do list', { stayInTitle: true });
+  await page.keyboard.type('Ideas');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('paint');
+  return col;
+}
+
+test('Ctrl+A again and again: the item text, the list, the column\'s lists, the whole board; Ctrl+C copies them with titles', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const col = await columnWithLists(page);
+  const picked = page.locator('.todo-item.picked');
+  await col.getByLabel('Item text').first().click(); // "milk"
+  await page.keyboard.press('Control+a'); // the text
+  await expect(picked).toHaveCount(0);
+  await page.keyboard.press('Control+a'); // the list
+  await expect(picked).toHaveCount(2);
+  await page.keyboard.press('Control+a'); // the column's lists
+  await expect(picked).toHaveCount(3);
+  await page.keyboard.press('Control+c');
+  const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'); // Windows line endings
+  expect(copied).toBe('Groceries\n  milk\n  eggs\nChores\n  sweep');
+  await page.keyboard.press('Control+a'); // the whole board
+  await expect(picked).toHaveCount(4);
+  await page.keyboard.press('Escape');
+  await expect(picked).toHaveCount(0);
+});
+
+test('press and drag from an item into the next card of the column selects across both', async ({ page }) => {
+  const col = await columnWithLists(page);
+  await clickEmpty(page);
+  const eggs = (await col.getByLabel('Item text').nth(1).boundingBox())!;
+  const sweep = (await col.getByLabel('Item text').nth(2).boundingBox())!;
+  await page.mouse.move(eggs.x + 20, eggs.y + eggs.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sweep.x + 20, sweep.y + sweep.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('.todo-item.picked')).toHaveCount(2);
+  await page.keyboard.press('Delete');
+  await expect(col.getByLabel('Item text')).toHaveCount(2); // milk, and a blank item left in Chores
+});

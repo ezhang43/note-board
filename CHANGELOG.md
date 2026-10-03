@@ -1,5 +1,11 @@
 # Changelog
 
+## BusyAnts, part 6: selecting items across lists (2026-10-03)
+
+- Press Ctrl+A again and again in a checklist item to select more each time: the item's text, the whole list, every list in the same column, then every item on the board (only ones you can see). Escape clears.
+- Press on an item and drag down into the next cards of the same column to select across them.
+- With items in several lists selected, Delete, ticking and Ctrl+C work on all of them. The copied text puts each list's title on its own line with its items under it.
+
 ## BusyAnts, part 5: the board follows you to the edge (2026-10-03)
 
 - When you drag a card, drag checklist items, select items or draw a selection box and hold the pointer near the edge of the screen, the board keeps moving that way, and keeps selecting or carrying what you are dragging.

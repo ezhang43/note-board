@@ -1090,3 +1090,16 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .fb-font-menu button { justify-content: flex-start; text-align: left; height: 32px; font-size: 16px; }
 /* While the bar is hovered: the text boxes it will change. */
 .format-target { outline: 1.5px dashed var(--accent); outline-offset: 1px; border-radius: 4px; }
+
+/*
+ * Touch screens: bigger invisible areas to press around the small card controls (owner request,
+ * phone step 4). The grip and trash sit side by side, so theirs only grow away from each other.
+ */
+@media (pointer: coarse) {
+  .icon-button { position: relative; }
+  .icon-button::before { content: ''; position: absolute; inset: -6px; }
+  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
+  .item-grip::before { top: -8px; bottom: -8px; left: 0; right: -12px; }
+  /* Outwards, past the card's corner, so it never takes presses meant for the last item's grip. */
+  .resize-corner::before { inset: -4px -12px -12px -4px; }
+}

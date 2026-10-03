@@ -1,16 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { appStore } from '../store/appStore';
 import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon } from './icons';
 
-type Typing = { cardId: string; itemId: string; field: HTMLTextAreaElement };
+type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
 
-/** The checklist item whose text is being typed in, if any. */
+/** The text box on the board being typed in, if any, and its checklist item if it is one. */
 function typingIn(): Typing | null {
   const field = document.activeElement;
-  if (!(field instanceof HTMLTextAreaElement)) return null;
+  if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) || !field.closest('.canvas')) return null;
   const itemId = field.closest<HTMLElement>('[data-item-id]')?.dataset.itemId;
   const cardId = field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
-  return itemId && cardId ? { cardId, itemId, field } : null;
+  return { field, item: itemId && cardId ? { cardId, itemId } : null };
 }
 
 /** How much of the bottom of the window the on-screen keyboard covers (0 with no keyboard up). */
@@ -27,6 +27,7 @@ function keyboardCover() {
 export function ItemBar() {
   const [typing, setTyping] = useState<Typing | null>(null);
   const [cover, setCover] = useState(0);
+  const bar = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // After a change the item's text box can be redrawn, so look again once focus has settled.
@@ -45,8 +46,17 @@ export function ItemBar() {
     };
   }, []);
 
-  if (!typing) return null;
-  const { cardId, itemId, field } = typing;
+  // Keep the box being typed in clear of the keyboard and of this bar: move the board up under it.
+  useLayoutEffect(() => {
+    if (!typing) return;
+    const limit = (bar.current?.getBoundingClientRect().top ?? window.innerHeight - cover) - 12;
+    const bottom = typing.field.getBoundingClientRect().bottom;
+    if (bottom > limit) appStore.panBy(0, Math.round(limit - bottom));
+  }, [typing, cover]);
+
+  if (!typing?.item) return null;
+  const { field } = typing;
+  const { cardId, itemId } = typing.item;
   const button = (label: string, icon: ReactNode, act: () => void) => (
     <button
       type="button"
@@ -61,11 +71,11 @@ export function ItemBar() {
     </button>
   );
   return (
-    <div className="item-bar" role="toolbar" aria-label="Item actions" style={{ bottom: cover }}>
+    <div ref={bar} className="item-bar" role="toolbar" aria-label="Item actions" style={{ bottom: cover }}>
       {button('Outdent', <IndentIcon out />, () => appStore.itemTab(cardId, itemId, true))}
       {button('Indent', <IndentIcon />, () => appStore.itemTab(cardId, itemId, false))}
-      {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, field.selectionStart))}
-      {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, field.selectionStart))}
+      {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, field.selectionStart ?? 0))}
+      {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, field.selectionStart ?? 0))}
       {button('Tick', <CheckIcon />, () => appStore.toggleItem(cardId, itemId))}
       {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
     </div>

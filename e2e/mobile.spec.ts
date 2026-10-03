@@ -150,4 +150,52 @@ test.describe('on a phone-sized screen', () => {
     await page.mouse.click(200, 70);
     await expect(items).toBeHidden();
   });
+
+  test('small card buttons can be pressed a little outside their drawn edge', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Milk');
+    const card = page.locator('[data-card-id]').first();
+    // What a tap this far outside a control's drawn edge (below it) would land on.
+    const hitBelow = (name: string, gap: number) =>
+      card.getByRole('button', { name, exact: true }).evaluate((el, g) => {
+        const r = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(r.x + r.width / 2, r.bottom + g));
+      }, gap);
+    expect(await hitBelow('Delete card', 5)).toBe(true);
+    expect(await hitBelow('Collapse card', 5)).toBe(true);
+    expect(await hitBelow('Delete item', 6)).toBe(true);
+    expect(await hitBelow('Drag item', 6)).toBe(true);
+    const corner = await card.getByRole('button', { name: 'Resize card' }).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.right + 8, r.bottom + 8)); // just past the card's corner
+    });
+    expect(corner).toBe(true);
+  });
+
+  test('the item being typed in stays in view above the keyboard and the item buttons', async ({ page }) => {
+    // Stand in for the phone keyboard: a visual viewport we can shrink.
+    await page.addInitScript(() => {
+      const fake = Object.assign(new EventTarget(), { height: window.innerHeight, offsetTop: 0 });
+      Object.defineProperty(window, 'visualViewport', { value: fake, configurable: true });
+      (window as unknown as { openKeyboard: (h: number) => void }).openKeyboard = (h) => {
+        fake.height = window.innerHeight - h;
+        fake.dispatchEvent(new Event('resize'));
+      };
+    });
+    await page.reload();
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Milk');
+    const field = page.locator('[data-card-id]').first().getByLabel('Item text');
+    await page.evaluate(() => (window as unknown as { openKeyboard: (h: number) => void }).openKeyboard(420));
+    const items = page.getByRole('toolbar', { name: 'Item actions' });
+    await expect.poll(async () => Math.round((await items.boundingBox())!.y + (await items.boundingBox())!.height)).toBe(800 - 420);
+    await expect.poll(async () => (await field.boundingBox())!.y + (await field.boundingBox())!.height).toBeLessThanOrEqual((await items.boundingBox())!.y);
+    expect((await field.boundingBox())!.y).toBeGreaterThan(52); // and not up under the top bar
+  });
 });

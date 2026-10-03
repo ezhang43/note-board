@@ -1,5 +1,10 @@
 # Changelog
 
+## Phone and tablet, part 4: easier to tap, and the keyboard never hides what you type (2026-10-04)
+
+- On a touch screen, the small buttons on cards (collapse, ×, an item's grip and trash, the resize corner) are easier to hit: a press just outside them still counts.
+- On a phone, when the keyboard comes up over the text you are typing, the board moves up so you can still see it.
+
 ## Phone and tablet, part 3: item buttons above the keyboard (2026-10-04)
 
 - On a phone, while you type in a checklist item, a row of buttons appears just above the keyboard: outdent, indent, move up, move down, tick and delete. The keyboard stays up while you use them.

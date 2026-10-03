@@ -7,6 +7,7 @@ import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
+import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
 
 /** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
@@ -31,7 +32,7 @@ function NewColumnButton() {
 }
 
 /** Import: pick a Milanote board exported as Markdown; its cards are added to this board. */
-function ImportButton() {
+export function ImportButton() {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -63,7 +64,7 @@ function ImportButton() {
  * Colour button: recolours the selected columns, and the title band of the selected cards (cards
  * themselves are always white). Faded while nothing is selected.
  */
-function ColourControl() {
+export function ColourControl() {
   const count = useAppState((s) => s.ui.selection.length);
   const open = useAppState((s) => s.ui.colourMenuOpen && count > 0);
   // The colour of the last selected block, shown on the button and ringed in the menu.
@@ -142,7 +143,7 @@ function ColourControl() {
  * Collapse all / Expand all: collapses every card and column, or (when all are collapsed) opens them
  * all. With blocks selected, only those (owner request).
  */
-function CollapseAllButton() {
+export function CollapseAllButton({ labelled = false }: { labelled?: boolean }) {
   const any = useAppState((s) => Object.keys(s.board.cards).length + Object.keys(s.board.columns).length > 0);
   const selected = useAppState((s) => s.ui.selection.length > 0);
   const expand = useAppState((s) => any && !anyExpanded(s.board, s.ui.selection.length ? s.ui.selection : undefined));
@@ -151,53 +152,56 @@ function CollapseAllButton() {
   return (
     <button
       type="button"
-      className="tb-button icon-only faded-colour quiet"
+      className={`tb-button faded-colour quiet${labelled ? '' : ' icon-only'}`}
       aria-label={label}
       title={any ? title : 'Nothing to collapse yet'}
       aria-disabled={any ? undefined : true}
       onClick={() => any && appStore.toggleAllCollapsed()}
     >
       <CollapseAllIcon expand={expand} />
+      {labelled && label}
     </button>
   );
 }
 
 /** Same width: the selected loose cards and columns take the first one's width. Faded with fewer than two selected. */
-function SameWidthButton() {
+export function SameWidthButton({ labelled = false }: { labelled?: boolean }) {
   const ready = useAppState((s) => s.ui.selection.filter((id) => s.board.order.includes(id)).length >= 2);
   return (
     <button
       type="button"
-      className="tb-button icon-only faded-colour quiet"
+      className={`tb-button faded-colour quiet${labelled ? '' : ' icon-only'}`}
       aria-label="Same width"
       title={ready ? "Make the selected cards and columns as wide as the first one you selected" : 'Select two or more cards or columns first'}
       aria-disabled={ready ? undefined : true}
       onClick={() => ready && appStore.matchWidths()}
     >
       <SameWidthIcon />
+      {labelled && 'Same width'}
     </button>
   );
 }
 
 /** Light / dark toggle (pressed = dark). The choice is remembered on this device only. */
-function DarkModeButton() {
+export function DarkModeButton({ labelled = false }: { labelled?: boolean }) {
   const dark = useAppState((s) => s.view.theme === 'dark');
   return (
     <button
       type="button"
-      className="tb-button icon-only"
+      className={`tb-button${labelled ? '' : ' icon-only'}`}
       aria-label="Dark mode"
       title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
       aria-pressed={dark}
       onClick={appStore.toggleTheme}
     >
       <MoonIcon />
+      {labelled && 'Dark mode'}
     </button>
   );
 }
 
 /** Clean up: moves every ticked item into the Completed card. Faded when nothing is ticked. */
-function CleanUpButton() {
+export function CleanUpButton() {
   const any = useAppState((s) => hasTickedItems(s.board));
   return (
     <button
@@ -213,7 +217,7 @@ function CleanUpButton() {
 }
 
 /** Auto-colour: gives every column a different colour. Faded when there are no columns. */
-function AutoColourButton() {
+export function AutoColourButton() {
   const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
   return (
     <button
@@ -228,46 +232,67 @@ function AutoColourButton() {
   );
 }
 
-export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
-  const name = useAppState((s) => s.board.name);
-  const snap = useAppState((s) => s.board.snap);
+/** Hand / Select: what dragging empty board does. */
+export function ToolGroup() {
   const tool = useAppState((s) => s.view.tool);
+  return (
+    <div className="tool-group" role="group" aria-label="Board tool">
+      <button
+        type="button"
+        className="tool-button"
+        aria-label="Hand (H)"
+        title="Hand (H): drag empty space to move the board"
+        aria-pressed={tool === 'hand'}
+        onClick={() => appStore.setTool('hand')}
+      >
+        <HandIcon />
+      </button>
+      <button
+        type="button"
+        className="tool-button"
+        aria-label="Select (V)"
+        title="Select (V): drag a rectangle to select several cards and columns"
+        aria-pressed={tool === 'select'}
+        onClick={() => appStore.setTool('select')}
+      >
+        <SelectIcon />
+      </button>
+    </div>
+  );
+}
+
+export function SnapButton() {
+  const snap = useAppState((s) => s.board.snap);
+  return (
+    <button type="button" className="tb-button snap" aria-pressed={snap} onClick={appStore.toggleSnap}>
+      <GridIcon />
+      Snap to grid
+    </button>
+  );
+}
+
+function BoardName() {
+  const name = useAppState((s) => s.board.name);
+  return <AutoSizeInput className="board-name" aria-label="Board name" placeholder="Untitled board" value={name} onChange={appStore.renameBoard} />;
+}
+
+export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   const canUndo = useAppState((s) => s.ui.canUndo);
   const canRedo = useAppState((s) => s.ui.canRedo);
+  // On a phone the top bar only holds the board name; everything else is in the bottom bar (PhoneBar).
+  if (usePhone())
+    return (
+      <header className="toolbar phone">
+        <BoardName />
+      </header>
+    );
 
   return (
     <header className="toolbar">
-      <AutoSizeInput
-        className="board-name"
-        aria-label="Board name"
-        placeholder="Untitled board"
-        value={name}
-        onChange={appStore.renameBoard}
-      />
+      <BoardName />
       <div className="toolbar-spacer" />
 
-      <div className="tool-group" role="group" aria-label="Board tool">
-        <button
-          type="button"
-          className="tool-button"
-          aria-label="Hand (H)"
-          title="Hand (H): drag empty space to move the board"
-          aria-pressed={tool === 'hand'}
-          onClick={() => appStore.setTool('hand')}
-        >
-          <HandIcon />
-        </button>
-        <button
-          type="button"
-          className="tool-button"
-          aria-label="Select (V)"
-          title="Select (V): drag a rectangle to select several cards and columns"
-          aria-pressed={tool === 'select'}
-          onClick={() => appStore.setTool('select')}
-        >
-          <SelectIcon />
-        </button>
-      </div>
+      <ToolGroup />
 
       {/* Faded when there is nothing to undo or redo. */}
       <button
@@ -293,10 +318,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
 
       <div className="toolbar-divider" aria-hidden="true" />
 
-      <button type="button" className="tb-button snap" aria-pressed={snap} onClick={appStore.toggleSnap}>
-        <GridIcon />
-        Snap to grid
-      </button>
+      <SnapButton />
 
       <ColourControl />
       <AutoColourButton />

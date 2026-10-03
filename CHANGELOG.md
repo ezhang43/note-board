@@ -1,5 +1,10 @@
 # Changelog
 
+## Phone and tablet, part 2: a phone layout (2026-10-04)
+
+- On a phone, the top bar shows just the board name, and a new bar along the bottom holds Undo, Redo, a big + (Note, To-do list, Link, Column) and ⋯ for everything else (Hand / Select, text size, Snap, Colour, Collapse all, Dark mode, Import, Sign out…).
+- The zoom buttons and ? are hidden on a phone: pinch with two fingers to zoom.
+
 ## Phone and tablet, part 1: touch controls for checklist items (2026-10-04)
 
 - On a touch screen, tap into a checklist item to show its grip and trash. Only that item shows them, and the hidden ones on other items can no longer be tapped by accident. Tapping the trash deletes the item; the grip drags it with your finger.

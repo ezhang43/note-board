@@ -55,3 +55,58 @@ test.describe('on a touch screen', () => {
     expect(await list.getByLabel('Item text').evaluateAll((els) => els.map((e) => (e as HTMLTextAreaElement).value))).toEqual(['two', 'three', 'one']);
   });
 });
+
+test.describe('on a phone-sized screen', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+
+  test('the top bar fits the screen; Undo, Redo, + and ⋯ sit in a bar at the bottom', async ({ page }) => {
+    const top = page.locator('.toolbar');
+    expect(await top.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(top.getByLabel('Board name')).toBeVisible();
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    for (const name of ['Undo', 'Redo', 'Add', 'More']) {
+      const b = (await bar.getByRole('button', { name, exact: true }).boundingBox())!;
+      expect(b.y + b.height).toBeLessThanOrEqual(800);
+      expect(b.y).toBeGreaterThan(800 - 100);
+      expect(b.width).toBeGreaterThanOrEqual(44); // big enough for a thumb
+    }
+    // The desktop corner (zoom, text size, ?) is not shown on a phone; pinch zooms instead.
+    await expect(page.getByRole('group', { name: 'Zoom' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Keyboard shortcuts' })).toBeHidden();
+  });
+
+  test('+ adds a note, a to-do list, a link or a column, and the menu closes', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await expect(page.getByRole('menu')).toBeHidden();
+    const card = page.locator('[data-card-id]');
+    await expect(card).toHaveCount(1);
+    const b = (await card.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(0); // in view
+    for (const kind of ['Note', 'Link', 'Column']) {
+      await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+      await page.getByRole('menuitem', { name: kind }).tap();
+    }
+    await expect(page.locator('[data-card-id]')).toHaveCount(3);
+    await expect(page.locator('[data-col-id]')).toHaveCount(1);
+    await bar.getByRole('button', { name: 'Undo', exact: true }).tap();
+    await expect(page.locator('[data-col-id]')).toHaveCount(0);
+  });
+
+  test('⋯ holds the rest: dark mode, snap, text size and the other board actions', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'More', exact: true }).tap();
+    const menu = page.getByRole('dialog', { name: 'More' });
+    for (const name of ['Snap to grid', 'Auto-colour', 'Collapse all', 'Same width', 'Clean up', 'Import', 'Larger text', 'Smaller text', 'Hand (H)', 'Select (V)'])
+      await expect(menu.getByRole('button', { name, exact: true })).toBeVisible();
+    const m = (await menu.boundingBox())!;
+    expect(m.x).toBeGreaterThanOrEqual(0);
+    expect(m.x + m.width).toBeLessThanOrEqual(390);
+    await menu.getByRole('button', { name: 'Dark mode' }).tap();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    // Tapping the board closes it.
+    await page.mouse.click(200, 70); // just under the top bar, above the menu
+    await expect(menu).toBeHidden();
+  });
+});

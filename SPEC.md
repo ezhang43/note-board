@@ -33,7 +33,7 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 | Action | How |
 | --- | --- |
 | Pan the board | Hand tool: drag empty space. Any tool: scroll or trackpad swipe |
-| Zoom | Ctrl + scroll or trackpad pinch, centred on the cursor; Ctrl + = / Ctrl + − / Ctrl + 0 to reset (these also work while typing, so the browser never zooms the page instead). On a touch screen, two fingers pinch to zoom and move together to pan, anywhere on the board including over cards; a pinch cancels whatever the first finger had started (such as dragging a card). No phone layout in version 1. Range 30%–250% |
+| Zoom | Ctrl + scroll or trackpad pinch, centred on the cursor; Ctrl + = / Ctrl + − / Ctrl + 0 to reset (these also work while typing, so the browser never zooms the page instead). On a touch screen, two fingers pinch to zoom and move together to pan, anywhere on the board including over cards; a pinch cancels whatever the first finger had started (such as dragging a card). Phones use the phone layout below. Range 30%–250% |
 | Rectangle select | Select tool (V): drag on empty space; anything the rectangle touches is selected live |
 | Switch tools | H for Hand, V for Select |
 | Snap to grid | Toggle, on by default. Moves, resizes and pastes land on 20px steps. Snapping happens where a block lands, not while it moves (see Moving). Turning it back on moves every block (position and resized sizes) to the nearest grid point |
@@ -226,7 +226,7 @@ Build in this order, each step tested and working before the next.
 
 After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, white cards with 16 column colours and Auto-colour, Clean up with the Completed card, Delete joining checklist items, Tab on several items, collapse returning pushed blocks, and the published site with sign-in, sync, offline use and installing as an app.
 
-**Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards, mobile layout.
+**Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards.
 
 **Decisions (1 Oct 2026)**
 
@@ -234,3 +234,11 @@ After step 5 (owner additions): dragging new blocks from the toolbar, keyboard n
 - Version 1 supports one board only.
 
 Later decisions, with dates and reasons, are listed under "Decisions" in `CLAUDE.md`.
+
+## Phone layout
+
+- Windows under 600px wide (phones) use a phone layout; tablets and wider windows keep the desktop layout. Touch screens of any size follow the touch rules for checklist items above.
+- The top bar shows only the board name. A bar along the bottom holds Undo, Redo, a large + and ⋯.
+- + opens a menu: Note, To-do list, Link, Column. Choosing one adds it (as the desktop buttons do) and closes the menu.
+- ⋯ opens a panel above the bar with every other toolbar control: Hand / Select, text size A− / A+, Snap to grid, Colour (its swatches open inside the panel), Auto-colour, Collapse all, Same width, Clean up, Import, Dark mode and, on the published site, Sign out. Tapping outside it closes it.
+- The zoom control and the ? button are not shown on a phone (two fingers pinch to zoom; there is no keyboard). The "Saving…" / "Saved" note sits just above the bottom bar.

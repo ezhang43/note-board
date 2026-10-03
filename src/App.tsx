@@ -1,8 +1,10 @@
 import { Canvas } from './components/Canvas';
 import { FormatBar } from './components/FormatBar';
+import { PhoneBar } from './components/PhoneBar';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
+import { usePhone } from './components/usePhone';
 import { useShortcuts } from './components/useShortcuts';
 
 /**
@@ -11,10 +13,12 @@ import { useShortcuts } from './components/useShortcuts';
  */
 export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?: string | null }) {
   useShortcuts();
+  const phone = usePhone();
   return (
-    <div className="app">
+    <div className={phone ? 'app phone' : 'app'}>
       <Toolbar onSignOut={onSignOut} />
       <Canvas />
+      {phone && <PhoneBar onSignOut={onSignOut} />}
       <ZoomControl saveNote={saveNote} />
       <FormatBar />
       <ShortcutsPanel />

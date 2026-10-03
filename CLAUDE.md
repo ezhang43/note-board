@@ -42,6 +42,8 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Decisions
 
+- 2026-10-04 (owner rule): when a question comes up while building, go ahead with the recommended option instead of asking, and list those calls in the report.
+
 - 2026-10-01: Stack as above (spec default, no alternative). localStorage over IndexedDB: the board is small and synchronous saving is simpler and easier to test.
 - 2026-10-01: Clicking the zoom percentage or Ctrl+0 resets to 100% around the centre of the screen (not back to the board's top-left like the prototype).
 - 2026-10-01: Toolbar buttons for later steps are shown from step 1 but do nothing until their step (Undo/Redo/Colour faded).

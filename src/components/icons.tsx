@@ -161,3 +161,12 @@ export function MinusIcon() {
     </svg>
   );
 }
+
+/** Phone bar: more board actions. */
+export function MoreIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2.4" {...common}>
+      <path d="M5 12h.01M12 12h.01M19 12h.01" />
+    </svg>
+  );
+}

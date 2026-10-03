@@ -16,7 +16,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
   {
     title: 'Cards and columns',
     keys: [
-      ['Ctrl+A', 'Select every card and column'],
+      ['Ctrl+A', 'Select every card and column (in a checklist: see below)'],
       ['Ctrl+C / Ctrl+V', 'Copy / paste the selection'],
       ['Ctrl+D', 'Duplicate the selection'],
       ['Delete / Backspace', 'Delete the selection'],
@@ -33,7 +33,8 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Backspace in an empty item', 'Delete it'],
       ['Delete at the end', 'Join the next item into this one'],
       ['Up / Down', 'Move between items and cards'],
-      ['Shift+click, or press and drag', 'Select several items'],
+      ['Shift+click, or press and drag', 'Select several items (drag on into the next cards of a column)'],
+      ['Ctrl+A again and again', "Select the item text, the list, the column's lists, then the whole board"],
       ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste selected items'],
     ],
   },

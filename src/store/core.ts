@@ -4,7 +4,7 @@ import { settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
 import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
 import { recordPushes, type Pushes } from '../model/placement';
-import type { LayoutSnapshot } from '../model/board';
+import { blockOf, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
@@ -65,6 +65,8 @@ export interface StoreContext {
     importLayout: { ids: string[]; origin: Point } | null;
     /** The layout before and right after Collapse all, so Expand all can give it back. */
     collapseAll: { before: LayoutSnapshot; after: LayoutSnapshot } | null;
+    /** Until when (ms) blocks opened by Expand all are still growing; meanwhile higher blocks win. */
+    expandAllUntil: number;
   };
   /** Saves a value in the browser (does nothing if storage is unavailable). */
   write(key: string, value: string): void;
@@ -102,7 +104,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let settleQueued = false;
   let history: History = emptyHistory;
   const pending: StoreContext['pending'] = { tick: null };
-  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null };
+  const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, expandAllUntil: 0 };
   const measured: MeasuredHeight = (id) => heights.get(id);
 
   function flushView() {
@@ -171,6 +173,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       // The most recent change wins when two anchored blocks are in each other's way.
       const a = [...settleAnchors].reverse();
       settleAnchors.clear();
+      // After Expand all, everything grows at once: the higher block wins, so blocks only move down.
+      if (Date.now() <= layout.expandAllUntil) a.sort((p, q) => (blockOf(state.board, p)?.y ?? 0) - (blockOf(state.board, q)?.y ?? 0));
       // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
       const board = settle(state.board, measured, a, true);
       const exp = layout.expanding;

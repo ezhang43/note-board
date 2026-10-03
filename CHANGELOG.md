@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: Expand all opens everything (2026-10-04)
+
+- Expand all now opens every card and column, including ones that were already collapsed before you pressed Collapse all. Blocks still go back to their places, and anything they grow into moves straight down.
+
 ## Accessibility and wording fixes (2026-10-04)
 
 - Keyboard: tick boxes now show the teal ring when you reach them with Tab; a resize handle reached with Tab resizes with the arrow keys (Shift for big steps); Ctrl+Shift+Up / Down move a checklist item up or down.

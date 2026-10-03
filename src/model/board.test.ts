@@ -219,7 +219,7 @@ describe('resizing a collapsed card (owner request)', () => {
 });
 
 describe('Collapse all and back (owner request)', () => {
-  it('gives back which blocks were open and where loose blocks were, unless moved since', () => {
+  it('opens every block, and puts loose blocks back where they were unless moved since (owner: Expand all opens everything)', () => {
     let b = B.addCard(B.createBoard(), createCard('note', 'a'), { type: 'loose', x: 0, y: 0 });
     b = B.addCard(b, { ...createCard('note', 'z'), collapsed: true }, { type: 'loose', x: 0, y: 300 });
     b = B.addCard(b, createCard('note', 'm'), { type: 'loose', x: 400, y: 0 });
@@ -229,7 +229,7 @@ describe('Collapse all and back (owner request)', () => {
     collapsed = B.moveCard(collapsed, 'm', { type: 'loose', x: 900, y: 0 });
     const back = B.restoreLayout(collapsed, before, after);
     expect(back.cards.a).toMatchObject({ collapsed: false, x: 0, y: 0 });
-    expect(back.cards.z).toMatchObject({ collapsed: true, x: 0, y: 300 });
+    expect(back.cards.z).toMatchObject({ collapsed: false, x: 0, y: 300 });
     expect(back.cards.m).toMatchObject({ collapsed: false, x: 900, y: 0 });
   });
 });

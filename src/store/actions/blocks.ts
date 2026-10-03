@@ -243,6 +243,7 @@ export function blockActions(ctx: StoreContext) {
       // Expand all right after Collapse all gives back the layout from before it (owner request).
       const saved = layout.collapseAll;
       layout.collapseAll = null;
+      layout.expandAllUntil = Date.now() + EXPAND_WATCH_MS;
       commit((b) => (saved ? B.restoreLayout(b, saved.before, saved.after) : B.setAllCollapsed(b, false)));
       requestSettle();
     },

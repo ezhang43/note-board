@@ -141,28 +141,25 @@ export function setAllCollapsed(board: Board, collapsed: boolean): Board {
   return { ...board, cards, columns };
 }
 
-/** Which blocks are collapsed, and where the loose blocks and columns are. */
+/** Where the loose blocks and columns are. */
 export interface LayoutSnapshot {
-  collapsed: Record<string, boolean>;
   at: Record<string, Point>;
 }
 
 export function layoutSnapshot(board: Board): LayoutSnapshot {
-  const blocks = [...Object.values(board.cards), ...Object.values(board.columns)];
   return {
-    collapsed: Object.fromEntries(blocks.map((b) => [b.id, b.collapsed])),
     at: Object.fromEntries(board.order.map((id) => [id, { x: blockOf(board, id)!.x, y: blockOf(board, id)!.y }])),
   };
 }
 
 /**
- * Expand all after Collapse all (owner request): every block gets back whether it was open
- * (`before`), and blocks still where Collapse all left them (`after`) go back to where they were.
- * Blocks moved in between stay put; blocks added since are opened.
+ * Expand all after Collapse all (owner request): every block opens (even ones that were collapsed
+ * before), and blocks still where Collapse all left them (`after`) go back to where they were
+ * (`before`). Blocks moved in between stay put.
  */
 export function restoreLayout(board: Board, before: LayoutSnapshot, after: LayoutSnapshot): Board {
   const place = <T extends Card | Column>(b: T): T => {
-    const collapsed = before.collapsed[b.id] ?? false;
+    const collapsed = false;
     const was = before.at[b.id];
     const left = after.at[b.id];
     const unmoved = was && left && b.x === left.x && b.y === left.y && board.order.includes(b.id);

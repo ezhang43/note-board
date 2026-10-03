@@ -253,3 +253,23 @@ test.describe('on a touch screen', () => {
     expect(await spot()).toEqual(before);
   });
 });
+
+test('Expand all opens everything, including cards and columns that were closed before Collapse all (owner bug report)', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await page.keyboard.press('Escape');
+  await columns(page).first().getByRole('button', { name: 'Collapse column' }).click();
+  await clickEmpty(page);
+  await add(page, 'To-do list');
+  await page.keyboard.press('Escape');
+  await page.locator('.card.loose').first().getByRole('button', { name: 'Collapse card' }).click();
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await expect(toggle).toHaveAccessibleName('Collapse all');
+  await toggle.click();
+  await expect(page.locator('.card.loose:not(.collapsed), .column:not(.collapsed)')).toHaveCount(0);
+  await toggle.click();
+  await expect(page.locator('.card.loose.collapsed, .column.collapsed')).toHaveCount(0);
+});

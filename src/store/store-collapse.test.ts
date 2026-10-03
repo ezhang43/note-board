@@ -89,7 +89,7 @@ describe('collapsing puts pushed blocks back (owner request)', () => {
 });
 
 describe('Collapse all, then Expand all, gives back the same layout (owner request)', () => {
-  it('cards that were collapsed before stay collapsed, so nothing below gets pushed', () => {
+  it('opens everything, even cards that were collapsed before; blocks go back to their spots and what they grow into moves straight down', () => {
     const s = store();
     const a = noteAt(s, 0, 0, 200);
     const b = noteAt(s, 0, 220, 40); // already collapsed before Collapse all
@@ -104,12 +104,15 @@ describe('Collapse all, then Expand all, gives back the same layout (owner reque
     vi.runAllTimers();
     s.toggleAllCollapsed(); // expand all
     s.setMeasuredHeight(a, 200);
+    s.setMeasuredHeight(b, 120); // was collapsed before; now open, so taller
     s.setMeasuredHeight(c, 160);
     vi.runAllTimers();
 
-    expect(s.getState().board.cards[b].collapsed).toBe(true);
-    expect(s.getState().board.cards[a].collapsed).toBe(false);
-    expect({ a: pos(s, a), b: pos(s, b), c: pos(s, c) }).toEqual(before);
+    for (const id of [a, b, c]) expect(s.getState().board.cards[id].collapsed).toBe(false);
+    expect(pos(s, a)).toEqual(before.a);
+    expect(pos(s, b)).toEqual(before.b);
+    expect(pos(s, c).x).toBe(before.c.x); // straight down, never sideways
+    expect(pos(s, c).y).toBeGreaterThanOrEqual(before.b.y + 120);
   });
 
   it('a block moved while everything was collapsed stays where it was put', () => {

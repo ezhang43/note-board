@@ -4,6 +4,17 @@ import type { Theme } from './theme';
 
 export type CardKind = 'note' | 'todo' | 'link';
 
+/**
+ * How one whole text box looks (owner request): left out = the usual Normal size, regular weight,
+ * upright, Plex Sans. Only what differs is saved.
+ */
+export interface TextStyle {
+  size?: 'small' | 'large';
+  bold?: true;
+  italic?: true;
+  font?: 'serif' | 'rounded' | 'hand' | 'mono';
+}
+
 interface CardBase {
   id: string;
   color: ColorKey;
@@ -21,6 +32,8 @@ interface CardBase {
   titleColor?: ColorKey | null;
   /** Height while collapsed, if resized then (owner request); its open height (h) is kept apart. */
   collapsedH?: number | null;
+  /** Format of the card's title (to-do list, link) or text (note). */
+  style?: TextStyle;
 }
 
 export interface NoteCard extends CardBase {
@@ -33,6 +46,7 @@ export interface TodoItem {
   text: string;
   done: boolean;
   children: TodoItem[];
+  style?: TextStyle;
 }
 
 export interface TodoCard extends CardBase {
@@ -90,6 +104,8 @@ export interface Column {
   collapsed: boolean;
   /** Cards in this column, top to bottom. */
   cardIds: string[];
+  /** Format of the column's title. */
+  style?: TextStyle;
 }
 
 /**

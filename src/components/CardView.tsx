@@ -1,3 +1,5 @@
+import { styleCss } from '../model/textStyle';
+import { boxProps } from './textBox';
 import { memo, useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
@@ -159,7 +161,9 @@ function CompletedRow({ entry }: { entry: CompletedEntry }) {
             onChange={() => appStore.restoreCompleted(entry.item.id)}
           />
         </label>
-        <span className="completed-text">{entry.item.text}</span>
+        <span className="completed-text" style={styleCss(entry.item.style) as CSSProperties}>
+          {entry.item.text}
+        </span>
         <span className="completed-from">{entry.fromTitle || 'List'}</span>
       </div>
       <CompletedChildren items={entry.item.children} depth={1} />
@@ -172,7 +176,9 @@ function CompletedChildren({ items, depth }: { items: TodoItem[]; depth: number 
     <div key={it.id}>
       <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
         <input type="checkbox" aria-label="Done" checked={it.done} disabled />
-        <span className="completed-text">{it.text}</span>
+        <span className="completed-text" style={styleCss(it.style) as CSSProperties}>
+          {it.text}
+        </span>
       </div>
       <CompletedChildren items={it.children} depth={depth + 1} />
     </div>
@@ -187,6 +193,7 @@ function NoteBody({ card }: { card: NoteCard }) {
       ref={text}
       className="note-text"
       aria-label="Note text"
+      {...boxProps({ cardId: card.id }, card.style)}
       placeholder="Write something…"
       value={card.text}
       onChange={(text) => appStore.setNoteText(card.id, text)}
@@ -204,6 +211,7 @@ function LinkBody({ card }: { card: LinkCard }) {
         ref={title}
         className="card-title"
         aria-label="Link title"
+        {...boxProps({ cardId: card.id }, card.style)}
         placeholder="Title"
         value={card.title}
         onChange={(title) => appStore.setCardTitle(card.id, title)}

@@ -26,6 +26,14 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
     ],
   },
   {
+    title: 'Text',
+    keys: [
+      ['Ctrl+B / Ctrl+I', 'Bold / italic: the whole text box, selected items, or every box in selected cards'],
+      ['Ctrl+Shift+> / <', 'Larger / smaller (Small, Normal, Large)'],
+      ['Highlight some text', 'Shows the format bar: bold, italic, size and font'],
+    ],
+  },
+  {
     title: 'Checklists',
     keys: [
       ['Enter', 'Split at the cursor; at the start, add an item above'],

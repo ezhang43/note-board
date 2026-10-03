@@ -1,6 +1,7 @@
 import type { StorageLike } from '../model/persist';
 import { blockActions } from './actions/blocks';
 import { checklistActions } from './actions/checklist';
+import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
 import { createCore } from './core';
 import { later, type Schedule } from './env';
@@ -28,5 +29,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...blockActions(ctx),
     ...gestureActions(ctx),
     ...checklistActions(ctx),
+    ...formatActions(ctx),
   };
 }

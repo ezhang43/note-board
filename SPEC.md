@@ -98,6 +98,14 @@ The board holds three card types and columns that stack cards. Cards show no typ
 - Toolbar Colour recolours every selected column from 16 swatches (two rows of 8 large 32px chips, table below, each ringed in its own edge tone; if the open menu would cover the block being coloured, the board moves down so it stays in view), plus Default (back to stone-grey). The name of the swatch under the pointer (or of the current colour) shows under the swatches. For selected cards, which stay white, it colours their title band instead, in a deeper shade of the swatch (70% edge tone mixed with its background); a note, which has no title, gets the band across its header strip. Default puts a card's usual band back. It is faded with nothing selected.
 - Toolbar Auto-colour gives every column on the board a different colour in one step (undoable). Columns are taken left to right, and colours handed out in this order so neighbours differ clearly: Sky, Peach, Mint, Lavender, Butter, Teal, Rose, Lime, Periwinkle, Coral, Aqua, Orchid, Sage, Sand, Slate, Stone. Colours repeat only beyond 16 columns. Faded when there are no columns.
 
+### Text formatting
+
+- Every text box can be formatted as a whole: card titles (to-do lists and links), note text, checklist items and column titles. Not a link's address, nor the board name. Formatting always covers the whole box, never single words.
+- Choices: size Small / Normal / Large (Normal is the usual size; they scale with A− / A+, so Large stays larger than the text around it), **bold**, *italic*, and a typeface: Plex Sans (the usual one), Serif, Rounded, Handwritten, Typewriter. No colours.
+- Highlighting any text in a box shows a small bar just above it with B, I, the three sizes and a Font menu (each font shown in its own style). Its buttons format the whole box; hovering the bar outlines what it will change. With checklist items selected, the bar shows above them and formats all of them.
+- While typing: Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+> larger, Ctrl+Shift+< smaller, on the box you are in (with or without highlighting). With checklist items selected, they format those items; with whole cards or columns selected, every text box in them. Bold and italic turn on for all unless all already have it, then off for all.
+- Formatting is saved with the board, syncs, is one Ctrl+Z step, and is kept by copy, duplicate and paste. Enter keeps it on both halves of a split item (and on the new item below); joining two items keeps the first one's formatting. Ticked items and items in the Completed card keep it. Text copied to other apps is plain.
+
 ## Checklists
 
 A to-do list is an editable title plus a tree of items up to 6 levels deep, with finished top-level items gathered in a Completed section.

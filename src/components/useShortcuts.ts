@@ -3,6 +3,8 @@ import { ZOOM_STEP } from '../model/constants';
 import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
 import { handleArrowKey } from './keyboardNav';
+import type { FormatAsk } from '../store/actions/format';
+import { focusedBox } from './textBox';
 import { isTextField } from './textField';
 
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */
@@ -24,6 +26,16 @@ export function useShortcuts() {
 
       // Arrows move between a card's fields and between cards; Ctrl+arrows jump card to card.
       if (handleArrowKey(e)) return e.preventDefault();
+
+      // Text formatting (owner request): on the box being typed in, or else on the selected
+      // checklist items, or every text box in the selected cards and columns.
+      const format = mod && !e.altKey ? formatAsk(e, key) : null;
+      if (format) {
+        const typing = focusedBox();
+        if (typing) return run(e, () => appStore.formatBoxes([typing.box], format));
+        const boxes = isTextField(e.target) ? [] : appStore.selectedBoxes();
+        if (boxes.length) return run(e, () => appStore.formatBoxes(boxes, format));
+      }
 
       // Escape while typing in a card leaves the text field, keeping the card selected (so arrows then move it).
       if (key === 'escape' && isTextField(e.target) && (e.target as HTMLElement).closest('[data-card-id], [data-col-id]')) {
@@ -88,6 +100,14 @@ export function useShortcuts() {
 }
 
 const NUDGE: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+
+/** Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+> larger, Ctrl+Shift+< smaller (by key position too, as on other layouts). */
+function formatAsk(e: KeyboardEvent, key: string): FormatAsk | null {
+  if (e.shiftKey && (e.key === '>' || e.code === 'Period')) return 'larger';
+  if (e.shiftKey && (e.key === '<' || e.code === 'Comma')) return 'smaller';
+  if (e.shiftKey) return null;
+  return key === 'b' ? 'bold' : key === 'i' ? 'italic' : null;
+}
 
 function run(e: KeyboardEvent, action: () => unknown) {
   e.preventDefault();

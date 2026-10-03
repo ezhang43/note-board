@@ -1,5 +1,12 @@
 # Changelog
 
+## Text formatting (2026-10-04)
+
+- Any text box (a card title, a note, a checklist item, a column title) can be made Small / Normal / Large, bold, italic, and set in one of five fonts: Plex Sans, Serif, Rounded, Handwritten or Typewriter. The whole box changes, not single words.
+- Highlight some text and a small bar appears above it with B, I, the three sizes and a Font menu. Select several checklist items and the bar formats all of them.
+- Shortcuts: Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+> larger, Ctrl+Shift+< smaller. With whole cards selected they format every text box in those cards.
+- Formatting is saved, syncs, undoes with Ctrl+Z, and stays when you copy, split an item with Enter, or clean items up into the Completed card.
+
 ## Fix: Expand all opens everything (2026-10-04)
 
 - Expand all now opens every card and column, including ones that were already collapsed before you pressed Collapse all. Blocks still go back to their places, and anything they grow into moves straight down.

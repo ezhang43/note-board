@@ -108,6 +108,8 @@ export function enterItem(
   if (!loc) return null;
   const text = loc.item.text;
   const after = text.slice(end);
+  // The new item looks like the one it came from (text formatting, owner request).
+  if (loc.item.style) blank = { ...blank, style: loc.item.style };
   if (start === 0 && after !== '') {
     loc.item.text = after;
     loc.list.splice(loc.index, 0, blank);

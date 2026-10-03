@@ -26,6 +26,11 @@
   --colour-dot: #efece6;
   --toolbar-height: 64px;
   --font: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Typefaces a text box can be given (text formatting, owner request). */
+  --font-serif: 'Lora', Georgia, serif;
+  --font-rounded: 'Nunito', system-ui, sans-serif;
+  --font-hand: 'Caveat', 'Segoe Print', cursive;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
 }
 
 /*
@@ -459,10 +464,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card.loose.collapsed .card-meta { padding-left: 58px; text-align: center; }
 .card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: 26px; }
 
-.note-text { font-size: calc(14px * var(--fs, 1)); line-height: 1.55; }
+.note-text { font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: 1.55; }
 .note-text > textarea { min-height: 104px; }
 
-.card-title { --pad: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1)); max-width: 100%; align-self: flex-start; }
+.card-title { --pad: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; align-self: flex-start; }
 
 .todo-body, .link-body { display: flex; flex-direction: column; gap: 6px; }
 
@@ -478,7 +483,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   accent-color: var(--checkbox);
   cursor: pointer;
 }
-.item-text { flex-grow: 1; font-size: calc(14px * var(--fs, 1)); line-height: calc(20px * var(--fs, 1)); --pad: 4px; }
+.item-text { flex-grow: 1; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: calc(20px * var(--fs, 1) * var(--ts, 1)); --pad: 4px; }
 .todo-item.done .item-text > textarea { text-decoration: line-through; }
 
 .link-url {
@@ -534,8 +539,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   flex-grow: 1;
   min-width: 0;
   padding: 4px 0;
-  font-size: calc(14px * var(--fs, 1));
-  line-height: calc(20px * var(--fs, 1));
+  font-size: calc(14px * var(--fs, 1) * var(--ts, 1));
+  line-height: calc(20px * var(--fs, 1) * var(--ts, 1));
   text-decoration: line-through;
   overflow-wrap: anywhere;
 }
@@ -574,7 +579,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .column-heading { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
 .column-actions { display: flex; justify-content: flex-end; gap: 2px; }
-.column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
+.column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
 .column-count {
   flex-shrink: 0;
   padding: 1px 8px;
@@ -931,3 +936,53 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .align-guide { position: absolute; pointer-events: none; z-index: 5; background: var(--accent); }
 .align-guide.x { width: 1.5px; margin-left: -0.75px; }
 .align-guide.y { height: 1.5px; margin-top: -0.75px; }
+
+/* Text format bar (owner request): above highlighted text or selected checklist items. */
+.format-bar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.format-bar button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.format-bar button:hover { background: var(--hover); }
+.format-bar button[aria-pressed='true'],
+.format-bar .fb-font-menu button[aria-checked='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.format-bar .fb-bold { font-weight: 700; }
+.format-bar .fb-italic { font-style: italic; font-family: Georgia, serif; }
+.fb-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
+.fb-font { position: relative; }
+.fb-font > button { white-space: nowrap; }
+.fb-font-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.fb-font-menu button { justify-content: flex-start; text-align: left; height: 32px; font-size: 16px; }
+/* While the bar is hovered: the text boxes it will change. */
+.format-target { outline: 1.5px dashed var(--accent); outline-offset: 1px; border-radius: 4px; }

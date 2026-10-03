@@ -1,4 +1,5 @@
 import { Canvas } from './components/Canvas';
+import { FormatBar } from './components/FormatBar';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
@@ -15,6 +16,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <Toolbar onSignOut={onSignOut} />
       <Canvas />
       <ZoomControl saveNote={saveNote} />
+      <FormatBar />
       <ShortcutsPanel />
     </div>
   );

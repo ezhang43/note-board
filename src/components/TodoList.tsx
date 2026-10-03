@@ -1,3 +1,4 @@
+import { boxProps } from './textBox';
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ITEM_INDENT, sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
@@ -32,6 +33,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
         className="card-title"
         ref={title}
         aria-label="List title"
+        {...boxProps({ cardId: card.id }, card.style)}
         placeholder="List title"
         value={card.title}
         onChange={(text) => appStore.setCardTitle(card.id, text)}
@@ -140,6 +142,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         ref={ref}
         className="item-text"
         aria-label="Item text"
+        {...boxProps({ cardId, itemId: item.id }, item.style)}
         placeholder="Add an item"
         value={item.text}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}

@@ -1,3 +1,4 @@
+import { boxProps } from './textBox';
 import { memo, useRef, type CSSProperties } from 'react';
 import { swatchFor } from '../model/theme';
 import { appStore, useAppState } from '../store/appStore';
@@ -76,6 +77,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             ref={title}
             className="column-title"
             aria-label="Column title"
+            {...boxProps({ columnId: id }, col.style)}
             placeholder="Column title"
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}

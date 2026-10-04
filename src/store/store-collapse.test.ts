@@ -176,6 +176,27 @@ describe('alignment guides while dragging (owner request)', () => {
     expect(pos(s, b)).toEqual({ x: 10, y: 400 });
     expect(s.getState().ui.drag).toBeNull();
   });
+
+  it('several selected blocks dragged together line up as one (their outer edges and middle), show guides, and land there (owner request)', () => {
+    const s = store();
+    const a = noteAt(s, 0, 0);
+    s.showResize({ kind: 'card', id: a, w: 250, h: null, liveW: 250, liveH: null, matchIds: [], label: '', labelAt: { x: 0, y: 0 } });
+    s.commitResize();
+    const b = noteAt(s, 600, 400);
+    const c = noteAt(s, 900, 400);
+    s.pressBlock(b, false);
+    s.pressBlock(c, true);
+    s.startDrag('card', c, 900, 400);
+    // Together they span 600–1140. Moved left by 888 they span -288–252: the pair's right edge is
+    // 2px from a's (250), so the pair lines up with it.
+    s.moveDrag(900 - 888, 400, null);
+    const d = s.getState().ui.drag!;
+    expect(d.x).toBe(10);
+    expect(d.guides.some((g) => g.axis === 'x' && g.at === 250)).toBe(true);
+    s.dropDrag(null);
+    expect(pos(s, c)).toEqual({ x: 10, y: 400 });
+    expect(pos(s, b)).toEqual({ x: -290, y: 400 });
+  });
 });
 
 describe('Collapse all closes the gaps (owner request)', () => {

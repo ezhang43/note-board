@@ -1,5 +1,9 @@
 # Changelog
 
+## Alignment guides when dragging several cards (2026-10-05)
+
+- Dragging several selected cards or columns together now lines them up with other blocks too, with the same guide lines as a single card. They line up as one group: the outer edges and middle of the space they cover together.
+
 ## Invite-only sign-in, and publishing only when you say so (2026-10-05)
 
 - BusyAnts can now be used by invited Google accounts, each with its own private board: for now you and erikazhu95@gmail.com. Anyone else who signs in is told it's invite-only. (This takes effect once the new rules in `firestore.rules` are pasted into the Firebase console.)

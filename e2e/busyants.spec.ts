@@ -104,6 +104,34 @@ test('dragging a card near another shows an alignment guide', async ({ page }) =
   expect(Math.round((await second.boundingBox())!.x)).toBe(Math.round(a.x));
 });
 
+test('several selected cards dragged together show alignment guides too (owner request)', async ({ page }) => {
+  for (let i = 0; i < 3; i++) {
+    await clickEmpty(page);
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+  }
+  const cards = page.locator('.card.loose');
+  const a = (await cards.nth(0).boundingBox())!;
+  const b = (await cards.nth(1).boundingBox())!;
+  const c = (await cards.nth(2).boundingBox())!;
+  // Select the second and third notes, then drag them by the second so its left edge (the pair's
+  // left edge, if it is the leftmost) comes 3px right of the first note's, well below it.
+  await clickEmpty(page);
+  await page.mouse.click(b.x + 30, b.y + 10);
+  await page.keyboard.down('Shift');
+  await page.mouse.click(c.x + 30, c.y + 10);
+  await page.keyboard.up('Shift');
+  const left = Math.min(b.x, c.x);
+  await page.mouse.move(b.x + 30, b.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 30 + (a.x + 3 - left), a.y + a.height + 300 + 10, { steps: 10 });
+  await expect(page.locator('.align-guide').first()).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator('.align-guide')).toHaveCount(0);
+  const after = [(await cards.nth(1).boundingBox())!.x, (await cards.nth(2).boundingBox())!.x];
+  expect(Math.round(Math.min(...after))).toBe(Math.round(a.x));
+});
+
 test('guide lines all go away once the card no longer lines up, even when it lined up with two cards at once (owner bug report)', async ({ page }) => {
   for (let i = 0; i < 3; i++) {
     await clickEmpty(page);

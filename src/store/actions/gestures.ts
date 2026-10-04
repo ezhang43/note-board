@@ -2,7 +2,7 @@ import * as B from '../../model/board';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
 import { overlaps, snapIf } from '../../model/geometry';
 import { alignTo } from '../../model/align';
-import { landingSpot, topLevelRects } from '../../model/layout';
+import { blockRect, landingSpot, topLevelRects } from '../../model/layout';
 import { dropBoard } from '../../model/placement';
 import type { Board, Point, Rect } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -17,6 +17,16 @@ export function gestureActions(ctx: StoreContext) {
   let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
 
   /** Size of a block being dragged, as it will be once dropped loose on the board. */
+  /** The box around every block of a group drag, moved by `by` from where they were. */
+  function groupBox(d: Drag, by: { x: number; y: number }) {
+    const rects = [d.id, ...d.group].flatMap((id) => blockRect(ctx.state.board, id, measured) ?? []);
+    const left = Math.min(...rects.map((r) => r.x));
+    const top = Math.min(...rects.map((r) => r.y));
+    const right = Math.max(...rects.map((r) => r.x + r.w));
+    const bottom = Math.max(...rects.map((r) => r.y + r.h));
+    return { x: left + by.x, y: top + by.y, w: right - left, h: bottom - top };
+  }
+
   function draggedSize(d: Drag) {
     const { board } = ctx.state;
     const h = heights.get(d.id) ?? NEW_BLOCK_H.column;
@@ -83,12 +93,13 @@ export function gestureActions(ctx: StoreContext) {
         if (d.x === px && d.y === py && d.overColumn === over) return;
         return updateUi({ drag: { ...d, x: px, y: py, overColumn: over, land: null, bumped: {}, guides: [], exactX: false, exactY: false } });
       }
-      // A single dragged block lines up with nearby blocks' edges and middles (alignment guides),
-      // leaving out blocks it is on top of: those are about to move out of its way.
-      const rect = { x: px, y: py, ...draggedSize(d) };
-      const aligned = d.group.length
-        ? { x: px, y: py, alignedX: false, alignedY: false, guides: [] }
-        : alignTo(rect, topLevelRects(board, measured, [d.id]).filter((o) => !overlaps(rect, o)));
+      // The dragged block lines up with nearby blocks' edges and middles (alignment guides), leaving
+      // out blocks it is on top of: those are about to move out of its way. Several blocks dragged
+      // together line up as one: the box around them all (owner request).
+      const moved = { x: px - d.startX, y: py - d.startY };
+      const rect = d.group.length ? groupBox(d, moved) : { x: px, y: py, ...draggedSize(d) };
+      const box = alignTo(rect, topLevelRects(board, measured, [d.id, ...d.group]).filter((o) => !overlaps(rect, o)));
+      const aligned = { ...box, x: px + box.x - rect.x, y: py + box.y - rect.y };
       const { x, y } = aligned;
       if (d.x === x && d.y === y && d.overColumn === null && d.guides.length === aligned.guides.length) return;
       // The block follows the pointer exactly. It will land on the grid spot under it (dashed

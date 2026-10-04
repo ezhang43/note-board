@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard } from './board';
 import { createCard, createColumn } from './cards';
-import { KEEP_VERSIONS, LONG_SESSION_MS, VERSION_GAP_MS, contentHash, dayLabel, describeVersion, groupByDay, needsVersion, summarize, versionsToDrop, type VersionMeta } from './versions';
+import { KEEP_VERSIONS, LONG_SESSION_MS, VERSION_GAP_MS, contentHash, dayLabel, describeVersion, groupByDay, needsVersion, summarize, summarizeWorkspace, versionsToDrop, type VersionMeta } from './versions';
 
 // Version history (owner request, like Google Docs): the board as it was is saved now and then.
 
@@ -46,6 +46,14 @@ describe('what a version says about itself', () => {
     b = addCard(b, createCard('note', 'n1'), { type: 'column', columnId: 'c1', index: 0 });
     b = addCard(b, createCard('todo', 't1'), { type: 'loose', x: 0, y: 0 });
     expect(summarize(b)).toEqual({ cards: 2, columns: 1 });
+  });
+  it('several boards: cards and columns of every board, and how many boards', () => {
+    const one = addCard(createBoard(), createCard('note', 'n1'), { type: 'loose', x: 0, y: 0 });
+    const two = addColumn(createBoard(), createColumn('c1'));
+    expect(summarizeWorkspace({ home: 'a', boards: { a: one, b: two } })).toEqual({ cards: 1, columns: 1, boards: 2 });
+    expect(summarizeWorkspace({ home: 'a', boards: { a: one } })).toEqual({ cards: 1, columns: 0 });
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1, boards: 2 })).toBe('2 boards · 1 card · 1 column');
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 0, columns: 0, boards: 3 })).toBe('3 boards');
   });
   it('reads as a short line', () => {
     expect(describeVersion({ id: 'a', savedAt: 0, cards: 12, columns: 3 })).toBe('12 cards · 3 columns');

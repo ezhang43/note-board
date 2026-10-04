@@ -14,7 +14,7 @@ import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, viewFitting, viewShowing, zoomBy } from '../../model/view';
-import { readBoard } from '../../model/persist';
+import { readWorkspace, type Workspace } from '../../model/workspace';
 import type { StoreContext } from '../core';
 
 // Board, view, selection and block actions: adding, importing, editing, collapsing, deleting,
@@ -45,6 +45,9 @@ export function blockActions(ctx: StoreContext) {
   let clipboard: { entries: ClipEntry[]; pastes: number } | null = null;
   /** Selection when the selection box started (kept when Ctrl is held). */
   let marqueeBase: string[] = [];
+
+  /** A backup of several boards, or any backup while there are several boards here. */
+  const replacesEveryBoard = (ws: Workspace) => Object.keys(ws.boards).length > 1 || Object.keys(ctx.state.boards.others).length > 0;
 
   /** Put newly pasted / duplicated blocks on the board and select them. */
   function placeCopies(entries: ClipEntry[], times: number) {
@@ -107,18 +110,31 @@ export function blockActions(ctx: StoreContext) {
     /** Show an old version on the board, read-only (the real board is untouched). */
     previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null }),
     endPreview: () => updateUi({ preview: null }),
-    /** Put an old version back as the board: one change, so Ctrl+Z brings the board before it back. */
-    restoreBoard(board: Board) {
-      updateUi({ preview: null });
-      commit(() => board, { ui: { historyOpen: false, selection: [], itemSel: null } });
+    /** Whether `text` is a BusyAnts backup (one board, or every board, that this version can read). */
+    isBackup: (text: string) => readWorkspace(text) !== null,
+    /**
+     * Whether restoring `text` replaces every board: a backup of several boards, or any backup
+     * while there are several boards here. Otherwise it only replaces the open board.
+     */
+    isFullBackup(text: string) {
+      const got = readWorkspace(text);
+      return !!got && !got.legacy && replacesEveryBoard(got.ws);
     },
-    /** Whether `text` is a BusyAnts backup (a saved board this version can read). */
-    isBackup: (text: string) => readBoard(text) !== null,
-    /** Put a backup file's board in place of this one (owner request): one change, so Ctrl+Z brings this board back. */
+    /**
+     * Put a backup file in place (owner request). One board's backup (with one board here) replaces
+     * the open board: one change, so Ctrl+Z brings it back. Otherwise every board is replaced (undo
+     * starts over; the boards before are kept in Version history).
+     */
     restoreBackup(text: string): boolean {
-      const board = readBoard(text);
-      if (!board) return false;
+      const got = readWorkspace(text);
+      if (!got) return false;
       updateUi({ preview: null }); // an old version being looked at is put away first
+      if (!got.legacy && replacesEveryBoard(got.ws)) {
+        ctx.replaceWorkspace(got.ws);
+        updateUi({ historyOpen: false });
+        return true;
+      }
+      const board = Object.values(got.ws.boards)[0];
       commit(() => board, { ui: { selection: [], itemSel: null, confirm: null, historyOpen: false } });
       return true;
     },

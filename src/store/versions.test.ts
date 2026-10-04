@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { readBoard, serializeBoard } from '../model/persist';
+import { describe, expect, it, vi } from 'vitest';
+import { serializeBoard } from '../model/persist';
+import { readWorkspace, serializeWorkspace } from '../model/workspace';
 import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, VERSION_GAP_MS, type VersionMeta } from '../model/versions';
 import { createStore } from './store';
-import { localVersionStore, restoreFromBackup, restoreVersion, startVersions } from './versions';
+import { VERSION_SAVE_WAIT_MS, deleteBoardSafely, localVersionStore, restoreFromBackup, restoreVersion, startVersions } from './versions';
 
 // Version history (owner request): the board as it was is saved when editing starts after a quiet spell.
 
@@ -10,6 +11,9 @@ function memory() {
   const data = new Map<string, string>();
   return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) };
 }
+
+/** The home board in a saved version (versions hold every board). */
+const homeIn = (raw: string | null) => readWorkspace(raw)?.ws.boards.home ?? null;
 
 async function settled() {
   for (let i = 0; i < 100; i++) await Promise.resolve();
@@ -32,7 +36,7 @@ describe('saving versions', () => {
     await settled();
     const list = await versions.list();
     expect(list).toHaveLength(1);
-    expect(readBoard(await versions.get(list[0].id))?.name).toBe('My first board');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('My first board');
   });
 
   it('no new version while editing carries on; one after a 10-minute quiet spell', async () => {
@@ -49,7 +53,7 @@ describe('saving versions', () => {
     const list = await versions.list();
     expect(list).toHaveLength(2);
     // Newest first: the board just before "Three".
-    expect(readBoard(await versions.get(list[0].id))?.name).toBe('Two');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Two');
   });
 
   it("a change from another device doesn't save a version (that device saves its own)", async () => {
@@ -81,7 +85,7 @@ describe('looking at and restoring a version', () => {
     store.renameBoard('New');
     await settled();
     const [v] = await versions.list();
-    store.previewVersion(v, readBoard(await versions.get(v.id))!);
+    store.previewVersion(v, homeIn(await versions.get(v.id))!);
     expect(store.getState().ui.preview?.board.name).toBe('My first board');
     expect(store.getState().board.name).toBe('New');
     store.renameBoard('Typed while looking');
@@ -103,7 +107,7 @@ describe('looking at and restoring a version', () => {
     expect(store.getState().ui.preview).toBeNull();
     const list = await versions.list();
     expect(list).toHaveLength(2);
-    expect(readBoard(await versions.get(list[0].id))?.name).toBe('New');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('New');
     // The restore itself doesn't save the same version again.
     await settled();
     expect(await versions.list()).toHaveLength(2);
@@ -184,7 +188,7 @@ describe('fixes from the code review (2026-10-05)', () => {
     const [v] = await versions.list();
     store.addCard('note');
     const id = store.getState().ui.selection[0];
-    store.previewVersion(v, readBoard(await versions.get(v.id))!);
+    store.previewVersion(v, homeIn(await versions.get(v.id))!);
     store.showResize({ kind: 'card', id, w: 300, h: 200, label: '300 × 200', labelAt: { x: 0, y: 0 } } as never);
     store.commitResize();
     expect(store.getState().ui.resize).toBeNull();
@@ -212,7 +216,7 @@ describe('fixes from the code review (2026-10-05)', () => {
     await settled();
     const list = await versions.list();
     expect(list).toHaveLength(2);
-    expect(readBoard(await versions.get(list[0].id))?.name).toBe('Two');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Two');
   });
 
   it("a version that couldn't be saved is tried again a minute later, not an hour later", async () => {
@@ -237,7 +241,7 @@ describe('fixes from the code review (2026-10-05)', () => {
     const list = await inner.list();
     expect(list).toHaveLength(1);
     // The board kept is the one from before the edits began, not a later one.
-    expect(readBoard(await inner.get(list[0].id))?.name).toBe('My first board');
+    expect(homeIn(await inner.get(list[0].id))?.name).toBe('My first board');
   });
 
   it('while looking at an old version, only what a gesture showed is cleared; nothing else changes', async () => {
@@ -245,7 +249,7 @@ describe('fixes from the code review (2026-10-05)', () => {
     store.renameBoard('Old');
     await settled();
     const [v] = await versions.list();
-    store.previewVersion(v, readBoard(await versions.get(v.id))!);
+    store.previewVersion(v, homeIn(await versions.get(v.id))!);
     store.addCard('note');
     expect(store.getState().ui.selection).toEqual([]);
     expect(Object.keys(store.getState().board.cards)).toHaveLength(0);
@@ -269,18 +273,130 @@ describe('restoring a backup file (owner request)', () => {
     await settled();
     const backup = serializeBoard({ ...store.getState().board, name: 'From the backup' });
     const [v] = await versions.list();
-    store.previewVersion(v, readBoard(await versions.get(v.id))!);
+    store.previewVersion(v, homeIn(await versions.get(v.id))!);
     store.renameBoard('Now');
     await restoreFromBackup(store, versions, backup);
     expect(store.getState().ui.preview).toBeNull();
     expect(store.getState().board.name).toBe('From the backup');
     const list = await versions.list();
-    expect(readBoard(await versions.get(list[0].id))?.name).toBe('Before');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Before');
   });
 
   it('refuses a file that is not a backup, changing nothing', async () => {
     const { store, versions } = setup();
     expect(await restoreFromBackup(store, versions, '{"hello":1}')).toBe(false);
     expect(store.getState().board.name).toBe('My first board');
+  });
+});
+
+describe('versions of several boards (owner request)', () => {
+  it('a version holds every board', async () => {
+    const { store, versions, clock } = setup();
+    store.renameBoard('Home');
+    const id = store.newBoard();
+    store.renameBoard('Second');
+    await settled();
+    clock.now += VERSION_GAP_MS * 2;
+    store.renameBoard('Second, later');
+    await settled();
+    const [v] = await versions.list();
+    expect(v.boards).toBe(2);
+    expect(readWorkspace(await versions.get(v.id))!.ws.boards[id].name).toBe('Second');
+  });
+
+  it('restoring puts back the open board, brings back a deleted board, and leaves other boards alone', async () => {
+    const { store, versions, clock } = setup();
+    const home = store.getState().boards.open;
+    const gone = store.addBoardCard();
+    store.openBoard(gone);
+    store.renameBoard('Deleted later');
+    const kept = store.newBoard();
+    store.renameBoard('Kept');
+    store.openBoard(home);
+    store.renameBoard('Home then');
+    await settled();
+    clock.now += VERSION_GAP_MS * 2;
+    store.renameBoard('Home now');
+    await settled();
+    const [v] = await versions.list();
+    store.deleteBoard(gone);
+    store.openBoard(kept);
+    store.renameBoard('Kept, renamed');
+    store.openBoard(home);
+    await restoreVersion(store, versions, v.id, () => clock.now + 1000);
+    expect(store.getState().board.name).toBe('Home then');
+    expect(store.boardName(gone)).toBe('Deleted later');
+    expect(store.boardName(kept)).toBe('Kept, renamed');
+  });
+
+  it('deleting a board saves every board as a version first, so it can be brought back', async () => {
+    const { store, versions } = setup();
+    const gone = store.addBoardCard();
+    store.openBoard(gone);
+    store.renameBoard('Old plans');
+    store.openBoard(store.getState().boards.home);
+    await settled();
+    const before = (await versions.list()).length;
+    await deleteBoardSafely(store, versions, gone);
+    expect(store.boardName(gone)).toBe('');
+    const list = await versions.list();
+    expect(list.length).toBe(before + 1);
+    expect(readWorkspace(await versions.get(list[0].id))!.ws.boards[gone].name).toBe('Old plans');
+  });
+
+  it('with one board here and one in the backup, restoring it is an ordinary change (Ctrl+Z undoes it)', async () => {
+    const { store, versions } = setup();
+    store.renameBoard('Before');
+    const home = store.getState().boards.open;
+    const backup = serializeWorkspace({ home, boards: { [home]: { ...store.getState().board, name: 'Backup' } } });
+    expect(store.isFullBackup(backup)).toBe(false);
+    await restoreFromBackup(store, versions, backup);
+    expect(store.getState().board.name).toBe('Backup');
+    store.undo();
+    expect(store.getState().board.name).toBe('Before');
+  });
+
+  it('a backup of every board replaces every board, keeping them all as a version first', async () => {
+    const { store, versions } = setup();
+    store.renameBoard('Before');
+    const home = store.getState().boards.open;
+    const backup = serializeWorkspace({ home, boards: { [home]: { ...store.getState().board, name: 'Backup home' }, other: { ...store.getState().board, name: 'Backup other' } } });
+    expect(store.isBackup(backup)).toBe(true);
+    await restoreFromBackup(store, versions, backup);
+    expect(store.getState().board.name).toBe('Backup home');
+    expect(store.boardName('other')).toBe('Backup other');
+    const [v] = await versions.list();
+    expect(homeIn(await versions.get(v.id))?.name).toBe('Before');
+  });
+});
+
+describe('review fixes: several boards (2026-10-05)', () => {
+  it('deleting a board still happens when the version can’t be saved yet (offline: the save never answers)', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = createStore(null, (fn) => fn());
+      const hanging = { ...localVersionStore(memory()), save: () => new Promise<void>(() => {}) };
+      const gone = store.addBoardCard();
+      const done = deleteBoardSafely(store, hanging, gone);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.boardName(gone)).toBe('');
+      expect(store.getState().boards.others[gone]).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a version from before there were several boards is of the home board: restoring it opens home and puts it back', async () => {
+    const { store, versions } = setup();
+    const home = store.getState().boards.home;
+    const old = serializeBoard({ ...store.getState().board, name: 'Home long ago' });
+    await versions.save({ id: 'old', savedAt: 1, cards: 0, columns: 0 }, old);
+    const other = store.newBoard();
+    store.renameBoard('Other');
+    await restoreVersion(store, versions, 'old');
+    expect(store.getState().boards.open).toBe(home);
+    expect(store.getState().board.name).toBe('Home long ago');
+    expect(store.boardName(other)).toBe('Other');
   });
 });

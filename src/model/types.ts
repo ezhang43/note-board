@@ -89,7 +89,16 @@ export interface CompletedCard extends CardBase {
   groups: CompletedGroup[];
 }
 
-export type Card = NoteCard | TodoCard | LinkCard | CompletedCard;
+/**
+ * A card that opens another board (owner request: boards inside boards). Its name is that board's
+ * name, so it has no title of its own.
+ */
+export interface BoardCard extends CardBase {
+  kind: 'board';
+  boardId: string;
+}
+
+export type Card = NoteCard | TodoCard | LinkCard | CompletedCard | BoardCard;
 
 export interface Column {
   id: string;

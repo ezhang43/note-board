@@ -8,8 +8,13 @@ function items(list: TodoItem[], depth = 0): string[] {
   return list.flatMap((it) => [`${'    '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text}`, ...items(it.children, depth + 1)]);
 }
 
-function cardText(card: Card): string[] {
+/** A board's name by its id (for board cards). */
+export type BoardNameOf = (boardId: string) => string;
+
+function cardText(card: Card, nameOf: BoardNameOf): string[] {
   switch (card.kind) {
+    case 'board':
+      return [`Board: ${nameOf(card.boardId).trim() || 'Untitled board'}`];
     case 'note':
       return card.text.trim() ? [card.text.trim()] : [];
     case 'link': {
@@ -28,19 +33,19 @@ function cardText(card: Card): string[] {
 }
 
 /** The board as Markdown: its name, each column (left to right) with its cards, then the loose cards top to bottom. */
-export function boardAsMarkdown(board: Board): string {
+export function boardAsMarkdown(board: Board, nameOf: BoardNameOf = () => ''): string {
   const out: string[] = [`# ${board.name.trim() || 'Board'}`, ''];
   const block = (lines: string[]) => lines.length && out.push(...lines, '');
   const columns = board.order.filter((id) => board.columns[id]).sort((a, b) => board.columns[a].x - board.columns[b].x || board.columns[a].y - board.columns[b].y);
   for (const id of columns) {
     const col = board.columns[id];
     out.push(`## ${col.title.trim() || 'Untitled column'}`, '');
-    for (const cardId of col.cardIds) if (board.cards[cardId]) block(cardText(board.cards[cardId]));
+    for (const cardId of col.cardIds) if (board.cards[cardId]) block(cardText(board.cards[cardId], nameOf));
   }
   const loose = board.order.filter((id) => board.cards[id]).sort((a, b) => board.cards[a].y - board.cards[b].y || board.cards[a].x - board.cards[b].x);
   if (loose.length) {
     if (columns.length) out.push('## On the board', '');
-    for (const id of loose) block(cardText(board.cards[id]));
+    for (const id of loose) block(cardText(board.cards[id], nameOf));
   }
   return out.join('\n');
 }

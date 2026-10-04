@@ -105,7 +105,7 @@ describe('saving the board on the way out', () => {
     const a = createStore(storage);
     a.renameBoard('Closing');
     a.flush();
-    expect(JSON.parse(storage.data[BOARD_KEY]).board.name).toBe('Closing');
+    expect(JSON.parse(storage.data[BOARD_KEY]).boards.home.name).toBe('Closing');
   });
 });
 

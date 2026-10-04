@@ -36,6 +36,6 @@ describe('who can use BusyAnts', () => {
     expect(rules.match(/boardText\(request\.resource\.data\.data\)/g)?.length).toBe(2); // the board, and a version's board
     expect(rules).toContain("hasOnly(['data', 'client', 'updatedAt'])");
     expect(rules).toContain("hasOnly(['data'])");
-    expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'hash'])");
+    expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash'])");
   });
 });

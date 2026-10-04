@@ -2,14 +2,15 @@ import { centreOf, screenToBoard } from '../model/view';
 import { emptyHistory, recordChange, redo as redoStep, undo as undoStep, type History } from '../model/history';
 import { closeGaps, settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
-import { BOARD_KEY, VIEW_KEY, parseBoard, parseView, serializeBoard, serializeView, type StorageLike } from '../model/persist';
+import { BOARD_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
+import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
 import { prefersDark, type Schedule } from './env';
-import { emptyUi, type AppState, type Ui } from './types';
+import { emptyUi, type AppState, type Boards, type Ui } from './types';
 
 // The store's core: the one state object, saving, undo history, the change function and the
 // overlap clean-up queue. The action files (blocks, gestures, checklist) work through this.
@@ -86,6 +87,47 @@ export interface StoreContext {
   };
   /** Saves a value in the browser (does nothing if storage is unavailable). */
   write(key: string, value: string): void;
+  /** Every board as saved: the open one and the others (the same object until one changes). */
+  workspace(): Workspace;
+  /** Change the boards that aren't open (adding or removing boards). Not undoable. */
+  setOthers(fn: (others: Record<string, Board>) => Record<string, Board>): void;
+  /** Open another board: its own undo history, nothing selected, brought into view once drawn. */
+  openBoard(id: string): void;
+  /** Swap in every board (from elsewhere, or a backup of every board); undo starts over. */
+  replaceWorkspace(ws: Workspace): void;
+}
+
+/** What is cleared on screen when a different board is shown. */
+const BOARD_SWITCH_UI: Partial<Ui> = {
+  selection: [],
+  confirm: null,
+  drag: null,
+  resize: null,
+  marquee: null,
+  itemSel: null,
+  itemDrag: null,
+  newDrag: null,
+  completing: [],
+  arrived: [],
+  focusItem: null,
+  focusOffset: null,
+  focusBlock: null,
+  colourMenuOpen: false,
+  preview: null,
+};
+
+/** The boards as one object, in a fixed order (so saving the same boards gives the same text). */
+function workspaceFrom(board: Board, boards: Boards): Workspace {
+  const all: Record<string, Board> = { ...boards.others, [boards.open]: board };
+  return { home: boards.home, boards: Object.fromEntries(Object.keys(all).sort().map((id) => [id, all[id]])) };
+}
+
+/** Splits a workspace into the board to open (`open`, if it exists, else home) and the others. */
+function split(ws: Workspace, open: string | null): { board: Board; boards: Boards } {
+  const id = open && ws.boards[open] ? open : ws.home;
+  const others = { ...ws.boards };
+  delete others[id];
+  return { board: ws.boards[id], boards: { home: ws.home, open: id, others } };
 }
 
 export function createCore(storage: StorageLike | null, schedule: Schedule) {
@@ -106,7 +148,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   }
 
   let state: AppState = {
-    board: parseBoard(read(BOARD_KEY)),
+    ...split(parseWorkspace(read(BOARD_KEY)), read(OPEN_BOARD_KEY)),
     view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()), fontSize: startingFontSize(read(FONT_KEY)) },
     ui: emptyUi,
   };
@@ -123,6 +165,15 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   const settleAnchors = new Set<string>();
   let settleQueued = false;
   let history: History = emptyHistory;
+  /** Undo history of each board that isn't open (undo belongs to each board). */
+  const histories = new Map<string, History>();
+  let wsCache: { board: Board; boards: Boards; ws: Workspace } | null = null;
+  function workspace(): Workspace {
+    if (!wsCache || wsCache.board !== state.board || wsCache.boards !== state.boards) {
+      wsCache = { board: state.board, boards: state.boards, ws: workspaceFrom(state.board, state.boards) };
+    }
+    return wsCache.ws;
+  }
   const pending: StoreContext['pending'] = { tick: null };
   const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, closing: null, expandAllUntil: 0 };
   const measured: MeasuredHeight = (id) => heights.get(id);
@@ -137,14 +188,14 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (!boardTimer) return;
     clearTimeout(boardTimer);
     boardTimer = null;
-    write(BOARD_KEY, serializeBoard(state.board));
+    write(BOARD_KEY, serializeWorkspace(workspace()));
   }
 
   function set(next: AppState) {
-    if (next.board === state.board && next.view === state.view && next.ui === state.ui) return;
+    if (next.board === state.board && next.boards === state.boards && next.view === state.view && next.ui === state.ui) return;
     const prev = state;
     state = next;
-    if (next.board !== prev.board) {
+    if (next.board !== prev.board || next.boards.others !== prev.boards.others) {
       if (boardTimer) clearTimeout(boardTimer);
       boardTimer = setTimeout(flushBoard, BOARD_SAVE_DELAY);
     }
@@ -268,12 +319,13 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
    * heights known here are from before it and would move blocks wrongly). Blocks that change size
    * here are tidied once they have been drawn.
    */
-  function restore(result: { history: History; board: Board } | null, tidy = true) {
+  function restore(result: { history: History; board: Board } | null, tidy = true, boards = state.boards) {
     if (!result) return;
     history = result.history;
     set({
       ...state,
       board: result.board,
+      boards,
       ui: uiWith({
         selection: liveSelection(result.board),
         confirm: null,
@@ -287,6 +339,63 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       }),
     });
     if (tidy) requestSettle();
+  }
+
+  /** Forget what belongs to the board shown until now (drawn heights, layout memory). */
+  function forgetShownBoard() {
+    flushPendingTick();
+    heights.clear();
+    settleAnchors.clear();
+    layout.pushedBy.clear();
+    layout.expanding = null;
+    layout.importLayout = null;
+    layout.collapseAll = null;
+    layout.closing = null;
+  }
+
+  function openBoard(id: string) {
+    const { boards } = state;
+    if (id === boards.open || !boards.others[id]) return;
+    forgetShownBoard();
+    const left = boards.open;
+    histories.set(left, history);
+    const others = { ...boards.others, [left]: state.board };
+    const board = others[id];
+    delete others[id];
+    // A new board left empty and unnamed, that no card opens, isn't kept.
+    if (isLeftoverBoard(workspaceFrom(board, { home: boards.home, open: id, others }), left)) {
+      delete others[left];
+      histories.delete(left);
+    }
+    history = histories.get(id) ?? emptyHistory;
+    histories.delete(id);
+    centreOnArrival = true;
+    // Search keeps its words, but its match was on the other board.
+    const find = state.ui.find && { ...state.ui.find, current: null };
+    set({ ...state, board, boards: { ...boards, open: id, others }, ui: uiWith({ ...BOARD_SWITCH_UI, find }) });
+    write(OPEN_BOARD_KEY, id);
+  }
+
+  /**
+   * Swap in every board from elsewhere (the online copy, or a backup of every board). The open
+   * board stays open if it is still there, else home opens. Undo starts over on every board.
+   */
+  function replaceWorkspace(ws: Workspace) {
+    const next = split(ws, state.boards.open);
+    if (next.boards.open !== state.boards.open) {
+      forgetShownBoard();
+      write(OPEN_BOARD_KEY, next.boards.open);
+      centreOnArrival = true;
+    } else if (!state.board.order.length && next.board.order.length) centreOnArrival = true;
+    outsideChanges++;
+    histories.clear();
+    history = emptyHistory;
+    restore({ history, board: next.board }, false, next.boards);
+  }
+
+  function setOthers(fn: (others: Record<string, Board>) => Record<string, Board>) {
+    const others = fn(state.boards.others);
+    if (others !== state.boards.others) set({ ...state, boards: { ...state.boards, others } });
   }
 
   const ctx: StoreContext = {
@@ -308,6 +417,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     pending,
     layout,
     write,
+    workspace,
+    setOthers,
+    openBoard,
+    replaceWorkspace,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */
@@ -349,6 +462,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
      * Swap in a board that came from elsewhere (the online copy). Not a change the user made here,
      * so undo history starts over rather than undoing into the old board.
      */
+    workspace,
+    replaceWorkspace,
     replaceBoard(board: Board) {
       // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.
       if (!state.board.order.length && board.order.length) centreOnArrival = true;

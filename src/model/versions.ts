@@ -1,4 +1,5 @@
 import type { Board } from './types';
+import type { Workspace } from './workspace';
 
 // Version history (owner request, like Google Docs): the board as it was, saved now and then,
 // to look back at and restore. Pure rules here; saving and loading live in src/store/versions.ts.
@@ -10,6 +11,8 @@ export interface VersionMeta {
   savedAt: number;
   cards: number;
   columns: number;
+  /** How many boards it holds, when more than one (owner request: several boards). */
+  boards?: number;
   /** A short fingerprint of the board (`contentHash`), so a repeat can be spotted without downloading it. */
   hash?: string;
 }
@@ -53,11 +56,19 @@ export function summarize(board: Board): { cards: number; columns: number } {
   return { cards: Object.keys(board.cards).length, columns: Object.keys(board.columns).length };
 }
 
-/** e.g. "12 cards · 3 columns". */
+/** Cards and columns on every board, and how many boards (left out when there is just one). */
+export function summarizeWorkspace(ws: Workspace): { cards: number; columns: number; boards?: number } {
+  const all = Object.values(ws.boards).map(summarize);
+  const sum = { cards: all.reduce((n, s) => n + s.cards, 0), columns: all.reduce((n, s) => n + s.columns, 0) };
+  return all.length > 1 ? { ...sum, boards: all.length } : sum;
+}
+
+/** e.g. "2 boards · 12 cards · 3 columns". */
 export function describeVersion(v: VersionMeta): string {
-  if (!v.cards && !v.columns) return 'Empty board';
   const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
-  return [v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'column')].filter(Boolean).join(' · ');
+  const boards = v.boards && v.boards > 1 ? n(v.boards, 'board') : '';
+  if (!v.cards && !v.columns) return boards || 'Empty board';
+  return [boards, v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'column')].filter(Boolean).join(' · ');
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

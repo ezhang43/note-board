@@ -4,7 +4,8 @@ import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
-import { serializeBoard } from '../model/persist';
+import { serializeWorkspace } from '../model/workspace';
+import { BoardPath, BoardsMenu } from './BoardsMenu';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
@@ -76,6 +77,8 @@ export function FileMenu() {
     action();
   };
   const board = () => appStore.getState().board;
+  /** A backup holds every board: named after the board when there is just one. */
+  const backupName = () => (Object.keys(appStore.getState().boards.others).length ? 'All boards' : board().name);
   return (
     <div className="file-menu-wrap" ref={wrap}>
       <button type="button" className="tb-button quiet" aria-haspopup="menu" aria-expanded={open} title="Back up, restore or import" onClick={() => setOpen((o) => !o)}>
@@ -83,10 +86,10 @@ export function FileMenu() {
       </button>
       {open && (
         <div className="file-menu" role="menu" aria-label="File">
-          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'json'), serializeBoard(board()), 'application/json'))}>
+          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(backupName(), new Date(), 'json'), serializeWorkspace(appStore.workspace()), 'application/json'))}>
             Download backup
           </button>
-          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'md'), boardAsMarkdown(board()), 'text/markdown'))}>
+          <button type="button" role="menuitem" title="This board as readable text" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'md'), boardAsMarkdown(board(), appStore.boardName), 'text/markdown'))}>
             Download as text
           </button>
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
@@ -109,7 +112,10 @@ export function FileMenu() {
           if (!file) return;
           const text = await file.text();
           if (!appStore.isBackup(text)) return void window.alert('That file isn’t a BusyAnts backup, so nothing was changed.');
-          if (!window.confirm('Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.')) return;
+          const question = appStore.isFullBackup(text)
+            ? 'Replace all your boards with the ones in the backup? Your boards as they are now are kept in Version history.'
+            : 'Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.';
+          if (!window.confirm(question)) return;
           await restoreFromBackup(appStore, activeVersionStore(), text);
           // Bring the restored board into view once it has been drawn.
           requestAnimationFrame(() => requestAnimationFrame(() => appStore.showWholeBoard()));
@@ -360,6 +366,8 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
     return (
       <header className="toolbar phone">
         <Logo />
+        <BoardsMenu labelled={false} />
+        <BoardPath />
         <BoardName />
       </header>
     );
@@ -367,6 +375,8 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   return (
     <header className="toolbar">
       <Logo />
+      <BoardsMenu labelled={false} />
+      <BoardPath />
       <BoardName />
       <div className="toolbar-spacer" />
 

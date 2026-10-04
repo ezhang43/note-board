@@ -37,6 +37,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     els.map((el) => el.getAttribute('aria-label') ?? el.textContent?.trim()),
   );
   expect(labels).toEqual([
+    'Boards',
     'Board name',
     'Hand (H)',
     'Select (V)',

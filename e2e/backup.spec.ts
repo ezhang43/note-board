@@ -25,7 +25,7 @@ test('Download backup saves the whole board as a file, which Restore from backup
   await cards(page).first().getByLabel('Note text').fill('Keep me');
   const backup = await download(page, 'Download backup');
   expect(backup.name).toMatch(/^BusyAnts - Home - \d{4}-\d\d-\d\d\.json$/);
-  expect(JSON.parse(backup.text).board.name).toBe('Home');
+  expect(JSON.parse(backup.text).boards.home.name).toBe('Home');
 
   // Change the board, then restore the backup.
   await cards(page).first().getByLabel('Note text').fill('Changed');

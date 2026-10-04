@@ -28,7 +28,7 @@ service cloud.firestore {
     match /boards/{uid}/versions/{id} {
       allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['savedAt', 'cards', 'columns', 'hash'])
+        && request.resource.data.keys().hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash'])
         && request.resource.data.savedAt is number;
     }
     // ...and each version's board.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard, renameBoard } from './board';
-import { createCard, createColumn } from './cards';
+import { createBoardCard, createCard, createColumn } from './cards';
 import { backupFileName, boardAsMarkdown } from './exportText';
 import type { LinkCard, NoteCard, TodoCard } from './types';
 
@@ -47,6 +47,14 @@ describe('the board as readable text (Markdown)', () => {
         '',
       ].join('\n'),
     );
+  });
+});
+
+describe('boards inside boards', () => {
+  it('a board card is written as the name of the board it opens', () => {
+    const b = addCard(renameBoard(createBoard(), 'Home'), createBoardCard('trips', 'k1'), { type: 'loose', x: 0, y: 0 });
+    expect(boardAsMarkdown(b, (id) => (id === 'trips' ? 'Trips' : ''))).toBe('# Home\n\nBoard: Trips\n');
+    expect(boardAsMarkdown(b)).toBe('# Home\n\nBoard: Untitled board\n');
   });
 });
 

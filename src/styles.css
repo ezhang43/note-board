@@ -1312,3 +1312,66 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .note-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .note-link svg { flex-shrink: 0; }
 .note-link:hover span { text-decoration: underline; }
+
+/* Several boards (owner request): the Boards menu, the path back up, and board cards. */
+.boards-menu-wrap { position: relative; flex-shrink: 0; }
+.boards-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.boards-list { max-height: min(60vh, 420px); overflow-y: auto; }
+.boards-row { display: flex; align-items: center; gap: 2px; }
+.boards-menu button[role='menuitem'] {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.boards-menu button[role='menuitem']:hover, .boards-menu button[role='menuitem']:focus-visible { background: var(--hover); }
+.boards-menu .boards-open[aria-current='true'] { background: var(--accent-soft); font-weight: 600; }
+.boards-actions { display: flex; flex-direction: column; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+.boards-actions button[role='menuitem'] { flex: none; }
+.board-path { display: flex; align-items: center; min-width: 0; flex-shrink: 1; overflow: hidden; }
+.board-path-step { display: flex; align-items: center; min-width: 0; }
+.board-path-link {
+  max-width: 120px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.board-path-link:hover, .board-path-link:focus-visible { background: var(--hover); color: var(--ink); }
+.board-path-sep { color: var(--ink-faint); padding: 0 2px; }
+.board-body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 12px 12px; }
+.board-card-name { font-weight: 600; font-size: calc(16px * var(--fs, 1)); overflow-wrap: anywhere; }
+.board-card-count { color: var(--ink-faint); font-size: calc(13px * var(--fs, 1)); }
+.board-open { height: 32px; }

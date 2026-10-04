@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { readBoard } from '../model/persist';
+import { createBoard } from '../model/board';
+import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion } from '../store/versions';
@@ -16,12 +17,18 @@ function problem(e: unknown) {
     : 'Couldn’t load the version history. Check your connection and try again.';
 }
 
-/** Show version `meta` on the board, read-only. */
+/**
+ * Show version `meta` on the board, read-only: the open board as it was then (empty if it didn't
+ * exist yet; restoring then only brings back boards deleted since).
+ */
 async function look(meta: VersionMeta, onError: (message: string) => void) {
   const data = await activeVersionStore()
     ?.get(meta.id)
     .catch(() => null);
-  const board = data ? readBoard(data) : null;
+  const got = data ? readWorkspace(data) : null;
+  const open = appStore.getState().boards.open;
+  // A version from before there were several boards is of the home board.
+  const board = got && (got.legacy ? Object.values(got.ws.boards)[0] : (got.ws.boards[open] ?? { ...createBoard(), name: appStore.boardName(open) }));
   if (board) appStore.previewVersion(meta, board);
   else onError('That version couldn’t be opened.');
 }

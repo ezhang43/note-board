@@ -296,7 +296,7 @@ test.describe('on a touch screen', () => {
     const card = page.locator('.card.loose').first();
     const id = (await card.getAttribute('data-card-id'))!;
     const spot = () => page.evaluate((id) => {
-      const c = JSON.parse(localStorage.getItem('note-board:v1') ?? 'null')?.board.cards[id];
+      const c = JSON.parse(localStorage.getItem('note-board:v1') ?? 'null')?.boards.home.cards[id];
       return c ? { x: c.x, y: c.y } : null;
     }, id);
     await expect.poll(spot).not.toBeNull(); // saving waits a moment

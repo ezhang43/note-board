@@ -1,5 +1,6 @@
 import type { StorageLike } from '../model/persist';
 import { blockActions } from './actions/blocks';
+import { boardActions } from './actions/boards';
 import { checklistActions } from './actions/checklist';
 import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
@@ -27,6 +28,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (focusBlock === id) ctx.updateUi({ focusBlock: null });
     },
     ...blockActions(ctx),
+    ...boardActions(ctx),
     ...gestureActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),

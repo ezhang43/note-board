@@ -1,5 +1,12 @@
 # Changelog
 
+## Several boards, and boards inside boards (2026-10-05)
+
+- A new **Boards** button (left end of the toolbar) lists all your boards. **New board** makes a fresh board; **Add a board here** puts a board card on this board that opens a new board inside it.
+- Inside a board, the boards above it show before its name ("Home ›"), so you can click back out.
+- Each board has its own undo. Deleting a board (× in the Boards menu) asks first and keeps a copy in Version history.
+- Backups and Version history now cover every board. Search, Clean up and the other board tools work on the open board.
+
 ## Open to everyone (2026-10-05)
 
 - Anyone with a Google account can now sign in and gets their own private board; no one else can see it. The sign-in screen says so.

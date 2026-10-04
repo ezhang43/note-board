@@ -1,5 +1,5 @@
 import type { ColorKey } from './palette';
-import type { Card, CardKind, Column, TodoItem } from './types';
+import type { BoardCard, Card, CardKind, Column, TodoItem } from './types';
 import { COLUMN_W } from './constants';
 
 export const DEFAULT_COLOR: Record<CardKind, ColorKey> = { note: 'butter', todo: 'mint', link: 'sky' };
@@ -25,6 +25,11 @@ export function createCard(kind: CardKind, id = newId('k')): Card {
     case 'link':
       return { ...base, kind, title: '', url: '' };
   }
+}
+
+/** A card that opens board `boardId`. */
+export function createBoardCard(boardId: string, id = newId('k')): BoardCard {
+  return { id, kind: 'board', boardId, color: 'stone', collapsed: false, x: 0, y: 0, w: null, h: null };
 }
 
 export function createColumn(id = newId('c')): Column {
@@ -65,6 +70,8 @@ export function collapsedPreview(card: Card): string {
       return 'Completed';
     case 'link':
       return card.title || domainOf(card.url) || '';
+    case 'board':
+      return 'Board';
   }
 }
 

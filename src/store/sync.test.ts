@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCard, createBoard } from '../model/board';
 import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
+import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
 import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
@@ -65,7 +66,7 @@ describe('board sync', () => {
     fake.send(null);
     expect(onReady).toHaveBeenCalledOnce();
     expect(fake.writes).toHaveLength(1);
-    expect(JSON.parse(fake.writes[0].data).board.name).toBe('My board');
+    expect(JSON.parse(fake.writes[0].data).boards.home.name).toBe('My board');
     expect(fake.writes[0].client).toBe('me');
   });
 
@@ -78,7 +79,7 @@ describe('board sync', () => {
     expect(fake.writes).toEqual([]);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes).toHaveLength(1);
-    expect(JSON.parse(fake.writes[0].data).board.name).toBe('Shop');
+    expect(JSON.parse(fake.writes[0].data).boards.home.name).toBe('Shop');
   });
 
   it('does not upload before the online copy has been checked', () => {
@@ -172,7 +173,7 @@ describe('board sync', () => {
     expect(moved.x).toBeGreaterThan(card.x + 300);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes.length).toBe(writesBefore + 1);
-    expect(JSON.parse(fake.writes.at(-1)!.data).board.cards[id].x).toBe(moved.x);
+    expect(JSON.parse(fake.writes.at(-1)!.data).boards.home.cards[id].x).toBe(moved.x);
   });
 
   it('a change not yet uploaded is kept and sent when another device saves meanwhile', () => {
@@ -184,7 +185,7 @@ describe('board sync', () => {
     expect(store.getState().board.name).toBe('Typed here');
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes).toHaveLength(1);
-    expect(JSON.parse(fake.writes[0].data).board.name).toBe('Typed here');
+    expect(JSON.parse(fake.writes[0].data).boards.home.name).toBe('Typed here');
   });
 
   it('an online board it cannot read is never replaced or overwritten', () => {
@@ -222,7 +223,7 @@ describe('board sync', () => {
     vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
     expect(fake.writes).toHaveLength(2);
-    expect(JSON.parse(fake.writes[1].data).board.name).toBe('Smaller');
+    expect(JSON.parse(fake.writes[1].data).boards.home.name).toBe('Smaller');
     expect(onSaveState).toHaveBeenLastCalledWith('saved');
   });
 
@@ -246,5 +247,61 @@ describe('board sync', () => {
     vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
     expect(onSaveState).toHaveBeenLastCalledWith('saved');
+  });
+});
+
+describe('syncing several boards (owner request)', () => {
+  it('uploads every board together, and opening another board uploads nothing', () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send(null);
+    const home = store.getState().boards.open;
+    const id = store.newBoard();
+    store.renameBoard('Second');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const sent = JSON.parse(fake.writes[fake.writes.length - 1].data);
+    expect(sent.version).toBe(3);
+    expect(Object.keys(sent.boards).sort()).toEqual([home, id].sort());
+    const writes = fake.writes.length;
+    onSaveState.mockClear();
+    store.openBoard(home);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(writes);
+    expect(onSaveState).not.toHaveBeenCalledWith('saving');
+  });
+
+  it('boards from another device replace these, keeping the open board open', () => {
+    const { store, fake } = setup();
+    fake.send(null);
+    const home = store.getState().boards.open;
+    const id = store.newBoard();
+    store.renameBoard('Mine');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard(), [id]: { ...createBoard(), name: 'Renamed on the phone' } } }), client: 'phone' });
+    expect(store.getState().boards.open).toBe(id);
+    expect(store.getState().board.name).toBe('Renamed on the phone');
+  });
+
+  it('a single board from an older version of the app only replaces the home board; other boards are kept', () => {
+    const { store, fake } = setup();
+    fake.send(null);
+    const home = store.getState().boards.open;
+    const id = store.newBoard();
+    store.renameBoard('Kept');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    fake.send({ data: boardJson('Old app'), client: 'old phone' });
+    expect(store.boardName(home)).toBe('Old app');
+    expect(store.boardName(id)).toBe('Kept');
+    expect(store.getState().boards.open).toBe(id);
+  });
+});
+
+describe('review fixes: several boards (2026-10-05)', () => {
+  it("on first sign-in an older single online board replaces this device's boards (another account's boards aren't taken along)", () => {
+    const { store, fake } = setup();
+    store.newBoard();
+    store.renameBoard('Someone else’s');
+    fake.send({ data: boardJson('Mine online'), client: 'laptop' });
+    expect(Object.keys(store.getState().boards.others)).toHaveLength(0);
+    expect(store.getState().board.name).toBe('Mine online');
   });
 });

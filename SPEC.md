@@ -4,13 +4,13 @@ As of 2026-10-02 · Owner: Eric Zhang
 
 ## Overview
 
-BusyAnts (built as "Note Board"; the name shows in the browser tab, the installed app and the sign-in screen) is a web-based visual board for notes, to-do lists and links, in the spirit of Milanote. Version 1 is a single-user app with one board that runs in the browser and saves it between visits. The published site (https://ezhang43.github.io/note-board/) also syncs the board to the signed-in Google account (any Google account), so the same board opens on every device.
+BusyAnts (built as "Note Board"; the name shows in the browser tab, the installed app and the sign-in screen) is a web-based visual board for notes, to-do lists and links, in the spirit of Milanote. Version 1 is a single-user app that runs in the browser and saves its boards between visits; a person can have several boards, and boards inside boards. The published site (https://ezhang43.github.io/note-board/) also syncs every board to the signed-in Google account (any Google account), so the same boards open on every device.
 
 The clickable prototype (`note-board-prototype-reference.html`) is the reference for look and behaviour. Where this spec and the prototype disagree, this spec wins.
 
 - **Who it's for:** one person organising ideas, plans and tasks on a free-form canvas.
 - **Version 1 goal:** everything in this spec working reliably, saved in the browser and synced to the owner's account.
-- **Not in version 1:** multiple boards, sharing and real-time collaboration.
+- **Not in version 1:** sharing and real-time collaboration.
 
 ## Build rules for Claude Code
 
@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · File · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid amber button. Rarely used buttons (Auto-colour, Collapse all, Same width, File, Clean up) have no border until hovered. A zoom control (Fit to screen · − · percentage · +) sits bottom-right; Fit to screen (or Shift+1 outside text fields) brings every card and column into view, as large as fits, centred (zooming in up to 100%, or out as far as 30%); clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
+**Toolbar, left to right:** Boards button (see "Several boards") · the path to the open board, when it is inside another · board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · File · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid amber button. Rarely used buttons (Auto-colour, Collapse all, Same width, File, Clean up) have no border until hovered. A zoom control (Fit to screen · − · percentage · +) sits bottom-right; Fit to screen (or Shift+1 outside text fields) brings every card and column into view, as large as fits, centred (zooming in up to 100%, or out as far as 30%); clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
 
 | Action | How |
 | --- | --- |
@@ -45,13 +45,24 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 - Add Note, Add To-do list, Add Link and New column can also be dragged from the toolbar onto the board. A dashed outline shows where the block will appear (the free spot nearest the pointer); a new card dragged over a column goes into the column at the pointer (a new column never does). Letting go off the board adds nothing.
 - Opening the board (desktop and phone) shows every card and column, centred on the screen. The remembered zoom is kept when everything fits at it; otherwise the board zooms out just enough, but not below 50% so text stays readable. If the board is still too big at 50%, its top-left part is shown. This also happens when the online copy first arrives on an empty screen. The tool always starts as Hand.
 
+### Several boards
+
+- There can be any number of boards. The first board is the **home board**, which can't be deleted. Each board has its own cards, columns, name, Snap setting and undo history: Ctrl+Z never undoes something on another board, and switching away and back keeps a board's undo history (until the page is reloaded).
+- **Boards button** (a two-boards icon at the left of the toolbar, after the ant; on a phone, in the top bar) opens a menu listing every board: the home board first with the boards inside it indented under it (and theirs under them), then each board that isn't inside another. The open board is highlighted. Clicking a board opens it. Every board except home has a × that deletes it, after a confirmation.
+- **Add a board here** (in the menu; on a phone also + → Board) makes a new, empty board inside the open one: a **board card** appears on the open board (placed like a new card: into a selected column, else at the free spot nearest the middle of the screen), selected. A board card shows the board's name ("Untitled board" until it is named), how many cards are on it, and **Open board**; double-clicking the card opens it too. It can be moved, put in a column, collapsed (showing the name), resized, copied (the copy opens the same board), and deleted like any card: deleting the card leaves the board itself in the Boards menu.
+- **New board** (in the menu) makes a new, empty board on its own (not inside another) and opens it. A new board that is left empty and unnamed, and that no card opens, is dropped when another board is opened.
+- Opening a board shows every card and column on it, as when the app opens. Which board is open is remembered on each device (not synced), so the app reopens there.
+- **Path back up:** on a board inside another, the boards above it show before its name, smaller and greyed ("Home › Trips ›"); clicking one opens it.
+- **Deleting a board** removes it and every board card that opens it, on every board; boards inside it are kept and then stand alone. Every board is saved in Version history first, so a deleted board can be brought back from there. If the deleted board is open, the board above it opens.
+- Search, Ctrl+A, Clean up, Collapse all, Fit to screen and Download as text work on the open board only. Copy and paste work between boards.
+
 ### Importing from Milanote
 
 **File** (toolbar; on a phone under ⋯) opens a menu:
 
-- **Download backup:** the whole board (every card, position, size, colour and setting) as a file named like "BusyAnts - Home - 2026-10-05.json".
-- **Download as text:** the board as readable Markdown: its name, each column (left to right) with its cards, then the loose cards top to bottom; to-do items as "- [ ]" / "- [x]", sub-items indented.
-- **Restore from backup…:** pick a backup file; after a confirmation it replaces the board. The board as it was is saved in Version history first, and Ctrl+Z brings it back. A file that isn't a BusyAnts backup changes nothing and says so. The restored board is brought into view.
+- **Download backup:** every board (every card, position, size, colour and setting) in one file, named like "BusyAnts - Home - 2026-10-05.json" ("All boards" in place of the name when there are several).
+- **Download as text:** the open board as readable Markdown (a board card is written as "Board: its name"): its name, each column (left to right) with its cards, then the loose cards top to bottom; to-do items as "- [ ]" / "- [x]", sub-items indented.
+- **Restore from backup…:** pick a backup file; after a confirmation it replaces the board. A backup of one board, with one board here, replaces the open board: the board as it was is saved in Version history first, and Ctrl+Z brings it back. A backup of several boards (or any backup while there are several boards here) replaces every board, after asking "Replace all your boards…?": every board is saved in Version history first, and undo starts over. A backup made before there were several boards replaces the open board. A file that isn't a BusyAnts backup changes nothing and says so. The restored board is brought into view.
 - **Import from Milanote…:** pick a Milanote board exported as Markdown (.md). Its cards are added to the current board; nothing already there is changed or replaced.
 
 On an iPhone with BusyAnts on the home screen, the downloads open the Share sheet (Save to Files) instead.
@@ -186,7 +197,7 @@ Every block action works on one block or on a whole selection, and every change 
 ## Sign-in, sync and offline (published site)
 
 - The published site shows only a "Sign in with Google" screen until someone signs in; sign-in is remembered on each device. It is open to everyone: any Google account (with a verified address) can sign in and gets its own private board, synced across that person's devices, which no one else can see. Under the button: "Your board is saved online with your Google account so it opens on all your devices. Only you can see it." The online rules only accept the fields the app saves, and a board (or a saved version) of at most 900,000 characters; a refused save shows the usual "Couldn't save online" banner. An account the rules turn away anyway is told "This Google account can't open a board" and offered Sign out.
-- The board is stored in Firebase (project `note-board-a672a`) as one document per user, holding the same data as the browser save. Firestore security rules (`firestore.rules`, pasted into the Firebase console by the owner) allow only the owner's account to read or write it.
+- Every board is stored in Firebase (project `note-board-a672a`) in one document per user, holding the same data as the browser save (so the 900,000-character limit is for all of a person's boards together). Which board is open isn't synced. A single board sent by an older version of the app (still open somewhere) only replaces the home board; the other boards are kept. Firestore security rules (`firestore.rules`, pasted into the Firebase console by the owner) allow only the owner's account to read or write it.
 - First sign-in: the online board wins; if there is none, this device's board is uploaded. After that, changes reach other devices within a second or two, and the most recent change wins. A change from another device clears undo history and waits for any drag in progress to finish. A change made on this device that hasn't been uploaded yet, or a drop made after the other device saved, counts as more recent: it is kept and sent, and the other device's version is dropped. If the online board can't be read (damaged, or saved by a newer version of the app), it is never shown or overwritten: the page shows "Your board couldn't be loaded" and stops syncing until reloaded. If an upload is refused (for example the board is too big for Firebase), a small red note at the bottom says "Couldn't save online. Changes are on this device only." The next change tries again; the note goes once an upload succeeds, and until then changes from other devices are not applied. Changes are also uploaded straight away when the window is hidden or minimised, not only when it is closed.
 - Works offline: once visited online, the page opens without internet; edits are kept on the device and uploaded when the connection returns. A small grey note left of the bottom-right controls says "Saving…" while a change waits to upload, "Saved" once it is online, and "Offline. Will save when you’re back online" without a connection (the red banner shows instead when a save fails). A new version of the site replaces its offline copy, so new icons and files reach returning visitors.
 - Installable as an app: in Edge or Chrome the site can be installed (address-bar Install button), giving BusyAnts its own window without an address bar, a Start menu and taskbar icon (a simple chibi ant silhouette on warm yellow), and the same sign-in, sync and offline behaviour. It updates itself whenever the site does.
@@ -235,20 +246,20 @@ Build in this order, each step tested and working before the next.
 
 After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, white cards with 16 column colours and Auto-colour, Clean up with the Completed card, Delete joining checklist items, Tab on several items, collapse returning pushed blocks, and the published site with sign-in, sync, offline use and installing as an app.
 
-**Not in version 1:** more than one board, sharing, real-time collaboration, image cards, connector lines, nested boards.
+**Not in version 1:** sharing, real-time collaboration, image cards, connector lines. (Several boards and boards inside boards were added on 5 Oct 2026.)
 
 **Decisions (1 Oct 2026)**
 
 - The Delete key asks for confirmation when the selection includes a column.
-- Version 1 supports one board only.
+- Version 1 supports one board only (changed on 5 Oct 2026: several boards, and boards inside boards).
 
 Later decisions, with dates and reasons, are listed under "Decisions" in `CLAUDE.md`.
 
 ## Phone layout
 
 - Windows under 600px wide (phones) use a phone layout; tablets and wider windows keep the desktop layout. Touch screens of any size follow the touch rules for checklist items above.
-- The top bar shows only the board name. A bar along the bottom holds Undo, Redo, a large + and ⋯.
-- + opens a menu: Note, To-do list, Link, Column. Choosing one adds it (as the desktop buttons do) and closes the menu.
+- The top bar shows the Boards button (icon), the path back up when inside another board, and the board name. A bar along the bottom holds Undo, Redo, a large + and ⋯.
+- + opens a menu: Note, To-do list, Link, Column, Board (Add a board here). Choosing one adds it (as the desktop buttons do) and closes the menu.
 - ⋯ opens a panel above the bar with every other toolbar control: Hand / Select, text size A− / A+, Snap to grid, Colour (its swatches open inside the panel), Auto-colour, Collapse all, Same width, Clean up, Import, Dark mode and, on the published site, Sign out. Tapping outside it closes it.
 - The zoom control and the ? button are not shown on a phone (two fingers pinch to zoom; there is no keyboard). The "Saving…" / "Saved" note sits just above the bottom bar.
 - While typing in a checklist item on a phone, a row of buttons sits just above the on-screen keyboard: Outdent, Indent, Move up, Move down, Tick and Delete (the same as Shift+Tab, Tab, Ctrl+Shift+Up / Down, the tick box and the trash). Pressing them keeps the cursor in the item, so the keyboard stays up. The row goes once nothing is being typed in.
@@ -259,11 +270,11 @@ Later decisions, with dates and reasons, are listed under "Decisions" in `CLAUDE
 ## Version history
 
 - Like Google Docs, earlier versions of the board are kept and can be looked at and restored. On a computer it opens from a clock button beside ? (bottom right); on a phone from ⋯ → Version history.
-- A version is saved automatically: when editing starts again after 10 minutes without an edit, the board as it was just before is saved (and during a long stretch of editing, once an hour). Undo and redo count as edits; blocks re-arranging themselves don't. A version that couldn't be saved (offline, say) is tried again a minute later. The board on screen is always the "Current version". Changes arriving from another device don't save a version there (that device saves its own). A version the same as the newest one isn't saved again. The newest 100 versions are kept online; a board kept on one device only (no sign-in) keeps 20, since each is a whole copy of the board and device storage is small.
+- A version holds every board. A version is saved automatically: when editing starts again after 10 minutes without an edit on any board, every board as it was just before is saved (and during a long stretch of editing, once an hour). Undo and redo count as edits; blocks re-arranging themselves don't. A version that couldn't be saved (offline, say) is tried again a minute later. The board on screen is always the "Current version". Changes arriving from another device don't save a version there (that device saves its own). A version the same as the newest one isn't saved again. The newest 100 versions are kept online; a board kept on one device only (no sign-in) keeps 20, since each is a whole copy of the board and device storage is small.
 - On the published site, versions are kept online with the board (shared by every device the owner signs in on); otherwise, on the device.
-- The list shows "Current version", then earlier versions grouped by day (Today, Yesterday, then the date), newest first, each with its time and what was on the board (e.g. "12 cards · 3 columns").
-- Picking a version shows it on the board, read-only: the board can be moved around and zoomed, but nothing can be changed. A bar shows when it was saved, with Back to current and Restore this version. Escape goes back to the current board, then closes the history. On a computer the list stays at the right; on a phone it fills the screen and steps aside while a version is shown (Back to current brings the list back).
-- Restoring first saves the current board as a version (so nothing is lost), then puts the chosen version back as one change: Ctrl+Z (or Undo) brings back the board from before the restore.
+- The list shows "Current version", then earlier versions grouped by day (Today, Yesterday, then the date), newest first, each with its time and what was on the boards (e.g. "12 cards · 3 columns", or "2 boards · 12 cards · 3 columns").
+- Picking a version shows the open board as it was then (empty if it didn't exist yet), read-only: the board can be moved around and zoomed, but nothing can be changed. A bar shows when it was saved, with Back to current and Restore this version. Escape goes back to the current board, then closes the history. On a computer the list stays at the right; on a phone it fills the screen and steps aside while a version is shown (Back to current brings the list back).
+- Restoring first saves every board as a version (so nothing is lost), then puts the open board back as it was in the chosen version, as one change: Ctrl+Z (or Undo) brings back the board from before the restore. Boards deleted since that version come back too (they stand alone in the Boards menu); other boards are left as they are.
 
 ## Search
 

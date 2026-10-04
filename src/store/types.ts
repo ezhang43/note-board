@@ -136,9 +136,21 @@ export interface Ui {
   find: { query: string; current: Match | null } | null;
 }
 
+/**
+ * Every board (owner request: several boards): which is home, which is open on this device, and
+ * the boards not open now. The open board itself is `AppState.board`.
+ */
+export interface Boards {
+  home: string;
+  open: string;
+  others: Record<string, Board>;
+}
+
 export interface AppState {
-  /** Board data: saved straight away after every change, and undoable. */
+  /** The open board's data: saved straight away after every change, and undoable. */
   board: Board;
+  /** The other boards, and which board is open (saved with the open board, undo is per board). */
+  boards: Boards;
   /** Pan / zoom / tool: pan and zoom are saved shortly after they stop changing. */
   view: View;
   ui: Ui;

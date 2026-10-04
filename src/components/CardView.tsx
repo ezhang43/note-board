@@ -5,7 +5,7 @@ import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards'
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { dayLabel } from '../model/completed';
 import { swatchFor } from '../model/theme';
-import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
+import type { BoardCard, Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
@@ -18,17 +18,20 @@ import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBl
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
-const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed' } as const;
+const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed', board: 'Board' } as const;
 
 /** What a screen reader calls a card: its kind, and its title where it has one. */
-function cardName(card: Card): string {
+function cardName(card: Card, boardName: string): string {
   if (card.kind === 'todo' || card.kind === 'link') return `${KIND_LABEL[card.kind]}: ${card.title || 'Untitled'}`;
+  if (card.kind === 'board') return `Board: ${boardName.trim() || 'Untitled board'}`;
   return KIND_LABEL[card.kind];
 }
 
 /** A note, to-do list or link card, either loose on the board or inside a column. */
 export const CardView = memo(function CardView({ id, inColumn }: { id: string; inColumn: boolean }) {
   const card = useAppState((s) => s.board.cards[id]);
+  // A board card is named after the board it opens.
+  const boardName = useAppState((s) => (card?.kind === 'board' ? (s.boards.open === card.boardId ? s.board.name : (s.boards.others[card.boardId]?.name ?? '')) : ''));
   const selected = useAppState((s) => s.ui.selection.includes(id));
   const theme = useAppState((s) => s.view.theme);
   const drag = useAppState((s) => (s.ui.drag?.id === id ? s.ui.drag : null));
@@ -62,7 +65,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     sizeMatch && 'size-match',
     card.collapsed && 'collapsed',
     // Notes have no title: a coloured note gets the band across its header instead.
-    (card.kind !== 'note' || band) && 'titled',
+    ((card.kind !== 'note' && card.kind !== 'board') || band) && 'titled',
     // Search: the current match is out of sight inside this card, so the card is marked.
     findTarget && 'find-target',
   ];
@@ -72,14 +75,14 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       ref={ref}
       data-card-id={id}
       data-kind={card.kind}
-      aria-label={cardName(card)}
+      aria-label={cardName(card, boardName)}
       className={classes.filter(Boolean).join(' ')}
       style={style}
       onPointerDown={blockPointerDown('card', id)}
       onPointerDownCapture={blockHoldPointerDown('card', id)}
     >
       <div className="card-header">
-        <span className="card-meta">{card.collapsed ? collapsedPreview(card) : ''}</span>
+        <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
         <button
           type="button"
           className="icon-button"
@@ -132,7 +135,38 @@ function CardBody({ card }: { card: Card }) {
       return <LinkBody card={card} />;
     case 'completed':
       return <CompletedBody card={card} />;
+    case 'board':
+      return <BoardBody card={card} />;
   }
+}
+
+/** The name of board `boardId`, kept up to date (on the board itself it is renamed). */
+function BoardCardName({ boardId }: { boardId: string }) {
+  const name = useAppState((s) => (s.boards.open === boardId ? s.board.name : (s.boards.others[boardId]?.name ?? '')));
+  return <>{name.trim() || 'Untitled board'}</>;
+}
+
+/**
+ * A board card (owner request: boards inside boards): the board's name, how many cards are on it,
+ * and Open board. Double-clicking the card opens it too. A deleted board's card says so.
+ */
+function BoardBody({ card }: { card: BoardCard }) {
+  const count = useAppState((s) => {
+    const b = s.boards.open === card.boardId ? s.board : s.boards.others[card.boardId];
+    return b ? Object.keys(b.cards).length : -1;
+  });
+  const open = () => count >= 0 && appStore.openBoard(card.boardId);
+  return (
+    <div className="board-body" onDoubleClick={open}>
+      <span className="board-card-name">
+        <BoardCardName boardId={card.boardId} />
+      </span>
+      <span className="board-card-count">{count < 0 ? 'This board was deleted' : `${count} card${count === 1 ? '' : 's'}`}</span>
+      <button type="button" className="tb-button board-open" aria-disabled={count < 0 ? true : undefined} onClick={open}>
+        Open board
+      </button>
+    </div>
+  );
 }
 
 /** The master Completed card: items moved here by Clean up, grouped by day, newest first. */

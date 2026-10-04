@@ -1,10 +1,10 @@
 import type { StorageLike } from '../model/persist';
-import { readBoard, serializeBoard } from '../model/persist';
-import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, contentHash, needsVersion, summarize, versionsToDrop, type VersionMeta } from '../model/versions';
+import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
+import { readWorkspace, serializeWorkspace } from '../model/workspace';
 import type { Store } from './store';
 
-// Version history (owner request, like Google Docs). When editing starts after a quiet spell, the
-// board as it was just before is saved as a version; the live board is always the current version.
+// Version history (owner request, like Google Docs). When editing starts after a quiet spell, every
+// board as it was just before is saved as a version; the live boards are always the current version.
 // Versions live online on the published site (shared by phone and computer), on this device otherwise.
 
 /** Where versions are kept: Firestore on the published site, this device's storage otherwise. */
@@ -20,6 +20,18 @@ export interface VersionStore {
 }
 
 const LIST_KEY = 'note-board:versions:v1';
+/**
+ * How long a delete or a backup restore waits for its safety version to be saved. Offline, an
+ * online save only answers once back online: the version is still saved then, but the action
+ * goes ahead now.
+ */
+export const VERSION_SAVE_WAIT_MS = 3000;
+
+/** Saves every board as a version, waiting at most VERSION_SAVE_WAIT_MS; never fails. */
+function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number) {
+  const saving = saveVersion(versions, serializeWorkspace(store.workspace()), now()).catch(() => null);
+  return Promise.race([saving, new Promise((done) => setTimeout(done, VERSION_SAVE_WAIT_MS))]);
+}
 const dataKey = (id: string) => `note-board:version:${id}`;
 
 /** Versions kept in this device's storage (local-only use and tests). */
@@ -63,9 +75,9 @@ async function saveVersion(versions: VersionStore, data: string, savedAt: number
   const hash = contentHash(data);
   // Versions saved before fingerprints existed are compared the slow way, by downloading them.
   if (newest && (newest.hash ? newest.hash === hash : (await versions.get(newest.id)) === data)) return null;
-  const board = readBoard(data);
-  if (!board) return null;
-  const meta: VersionMeta = { id: newId(), savedAt, ...summarize(board), hash };
+  const got = readWorkspace(data);
+  if (!got) return null;
+  const meta: VersionMeta = { id: newId(), savedAt, ...summarizeWorkspace(got.ws), hash };
   await versions.save(meta, data);
   for (const id of versionsToDrop([meta, ...known], versions.keep ?? KEEP_VERSIONS)) await versions.remove(id);
   return meta;
@@ -79,7 +91,7 @@ async function saveVersion(versions: VersionStore, data: string, savedAt: number
 export function startVersions(store: Store, versions: VersionStore, opts: { now?: () => number } = {}) {
   const now = opts.now ?? Date.now;
   current = versions;
-  let lastBoard = store.getState().board;
+  let lastWs = store.workspace();
   let seenOutside = store.outsideChanges();
   let seenEdits = store.edits();
   let lastSavedAt: number | null | undefined; // undefined until the list has been read
@@ -95,10 +107,10 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
   );
 
   const unsubscribe = store.subscribe(() => {
-    const board = store.getState().board;
-    if (board === lastBoard) return;
-    const before = lastBoard;
-    lastBoard = board;
+    const ws = store.workspace();
+    if (ws === lastWs) return;
+    const before = lastWs;
+    lastWs = ws;
     if (store.outsideChanges() !== seenOutside) {
       seenOutside = store.outsideChanges();
       return;
@@ -120,7 +132,7 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       if (latest !== null && (lastSavedAt === null || latest > lastSavedAt)) lastSavedAt = latest;
       if (!owed && !needsVersion(lastSavedAt, previousEdit, at)) return;
       // The board from before the edits began: kept for a retry if this save fails.
-      const data = owed?.data ?? serializeBoard(before);
+      const data = owed?.data ?? serializeWorkspace(before);
       const savedBefore = lastSavedAt;
       lastSavedAt = at; // so edits made meanwhile don't start saves of their own
       try {
@@ -142,25 +154,40 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
 }
 
 /**
- * Put version `id` back as the board. The board as it is now is saved as a version first, so
- * restoring never loses anything (and Ctrl+Z undoes the restore).
+ * Put version `id` back: the open board as it was then, and any board deleted since. Every board
+ * as it is now is saved as a version first, so restoring never loses anything (and Ctrl+Z undoes
+ * the restore of the open board).
  */
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
   const data = await versions.get(id);
-  const board = data && readBoard(data);
-  if (!board) throw new Error('That version could not be read.');
-  await saveVersion(versions, serializeBoard(store.getState().board), now());
-  store.restoreBoard(board);
+  const got = data ? readWorkspace(data) : null;
+  if (!got) throw new Error('That version could not be read.');
+  await saveVersion(versions, serializeWorkspace(store.workspace()), now());
+  // A version from before there were several boards is of the home board: home opens to take it.
+  const { home } = store.getState().boards;
+  if (got.legacy) store.openBoard(home);
+  store.restoreVersion(got.legacy ? { home, boards: { [home]: Object.values(got.ws.boards)[0] } } : got.ws);
 }
 
 /**
- * Put a backup file's board in place of this one (owner request). The board as it is now is saved
+ * Put a backup file in place (owner request): a single board's backup replaces the open board; a
+ * backup of every board replaces every board. The board as it is now is saved
  * as a version first (when version history is on), as for restoring a version, so it is never
  * lost even after undo history is gone. Returns false, changing nothing, if `text` isn't a backup.
  */
 export async function restoreFromBackup(store: Store, versions: VersionStore | null, text: string, now: () => number = Date.now) {
   if (!store.isBackup(text)) return false;
   // Saving the version may fail (offline): the restore still goes ahead, and Ctrl+Z still undoes it.
-  if (versions) await saveVersion(versions, serializeBoard(store.getState().board), now()).catch(() => null);
+  if (versions) await saveSafetyVersion(store, versions, now);
   return store.restoreBackup(text);
+}
+
+/**
+ * Delete a board (owner request: several boards). Every board as it is now is saved as a version
+ * first (when version history is on), so the deleted board can be brought back from there.
+ */
+export async function deleteBoardSafely(store: Store, versions: VersionStore | null, id: string, now: () => number = Date.now) {
+  // Saving the version may fail or wait (offline): the board is deleted anyway, as the person asked.
+  if (versions) await saveSafetyVersion(store, versions, now);
+  store.deleteBoard(id);
 }

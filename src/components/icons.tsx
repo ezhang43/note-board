@@ -231,3 +231,13 @@ export function SearchIcon() {
     </svg>
   );
 }
+
+/** Boards: two stacked boards (owner request: several boards). */
+export function BoardsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
+      <rect x="1.5" y="4.5" width="10" height="9" rx="1.5" />
+      <path d="M4.5 2.5h8.5a1.5 1.5 0 0 1 1.5 1.5v7" />
+    </svg>
+  );
+}

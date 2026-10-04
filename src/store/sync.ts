@@ -1,8 +1,7 @@
-import { readBoard, serializeBoard } from '../model/persist';
-import type { Board } from '../model/types';
+import { HOME_ID, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import type { Store } from './store';
 
-/** The online copy of the board: the saved board JSON and which open page last wrote it. */
+/** The online copy of every board: the saved boards' JSON and which open page last wrote it. */
 export interface RemoteDoc {
   data: string;
   client: string;
@@ -56,8 +55,20 @@ export function startSync(
    */
   let lastSynced: string | null = null;
   /** An online version that arrived mid-drag: applied once the drag is over. */
-  let waiting: Board | null = null;
-  let lastBoard = store.getState().board;
+  let waiting: Workspace | null = null;
+  let lastBoards = store.workspace().boards;
+  /**
+   * Whether any board changed since last time (opening another board changes none: which board is
+   * open isn't synced).
+   */
+  const boardsChanged = () => {
+    const boards = store.workspace().boards;
+    if (boards === lastBoards) return false;
+    const ids = Object.keys(boards);
+    const same = ids.length === Object.keys(lastBoards).length && ids.every((id) => boards[id] === lastBoards[id]);
+    lastBoards = boards;
+    return !same;
+  };
   let timer: ReturnType<typeof setTimeout> | null = null;
   /**
    * The last upload was refused: this device's board is newer than the online copy until a later
@@ -74,7 +85,7 @@ export function startSync(
     if (timer) clearTimeout(timer);
     timer = null;
     if (stopped) return;
-    const data = serializeBoard(store.getState().board);
+    const data = serializeWorkspace(store.workspace());
     if (data === lastSynced) {
       if (!failed) opts.onSaveState?.('saved');
       return;
@@ -97,25 +108,33 @@ export function startSync(
   }
 
   const unsubscribe = store.subscribe(() => {
-    const board = store.getState().board;
+    const changed = boardsChanged();
     if (waiting && !busy()) {
-      const remoteBoard = waiting;
+      const remoteWs = waiting;
       waiting = null;
       // The drag ended with a drop: that is newer than the waiting version, so it wins and is uploaded.
-      if (board === lastBoard) return store.replaceBoard(remoteBoard);
+      if (!changed) return store.replaceWorkspace(remoteWs);
     }
-    if (board === lastBoard) return;
-    lastBoard = board;
+    if (!changed) return;
     if (!ready || stopped) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(upload, SYNC_DELAY);
     if (!failed) opts.onSaveState?.('saving');
   });
 
-  /** Reads an online version; if it can't be read, stops syncing and reports it. */
+  /**
+   * Reads an online version; if it can't be read, stops syncing and reports it. A single board
+   * saved by an older version of the app only stands for the home board: the other boards are kept,
+   * except on first load, when the online copy wins outright (boards left on this device may be
+   * another account's).
+   */
   function read(data: string) {
-    const board = readBoard(data);
-    if (board) return board;
+    const got = readWorkspace(data);
+    if (got && (!got.legacy || !ready)) return got.ws;
+    if (got) {
+      const ws = store.workspace();
+      return { home: ws.home, boards: { ...ws.boards, [ws.home]: got.ws.boards[HOME_ID] } };
+    }
     stopped = true;
     waiting = null;
     if (timer) clearTimeout(timer);
@@ -132,24 +151,24 @@ export function startSync(
         upload();
         return opts.onReady();
       }
-      const board = read(doc.data);
-      if (!board) return;
+      const ws = read(doc.data);
+      if (!ws) return;
       ready = true;
-      lastSynced = serializeBoard(board);
-      store.replaceBoard(board);
+      lastSynced = serializeWorkspace(ws);
+      store.replaceWorkspace(ws);
       return opts.onReady();
     }
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.
     if (!doc || doc.client === opts.client || failed) return;
-    const board = read(doc.data);
-    if (!board) return;
-    const data = serializeBoard(board);
+    const ws = read(doc.data);
+    if (!ws) return;
+    const data = serializeWorkspace(ws);
     if (data === lastSynced) return;
     // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
-    if (timer && serializeBoard(store.getState().board) !== lastSynced) return upload();
+    if (timer && serializeWorkspace(store.workspace()) !== lastSynced) return upload();
     lastSynced = data;
-    if (busy()) waiting = board;
-    else store.replaceBoard(board);
+    if (busy()) waiting = ws;
+    else store.replaceWorkspace(ws);
   }, opts.onError);
 
   return {

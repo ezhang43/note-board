@@ -18,7 +18,7 @@ const sample = readFileSync(new URL('../../e2e/fixtures/milanote-sample.md', imp
 describe('parseMilanote', () => {
   it('reads the sample export into cards in reading order', () => {
     const cards = parse(sample);
-    expect(cards.map((c) => [c.kind, c.kind === 'note' ? c.text.split('\n')[0] : c.kind === 'completed' ? '' : c.title])).toEqual([
+    expect(cards.map((c) => [c.kind, c.kind === 'note' ? c.text.split('\n')[0] : c.kind === 'completed' || c.kind === 'board' ? '' : c.title])).toEqual([
       ['todo', 'Follow Up'],
       ['todo', 'Groceries'],
       ['todo', 'Weekend'],

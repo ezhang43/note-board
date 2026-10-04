@@ -74,10 +74,11 @@ function parseGroups(v: unknown): CompletedGroup[] {
 function parseCard(id: string, c: unknown): Card | null {
   if (!isObject(c)) return null;
   const kind = c.kind;
-  if (kind !== 'note' && kind !== 'todo' && kind !== 'link' && kind !== 'completed') return null;
+  if (kind !== 'note' && kind !== 'todo' && kind !== 'link' && kind !== 'completed' && kind !== 'board') return null;
+  if (kind === 'board' && typeof c.boardId !== 'string') return null;
   const base = {
     id,
-    color: isColorKey(c.color) ? c.color : kind === 'completed' ? 'stone' : DEFAULT_COLOR[kind],
+    color: isColorKey(c.color) ? c.color : kind === 'completed' || kind === 'board' ? 'stone' : DEFAULT_COLOR[kind],
     collapsed: bool(c.collapsed, false),
     x: num(c.x, 0),
     y: num(c.y, 0),
@@ -90,6 +91,7 @@ function parseCard(id: string, c: unknown): Card | null {
   if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
   if (kind === 'completed') return { ...base, kind, groups: parseGroups(c.groups) };
+  if (kind === 'board') return { ...base, kind, boardId: c.boardId as string };
   const items = parseItems(c.items);
   return {
     ...base,
@@ -170,14 +172,19 @@ function parseBlocks(b: Obj): Pick<Board, 'cards' | 'columns' | 'order'> {
  * version of the app). Within a readable board, anything damaged falls back to its default.
  */
 export function readBoard(raw: string | null): Board | null {
-  const fresh = createBoard();
   const data = parseJson(raw);
   if (!isObject(data) || !isObject(data.board)) return null;
-  const b = data.board;
+  return readBoardData(data.version, data.board);
+}
+
+/** One saved board (`b`, as saved under `version`), or null when that version can't be read. */
+export function readBoardData(version: unknown, b: unknown): Board | null {
+  const fresh = createBoard();
+  if (!isObject(b)) return null;
   const basics = { name: str(b.name, fresh.name), snap: bool(b.snap, fresh.snap) };
   // Version 1 (step 1) only had the name and snap setting.
-  if (data.version === 1) return { ...fresh, ...basics };
-  if (data.version !== BOARD_VERSION) return null;
+  if (version === 1) return { ...fresh, ...basics };
+  if (version !== BOARD_VERSION) return null;
   return { ...basics, ...parseBlocks(b) };
 }
 

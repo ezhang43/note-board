@@ -1,5 +1,9 @@
 # Changelog
 
+## Phone and tablet: press and hold to move a card (2026-10-04)
+
+- On a touch screen, press and hold anywhere on a card for about half a second, then move your finger to drag it. Before, only a thin strip at the top of a card could be dragged, so cards seemed stuck (columns were fine).
+
 ## Phone and tablet, part 4: easier to tap, and the keyboard never hides what you type (2026-10-04)
 
 - On a touch screen, the small buttons on cards (collapse, ×, an item's grip and trash, the resize corner) are easier to hit: a press just outside them still counts.

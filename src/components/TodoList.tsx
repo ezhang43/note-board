@@ -192,6 +192,7 @@ function rowPointerDown(cardId: string, itemId: string) {
 
     let selecting = false;
     const onMove = (ev: { clientX: number; clientY: number }) => {
+      if (appStore.getState().ui.drag) return; // a long press turned this into dragging the card
       const over = rowUnder(ev.clientX, ev.clientY, cardId);
       // Into another card of the same column: the selection carries on across the cards (owner request).
       const elsewhere = over ? null : rowAt(ev.clientX, ev.clientY);

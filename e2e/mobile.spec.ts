@@ -15,6 +15,17 @@ async function fingerDrag(page: Page, from: { x: number; y: number }, to: { x: n
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
+/** Press and hold one finger, then drag (real touch events). */
+async function holdAndDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, holdMs = 700) {
+  const cdp = await page.context().newCDPSession(page);
+  const at = (p: { x: number; y: number }) => [{ x: p.x, y: p.y, id: 1 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from) });
+  await page.waitForTimeout(holdMs);
+  for (let i = 1; i <= 12; i++)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at({ x: from.x + ((to.x - from.x) * i) / 12, y: from.y + ((to.y - from.y) * i) / 12 }) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
 test.describe('on a touch screen', () => {
   test.use({ hasTouch: true, isMobile: true });
 
@@ -197,5 +208,41 @@ test.describe('on a phone-sized screen', () => {
     await expect.poll(async () => Math.round((await items.boundingBox())!.y + (await items.boundingBox())!.height)).toBe(800 - 420);
     await expect.poll(async () => (await field.boundingBox())!.y + (await field.boundingBox())!.height).toBeLessThanOrEqual((await items.boundingBox())!.y);
     expect((await field.boundingBox())!.y).toBeGreaterThan(52); // and not up under the top bar
+  });
+
+  test('press and hold anywhere on a card, even on its text, then move to drag it', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.keyboard.type('Groceries');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Milk');
+    await page.mouse.click(200, 70); // done typing
+    const card = page.locator('[data-card-id]').first();
+    const before = (await card.boundingBox())!;
+    // On the list title...
+    const title = (await card.getByLabel('List title').boundingBox())!;
+    await holdAndDrag(page, { x: title.x + 20, y: title.y + title.height / 2 }, { x: title.x + 20, y: title.y + title.height / 2 + 160 });
+    await expect.poll(async () => (await card.boundingBox())!.y).toBeGreaterThan(before.y + 120);
+    // ...and on an item's text.
+    const mid = (await card.boundingBox())!;
+    const item = (await card.getByLabel('Item text').first().boundingBox())!;
+    await holdAndDrag(page, { x: item.x + 10, y: item.y + item.height / 2 }, { x: item.x + 10, y: item.y + item.height / 2 - 160 });
+    await expect.poll(async () => (await card.boundingBox())!.y).toBeLessThan(mid.y - 120);
+    expect(await card.getByLabel('Item text').first().inputValue()).toBe('Milk');
+  });
+
+  test('a quick swipe over a card (no hold) does not move it', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Note' }).tap();
+    await page.keyboard.type('Hello');
+    await page.mouse.click(200, 70);
+    const card = page.locator('[data-card-id]').first();
+    const before = (await card.boundingBox())!;
+    const text = (await card.getByRole('textbox').first().boundingBox())!;
+    await holdAndDrag(page, { x: text.x + 10, y: text.y + 10 }, { x: text.x + 10, y: text.y + 170 }, 50);
+    await page.waitForTimeout(300);
+    expect((await card.boundingBox())!.y).toBeCloseTo(before.y, 0);
   });
 });

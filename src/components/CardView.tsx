@@ -12,7 +12,7 @@ import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
-import { blockPointerDown, useDragPosition } from './useBlockDrag';
+import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -71,6 +71,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       className={classes.filter(Boolean).join(' ')}
       style={style}
       onPointerDown={blockPointerDown('card', id)}
+      onPointerDownCapture={blockHoldPointerDown('card', id)}
     >
       <div className="card-header">
         <span className="card-meta">{card.collapsed ? collapsedPreview(card) : ''}</span>

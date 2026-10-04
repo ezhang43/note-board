@@ -81,3 +81,15 @@ test('a collapsed loose card shows its title in the middle', async ({ page }) =>
   const textMid = (range.left + range.right) / 2;
   expect(Math.abs(textMid - (c.x + c.width / 2))).toBeLessThan(4);
 });
+
+test('collapsed loose cards are as tall as a collapsed column (owner request)', async ({ page }) => {
+  await add(page, 'To-do list');
+  await add(page, 'Note');
+  await add(page, 'New column');
+  const col = columns(page).first();
+  await col.getByRole('button', { name: 'Collapse column' }).click();
+  for (const card of await looseCards(page).all()) await card.getByRole('button', { name: 'Collapse card' }).click();
+  await expect(page.locator('.card.loose.collapsed')).toHaveCount(2);
+  const colH = (await box(col)).height;
+  for (const card of await looseCards(page).all()) expect((await box(card)).height).toBeCloseTo(colH, 0);
+});

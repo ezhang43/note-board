@@ -532,8 +532,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .card.in-column { width: auto; margin: 0 16px 10px; }
 .card.collapsed { padding-bottom: 0; }
-/* A collapsed card made taller keeps its header in the middle. */
-.card.loose.collapsed { justify-content: center; }
+/* A collapsed loose card is as tall as a collapsed column (owner request); made taller, it keeps its header in the middle. */
+.card.loose.collapsed { justify-content: center; min-height: 60px; }
 
 .card.selected, .column.selected { outline: 2px solid var(--accent); }
 .card.selected { outline-offset: 2px; }

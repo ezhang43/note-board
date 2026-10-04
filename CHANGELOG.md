@@ -1,5 +1,9 @@
 # Changelog
 
+## Collapsed cards as tall as collapsed columns (2026-10-04)
+
+- A collapsed loose card (to-do list, note, link, Completed) is now the same height as a collapsed column, so a row of collapsed blocks lines up. A collapsed card you made taller or shorter by hand keeps that height.
+
 ## Phone and tablet: press and hold to move a card (2026-10-04)
 
 - On a touch screen, press and hold anywhere on a card for about half a second, then move your finger to drag it. Before, only a thin strip at the top of a card could be dragged, so cards seemed stuck (columns were fine).

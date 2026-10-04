@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard } from './board';
 import { createCard, createColumn } from './cards';
-import { KEEP_VERSIONS, VERSION_GAP_MS, dayLabel, describeVersion, groupByDay, needsVersion, summarize, versionsToDrop, type VersionMeta } from './versions';
+import { KEEP_VERSIONS, LONG_SESSION_MS, VERSION_GAP_MS, contentHash, dayLabel, describeVersion, groupByDay, needsVersion, summarize, versionsToDrop, type VersionMeta } from './versions';
 
 // Version history (owner request, like Google Docs): the board as it was is saved now and then.
 
@@ -9,14 +9,34 @@ const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m -
 const meta = (id: string, savedAt: number): VersionMeta => ({ id, savedAt, cards: 1, columns: 0 });
 
 describe('when a version is saved', () => {
+  const t0 = at(2026, 10, 4, 9, 0);
   it('the first change ever saves one', () => {
-    expect(needsVersion(null, at(2026, 10, 4))).toBe(true);
+    expect(needsVersion(null, null, t0)).toBe(true);
   });
-  it('again only after a quiet spell of 10 minutes since the last one', () => {
-    const last = at(2026, 10, 4, 9, 0);
+  it('the first change since opening the board saves one if the newest version is 10 minutes old', () => {
     expect(VERSION_GAP_MS).toBe(10 * 60 * 1000);
-    expect(needsVersion(last, last + VERSION_GAP_MS - 1)).toBe(false);
-    expect(needsVersion(last, last + VERSION_GAP_MS)).toBe(true);
+    expect(needsVersion(t0, null, t0 + VERSION_GAP_MS - 1)).toBe(false);
+    expect(needsVersion(t0, null, t0 + VERSION_GAP_MS)).toBe(true);
+  });
+  it('after that, only once editing starts again after 10 minutes away (counted from the last edit)', () => {
+    // Edited 9 minutes ago, newest version 18 minutes old: still the same stretch of editing.
+    expect(needsVersion(t0, t0 + 9 * 60_000, t0 + 18 * 60_000)).toBe(false);
+    expect(needsVersion(t0, t0 + 9 * 60_000, t0 + 19 * 60_000)).toBe(true);
+  });
+  it('a long stretch of editing still gets one every hour', () => {
+    expect(LONG_SESSION_MS).toBe(60 * 60 * 1000);
+    expect(needsVersion(t0, t0 + LONG_SESSION_MS - 60_000, t0 + LONG_SESSION_MS - 1)).toBe(false);
+    expect(needsVersion(t0, t0 + LONG_SESSION_MS - 60_000, t0 + LONG_SESSION_MS)).toBe(true);
+  });
+});
+
+describe('telling versions apart without downloading them', () => {
+  it('the same board gives the same short fingerprint; a different one, a different fingerprint', () => {
+    expect(contentHash('{"a":1}')).toBe(contentHash('{"a":1}'));
+    expect(contentHash('{"a":1}')).not.toBe(contentHash('{"a":2}'));
+    expect(contentHash('x'.repeat(100_000)).length).toBeLessThan(24);
+    // Two fingerprints made with different starting points, so a chance match is far less likely.
+    expect(contentHash('abc').split('-')).toHaveLength(3);
   });
 });
 

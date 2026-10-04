@@ -93,7 +93,7 @@ export function versionsRemote(uid: string): VersionStore {
       const snap = await getDocs(query(metas, orderBy('savedAt', 'desc')));
       return snap.docs.map((d) => {
         const v = d.data();
-        return { id: d.id, savedAt: Number(v.savedAt), cards: Number(v.cards ?? 0), columns: Number(v.columns ?? 0) };
+        return { id: d.id, savedAt: Number(v.savedAt), cards: Number(v.cards ?? 0), columns: Number(v.columns ?? 0), ...(typeof v.hash === 'string' ? { hash: v.hash } : {}) };
       });
     },
     async get(id) {
@@ -104,7 +104,7 @@ export function versionsRemote(uid: string): VersionStore {
     async save(meta, data) {
       // The board first, so a version in the list always has its board.
       await setDoc(doc(datas, meta.id), { data });
-      await setDoc(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns });
+      await setDoc(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns, ...(meta.hash ? { hash: meta.hash } : {}) });
     },
     async remove(id) {
       await deleteDoc(doc(metas, id));

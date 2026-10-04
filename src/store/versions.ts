@@ -1,6 +1,6 @@
 import type { StorageLike } from '../model/persist';
 import { readBoard, serializeBoard } from '../model/persist';
-import { needsVersion, summarize, versionsToDrop, type VersionMeta } from '../model/versions';
+import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, contentHash, needsVersion, summarize, versionsToDrop, type VersionMeta } from '../model/versions';
 import type { Store } from './store';
 
 // Version history (owner request, like Google Docs). When editing starts after a quiet spell, the
@@ -15,13 +15,15 @@ export interface VersionStore {
   get(id: string): Promise<string | null>;
   save(meta: VersionMeta, data: string): Promise<void>;
   remove(id: string): Promise<void>;
+  /** How many versions to keep (default KEEP_VERSIONS). */
+  keep?: number;
 }
 
 const LIST_KEY = 'note-board:versions:v1';
 const dataKey = (id: string) => `note-board:version:${id}`;
 
 /** Versions kept in this device's storage (local-only use and tests). */
-export function localVersionStore(storage: StorageLike & { removeItem?(key: string): void }): VersionStore {
+export function localVersionStore(storage: StorageLike & { removeItem?(key: string): void }, keep = LOCAL_KEEP_VERSIONS): VersionStore {
   const read = (): VersionMeta[] => {
     try {
       const list = JSON.parse(storage.getItem(LIST_KEY) ?? '[]');
@@ -31,6 +33,7 @@ export function localVersionStore(storage: StorageLike & { removeItem?(key: stri
     }
   };
   return {
+    keep,
     list: async () => read().sort((a, b) => b.savedAt - a.savedAt),
     get: async (id) => storage.getItem(dataKey(id)),
     async save(meta, data) {
@@ -50,15 +53,21 @@ export const activeVersionStore = () => current;
 
 const newId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-/** Save `data` as a version, unless it is the same as the newest one; then drop the oldest past the limit. */
-async function saveVersion(versions: VersionStore, data: string, savedAt: number) {
-  const [newest] = await versions.list();
-  if (newest && (await versions.get(newest.id)) === data) return null;
+/**
+ * Save `data` as a version, unless it is the same as the newest one; then drop the oldest past the
+ * limit. `list`: the versions as just read, if at hand (saves reading them again).
+ */
+async function saveVersion(versions: VersionStore, data: string, savedAt: number, list?: VersionMeta[]) {
+  const known = list ?? (await versions.list());
+  const [newest] = known;
+  const hash = contentHash(data);
+  // Versions saved before fingerprints existed are compared the slow way, by downloading them.
+  if (newest && (newest.hash ? newest.hash === hash : (await versions.get(newest.id)) === data)) return null;
   const board = readBoard(data);
   if (!board) return null;
-  const meta: VersionMeta = { id: newId(), savedAt, ...summarize(board) };
+  const meta: VersionMeta = { id: newId(), savedAt, ...summarize(board), hash };
   await versions.save(meta, data);
-  for (const id of versionsToDrop(await versions.list())) await versions.remove(id);
+  for (const id of versionsToDrop([meta, ...known], versions.keep ?? KEEP_VERSIONS)) await versions.remove(id);
   return meta;
 }
 
@@ -72,7 +81,10 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
   current = versions;
   let lastBoard = store.getState().board;
   let seenOutside = store.outsideChanges();
+  let seenEdits = store.edits();
   let lastSavedAt: number | null | undefined; // undefined until the list has been read
+  let lastEditAt: number | null = null;
+  let owed: { data: string; retryAt: number } | null = null;
   let queue = versions.list().then(
     (list) => {
       lastSavedAt = list[0]?.savedAt ?? null;
@@ -91,15 +103,33 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       seenOutside = store.outsideChanges();
       return;
     }
+    // Blocks re-arranging themselves (e.g. once real heights are known) aren't an edit.
+    if (store.edits() === seenEdits) return;
+    seenEdits = store.edits();
     const at = now();
+    const previousEdit = lastEditAt;
+    lastEditAt = at;
+    // Decided here without going online, so typing doesn't read the list at every letter. A version
+    // that couldn't be saved is owed, and tried again a minute later.
+    if (owed ? at < owed.retryAt : lastSavedAt !== undefined && !needsVersion(lastSavedAt, previousEdit, at)) return;
     queue = queue.then(async () => {
       if (lastSavedAt === undefined) return;
       // Versions saved elsewhere (a restore, or another device) count too.
-      const latest = (await versions.list().catch(() => []))[0]?.savedAt ?? null;
+      const list = await versions.list().catch(() => null);
+      const latest = list?.[0]?.savedAt ?? null;
       if (latest !== null && (lastSavedAt === null || latest > lastSavedAt)) lastSavedAt = latest;
-      if (!needsVersion(lastSavedAt, at)) return;
-      lastSavedAt = at;
-      await saveVersion(versions, serializeBoard(before), at).catch(() => null);
+      if (!owed && !needsVersion(lastSavedAt, previousEdit, at)) return;
+      // The board from before the edits began: kept for a retry if this save fails.
+      const data = owed?.data ?? serializeBoard(before);
+      const savedBefore = lastSavedAt;
+      lastSavedAt = at; // so edits made meanwhile don't start saves of their own
+      try {
+        await saveVersion(versions, data, at, list ?? undefined);
+        owed = null;
+      } catch {
+        lastSavedAt = savedBefore;
+        owed = { data, retryAt: at + RETRY_MS };
+      }
     });
   });
 

@@ -10,16 +10,43 @@ export interface VersionMeta {
   savedAt: number;
   cards: number;
   columns: number;
+  /** A short fingerprint of the board (`contentHash`), so a repeat can be spotted without downloading it. */
+  hash?: string;
 }
 
-/** A new version is saved at most this often: when editing starts after a quiet spell this long. */
+/** A version is saved when editing starts again after a quiet spell this long. */
 export const VERSION_GAP_MS = 10 * 60 * 1000;
-/** How many versions are kept; older ones are dropped. */
+/** A long stretch of editing still gets a version this often. */
+export const LONG_SESSION_MS = 60 * 60 * 1000;
+/** How many versions are kept online; older ones are dropped. */
 export const KEEP_VERSIONS = 100;
+/** How many are kept on this device alone: each is a whole copy of the board, and device storage is small. */
+export const LOCAL_KEEP_VERSIONS = 20;
 
-/** Whether a change now should first save the board as it was (`lastSavedAt`: the newest version, if any). */
-export function needsVersion(lastSavedAt: number | null, now: number): boolean {
-  return lastSavedAt === null || now - lastSavedAt >= VERSION_GAP_MS;
+/**
+ * Whether a change now should first save the board as it was. `lastSavedAt`: the newest version,
+ * if any. `lastEditAt`: the previous edit made on this page (null: none since it opened).
+ */
+export function needsVersion(lastSavedAt: number | null, lastEditAt: number | null, now: number): boolean {
+  if (lastSavedAt === null) return true;
+  if (lastEditAt === null) return now - lastSavedAt >= VERSION_GAP_MS;
+  return now - lastEditAt >= VERSION_GAP_MS || now - lastSavedAt >= LONG_SESSION_MS;
+}
+
+/** A version that couldn't be saved (offline, say) is tried again this long after. */
+export const RETRY_MS = 60 * 1000;
+
+/** A short fingerprint of a saved board: two FNV-1a passes from different starting points, plus the length. */
+export function contentHash(data: string): string {
+  const pass = (seed: number) => {
+    let h = seed;
+    for (let i = 0; i < data.length; i++) {
+      h ^= data.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(36);
+  };
+  return `${pass(0x811c9dc5)}-${pass(0x050c5d1f)}-${data.length.toString(36)}`;
 }
 
 export function summarize(board: Board): { cards: number; columns: number } {

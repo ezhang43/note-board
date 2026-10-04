@@ -20,6 +20,8 @@ export const VIEW_SAVE_DELAY = 250;
 export const BOARD_SAVE_DELAY = 150;
 /** How long after a collapse the gaps below keep closing as the new heights come in (ms). */
 const CLOSING_MS = 1500;
+/** What a gesture shows while it lasts; cleared when it ends, even while an old version is shown. */
+const GESTURE_UI = new Set(['drag', 'newDrag', 'itemDrag', 'resize', 'marquee']);
 
 /** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
 export type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
@@ -114,6 +116,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let viewportSize: Size = { width: 0, height: 0 };
   let centreOnArrival = false;
   let outsideChanges = 0;
+  /** Changes made here by the person (not blocks re-arranging themselves, nor boards from elsewhere). */
+  let edits = 0;
   const heights = new Map<string, number>();
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
@@ -165,14 +169,22 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   }
 
   const commit: StoreContext['commit'] = (fn, opts = {}) => {
-    // Looking at an old version: nothing can be changed (the board shown isn't the real one).
-    if (state.ui.preview) return null;
+    // Looking at an old version: nothing can be changed (the board shown isn't the real one), but a
+    // gesture that ends still clears what it showed (a drag outline, a size label).
+    if (state.ui.preview) {
+      const ended = Object.fromEntries(Object.entries(opts.ui ?? {}).filter(([key]) => GESTURE_UI.has(key)));
+      if (Object.keys(ended).length) set({ ...state, ui: uiWith(ended) });
+      return null;
+    }
     flushPendingTick();
     const before = state.board;
     const result = fn(before);
     if (!result) return null;
     const { board, ui } = 'board' in result ? result : { board: result, ui: undefined };
-    if (board !== before) history = recordChange(history, before, opts.merge ?? null, Date.now());
+    if (board !== before) {
+      history = recordChange(history, before, opts.merge ?? null, Date.now());
+      edits++;
+    }
     set({ ...state, board, ui: uiWith({ ...opts.ui, ...ui }) });
     return board;
   };
@@ -314,6 +326,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     },
     /** How many boards have arrived from elsewhere (so a change can be told apart from one made here). */
     outsideChanges: () => outsideChanges,
+    /** How many edits were made on this page (version history tells them apart from automatic tidying). */
+    edits: () => edits,
     /** Whether a board just arrived that should be brought into view (asked once). */
     takeCentreOnArrival() {
       const wanted = centreOnArrival;
@@ -346,12 +360,16 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     undo() {
       if (state.ui.preview) return;
       flushPendingTick();
-      restore(undoStep(history, state.board));
+      const step = undoStep(history, state.board);
+      if (step && step.board !== state.board) edits++; // counted before it shows, for version history
+      restore(step);
     },
     redo() {
       if (state.ui.preview) return;
       flushPendingTick();
-      restore(redoStep(history, state.board));
+      const step = redoStep(history, state.board);
+      if (step && step.board !== state.board) edits++;
+      restore(step);
     },
   };
 

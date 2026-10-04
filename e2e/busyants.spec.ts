@@ -372,13 +372,16 @@ test('collapsing one column with its arrow pulls the block below up, leaving no 
   await clickEmpty(page);
   await add(page, 'Note');
   await page.keyboard.press('Escape');
-  const note = page.locator('.card.loose').first();
+  const noteId = await page.locator('.card.loose').first().getAttribute('data-card-id');
+  const note = page.locator(`[data-card-id="${noteId}"]`);
   const n = (await note.boundingBox())!;
   const c = (await col.boundingBox())!;
   await page.mouse.move(n.x + 30, n.y + 10);
   await page.mouse.down();
-  await page.mouse.move(c.x + 30, c.y + c.height + 30, { steps: 10 });
+  // Well below the column: within 60px of it the note would drop into the column instead.
+  await page.mouse.move(c.x + 30, c.y + c.height + 120, { steps: 10 });
   await page.mouse.up();
+  await expect(note).toHaveClass(/loose/);
   const gap = async () => (await note.boundingBox())!.y - ((await col.boundingBox())!.y + (await col.boundingBox())!.height);
   const before = await gap();
   await col.getByRole('button', { name: 'Collapse column' }).click();

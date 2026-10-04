@@ -5,9 +5,15 @@ const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height:
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  reporter: 'list',
+  // A failed or flaky test is retried once; its trace (every step, with snapshots of the page),
+  // screenshot and video are kept in test-results/ and shown in the report (npm run test:e2e:report).
+  retries: 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5173',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
     // Tests measure where blocks end up, so turn the gliding off (as "reduce motion" does);
     // the gliding itself has its own test with motion on.

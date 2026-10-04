@@ -6,6 +6,7 @@ import { clampZoom, createView } from './view';
 import type { Board, Card, Column, CompletedGroup, TodoItem, View } from './types';
 import { DEFAULT_COLOR } from './cards';
 import { isDueDate } from './due';
+import { readArrows } from './arrows';
 
 export const BOARD_KEY = 'note-board:v1';
 export const VIEW_KEY = 'note-board:view:v1';
@@ -186,7 +187,9 @@ export function readBoardData(version: unknown, b: unknown): Board | null {
   // Version 1 (step 1) only had the name and snap setting.
   if (version === 1) return { ...fresh, ...basics };
   if (version !== BOARD_VERSION) return null;
-  return { ...basics, ...parseBlocks(b) };
+  const board: Board = { ...basics, ...parseBlocks(b) };
+  const arrows = readArrows(b.arrows, board);
+  return arrows ? { ...board, arrows } : board;
 }
 
 /** Reads saved board data; anything unreadable gives a fresh board. */

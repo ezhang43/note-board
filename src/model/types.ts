@@ -131,6 +131,15 @@ export interface Board {
   columns: Record<string, Column>;
   /** Top-level blocks (columns and loose cards), back to front. */
   order: string[];
+  /** Arrows between cards and columns (owner request); left out on boards that never had one. */
+  arrows?: Arrow[];
+}
+
+/** An arrow from one card or column to another (owner request). */
+export interface Arrow {
+  id: string;
+  from: string;
+  to: string;
 }
 
 export type Tool = 'hand' | 'select';

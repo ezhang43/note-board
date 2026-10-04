@@ -1,5 +1,6 @@
 import { COLUMN_DROP_REACH } from '../model/constants';
 import { columnAt, insertIndex } from '../model/geometry';
+import type { Board, Rect } from '../model/types';
 import { screenToBoard } from '../model/view';
 import { appStore } from '../store/appStore';
 
@@ -86,4 +87,35 @@ export function revealOnBoard(el: Element) {
   }
   const r = el.getBoundingClientRect();
   appStore.panBy(Math.round(centre.x - (r.left + r.width / 2)), Math.round(centre.y - (r.top + r.height / 2)));
+}
+
+// Arrows between cards and columns (owner request): where their blocks are drawn.
+
+/** The element drawn for a block; a card hidden in a collapsed column counts as its column. */
+export function blockEl(board: Board, id: string): HTMLElement | null {
+  const el = document.querySelector<HTMLElement>(`.world [data-card-id="${CSS.escape(id)}"], .world [data-col-id="${CSS.escape(id)}"]`);
+  if (el) return el;
+  const col = Object.values(board.columns).find((c) => c.cardIds.includes(id));
+  return col ? document.querySelector<HTMLElement>(`.world [data-col-id="${CSS.escape(col.id)}"]`) : null;
+}
+
+/** Where an element is, in board pixels. */
+export function boardRect(el: Element): Rect {
+  const r = el.getBoundingClientRect();
+  const p = clientToBoard(r.left, r.top);
+  const zoom = appStore.getState().view.zoom;
+  return { x: p.x, y: p.y, w: r.width / zoom, h: r.height / zoom };
+}
+
+/** The block (card first, else column) under a screen point, other than `from` and blocks nested with it. */
+export function blockUnder(clientX: number, clientY: number, from: string): string | null {
+  for (const el of document.elementsFromPoint(clientX, clientY)) {
+    const block = el.closest<HTMLElement>('.world [data-card-id], .world [data-col-id]');
+    if (!block) continue;
+    const id = block.dataset.cardId ?? block.dataset.colId!;
+    const fromEl = document.querySelector(`.world [data-card-id="${CSS.escape(from)}"], .world [data-col-id="${CSS.escape(from)}"]`);
+    if (id === from || fromEl?.contains(block) || block.contains(fromEl)) return null;
+    return id;
+  }
+  return null;
 }

@@ -75,6 +75,12 @@ export function useShortcuts() {
         if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();
       }
 
+      // A clicked arrow (owner request: arrows): Delete / Backspace removes it.
+      if (state.ui.arrowSel && !state.ui.selection.length && (key === 'delete' || key === 'backspace')) {
+        const id = state.ui.arrowSel;
+        return run(e, () => appStore.deleteArrow(id));
+      }
+
       // Arrows move the selected blocks one grid step (Shift: five).
       const step = NUDGE[e.key];
       if (step && !mod && !state.ui.itemSel) {

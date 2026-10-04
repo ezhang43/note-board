@@ -116,6 +116,14 @@ The board holds three card types and columns that stack cards. Cards show no typ
 - Toolbar Colour recolours every selected column from 16 swatches (two rows of 8 large 32px chips, table below, each ringed in its own edge tone; if the open menu would cover the block being coloured, the board moves down so it stays in view), plus Default (back to stone-grey). The name of the swatch under the pointer (or of the current colour) shows under the swatches. For selected cards, which stay white, it colours their title band instead, in a deeper shade of the swatch (70% edge tone mixed with its background); a note, which has no title, gets the band across its header strip. Default puts a card's usual band back. It is faded with nothing selected.
 - Toolbar Auto-colour gives every column on the board a different colour in one step (undoable). Columns are taken left to right, and colours handed out in this order so neighbours differ clearly: Sky, Peach, Mint, Lavender, Butter, Teal, Rose, Lime, Periwinkle, Coral, Aqua, Orchid, Sage, Sand, Slate, Stone. Colours repeat only beyond 16 columns. Faded when there are no columns.
 
+### Arrows
+
+- An arrow joins one card or column to another (cards inside columns included), to show how they connect. It is a plain line with an arrowhead, no label.
+- To draw one, select a single card or column: a small round handle shows just off its right edge. Drag the handle onto another card or column (it gets a dashed amber outline) and let go. Letting go anywhere else draws nothing. A block can't point to itself, a column and a card inside it can't be joined, and two blocks are joined at most once.
+- The arrow runs along the line between the two blocks' middles, from edge to edge, and follows them as they move, grow, collapse or change column (a card in a collapsed column points from its column). It isn't drawn while the two blocks overlap.
+- Clicking an arrow selects it (amber, with a × in its middle); Delete, Backspace or the × removes it; Escape or clicking the board lets it go. Deleting a card or column deletes its arrows.
+- Drawing and deleting an arrow are each one undo step. Arrows are saved and synced with the board. They are not copied with copied or duplicated cards.
+
 ### Text formatting
 
 - Every text box can be formatted as a whole: card titles (to-do lists and links), note text, checklist items and column titles. Not a link's address, nor the board name. Formatting always covers the whole box, never single words.

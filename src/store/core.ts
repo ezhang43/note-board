@@ -115,6 +115,7 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   colourMenuOpen: false,
   preview: null,
   dueFor: null,
+  arrowSel: null,
 };
 
 /** The boards as one object, in a fixed order (so saving the same boards gives the same text). */

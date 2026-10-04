@@ -1,4 +1,5 @@
 import type { StorageLike } from '../model/persist';
+import { arrowActions } from './actions/arrows';
 import { blockActions } from './actions/blocks';
 import { boardActions } from './actions/boards';
 import { checklistActions } from './actions/checklist';
@@ -32,5 +33,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...gestureActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),
+    ...arrowActions(ctx),
   };
 }

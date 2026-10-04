@@ -1,5 +1,10 @@
 # Changelog
 
+## Arrows between cards (2026-10-05)
+
+- Select a card or column and drag the small round handle on its right edge onto another card or column to draw an arrow between them. The arrow follows the cards as you move them.
+- Click an arrow to select it, then press Delete (or click its ×) to remove it. Ctrl+Z undoes either.
+
 ## Due dates (2026-10-05)
 
 - Point at a checklist item and click the new calendar button to give it a due date: Today, Tomorrow, Next week or any day. A small chip under the item shows when it is due, amber for today and red when overdue. Click the chip to change or remove the date.

@@ -91,7 +91,7 @@ export function DuePicker() {
   }, [gone]);
 
   if (!dueFor || current === undefined) return null;
-  const row = document.querySelector(`[data-item-id="${dueFor.itemId}"]`);
+  const row = document.querySelector(`[data-item-id="${CSS.escape(dueFor.itemId)}"]`);
   const r = (row?.querySelector('[data-due-anchor]') ?? row)?.getBoundingClientRect();
   const left = r ? Math.max(8, Math.min(window.innerWidth - 228, r.right - 220)) : 16;
   const top = r ? Math.max(8, Math.min(window.innerHeight - 230, r.bottom + 6)) : 80;
@@ -167,7 +167,7 @@ export function DuePanel() {
     let frames = 3;
     const step = () => {
       if (--frames > 0) return void requestAnimationFrame(step);
-      const el = document.querySelector(`[data-card-id="${cardId}"] [data-item-id="${itemId}"]`) ?? document.querySelector(`[data-card-id="${cardId}"]`);
+      const el = document.querySelector(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id="${CSS.escape(itemId)}"]`) ?? document.querySelector(`[data-card-id="${CSS.escape(cardId)}"]`);
       if (el) revealOnBoard(el);
     };
     requestAnimationFrame(step);

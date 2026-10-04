@@ -138,6 +138,8 @@ export interface Ui {
   dueFor: { cardId: string; itemId: string } | null;
   /** The Due panel (what is due today or overdue, on every board) is open. */
   dueOpen: boolean;
+  /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
+  arrowSel: string | null;
 }
 
 /**
@@ -183,4 +185,5 @@ export const emptyUi: Ui = {
   find: null,
   dueFor: null,
   dueOpen: false,
+  arrowSel: null,
 };

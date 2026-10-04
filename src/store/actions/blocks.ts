@@ -163,7 +163,7 @@ export function blockActions(ctx: StoreContext) {
     /** Ctrl+A: every column and loose card. */
     selectAll: () => updateUi({ selection: [...ctx.state.board.order], itemSel: null }),
     /** Click on empty board or Escape: clear the selection and close menus. */
-    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null }),
+    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, arrowSel: null }),
     toggleColourMenu() {
       if (!ctx.state.ui.selection.length) return;
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });

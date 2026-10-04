@@ -40,8 +40,20 @@ export function Canvas() {
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
+    // The browser scrolls the board area by itself to keep a text cursor in view near its edge.
+    // That would shift everything drawn on it away from the pointer (owner bug report: the
+    // selection box sat above the pointer), so turn it into a pan of the board instead.
+    const unscroll = () => {
+      const { scrollLeft: x, scrollTop: y } = el;
+      if (!x && !y) return;
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+      appStore.panBy(-x, -y);
+    };
+    el.addEventListener('scroll', unscroll);
     return () => {
       ro.disconnect();
+      el.removeEventListener('scroll', unscroll);
       setCanvasElement(null);
     };
   }, []);

@@ -1,5 +1,13 @@
 # Changelog
 
+## Fix: selection box away from the pointer (2026-10-05)
+
+- With the Select tool, the selection box could start well above the pointer. Typing near the bottom of the screen made the browser scroll the board area by itself, which shifted everything drawn on it. That scroll now becomes an ordinary move of the board, so you still see what you type and the box starts right at the pointer.
+
+## Better test debugging (2026-10-05)
+
+- A browser test that fails is tried once more, and its step-by-step trace, screenshot and video are kept. `npm run test:e2e:report` opens the report; `npm run test:e2e:ui` opens Playwright's window to run and watch tests one at a time.
+
 ## Search the board (2026-10-04)
 
 - Press Ctrl+F (or the magnifier by ? in the corner, or ⋯ → Search on a phone) and type: every match is marked in yellow, and the board moves to the first one, marked in orange. Enter goes to the next, Shift+Enter to the previous. A match inside a collapsed card or column rings that card instead. Escape closes the search.

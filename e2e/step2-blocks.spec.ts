@@ -18,6 +18,8 @@ test.afterEach(async ({ page }) => {
 const cards = (page: Page) => page.locator('[data-card-id]');
 const looseCards = (page: Page) => page.locator('.card.loose');
 const columns = (page: Page) => page.locator('[data-col-id]');
+/** A loose block's position on the board (not on screen), from its style. */
+const boardPos = (l: Locator) => l.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
 const add = (page: Page, name: 'Note' | 'To-do list' | 'Link' | 'New column') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
 
@@ -340,7 +342,8 @@ test('everything is kept after reload', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Note');
   await looseCards(page).first().getByLabel('Note text').fill('Loose thought');
-  const noteBox = await box(looseCards(page).first());
+  const notePos = await boardPos(looseCards(page).first());
+  const noteSize = await box(looseCards(page).first());
 
   await page.reload();
 
@@ -349,5 +352,8 @@ test('everything is kept after reload', async ({ page }) => {
   const note = looseCards(page).first();
   await expect(note.getByLabel('Note text')).toHaveValue('Loose thought');
   await expect(columns(page).first()).toHaveCSS('background-color', 'rgb(252, 231, 236)');
-  expect(await box(note)).toEqual(noteBox);
+  // Same spot on the board and same size (the screen opens centred on the board, so not the same screen spot).
+  expect(await boardPos(note)).toEqual(notePos);
+  const size = await box(note);
+  expect([size.width, size.height]).toEqual([noteSize.width, noteSize.height]);
 });

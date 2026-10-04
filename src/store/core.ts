@@ -112,6 +112,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let viewTimer: ReturnType<typeof setTimeout> | null = null;
   let boardTimer: ReturnType<typeof setTimeout> | null = null;
   let viewportSize: Size = { width: 0, height: 0 };
+  let centreOnArrival = false;
   const heights = new Map<string, number>();
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
@@ -308,6 +309,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       flushBoard();
       flushView();
     },
+    /** Whether a board just arrived that should be brought into view (asked once). */
+    takeCentreOnArrival() {
+      const wanted = centreOnArrival;
+      centreOnArrival = false;
+      return wanted;
+    },
     setViewportSize(size: Size) {
       viewportSize = size;
     },
@@ -323,6 +330,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
      * so undo history starts over rather than undoing into the old board.
      */
     replaceBoard(board: Board) {
+      // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.
+      if (!state.board.order.length && board.order.length) centreOnArrival = true;
       history = emptyHistory;
       restore({ history, board }, false);
     },

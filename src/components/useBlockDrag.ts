@@ -4,6 +4,7 @@ import { DRAG_THRESHOLD } from '../model/constants';
 import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex } from './canvasDom';
 import { followEdges } from './edgeFollow';
+import { holdOrPan } from './touchHold';
 
 const INTERACTIVE = 'input, textarea, button, a, select, label';
 
@@ -26,58 +27,31 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     // Pressing blank card space: no text selection, and leave any text box being edited.
     e.preventDefault();
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    if (additive) return;
+    // By finger the board moves instead, unless the finger rests first (blockHoldPointerDown).
+    if (additive || e.pointerType === 'touch') return;
 
     trackDrag(kind, id, e.currentTarget, { x: e.clientX, y: e.clientY });
   };
 }
 
-/** How long a finger has to rest on a card before it can be dragged (owner request). */
-const HOLD_MS = 450;
-
 /**
- * Touch screens: a card is mostly text boxes, so pressing and holding anywhere on it (text
- * included) for a moment, then moving, drags it. A quick tap still types; moving before the
- * hold is up leaves the press to whatever is under the finger. Grip, tick boxes and buttons
- * keep their own meaning. Used as a capture handler so checklist rows can't swallow the press.
+ * Touch screens: one finger moving straight away moves the board around; resting it on a card or
+ * column for a moment, then moving, drags it (owner requests). Works on text too, since a card is
+ * mostly text boxes; a quick tap still types. Grip, tick boxes and buttons keep their own meaning.
+ * A capture handler, so checklist rows can't swallow the press; a column leaves presses on its
+ * cards to them.
  */
 export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
   return (e: React.PointerEvent<HTMLElement>) => {
     if (e.pointerType !== 'touch' || e.button !== 0) return;
     const target = e.target as Element;
-    if (target.closest('button, .tick, input[type="checkbox"], a') || !target.closest(INTERACTIVE)) return;
+    if (target.closest('button, .tick, input[type="checkbox"], a')) return;
+    if (kind === 'column' && target.closest('[data-card-id]')) return;
     const el = e.currentTarget;
-    const start = { x: e.clientX, y: e.clientY };
-    let at = start;
-    // No copy / paste menu from the long press, until just after the finger lifts.
-    const noMenu = (ev: Event) => ev.preventDefault();
-    const allowMenu = () => setTimeout(() => window.removeEventListener('contextmenu', noMenu, true), 300);
-    window.addEventListener('contextmenu', noMenu, true);
-
-    const onMove = (ev: PointerEvent) => {
-      at = { x: ev.clientX, y: ev.clientY };
-      if (Math.hypot(at.x - start.x, at.y - start.y) >= DRAG_THRESHOLD) cancel();
-    };
-    const listen = (on: boolean) => {
-      for (const [type, fn] of [['pointermove', onMove], ['pointerup', cancel], ['pointercancel', cancel]] as const) {
-        if (on) window.addEventListener(type, fn);
-        else window.removeEventListener(type, fn);
-      }
-    };
-    const timer = setTimeout(() => {
-      listen(false);
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      window.getSelection()?.removeAllRanges();
-      navigator.vibrate?.(10);
+    holdOrPan(e.nativeEvent, (start, at, done) => {
       appStore.select(id);
-      trackDrag(kind, id, el, start, { at, done: allowMenu });
-    }, HOLD_MS);
-    function cancel() {
-      clearTimeout(timer);
-      listen(false);
-      allowMenu();
-    }
-    listen(true);
+      trackDrag(kind, id, el, start, { at, done });
+    });
   };
 }
 

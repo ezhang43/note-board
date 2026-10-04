@@ -3,7 +3,7 @@ import { createCard, createColumn } from '../../model/cards';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../../model/clipboard';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/completed';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
-import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock } from '../../model/layout';
+import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
 import { addImported, estimateHeight, packInLanes, parseMilanote } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
@@ -11,7 +11,7 @@ import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
 import type { CardKind, Point, Tool, View } from '../../model/types';
 import { pinchView } from '../../model/pinch';
-import { centreOf, panBy, resetZoom, screenToBoard, zoomBy } from '../../model/view';
+import { centreOf, panBy, resetZoom, screenToBoard, viewShowing, zoomBy } from '../../model/view';
 import type { StoreContext } from '../core';
 
 // Board, view, selection and block actions: adding, importing, editing, collapsing, deleting,
@@ -89,6 +89,8 @@ export function blockActions(ctx: StoreContext) {
       }),
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(ctx.viewportSize()), factor)),
     resetZoom: () => updateView((v) => resetZoom(v, ctx.viewportSize())),
+    /** Opening the board (owner request): bring every card and column into view, centred. */
+    showWholeBoard: () => updateView((v) => viewShowing(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),
 
     // ---------- selection and menus ----------
     /** Select just this block. (Selected checklist items stay selected if they are in it.) */

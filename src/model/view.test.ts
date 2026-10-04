@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_ZOOM, MIN_ZOOM } from './constants';
-import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelZoomFactor, zoomBy, zoomLabel, zoomTo } from './view';
+import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, zoomTo } from './view';
 
 describe('pan', () => {
   it('moves the board by the drag distance', () => {
@@ -77,5 +77,44 @@ describe('grid', () => {
       expect(g.offsetY + g.size / 2).toBeCloseTo(v.panY);
       expect(g.size).toBeCloseTo(20 * v.zoom);
     }
+  });
+});
+
+describe('viewShowing (the view on opening the board, owner request)', () => {
+  const size = { width: 1000, height: 800 };
+  const at = (v: ReturnType<typeof createView>, p: { x: number; y: number }) => ({ x: p.x * v.zoom + v.panX, y: p.y * v.zoom + v.panY });
+
+  it('leaves an empty board as it is', () => {
+    const v = { ...createView(), panX: 123, panY: -45 };
+    expect(viewShowing([], size, v)).toBe(v);
+  });
+
+  it('centres the blocks when they fit, keeping the zoom', () => {
+    const v = { ...createView(), panX: -5000, panY: 3000 };
+    const out = viewShowing([{ x: 2000, y: 1000, w: 200, h: 100 }, { x: 2400, y: 1300, w: 200, h: 100 }], size, v);
+    expect(out.zoom).toBe(1);
+    const mid = at(out, { x: 2300, y: 1200 }); // middle of everything
+    expect(mid.x).toBeCloseTo(500);
+    expect(mid.y).toBeCloseTo(400);
+  });
+
+  it('zooms out just enough to fit everything, never zooming in past the remembered zoom', () => {
+    const wide = [{ x: 0, y: 0, w: 1600, h: 200 }];
+    const out = viewShowing(wide, size, createView());
+    expect(out.zoom).toBeLessThan(1);
+    expect(at(out, { x: 0, y: 0 }).x).toBeGreaterThanOrEqual(0);
+    expect(at(out, { x: 1600, y: 0 }).x).toBeLessThanOrEqual(1000);
+    expect(viewShowing([{ x: 0, y: 0, w: 100, h: 100 }], size, { ...createView(), zoom: 0.8 }).zoom).toBe(0.8);
+  });
+
+  it('never zooms out below 50%; a board still too big shows its top-left corner', () => {
+    const huge = [{ x: 100, y: 200, w: 5000, h: 4000 }];
+    const out = viewShowing(huge, size, createView());
+    expect(out.zoom).toBe(0.5);
+    const tl = at(out, { x: 100, y: 200 });
+    expect(tl.x).toBeGreaterThan(0);
+    expect(tl.x).toBeLessThan(100);
+    expect(tl.y).toBeGreaterThan(0);
+    expect(tl.y).toBeLessThan(100);
   });
 });

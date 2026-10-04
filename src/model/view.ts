@@ -1,5 +1,5 @@
 import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_ZOOM_SPEED } from './constants';
-import type { Point, Size, View } from './types';
+import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
   return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', fontSize: 'normal' };
@@ -43,6 +43,30 @@ export function centreOf(size: Size): Point {
 /** Back to 100%, keeping whatever is in the middle of the screen in the middle. */
 export function resetZoom(view: View, size: Size): View {
   return zoomTo(view, centreOf(size), 1);
+}
+
+/** Space kept around the blocks when the board opens, in screen pixels. */
+const OPEN_MARGIN = 40;
+/** The board never opens zoomed out further than this, so card text stays readable. */
+const OPEN_MIN_ZOOM = 0.5;
+
+/**
+ * The view to open the board with (owner request): the blocks in `rects` in view. Keeps the
+ * remembered zoom when they fit at it, else zooms out just enough (not below 50%). Each direction
+ * that fits is centred; one that still doesn't fit shows the start (top / left) of the board.
+ */
+export function viewShowing(rects: Rect[], size: Size, view: View): View {
+  if (!rects.length) return view;
+  const left = Math.min(...rects.map((r) => r.x));
+  const top = Math.min(...rects.map((r) => r.y));
+  const w = Math.max(...rects.map((r) => r.x + r.w)) - left;
+  const h = Math.max(...rects.map((r) => r.y + r.h)) - top;
+  const roomW = Math.max(1, size.width - 2 * OPEN_MARGIN);
+  const roomH = Math.max(1, size.height - 2 * OPEN_MARGIN);
+  const zoom = clampZoom(Math.min(view.zoom, Math.max(OPEN_MIN_ZOOM, Math.min(roomW / w, roomH / h))));
+  const place = (start: number, length: number, screen: number, room: number) =>
+    length * zoom <= room ? (screen - length * zoom) / 2 - start * zoom : OPEN_MARGIN - start * zoom;
+  return { ...view, zoom, panX: Math.round(place(left, w, size.width, roomW)), panY: Math.round(place(top, h, size.height, roomH)) };
 }
 
 /** Zoom factor for one wheel / pinch event. Scrolling up (negative deltaY) zooms in. */

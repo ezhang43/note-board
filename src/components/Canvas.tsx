@@ -46,6 +46,19 @@ export function Canvas() {
     };
   }, []);
 
+  // Opening the board shows what's on it, centred (owner request): once when the page loads, and
+  // again if the online copy arrives on an empty screen. Waits two frames so real heights are known.
+  useEffect(() => {
+    if (!order.length) return;
+    let frame = requestAnimationFrame(() => (frame = requestAnimationFrame(() => appStore.showWholeBoard())));
+    return () => cancelAnimationFrame(frame);
+  }, []); // only on opening
+  useEffect(() => {
+    if (!appStore.takeCentreOnArrival()) return;
+    let frame = requestAnimationFrame(() => (frame = requestAnimationFrame(() => appStore.showWholeBoard())));
+    return () => cancelAnimationFrame(frame);
+  }, [order]);
+
   // Scroll / swipe pans; Ctrl+scroll / pinch zooms at the cursor. Listens on the window
   // (not passive) so Ctrl+scroll never zooms the whole browser page instead.
   useEffect(() => {

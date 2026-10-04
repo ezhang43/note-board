@@ -232,17 +232,60 @@ test.describe('on a phone-sized screen', () => {
     expect(await card.getByLabel('Item text').first().inputValue()).toBe('Milk');
   });
 
-  test('a quick swipe over a card (no hold) does not move it', async ({ page }) => {
+  test('a quick swipe over a card, a column or a resize corner moves the board, not the block (owner request)', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
     await page.getByRole('menuitem', { name: 'Note' }).tap();
     await page.keyboard.type('Hello');
     await page.mouse.click(200, 70);
     const card = page.locator('[data-card-id]').first();
-    const before = (await card.boundingBox())!;
+    const pos = () => card.evaluate((el) => ({ x: (el as HTMLElement).style.left, y: (el as HTMLElement).style.top, w: el.getBoundingClientRect().width }));
+    const before = await pos();
+    const canvas = page.getByTestId('canvas');
+    const pan = async () => Number(await canvas.getAttribute('data-pan-y'));
+    // On its text.
+    let p0 = await pan();
     const text = (await card.getByRole('textbox').first().boundingBox())!;
-    await holdAndDrag(page, { x: text.x + 10, y: text.y + 10 }, { x: text.x + 10, y: text.y + 170 }, 50);
-    await page.waitForTimeout(300);
-    expect((await card.boundingBox())!.y).toBeCloseTo(before.y, 0);
+    await holdAndDrag(page, { x: text.x + 10, y: text.y + 10 }, { x: text.x + 10, y: text.y + 130 }, 50);
+    await expect.poll(pan).toBeGreaterThan(p0 + 80);
+    expect(await pos()).toEqual(before);
+    // On its resize corner.
+    p0 = await pan();
+    const corner = (await card.getByRole('button', { name: 'Resize card' }).boundingBox())!;
+    await holdAndDrag(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9 - 60, y: corner.y + 9 - 100 }, 50);
+    await expect.poll(pan).toBeLessThan(p0 - 60);
+    expect(await pos()).toEqual(before);
+  });
+
+  test('holding a resize corner for a moment, then moving, resizes the card', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Note' }).tap();
+    await page.mouse.click(200, 70);
+    const card = page.locator('[data-card-id]').first();
+    const w0 = (await card.boundingBox())!.width;
+    const corner = (await card.getByRole('button', { name: 'Resize card' }).boundingBox())!;
+    const pan0 = await page.getByTestId('canvas').getAttribute('data-pan-x');
+    await holdAndDrag(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9 + 60, y: corner.y + 9 + 80 });
+    await expect.poll(async () => (await card.boundingBox())!.width).toBeGreaterThan(w0 + 30);
+    expect(await page.getByTestId('canvas').getAttribute('data-pan-x')).toBe(pan0);
+  });
+
+  test('a column moves by a quick swipe (the board moves) or by holding first (the column moves)', async ({ page }) => {
+    const bar = page.getByRole('toolbar', { name: 'Board actions' });
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Column' }).tap();
+    await page.mouse.click(200, 70);
+    const col = page.locator('[data-col-id]').first();
+    const left = () => col.evaluate((el) => (el as HTMLElement).style.left + ',' + (el as HTMLElement).style.top);
+    const before = await left();
+    const b = (await col.boundingBox())!;
+    const grab = { x: b.x + 12, y: b.y + 26 }; // header, beside the title
+    await holdAndDrag(page, grab, { x: grab.x, y: grab.y + 150 }, 50);
+    expect(await left()).toBe(before);
+    const b2 = (await col.boundingBox())!;
+    const grab2 = { x: b2.x + 12, y: b2.y + 26 };
+    await holdAndDrag(page, grab2, { x: grab2.x, y: grab2.y + 150 });
+    await expect.poll(left).not.toBe(before);
   });
 });

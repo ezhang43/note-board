@@ -189,6 +189,8 @@ function rowPointerDown(cardId: string, itemId: string) {
       return;
     }
     appStore.clearItemSelection();
+    // By finger, moving moves the board instead (owner request), so no range selection.
+    if (e.pointerType === 'touch') return;
 
     let selecting = false;
     const onMove = (ev: { clientX: number; clientY: number }) => {

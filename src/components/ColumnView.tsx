@@ -7,7 +7,7 @@ import { useTakeFocus } from './useTakeFocus';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
-import { blockPointerDown, useDragPosition } from './useBlockDrag';
+import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -68,6 +68,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       className={classes.filter(Boolean).join(' ')}
       style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
+      onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
       {/* Title and count centred; collapse arrow and × on the right. */}
       <div className="column-header">

@@ -4,6 +4,7 @@ import { GRID } from '../model/constants';
 import { resizeTo } from '../model/sizing';
 import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, otherBlockSizes } from './canvasDom';
+import { holdOrPan } from './touchHold';
 
 /**
  * Pointer handling for a resize handle. `axes` is 'both' for a corner handle (width and
@@ -14,39 +15,46 @@ export function resizePointerDown(kind: 'card' | 'column', id: string, axes: 'bo
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
-    appStore.select(id);
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-
     const block = e.currentTarget.closest<HTMLElement>('[data-card-id], [data-col-id]')!;
-    // offsetWidth / offsetHeight are in board pixels (they ignore the zoom).
-    const w0 = block.offsetWidth;
-    const h0 = block.offsetHeight;
-    const start = clientToBoard(e.clientX, e.clientY);
-    const candidates = otherBlockSizes(block);
-    const snap = appStore.getState().board.snap;
-    let moved = false;
-
-    const onMove = (ev: PointerEvent) => {
-      moved = true;
-      const p = clientToBoard(ev.clientX, ev.clientY);
-      const raw = { w: w0 + p.x - start.x, h: axes === 'both' ? h0 + p.y - start.y : null };
-      const at = clientToCanvas(ev.clientX, ev.clientY);
-      appStore.showResize({ kind, id, ...resizeTo(kind, raw, candidates, snap, minH), labelAt: { x: at.x + 16, y: at.y + 16 } });
-    };
-
-    const finish = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      if (!moved) return;
-      if (ev.type === 'pointercancel') appStore.cancelResize();
-      else appStore.commitResize();
-    };
-
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', finish);
-    window.addEventListener('pointercancel', finish);
+    // By finger, moving straight away moves the board; resting a moment first resizes (owner request).
+    if (e.pointerType === 'touch') return holdOrPan(e.nativeEvent, (start) => beginResize(kind, id, axes, minH, block, start));
+    beginResize(kind, id, axes, minH, block, { x: e.clientX, y: e.clientY });
   };
+}
+
+/** Resize `block` as the pointer moves from `from` (screen point); letting go keeps the new size. */
+function beginResize(kind: 'card' | 'column', id: string, axes: 'both' | 'width', minH: number | undefined, block: HTMLElement, from: { x: number; y: number }) {
+  appStore.select(id);
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+
+  // offsetWidth / offsetHeight are in board pixels (they ignore the zoom).
+  const w0 = block.offsetWidth;
+  const h0 = block.offsetHeight;
+  const start = clientToBoard(from.x, from.y);
+  const candidates = otherBlockSizes(block);
+  const snap = appStore.getState().board.snap;
+  let moved = false;
+
+  const onMove = (ev: PointerEvent) => {
+    moved = true;
+    const p = clientToBoard(ev.clientX, ev.clientY);
+    const raw = { w: w0 + p.x - start.x, h: axes === 'both' ? h0 + p.y - start.y : null };
+    const at = clientToCanvas(ev.clientX, ev.clientY);
+    appStore.showResize({ kind, id, ...resizeTo(kind, raw, candidates, snap, minH), labelAt: { x: at.x + 16, y: at.y + 16 } });
+  };
+
+  const finish = (ev: PointerEvent) => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', finish);
+    window.removeEventListener('pointercancel', finish);
+    if (!moved) return;
+    if (ev.type === 'pointercancel') appStore.cancelResize();
+    else appStore.commitResize();
+  };
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', finish);
+  window.addEventListener('pointercancel', finish);
 }
 
 /**

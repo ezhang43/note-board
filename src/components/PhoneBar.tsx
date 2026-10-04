@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { appStore, useAppState } from '../store/appStore';
-import { MoreIcon, PlusIcon, RedoIcon, UndoIcon } from './icons';
+import { HistoryIcon, MoreIcon, PlusIcon, RedoIcon, UndoIcon } from './icons';
 import {
   AutoColourButton,
   CleanUpButton,
@@ -72,6 +72,17 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <CleanUpButton />
           <ImportButton />
           <DarkModeButton labelled />
+          <button
+            type="button"
+            className="tb-button"
+            onClick={() => {
+              setOpen(null);
+              appStore.toggleHistory();
+            }}
+          >
+            <HistoryIcon />
+            Version history
+          </button>
           {onSignOut && (
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out

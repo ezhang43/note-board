@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { appStore } from './store/appStore';
 import { flushWhenHidden } from './sync/pageHide';
+import { localVersionStore, startVersions } from './store/versions';
 import './styles.css';
 
 // Save any board change or pan/zoom still waiting when the tab is closed or hidden.
@@ -22,6 +23,8 @@ if (import.meta.env.VITE_SYNC === 'on') {
   );
   registerOfflineCache(loaded);
 } else {
+  // Local-only: version history is kept on this device.
+  startVersions(appStore, localVersionStore(localStorage));
   root.render(
     <StrictMode>
       <App />

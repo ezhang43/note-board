@@ -2,7 +2,7 @@ import { ZOOM_STEP } from '../model/constants';
 import { FONT_SIZES } from '../model/font';
 import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import { MinusIcon, PlusIcon } from './icons';
+import { HistoryIcon, MinusIcon, PlusIcon } from './icons';
 import { usePhone } from './usePhone';
 
 /**
@@ -11,6 +11,7 @@ import { usePhone } from './usePhone';
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
+  const historyOpen = useAppState((s) => s.ui.historyOpen);
   const note = saveNote && (
     <span className="save-note" role="status">
       {saveNote}
@@ -22,6 +23,9 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
     <div className="corner-controls">
       {note}
       <TextSizeButtons />
+      <button type="button" className="help-button" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
+        <HistoryIcon />
+      </button>
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?
       </button>

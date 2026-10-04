@@ -113,6 +113,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let boardTimer: ReturnType<typeof setTimeout> | null = null;
   let viewportSize: Size = { width: 0, height: 0 };
   let centreOnArrival = false;
+  let outsideChanges = 0;
   const heights = new Map<string, number>();
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
@@ -164,6 +165,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   }
 
   const commit: StoreContext['commit'] = (fn, opts = {}) => {
+    // Looking at an old version: nothing can be changed (the board shown isn't the real one).
+    if (state.ui.preview) return null;
     flushPendingTick();
     const before = state.board;
     const result = fn(before);
@@ -309,6 +312,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       flushBoard();
       flushView();
     },
+    /** How many boards have arrived from elsewhere (so a change can be told apart from one made here). */
+    outsideChanges: () => outsideChanges,
     /** Whether a board just arrived that should be brought into view (asked once). */
     takeCentreOnArrival() {
       const wanted = centreOnArrival;
@@ -319,7 +324,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       viewportSize = size;
     },
     setMeasuredHeight(id: string, h: number) {
-      if (heights.get(id) === h) return;
+      // Heights drawn for an old version being looked at aren't the real board's.
+      if (state.ui.preview || heights.get(id) === h) return;
       heights.set(id, h);
       relayoutImport();
       // A loose block or column that grew may now cover something: move that out of its way.
@@ -332,15 +338,18 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceBoard(board: Board) {
       // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.
       if (!state.board.order.length && board.order.length) centreOnArrival = true;
+      outsideChanges++;
       history = emptyHistory;
       restore({ history, board }, false);
     },
     // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
     undo() {
+      if (state.ui.preview) return;
       flushPendingTick();
       restore(undoStep(history, state.board));
     },
     redo() {
+      if (state.ui.preview) return;
       flushPendingTick();
       restore(redoStep(history, state.board));
     },

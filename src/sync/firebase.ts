@@ -1,8 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
+  collection,
+  deleteDoc,
   doc,
+  getDoc,
+  getDocs,
   initializeFirestore,
+  orderBy,
+  query,
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -10,6 +16,7 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import type { Remote } from '../store/sync';
+import type { VersionStore } from '../store/versions';
 
 // Not secret: these only say which Firebase project to talk to. The rules in
 // firestore.rules decide who may read or write the board.
@@ -69,6 +76,39 @@ export function boardRemote(uid: string): Remote {
       // Offline, this is queued and resolves once sent; it rejects if Firestore refuses it
       // (too big, or not allowed by the rules).
       return setDoc(ref, { data, client, updatedAt: serverTimestamp() });
+    },
+  };
+}
+
+/**
+ * Version history online (owner request), shared by every device: boards/{uid}/versions/{id}
+ * holds what the list shows, boards/{uid}/versionData/{id} the board itself, so the list loads
+ * quickly. Needs the rules in firestore.rules (they cover everything under boards/{uid}).
+ */
+export function versionsRemote(uid: string): VersionStore {
+  const metas = collection(db, 'boards', uid, 'versions');
+  const datas = collection(db, 'boards', uid, 'versionData');
+  return {
+    async list() {
+      const snap = await getDocs(query(metas, orderBy('savedAt', 'desc')));
+      return snap.docs.map((d) => {
+        const v = d.data();
+        return { id: d.id, savedAt: Number(v.savedAt), cards: Number(v.cards ?? 0), columns: Number(v.columns ?? 0) };
+      });
+    },
+    async get(id) {
+      const snap = await getDoc(doc(datas, id));
+      const data = snap.exists() ? snap.data().data : null;
+      return typeof data === 'string' ? data : null;
+    },
+    async save(meta, data) {
+      // The board first, so a version in the list always has its board.
+      await setDoc(doc(datas, meta.id), { data });
+      await setDoc(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns });
+    },
+    async remove(id) {
+      await deleteDoc(doc(metas, id));
+      await deleteDoc(doc(datas, id));
     },
   };
 }

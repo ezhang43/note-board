@@ -27,7 +27,23 @@ if (typeof document !== 'undefined') {
   appStore.subscribe(showTheme);
 }
 
+/**
+ * The state as the screen shows it: while an old version is being looked at (version history),
+ * its board stands in for the real one, which is left untouched.
+ */
+let shownFor: AppState | null = null;
+let shown: AppState | null = null;
+function shownState(): AppState {
+  const s = appStore.getState();
+  if (!s.ui.preview) return s;
+  if (shownFor !== s) {
+    shownFor = s;
+    shown = { ...s, board: s.ui.preview.board };
+  }
+  return shown!;
+}
+
 /** Read part of the app state in a component; re-renders when that part changes. */
 export function useAppState<T>(select: (s: AppState) => T): T {
-  return useSyncExternalStore(appStore.subscribe, () => select(appStore.getState()));
+  return useSyncExternalStore(appStore.subscribe, () => select(shownState()));
 }

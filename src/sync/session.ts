@@ -1,6 +1,7 @@
 import { appStore } from '../store/appStore';
 import { startSync, type SaveState } from '../store/sync';
-import { boardRemote, signInWithGoogle, signOutUser, watchUser } from './firebase';
+import { startVersions } from '../store/versions';
+import { boardRemote, signInWithGoogle, signOutUser, versionsRemote, watchUser } from './firebase';
 import { flushWhenHidden } from './pageHide';
 
 /**
@@ -17,6 +18,7 @@ let saveState: SaveState = 'saved';
 let online = typeof navigator === 'undefined' ? true : navigator.onLine;
 const listeners = new Set<() => void>();
 let sync: ReturnType<typeof startSync> | null = null;
+let versions: ReturnType<typeof startVersions> | null = null;
 /** Identifies this open page, so it can ignore its own uploads when they come back. */
 const client = crypto.randomUUID();
 
@@ -29,6 +31,8 @@ function update(next: SessionStatus, error = '') {
 watchUser((user) => {
   sync?.stop();
   sync = null;
+  versions?.stop();
+  versions = null;
   if (!user) {
     update('signed-out');
     return;
@@ -36,7 +40,11 @@ watchUser((user) => {
   update('loading');
   sync = startSync(appStore, boardRemote(user.uid), {
     client,
-    onReady: () => update('ready'),
+    onReady: () => {
+      // Version history starts once the online board is in, so its arrival isn't taken for an edit.
+      versions = startVersions(appStore, versionsRemote(user.uid));
+      update('ready');
+    },
     onSaveState: (state) => {
       saveState = state;
       listeners.forEach((l) => l());

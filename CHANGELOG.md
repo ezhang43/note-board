@@ -1,5 +1,10 @@
 # Changelog
 
+## Version history, like Google Docs (2026-10-04)
+
+- BusyAnts now keeps earlier versions of your board. Open it from the clock button by ? (bottom right), or from ⋯ on a phone. Pick a version to see it, then Restore it or go Back to current. Restoring keeps your current board as a version too, and Undo takes a restore back.
+- A version is saved by itself whenever you start editing after 10 minutes away; the newest 100 are kept. On the website they are saved with your board online, so your phone and computer share the same history.
+
 ## The board opens centred on your cards; on a phone, swiping moves around (2026-10-04)
 
 - Opening BusyAnts (computer or phone) now shows all your cards and columns in the middle of the screen, zooming out a little if they don't fit (never below 50%).

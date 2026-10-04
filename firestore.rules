@@ -4,7 +4,8 @@ rules_version = '2';
 // Only the board owner's Google account can read or write, and only their own board.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /boards/{uid} {
+    // The board, and everything under it (version history: versions/ and versionData/).
+    match /boards/{uid}/{document=**} {
       allow read, write: if request.auth != null
         && request.auth.uid == uid
         && request.auth.token.email == "ezhang43@gmail.com"

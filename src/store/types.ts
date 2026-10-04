@@ -1,3 +1,4 @@
+import type { VersionMeta } from '../model/versions';
 import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
 import type { ListSelection } from '../model/multiSelect';
@@ -123,6 +124,13 @@ export interface Ui {
   marquee: Rect | null;
   canUndo: boolean;
   canRedo: boolean;
+  /** The version history panel is open (owner request). */
+  historyOpen: boolean;
+  /**
+   * An old version being looked at: the board shows it instead of the real one, which stays as it
+   * is (and keeps syncing). Nothing can be changed meanwhile.
+   */
+  preview: { meta: VersionMeta; board: Board } | null;
 }
 
 export interface AppState {
@@ -151,4 +159,6 @@ export const emptyUi: Ui = {
   marquee: null,
   canUndo: false,
   canRedo: false,
+  historyOpen: false,
+  preview: null,
 };

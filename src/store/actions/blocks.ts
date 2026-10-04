@@ -9,7 +9,8 @@ import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
-import type { CardKind, Point, Tool, View } from '../../model/types';
+import type { Board, CardKind, Point, Tool, View } from '../../model/types';
+import type { VersionMeta } from '../../model/versions';
 import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, viewShowing, zoomBy } from '../../model/view';
 import type { StoreContext } from '../core';
@@ -89,6 +90,16 @@ export function blockActions(ctx: StoreContext) {
       }),
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(ctx.viewportSize()), factor)),
     resetZoom: () => updateView((v) => resetZoom(v, ctx.viewportSize())),
+    // ---------- version history (owner request) ----------
+    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
+    /** Show an old version on the board, read-only (the real board is untouched). */
+    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null }),
+    endPreview: () => updateUi({ preview: null }),
+    /** Put an old version back as the board: one change, so Ctrl+Z brings the board before it back. */
+    restoreBoard(board: Board) {
+      updateUi({ preview: null });
+      commit(() => board, { ui: { historyOpen: false, selection: [], itemSel: null } });
+    },
     /** Opening the board (owner request): bring every card and column into view, centred. */
     showWholeBoard: () => updateView((v) => viewShowing(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),
 

@@ -998,6 +998,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .sign-in-title { margin: 0; font-size: 20px; font-weight: 600; }
 .sign-in-text { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.sign-in-note { margin: 4px 0 0; max-width: 300px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
 .sign-in-error { margin: 0; font-size: 13px; color: var(--danger); }
 .tb-button.sign-in-button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 

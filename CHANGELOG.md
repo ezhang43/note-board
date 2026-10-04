@@ -1,5 +1,10 @@
 # Changelog
 
+## Open to everyone (2026-10-05)
+
+- Anyone with a Google account can now sign in and gets their own private board; no one else can see it. The sign-in screen says so.
+- Each board (and each saved version) is capped at 900,000 characters, far bigger than a real board, so no one can fill up the storage. (This takes effect once the new rules in `firestore.rules` are pasted into the Firebase console.)
+
 ## Uncheck all, Fit to screen, and links in notes (2026-10-05)
 
 - **Uncheck all** next to a list's "Completed" heading unticks everything, so you can reuse a list like groceries.

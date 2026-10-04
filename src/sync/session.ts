@@ -7,7 +7,7 @@ import { flushWhenHidden } from './pageHide';
 /**
  * checking: finding out whether someone is signed in on this device.
  * loading: signed in, waiting for the board.
- * no-access: signed in with an account that isn't invited (firestore.rules).
+ * no-access: signed in with an account the online rules turn away (firestore.rules).
  */
 export type SessionStatus = 'checking' | 'signed-out' | 'loading' | 'ready' | 'no-access' | 'error';
 

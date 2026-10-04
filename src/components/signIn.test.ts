@@ -4,25 +4,38 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SignInScreen } from './SignInScreen';
 
-// Invite-only (owner request, 2026-10-05): each invited Google account gets its own board; others
-// are told it's invite-only.
+// Open to the public (owner request, 2026-10-05; replaces invite-only): any Google account can sign
+// in and gets its own private board. The online rules keep boards apart and cap their size.
 
 const screen = (status: 'signed-out' | 'no-access') =>
   renderToStaticMarkup(createElement(SignInScreen, { status, error: '', onSignIn: () => {}, onSignOut: () => {} }));
 
+const rules = readFileSync('firestore.rules', 'utf8');
+
 describe('who can use BusyAnts', () => {
-  it('an account that is not invited is told BusyAnts is invite-only, and what to do', () => {
-    const html = screen('no-access');
-    expect(html).toContain('invite-only');
-    expect(html).toContain('Sign out');
-    expect(html).not.toContain('owns it');
+  it('the sign-in screen says the board is private to your Google account', () => {
+    const html = screen('signed-out');
+    expect(html).toContain('Sign in with Google');
+    expect(html).toMatch(/only you can see it/i);
   });
 
-  it('the online rules let in exactly the invited accounts, each to their own board only', () => {
-    const rules = readFileSync('firestore.rules', 'utf8');
+  it('an account the rules turn away is not told it is invite-only, and can sign out', () => {
+    const html = screen('no-access');
+    expect(html).not.toContain('invite');
+    expect(html).toContain('Sign out');
+  });
+
+  it('the online rules let any verified Google account in, each to its own board only', () => {
     expect(rules).toContain('request.auth.uid == uid');
     expect(rules).toContain('email_verified == true');
-    const invited = [...rules.matchAll(/"([^"\s]+@[^"\s]+)"/g)].map((m) => m[1]).sort();
-    expect(invited).toEqual(['erikazhu95@gmail.com', 'ezhang43@gmail.com']);
+    expect(rules).not.toMatch(/@gmail\.com/);
+  });
+
+  it('the online rules cap what can be saved: a board or version under 900,000 characters, only the fields the app writes', () => {
+    expect(rules).toContain('text.size() <= 900000');
+    expect(rules.match(/boardText\(request\.resource\.data\.data\)/g)?.length).toBe(2); // the board, and a version's board
+    expect(rules).toContain("hasOnly(['data', 'client', 'updatedAt'])");
+    expect(rules).toContain("hasOnly(['data'])");
+    expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'hash'])");
   });
 });

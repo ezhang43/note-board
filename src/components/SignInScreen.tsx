@@ -7,7 +7,7 @@ interface Props {
   onSignOut: () => void;
 }
 
-/** Shown instead of the board until an invited account is signed in and its board has loaded. */
+/** Shown instead of the board until an account is signed in and its board has loaded. */
 export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
   return (
     <main className="sign-in">
@@ -20,6 +20,7 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
             <button type="button" className="tb-button sign-in-button" onClick={onSignIn}>
               Sign in with Google
             </button>
+            <p className="sign-in-note">Your board is saved online with your Google account so it opens on all your devices. Only you can see it.</p>
             {error && (
               <p className="sign-in-error" role="alert">
                 {error}
@@ -29,7 +30,7 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
         )}
         {status === 'no-access' && (
           <>
-            <p className="sign-in-text">BusyAnts is invite-only for now, and this Google account isn’t invited. Ask the person who shared it with you to add your account, or sign out and use an invited one.</p>
+            <p className="sign-in-text">This Google account can’t open a board. Sign out and sign in with another Google account.</p>
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out
             </button>

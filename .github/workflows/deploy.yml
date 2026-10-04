@@ -1,9 +1,10 @@
-# Tests, builds and publishes the board to GitHub Pages on every push to build/v1.
+# Tests, builds and publishes the board to GitHub Pages on every push to main (publishing:
+# main is moved up to build/v1 when the owner says so; work on build/v1 alone changes nothing live).
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [build/v1]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

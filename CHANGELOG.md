@@ -1,5 +1,17 @@
 # Changelog
 
+## Invite-only sign-in, and publishing only when you say so (2026-10-05)
+
+- BusyAnts can now be used by invited Google accounts, each with its own private board: for now you and erikazhu95@gmail.com. Anyone else who signs in is told it's invite-only. (This takes effect once the new rules in `firestore.rules` are pasted into the Firebase console.)
+- The live site now only changes when you say "publish". Work still lands on `build/v1` and is tested there first.
+
+## Version history: lighter and more reliable (2026-10-05)
+
+- Typing no longer checks the version list online at every letter (it could have used up the free daily allowance and stopped syncing).
+- A version is saved when you start editing after 10 minutes away (and once an hour during long stretches), not every 10 minutes regardless. Undo counts as an edit; cards re-arranging themselves doesn't.
+- If a version can't be saved (offline, say), it's tried again a minute later.
+- Dragging or resizing while looking at an old version no longer leaves its outline stuck on screen.
+
 ## Honey look, to match the app icon (2026-10-05)
 
 - The toolbar is now soft honey yellow with the BusyAnts ant at its left, the board a warm cream, and the teal highlights (selection outlines, title bands, New column, pressed buttons) are amber instead, so the app and its icon feel like one thing. Dark mode gets matching warm, darker tones. The window's title bar takes the toolbar colour too.

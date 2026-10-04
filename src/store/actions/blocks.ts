@@ -14,6 +14,7 @@ import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, viewShowing, zoomBy } from '../../model/view';
+import { readBoard } from '../../model/persist';
 import type { StoreContext } from '../core';
 
 // Board, view, selection and block actions: adding, importing, editing, collapsing, deleting,
@@ -110,6 +111,16 @@ export function blockActions(ctx: StoreContext) {
     restoreBoard(board: Board) {
       updateUi({ preview: null });
       commit(() => board, { ui: { historyOpen: false, selection: [], itemSel: null } });
+    },
+    /** Whether `text` is a BusyAnts backup (a saved board this version can read). */
+    isBackup: (text: string) => readBoard(text) !== null,
+    /** Put a backup file's board in place of this one (owner request): one change, so Ctrl+Z brings this board back. */
+    restoreBackup(text: string): boolean {
+      const board = readBoard(text);
+      if (!board) return false;
+      updateUi({ preview: null }); // an old version being looked at is put away first
+      commit(() => board, { ui: { selection: [], itemSel: null, confirm: null, historyOpen: false } });
+      return true;
     },
     /** Opening the board (owner request): bring every card and column into view, centred. */
     showWholeBoard: () => updateView((v) => viewShowing(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),

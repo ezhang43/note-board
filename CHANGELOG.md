@@ -1,5 +1,9 @@
 # Changelog
 
+## Backup: download and restore your board (2026-10-05)
+
+- A new **File** button (in place of Import) downloads your board as a backup file, or as readable text, and restores a backup. Restoring keeps the board you had in Version history, and Ctrl+Z brings it back. Import from Milanote moved into the same menu.
+
 ## Alignment guides when dragging several cards (2026-10-05)
 
 - Dragging several selected cards or columns together now lines them up with other blocks too, with the same guide lines as a single card. They line up as one group: the outer edges and middle of the space they cover together.

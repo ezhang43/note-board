@@ -152,3 +152,15 @@ export async function restoreVersion(store: Store, versions: VersionStore, id: s
   await saveVersion(versions, serializeBoard(store.getState().board), now());
   store.restoreBoard(board);
 }
+
+/**
+ * Put a backup file's board in place of this one (owner request). The board as it is now is saved
+ * as a version first (when version history is on), as for restoring a version, so it is never
+ * lost even after undo history is gone. Returns false, changing nothing, if `text` isn't a backup.
+ */
+export async function restoreFromBackup(store: Store, versions: VersionStore | null, text: string, now: () => number = Date.now) {
+  if (!store.isBackup(text)) return false;
+  // Saving the version may fail (offline): the restore still goes ahead, and Ctrl+Z still undoes it.
+  if (versions) await saveVersion(versions, serializeBoard(store.getState().board), now()).catch(() => null);
+  return store.restoreBackup(text);
+}

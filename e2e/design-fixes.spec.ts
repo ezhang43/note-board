@@ -85,7 +85,7 @@ test('Add Note / To-do list / Link are plain buttons (cards are always white); N
 
 test('the toolbar is grouped by dividers, and rarely used buttons are quiet until hovered', async ({ page }) => {
   await expect(page.locator('header.toolbar .toolbar-divider')).toHaveCount(3);
-  const importButton = toolbarButton(page, 'Import');
+  const importButton = toolbarButton(page, 'File');
   expect(await style(importButton, 'border-top-color')).toBe('rgba(0, 0, 0, 0)');
   await importButton.hover();
   expect(await style(importButton, 'border-top-color')).not.toBe('rgba(0, 0, 0, 0)');

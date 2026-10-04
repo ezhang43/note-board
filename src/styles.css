@@ -1247,3 +1247,35 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 :root[data-theme='dark'] .find-mark.current { background: rgba(255, 152, 0, 0.75); box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.75); }
 .find-marks .find-mark { color: transparent; }
 .card.find-target, .column.find-target, .link-url.find-current { outline: 3px solid #ffb347; outline-offset: 2px; }
+
+/* ---------- File menu (owner request: backup, restore, import) ---------- */
+
+.file-menu-wrap { position: relative; }
+.file-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.file-menu button {
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.file-menu button:hover, .file-menu button:focus-visible { background: var(--hover); }
+.phone-more .file-menu { position: static; box-shadow: none; margin-top: 6px; }

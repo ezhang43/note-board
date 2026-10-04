@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { readBoard } from '../model/persist';
+import { readBoard, serializeBoard } from '../model/persist';
 import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, VERSION_GAP_MS, type VersionMeta } from '../model/versions';
 import { createStore } from './store';
-import { localVersionStore, restoreVersion, startVersions } from './versions';
+import { localVersionStore, restoreFromBackup, restoreVersion, startVersions } from './versions';
 
 // Version history (owner request): the board as it was is saved when editing starts after a quiet spell.
 
@@ -261,3 +261,26 @@ function setupCounted() {
   startVersions(s, versions, { now: () => clock.now });
   return { store: { s, calls, renameBoard: s.renameBoard }, versions, clock };
 }
+
+describe('restoring a backup file (owner request)', () => {
+  it('saves the board as it is now as a version first, ends any preview, and puts the backup in place', async () => {
+    const { store, versions } = setup();
+    store.renameBoard('Before');
+    await settled();
+    const backup = serializeBoard({ ...store.getState().board, name: 'From the backup' });
+    const [v] = await versions.list();
+    store.previewVersion(v, readBoard(await versions.get(v.id))!);
+    store.renameBoard('Now');
+    await restoreFromBackup(store, versions, backup);
+    expect(store.getState().ui.preview).toBeNull();
+    expect(store.getState().board.name).toBe('From the backup');
+    const list = await versions.list();
+    expect(readBoard(await versions.get(list[0].id))?.name).toBe('Before');
+  });
+
+  it('refuses a file that is not a backup, changing nothing', async () => {
+    const { store, versions } = setup();
+    expect(await restoreFromBackup(store, versions, '{"hello":1}')).toBe(false);
+    expect(store.getState().board.name).toBe('My first board');
+  });
+});

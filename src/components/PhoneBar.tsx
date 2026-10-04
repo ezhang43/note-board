@@ -7,7 +7,7 @@ import {
   CollapseAllButton,
   ColourControl,
   DarkModeButton,
-  ImportButton,
+  FileMenu,
   SameWidthButton,
   SnapButton,
   ToolGroup,
@@ -70,7 +70,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <CollapseAllButton labelled />
           <SameWidthButton labelled />
           <CleanUpButton />
-          <ImportButton />
+          <FileMenu />
           <DarkModeButton labelled />
           <button
             type="button"

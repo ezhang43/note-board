@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · Import · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid amber button. Rarely used buttons (Auto-colour, Collapse all, Same width, Import, Clean up) have no border until hovered. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
+**Toolbar, left to right:** board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · File · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid amber button. Rarely used buttons (Auto-colour, Collapse all, Same width, File, Clean up) have no border until hovered. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
 
 | Action | How |
 | --- | --- |
@@ -47,7 +47,14 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 
 ### Importing from Milanote
 
-Import (toolbar) opens a file picker for a Milanote board exported as Markdown (.md). Its cards are added to the current board; nothing already there is changed or replaced.
+**File** (toolbar; on a phone under ⋯) opens a menu:
+
+- **Download backup:** the whole board (every card, position, size, colour and setting) as a file named like "BusyAnts - Home - 2026-10-05.json".
+- **Download as text:** the board as readable Markdown: its name, each column (left to right) with its cards, then the loose cards top to bottom; to-do items as "- [ ]" / "- [x]", sub-items indented.
+- **Restore from backup…:** pick a backup file; after a confirmation it replaces the board. The board as it was is saved in Version history first, and Ctrl+Z brings it back. A file that isn't a BusyAnts backup changes nothing and says so. The restored board is brought into view.
+- **Import from Milanote…:** pick a Milanote board exported as Markdown (.md). Its cards are added to the current board; nothing already there is changed or replaced.
+
+On an iPhone with BusyAnts on the home screen, the downloads open the Share sheet (Save to Files) instead.
 
 - Each heading becomes a to-do list with that title; a heading with nothing under it becomes an empty list. The board name line at the top of the file is ignored.
 - Checklist lines become the list's items, keeping sub-items (up to 6 levels) and ticks; ticked top-level items go into "Completed". A blank line between items starts a new list with no title.

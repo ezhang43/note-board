@@ -8,7 +8,8 @@ const sample = fileURLToPath(new URL('./fixtures/milanote-sample.md', import.met
 
 async function importSample(page: import('@playwright/test').Page) {
   const chooser = page.waitForEvent('filechooser');
-  await page.locator('header.toolbar').getByRole('button', { name: 'Import', exact: true }).click();
+  await page.locator('header.toolbar').getByRole('button', { name: 'File', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Import from Milanote…' }).click();
   await (await chooser).setFiles(sample);
 }
 

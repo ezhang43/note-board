@@ -3,9 +3,12 @@ import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { swatchFor } from '../model/theme';
+import { backupFileName, boardAsMarkdown } from '../model/exportText';
+import { serializeBoard } from '../model/persist';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
+import { activeVersionStore, restoreFromBackup } from '../store/versions';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
@@ -31,21 +34,89 @@ function NewColumnButton() {
   );
 }
 
-/** Import: pick a Milanote board exported as Markdown; its cards are added to this board. */
-export function ImportButton() {
-  const input = useRef<HTMLInputElement>(null);
+/**
+ * Save `text` as a file called `name` on this device. An iPhone home-screen app can't download
+ * files, so there the Share sheet offers to save it (Save to Files) instead.
+ */
+async function saveFile(name: string, text: string, type: string) {
+  const file = new File([text], name, { type });
+  const homeScreenIphone = (navigator as { standalone?: boolean }).standalone === true;
+  if (homeScreenIphone && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file] }).catch(() => {}); // closing the sheet isn't an error
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * File menu (owner request): download the board as a backup file (everything, to restore later)
+ * or as readable text (Markdown); restore a backup; import a Milanote board exported as Markdown.
+ */
+export function FileMenu() {
+  const [open, setOpen] = useState(false);
+  const milanote = useRef<HTMLInputElement>(null);
+  const backup = useRef<HTMLInputElement>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+
+  // A click anywhere else closes the menu.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener('pointerdown', away, true);
+    return () => window.removeEventListener('pointerdown', away, true);
+  }, [open]);
+
+  const pick = (action: () => void) => () => {
+    setOpen(false);
+    action();
+  };
+  const board = () => appStore.getState().board;
   return (
-    <>
-      <button
-        type="button"
-        className="tb-button quiet"
-        title="Add the cards from a Milanote board exported as Markdown (.md)"
-        onClick={() => input.current?.click()}
-      >
-        Import
+    <div className="file-menu-wrap" ref={wrap}>
+      <button type="button" className="tb-button quiet" aria-haspopup="menu" aria-expanded={open} title="Back up, restore or import" onClick={() => setOpen((o) => !o)}>
+        File
       </button>
+      {open && (
+        <div className="file-menu" role="menu" aria-label="File">
+          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'json'), serializeBoard(board()), 'application/json'))}>
+            Download backup
+          </button>
+          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'md'), boardAsMarkdown(board()), 'text/markdown'))}>
+            Download as text
+          </button>
+          <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
+            Restore from backup…
+          </button>
+          <button type="button" role="menuitem" title="Add the cards from a Milanote board exported as Markdown (.md)" onClick={pick(() => milanote.current?.click())}>
+            Import from Milanote…
+          </button>
+        </div>
+      )}
       <input
-        ref={input}
+        ref={backup}
+        type="file"
+        accept=".json,application/json"
+        aria-label="Backup file"
+        hidden
+        onChange={async (e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = ''; // so picking the same file again works again
+          if (!file) return;
+          const text = await file.text();
+          if (!appStore.isBackup(text)) return void window.alert('That file isn’t a BusyAnts backup, so nothing was changed.');
+          if (!window.confirm('Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.')) return;
+          await restoreFromBackup(appStore, activeVersionStore(), text);
+          // Bring the restored board into view once it has been drawn.
+          requestAnimationFrame(() => requestAnimationFrame(() => appStore.showWholeBoard()));
+        }}
+      />
+      <input
+        ref={milanote}
         type="file"
         accept=".md,.markdown,.txt,text/markdown,text/plain"
         aria-label="Milanote Markdown file"
@@ -56,7 +127,7 @@ export function ImportButton() {
           if (file) appStore.importMilanote(await file.text());
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -341,7 +412,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <NewColumnButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
-      <ImportButton />
+      <FileMenu />
       <CleanUpButton />
       <DarkModeButton />
 

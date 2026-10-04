@@ -48,6 +48,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   // A column with cards is exactly as tall as its cards (no blank space when they collapse);
   // only an empty column keeps a minimum height, which its corner handle sets.
   const minH = col.collapsed ? undefined : cardIds.length ? 0 : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
+  // Search: the current match is out of sight inside this collapsed column, so the column is marked.
+  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const classes = [
     'column',
     selected && 'selected',
@@ -58,6 +60,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     dropTarget && 'drop-target',
     col.collapsed && 'collapsed',
     col.color === null && 'uncoloured',
+    findTarget && 'find-target',
   ];
 
   return (
@@ -79,6 +82,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             className="column-title"
             aria-label="Column title"
             {...boxProps({ columnId: id }, col.style)}
+            find={`column:${id}`}
             placeholder="Column title"
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}

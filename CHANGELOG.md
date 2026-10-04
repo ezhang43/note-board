@@ -1,5 +1,9 @@
 # Changelog
 
+## Search the board (2026-10-04)
+
+- Press Ctrl+F (or the magnifier by ? in the corner, or ⋯ → Search on a phone) and type: every match is marked in yellow, and the board moves to the first one, marked in orange. Enter goes to the next, Shift+Enter to the previous. A match inside a collapsed card or column rings that card instead. Escape closes the search.
+
 ## Version history, like Google Docs (2026-10-04)
 
 - BusyAnts now keeps earlier versions of your board. Open it from the clock button by ? (bottom right), or from ⋯ on a phone. Pick a version to see it, then Restore it or go Back to current. Restoring keeps your current board as a version too, and Undo takes a restore back.

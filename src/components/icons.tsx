@@ -209,3 +209,13 @@ export function HistoryIcon() {
     </svg>
   );
 }
+
+/** Search: a magnifying glass. */
+export function SearchIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.9" {...common}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </svg>
+  );
+}

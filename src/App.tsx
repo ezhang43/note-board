@@ -1,4 +1,5 @@
 import { Canvas } from './components/Canvas';
+import { FindBar } from './components/FindBar';
 import { FormatBar } from './components/FormatBar';
 import { HistoryPanel, PreviewBar } from './components/HistoryPanel';
 import { ItemBar } from './components/ItemBar';
@@ -27,6 +28,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       {phone && <PhoneBar onSignOut={onSignOut} />}
       {phone && <ItemBar />}
       <ZoomControl saveNote={saveNote} />
+      <FindBar />
       <HistoryPanel />
       <PreviewBar />
       <FormatBar />

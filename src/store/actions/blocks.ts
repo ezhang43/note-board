@@ -11,6 +11,7 @@ import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
+import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, viewShowing, zoomBy } from '../../model/view';
 import type { StoreContext } from '../core';
@@ -90,6 +91,16 @@ export function blockActions(ctx: StoreContext) {
       }),
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(ctx.viewportSize()), factor)),
     resetZoom: () => updateView((v) => resetZoom(v, ctx.viewportSize())),
+    // ---------- search (owner request) ----------
+    openFind: () => updateUi({ find: { query: ctx.state.ui.find?.query ?? '', current: null }, colourMenuOpen: false }),
+    closeFind: () => updateUi({ find: null }),
+    setFindQuery: (query: string) => updateUi({ find: { query, current: null } }),
+    /** The match to show and mark as the current one. */
+    showMatch: (current: Match | null) => {
+      const find = ctx.state.ui.find;
+      if (find) updateUi({ find: { ...find, current } });
+    },
+
     // ---------- version history (owner request) ----------
     toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Show an old version on the board, read-only (the real board is untouched). */

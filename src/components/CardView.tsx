@@ -9,6 +9,7 @@ import type { Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem 
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
+import { FindMarks } from './FindMarks';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
@@ -49,6 +50,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})` } : {}),
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
+  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const classes = [
     'card',
     inColumn ? 'in-column' : 'loose',
@@ -60,6 +62,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     card.collapsed && 'collapsed',
     // Notes have no title: a coloured note gets the band across its header instead.
     (card.kind !== 'note' || band) && 'titled',
+    // Search: the current match is out of sight inside this card, so the card is marked.
+    findTarget && 'find-target',
   ];
 
   return (
@@ -140,7 +144,7 @@ function CompletedBody({ card }: { card: CompletedCard }) {
         <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>
           <h3 className="completed-date">{dayLabel(g.date)}</h3>
           {g.entries.map((e) => (
-            <CompletedRow key={e.item.id} entry={e} />
+            <CompletedRow key={e.item.id} entry={e} cardId={card.id} />
           ))}
         </section>
       ))}
@@ -149,7 +153,7 @@ function CompletedBody({ card }: { card: CompletedCard }) {
 }
 
 /** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
-function CompletedRow({ entry }: { entry: CompletedEntry }) {
+function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string }) {
   return (
     <div className="completed-entry" data-entry-id={entry.item.id}>
       <div className="completed-row">
@@ -162,26 +166,26 @@ function CompletedRow({ entry }: { entry: CompletedEntry }) {
             onChange={() => appStore.restoreCompleted(entry.item.id)}
           />
         </label>
-        <span className="completed-text" style={styleCss(entry.item.style) as CSSProperties}>
-          {entry.item.text}
+        <span className="completed-text" data-find={`done:${cardId}:${entry.item.id}`} style={styleCss(entry.item.style) as CSSProperties}>
+          <FindMarks find={`done:${cardId}:${entry.item.id}`} text={entry.item.text} />
         </span>
         <span className="completed-from">{entry.fromTitle || 'List'}</span>
       </div>
-      <CompletedChildren items={entry.item.children} depth={1} />
+      <CompletedChildren items={entry.item.children} depth={1} cardId={cardId} />
     </div>
   );
 }
 
-function CompletedChildren({ items, depth }: { items: TodoItem[]; depth: number }) {
+function CompletedChildren({ items, depth, cardId }: { items: TodoItem[]; depth: number; cardId: string }) {
   return items.map((it) => (
     <div key={it.id}>
       <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
         <input type="checkbox" aria-label="Done" checked={it.done} disabled />
-        <span className="completed-text" style={styleCss(it.style) as CSSProperties}>
-          {it.text}
+        <span className="completed-text" data-find={`done:${cardId}:${it.id}`} style={styleCss(it.style) as CSSProperties}>
+          <FindMarks find={`done:${cardId}:${it.id}`} text={it.text} />
         </span>
       </div>
-      <CompletedChildren items={it.children} depth={depth + 1} />
+      <CompletedChildren items={it.children} depth={depth + 1} cardId={cardId} />
     </div>
   ));
 }
@@ -195,6 +199,7 @@ function NoteBody({ card }: { card: NoteCard }) {
       className="note-text"
       aria-label="Note text"
       {...boxProps({ cardId: card.id }, card.style)}
+      find={`note:${card.id}`}
       placeholder="Write something…"
       value={card.text}
       onChange={(text) => appStore.setNoteText(card.id, text)}
@@ -204,6 +209,8 @@ function NoteBody({ card }: { card: NoteCard }) {
 
 function LinkBody({ card }: { card: LinkCard }) {
   const href = hrefOf(card.url);
+  // The address box is a plain field: a search match there rings the whole box.
+  const findCurrent = useAppState((s) => s.ui.find?.current?.key === `url:${card.id}`);
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
   return (
@@ -213,12 +220,14 @@ function LinkBody({ card }: { card: LinkCard }) {
         className="card-title"
         aria-label="Link title"
         {...boxProps({ cardId: card.id }, card.style)}
+        find={`title:${card.id}`}
         placeholder="Title"
         value={card.title}
         onChange={(title) => appStore.setCardTitle(card.id, title)}
       />
       <input
-        className="link-url"
+        className={findCurrent ? 'link-url find-current' : 'link-url'}
+        data-find={`url:${card.id}`}
         aria-label="Link address"
         placeholder="Paste a link address"
         spellCheck={false}

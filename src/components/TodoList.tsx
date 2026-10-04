@@ -34,6 +34,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
         ref={title}
         aria-label="List title"
         {...boxProps({ cardId: card.id }, card.style)}
+        find={`title:${card.id}`}
         placeholder="List title"
         value={card.title}
         onChange={(text) => appStore.setCardTitle(card.id, text)}
@@ -143,6 +144,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         className="item-text"
         aria-label="Item text"
         {...boxProps({ cardId, itemId: item.id }, item.style)}
+        find={`item:${cardId}:${item.id}`}
         placeholder="Add an item"
         value={item.text}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}

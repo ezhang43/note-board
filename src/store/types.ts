@@ -1,3 +1,4 @@
+import type { Match } from '../model/search';
 import type { VersionMeta } from '../model/versions';
 import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
@@ -131,6 +132,8 @@ export interface Ui {
    * is (and keeps syncing). Nothing can be changed meanwhile.
    */
   preview: { meta: VersionMeta; board: Board } | null;
+  /** Search (owner request): what is being looked for, and the match being shown (null: none). */
+  find: { query: string; current: Match | null } | null;
 }
 
 export interface AppState {
@@ -161,4 +164,5 @@ export const emptyUi: Ui = {
   canRedo: false,
   historyOpen: false,
   preview: null,
+  find: null,
 };

@@ -255,3 +255,11 @@ Later decisions, with dates and reasons, are listed under "Decisions" in `CLAUDE
 - The list shows "Current version", then earlier versions grouped by day (Today, Yesterday, then the date), newest first, each with its time and what was on the board (e.g. "12 cards · 3 columns").
 - Picking a version shows it on the board, read-only: the board can be moved around and zoomed, but nothing can be changed. A bar shows when it was saved, with Back to current and Restore this version. Escape goes back to the current board, then closes the history. On a computer the list stays at the right; on a phone it fills the screen and steps aside while a version is shown (Back to current brings the list back).
 - Restoring first saves the current board as a version (so nothing is lost), then puts the chosen version back as one change: Ctrl+Z (or Undo) brings back the board from before the restore.
+
+## Search
+
+- Ctrl+F (also while typing in a card) opens the board's own search bar instead of the browser's; so does the magnifier button beside the clock button (bottom right), and ⋯ → Search on a phone. The bar sits at the top right (across the top on a phone).
+- It looks in column titles, list and link titles, checklist items (sub-items and ticked items too), notes, link addresses and the Completed card, ignoring upper / lower case. Matches are taken in board order: columns left to right (their cards top to bottom), then loose cards top to bottom.
+- Every match is marked in yellow inside the text, the current one in orange; the bar shows e.g. "2 of 7", or "No matches". Enter / ↓ / the down arrow button go to the next match, Shift+Enter / ↑ / the up arrow button to the previous one (wrapping round). The board moves so the current match is in the middle of what can be seen (above a phone's keyboard), zooming in to 100% first if the board is zoomed out below 60%.
+- A match out of sight (in a collapsed card or column, or a closed Completed section) marks that card or column with an orange ring instead, and the count says "in a closed card"; nothing is opened by itself. A match in a link address rings the address box.
+- Escape or × closes the bar and the marks go.

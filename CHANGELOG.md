@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: boards with unusual card ids (2026-10-05)
+
+- A board loaded from an old save or a backup whose cards or items have ids with quotes or brackets in them no longer breaks search, Shift+click on checklist items, Alt + arrows or the Colour menu.
+
 ## Arrows between cards (2026-10-05)
 
 - Select a card or column and drag the small round handle on its right edge onto another card or column to draw an arrow between them. The arrow follows the cards as you move them.

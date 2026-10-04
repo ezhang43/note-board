@@ -196,7 +196,7 @@ function rowPointerDown(cardId: string, itemId: string) {
     e.stopPropagation(); // pressing a row never drags the card
     appStore.select(cardId);
     // Shift+click extends the selection, or starts one from the item being typed in.
-    const typingIn = document.activeElement?.closest<HTMLElement>(`[data-card-id="${cardId}"] [data-item-id]`)?.dataset.itemId;
+    const typingIn = document.activeElement?.closest<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id]`)?.dataset.itemId;
     if (e.shiftKey && appStore.extendItemSelection(cardId, itemId, typingIn)) {
       e.preventDefault();
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();

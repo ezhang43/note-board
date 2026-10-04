@@ -6,8 +6,8 @@ import { ArrowIcon, CloseIcon } from './icons';
 
 /** The element to bring into view for a match: its marked text, or what hides it. */
 function targetOf(m: Match): Element | null {
-  if (m.showInstead) return document.querySelector(`[data-card-id="${m.showInstead}"], [data-col-id="${m.showInstead}"]`);
-  const box = document.querySelector(`[data-find="${m.key}"]`);
+  if (m.showInstead) return document.querySelector(`[data-card-id="${CSS.escape(m.showInstead)}"], [data-col-id="${CSS.escape(m.showInstead)}"]`);
+  const box = document.querySelector(`[data-find="${CSS.escape(m.key)}"]`);
   return box?.querySelector('mark[data-current]') ?? box;
 }
 

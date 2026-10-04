@@ -5,6 +5,10 @@
 - Opening BusyAnts (computer or phone) now shows all your cards and columns in the middle of the screen, zooming out a little if they don't fit (never below 50%).
 - On a phone or tablet, a quick finger swipe over a card, a column or a resize corner now moves around the board. To move a card or column, or to resize one, rest your finger on it for about half a second first.
 
+## Collapsed cards as tall as collapsed columns (2026-10-04)
+
+- A collapsed loose card (to-do list, note, link, Completed) is now the same height as a collapsed column, so a row of collapsed blocks lines up. A collapsed card you made taller or shorter by hand keeps that height.
+
 ## Phone and tablet: press and hold to move a card (2026-10-04)
 
 - On a touch screen, press and hold anywhere on a card for about half a second, then move your finger to drag it. Before, only a thin strip at the top of a card could be dragged, so cards seemed stuck (columns were fine).

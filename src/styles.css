@@ -903,6 +903,23 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   align-self: flex-start;
 }
 .completed-toggle:hover { background: var(--hover); }
+/* Uncheck all (owner request): on the same line as "Completed", at the right. */
+.completed { position: relative; }
+.uncheck-all {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.uncheck-all:hover { background: var(--hover); color: var(--ink); }
 
 .item-ghost {
   position: absolute;
@@ -1279,3 +1296,18 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .file-menu button:hover, .file-menu button:focus-visible { background: var(--hover); }
 .phone-more .file-menu { position: static; box-shadow: none; margin-top: 6px; }
+
+/* Web addresses in a note, as links under its text (owner request). */
+.note-links { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }
+.note-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--accent-ink);
+  font-size: calc(13px * var(--fs, 1));
+  text-decoration: none;
+}
+.note-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-link svg { flex-shrink: 0; }
+.note-link:hover span { text-decoration: underline; }

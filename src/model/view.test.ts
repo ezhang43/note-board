@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_ZOOM, MIN_ZOOM } from './constants';
-import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, zoomTo } from './view';
+import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo } from './view';
 
 describe('pan', () => {
   it('moves the board by the drag distance', () => {
@@ -116,5 +116,22 @@ describe('viewShowing (the view on opening the board, owner request)', () => {
     expect(tl.x).toBeLessThan(100);
     expect(tl.y).toBeGreaterThan(0);
     expect(tl.y).toBeLessThan(100);
+  });
+});
+
+describe('viewFitting (Fit to screen, owner request)', () => {
+  const size = { width: 1000, height: 600 };
+  it('zooms in up to 100% to fill the screen with a small board, centred', () => {
+    const v = { ...createView(), zoom: 0.5 };
+    const fit = viewFitting([{ x: 0, y: 0, w: 200, h: 100 }], size, v);
+    expect(fit.zoom).toBe(1);
+    expect(fit.panX).toBe(400);
+    expect(fit.panY).toBe(250);
+  });
+  it('zooms out as far as needed (down to the smallest zoom) to show a big board', () => {
+    const fit = viewFitting([{ x: 0, y: 0, w: 3000, h: 400 }], size, createView());
+    expect(fit.zoom).toBeCloseTo((1000 - 80) / 3000, 3);
+    const huge = viewFitting([{ x: 0, y: 0, w: 30000, h: 400 }], size, createView());
+    expect(huge.zoom).toBe(0.3);
   });
 });

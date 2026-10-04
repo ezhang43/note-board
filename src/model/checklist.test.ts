@@ -438,3 +438,19 @@ describe('Ctrl+Shift+Up / Down: moving an item past its neighbour', () => {
     expect(ids(C.moveItemBy(mixed, 'x', 1)!)).toBe('d y x'); // past the hidden-in-Completed one, onto y's far side
   });
 });
+
+describe('Uncheck all (owner request, to reuse a list)', () => {
+  it('unticks every item and sub-item, keeping their order and nesting', () => {
+    const items = [
+      { id: 'a', text: 'Bread', done: false, children: [{ id: 'a1', text: 'Rye', done: true, children: [] }] },
+      { id: 'b', text: 'Milk', done: true, children: [{ id: 'b1', text: 'Oat', done: true, children: [] }] },
+    ];
+    expect(C.uncheckAll(items)).toEqual([
+      { id: 'a', text: 'Bread', done: false, children: [{ id: 'a1', text: 'Rye', done: false, children: [] }] },
+      { id: 'b', text: 'Milk', done: false, children: [{ id: 'b1', text: 'Oat', done: false, children: [] }] },
+    ]);
+  });
+  it('does nothing (no undo step) when nothing is ticked', () => {
+    expect(C.uncheckAll([{ id: 'a', text: 'Bread', done: false, children: [] }])).toBeNull();
+  });
+});

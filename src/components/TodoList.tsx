@@ -1,4 +1,5 @@
 import { boxProps } from './textBox';
+import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ITEM_INDENT, sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
@@ -59,6 +60,9 @@ export function TodoBody({ card }: { card: TodoCard }) {
           >
             <ChevronIcon collapsed={!card.completedOpen} />
             Completed
+          </button>
+          <button type="button" className="uncheck-all" title="Untick every item, to use this list again" onClick={() => appStore.uncheckAll(card.id)}>
+            Uncheck all
           </button>
           {card.completedOpen &&
             flatten(done).map(({ item, depth }) => <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />)}
@@ -149,6 +153,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         value={item.text}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
+        onClick={openLinkOnCtrlClick}
       />
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
       {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}

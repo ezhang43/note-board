@@ -10,6 +10,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { FindMarks } from './FindMarks';
+import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
 import { TodoBody } from './TodoList';
@@ -194,16 +195,20 @@ function NoteBody({ card }: { card: NoteCard }) {
   const text = useRef<HTMLTextAreaElement>(null);
   useTakeFocus(card.id, text);
   return (
-    <GrowTextarea
-      ref={text}
-      className="note-text"
-      aria-label="Note text"
-      {...boxProps({ cardId: card.id }, card.style)}
-      find={`note:${card.id}`}
-      placeholder="Write something…"
-      value={card.text}
-      onChange={(text) => appStore.setNoteText(card.id, text)}
-    />
+    <>
+      <GrowTextarea
+        ref={text}
+        className="note-text"
+        aria-label="Note text"
+        {...boxProps({ cardId: card.id }, card.style)}
+        find={`note:${card.id}`}
+        placeholder="Write something…"
+        value={card.text}
+        onChange={(text) => appStore.setNoteText(card.id, text)}
+        onClick={openLinkOnCtrlClick}
+      />
+      <NoteLinks text={card.text} />
+    </>
   );
 }
 

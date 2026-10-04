@@ -55,7 +55,7 @@ const OPEN_MIN_ZOOM = 0.5;
  * remembered zoom when they fit at it, else zooms out just enough (not below 50%). Each direction
  * that fits is centred; one that still doesn't fit shows the start (top / left) of the board.
  */
-export function viewShowing(rects: Rect[], size: Size, view: View): View {
+export function viewShowing(rects: Rect[], size: Size, view: View, minZoom = OPEN_MIN_ZOOM): View {
   if (!rects.length) return view;
   const left = Math.min(...rects.map((r) => r.x));
   const top = Math.min(...rects.map((r) => r.y));
@@ -63,7 +63,7 @@ export function viewShowing(rects: Rect[], size: Size, view: View): View {
   const h = Math.max(...rects.map((r) => r.y + r.h)) - top;
   const roomW = Math.max(1, size.width - 2 * OPEN_MARGIN);
   const roomH = Math.max(1, size.height - 2 * OPEN_MARGIN);
-  const zoom = clampZoom(Math.min(view.zoom, Math.max(OPEN_MIN_ZOOM, Math.min(roomW / w, roomH / h))));
+  const zoom = clampZoom(Math.min(view.zoom, Math.max(minZoom, Math.min(roomW / w, roomH / h))));
   const place = (start: number, length: number, screen: number, room: number) =>
     length * zoom <= room ? (screen - length * zoom) / 2 - start * zoom : OPEN_MARGIN - start * zoom;
   return { ...view, zoom, panX: Math.round(place(left, w, size.width, roomW)), panY: Math.round(place(top, h, size.height, roomH)) };
@@ -90,4 +90,12 @@ export function gridStyle(view: View): { size: number; offsetX: number; offsetY:
     offsetY: view.panY - size / 2,
     dotRadius: Math.max(0.6, view.zoom),
   };
+}
+
+/**
+ * Fit to screen (owner request): every block in `rects` in view and as large as fits, centred,
+ * zooming in up to 100% or out as far as needed (to the smallest zoom).
+ */
+export function viewFitting(rects: Rect[], size: Size, view: View): View {
+  return viewShowing(rects, size, { ...view, zoom: 1 }, MIN_ZOOM);
 }

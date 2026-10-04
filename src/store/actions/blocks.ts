@@ -13,7 +13,7 @@ import type { Board, CardKind, Point, Tool, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
-import { centreOf, panBy, resetZoom, screenToBoard, viewShowing, zoomBy } from '../../model/view';
+import { centreOf, panBy, resetZoom, screenToBoard, viewFitting, viewShowing, zoomBy } from '../../model/view';
 import { readBoard } from '../../model/persist';
 import type { StoreContext } from '../core';
 
@@ -124,6 +124,8 @@ export function blockActions(ctx: StoreContext) {
     },
     /** Opening the board (owner request): bring every card and column into view, centred. */
     showWholeBoard: () => updateView((v) => viewShowing(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),
+    /** Fit to screen (owner request): every card and column in view, as large as fits (up to 100%). */
+    fitToScreen: () => updateView((v) => viewFitting(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),
 
     // ---------- selection and menus ----------
     /** Select just this block. (Selected checklist items stay selected if they are in it.) */

@@ -2,7 +2,7 @@ import { ZOOM_STEP } from '../model/constants';
 import { FONT_SIZES } from '../model/font';
 import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import { HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
+import { FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
 
 /**
@@ -34,6 +34,9 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
         ?
       </button>
       <div className="zoom-control" role="group" aria-label="Zoom">
+        <button type="button" aria-label="Fit to screen" title="Fit to screen (Shift+1)" onClick={appStore.fitToScreen}>
+          <FitIcon />
+        </button>
         <button type="button" aria-label="Zoom out" title="Zoom out (Ctrl+−)" onClick={() => appStore.zoomAtCentre(1 / ZOOM_STEP)}>
           <MinusIcon />
         </button>

@@ -1,5 +1,11 @@
 # Changelog
 
+## Uncheck all, Fit to screen, and links in notes (2026-10-05)
+
+- **Uncheck all** next to a list's "Completed" heading unticks everything, so you can reuse a list like groceries.
+- **Fit to screen** (the corners button by the zoom, or Shift+1) shows every card and column at once.
+- Web addresses in a note now appear as links under it. Ctrl+click an address in a note or checklist item to open it.
+
 ## Backup: download and restore your board (2026-10-05)
 
 - A new **File** button (in place of Import) downloads your board as a backup file, or as readable text, and restores a backup. Restoring keeps the board you had in Version history, and Ctrl+Z brings it back. Import from Milanote moved into the same menu.

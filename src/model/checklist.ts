@@ -477,3 +477,15 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
   if (!items) return board;
   return editItems(editItems(board, fromCardId, () => refill(rest, makeId)), to.cardId, () => items);
 }
+
+/** Uncheck all (owner request, to reuse a list): every item and sub-item unticked; null if none was ticked. */
+export function uncheckAll(items: TodoItem[]): TodoItem[] | null {
+  let changed = false;
+  const untick = (list: TodoItem[]): TodoItem[] =>
+    list.map((it) => {
+      if (it.done) changed = true;
+      return { ...it, done: false, children: untick(it.children) };
+    });
+  const result = untick(items);
+  return changed ? result : null;
+}

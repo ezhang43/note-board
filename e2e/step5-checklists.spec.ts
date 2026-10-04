@@ -461,3 +461,19 @@ test('copying copies exactly the highlighted items, keeping their levels; cut le
   expect(await texts(list)).toEqual(['two b', 'three']); // "two b" stays, moved up a level
   expect(await depthOf(rowWithText(list, 'two b'))).toBe(0);
 });
+
+test('Uncheck all, beside Completed, unticks every item in the list so it can be used again (owner request)', async ({ page }) => {
+  await add(page, 'To-do list');
+  const card = cards(page).first();
+  const items = card.getByLabel('Item text');
+  await items.first().fill('Bread');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Milk');
+  await card.getByRole('checkbox', { name: 'Done' }).first().check();
+  await card.getByRole('checkbox', { name: 'Done' }).first().check();
+  await expect(card.getByRole('button', { name: 'Uncheck all' })).toBeVisible();
+  await card.getByRole('button', { name: 'Uncheck all' }).click();
+  await expect(card.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Completed', exact: true })).toHaveCount(0);
+  await expect(items).toHaveText(['Bread', 'Milk']);
+});

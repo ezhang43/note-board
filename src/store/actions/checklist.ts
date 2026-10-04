@@ -208,6 +208,8 @@ export function checklistActions(ctx: StoreContext) {
       commit((b) => C.editItems(b, cardId, (items) => C.deleteItems(items, ids)), { ui: { itemSel: null } });
     },
     toggleCompletedSection: (cardId: string) => commit((b) => C.toggleCompletedSection(b, cardId)),
+    /** Uncheck all (owner request): every item in the list unticked, to use it again. One undo step. */
+    uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
 
     // ---------- selecting several checklist items ----------
     selectItemRange,

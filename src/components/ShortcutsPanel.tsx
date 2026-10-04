@@ -9,6 +9,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Ctrl+Z / Ctrl+Y', 'Undo / redo (also while typing)'],
       ['H / V', 'Hand tool / Select tool'],
       ['Ctrl+= / Ctrl+− / Ctrl+0', 'Zoom in / out / back to 100%'],
+      ['Shift+1', 'Fit to screen: every card and column in view'],
       ['Ctrl+scroll or pinch', 'Zoom at the pointer'],
       ['?', 'Show or hide this list'],
     ],

@@ -1,5 +1,9 @@
 # Changelog
 
+## Honey look, to match the app icon (2026-10-05)
+
+- The toolbar is now soft honey yellow with the BusyAnts ant at its left, the board a warm cream, and the teal highlights (selection outlines, title bands, New column, pressed buttons) are amber instead, so the app and its icon feel like one thing. Dark mode gets matching warm, darker tones. The window's title bar takes the toolbar colour too.
+
 ## Fix: selection box away from the pointer (2026-10-05)
 
 - With the Select tool, the selection box could start well above the pointer. Typing near the bottom of the screen made the browser scroll the board area by itself, which shifted everything drawn on it. That scroll now becomes an ordinary move of the board, so you still see what you type and the box starts right at the pointer.

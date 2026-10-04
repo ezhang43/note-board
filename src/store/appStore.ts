@@ -20,7 +20,7 @@ function showTheme() {
   const theme = appStore.getState().view.theme;
   if (document.documentElement.dataset.theme === theme) return;
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#232220' : '#FFFFFF');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#2A2416' : '#FFF1C2');
 }
 if (typeof document !== 'undefined') {
   showTheme();

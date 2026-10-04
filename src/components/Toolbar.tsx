@@ -271,6 +271,11 @@ export function SnapButton() {
   );
 }
 
+/** The BusyAnts ant from the app icon (owner request: the toolbar matches the icon). */
+function Logo() {
+  return <img className="toolbar-logo" src={`${import.meta.env.BASE_URL}icon.svg`} alt="BusyAnts" width={30} height={30} />;
+}
+
 function BoardName() {
   const name = useAppState((s) => s.board.name);
   return <AutoSizeInput className="board-name" aria-label="Board name" placeholder="Untitled board" value={name} onChange={appStore.renameBoard} />;
@@ -283,12 +288,14 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   if (usePhone())
     return (
       <header className="toolbar phone">
+        <Logo />
         <BoardName />
       </header>
     );
 
   return (
     <header className="toolbar">
+      <Logo />
       <BoardName />
       <div className="toolbar-spacer" />
 

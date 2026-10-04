@@ -28,7 +28,7 @@ The owner reads code at a beginner level and will not review it line by line, so
 
 The board is an endless canvas with a dotted 20px grid under a fixed top toolbar.
 
-**Toolbar, left to right:** board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · Import · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid teal button. Rarely used buttons (Auto-colour, Collapse all, Same width, Import, Clean up) have no border until hovered. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
+**Toolbar, left to right:** board name (editable, box sized to its text; in a narrow window it shrinks first, down to 140px, ending in …, so no button is pushed off) · Hand / Select tool toggle · Undo · Redo · | · Snap to grid · Colour · Auto-colour · Collapse all · Same width · | · Add Note · Add To-do list · Add Link · New column · | · Import · Clean up · Dark mode (moon icon); on the published site, | · Sign out at the far right. (| = a thin divider between groups.) Add Note, To-do list and Link are plain buttons; New column is the one solid amber button. Rarely used buttons (Auto-colour, Collapse all, Same width, Import, Clean up) have no border until hovered. A zoom control (− · percentage · +) sits bottom-right; clicking the percentage resets to 100% around the centre of the screen. Left of it: A− / A+ (text size on cards and columns: Small, Normal, Large, Larger; the toolbar keeps its size; remembered on this device, not synced, not undoable; A− / A+ fade at the ends), and a round ? button that opens a Keyboard shortcuts panel listing every shortcut (also opened and closed by the ? key outside text fields; Escape, its ×, or a click outside closes it).
 
 | Action | How |
 | --- | --- |
@@ -41,7 +41,7 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 - With the Hand tool, the cursor is an open glove over empty board and a closed glove while dragging the board. Otherwise (Select tool, and over cards and columns with either tool) it is the normal arrow. Text fields show the text cursor.
 - New cards and columns never appear on top of existing blocks. From a toolbar click they appear at the free spot nearest the middle of the screen.
 - Edge panning: while dragging a block, dragging checklist items, selecting items by press-and-drag, or drawing a selection box, holding the pointer within 48px of the edge of the board area keeps moving the board that way (faster nearer the edge), and the drag carries on as if the pointer had moved. A drag that starts near an edge only does this once the pointer has been away from the edges.
-- Alignment guides: while dragging a single card or column, when its left edge, middle or right edge (or top, middle or bottom) comes within 8px of the same line of another block on the board, it snaps onto that line and a thin teal guide shows across both blocks. A guide wins over the grid on its axis. Blocks the dragged one is on top of are left out (they are about to move aside). Not for several blocks dragged together, nor while resizing (sizes match instead).
+- Alignment guides: while dragging a single card or column, when its left edge, middle or right edge (or top, middle or bottom) comes within 8px of the same line of another block on the board, it snaps onto that line and a thin amber guide shows across both blocks. A guide wins over the grid on its axis. Blocks the dragged one is on top of are left out (they are about to move aside). Not for several blocks dragged together, nor while resizing (sizes match instead).
 - Add Note, Add To-do list, Add Link and New column can also be dragged from the toolbar onto the board. A dashed outline shows where the block will appear (the free spot nearest the pointer); a new card dragged over a column goes into the column at the pointer (a new column never does). Letting go off the board adds nothing.
 - Opening the board (desktop and phone) shows every card and column, centred on the screen. The remembered zoom is kept when everything fits at it; otherwise the board zooms out just enough, but not below 50% so text stays readable. If the board is still too big at 50%, its top-left part is shown. This also happens when the online copy first arrives on an empty screen. The tool always starts as Hand.
 
@@ -66,14 +66,14 @@ The board holds three card types and columns that stack cards. Cards show no typ
 | Link | Title, URL field, "Open <domain>" button in a new tab | White |
 | Column | Title (box sized to its text), card count, stacked cards | Neutral stone-grey until recoloured |
 
-**Headers:** cards show a collapse arrow and × at the top right (no "2/5 done" count); hovering them shows what they do ("Collapse card", "Delete card (Ctrl+Z brings it back)"; columns the same). To-do lists, links and the Completed card have a tinted title band across the top (header and title): soft teal (#E0F2F1) when loose; inside a coloured column, a deeper shade of the column's colour (70% of its edge tone mixed with its background), so it stands out from the column but stays in the same colour family; inside an uncoloured (Default) column, the same soft teal as loose cards. Columns show the title and count centred, and the collapse arrow next to the × on the right. No move handles and no per-block palette icons.
+**Headers:** cards show a collapse arrow and × at the top right (no "2/5 done" count); hovering them shows what they do ("Collapse card", "Delete card (Ctrl+Z brings it back)"; columns the same). To-do lists, links and the Completed card have a tinted title band across the top (header and title): soft honey (#FFF1C2) when loose; inside a coloured column, a deeper shade of the column's colour (70% of its edge tone mixed with its background), so it stands out from the column but stays in the same colour family; inside an uncoloured (Default) column, the same soft honey as loose cards. Columns show the title and count centred, and the collapse arrow next to the × on the right. No move handles and no per-block palette icons.
 
 **Moving**
 
 - Drag any blank part of a card or column to move it; a drag starts after a 5px nudge so a click still just selects.
-- The dragged block stays flat (no tilt) with a 2.5px teal border and soft glow.
+- The dragged block stays flat (no tilt) with a 2.5px amber border and soft glow.
 - Dropping a card fully onto a column inserts it at the pointer position; the column opens if collapsed. Dragging a card out of a column makes it loose.
-- While dragging, the block follows the pointer exactly; a dashed teal outline shows the grid spot it will land on, and on release it glides there (160ms). Blocks pushed aside also glide. No gliding when the computer is set to reduce motion.
+- While dragging, the block follows the pointer exactly; a dashed amber outline shows the grid spot it will land on, and on release it glides there (160ms). Blocks pushed aside also glide. No gliding when the computer is set to reduce motion.
 - **The dragged block takes priority:** it lands on the grid spot under the pointer, and blocks in its way move to the nearest free spot, previewed live while dragging. A single dragged card never pushes a column: over a column it drops in, and where it would otherwise cover one it takes the nearest free spot. Dragged columns and groups push everything.
 - **No overlap, ever:** loose blocks keep at least a 10px gap. When a column grows, a block is pasted or a size changes, anything it would cover moves to the nearest free spot. When a block grows (expanding, typing, a column filling up), blocks below it (their top level with or lower than its top) are pushed straight down instead, and so are blocks below those; blocks beside it still take the nearest free spot.
 
@@ -85,7 +85,7 @@ The board holds three card types and columns that stack cards. Cards show no typ
 - Keyboard: a resize handle reached with Tab resizes with the arrow keys: → / ← 20px wider / narrower, ↓ / ↑ taller / shorter (corner handles only); Shift for 100px. Each press is one undo step.
 - While resizing, the edge follows the pointer and eases to the grid size on release; the size label shows the final size.
 - Size limits: cards 200–640 wide, columns 240–640 wide, heights 100–700.
-- Size matching: within 8px of another block's width or height, the size snaps to match; matched blocks get a dashed teal outline and a label shows e.g. "240 × 180 · same width as 2 blocks". Otherwise sizes snap to the grid when snapping is on.
+- Size matching: within 8px of another block's width or height, the size snaps to match; matched blocks get a dashed amber outline and a label shows e.g. "240 × 180 · same width as 2 blocks". Otherwise sizes snap to the grid when snapping is on.
 
 **Collapse, add, delete, colour**
 
@@ -122,18 +122,18 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 **Completed section**
 
 - Ticking a top-level item moves it and its sub-items into the "Completed" section at the bottom (its header shows no count, and collapses and expands the section). Ticking a sub-item only strikes it through, except that ticking the last open sub-item of an item ticks that item too (and so on upwards), so a list item whose sub-items are all done moves to Completed. Unticking a sub-item unticks the items it is nested in.
-- With motion allowed, an item on its way to Completed shows ticked and eases down and out (280ms) before moving, then fades in at its new place with a brief teal tint (450ms). With reduced motion it moves at once. Undo right after ticking undoes the tick.
+- With motion allowed, an item on its way to Completed shows ticked and eases down and out (280ms) before moving, then fades in at its new place with a brief amber tint (450ms). With reduced motion it moves at once. Undo right after ticking undoes the tick.
 - Trash deletes that item and everything nested under it. If a list becomes empty, a blank item replaces it.
 - Exception: deleting an item with no text (trash, Backspace or Delete) keeps its sub-items if any of them has text; they move up one level into its place. Cut (Ctrl+X) always takes sub-items with the parent.
 
 **Dragging items**
 
-- Drag the grip to move an item and all its sub-items: before/after another item (teal line), nested under an item (drop slightly right; teal tint), into another list, or onto empty list space (appends; the whole card, top included, gets a dashed teal outline).
+- Drag the grip to move an item and all its sub-items: before/after another item (amber line), nested under an item (drop slightly right; amber tint), into another list, or onto empty list space (appends; the whole card, top included, gets a dashed amber outline).
 - Dropping on empty board space (or on a note, link or column) creates a new untitled to-do list at that spot with the dragged items (the dragged label says "Drop to make a new list").
 
 **Selecting several items**
 
-- Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range; with no range yet, Shift+click selects from the item being typed in to the one clicked. A range can span items at different levels. Selected items get a teal text highlight and a lighter row tint. No action bar.
+- Hold the mouse on one item and drag over others to select a range, across open and completed items. Shift+click extends the range; with no range yet, Shift+click selects from the item being typed in to the one clicked. A range can span items at different levels. Selected items get a amber text highlight and a lighter row tint. No action bar.
 - With several selected: Backspace or Delete removes them all; ticking any one ticks them all (unticking one reopens them all); the trash on any one deletes them all; dragging any one moves them all, in order, with their sub-items; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection. Copy and cut take exactly the highlighted items (a sub-item that isn't highlighted is left out, and cut leaves it in the list, moved up into its parent's place), and also put their text on the computer's clipboard for other apps: one item per line in the order shown, indented two spaces per level below the least-indented highlighted item; Tab / Shift+Tab move them all in or out one level together (one that can't move, such as the first item of a list, stays and the ones after it nest under it) and they stay selected; Escape clears.
 - Ctrl+A, pressed again and again, selects more each time: first the text of the item being typed in; then every item in that list (from some of a list's items, the whole list); then every item in every list in the same column (skipped for a loose list); then every item on the board. Only items you can see are taken: none from collapsed cards or columns, nor from a closed Completed section. Escape or clicking empty board clears.
 - Pressing on an item and dragging down or up into another card of the same column carries the selection on through those cards (never into other columns or loose cards).
@@ -152,7 +152,7 @@ Every block action works on one block or on a whole selection, and every change 
 
 | Shortcut (⌘ on Mac) | Does |
 | --- | --- |
-| Click | Select one block (teal outline); click empty space to clear |
+| Click | Select one block (amber outline); click empty space to clear |
 | Ctrl + click (or Shift + click) | Add or remove a block from the selection |
 | Select tool drag | Rectangle selection; hold Ctrl to add to the current selection |
 | Ctrl + A | Select every column and loose card (with checklist items selected, selects more items instead; see "Selecting several items") |
@@ -185,14 +185,14 @@ Every block action works on one block or on a whole selection, and every change 
 
 ## Look and feel
 
-Professional but with colour: white cards and soft-tinted columns on a warm neutral canvas, thin borders, soft shadows, one teal accent.
+Professional but with colour: white cards and soft-tinted columns on a warm neutral canvas, thin borders, soft shadows, one amber accent, all in the warm honey tones of the BusyAnts icon (an ant on yellow).
 
 - **Type:** IBM Plex Sans (400, 500, 600). Titles 14–17px semibold, body 14px.
-- **Canvas:** #F6F4F0 with #CFC8BC dots every 20px (fainter when snapping is off). Toolbar white with a #E2DDD4 bottom border.
-- **Accent:** teal #1F5F5B for selection, active tool, drop lines and New column. Destructive actions use #A3263F.
+- **Canvas:** #FAF6EC (warm cream) with #D6CBB0 dots every 20px (fainter when snapping is off). Toolbar soft honey #FFF1C2 with a #ECD897 bottom border, the BusyAnts ant (the app icon) at its left before the board name; the browser / app title bar takes the toolbar colour. Dark mode: toolbar #2A2416, canvas #1D1B17.
+- **Accent:** amber-brown #8A5A00 (dark mode: honey #F2C14E) for selection, active tool, drop lines and New column; its soft tint #FFF1C2 (dark #3A3020) for title bands and pressed buttons. Destructive actions use #A3263F.
 - **Cards:** white (#FFFFFF), 10px radius, 1px #E2DDD4 border, shadow 0 1px 2px at 6%. Columns: 12px radius, #EFECE6 unless recoloured; the swatches below are for columns.
-- **Dark mode:** the toolbar's moon button switches between light and dark (pressed = dark; it shows the same pressed look as Snap to grid: soft teal with a teal border). A first visit on a device follows the computer's light / dark setting; once the button is pressed, that device remembers the choice (it is not synced, not saved with the board, and not undone by Ctrl+Z). Dark mode changes only colours: canvas #1C1B19 with #45413B dots, toolbar #232220, cards #2B2926 with a #3D3A35 border and #ECE8E1 text, accent teal #5FB3AB. Columns use a deep, muted shade of each swatch (`DARK_PALETTE` in `src/model/theme.ts`, same names; uncoloured columns #2A2825), and the Colour menu shows those shades. Every dark column colour keeps at least 7:1 contrast with the text. Faded toolbar buttons fade a little less in dark mode (55% instead of 45%; Undo/Redo 50% instead of 40%). Placeholder text is #736C62 in light mode and #A39D93 in dark mode, readable at about 4.5:1.
-- **States:** selection = 2px solid teal outline; size match = 2px dashed teal; a list about to take dragged items at its end = 2px dashed teal around the whole card; dragging = 2.5px teal border with glow; no focus rectangles on text fields (buttons and tick boxes keep a keyboard focus ring).
+- **Dark mode:** the toolbar's moon button switches between light and dark (pressed = dark; it shows the same pressed look as Snap to grid: soft honey with an amber border). A first visit on a device follows the computer's light / dark setting; once the button is pressed, that device remembers the choice (it is not synced, not saved with the board, and not undone by Ctrl+Z). Dark mode changes only colours: canvas #1C1B19 with #45413B dots, toolbar #232220, cards #2B2926 with a #3D3A35 border and #ECE8E1 text, accent amber #5FB3AB. Columns use a deep, muted shade of each swatch (`DARK_PALETTE` in `src/model/theme.ts`, same names; uncoloured columns #2A2825), and the Colour menu shows those shades. Every dark column colour keeps at least 7:1 contrast with the text. Faded toolbar buttons fade a little less in dark mode (55% instead of 45%; Undo/Redo 50% instead of 40%). Placeholder text is #736C62 in light mode and #A39D93 in dark mode, readable at about 4.5:1.
+- **States:** selection = 2px solid amber outline; size match = 2px dashed amber; a list about to take dragged items at its end = 2px dashed amber around the whole card; dragging = 2.5px amber border with glow; no focus rectangles on text fields (buttons and tick boxes keep a keyboard focus ring).
 - **Accessibility:** tick boxes, resize handles and the item grip can be pressed within at least 24×24px (the drawn handles stay small). Screen readers hear cards as "To-do list: Groceries" / "Link: …" / "Note" and columns as "Column: Week" ("Untitled …" when there is no title); the board area is called "Board". Placeholders: "Add an item" for a blank checklist item, "Paste a link address" for a link's address.
 
 | Swatch | Background | Edge | Text |

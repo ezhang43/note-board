@@ -1,5 +1,10 @@
 # Changelog
 
+## Due dates (2026-10-05)
+
+- Point at a checklist item and click the new calendar button to give it a due date: Today, Tomorrow, Next week or any day. A small chip under the item shows when it is due, amber for today and red when overdue. Click the chip to change or remove the date.
+- The calendar button by the zoom control shows how many items are due today or overdue, on all your boards. Click it for the list, and click an item to jump straight to it.
+
 ## Several boards, and boards inside boards (2026-10-05)
 
 - A new **Boards** button (left end of the toolbar) lists all your boards. **New board** makes a fresh board; **Add a board here** puts a board card on this board that opens a new board inside it.

@@ -134,6 +134,10 @@ export interface Ui {
   preview: { meta: VersionMeta; board: Board } | null;
   /** Search (owner request): what is being looked for, and the match being shown (null: none). */
   find: { query: string; current: Match | null } | null;
+  /** The checklist item whose due date is being picked (owner request: due dates). */
+  dueFor: { cardId: string; itemId: string } | null;
+  /** The Due panel (what is due today or overdue, on every board) is open. */
+  dueOpen: boolean;
 }
 
 /**
@@ -177,4 +181,6 @@ export const emptyUi: Ui = {
   historyOpen: false,
   preview: null,
   find: null,
+  dueFor: null,
+  dueOpen: false,
 };

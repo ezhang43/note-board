@@ -1,5 +1,6 @@
 import { boxProps } from './textBox';
 import { openLinkOnCtrlClick } from './TextLinks';
+import { DueButton, DueChip } from './Due';
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ITEM_INDENT, sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
@@ -143,18 +144,24 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       <label className="tick">
         <input type="checkbox" aria-label="Done" checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
       </label>
-      <GrowTextarea
-        ref={ref}
-        className="item-text"
-        aria-label="Item text"
-        {...boxProps({ cardId, itemId: item.id }, item.style)}
-        find={`item:${cardId}:${item.id}`}
-        placeholder="Add an item"
-        value={item.text}
-        onChange={(text) => appStore.setItemText(cardId, item.id, text)}
-        onKeyDown={onKeyDown}
-        onClick={openLinkOnCtrlClick}
-      />
+      {/* The text, and under it the due date chip, so the text keeps the row's full width. */}
+      <div className="item-main">
+        <GrowTextarea
+          ref={ref}
+          className="item-text"
+          aria-label="Item text"
+          {...boxProps({ cardId, itemId: item.id }, item.style)}
+          find={`item:${cardId}:${item.id}`}
+          placeholder="Add an item"
+          value={item.text}
+          onChange={(text) => appStore.setItemText(cardId, item.id, text)}
+          onKeyDown={onKeyDown}
+          onClick={openLinkOnCtrlClick}
+        />
+        {item.due && <DueChip cardId={cardId} itemId={item.id} due={item.due} done={item.done || leaving} />}
+      </div>
+      {/* Due date (owner request): a calendar button on hover, beside the trash; with a date, the chip instead. */}
+      {!item.due && <DueButton cardId={cardId} itemId={item.id} />}
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
       {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}
       <button

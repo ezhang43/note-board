@@ -159,6 +159,13 @@ A to-do list is an editable title plus a tree of items up to 6 levels deep, with
 - Pressing on an item and dragging down or up into another card of the same column carries the selection on through those cards (never into other columns or loose cards).
 - With items selected in several lists: Delete / Backspace, ticking and the trash work on all of them (a list left empty keeps one blank item); Ctrl+C copies them, putting each list's title on its own line with its items indented two spaces under it, in board order (columns left to right, each top to bottom, then loose lists top to bottom, left to right). Tab, Ctrl+X, Ctrl+V and dragging do nothing then.
 
+### Due dates
+
+- Any checklist item can have a due date: a day, with no time and no reminders. On hover a calendar button shows beside the trash (the strip kept free for the hover buttons is wide enough for grip, trash and calendar, so text never moves). On a phone the same button is in the bar above the keyboard.
+- The calendar opens a small menu: **Today**, **Tomorrow**, **Next week**, a box to pick any day, and **No due date** (shown when the item has one). Escape or a click elsewhere closes it. Setting or clearing a date is one undo step; it is saved, synced, copied with the item and kept when the item moves to Completed.
+- An item with a date shows a small chip under its text: Today, Tomorrow, Yesterday, a weekday within the next six days (Fri), otherwise the date (Tue 20 Oct, with the year when not this year). Today's chip is amber, an overdue one red, a ticked item's faded. Clicking the chip opens the same menu.
+- The **Due** button (calendar, by the zoom control; in the phone's ⋯ menu) shows a red count of unticked items due today or earlier, on every board. It opens the Due panel on the right (it takes the place of Version history; only one shows at a time): **Overdue** (oldest first, each with its date) and **Today**, each item with its list's title and, when there are several boards, its board's name. Clicking one opens its board, brings the item into view and puts the cursor in it. Ticked items, and sub-items of ticked items, are left out. With nothing due it says so and how to add a date. Escape closes it.
+
 ### Clean up and the Completed card
 
 - Toolbar **Clean up** moves every ticked checklist item on the board into the board's one **Completed** card: ticked top-level items (the Completed sections) and ticked sub-items under open items, each with everything nested under it. Lists left empty get one blank item. It is faded when nothing is ticked, and is one undo step.

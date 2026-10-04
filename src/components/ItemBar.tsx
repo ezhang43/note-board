@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { appStore } from '../store/appStore';
-import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon } from './icons';
+import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon, CalendarIcon } from './icons';
 
 type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
 
@@ -77,6 +77,7 @@ export function ItemBar() {
       {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, field.selectionStart ?? 0))}
       {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, field.selectionStart ?? 0))}
       {button('Tick', <CheckIcon />, () => appStore.toggleItem(cardId, itemId))}
+      {button('Due date', <CalendarIcon size={18} />, () => appStore.openDuePicker(cardId, itemId))}
       {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
     </div>
   );

@@ -2,6 +2,7 @@ import { Canvas } from './components/Canvas';
 import { FindBar } from './components/FindBar';
 import { FormatBar } from './components/FormatBar';
 import { HistoryPanel, PreviewBar } from './components/HistoryPanel';
+import { DuePanel, DuePicker } from './components/Due';
 import { ItemBar } from './components/ItemBar';
 import { PhoneBar } from './components/PhoneBar';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
@@ -19,7 +20,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   useShortcuts();
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
-  const historyOpen = useAppState((s) => s.ui.historyOpen);
+  const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.dueOpen);
   const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
   return (
     <div className={classes}>
@@ -30,6 +31,8 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <ZoomControl saveNote={saveNote} />
       <FindBar />
       <HistoryPanel />
+      <DuePanel />
+      <DuePicker />
       <PreviewBar />
       <FormatBar />
       <ShortcutsPanel />

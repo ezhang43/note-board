@@ -106,7 +106,7 @@ export function blockActions(ctx: StoreContext) {
     },
 
     // ---------- version history (owner request) ----------
-    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
+    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Show an old version on the board, read-only (the real board is untouched). */
     previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null }),
     endPreview: () => updateUi({ preview: null }),

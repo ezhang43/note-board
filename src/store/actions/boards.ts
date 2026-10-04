@@ -71,6 +71,14 @@ export function boardActions(ctx: StoreContext) {
         return others;
       });
     },
+    // ---------- the Due panel (owner request: due dates) ----------
+    toggleDuePanel: () => ctx.updateUi({ dueOpen: !ctx.state.ui.dueOpen, dueFor: null, historyOpen: false, preview: null }),
+    /** Go to a checklist item from the Due panel: open its board, select its list, cursor in the item. */
+    goToItem(boardId: string, cardId: string, itemId: string) {
+      if (ctx.state.boards.open !== boardId) openBoard(boardId);
+      if (!ctx.state.board.cards[cardId]) return;
+      ctx.updateUi({ selection: [cardId], itemSel: null, focusItem: itemId, focusOffset: null });
+    },
     /**
      * Put an old version back (version history): the open board as it was then (one change, so
      * Ctrl+Z undoes it), and any board deleted since comes back too. Other boards are left as they are.

@@ -13,6 +13,7 @@ import {
   ToolGroup,
 } from './Toolbar';
 import { TextSizeButtons } from './ZoomControl';
+import { DuePanelButton } from './Due';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
@@ -75,6 +76,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <SameWidthButton labelled />
           <CleanUpButton />
           <FileMenu />
+          <DuePanelButton labelled />
           <DarkModeButton labelled />
           <button
             type="button"

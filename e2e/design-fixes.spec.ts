@@ -128,7 +128,8 @@ test('checklist text stops before the grip and trash, so hovering never covers i
   const row = card.locator('[data-item-id]').first();
   const field = row.getByLabel('Item text');
   const before = (await field.boundingBox())!;
-  expect(before.width).toBeGreaterThan((await card.boundingBox())!.width - 110);
+  // The strip kept free holds grip, trash and the due-date calendar (64px).
+  expect(before.width).toBeGreaterThan((await card.boundingBox())!.width - 135);
   await row.hover();
   const trash = row.getByRole('button', { name: 'Delete item' });
   await expect(trash).toBeVisible();
@@ -139,6 +140,8 @@ test('checklist text stops before the grip and trash, so hovering never covers i
   const rowBox = (await row.boundingBox())!;
   expect(after.x + after.width).toBeLessThanOrEqual(t.x);
   expect(after.x + after.width).toBeLessThanOrEqual(g.x);
+  const d = (await row.getByRole('button', { name: 'Due date' }).boundingBox())!;
+  expect(after.x + after.width).toBeLessThanOrEqual(d.x);
   expect(g.x + g.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
 });
 

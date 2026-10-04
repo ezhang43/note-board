@@ -5,6 +5,7 @@ import { parseStyle } from './textStyle';
 import { clampZoom, createView } from './view';
 import type { Board, Card, Column, CompletedGroup, TodoItem, View } from './types';
 import { DEFAULT_COLOR } from './cards';
+import { isDueDate } from './due';
 
 export const BOARD_KEY = 'note-board:v1';
 export const VIEW_KEY = 'note-board:view:v1';
@@ -51,7 +52,7 @@ function parseItems(v: unknown, depth = 0): TodoItem[] {
   if (!Array.isArray(v) || depth > 10) return [];
   return v.filter(isObject).flatMap((it) =>
     typeof it.id === 'string'
-      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style) }]
+      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style), ...(isDueDate(it.due) ? { due: it.due } : {}) }]
       : [],
   );
 }

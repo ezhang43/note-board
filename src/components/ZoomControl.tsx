@@ -4,6 +4,7 @@ import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import { FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
+import { DuePanelButton } from './Due';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
@@ -27,6 +28,7 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <button type="button" className="help-button" aria-label="Search" title="Search the board (Ctrl+F)" aria-pressed={findOpen} onClick={() => (findOpen ? appStore.closeFind() : appStore.openFind())}>
         <SearchIcon />
       </button>
+      <DuePanelButton />
       <button type="button" className="help-button" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
         <HistoryIcon />
       </button>

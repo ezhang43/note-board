@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// A session working in another copy of the project can run its tests at the same time on other
+// ports: E2E_PORT (default 5173) and E2E_PREVIEW_PORT (default 4173).
+const port = Number(process.env.E2E_PORT ?? 5173);
+const previewPort = Number(process.env.E2E_PREVIEW_PORT ?? 4173);
+
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
 
 export default defineConfig({
@@ -10,7 +15,7 @@ export default defineConfig({
   retries: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${port}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -22,17 +27,17 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: desktop, testIgnore: /published/ },
     // The published build (sign-in, offline copy), served as GitHub Pages serves it.
-    { name: 'published', use: { ...desktop, baseURL: 'http://localhost:4173/note-board/' }, testMatch: /published/ },
+    { name: 'published', use: { ...desktop, baseURL: `http://localhost:${previewPort}/note-board/` }, testMatch: /published/ },
   ],
   webServer: [
     {
-      command: 'npm run dev',
-      url: 'http://localhost:5173',
+      command: `npm run dev -- --port ${port} --strictPort`,
+      url: `http://localhost:${port}`,
       reuseExistingServer: true,
     },
     {
-      command: 'npm run build && npx vite preview --port 4173 --strictPort',
-      url: 'http://localhost:4173/note-board/',
+      command: `npm run build && npx vite preview --port ${previewPort} --strictPort`,
+      url: `http://localhost:${previewPort}/note-board/`,
       reuseExistingServer: true,
       timeout: 180_000,
     },

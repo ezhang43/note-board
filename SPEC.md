@@ -10,7 +10,7 @@ The clickable prototype (`note-board-prototype-reference.html`) is the reference
 
 - **Who it's for:** one person organising ideas, plans and tasks on a free-form canvas.
 - **Version 1 goal:** everything in this spec working reliably, saved in the browser and synced to the owner's account.
-- **Not in version 1:** sharing and real-time collaboration.
+- **Not in version 1:** image cards. Sharing and real-time collaboration are being built (see "Sharing and editing together").
 
 ## Build rules for Claude Code
 
@@ -221,6 +221,16 @@ Every block action works on one block or on a whole selection, and every change 
 - Installable as an app: in Edge or Chrome the site can be installed (address-bar Install button), giving BusyAnts its own window without an address bar, a Start menu and taskbar icon (a simple chibi ant silhouette on warm yellow), and the same sign-in, sync and offline behaviour. It updates itself whenever the site does. The icon files are named after the app (`busyants-192.png`, `busyants-512.png`, `busyants-maskable-512.png`, `busyants-icon.svg`, and `busyants-apple-180.png` for iPhone / iPad home screens) so a changed icon gets new file names and is fetched again rather than kept from before.
 - Running the app locally (`npm run dev`) and the tests stay browser-only, with no sign-in.
 
+## Sharing and editing together (being built, owner request 2026-10-05)
+
+Several people can work on the same board at once, on the published site. Built in steps; this section says which are done.
+
+- **Sharing by link (planned, step 2).** Any board except the home board can be shared. The owner gets a link; anyone who opens it and signs in with Google can see and edit that board and every board inside it (sub-boards added later too). The board then shows in their Boards menu. Only the person who shared it can turn the link off, remove people, rename or delete the board, or restore an old version of it; everyone else can change everything on it.
+- **Edits are combined (done, step 1: `src/model/merge.ts`).** When two people change a board at the same time, every change to different things is kept: different cards, different parts of one card (its text and its position, say), different checklist items, cards both added to one column, arrows both drew. Only when both change the very same thing (the same text box, the same card's colour) does the later change win. A card or item one person deletes while the other is changing it is kept, so nothing typed is lost. The combined board always keeps the board's rules (every card in one place, every item in one list, no arrow to a missing block).
+- **Undo (planned, step 3).** Ctrl+Z undoes only your own changes, and changes from other people no longer clear undo history.
+- **Who's here (planned, step 4).** Small round photos of everyone who has the board open; a coloured outline with the person's name on any card or column they're typing in or dragging.
+- **Version history (planned, step 5)** for shared boards, restored only by the person who shared it.
+
 ## Look and feel
 
 Professional but with colour: white cards and soft-tinted columns on a warm neutral canvas, thin borders, soft shadows, one amber accent, all in the warm honey tones of the BusyAnts icon (an ant on yellow).
@@ -264,7 +274,7 @@ Build in this order, each step tested and working before the next.
 
 After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, white cards with 16 column colours and Auto-colour, Clean up with the Completed card, Delete joining checklist items, Tab on several items, collapse returning pushed blocks, and the published site with sign-in, sync, offline use and installing as an app.
 
-**Not in version 1:** sharing, real-time collaboration, image cards, connector lines. (Several boards and boards inside boards were added on 5 Oct 2026.)
+**Not in version 1:** image cards. (Several boards and boards inside boards were added on 5 Oct 2026, arrows between blocks since, and sharing and real-time collaboration are being built from 5 Oct 2026.)
 
 **Decisions (1 Oct 2026)**
 

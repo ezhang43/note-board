@@ -1,5 +1,9 @@
 # Changelog
 
+## Editing together, step 1: combining edits (2026-10-05)
+
+- Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
+
 ## Owner requests: Sign out, Checklist, Miro-style arrows, Clean up per list (2026-10-05)
 
 - Sign out is no longer cut off at the right of the toolbar. It is now a small icon (an arrow leaving a door) at the far right, and the whole toolbar fits windows from 1280px wide, also inside a sub-board.

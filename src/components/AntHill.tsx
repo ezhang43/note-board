@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { FLAG_FOOT, HILL_PATH, HILL_VIEW, TRAIL_PATH, antClimb, trailPoint } from '../model/antHill';
+import { FLAG_FOOT, HILL_PATH, HILL_VIEW, TRAIL_PATH, antClimb, climbedCount, trailPoint } from '../model/antHill';
+import { completedCardOf } from '../model/completed';
+import { useAppState } from '../store/appStore';
 import { reducedMotion } from '../store/env';
 
 /**
- * The ant hill at the top of the Completed card (owner request): the ant stands as far up the
- * trail as the items cleaned up so far take it. When more arrive it walks up slowly.
+ * The ant hill at the top of the board (owner request): the ant stands as far up the trail as the
+ * items cleaned up into the Completed card so far take it. When more arrive it walks up slowly.
+ * It stays in place on screen while the board moves, and clicks go through it.
  */
-export function AntHill({ count }: { count: number }) {
+export function AntHill() {
+  const count = useAppState((s) => climbedCount(completedCardOf(s.board)));
+  const boardId = useAppState((s) => s.boards.open);
   const climb = antClimb(count);
-  const { value, moving } = useWalk(climb.step / climb.steps, climb.hill);
+  // Each board has its own Completed card, so its own hill: the ant only walks on the same hill of the same board.
+  const { value, moving } = useWalk(climb.step / climb.steps, `${boardId}:${climb.hill}`);
   const at = trailPoint(value);
   const label = climb.atTop ? `Ant at the top of hill ${climb.hill}` : `Ant on hill ${climb.hill}: ${climb.step} of ${climb.steps} steps to the top`;
   return (
@@ -52,18 +58,18 @@ function AntArt() {
 
 /**
  * Walks `target` (0 = foot, 1 = top) from where the ant is, slowly: about a second plus a quarter
- * second per tenth of the hill, at most three seconds. On another hill (or with reduced motion,
- * or when first shown) it is there at once, so the ant never slides back down a hill.
+ * second per tenth of the hill, at most three seconds. On another hill or board (`place`), with
+ * reduced motion, or when first shown, it is there at once, so the ant never slides down a hill.
  */
-function useWalk(target: number, hill: number): { value: number; moving: boolean } {
+function useWalk(target: number, place: string): { value: number; moving: boolean } {
   const [value, setValue] = useState(target);
   const [moving, setMoving] = useState(false);
   const now = useRef(target);
-  const onHill = useRef(hill);
+  const at = useRef(place);
   useEffect(() => {
     const from = now.current;
-    if (onHill.current !== hill || reducedMotion() || from === target) {
-      onHill.current = hill;
+    if (at.current !== place || reducedMotion() || from === target) {
+      at.current = place;
       now.current = target;
       setValue(target);
       setMoving(false);
@@ -83,6 +89,6 @@ function useWalk(target: number, hill: number): { value: number; moving: boolean
     setMoving(true);
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [target, hill]);
+  }, [target, place]);
   return { value, moving };
 }

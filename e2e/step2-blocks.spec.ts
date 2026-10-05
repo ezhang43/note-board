@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { fontsLoaded } from './helpers';
 
 // Step 2: cards and columns — add, edit, move, drop into columns, collapse, colour, delete with confirmation.
 
@@ -9,6 +10,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (e) => errors.push(e.message));
   (page as WithErrors).errors = errors;
   await page.goto('/');
+  await fontsLoaded(page);
 });
 
 test.afterEach(async ({ page }) => {

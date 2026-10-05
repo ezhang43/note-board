@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { fontsLoaded } from './helpers';
 
 // Step 1: canvas, toolbar, pan and zoom, grid, and saving to the browser.
 
@@ -24,6 +25,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (e) => errors.push(e.message));
   (page as Page & { errors: string[] }).errors = errors;
   await page.goto('/');
+  await fontsLoaded(page);
 });
 
 test.afterEach(async ({ page }) => {

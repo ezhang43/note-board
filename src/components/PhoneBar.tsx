@@ -36,7 +36,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
   }, [open]);
 
   const toggle = (menu: 'add' | 'more') => setOpen((o) => (o === menu ? null : menu));
-  const add = (kind: 'note' | 'todo' | 'link' | 'column' | 'board') => {
+  const add = (kind: 'note' | 'todo' | 'column' | 'board') => {
     setOpen(null);
     if (kind === 'column') appStore.addColumn();
     else if (kind === 'board') appStore.addBoardCard();
@@ -53,14 +53,11 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <button type="button" role="menuitem" onClick={() => add('todo')}>
             To-do list
           </button>
-          <button type="button" role="menuitem" onClick={() => add('link')}>
-            Link
-          </button>
           <button type="button" role="menuitem" onClick={() => add('column')}>
             Column
           </button>
           <button type="button" role="menuitem" onClick={() => add('board')}>
-            Board
+            Sub-board
           </button>
         </div>
       )}

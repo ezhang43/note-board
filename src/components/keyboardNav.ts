@@ -39,12 +39,16 @@ function reveal(el: Element) {
   appStore.panBy(shift(r.left, r.right, view.left, view.right), shift(r.top, r.bottom, view.top, view.bottom));
 }
 
-/** Selects a card and puts the cursor in one of its fields (if it has any). */
-function goToCard(card: HTMLElement, field: Field | null, atEnd: boolean) {
-  appStore.select(card.dataset.cardId!);
+/** Selects a block (card or column) and puts the cursor in one of its fields (if it has any). */
+function goToBlock(id: string, shown: Element, field: Field | null, atEnd: boolean) {
+  appStore.select(id);
   if (field) focusField(field, atEnd);
   else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  reveal(card);
+  reveal(shown);
+}
+
+function goToCard(card: HTMLElement, field: Field | null, atEnd: boolean) {
+  goToBlock(card.dataset.cardId!, card, field, atEnd);
 }
 
 /**
@@ -76,38 +80,59 @@ function arrowThroughFields(el: Field, step: -1 | 1): boolean {
 }
 
 /**
- * Alt+arrow: jump to the nearest card in that direction (loose or in a column), select it and put
- * the cursor in its first field. Starts from the card being typed in, else the selected block, else
- * picks the card nearest the middle of the screen.
+ * A place Alt+arrows can land on: every card on screen, and every column at its title strip (so
+ * Up from a column's top card reaches the column, and an empty or collapsed column can be reached).
+ */
+type Stop = { id: string; el: HTMLElement; field: Field | null };
+
+function stops(): Stop[] {
+  const shown = (el: HTMLElement) => el.getClientRects().length > 0;
+  const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-card-id]'))
+    .filter(shown)
+    .map((card) => ({ id: card.dataset.cardId!, el: card, field: fieldsOf(card)[0] ?? null }));
+  const columns = Array.from(document.querySelectorAll<HTMLElement>('[data-col-id]'))
+    .filter(shown)
+    .map((col) => ({
+      id: col.dataset.colId!,
+      el: col.querySelector<HTMLElement>('.column-header') ?? col,
+      field: col.querySelector<Field>('.column-header input, .column-header textarea'),
+    }));
+  return [...cards, ...columns];
+}
+
+/**
+ * Alt+arrow: jump to the nearest card or column in that direction (only ones wholly that way),
+ * select it and put the cursor at the end of its first field. Starts from the card or column being
+ * typed in, else the selected block, else picks the card or column nearest the middle of the screen.
  */
 function jumpToCard(dir: Direction) {
-  const active = document.activeElement;
-  const typingIn = active instanceof HTMLElement ? active.closest<HTMLElement>('[data-card-id]') : null;
+  const all = stops();
+  const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const typingIn = active?.closest<HTMLElement>('[data-card-id], [data-col-id]');
   const sel = appStore.getState().ui.selection;
-  const selectedId = sel.length === 1 ? sel[0] : null;
-  const from =
-    typingIn ??
-    (selectedId ? document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(selectedId)}"], [data-col-id="${CSS.escape(selectedId)}"]`) : null);
+  const fromId = typingIn ? (typingIn.dataset.cardId ?? typingIn.dataset.colId) : sel.length === 1 ? sel[0] : null;
+  const from = all.find((s) => s.id === fromId) ?? null;
 
   const toRect = (r: DOMRect) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
-  const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-card-id]')).filter((c) => c !== from);
-  const candidates = cards.map((c) => ({ id: c.dataset.cardId!, rect: toRect(c.getBoundingClientRect()) }));
+  const others = all.filter((s) => s !== from);
+  // Keyed by position in the list: a card and a column could in theory share an id.
+  const candidates = others.map((s, i) => ({ id: String(i), rect: toRect(s.el.getBoundingClientRect()) }));
 
-  let targetId: string | null;
+  let found: string | null;
   if (from) {
-    targetId = nearestInDirection(toRect(from.getBoundingClientRect()), candidates, dir);
+    found = nearestInDirection(toRect(from.el.getBoundingClientRect()), candidates, dir);
   } else {
     const view = canvas()?.getBoundingClientRect();
     if (!view) return;
     const mid = { x: view.left + view.width / 2, y: view.top + view.height / 2 };
     const dist = (r: { x: number; y: number; w: number; h: number }) => Math.hypot(r.x + r.w / 2 - mid.x, r.y + r.h / 2 - mid.y);
-    targetId = candidates.reduce<{ id: string; d: number } | null>((best, c) => {
+    found = candidates.reduce<{ id: string; d: number } | null>((best, c) => {
       const d = dist(c.rect);
       return !best || d < best.d ? { id: c.id, d } : best;
     }, null)?.id ?? null;
   }
-  const target = targetId ? cards.find((c) => c.dataset.cardId === targetId)! : null;
-  if (target) goToCard(target, fieldsOf(target)[0] ?? null, true);
+  const target = found === null ? null : others[Number(found)];
+  if (target) goToBlock(target.id, target.el, target.field, true);
 }
 
 const DIRECTIONS: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };

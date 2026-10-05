@@ -87,7 +87,7 @@ test('Ctrl + A then Delete asks about the column, then deletes everything select
   await add(page, 'New column');
   await add(page, 'Note'); // into the column
   await clickEmpty(page);
-  await add(page, 'Link');
+  await add(page, 'Note');
   await clickEmpty(page);
   await page.keyboard.press('Control+a');
   await expect(columns(page).first()).toHaveClass(/selected/);
@@ -133,8 +133,8 @@ test('Ctrl + C, Ctrl + V pastes copies 40px further each time; a column copies w
   await expectNoOverlaps(page);
 
   await clickEmpty(page);
-  await add(page, 'Link');
-  await page.keyboard.press('Escape'); // leave the new link's title (it takes the cursor), keeping it selected
+  await add(page, 'Note');
+  await page.keyboard.press('Escape'); // leave the new note's text (it takes the cursor), keeping it selected
   const link = page.locator('.card.loose.selected');
   const p0 = await boardPos(link);
   await page.keyboard.press('Control+c');

@@ -1,5 +1,12 @@
 # Changelog
 
+## Owner requests: icon, no Link button, sub-boards, Alt + arrows (2026-10-05)
+
+- The icon files have new names, so the installed app, the browser tab and phone home screens pick up the ant instead of an old saved picture. iPhones and iPads now get the ant on the home screen too.
+- The toolbar (and the phone's + menu) no longer has Link: you add notes and to-do lists. Link cards already on your boards still work.
+- In the Boards menu, "Add a board here" now reads "Add a sub-board here" (on a phone: + → Sub-board).
+- Alt + arrow keys now go the way the arrow points: → only goes to something to the right, ↓ only to something below, and a card level with you wins over one off to the side. Columns are stops too, at their title: ↑ from a column's top card goes to the column title, and empty or collapsed columns can be reached.
+
 ## Buy me a coffee (2026-10-05)
 
 - A small coffee-cup button in the bottom-right corner, next to ?, opens the BusyAnts Buy Me a Coffee page in a new tab. On a phone it is in the ⋯ menu.

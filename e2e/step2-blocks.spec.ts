@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { fontsLoaded } from './helpers';
+import { fontsLoaded, importLinkCard } from './helpers';
 
 // Step 2: cards and columns — add, edit, move, drop into columns, collapse, colour, delete with confirmation.
 
@@ -22,7 +22,7 @@ const looseCards = (page: Page) => page.locator('.card.loose');
 const columns = (page: Page) => page.locator('[data-col-id]');
 /** A loose block's position on the board (not on screen), from its style. */
 const boardPos = (l: Locator) => l.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
-const add = (page: Page, name: 'Note' | 'To-do list' | 'Link' | 'New column') =>
+const add = (page: Page, name: 'Note' | 'To-do list' | 'New column') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
 
 async function box(l: Locator) {
@@ -87,13 +87,13 @@ test('Add To-do list starts untitled with one blank item; the cursor is in the t
 });
 
 test('Link card opens the address in a new tab', async ({ page }) => {
-  await add(page, 'Link');
-  const link = cards(page).first();
+  // The toolbar no longer adds links (owner request, 2026-10-05); boards can still hold them.
+  const link = await importLinkCard(page, 'Inspiration', 'https://example.org');
   await expect(link).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   const open = link.locator('.link-open');
+  await link.getByLabel('Link address').fill('');
   await expect(open).toHaveText('Open link');
   await expect(open).not.toHaveAttribute('href');
-  await link.getByLabel('Link title').fill('Inspiration');
   await link.getByLabel('Link address').fill('www.example.com/ideas');
   await expect(open).toHaveText('Open example.com');
   await expect(open).toHaveAttribute('href', 'https://www.example.com/ideas');
@@ -101,7 +101,7 @@ test('Link card opens the address in a new tab', async ({ page }) => {
 });
 
 test('new cards and columns never appear on top of existing blocks', async ({ page }) => {
-  for (const kind of ['Note', 'To-do list', 'Link', 'New column', 'Note', 'New column'] as const) {
+  for (const kind of ['Note', 'To-do list', 'Note', 'New column', 'Note', 'New column'] as const) {
     await clickEmpty(page); // nothing selected, so every card goes loose on the board
     await add(page, kind);
   }
@@ -126,9 +126,9 @@ test('adding with a column selected puts the card at the end; with a card in a c
 
   // Select the first card, then add: it goes directly below the first card.
   await col.locator('[data-card-id]').first().click({ position: { x: 30, y: 18 } });
-  await add(page, 'Link');
+  await add(page, 'To-do list');
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
-  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'link');
+  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'todo');
   await expect(col.locator('.column-count')).toHaveText('3');
   await expect(looseCards(page)).toHaveCount(0);
 });
@@ -143,14 +143,14 @@ test('drag a loose card into a column at the pointer, then out again', async ({ 
   await col.locator('[data-card-id]').nth(1).getByLabel('Note text').fill('bottom');
 
   await clickEmpty(page);
-  await add(page, 'Link');
-  const link = looseCards(page).first();
+  await add(page, 'To-do list');
+  const list = looseCards(page).first();
 
   // Drop it between the two notes.
   const top = await box(col.locator('[data-card-id]').first());
-  await dragTo(page, link, { x: top.x + 60, y: top.y + top.height + 2 });
+  await dragTo(page, list, { x: top.x + 60, y: top.y + top.height + 2 });
   await expect(looseCards(page)).toHaveCount(0);
-  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'link');
+  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'todo');
 
   // Drag it back out onto empty board.
   const moved = col.locator('[data-card-id]').nth(1);
@@ -158,7 +158,7 @@ test('drag a loose card into a column at the pointer, then out again', async ({ 
   await dragTo(page, moved, { x: target.x + 300, y: target.y - 150 });
   await expect(col.locator('[data-card-id]')).toHaveCount(2);
   await expect(looseCards(page)).toHaveCount(1);
-  await expect(looseCards(page).first()).toHaveAttribute('data-kind', 'link');
+  await expect(looseCards(page).first()).toHaveAttribute('data-kind', 'todo');
 });
 
 test('dropping a card on a collapsed column opens it', async ({ page }) => {
@@ -286,7 +286,7 @@ test('card × deletes it; column × asks first, then deletes the column and its 
   await col.getByLabel('Column title').fill('Ideas');
   await add(page, 'Note');
   await col.click({ position: { x: 240, y: 26 } });
-  await add(page, 'Link');
+  await add(page, 'Note');
 
   await col.getByRole('button', { name: 'Delete column and its cards' }).click();
   const dialog = page.getByRole('alertdialog');

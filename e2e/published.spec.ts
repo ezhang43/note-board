@@ -18,7 +18,7 @@ test('opens without internet after one visit online', async ({ page, context }) 
   // Wait until the offline copy is running and has saved this visit's files.
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect
-    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v3')).keys()).length))
+    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v4')).keys()).length))
     .toBeGreaterThan(2);
 
   await context.setOffline(true);
@@ -47,6 +47,27 @@ test('can be installed as an app (manifest and icons)', async ({ page, request }
   expect(manifest.icons.map((i: { sizes: string }) => i.sizes)).toEqual(
     expect.arrayContaining(['192x192', '512x512']),
   );
+});
+
+test('the ant icon has new file names, so installed apps and browser tabs drop the old cached icon', async ({ page, request }) => {
+  await page.goto('./');
+  const manifest = await (await request.get(new URL('manifest.webmanifest', page.url()).href)).json();
+  const files = [
+    ...manifest.icons.map((i: { src: string }) => i.src),
+    await page.locator('link[rel="icon"]').getAttribute('href'),
+    await page.locator('link[rel="apple-touch-icon"]').getAttribute('href'),
+  ].filter(Boolean) as string[];
+  for (const f of files) {
+    expect(f).toMatch(/busyants-[\w-]+\.(png|svg)$/);
+    const res = await request.get(new URL(f, page.url()).href);
+    expect(res.ok(), f).toBe(true);
+    expect(res.headers()['content-type']).toMatch(/image\/(png|svg\+xml)/);
+  }
+  // The old names are gone, so nothing can show the old picture by mistake.
+  for (const old of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
+    const res = await request.get(new URL(old, page.url()).href);
+    expect(res.headers()['content-type'] ?? '', old).not.toMatch(/image/);
+  }
 });
 
 test('a new version of the offline copy clears out the old one (so new icons show)', async ({ page }) => {

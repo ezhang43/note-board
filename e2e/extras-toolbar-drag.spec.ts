@@ -5,11 +5,11 @@ import { add, box, cards, clickEmpty, columns, expectNoOverlaps, freshBoardEachT
 
 freshBoardEachTest();
 
-const addButton = (page: Page, name: 'Note' | 'To-do list' | 'Link') =>
+const addButton = (page: Page, name: 'Note' | 'To-do list') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true });
 
 /** Press an Add button and drag to a point, optionally checking things before letting go. */
-async function dragFromToolbar(page: Page, name: 'Note' | 'To-do list' | 'Link', to: { x: number; y: number }, during?: () => Promise<void>) {
+async function dragFromToolbar(page: Page, name: 'Note' | 'To-do list', to: { x: number; y: number }, during?: () => Promise<void>) {
   const b = await box(addButton(page, name));
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();
@@ -38,10 +38,10 @@ test('dragging Note from the toolbar places a new note where it is let go', asyn
 });
 
 test('a plain click on an Add button still adds one card, and a drag adds only one', async ({ page }) => {
-  await addButton(page, 'Link').click();
+  await addButton(page, 'Note').click();
   await expect(cards(page)).toHaveCount(1);
   const canvas = await box(page.getByTestId('canvas'));
-  await dragFromToolbar(page, 'Link', { x: canvas.x + 200, y: canvas.y + 500 });
+  await dragFromToolbar(page, 'Note', { x: canvas.x + 200, y: canvas.y + 500 });
   await expect(cards(page)).toHaveCount(2);
 });
 
@@ -65,11 +65,11 @@ test('dragging onto a column puts the card into it at the pointer', async ({ pag
   await add(page, 'Note');
   await clickEmpty(page);
   const first = await box(col.locator('[data-card-id]').first());
-  await dragFromToolbar(page, 'Link', { x: first.x + 60, y: first.y + first.height + 3 }, async () => {
+  await dragFromToolbar(page, 'To-do list', { x: first.x + 60, y: first.y + first.height + 3 }, async () => {
     await expect(col).toHaveClass(/drop-target/);
   });
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
-  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'link');
+  await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'todo');
   await expect(looseCards(page)).toHaveCount(0);
 });
 

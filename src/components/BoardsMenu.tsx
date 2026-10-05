@@ -73,7 +73,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
           </div>
           <div className="boards-actions">
             <button type="button" role="menuitem" title="A new board inside this one, with a card here that opens it" onClick={pick(() => appStore.addBoardCard())}>
-              Add a board here
+              Add a sub-board here
             </button>
             <button type="button" role="menuitem" title="A new board on its own" onClick={pick(() => appStore.newBoard())}>
               New board

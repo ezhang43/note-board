@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, box, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, box, cards, clickEmpty, columns, freshBoardEachTest, importLinkCard } from './helpers';
 
 // The accessibility and wording reviews (2026-10-03, owner approved all of it).
 
@@ -94,7 +94,7 @@ test('wording: placeholders, empty hint, Select tool tip, Colour label', async (
   const l = await list(page, '', []);
   await expect(l.getByLabel('Item text').first()).toHaveAttribute('placeholder', 'Add an item');
   await clickEmpty(page);
-  await add(page, 'Link');
+  await importLinkCard(page);
   await expect(page.getByLabel('Link address')).toHaveAttribute('placeholder', 'Paste a link address');
 });
 

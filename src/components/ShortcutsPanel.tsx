@@ -22,7 +22,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Ctrl+D', 'Duplicate the selection'],
       ['Delete / Backspace', 'Delete the selection'],
       ['Arrows (Shift: 5 steps)', 'Move the selection'],
-      ['Alt+arrows', 'Jump to the nearest card that way'],
+      ['Alt+arrows', 'Jump to the nearest card or column that way'],
       ['Escape', 'Leave a text field (keeps the card selected), then clear the selection'],
     ],
   },

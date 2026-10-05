@@ -1134,6 +1134,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  */
 .app.previewing .world { pointer-events: none; }
 .help-button { display: inline-flex; align-items: center; justify-content: center; }
+a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .help-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 .app.history-open .corner-controls { right: 324px; }
 .history-panel {

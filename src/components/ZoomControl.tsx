@@ -1,14 +1,14 @@
-import { ZOOM_STEP } from '../model/constants';
+import { DONATE_URL, ZOOM_STEP } from '../model/constants';
 import { FONT_SIZES } from '../model/font';
 import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import { FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
+import { CoffeeIcon, FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
 import { DuePanelButton } from './Due';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * (A− / A+), the keyboard shortcuts (?) button and the zoom control.
+ * (A− / A+), the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
@@ -35,6 +35,9 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?
       </button>
+      <a className="help-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" aria-label="Buy me a coffee" title="Buy me a coffee">
+        <CoffeeIcon />
+      </a>
       <div className="zoom-control" role="group" aria-label="Zoom">
         <button type="button" aria-label="Fit to screen" title="Fit to screen (Shift+1)" onClick={appStore.fitToScreen}>
           <FitIcon />

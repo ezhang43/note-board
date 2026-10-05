@@ -251,3 +251,14 @@ export function CalendarIcon({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+
+/** Buy me a coffee: a cup with a handle and steam. */
+export function CoffeeIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4 10h13v4a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6v-4z" />
+      <path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17" />
+      <path d="M8 3v3M12 3v3" />
+    </svg>
+  );
+}

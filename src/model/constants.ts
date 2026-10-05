@@ -46,3 +46,6 @@ export const COLUMN_DROP_REACH = 60;
  * so it can be placed where it won't cover anything.
  */
 export const NEW_BLOCK_H = { note: 160, todo: 120, link: 160, completed: 160, board: 120, column: COLUMN_MIN_H } as const;
+
+/** The owner's Buy Me a Coffee page (owner request 2026-10-05), opened by the coffee button. */
+export const DONATE_URL = 'https://buymeacoffee.com/ezcookie';

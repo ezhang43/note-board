@@ -91,7 +91,8 @@ service cloud.firestore {
         allow create, update: if signedIn() && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['name', 'photo', 'key', 'joinedAt'])
           && request.resource.data.name is string && request.resource.data.name.size() <= 200
-          && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 2000))
+          && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 2000
+            && request.resource.data.photo.matches('https://.*')))
           && (share().owner == uid || (share().link != null && request.resource.data.key == share().link));
         allow delete: if signedIn()
           && (request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid);

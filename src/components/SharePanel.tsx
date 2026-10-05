@@ -163,7 +163,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                     aria-label={`Remove ${p.name}`}
                     disabled={busy}
                     onClick={() => {
-                      if (window.confirm(`Remove ${p.name}? “${rootName}” will no longer be shared with them.`)) void run(() => sharing.removePerson(share.id, p.uid));
+                      if (window.confirm(`Remove ${p.name}? “${rootName}” will no longer be shared with them, and the link changes, so share the new one with anyone else who should join.`)) void run(() => sharing.removePerson(share.id, p.uid));
                     }}
                   >
                     Remove
@@ -199,7 +199,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
 
 /** A person's photo, or their initial on a coloured circle. */
 export function Avatar({ person }: { person: Person }) {
-  if (person.photo) return <img className="avatar" src={person.photo} alt="" referrerPolicy="no-referrer" width={24} height={24} />;
+  if (person.photo?.startsWith('https://')) return <img className="avatar" src={person.photo} alt="" referrerPolicy="no-referrer" width={24} height={24} />;
   return (
     <span className="avatar" aria-hidden="true">
       {person.name.trim().charAt(0).toUpperCase() || '?'}

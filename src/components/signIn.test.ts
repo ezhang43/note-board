@@ -45,5 +45,7 @@ describe('who can use BusyAnts', () => {
     expect(rules).toContain('request.resource.data.key == share().link');
     expect(rules).toContain('request.resource.data.rev == resource.data.rev + 1');
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
+    // A member's photo is only ever a secure web address (review fix).
+    expect(rules).toContain("request.resource.data.photo.matches('https://.*')");
   });
 });

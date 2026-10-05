@@ -18,7 +18,7 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
-import type { CollabBackend, Person } from '../store/collab';
+import { personFrom, type CollabBackend } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 
@@ -124,7 +124,7 @@ export function versionsRemote(uid: string): VersionStore {
  * only members read or change a shared board, and someone join only with the current link's key.
  */
 export function collabRemote(user: User): CollabBackend {
-  const me: Person = { uid: user.uid, name: user.displayName || user.email || 'Someone', photo: user.photoURL };
+  const me = personFrom(user);
   const shareRef = (id: string) => doc(db, 'shared', id);
   const memberRef = (id: string, uid: string) => doc(db, 'shared', id, 'members', uid);
   const mineRef = (id: string) => doc(db, 'boards', me.uid, 'shared', id);
@@ -156,7 +156,7 @@ export function collabRemote(user: User): CollabBackend {
         (snap) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
           const people = snap.docs
-            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
+            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
             .sort((a, b) => a.at - b.at)
             .map(({ uid, name, photo }) => ({ uid, name, photo }));
           onChange(people);

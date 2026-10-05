@@ -343,3 +343,22 @@ describe('shared boards (owner request: editing together)', () => {
     expect(store.getState().boards.open).toBe(trip);
   });
 });
+
+describe('review fixes: shared boards (2026-10-05)', () => {
+  it('a board just shared is taken out of the person’s own online copy straight away', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const shared = new Set<string>();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id) });
+    fake.send(null);
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).toContain(trip);
+    // Shared now: nothing else changes on the person's boards.
+    shared.add(trip);
+    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], link: 'k' }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).not.toContain(trip);
+  });
+});

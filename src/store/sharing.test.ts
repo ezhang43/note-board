@@ -241,3 +241,37 @@ describe('a busy board', () => {
     expect(notes(alice.store, trip).filter((n) => n.text.startsWith('bob'))).toHaveLength(10);
   });
 });
+
+describe('review fixes (2026-10-05)', () => {
+  it('removing someone changes the link, so the copy they have stops working', async () => {
+    const { alice, bob, shareId } = await together();
+    const oldKey = server.shares.get(shareId)!.link!;
+    await alice.sharing.removePerson(shareId, 'bob');
+    await settle();
+    expect(server.shares.get(shareId)!.link).not.toBe(oldKey);
+    await expect(bob.sharing.join(shareId, oldKey)).rejects.toThrow();
+  });
+
+  it('a refused save isn’t tried again and again: it waits for the next change', async () => {
+    const { alice, trip } = await together();
+    alice.store.openBoard(trip);
+    server.control.refuse = true;
+    const before = server.control.writes;
+    alice.store.renameBoard('Too big');
+    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(server.control.writes - before).toBe(1);
+    server.control.refuse = false;
+    alice.store.renameBoard('Fine now');
+    await settle();
+    expect(server.shares.get([...server.shares.keys()][0])!.data).toContain('Fine now');
+  });
+
+  it('the screen’s list of a shared board’s boards drops a board deleted from it', async () => {
+    const { alice, trip, sub } = await together();
+    alice.store.openBoard(trip);
+    alice.store.deleteBoard(sub);
+    await settle();
+    expect(shareInfo(alice.store)[0].boards).toEqual([trip]);
+  });
+});

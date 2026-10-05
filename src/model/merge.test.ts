@@ -296,3 +296,30 @@ describe('random edits on both sides', () => {
     }
   });
 });
+
+describe('review fixes: a deleted block kept for an edit keeps what was in it', () => {
+  it('a list they delete while I edit one item comes back with all its items', () => {
+    const base = sample();
+    const mine = setItems(base, 't1', [item('a', [item('a1'), item('a2')], 'edited'), item('b')]);
+    const merged = mergeBoards(base, mine, B.deleteCard(base, 't1'));
+    expect(shape(items(merged, 't1'))).toBe('a(a1 a2) b');
+    expect(items(merged, 't1')[0].text).toBe('edited');
+    expect(B.problems(merged)).toEqual([]);
+  });
+
+  it('a list I delete while they edit one item comes back with all its items', () => {
+    const base = sample();
+    const theirs = setItems(base, 't1', [item('a', [item('a1'), item('a2')]), item('b', [], 'edited')]);
+    const merged = mergeBoards(base, B.deleteCard(base, 't1'), theirs);
+    expect(shape(items(merged, 't1'))).toBe('a(a1 a2) b');
+  });
+
+  it('a column they delete while I rename it comes back with its cards', () => {
+    const base = sample();
+    const mine = { ...base, columns: { ...base.columns, c1: { ...base.columns.c1, title: 'Renamed' } } };
+    const merged = mergeBoards(base, mine, B.deleteColumn(base, 'c1'));
+    expect(merged.columns.c1.title).toBe('Renamed');
+    expect(merged.columns.c1.cardIds).toEqual(['n2']);
+    expect(B.problems(merged)).toEqual([]);
+  });
+});

@@ -230,10 +230,41 @@ function mergeArrows(b: Board, m: Board, t: Board, blocks: (id: string) => boole
   return arrows.length || m.arrows || t.arrows ? arrows : undefined;
 }
 
+/**
+ * Columns and cards `side` deleted but `other` edited are kept, whole: they are put back on `side`
+ * as they were in `base`, with what was in them (a column's cards, a list's items), as if `side` had
+ * never deleted them. Otherwise only the edited part would come back (a list with just the item
+ * that was typed in).
+ */
+function putBack(base: Board, side: Board, other: Board): Board {
+  let out = side;
+  for (const [id, col] of Object.entries(base.columns)) {
+    if (out.columns[id] || !other.columns[id] || !edited(col, other.columns[id])) continue;
+    const placed = new Set([...out.order, ...Object.values(out.columns).flatMap((c) => c.cardIds)]);
+    const cardIds = col.cardIds.filter((cid) => base.cards[cid] && !placed.has(cid));
+    const cards = { ...out.cards };
+    for (const cid of cardIds) cards[cid] = base.cards[cid];
+    out = { ...out, cards, columns: { ...out.columns, [id]: { ...col, cardIds } }, order: [...out.order, id] };
+  }
+  for (const [id, card] of Object.entries(base.cards)) {
+    if (out.cards[id] || !other.cards[id] || !edited(card, other.cards[id])) continue;
+    const colId = base.order.find((c) => base.columns[c]?.cardIds.includes(id));
+    const col = colId ? out.columns[colId] : undefined;
+    if (col) {
+      const at = Math.min(base.columns[col.id].cardIds.indexOf(id), col.cardIds.length);
+      const cardIds = [...col.cardIds.slice(0, at), id, ...col.cardIds.slice(at)];
+      out = { ...out, cards: { ...out.cards, [id]: card }, columns: { ...out.columns, [col.id]: { ...col, cardIds } } };
+    } else out = { ...out, cards: { ...out.cards, [id]: card }, order: [...out.order, id] };
+  }
+  return out;
+}
+
 /** Combines my board and theirs, both changed from `base`. */
-export function mergeBoards(base: Board, mine: Board, theirs: Board): Board {
-  if (deepEqual(mine, base)) return theirs;
-  if (deepEqual(theirs, base)) return mine;
+export function mergeBoards(base: Board, mineAsIs: Board, theirsAsIs: Board): Board {
+  if (deepEqual(mineAsIs, base)) return theirsAsIs;
+  if (deepEqual(theirsAsIs, base)) return mineAsIs;
+  const mine = putBack(base, mineAsIs, theirsAsIs);
+  const theirs = putBack(base, theirsAsIs, mineAsIs);
   const columns = mergeEntities<Column>(base.columns, mine.columns, theirs.columns, (bc, mc, tc) => mergeFields(bc, mc, tc, ['cardIds']), edited);
   let cards = mergeCards(base, mine, theirs);
   cards = mergeItems(base, mine, theirs, cards);
@@ -254,8 +285,8 @@ export function mergeBoards(base: Board, mine: Board, theirs: Board): Board {
   };
   const arrows = mergeArrows(base, mine, theirs, (id) => Boolean(cards[id] || outColumns[id]));
   if (arrows) merged.arrows = arrows;
-  if (deepEqual(merged, theirs)) return theirs;
-  if (deepEqual(merged, mine)) return mine;
+  if (deepEqual(merged, theirsAsIs)) return theirsAsIs;
+  if (deepEqual(merged, mineAsIs)) return mineAsIs;
   return merged;
 }
 

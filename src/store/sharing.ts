@@ -2,6 +2,7 @@ import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
 import { groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
+import type { Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
 import type { Store } from './store';
 import { SYNC_DELAY, type SaveState } from './sync';
@@ -73,16 +74,29 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     return Boolean(ui.drag || ui.resize || ui.newDrag || ui.itemDrag);
   };
 
-  /** The boards that go with share `s` now (its board, the boards inside it, the ones it had). */
-  function idsOf(s: Share): string[] {
-    if (!s.root) return [];
+  /**
+   * The boards that go with each share now (its board, the boards inside it, the ones it had); a
+   * board in two goes with the first. Worked out again only when the boards or the shares change,
+   * not at every screen update (a drag moves the pointer many times a second).
+   */
+  let groupCache: { ws: Workspace; key: unknown[]; groups: Map<string, string[]> } | null = null;
+  function groups(): Map<string, string[]> {
+    const ws = store.workspace();
+    const key = [...shares.values()].flatMap((s) => [s.id, s.root, s.base]);
+    const c = groupCache;
+    if (c && c.ws === ws && c.key.length === key.length && c.key.every((k, i) => k === key[i])) return c.groups;
+    const out = new Map<string, string[]>();
     const taken = new Set<string>();
-    for (const other of shares.values()) {
-      if (other === s) break;
-      idsOf(other).forEach((id) => taken.add(id));
+    for (const s of shares.values()) {
+      const ids = s.root ? groupBoardIds(ws, s.root, Object.keys(s.base ?? {}), taken) : [];
+      ids.forEach((id) => taken.add(id));
+      out.set(s.id, ids);
     }
-    return groupBoardIds(store.workspace(), s.root, Object.keys(s.base ?? {}), taken);
+    groupCache = { ws, key, groups: out };
+    return out;
   }
+
+  const idsOf = (s: Share): string[] => groups().get(s.id) ?? [];
 
   function boardsOf(s: Share): Record<string, Board> {
     const all = store.workspace().boards;
@@ -196,9 +210,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         },
         (e: { code?: string }) => {
           s.uploading = false;
-          // Refused (too big, say): the red banner. Otherwise (no connection) it waits quietly.
+          // Refused (too big, say): the red banner, and the next change tries again (trying the
+          // same save again would only be refused again). No connection: it tries again quietly.
           s.failed = e?.code === 'permission-denied';
-          if (!s.timer && shares.has(s.id)) s.timer = setTimeout(() => upload(s), RETRY_MS);
+          if (!s.failed && !s.timer && shares.has(s.id)) s.timer = setTimeout(() => upload(s), RETRY_MS);
           report();
         },
       );
@@ -337,8 +352,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     },
   );
 
+  /** The boards when last looked at: screen-only updates (a pointer moving) are skipped quickly. */
+  let lastWs: Workspace | null = null;
   const unsubscribe = store.subscribe(() => {
     if (applying || stopped) return;
+    const ws = store.workspace();
+    if (ws === lastWs && ![...shares.values()].some((s) => s.waiting)) return;
+    lastWs = ws;
     for (const s of shares.values()) {
       if (s.waiting && !busy()) {
         const doc = s.waiting;
@@ -350,10 +370,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const ids = Object.keys(now);
       const same = ids.length === Object.keys(s.seen).length && ids.every((id) => now[id] === s.seen[id]);
       if (same) continue;
-      const added = ids.some((id) => !(id in s.seen));
+      const moved = ids.length !== Object.keys(s.seen).length || ids.some((id) => !(id in s.seen));
       s.seen = now;
       schedule(s);
-      if (added) publish();
+      // A board added to it, or deleted from it.
+      if (moved) publish();
     }
   });
 
@@ -400,7 +421,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     },
     /** Owner: turn the link off, or on again with a new link (the old one stays off). */
     setLinkOn: (id: string, on: boolean) => backend.setLink(id, on ? randomKey(20) : null),
-    removePerson: (id: string, uid: string) => backend.removePerson(id, uid),
+    /** Owner: removes someone. The link changes too, so the copy of it they have stops working. */
+    async removePerson(id: string, uid: string) {
+      await backend.removePerson(id, uid);
+      if (shares.get(id)?.link) await backend.setLink(id, randomKey(20));
+    },
     /** Stop having a board someone shared: it goes from this person's boards. */
     async leave(id: string) {
       const s = need(id);

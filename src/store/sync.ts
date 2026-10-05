@@ -79,7 +79,16 @@ export function startSync(
    * Whether any board changed since last time (opening another board changes none: which board is
    * open isn't synced).
    */
+  let lastShares = store.getState().ui.shares;
   const boardsChanged = () => {
+    // Which boards are shared changed: the person's own boards to upload change with it (a board
+    // just shared leaves them straight away).
+    const shares = store.getState().ui.shares;
+    if (shares !== lastShares) {
+      lastShares = shares;
+      lastBoards = store.workspace().boards;
+      return true;
+    }
     const boards = store.workspace().boards;
     if (boards === lastBoards) return false;
     const ids = Object.keys(boards);

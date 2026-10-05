@@ -8,6 +8,15 @@ export interface Person {
   photo: string | null;
 }
 
+/**
+ * Someone as the people a board is shared with see them: their Google name (never their email
+ * address, which a share link could show to strangers) and photo (only from a secure address).
+ */
+export function personFrom(user: { uid: string; displayName?: string | null; photoURL?: string | null; email?: string | null }): Person {
+  const photo = user.photoURL && user.photoURL.startsWith('https://') && user.photoURL.length <= 2000 ? user.photoURL : null;
+  return { uid: user.uid, name: user.displayName?.trim().slice(0, 200) || 'Someone', photo };
+}
+
 /** A shared board online: its boards' JSON (see serializeShare) and who may do what. */
 export interface ShareDoc {
   /** The person who shared it. */
@@ -115,7 +124,8 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
   const shares = new Map<string, Stored>();
   const mine = new Map<string, Set<string>>();
   const watchers = new Set<() => void>();
-  const control = { offline: false };
+  /** offline: every call fails, as without a connection. refuse: saves are refused, as past the size cap. writes: saves tried. */
+  const control = { offline: false, refuse: false, writes: 0 };
   const notify = () => deliver(() => watchers.forEach((w) => w()));
   const myIds = (uid: string) => [...(mine.get(uid) ?? [])].sort();
   const member = (who: Person, s: Stored | undefined) => Boolean(s && s.people.some((p) => p.uid === who.uid));
@@ -188,7 +198,8 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     },
     async write(who, id, data, client, rev) {
       const s = shares.get(id);
-      check(member(who, s));
+      control.writes++;
+      check(member(who, s) && !control.refuse);
       if (s!.rev !== rev) return false;
       Object.assign(s!, { data, client, rev: rev + 1 });
       notify();

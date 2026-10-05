@@ -25,9 +25,13 @@ if (import.meta.env.VITE_SYNC === 'on') {
 } else {
   // Local-only: version history is kept on this device.
   startVersions(appStore, localVersionStore(localStorage));
+  // `npm run dev` with ?signed-in shows the published site's Sign out button, to check how the
+  // toolbar fits (it doesn't sign anything out here).
+  const demoSignOut =
+    import.meta.env.DEV && new URLSearchParams(location.search).has('signed-in') ? () => window.alert('Sign out only works on the published site.') : undefined;
   root.render(
     <StrictMode>
-      <App />
+      <App onSignOut={demoSignOut} />
     </StrictMode>,
   );
 }

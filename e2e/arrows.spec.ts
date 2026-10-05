@@ -33,15 +33,15 @@ async function clickArrow(page: Page) {
 }
 
 async function connect(page: Page, to: ReturnType<typeof cards>) {
-  const handle = page.getByRole('button', { name: 'Draw an arrow' });
+  const handle = page.getByRole('button', { name: 'Draw an arrow from the right' });
   const h = await box(handle);
   const t = await box(to);
   await dragPointer(page, { x: h.x + h.width / 2, y: h.y + h.height / 2 }, { x: t.x + t.width / 2, y: t.y + t.height / 2 });
 }
 
-test('dragging the round handle of a selected card onto another card draws an arrow between them', async ({ page }) => {
+test('dragging the right-hand dot of a selected card onto another card draws an arrow between them', async ({ page }) => {
   const { second } = await twoNotes(page);
-  await expect(page.getByRole('button', { name: 'Draw an arrow' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Draw an arrow from the right' })).toBeVisible();
   await connect(page, second);
   await expect(arrows(page)).toHaveCount(1);
   // Ctrl+Z takes it away again.
@@ -50,9 +50,9 @@ test('dragging the round handle of a selected card onto another card draws an ar
   await expect(arrows(page)).toHaveCount(0);
 });
 
-test('dropping the handle on empty board draws nothing', async ({ page }) => {
+test('dropping a dot on empty board draws nothing', async ({ page }) => {
   await twoNotes(page);
-  const h = await box(page.getByRole('button', { name: 'Draw an arrow' }));
+  const h = await box(page.getByRole('button', { name: 'Draw an arrow from the right' }));
   await dragPointer(page, { x: h.x + h.width / 2, y: h.y + h.height / 2 }, { x: h.x + 30, y: h.y + 250 });
   await expect(arrows(page)).toHaveCount(0);
 });

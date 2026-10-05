@@ -57,7 +57,7 @@ test('a file that isn’t a BusyAnts backup changes nothing and says so', async 
 });
 
 test('Download as text saves the board as readable Markdown', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await cards(page).first().getByLabel('List title').fill('Groceries');
   await cards(page).first().getByLabel('Item text').first().fill('Milk');
   const text = await download(page, 'Download as text');

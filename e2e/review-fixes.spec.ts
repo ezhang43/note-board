@@ -7,7 +7,7 @@ freshBoardEachTest();
 
 async function makeList(page: Page, texts: string[]) {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const id = await page.locator('.card.selected').getAttribute('data-card-id');
   for (const [i, t] of texts.entries()) {
     if (i) await page.keyboard.press('Enter');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addArrow, arrowLine, pruneArrows, removeArrow } from './arrows';
+import { addArrow, arrowCurve, connectorDots, curveMid, curvePath, pruneArrows, removeArrow } from './arrows';
 import { addCard, addColumn, createBoard, deleteBlocks } from './board';
 import { createCard, createColumn } from './cards';
 import { parseBoard, serializeBoard } from './persist';
@@ -67,24 +67,53 @@ describe('arrows', () => {
   });
 });
 
-describe('where an arrow is drawn', () => {
-  it('runs between the two blocks’ edges, along the line joining their middles, leaving a small gap', () => {
-    const line = arrowLine({ x: 0, y: 0, w: 100, h: 100 }, { x: 300, y: 0, w: 100, h: 100 }, 6)!;
-    expect(line).toEqual({ x1: 106, y1: 50, x2: 294, y2: 50 });
-    const down = arrowLine({ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 300, w: 100, h: 100 }, 0)!;
-    expect(down).toEqual({ x1: 50, y1: 100, x2: 50, y2: 300 });
+describe('where an arrow is drawn (Miro style, owner request)', () => {
+  const a = { x: 0, y: 0, w: 100, h: 100 };
+
+  it('joins the middles of the two sides that face each other, a small gap clear of each', () => {
+    const right = arrowCurve(a, { x: 300, y: 0, w: 100, h: 100 }, 6)!;
+    expect([right.fromSide, right.toSide]).toEqual(['right', 'left']);
+    expect(right.from).toEqual({ x: 106, y: 50 });
+    expect(right.to).toEqual({ x: 294, y: 50 });
+    const left = arrowCurve(a, { x: -300, y: 0, w: 100, h: 100 }, 0)!;
+    expect([left.fromSide, left.toSide, left.from, left.to]).toEqual(['left', 'right', { x: 0, y: 50 }, { x: -200, y: 50 }]);
+    const down = arrowCurve(a, { x: 0, y: 300, w: 100, h: 100 }, 0)!;
+    expect([down.fromSide, down.toSide, down.from, down.to]).toEqual(['bottom', 'top', { x: 50, y: 100 }, { x: 50, y: 300 }]);
+    const up = arrowCurve(a, { x: 0, y: -300, w: 100, h: 100 }, 0)!;
+    expect([up.fromSide, up.toSide]).toEqual(['top', 'bottom']);
   });
 
-  it('leaves a slanted line at the edge it crosses', () => {
-    const l = arrowLine({ x: 0, y: 0, w: 200, h: 100 }, { x: 400, y: 200, w: 200, h: 100 }, 0)!;
-    // middles (100,50) → (500,250): leaves through the bottom edge at x = 200
-    expect(l.x1).toBeCloseTo(200);
-    expect(l.y1).toBeCloseTo(100);
-    expect(l.x2).toBeCloseTo(400);
-    expect(l.y2).toBeCloseTo(200);
+  it('picks the sides by the bigger gap between the blocks, and still meets each side in its middle', () => {
+    // Far to the right, a little lower: left / right sides.
+    const r = arrowCurve({ x: 0, y: 0, w: 200, h: 100 }, { x: 500, y: 150, w: 200, h: 100 }, 0)!;
+    expect([r.fromSide, r.toSide, r.from, r.to]).toEqual(['right', 'left', { x: 200, y: 50 }, { x: 500, y: 200 }]);
+    // Far below, a little to the right: top / bottom sides.
+    const d = arrowCurve({ x: 0, y: 0, w: 200, h: 100 }, { x: 250, y: 400, w: 200, h: 100 }, 0)!;
+    expect([d.fromSide, d.toSide, d.from, d.to]).toEqual(['bottom', 'top', { x: 100, y: 100 }, { x: 350, y: 400 }]);
   });
 
-  it('is not drawn when the blocks overlap', () => {
-    expect(arrowLine({ x: 0, y: 0, w: 100, h: 100 }, { x: 50, y: 50, w: 100, h: 100 }, 6)).toBeNull();
+  it('is a smooth curve that leaves and arrives square to each side', () => {
+    const r = arrowCurve({ x: 0, y: 0, w: 200, h: 100 }, { x: 500, y: 150, w: 200, h: 100 }, 0)!;
+    // Handles straight out of each side, half the way across.
+    expect(r.c1).toEqual({ x: 350, y: 50 });
+    expect(r.c2).toEqual({ x: 350, y: 200 });
+    expect(curvePath(r)).toBe('M 200 50 C 350 50 350 200 500 200');
+    expect(curveMid(r)).toEqual({ x: 350, y: 125 });
+  });
+
+  it('is not drawn when the blocks overlap or nearly touch', () => {
+    expect(arrowCurve(a, { x: 50, y: 50, w: 100, h: 100 }, 6)).toBeNull();
+    expect(arrowCurve(a, { x: 105, y: 0, w: 100, h: 100 }, 6)).toBeNull();
+  });
+});
+
+describe('connection dots', () => {
+  it('sit just outside the middle of each side', () => {
+    expect(connectorDots({ x: 0, y: 0, w: 200, h: 100 }, 14)).toEqual([
+      { side: 'top', x: 100, y: -14 },
+      { side: 'right', x: 214, y: 50 },
+      { side: 'bottom', x: 100, y: 114 },
+      { side: 'left', x: -14, y: 50 },
+    ]);
   });
 });

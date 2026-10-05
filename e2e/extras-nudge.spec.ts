@@ -47,7 +47,7 @@ test('several selected blocks move together; a card in a column moves up and dow
   const col = columns(page).first();
   await add(page, 'Note');
   await col.click({ position: { x: 20, y: 20 } });
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const inCol = col.locator('[data-card-id]');
   await expect(inCol).toHaveCount(2);
   const second = await inCol.nth(1).getAttribute('data-card-id');
@@ -64,7 +64,7 @@ test('several selected blocks move together; a card in a column moves up and dow
 });
 
 test('a collapsed loose card shows its title in the middle', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const card = looseCards(page).first();
   await card.getByLabel('List title').fill('Shopping');
   await card.getByRole('button', { name: 'Collapse card' }).click();
@@ -83,7 +83,7 @@ test('a collapsed loose card shows its title in the middle', async ({ page }) =>
 });
 
 test('collapsed loose cards are as tall as a collapsed column (owner request)', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await add(page, 'Note');
   await add(page, 'New column');
   const col = columns(page).first();

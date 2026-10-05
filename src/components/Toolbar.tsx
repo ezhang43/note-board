@@ -12,9 +12,9 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreFromBackup } from '../store/versions';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
-import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
+import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
-/** Add Note / To-do list: click to add, or press and drag onto the board to place it. */
+/** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   const drag = useNewCardDrag(kind);
   return (
@@ -417,7 +417,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <span className="toolbar-label">Add</span>
 
       <AddCardButton kind="note" label="Note" />
-      <AddCardButton kind="todo" label="To-do list" />
+      <AddCardButton kind="todo" label="Checklist" />
       <NewColumnButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
@@ -428,8 +428,9 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       {onSignOut && (
         <>
           <div className="toolbar-divider" aria-hidden="true" />
-          <button type="button" className="tb-button" onClick={onSignOut}>
-            Sign out
+          {/* An icon, so it still fits at the far right of a 1280px window (owner bug report). */}
+          <button type="button" className="tb-button icon-only" aria-label="Sign out" title="Sign out" onClick={onSignOut}>
+            <SignOutIcon />
           </button>
         </>
       )}

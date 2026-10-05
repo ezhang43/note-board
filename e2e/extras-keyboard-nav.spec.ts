@@ -15,10 +15,10 @@ async function columnOfThree(page: Page) {
   const col = columns(page).first();
   await add(page, 'Note');
   await col.click(header);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('item one');
   await col.click(header);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('item two');
   const cards = col.locator('[data-card-id]');
   return { col, note: cards.nth(0), list: cards.nth(1), last: cards.nth(2) };

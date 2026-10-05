@@ -53,18 +53,25 @@ export function TodoBody({ card }: { card: TodoCard }) {
       </div>
       {done.length > 0 && (
         <div className="completed">
-          <button
-            type="button"
-            className="completed-toggle"
-            aria-expanded={card.completedOpen}
-            onClick={() => appStore.toggleCompletedSection(card.id)}
-          >
-            <ChevronIcon collapsed={!card.completedOpen} />
-            Completed
-          </button>
-          <button type="button" className="uncheck-all" title="Untick every item, to use this list again" onClick={() => appStore.uncheckAll(card.id)}>
-            Uncheck all
-          </button>
+          <div className="completed-head">
+            <button
+              type="button"
+              className="completed-toggle"
+              aria-expanded={card.completedOpen}
+              onClick={() => appStore.toggleCompletedSection(card.id)}
+            >
+              <ChevronIcon collapsed={!card.completedOpen} />
+              Completed
+            </button>
+            <div className="completed-actions">
+              <button type="button" className="uncheck-all" title="Move this list's ticked items into the Completed card, under today's date" onClick={() => appStore.cleanUpList(card.id)}>
+                Clean up
+              </button>
+              <button type="button" className="uncheck-all" title="Untick every item, to use this list again" onClick={() => appStore.uncheckAll(card.id)}>
+                Uncheck all
+              </button>
+            </div>
+          </div>
           {card.completedOpen &&
             flatten(done).map(({ item, depth }) => <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />)}
         </div>

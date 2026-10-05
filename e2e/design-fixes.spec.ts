@@ -7,7 +7,7 @@ freshBoardEachTest();
 
 test('typing straight after adding a note, to-do list or column goes into it', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('first item');
 
   await clickEmpty(page);
@@ -58,19 +58,19 @@ test('faded toolbar buttons are a little stronger in dark mode', async ({ page }
 
 test('cards in an uncoloured column use the usual teal title band', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const loose = page.locator('.card.loose').first();
   const looseBand = await style(loose, '--band');
   await clickEmpty(page);
   await add(page, 'New column');
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const inColumn = columns(page).first().locator('.card').first();
   expect(await style(inColumn, '--band')).toBe(looseBand);
 });
 
-test('Add Note / To-do list are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
+test('Add Note / Checklist are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
   const plain = await style(toolbarButton(page, 'Undo (Ctrl+Z)'), 'background-color');
-  for (const name of ['Note', 'To-do list']) {
+  for (const name of ['Note', 'Checklist']) {
     const b = toolbarButton(page, name);
     expect(await style(b, 'background-color')).toBe(plain);
     await expect(b.locator('.add-dot')).toHaveCount(0);
@@ -117,7 +117,7 @@ test('the Colour menu names the swatch under the pointer, and rings each swatch 
 
 test('checklist text stops before the grip and trash, so hovering never covers it (owner request)', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('Call the plumber about the leaking kitchen tap');
   const card = page.locator('.card.selected');
   const row = card.locator('[data-item-id]').first();
@@ -142,7 +142,7 @@ test('checklist text stops before the grip and trash, so hovering never covers i
 
 test('Enter in a checklist item works like a text editor (owner request)', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const list = page.locator('.card.selected');
   const values = () => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
   await page.keyboard.type('Buy milk and bread');
@@ -164,7 +164,7 @@ test('Enter in a checklist item works like a text editor (owner request)', async
 
 test('a collapsed to-do list can be made taller from its corner; expanding it keeps its open height (owner request)', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('one');
   const card = page.locator('.card.selected');
   const openHeight = (await card.boundingBox())!.height;

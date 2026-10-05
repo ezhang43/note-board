@@ -24,7 +24,7 @@ async function scrollAway(page: Page) {
 }
 
 test('reopening the board shows its cards and columns, centred, even after scrolling far away', async ({ page }) => {
-  for (const kind of ['Note', 'To-do list', 'New column'] as const) {
+  for (const kind of ['Note', 'Checklist', 'New column'] as const) {
     await clickEmpty(page);
     await add(page, kind);
     await page.keyboard.press('Escape');
@@ -48,7 +48,7 @@ test.describe('on a phone', () => {
 
   test('reopening shows the cards on the small screen, zooming out if needed', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
-    for (const kind of ['Note', 'Note', 'To-do list']) {
+    for (const kind of ['Note', 'Note', 'Checklist']) {
       await bar.getByRole('button', { name: 'Add', exact: true }).tap();
       await page.getByRole('menuitem', { name: kind, exact: true }).tap();
     }

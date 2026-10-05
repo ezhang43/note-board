@@ -18,7 +18,7 @@ import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBl
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
-const KIND_LABEL = { note: 'Note', todo: 'To-do list', link: 'Link', completed: 'Completed', board: 'Board' } as const;
+const KIND_LABEL = { note: 'Note', todo: 'Checklist', link: 'Link', completed: 'Completed', board: 'Board' } as const;
 
 /** What a screen reader calls a card: its kind, and its title where it has one. */
 function cardName(card: Card, boardName: string): string {

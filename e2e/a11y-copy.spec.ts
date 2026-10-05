@@ -9,7 +9,7 @@ const css = (l: import('@playwright/test').Locator, prop: string) => l.evaluate(
 
 async function list(page: import('@playwright/test').Page, title: string, items: string[]) {
   await clickEmpty(page);
-  await add(page, 'To-do list', { stayInTitle: true });
+  await add(page, 'Checklist', { stayInTitle: true });
   await page.keyboard.type(title);
   await page.keyboard.press('Enter');
   for (const [i, t] of items.entries()) {
@@ -46,7 +46,7 @@ test('a focused resize handle resizes with the arrow keys', async ({ page }) => 
 
 test('screen readers hear card and column titles, and "Untitled" when there is none', async ({ page }) => {
   await list(page, 'Groceries', ['milk']);
-  await expect(page.getByRole('article', { name: 'To-do list: Groceries' })).toHaveCount(1);
+  await expect(page.getByRole('article', { name: 'Checklist: Groceries' })).toHaveCount(1);
   await clickEmpty(page);
   await add(page, 'New column');
   await expect(columns(page).first()).toHaveAttribute('aria-label', 'Untitled column');
@@ -88,7 +88,7 @@ test('Ctrl+Shift+Down / Up move an item past its neighbour, keeping the cursor i
 });
 
 test('wording: placeholders, empty hint, Select tool tip, Colour label', async ({ page }) => {
-  await expect(page.getByText('Add a note, a to-do list or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
+  await expect(page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('title', 'Select (V): drag a rectangle to select several cards and columns');
   await expect(page.getByRole('button', { name: 'Colour of selected cards and columns' })).toHaveCount(1);
   const l = await list(page, '', []);

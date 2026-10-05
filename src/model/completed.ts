@@ -61,14 +61,21 @@ function takeTicked(items: TodoItem[], parentId: string | null): { rest: TodoIte
  * Clean up: moves every ticked item into the Completed card, under the group for `day` (newest
  * group first; a second Clean up on the same day adds to that day's group). Makes the Completed card
  * at `place` if the board doesn't have one yet. Lists left empty get one blank item.
+ * With `onlyCardId`, only that list is cleaned up (the Clean up button beside its Uncheck all).
  * Returns the same board (and count 0) when nothing is ticked.
  */
-export function cleanUp(board: Board, day: string, place: Placement, makeId: MakeId = newId): { board: Board; count: number; cardId: string | null } {
+export function cleanUp(
+  board: Board,
+  day: string,
+  place: Placement,
+  makeId: MakeId = newId,
+  onlyCardId?: string,
+): { board: Board; count: number; cardId: string | null } {
   const entries: CompletedEntry[] = [];
   let b = board;
-  for (const id of listsInOrder(board)) {
+  for (const id of onlyCardId ? [onlyCardId] : listsInOrder(board)) {
     const card = board.cards[id];
-    if (card.kind !== 'todo') continue;
+    if (card?.kind !== 'todo') continue;
     const { rest, taken } = takeTicked(card.items, null);
     if (!taken.length) continue;
     for (const t of taken) entries.push({ item: t.item, fromCardId: id, fromTitle: card.title, fromParentId: t.parentId });

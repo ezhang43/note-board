@@ -46,30 +46,57 @@ export function readArrows(v: unknown, board: Board): Arrow[] | undefined {
   return b.arrows;
 }
 
-/** Where the line from the middle of `r` towards `toward` leaves `r`, pushed `gap` further out. */
-function exit(r: Rect, toward: { x: number; y: number }, gap: number) {
-  const cx = r.x + r.w / 2;
-  const cy = r.y + r.h / 2;
-  const dx = toward.x - cx;
-  const dy = toward.y - cy;
-  // How far along (dx, dy) the edge is: the nearer of the side and the top / bottom.
-  const t = Math.min(dx ? r.w / 2 / Math.abs(dx) : Infinity, dy ? r.h / 2 / Math.abs(dy) : Infinity);
-  const len = Math.hypot(dx, dy);
-  const extra = len ? gap / len : 0;
-  return { x: cx + dx * (t + extra), y: cy + dy * (t + extra) };
+// Drawn as in Miro (owner request, 2026-10-05): a curve from the middle of one side of a block to
+// the middle of the facing side of the other, leaving and arriving square to each side.
+
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+type Point = { x: number; y: number };
+/** A curve (cubic Bézier) from `from` to `to`, pulled by the handles `c1` and `c2`. */
+export type Curve = { from: Point; c1: Point; c2: Point; to: Point; fromSide: Side; toSide: Side };
+
+const OUT: Record<Side, Point> = { top: { x: 0, y: -1 }, right: { x: 1, y: 0 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
+
+/** The middle of side `side` of `r`, pushed `gap` further out. */
+function sideMiddle(r: Rect, side: Side, gap: number): Point {
+  const o = OUT[side];
+  return { x: r.x + r.w / 2 + o.x * (r.w / 2 + gap), y: r.y + r.h / 2 + o.y * (r.h / 2 + gap) };
+}
+
+/** The connection dots of a block: just outside the middle of each side, `offset` pixels out. */
+export function connectorDots(r: Rect, offset: number): { side: Side; x: number; y: number }[] {
+  return (['top', 'right', 'bottom', 'left'] as const).map((side) => ({ side, ...sideMiddle(r, side, offset) }));
 }
 
 /**
- * The line drawn for an arrow from block `a` to block `b`: along the line joining their middles,
- * from `a`'s edge to `b`'s edge, `gap` pixels clear of each. null when the blocks overlap.
+ * The curve drawn for an arrow from block `a` to block `b`, `gap` pixels clear of each. It joins the
+ * two sides that face each other: left / right when the blocks are further apart side to side than
+ * up and down, otherwise top / bottom. null when the blocks overlap or nearly touch.
  */
-export function arrowLine(a: Rect, b: Rect, gap = 6): { x1: number; y1: number; x2: number; y2: number } | null {
-  if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) return null;
-  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
-  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-  const s = exit(a, cb, gap);
-  const e = exit(b, ca, gap);
-  // Blocks closer together than the gaps: nothing sensible to draw.
-  if ((e.x - s.x) * (cb.x - ca.x) + (e.y - s.y) * (cb.y - ca.y) <= 0) return null;
-  return { x1: s.x, y1: s.y, x2: e.x, y2: e.y };
+export function arrowCurve(a: Rect, b: Rect, gap = 6): Curve | null {
+  const across = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+  const down = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+  if (across < 0 && down < 0) return null; // overlapping
+  const sideways = across >= down;
+  const fromSide: Side = sideways ? (b.x + b.w / 2 >= a.x + a.w / 2 ? 'right' : 'left') : b.y + b.h / 2 >= a.y + a.h / 2 ? 'bottom' : 'top';
+  const toSide: Side = ({ right: 'left', left: 'right', bottom: 'top', top: 'bottom' } as const)[fromSide];
+  const from = sideMiddle(a, fromSide, gap);
+  const to = sideMiddle(b, toSide, gap);
+  // How far the ends are apart the way the arrow leaves; none or less: too close to draw.
+  const o = OUT[fromSide];
+  const reach = (to.x - from.x) * o.x + (to.y - from.y) * o.y;
+  if (reach <= 0) return null;
+  const pull = reach / 2;
+  const c1 = { x: from.x + o.x * pull, y: from.y + o.y * pull };
+  const c2 = { x: to.x - o.x * pull, y: to.y - o.y * pull };
+  return { from, c1, c2, to, fromSide, toSide };
+}
+
+/** The curve as an SVG path. */
+export function curvePath(c: Curve): string {
+  return `M ${c.from.x} ${c.from.y} C ${c.c1.x} ${c.c1.y} ${c.c2.x} ${c.c2.y} ${c.to.x} ${c.to.y}`;
+}
+
+/** The point halfway along the curve (where a selected arrow's × sits). */
+export function curveMid(c: Curve): Point {
+  return { x: (c.from.x + 3 * c.c1.x + 3 * c.c2.x + c.to.x) / 8, y: (c.from.y + 3 * c.c1.y + 3 * c.c2.y + c.to.y) / 8 };
 }

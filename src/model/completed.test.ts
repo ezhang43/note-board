@@ -69,6 +69,17 @@ describe('Clean up', () => {
     expect(items(b, 'x')[0]).toMatchObject({ text: '', done: false });
   });
 
+  it('can clean up one list only (its own Clean up button), leaving other lists as they are', () => {
+    const r = cleanUp(board(), '2026-10-02', here, makeId, 'g');
+    expect(r.count).toBe(2);
+    expect(outline(items(r.board, 'g'))).toBe('bread fruit(apples)');
+    expect(outline(items(r.board, 'c'))).toBe('+sweep dust');
+    expect(entryIds(done(r.board))).toEqual(['2026-10-02: +milk, +pears(seeds)']);
+    // Nothing ticked in that list: nothing happens, even when other lists have ticked items.
+    const b = r.board;
+    expect(cleanUp(b, '2026-10-02', here, makeId, 'g')).toMatchObject({ board: b, count: 0 });
+  });
+
   it('does nothing when nothing is ticked', () => {
     const b = B.addCard(B.createBoard(), list('x', 'X', [it_('a')]), { type: 'loose', x: 0, y: 0 });
     expect(hasTickedItems(b)).toBe(false);

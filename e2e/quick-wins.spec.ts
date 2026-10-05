@@ -48,7 +48,7 @@ test('web addresses in a note show as links under it, opening in a new tab', asy
 });
 
 test('Ctrl+click on a web address in a checklist item opens it', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const item = cards(page).first().getByLabel('Item text').first();
   await item.fill('Book at https://example.com/tickets');
   const box = (await item.boundingBox())!;

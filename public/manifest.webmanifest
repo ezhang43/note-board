@@ -1,7 +1,7 @@
 {
   "name": "BusyAnts",
   "short_name": "BusyAnts",
-  "description": "A board for notes, to-do lists and links.",
+  "description": "A board for notes, checklists and links.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

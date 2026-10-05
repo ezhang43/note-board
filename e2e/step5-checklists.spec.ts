@@ -8,7 +8,7 @@ freshBoardEachTest();
 /** Adds a loose to-do list and types each text as an item (Enter between them). Returns the card. */
 async function makeList(page: Page, texts: string[]) {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const id = await page.locator('.card.selected').getAttribute('data-card-id');
   for (const [i, t] of texts.entries()) {
     if (i) await page.keyboard.press('Enter');
@@ -463,7 +463,7 @@ test('copying copies exactly the highlighted items, keeping their levels; cut le
 });
 
 test('Uncheck all, beside Completed, unticks every item in the list so it can be used again (owner request)', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const card = cards(page).first();
   const items = card.getByLabel('Item text');
   await items.first().fill('Bread');

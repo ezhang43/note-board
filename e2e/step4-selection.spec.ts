@@ -147,7 +147,7 @@ test('Ctrl + C, Ctrl + V pastes copies 40px further each time; a column copies w
 });
 
 test('Ctrl + D duplicates the selection', async ({ page }) => {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('Pack');
   await clickEmpty(page);
   await looseCards(page).first().click(header);

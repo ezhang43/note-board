@@ -101,15 +101,17 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   padding: 0 16px;
   background: var(--toolbar-bg);
   border-bottom: 1px solid var(--toolbar-edge);
+  /* Never wider than the window: the board name and the path to it shrink instead. */
+  min-width: 0;
 }
 /* The BusyAnts ant, as on the app icon. */
 .toolbar-logo { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; }
 
 .toolbar-spacer { flex-grow: 1; }
 
-/* Narrower windows: tighter still, so every button fits. */
-@media (max-width: 1320px) {
-  .toolbar { gap: 4px; padding: 0 10px; }
+/* Narrower windows: tighter still, so every button (Sign out too) fits. */
+@media (max-width: 1500px) {
+  .toolbar { gap: 3px; padding: 0 10px; }
   /* (.toolbar raises it above the plain .tb-button rule further down; icon-only buttons stay square.) */
   .toolbar .tb-button:not(.icon-only) { padding: 0 6px; font-size: 13px; }
   .toolbar-label { display: none; }
@@ -255,7 +257,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   overflow: hidden;
 }
 .board-name > input { text-overflow: ellipsis; }
-.toolbar > :not(.board-name):not(.toolbar-spacer) { flex-shrink: 0; }
+.toolbar > :not(.board-name):not(.board-path):not(.toolbar-spacer) { flex-shrink: 0; }
 
 .tool-group {
   display: flex;
@@ -903,14 +905,13 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   align-self: flex-start;
 }
 .completed-toggle:hover { background: var(--hover); }
-/* Uncheck all (owner request): on the same line as "Completed", at the right. */
-.completed { position: relative; }
+/* Clean up and Uncheck all (owner requests): on the same line as "Completed", at the right
+   (on a card too narrow for all three, they go on the line below, still at the right). */
+.completed-head { display: flex; flex-wrap: wrap; align-items: center; }
+.completed-actions { display: flex; margin-left: auto; }
 .uncheck-all {
-  position: absolute;
-  top: 4px;
-  right: 0;
   height: 28px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -1481,14 +1482,14 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 
 /* Arrows between cards and columns (owner request). */
 .arrows-layer { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 4; }
-.arrow-line { stroke: var(--ink-soft); stroke-width: 2; stroke-linecap: round; }
+.arrow-line { fill: none; stroke: var(--ink-soft); stroke-width: 2; stroke-linecap: round; }
 .arrow-tip { fill: var(--ink-soft); }
 .arrow-tip.on, .arrow.selected .arrow-tip { fill: var(--accent); }
 .arrow.selected .arrow-line, .arrow-pending { stroke: var(--accent); stroke-width: 2.5; }
 .arrow-pending { stroke-dasharray: 6 5; }
-.arrow-hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.arrow-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .arrow:hover .arrow-line { stroke: var(--accent); }
-.arrow-handle, .arrow-delete {
+.arrow-dot, .arrow-delete {
   position: absolute;
   z-index: 6;
   transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1)));
@@ -1496,19 +1497,18 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   cursor: pointer;
   touch-action: none;
 }
-.arrow-handle {
-  width: 16px;
-  height: 16px;
-  /* Just clear of the block's right edge, at any zoom. */
-  translate: calc(14px / var(--zoom, 1)) 0;
+/* Connection dots, as in Miro: one just outside the middle of each side (placed by Arrows.tsx). */
+.arrow-dot {
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: 2px solid var(--accent);
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(31, 29, 26, 0.2);
 }
-.arrow-handle:hover { background: var(--accent); }
+.arrow-dot:hover { background: var(--accent); }
 /* A wider invisible ring so the small dot is easy to press. */
-.arrow-handle::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+.arrow-dot::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
 .arrow-delete {
   width: 24px;
   height: 24px;

@@ -1,5 +1,12 @@
 # Changelog
 
+## Owner requests: Sign out, Checklist, Miro-style arrows, Clean up per list (2026-10-05)
+
+- Sign out is no longer cut off at the right of the toolbar. It is now a small icon (an arrow leaving a door) at the far right, and the whole toolbar fits windows from 1280px wide, also inside a sub-board.
+- "To-do list" is now called "Checklist" everywhere: the toolbar button, the phone's + menu and the empty-board hint. Your lists are unchanged.
+- Arrows work like Miro: hover a card or column and a small dot shows on each side. Drag a dot onto another card or column to join them. Arrows are now smooth curves that meet each card in the middle of the side facing the other.
+- Each checklist has its own Clean up button, next to Uncheck all, that moves just that list's ticked items into the Completed card.
+
 ## Auto-publish for low-risk changes (2026-10-05)
 
 - Small, low-risk changes now go live by themselves a few minutes after they are merged and pass their tests. Anything touching saving, sync, undo or deleting, or labelled `high-risk`, still waits for you to say "publish".

@@ -10,7 +10,7 @@ const toolbar = (page: Page) => page.locator('header.toolbar');
 
 test('the toolbar adds notes, to-do lists and columns, but no longer links', async ({ page }) => {
   await expect(toolbar(page).getByRole('button', { name: 'Note', exact: true })).toBeVisible();
-  await expect(toolbar(page).getByRole('button', { name: 'To-do list', exact: true })).toBeVisible();
+  await expect(toolbar(page).getByRole('button', { name: 'Checklist', exact: true })).toBeVisible();
   await expect(toolbar(page).getByRole('button', { name: 'New column', exact: true })).toBeVisible();
   await expect(toolbar(page).getByRole('button', { name: 'Link', exact: true })).toHaveCount(0);
 });

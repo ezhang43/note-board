@@ -10,7 +10,7 @@ test('cards and items whose saved ids hold odd characters still work with search
   await add(page, 'Note');
   await page.keyboard.type('Buy eggs');
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('one');
   await page.keyboard.press('Enter');
   await page.keyboard.type('two');

@@ -8,7 +8,7 @@ const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) 
 
 async function makeList(page: Page, title: string, items: string[]) {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const id = await page.locator('.card.selected').getAttribute('data-card-id');
   const list = page.locator(`[data-card-id="${id}"]`);
   await list.getByLabel('List title').fill(title);

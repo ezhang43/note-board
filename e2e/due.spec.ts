@@ -14,7 +14,7 @@ const day = (page: Page, n = 0) =>
   }, n);
 
 async function listWith(page: Page, text: string) {
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const card = cards(page).first();
   await card.getByLabel('Item text').first().fill(text);
   return card;

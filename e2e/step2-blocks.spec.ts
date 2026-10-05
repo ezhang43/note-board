@@ -22,7 +22,7 @@ const looseCards = (page: Page) => page.locator('.card.loose');
 const columns = (page: Page) => page.locator('[data-col-id]');
 /** A loose block's position on the board (not on screen), from its style. */
 const boardPos = (l: Locator) => l.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
-const add = (page: Page, name: 'Note' | 'To-do list' | 'New column') =>
+const add = (page: Page, name: 'Note' | 'Checklist' | 'New column') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
 
 async function box(l: Locator) {
@@ -71,8 +71,8 @@ test('Add Note puts a white note on the board, selected, and it grows as you typ
   await expect.poll(async () => (await box(note)).height).toBeGreaterThan(before + 40);
 });
 
-test('Add To-do list starts untitled with one blank item; the cursor is in the title, and Enter moves it to the item', async ({ page }) => {
-  await add(page, 'To-do list');
+test('Add Checklist starts untitled with one blank item; the cursor is in the title, and Enter moves it to the item', async ({ page }) => {
+  await add(page, 'Checklist');
   const list = cards(page).first();
   await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(list.getByLabel('List title')).toHaveValue('');
@@ -101,7 +101,7 @@ test('Link card opens the address in a new tab', async ({ page }) => {
 });
 
 test('new cards and columns never appear on top of existing blocks', async ({ page }) => {
-  for (const kind of ['Note', 'To-do list', 'Note', 'New column', 'Note', 'New column'] as const) {
+  for (const kind of ['Note', 'Checklist', 'Note', 'New column', 'Note', 'New column'] as const) {
     await clickEmpty(page); // nothing selected, so every card goes loose on the board
     await add(page, kind);
   }
@@ -126,7 +126,7 @@ test('adding with a column selected puts the card at the end; with a card in a c
 
   // Select the first card, then add: it goes directly below the first card.
   await col.locator('[data-card-id]').first().click({ position: { x: 30, y: 18 } });
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
   await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'todo');
   await expect(col.locator('.column-count')).toHaveText('3');
@@ -143,7 +143,7 @@ test('drag a loose card into a column at the pointer, then out again', async ({ 
   await col.locator('[data-card-id]').nth(1).getByLabel('Note text').fill('bottom');
 
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const list = looseCards(page).first();
 
   // Drop it between the two notes.
@@ -241,7 +241,7 @@ test("Colour is faded with nothing selected; it colours a card's title band (car
   await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
 
   // A selected card: Colour tints its title band; the card stays white, text stays black.
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   const list = cards(page).first();
   const header = list.locator('.card-header');
   const usual = await header.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -334,7 +334,7 @@ test('everything is kept after reload', async ({ page }) => {
   await add(page, 'New column');
   const col = columns(page).first();
   await col.getByLabel('Column title').fill('This week');
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.press('Enter'); // from the new list's title to its first item
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);

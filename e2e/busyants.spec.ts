@@ -10,7 +10,7 @@ test('the app is called BusyAnts', async ({ page }) => {
 });
 
 test('an empty board shows a hint, which goes once anything is on the board', async ({ page }) => {
-  const hint = page.getByText('Add a note, a to-do list or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
+  const hint = page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
   await expect(hint).toBeVisible();
   await add(page, 'Note');
   await expect(hint).toHaveCount(0);
@@ -18,7 +18,7 @@ test('an empty board shows a hint, which goes once anything is on the board', as
 
 test('new lists and columns start untitled; a new list takes the cursor in its title, and Enter moves to its first item', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list', { stayInTitle: true });
+  await add(page, 'Checklist', { stayInTitle: true });
   const list = page.locator('.card.selected');
   await expect(list.getByLabel('List title')).toHaveValue('');
   await expect(list.getByLabel('List title')).toHaveAttribute('placeholder', 'List title');
@@ -39,7 +39,7 @@ const css = (l: import('@playwright/test').Locator, prop: string) => l.evaluate(
 
 test('A+ / A− change the text size on cards and columns (not the toolbar), and it is remembered', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.type('milk');
   const item = page.getByLabel('Item text').first();
   const before = parseFloat(await css(item, 'font-size'));
@@ -207,7 +207,7 @@ async function columnWithLists(page: import('@playwright/test').Page) {
   const col = columns(page).first();
   const listIn = async (title: string, items: string[]) => {
     await col.click({ position: { x: 20, y: 20 } });
-    await add(page, 'To-do list', { stayInTitle: true });
+    await add(page, 'Checklist', { stayInTitle: true });
     await page.keyboard.type(title);
     await page.keyboard.press('Enter');
     for (const [i, t] of items.entries()) {
@@ -219,7 +219,7 @@ async function columnWithLists(page: import('@playwright/test').Page) {
   await listIn('Groceries', ['milk', 'eggs']);
   await listIn('Chores', ['sweep']);
   await clickEmpty(page);
-  await add(page, 'To-do list', { stayInTitle: true });
+  await add(page, 'Checklist', { stayInTitle: true });
   await page.keyboard.type('Ideas');
   await page.keyboard.press('Enter');
   await page.keyboard.type('paint');
@@ -323,7 +323,7 @@ test('Expand all opens everything, including cards and columns that were closed 
   await page.keyboard.press('Escape');
   await columns(page).first().getByRole('button', { name: 'Collapse column' }).click();
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await page.keyboard.press('Escape');
   await page.locator('.card.loose').first().getByRole('button', { name: 'Collapse card' }).click();
   await clickEmpty(page);

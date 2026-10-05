@@ -5,11 +5,11 @@ import { add, box, cards, clickEmpty, columns, expectNoOverlaps, freshBoardEachT
 
 freshBoardEachTest();
 
-const addButton = (page: Page, name: 'Note' | 'To-do list') =>
+const addButton = (page: Page, name: 'Note' | 'Checklist') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true });
 
 /** Press an Add button and drag to a point, optionally checking things before letting go. */
-async function dragFromToolbar(page: Page, name: 'Note' | 'To-do list', to: { x: number; y: number }, during?: () => Promise<void>) {
+async function dragFromToolbar(page: Page, name: 'Note' | 'Checklist', to: { x: number; y: number }, during?: () => Promise<void>) {
   const b = await box(addButton(page, name));
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();
@@ -49,7 +49,7 @@ test('dragging a to-do list onto another card lands it at the nearest free spot,
   await add(page, 'Note');
   await clickEmpty(page);
   const note = await box(looseCards(page).first());
-  await dragFromToolbar(page, 'To-do list', { x: note.x + note.width / 2, y: note.y + 30 });
+  await dragFromToolbar(page, 'Checklist', { x: note.x + note.width / 2, y: note.y + 30 });
   await expect(looseCards(page)).toHaveCount(2);
   await expectNoOverlaps(page);
   const list = page.locator('.card.selected');
@@ -65,7 +65,7 @@ test('dragging onto a column puts the card into it at the pointer', async ({ pag
   await add(page, 'Note');
   await clickEmpty(page);
   const first = await box(col.locator('[data-card-id]').first());
-  await dragFromToolbar(page, 'To-do list', { x: first.x + 60, y: first.y + first.height + 3 }, async () => {
+  await dragFromToolbar(page, 'Checklist', { x: first.x + 60, y: first.y + first.height + 3 }, async () => {
     await expect(col).toHaveClass(/drop-target/);
   });
   await expect(col.locator('[data-card-id]')).toHaveCount(3);

@@ -79,6 +79,15 @@ export function MoonIcon() {
   );
 }
 
+/** Sign out: an arrow leaving through a door. */
+export function SignOutIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" />
+    </svg>
+  );
+}
+
 /** Collapse all (arrows pointing in) or expand all (arrows pointing out). */
 export function CollapseAllIcon({ expand }: { expand: boolean }) {
   return (

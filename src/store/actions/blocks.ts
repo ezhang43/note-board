@@ -61,6 +61,27 @@ export function blockActions(ctx: StoreContext) {
     requestSettle(ids.map((id) => B.topLevelOf(board, id)));
   }
 
+  /**
+   * Clean up every list, or only list `onlyCardId`. The first Clean up makes the Completed card, at
+   * the free spot nearest the middle of the screen. The toolbar's selects the Completed card; a
+   * list's own keeps the list selected. One undo step. Returns how many items moved.
+   */
+  function cleanUpLists(now: Date, onlyCardId?: string): number {
+    let count = 0;
+    let made: string | null = null;
+    commit((b) => {
+      const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.completed, ctx.screenCentre(), measured) } as const;
+      const result = cleanUp(b, dayKey(now), place, undefined, onlyCardId);
+      if (!result.count) return null;
+      count = result.count;
+      if (!completedCardOf(b)) made = result.cardId;
+      const selection = onlyCardId ? [onlyCardId] : result.cardId ? [result.cardId] : [];
+      return { board: result.board, ui: { selection, itemSel: null, confirm: null } };
+    });
+    if (made) requestSettle([made]);
+    return count;
+  }
+
   return {
     // ---------- board ----------
     renameBoard: (name: string) => commit((b) => B.renameBoard(b, name), { merge: 'board-name' }),
@@ -233,24 +254,17 @@ export function blockActions(ctx: StoreContext) {
       return cards.length;
     },
 
-    /**
-     * Clean up: every ticked checklist item moves into the board's Completed card, under today's
-     * date. The first Clean up makes that card, at the free spot nearest the middle of the screen.
-     * One undo step. Returns how many items moved.
-     */
+    /** Clean up (toolbar): every ticked checklist item moves into the board's Completed card, under today's date. */
     cleanUp(now: Date = new Date()): number {
-      let count = 0;
-      let made: string | null = null;
-      commit((b) => {
-        const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.completed, ctx.screenCentre(), measured) } as const;
-        const result = cleanUp(b, dayKey(now), place);
-        if (!result.count) return null;
-        count = result.count;
-        if (!completedCardOf(b)) made = result.cardId;
-        return { board: result.board, ui: { selection: result.cardId ? [result.cardId] : [], itemSel: null, confirm: null } };
-      });
-      if (made) requestSettle([made]);
-      return count;
+      return cleanUpLists(now);
+    },
+
+    /**
+     * Clean up one list (its button beside Uncheck all): only its ticked items move into the
+     * Completed card. The list stays selected. One undo step. Returns how many items moved.
+     */
+    cleanUpList(cardId: string, now: Date = new Date()): number {
+      return cleanUpLists(now, cardId);
     },
 
     /** Unticking an item in the Completed card sends it back to its list (or a new list, if that's gone). */

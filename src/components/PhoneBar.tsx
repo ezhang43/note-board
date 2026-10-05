@@ -51,7 +51,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             Note
           </button>
           <button type="button" role="menuitem" onClick={() => add('todo')}>
-            To-do list
+            Checklist
           </button>
           <button type="button" role="menuitem" onClick={() => add('column')}>
             Column

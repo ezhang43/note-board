@@ -262,7 +262,7 @@ test('Collapse all collapses every card and column; the same button then expands
   await add(page, 'New column');
   await add(page, 'Note');
   await clickEmpty(page);
-  await add(page, 'To-do list');
+  await add(page, 'Checklist');
   await clickEmpty(page);
   const button = () => page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
   await expect(button()).toHaveAccessibleName('Collapse all');

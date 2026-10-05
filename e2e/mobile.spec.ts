@@ -32,7 +32,7 @@ test.describe('on a touch screen', () => {
   test('the item you tap shows its grip and trash; the others stay hidden and cannot be hit', async ({ page }) => {
     expect(await page.evaluate(() => matchMedia('(hover: none)').matches)).toBe(true);
     await clickEmpty(page);
-    await add(page, 'To-do list');
+    await add(page, 'Checklist');
     await page.keyboard.type('Buy milk');
     await page.keyboard.press('Enter');
     await page.keyboard.type('Call plumber');
@@ -51,7 +51,7 @@ test.describe('on a touch screen', () => {
 
   test('an item can be dragged by its grip with a finger', async ({ page }) => {
     await clickEmpty(page);
-    await add(page, 'To-do list');
+    await add(page, 'Checklist');
     for (const [i, t] of ['one', 'two', 'three'].entries()) {
       if (i) await page.keyboard.press('Enter');
       await page.keyboard.type(t);
@@ -89,7 +89,7 @@ test.describe('on a phone-sized screen', () => {
   test('+ adds a note, a to-do list, a column or a sub-board (no link), and the menu closes', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
     await expect(page.getByRole('menu')).toBeHidden();
     const card = page.locator('[data-card-id]');
     await expect(card).toHaveCount(1);
@@ -127,7 +127,7 @@ test.describe('on a phone-sized screen', () => {
   test('while typing in a checklist item, a bar of item actions shows: indent, outdent, move, tick, delete', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
     await page.keyboard.press('Enter'); // from the title to the first item
     for (const [i, t] of ['one', 'two', 'three'].entries()) {
       if (i) await page.keyboard.press('Enter');
@@ -168,7 +168,7 @@ test.describe('on a phone-sized screen', () => {
   test('small card buttons can be pressed a little outside their drawn edge', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
     await page.keyboard.press('Enter');
     await page.keyboard.type('Milk');
     const card = page.locator('[data-card-id]').first();
@@ -202,7 +202,7 @@ test.describe('on a phone-sized screen', () => {
     await page.reload();
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
     await page.keyboard.press('Enter');
     await page.keyboard.type('Milk');
     const field = page.locator('[data-card-id]').first().getByLabel('Item text');
@@ -216,7 +216,7 @@ test.describe('on a phone-sized screen', () => {
   test('press and hold anywhere on a card, even on its text, then move to drag it', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'To-do list' }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
     await page.keyboard.type('Groceries');
     await page.keyboard.press('Enter');
     await page.keyboard.type('Milk');

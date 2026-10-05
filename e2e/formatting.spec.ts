@@ -10,7 +10,7 @@ const bar = (page: Page) => page.getByRole('toolbar', { name: 'Text format' });
 
 async function list(page: Page, title: string, items: string[]) {
   await clickEmpty(page);
-  await add(page, 'To-do list', { stayInTitle: true });
+  await add(page, 'Checklist', { stayInTitle: true });
   await page.keyboard.type(title);
   await page.keyboard.press('Enter');
   for (const [i, t] of items.entries()) {

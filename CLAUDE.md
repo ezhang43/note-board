@@ -4,7 +4,7 @@
 
 ## Owner and review
 
-The owner reads code at a beginner level and does not review it line by line. Every change must be provable by automated tests and by a short click-through the owner can do. After each step, report: what was built, how to run it, and exactly what to click to check it.
+The owner reads code at a beginner level and does not review it line by line. Every change must be provable by automated tests and by a short click-through the owner can do. After each step, report: what was built, how to run it, and exactly what to click to check it. Scale the report to the change, like the review levels in rule 10 (owner request, 2026-10-05): a tiny fix or a wording/document change gets a few lines; a normal feature gets the full report; anything touching saving, sync, undo or deleting gets the full report plus what happens to boards already saved. The `/finish-step` skill has the three shapes.
 
 ## Stack (decided)
 

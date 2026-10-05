@@ -119,3 +119,27 @@ describe('share links', () => {
     expect(parseJoin('?join=s_1/../x.key')).toBeNull();
   });
 });
+
+describe('which boards a shared board holds: code review fixes (2026-10-06)', () => {
+  it('a board card that came with its data, moved to another of its boards, still takes nothing in', () => {
+    const ws = sample();
+    const planted = opening(ws.boards.trip, 'work');
+    const agreed = { trip: planted, days: ws.boards.days };
+    // Here, the card was moved from trip onto days.
+    const here = { ...ws, boards: { ...ws.boards, days: opening(ws.boards.days, 'work') } };
+    expect(groupBoardIds(here, 'trip', agreed, new Set())).not.toContain('work');
+  });
+
+  it('a card that came with an earlier version (`cameWith`) takes nothing in either', () => {
+    const ws = sample();
+    const here = { ...ws, boards: { ...ws.boards, trip: opening(ws.boards.trip, 'work') } };
+    expect(groupBoardIds(here, 'trip', { trip: ws.boards.trip }, new Set(), new Set(['card-work>work']))).not.toContain('work');
+  });
+
+  it('with its starting board gone from here, it still holds its other boards', () => {
+    const ws = sample();
+    const { trip: _gone, ...rest } = ws.boards;
+    const here = { ...ws, boards: rest };
+    expect(groupBoardIds(here, 'trip', { trip: ws.boards.trip, days: ws.boards.days }, new Set())).toEqual(['days']);
+  });
+});

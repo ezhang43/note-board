@@ -163,7 +163,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                     aria-label={`Remove ${p.name}`}
                     disabled={busy}
                     onClick={() => {
-                      if (window.confirm(`Remove ${p.name}? “${rootName}” will no longer be shared with them, and the link changes, so share the new one with anyone else who should join.`)) void run(() => sharing.removePerson(share.id, p.uid));
+                      if (window.confirm(`Remove ${p.name}? “${rootName}” will no longer be shared with them. If the link is on, it changes: share the new one with anyone else who should join.`)) void run(() => sharing.removePerson(share.id, p.uid));
                     }}
                   >
                     Remove

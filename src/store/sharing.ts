@@ -1,6 +1,6 @@
 import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
-import { boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
+import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
 import type { Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
@@ -46,6 +46,8 @@ interface Share {
   failed: boolean;
   /** The owner is deleting it: nothing more is sent. */
   deleting: boolean;
+  /** Every board card that came with a version of its data (see groupBoardIds). */
+  cameWith: Set<string>;
   /** The boards as last seen in the store, to notice changes made here. */
   seen: Record<string, Board>;
   stops: (() => void)[];
@@ -90,7 +92,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const out = new Map<string, string[]>();
     const taken = new Set<string>();
     for (const s of shares.values()) {
-      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, taken) : [];
+      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, taken, s.cameWith) : [];
       ids.forEach((id) => taken.add(id));
       out.set(s.id, ids);
     }
@@ -127,10 +129,14 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     }
   }
 
+  let remembered = '';
   function remember() {
     if (stopped) return;
+    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner })));
+    if (list === remembered) return;
+    remembered = list;
     try {
-      opts.storage?.setItem(sharesKey(backend.me.uid), JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner }))));
+      opts.storage?.setItem(sharesKey(backend.me.uid), list);
     } catch {
       // Storage full: the shares are known once the server answers.
     }
@@ -138,12 +144,27 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   /**
    * Boards in the share's data that may be taken here: never one with the id of a board of this
-   * person's own (security review fix). The person who shared it owns all of them anyway.
+   * person's own (security review fix), since anyone it is shared with can save anything in it.
+   * One exception: the first time the person who shared it gets it on a device, that device's old
+   * copy of the board they shared (and the boards inside it) is taken over by the share.
    */
-  function safeBoards(s: Share, boards: Record<string, Board>): Record<string, Board> {
-    if (s.owner) return boards;
-    const clash = clashingBoards(store.workspace(), boards, [...idsOf(s), ...Object.keys(s.base ?? {})]);
+  function safeBoards(s: Share, boards: Record<string, Board>, root: string): Record<string, Board> {
+    const ws = store.workspace();
+    const held = [...idsOf(s), ...Object.keys(s.base ?? {})];
+    if (s.owner && !s.base) {
+      const others = new Set([...shares.values()].filter((o) => o !== s).flatMap(idsOf));
+      held.push(...boardsToShare(ws, root, others));
+    }
+    const clash = clashingBoards(ws, boards, held);
     return clash.length ? Object.fromEntries(Object.entries(boards).filter(([id]) => !clash.includes(id))) : boards;
+  }
+
+  /** A version of the share's data is the agreed one now. */
+  function agree(s: Share, boards: Record<string, Board>, rev: number) {
+    s.base = boards;
+    s.baseRev = rev;
+    boardCardKeys(boards).forEach((k) => s.cameWith.add(k));
+    saveBase(s);
   }
 
   /** The share can't be used here (security review fix): it holds nothing, and a join waiting on it fails. */
@@ -238,10 +259,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           s.failed = false;
           const got = readShare(after.data);
           if (got && after.rev > s.baseRev && shares.has(s.id)) {
-            const boards = safeBoards(s, got.boards);
-            s.base = boards;
-            s.baseRev = after.rev;
-            saveBase(s);
+            const boards = safeBoards(s, got.boards, root);
+            agree(s, boards, after.rev);
             // Others' changes that came with it, on top of anything typed here since.
             const now = boardsOf(s);
             applyBoards(now, mergeBoardSets(sent, now, boards));
@@ -258,6 +277,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           // Refused (too big, say): the red banner, and the next change tries again (trying the
           // same save again would only be refused again). No connection: it tries again quietly.
           s.failed = e?.code === 'permission-denied';
+          // A change made while this one was on its way is a new version: it is tried once.
+          if (s.failed && s.again && !s.timer && shares.has(s.id)) schedule(s);
+          s.again = false;
           if (!s.failed && !s.timer && shares.has(s.id)) s.timer = setTimeout(() => upload(s), RETRY_MS);
           report();
         },
@@ -285,15 +307,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       }
       // Only boards in the share's data, never one of this person's own, and its starting board must
       // be one of them (security review fix: whatever is saved online can't take this person's boards).
-      const boards = safeBoards(s, got.boards);
-      if (!boards[doc.root]) return refuse(s);
+      const boards = safeBoards(s, got.boards, doc.root);
+      // A version without its starting board: one it had before stays as it was (anyone it is
+      // shared with can save anything in it); one never opened here can't be used.
+      if (!boards[doc.root] || (s.root && doc.root !== s.root)) return s.base ? undefined : refuse(s);
       const next = s.base && !missing ? mergeBoardSets(s.base, now, boards) : boards;
       s.root = doc.root;
-      s.base = boards;
-      s.baseRev = doc.rev;
-      saveBase(s);
+      agree(s, boards, doc.rev);
       applyBoards(now, next);
-    } else if (doc.root !== s.root) return refuse(s);
+    } else if (doc.root !== s.root) return;
     s.seen = boardsOf(s);
     // Changes made here (now, or before a reload) that the server doesn't have yet.
     if (!deepEqual(s.seen, s.base)) schedule(s);
@@ -362,6 +384,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       again: false,
       failed: false,
       deleting: false,
+      cameWith: boardCardKeys(saved?.boards ?? {}),
       seen: {},
       stops: [],
       arrived: [],
@@ -425,6 +448,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         received(s, doc);
       }
       if (!s.ready) continue;
+      // Its starting board gone from here (undoing its making, say): it comes back, since only the
+      // person who shared it deletes it, for everyone, from the Boards menu.
+      if (s.root && s.base?.[s.root] && !ws.boards[s.root]) {
+        applyBoards({}, { [s.root]: s.base[s.root] });
+        s.seen = {};
+      }
       const now = boardsOf(s);
       const ids = Object.keys(now);
       const same = ids.length === Object.keys(s.seen).length && ids.every((id) => now[id] === s.seen[id]);
@@ -487,7 +516,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     /** Owner: turn the link off, or on again with a new link (the old one stays off). */
     setLinkOn: (id: string, on: boolean) => backend.setLink(id, on ? randomKey(20) : null),
     /** Owner: removes someone. The link changes too, so the copy of it they have stops working. */
-    removePerson: (id: string, uid: string) => backend.removePerson(id, uid, shares.get(id)?.link ? randomKey(20) : null),
+    removePerson: (id: string, uid: string) => backend.removePerson(id, uid, randomKey(20)),
     /** Stop having a board someone shared: it goes from this person's boards. */
     async leave(id: string) {
       const s = need(id);

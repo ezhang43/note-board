@@ -63,10 +63,11 @@ export interface CollabBackend {
   join(id: string, key: string): Promise<void>;
   leave(id: string): Promise<void>;
   /**
-   * Owner only: removes someone and sets the link to `link` (a new key, or null for off) in one
-   * go, so the copy of the link they have never lets them back in, not even for a moment.
+   * Owner only: removes someone and, if the link is on, changes it to `newKey`, in one go, so the
+   * copy of the link they have never lets them back in, not even for a moment. A link turned off
+   * stays off (decided online, so a page that hasn't heard of it yet can't turn it back on).
    */
-  removePerson(id: string, uid: string, link: string | null): Promise<void>;
+  removePerson(id: string, uid: string, newKey: string): Promise<void>;
   /** Owner only: a new link key, or null to turn the link off. */
   setLink(id: string, key: string | null): Promise<void>;
   /** Owner only. */
@@ -87,7 +88,7 @@ export interface CollabServer {
   createShare(who: Person, id: string, root: string, link: string, data: string, client: string): Promise<void>;
   join(who: Person, id: string, key: string): Promise<void>;
   leave(who: Person, id: string): Promise<void>;
-  removePerson(who: Person, id: string, uid: string, link: string | null): Promise<void>;
+  removePerson(who: Person, id: string, uid: string, newKey: string): Promise<void>;
   setLink(who: Person, id: string, key: string | null): Promise<void>;
   deleteShare(who: Person, id: string): Promise<void>;
 }
@@ -111,7 +112,7 @@ export function serverBackend(server: CollabServer, me: Person): CollabBackend {
     createShare: (id, root, link, data, client) => server.createShare(me, id, root, link, data, client),
     join: (id, key) => server.join(me, id, key),
     leave: (id) => server.leave(me, id),
-    removePerson: (id, uid, link) => server.removePerson(me, id, uid, link),
+    removePerson: (id, uid, newKey) => server.removePerson(me, id, uid, newKey),
     setLink: (id, key) => server.setLink(me, id, key),
     deleteShare: (id) => server.deleteShare(me, id),
   };
@@ -232,11 +233,11 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       dropMine(who.uid, id);
       notify();
     },
-    async removePerson(who, id, uid, link) {
+    async removePerson(who, id, uid, newKey) {
       const s = shares.get(id);
       check(Boolean(s && s.owner === who.uid && uid !== who.uid));
       s!.people = s!.people.filter((p) => p.uid !== uid);
-      s!.link = link;
+      if (s!.link !== null) s!.link = newKey;
       notify();
     },
     async setLink(who, id, key) {

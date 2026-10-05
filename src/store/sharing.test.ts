@@ -6,6 +6,7 @@ import { serializeShare } from '../model/sharing';
 import type { Board, NoteCard } from '../model/types';
 import { memoryServer, type Person } from './collab';
 import { startSharing } from './sharing';
+import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
 import { createStore, type Store } from './store';
 
 // Sharing a board and editing it together (owner request, 2026-10-05), with a pretend server.
@@ -411,5 +412,95 @@ describe('security review fixes: removing someone and opening a page again (2026
     expect(server.shares.get(shareId)!.data).toContain('Trip');
     expect(alice.store.workspace().boards[sub]).toBeDefined();
     expect(again.store.workspace().boards[trip]?.name).toBe('Trip');
+  });
+});
+
+describe('code review fixes (2026-10-06)', () => {
+  const named = (name: string) => ({ ...B.createBoard(), name });
+
+  it('someone a board is shared with can’t overwrite one of the owner’s own boards through it', async () => {
+    const { alice, trip, shareId } = await together();
+    const diary = alice.store.newBoard();
+    alice.store.renameBoard('Diary');
+    alice.store.addCard('note');
+    const before = alice.store.workspace().boards[diary];
+    await settle();
+    const s = server.shares.get(shareId)!;
+    const boards = JSON.parse(s.data).boards as Record<string, Board>;
+    await server.server.write(person('bob'), shareId, serializeShare(trip, { ...boards, [diary]: named('Overwritten') }), 'bob-page', s.rev);
+    await settle();
+    expect(alice.store.workspace().boards[diary]).toEqual(before);
+    expect(alice.sharing.isShared(diary)).toBe(false);
+  });
+
+  it('the owner’s other device, with an old copy of the board from before it was shared, takes the share', async () => {
+    const alice = device('alice');
+    await settle();
+    const trip = alice.store.newBoard();
+    alice.store.renameBoard('Trip');
+    const sub = alice.store.addBoardCard();
+    alice.store.flush();
+    const laptop = memoryStorage();
+    alice.storage.data.forEach((v, k) => laptop.setItem(k, v));
+    const shareId = await alice.sharing.share(trip);
+    // The laptop doesn't know about the share yet; it is on Alice's list online.
+    await settle();
+    const other = device('alice', laptop);
+    await settle();
+    expect(other.sharing.shareOf(trip)).toBe(shareId);
+    expect(other.sharing.isShared(sub)).toBe(true);
+  });
+
+  it('a later version without its starting board isn’t taken: the shared boards stay as they were', async () => {
+    const { alice, trip, sub, shareId } = await together();
+    const s = server.shares.get(shareId)!;
+    await server.server.write(person('bob'), shareId, serializeShare('x', { x: named('Other') }), 'bob-page', s.rev);
+    await settle();
+    expect(alice.sharing.isShared(trip)).toBe(true);
+    expect(alice.sharing.isShared(sub)).toBe(true);
+    expect(alice.store.workspace().boards[trip].name).toBe('Trip');
+  });
+
+  it('the starting board gone from this device comes straight back, and the boards inside it stay shared', async () => {
+    const { bob, trip, sub, shareId } = await together();
+    bob.store.replaceBoards({ [trip]: null });
+    expect(bob.sharing.isShared(sub)).toBe(true);
+    await settle();
+    expect(bob.store.workspace().boards[trip]?.name).toBe('Trip');
+    expect(server.shares.get(shareId)!.data).toContain('Trip');
+  });
+
+  it('a change made while a refused save was still on its way is tried once more', async () => {
+    const { alice, trip, shareId } = await together();
+    alice.store.openBoard(trip);
+    // Saves take a while to be answered, and are refused.
+    const write = server.server.write;
+    let release: () => void = () => {};
+    server.server.write = async (...args) => {
+      await new Promise<void>((done) => (release = done));
+      return write(...args);
+    };
+    server.control.refuse = true;
+    alice.store.renameBoard('Too big');
+    await vi.advanceTimersByTimeAsync(SYNC_DELAY_MS + 10);
+    alice.store.renameBoard('Smaller');
+    await vi.advanceTimersByTimeAsync(SYNC_DELAY_MS + 10);
+    // The first save is answered (refused); the change made meanwhile goes once the cap allows it.
+    release();
+    await vi.advanceTimersByTimeAsync(10);
+    server.control.refuse = false;
+    release();
+    await settle();
+    release();
+    await settle();
+    expect(server.shares.get(shareId)!.data).toContain('Smaller');
+  });
+
+  it('removing someone keeps the link turned off if it was turned off meanwhile (on another device)', async () => {
+    const { alice, shareId } = await together();
+    await server.server.setLink(person('alice'), shareId, null);
+    // Alice's page hasn't heard yet.
+    await alice.sharing.removePerson(shareId, 'bob');
+    expect(server.shares.get(shareId)!.link).toBeNull();
   });
 });

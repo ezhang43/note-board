@@ -200,12 +200,15 @@ export function collabRemote(user: User): CollabBackend {
       // Already gone when the board was deleted or the person removed.
       await deleteDoc(memberRef(id, me.uid)).catch(() => {});
     },
-    async removePerson(id, uid, link) {
-      // One batch: removed and the link changed together, or neither.
-      const batch = writeBatch(db);
-      batch.delete(memberRef(id, uid));
-      batch.update(shareRef(id), { link });
-      await batch.commit();
+    removePerson(id, uid, newKey) {
+      // One transaction: removed and the link changed together, or neither; whether the link is on
+      // is read online, so a link turned off on another device stays off.
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(shareRef(id));
+        if (!snap.exists()) throw notAllowed();
+        tx.delete(memberRef(id, uid));
+        if (typeof snap.data().link === 'string') tx.update(shareRef(id), { link: newKey });
+      });
     },
     setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
     async deleteShare(id) {

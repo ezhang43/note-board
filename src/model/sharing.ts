@@ -27,28 +27,36 @@ export function boardsToShare(ws: Workspace, root: string, taken: Set<string>): 
  * - the boards in its data (its starting board `root` must be one of them, or it holds nothing);
  * - boards that a board card added here since opens (a sub-board made on a shared board), with
  *   the boards inside those.
- * A board card that came with the share's data never takes in a board outside it, so whatever is
- * saved online can't make one of this person's own boards part of a share. Never the home board,
- * nor a board in `taken` (held by another share).
+ * A board card that came with the share's data (on any of its boards, or in an earlier version:
+ * `cameWith`, see boardCardKeys) never takes in a board outside it, even once moved, so whatever is
+ * saved online can't make one of this person's own boards part of a share. With its starting
+ * board gone from here, it still holds its other boards. Never the home board, nor a board in
+ * `taken` (held by another share).
  */
-export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string, Board>, taken: Set<string>): string[] {
+export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string, Board>, taken: Set<string>, cameWith = new Set<string>()): string[] {
   const ok = (id: string) => Boolean(ws.boards[id]) && id !== ws.home && !taken.has(id);
-  if (!agreed[root] || !ok(root)) return [];
+  if (!agreed[root] || root === ws.home || taken.has(root)) return [];
+  const came = new Set([...cameWith, ...boardCardKeys(agreed)]);
   const out: string[] = [];
   const queue = [root, ...Object.keys(agreed)];
   while (queue.length) {
     const id = queue.shift()!;
     if (out.includes(id) || !ok(id)) continue;
     out.push(id);
-    const before = agreed[id];
     for (const card of Object.values(ws.boards[id].cards)) {
-      if (card.kind !== 'board') continue;
-      const was = before?.cards[card.id];
       // A card that came with the data: only boards in the data count (they are queued already).
-      if (was?.kind === 'board' && was.boardId === card.boardId) continue;
-      queue.push(card.boardId);
+      if (card.kind === 'board' && !came.has(cardKey(card.id, card.boardId))) queue.push(card.boardId);
     }
   }
+  return out;
+}
+
+const cardKey = (cardId: string, boardId: string) => `${cardId}>${boardId}`;
+
+/** Every board card in `boards`, as "card>board it opens" (see groupBoardIds). */
+export function boardCardKeys(boards: Record<string, Board>): Set<string> {
+  const out = new Set<string>();
+  for (const b of Object.values(boards)) for (const c of Object.values(b.cards)) if (c.kind === 'board') out.add(cardKey(c.id, c.boardId));
   return out;
 }
 

@@ -111,7 +111,9 @@ export function startSync(
   function upload() {
     if (timer) clearTimeout(timer);
     timer = null;
-    if (stopped) return;
+    // A newer version waits for a drag to end: this device's boards are older (the drag's own
+    // change, if it makes one, is sent after it).
+    if (stopped || waiting) return;
     const data = ownData(store.workspace());
     if (data === lastSynced) {
       if (!failed) opts.onSaveState?.('saved');

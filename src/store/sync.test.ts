@@ -362,3 +362,24 @@ describe('review fixes: shared boards (2026-10-05)', () => {
     expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).not.toContain(trip);
   });
 });
+
+describe('code review fixes: shared boards and a drag (2026-10-06)', () => {
+  it('a change in which boards are shared, mid-drag, doesn’t send this device’s older boards over a newer version', () => {
+    const { store, fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const sent = fake.writes.length;
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    store.setShares([{ id: 's1', root: 'x', boards: [], owner: true, ownerUid: 'me', people: [], link: 'k' }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes.length).toBe(sent);
+    store.cancelDrag();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(store.getState().board.name).toBe('From phone');
+    expect(fake.writes.slice(sent).every((w) => w.data.includes('From phone'))).toBe(true);
+  });
+});

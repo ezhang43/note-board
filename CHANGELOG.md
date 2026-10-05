@@ -11,6 +11,10 @@
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
 
+## Ant hill on the Completed card (2026-10-05)
+
+- The Completed card now has a little hill with the BusyAnts ant on it. Every item Clean up sends into Completed moves the ant one step higher, and it walks up slowly. The first hill takes 10 items, the next 20, then 30, and so on; reaching the flag says "Top of hill 1!". Sending an item back to its list (or undoing) moves the ant back down.
+
 ## Owner requests: Sign out, Checklist, Miro-style arrows, Clean up per list (2026-10-05)
 
 - Sign out is no longer cut off at the right of the toolbar. It is now a small icon (an arrow leaving a door) at the far right, and the whole toolbar fits windows from 1280px wide, also inside a sub-board.

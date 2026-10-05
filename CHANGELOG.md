@@ -1,5 +1,9 @@
 # Changelog
 
+## Crew: one coordinator at a time (2026-10-06)
+
+- No change to the app. The crew log now names its one coordinator, and a new coordinator checks that the old one's helpers have really stopped (asking the old session, looking at the job's folder, or asking you) before restarting their jobs, so two helpers never end up editing the same folder.
+
 ## Ant hill moved onto the board (2026-10-05)
 
 - The ant hill is no longer inside the Completed card. It now sits at the top middle of the board and stays there while you move or zoom the board. It can't be clicked or moved; clicks go straight through to anything under it. It shows from the start, even before your first Clean up. Each board has its own hill.

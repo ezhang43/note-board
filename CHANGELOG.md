@@ -1,5 +1,9 @@
 # Changelog
 
+## Buy me a coffee (2026-10-05)
+
+- A small coffee-cup button in the bottom-right corner, next to ?, opens the BusyAnts Buy Me a Coffee page in a new tab. On a phone it is in the ⋯ menu.
+
 ## Housekeeping: decisions list moved (2026-10-05)
 
 - No change to the app. The long list of past decisions moved out of `CLAUDE.md` into its own file, `docs/decisions.md`, so each new Claude session starts with shorter instructions. Claude reads the list when it needs it.

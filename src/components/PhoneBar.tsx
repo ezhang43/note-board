@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { appStore, useAppState } from '../store/appStore';
-import { HistoryIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, UndoIcon } from './icons';
+import { CoffeeIcon, HistoryIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, UndoIcon } from './icons';
 import {
   AutoColourButton,
   CleanUpButton,
@@ -13,6 +13,7 @@ import {
   ToolGroup,
 } from './Toolbar';
 import { TextSizeButtons } from './ZoomControl';
+import { DONATE_URL } from '../model/constants';
 import { DuePanelButton } from './Due';
 
 /**
@@ -100,6 +101,10 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <HistoryIcon />
             Version history
           </button>
+          <a className="tb-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
+            <CoffeeIcon />
+            Buy me a coffee
+          </a>
           {onSignOut && (
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out

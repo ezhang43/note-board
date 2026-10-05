@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { arrowCurve, connectorDots, curveMid, curvePath, type Curve, type Side } from '../model/arrows';
+import { arrowCurve, clearDots, connectorDots, curveMid, curvePath, type Curve, type Side } from '../model/arrows';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { Rect } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
-import { blockEl, blockUnder, boardRect, clientToBoard } from './canvasDom';
+import { blockEl, blockUnder, boardRect, clientToBoard, dotObstacles } from './canvasDom';
 import { CloseIcon } from './icons';
 
 // Arrows between cards and columns (owner request, 2026-10-05), drawn as in Miro (owner request,
@@ -20,6 +20,8 @@ const FOLLOW_MS = 400;
 const DOT_OFFSET = 14;
 /** How far outside a hovered block (screen pixels) the pointer can go and still keep its dots, to reach them. */
 const DOT_REACH = 28;
+/** Half a dot's width (screen pixels, matching .arrow-dot), plus a little air: how far it must keep off other blocks. */
+const DOT_CLEAR = 7;
 const OUT: Record<Side, { x: number; y: number }> = { top: { x: 0, y: -1 }, right: { x: 1, y: 0 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
@@ -27,7 +29,7 @@ const samePoint = (a: { x: number; y: number }, b: { x: number; y: number }) => 
 const sameCurve = (a: Curve | null | undefined, b: Curve | null) =>
   a === b || (!!a && !!b && samePoint(a.from, b.from) && samePoint(a.to, b.to) && samePoint(a.c1, b.c1) && samePoint(a.c2, b.c2));
 type Dots = { of: string; dots: Dot[] } | null;
-const sameDots = (a: Dots, b: Dots) => a === b || (!!a && !!b && a.of === b.of && a.dots.every((d, i) => samePoint(d, b.dots[i])));
+const sameDots = (a: Dots, b: Dots) => a === b || (!!a && !!b && a.of === b.of && a.dots.length === b.dots.length && a.dots.every((d, i) => samePoint(d, b.dots[i])));
 
 /** The block under the pointer, looking through dots (a card before the column it is in). */
 function blockAt(clientX: number, clientY: number): HTMLElement | null {
@@ -98,8 +100,11 @@ export function Arrows() {
         const keys = Object.keys(next);
         return keys.length === Object.keys(old).length && keys.every((k) => sameCurve(old[k], next[k])) ? old : next;
       });
-      const r = dotsFor ? rectOf(dotsFor) : null;
-      const d = dotsFor && r ? { of: dotsFor, dots: connectorDots(r, DOT_OFFSET / appStore.getState().view.zoom) } : null;
+      // A dot that would lie over another card, or the title of the column the block is in, isn't
+      // shown, so it never covers their text (owner request, 2026-10-05).
+      const el = dotsFor ? blockEl(board, dotsFor) : null;
+      const zoom = appStore.getState().view.zoom;
+      const d = dotsFor && el ? { of: dotsFor, dots: clearDots(connectorDots(boardRect(el), DOT_OFFSET / zoom), DOT_CLEAR / zoom, dotObstacles(el)) } : null;
       setDots((old) => (sameDots(old, d) ? old : d));
     };
     const loop = () => {

@@ -4,6 +4,11 @@
 
 - The ant hill is no longer inside the Completed card. It now sits at the top middle of the board and stays there while you move or zoom the board. It can't be clicked or moved; clicks go straight through to anything under it. It shows from the start, even before your first Clean up. Each board has its own hill.
 
+## Quieter arrow dots (2026-10-05)
+
+- The dots for drawing arrows are smaller and soft grey, and fade in after a moment instead of popping up on every card the pointer passes. The one under the pointer turns amber.
+- A dot that would sit on top of another card or a column's title is no longer shown, so dots don't cover text. Cards in a column still have their left and right dots, and any dot draws the same arrow. A card hemmed in on every side keeps one dot, so you can always draw an arrow from it.
+
 ## Ant hill on the Completed card (2026-10-05)
 
 - The Completed card now has a little hill with the BusyAnts ant on it. Every item Clean up sends into Completed moves the ant one step higher, and it walks up slowly. The first hill takes 10 items, the next 20, then 30, and so on; reaching the flag says "Top of hill 1!". Sending an item back to its list (or undoing) moves the ant back down.

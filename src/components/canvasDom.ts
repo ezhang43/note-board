@@ -107,6 +107,20 @@ export function boardRect(el: Element): Rect {
   return { x: p.x, y: p.y, w: r.width / zoom, h: r.height / zoom };
 }
 
+/**
+ * Where everything a block's arrow dots must keep off is, in board pixels: every other card and
+ * column, and the title strip of the column the block sits in (the rest of that column is free).
+ */
+export function dotObstacles(block: HTMLElement): Rect[] {
+  const out: Rect[] = [];
+  for (const el of document.querySelectorAll<HTMLElement>('.world [data-card-id], .world [data-col-id]')) {
+    if (el === block || block.contains(el)) continue;
+    const header = el.contains(block) ? el.querySelector(':scope > .column-header') : el;
+    if (header) out.push(boardRect(header));
+  }
+  return out;
+}
+
 /** The block (card first, else column) under a screen point, other than `from` and blocks nested with it. */
 export function blockUnder(clientX: number, clientY: number, from: string): string | null {
   for (const el of document.elementsFromPoint(clientX, clientY)) {

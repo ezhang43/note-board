@@ -189,11 +189,14 @@ test('a dot of one card never covers the card below it in a column', async ({ pa
   const { upper, lower } = await columnOfTwo(page);
   const u = await box(upper);
   await page.mouse.move(u.x + u.width / 2, u.y + u.height / 2);
-  await expect(dot(page, 'bottom')).toBeVisible();
-  // Move down onto the top middle of the lower card, where the upper card's bottom dot sat.
+  // The upper card's bottom dot would lie on the lower card, so it isn't shown (owner request,
+  // later the same day); its side dots are.
+  await expect(dot(page, 'right')).toBeVisible();
+  await expect(dot(page, 'bottom')).toHaveCount(0);
+  // Move down onto the top middle of the lower card: it shows its dots, but no top one, which would
+  // lie on the upper card; its bottom dot is below it.
   const l = await box(lower);
   await page.mouse.move(l.x + l.width / 2, l.y + 3, { steps: 10 });
-  // Now the lower card shows its dots: its top dot is above it.
-  await expect.poll(async () => middle(await box(dot(page, 'top'))).y).toBeLessThan(l.y);
-  expect(middle(await box(dot(page, 'bottom'))).y).toBeGreaterThan(l.y + l.height);
+  await expect.poll(async () => middle(await box(dot(page, 'bottom'))).y).toBeGreaterThan(l.y + l.height);
+  await expect(dot(page, 'top')).toHaveCount(0);
 });

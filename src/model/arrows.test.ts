@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addArrow, arrowCurve, connectorDots, curveMid, curvePath, pruneArrows, removeArrow } from './arrows';
+import { addArrow, arrowCurve, clearDots, connectorDots, curveMid, curvePath, pruneArrows, removeArrow } from './arrows';
 import { addCard, addColumn, createBoard, deleteBlocks } from './board';
 import { createCard, createColumn } from './cards';
 import { parseBoard, serializeBoard } from './persist';
@@ -115,5 +115,27 @@ describe('connection dots', () => {
       { side: 'bottom', x: 100, y: 114 },
       { side: 'left', x: -14, y: 50 },
     ]);
+  });
+
+  it('leave out a dot that would lie over another block, so it never covers its text', () => {
+    const dots = connectorDots({ x: 0, y: 0, w: 200, h: 100 }, 14);
+    // A card just above (its bottom edge 10px above this one) hides the top dot only.
+    expect(clearDots(dots, 5, [{ x: 0, y: -110, w: 200, h: 100 }]).map((d) => d.side)).toEqual(['right', 'bottom', 'left']);
+    // The dot is a circle of radius 5: one grazed by its edge goes too; one clear of it stays.
+    expect(clearDots(dots, 5, [{ x: 218, y: 0, w: 100, h: 100 }]).map((d) => d.side)).toEqual(['top', 'bottom', 'left']);
+    expect(clearDots(dots, 5, [{ x: 220, y: 0, w: 100, h: 100 }])).toHaveLength(4);
+    expect(clearDots(dots, 5, [])).toEqual(dots);
+  });
+
+  it('keep the least covered dot when every dot would lie over something, so an arrow can still be drawn', () => {
+    const dots = connectorDots({ x: 0, y: 0, w: 200, h: 100 }, 14);
+    // Boxed in on all four sides; the block to the right only just reaches its dot.
+    const around = [
+      { x: 0, y: -110, w: 200, h: 100 },
+      { x: 0, y: 110, w: 200, h: 100 },
+      { x: -110, y: 0, w: 100, h: 100 },
+      { x: 218, y: 0, w: 100, h: 100 },
+    ];
+    expect(clearDots(dots, 5, around).map((d) => d.side)).toEqual(['right']);
   });
 });

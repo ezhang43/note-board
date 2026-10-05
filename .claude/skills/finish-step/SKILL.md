@@ -66,7 +66,24 @@ Use the `spec-checker` subagent on the change. Fix anything it lists, or say in 
 
 ## 8. Report to the owner
 
-Plain words, short, no code. The owner reads code at a beginner level.
+Plain words, short, no code. The owner reads code at a beginner level. Pick the size from step 3's review level (owner request, 2026-10-05):
+
+**Small** (review was `low`, none, or skipped for wording/documents): a few lines, no headings.
+
+- What changed, in one sentence.
+- One thing to click to see it (skip for documents only).
+- Any call made without asking, if there was one.
+- Where it is.
+
+Mention tests, review or security only if something failed, was found or was skipped for an unusual reason.
+
+**Standard** (review was `medium`): the full list below.
+
+**Full** (review was `high`): the full list below, plus:
+
+- **Saved boards**: what happens to boards already saved (on this computer and synced), whether anything could be lost, and how to undo it if it goes wrong.
+
+The full list:
 
 - **What was built**: one or two sentences.
 - **How to run it**: `npm run dev`, then http://localhost:5173 (or the live site, once published).

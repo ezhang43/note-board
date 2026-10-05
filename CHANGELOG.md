@@ -1,5 +1,9 @@
 # Changelog
 
+## Ant hill moved onto the board (2026-10-05)
+
+- The ant hill is no longer inside the Completed card. It now sits at the top middle of the board and stays there while you move or zoom the board. It can't be clicked or moved; clicks go straight through to anything under it. It shows from the start, even before your first Clean up. Each board has its own hill.
+
 ## Ant hill on the Completed card (2026-10-05)
 
 - The Completed card now has a little hill with the BusyAnts ant on it. Every item Clean up sends into Completed moves the ant one step higher, and it walks up slowly. The first hill takes 10 items, the next 20, then 30, and so on; reaching the flag says "Top of hill 1!". Sending an item back to its list (or undoing) moves the ant back down.

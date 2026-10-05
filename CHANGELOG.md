@@ -1,5 +1,9 @@
 # Changelog
 
+## Reports sized to the change (2026-10-05)
+
+- No change to the app. Claude's report after each step now matches the size of the change: a few lines for a tiny fix or a wording change, the full report for a normal feature, and the full report plus what happens to your saved boards for anything touching saving, sync, undo or deleting.
+
 ## Crew coordinator for Claude (2026-10-05)
 
 - No change to the app. One Claude session can now run the others: type `/crew` and a request, and it splits the request into jobs, starts a helper for each in its own copy of the code (up to 3 at once), keeps a log of where every job is (working, pull request open, waiting for you, merged), and `/crew` on its own gives you one plain-English status. Browser tests in each copy now use their own ports, so helpers testing at the same time can't test each other's work by mistake.

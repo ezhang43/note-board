@@ -4,6 +4,8 @@ import { memo, useRef, type CSSProperties } from 'react';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { dayLabel } from '../model/completed';
+import { climbedCount } from '../model/antHill';
+import { AntHill } from './AntHill';
 import { swatchFor } from '../model/theme';
 import type { BoardCard, Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -174,6 +176,7 @@ function CompletedBody({ card }: { card: CompletedCard }) {
   return (
     <div className="completed-card-body">
       <div className="completed-card-title">Completed</div>
+      <AntHill count={climbedCount(card)} />
       {!card.groups.length && <div className="completed-empty">Nothing cleaned up yet</div>}
       {card.groups.map((g) => (
         <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>

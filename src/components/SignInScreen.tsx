@@ -18,7 +18,7 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
         {status === 'signed-out' && (
           <>
             {/* Opened from a share link (owner request: editing together); it is joined after signing in. */}
-            <p className="sign-in-text">{parseJoin(location.search) ? 'Sign in to open the board shared with you.' : 'Sign in to open your board.'}</p>
+            <p className="sign-in-text">{typeof location !== 'undefined' && parseJoin(location.search) ? 'Sign in to open the board shared with you.' : 'Sign in to open your board.'}</p>
             <button type="button" className="tb-button sign-in-button" onClick={onSignIn}>
               Sign in with Google
             </button>

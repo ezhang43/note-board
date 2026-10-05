@@ -33,9 +33,17 @@ describe('who can use BusyAnts', () => {
 
   it('the online rules cap what can be saved: a board or version under 900,000 characters, only the fields the app writes', () => {
     expect(rules).toContain('text.size() <= 900000');
-    expect(rules.match(/boardText\(request\.resource\.data\.data\)/g)?.length).toBe(2); // the board, and a version's board
+    // The board, a version's board, and a shared board (owner request: editing together).
+    expect(rules.match(/boardText\(request\.resource\.data\.data\)/g)?.length).toBe(3);
     expect(rules).toContain("hasOnly(['data', 'client', 'updatedAt'])");
     expect(rules).toContain("hasOnly(['data'])");
     expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash'])");
+  });
+
+  it('a shared board is read and changed only by the people it is shared with; joining needs the current link', () => {
+    expect(rules).toContain('allow read: if isMember();');
+    expect(rules).toContain('request.resource.data.key == share().link');
+    expect(rules).toContain('request.resource.data.rev == resource.data.rev + 1');
+    expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
   });
 });

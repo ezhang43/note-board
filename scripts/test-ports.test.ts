@@ -29,3 +29,11 @@ describe('browser test ports', () => {
     expect(testPorts({ isWorktree: true, folder: 'x', env: { E2E_DEV_PORT: '6001', E2E_PREVIEW_PORT: '6002' } })).toEqual({ dev: 6001, preview: 6002 });
   });
 });
+
+describe('one override alone', () => {
+  it('keeps the worktree\'s own port for the other', () => {
+    const own = testPorts({ isWorktree: true, folder: 'C:/a/wt', env: {} });
+    expect(testPorts({ isWorktree: true, folder: 'C:/a/wt', env: { E2E_DEV_PORT: '6001' } })).toEqual({ dev: 6001, preview: own.preview });
+    expect(testPorts({ isWorktree: true, folder: 'C:/a/wt', env: { E2E_PREVIEW_PORT: '6002' } })).toEqual({ dev: own.dev, preview: 6002 });
+  });
+});

@@ -6,10 +6,15 @@ import { execSync } from 'node:child_process';
 const SLOTS = 300;
 
 export function testPorts({ isWorktree, folder, env }) {
-  if (env.E2E_DEV_PORT || env.E2E_PREVIEW_PORT)
-    return { dev: Number(env.E2E_DEV_PORT ?? 5173), preview: Number(env.E2E_PREVIEW_PORT ?? 4173) };
-  if (!isWorktree) return { dev: 5173, preview: 4173 };
-  // FNV-1a hash of the folder, so the same worktree gets the same ports every run.
+  const own = isWorktree ? folderPorts(folder) : { dev: 5173, preview: 4173 };
+  return {
+    dev: env.E2E_DEV_PORT ? Number(env.E2E_DEV_PORT) : own.dev,
+    preview: env.E2E_PREVIEW_PORT ? Number(env.E2E_PREVIEW_PORT) : own.preview,
+  };
+}
+
+// FNV-1a hash of the folder, so the same worktree gets the same ports every run.
+function folderPorts(folder) {
   let h = 0x811c9dc5;
   for (const c of folder.replace(/\\/g, '/').toLowerCase()) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
   const slot = h % SLOTS;

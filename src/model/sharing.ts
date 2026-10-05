@@ -22,7 +22,7 @@ export function boardsToShare(ws: Workspace, root: string, taken: Set<string>): 
 }
 
 /**
- * The boards here that a share holds (security review fix, 2026-10-05). `agreed` is the share's
+ * The boards here that a share holds (security review fix, 2026-10-06). `agreed` is the share's
  * data as last agreed with the server. A share only ever holds:
  * - the boards in its data (its starting board `root` must be one of them, or it holds nothing);
  * - boards that a board card added here since opens (a sub-board made on a shared board), with

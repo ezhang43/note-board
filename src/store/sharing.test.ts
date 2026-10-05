@@ -504,3 +504,23 @@ describe('code review fixes (2026-10-06)', () => {
     expect(server.shares.get(shareId)!.link).toBeNull();
   });
 });
+
+describe('security review fix: a deleted share’s id used again (2026-10-06)', () => {
+  it('a device closed when the share was deleted doesn’t carry on with someone else’s share of the same id', async () => {
+    const { alice, bob, trip, shareId } = await together();
+    // Bob's page is closed.
+    bob.sharing.stop();
+    bob.store.flush();
+    await alice.sharing.deleteShare(shareId);
+    await settle();
+    // Someone who had it makes a new share with the same id; Bob's old member record still lets him in.
+    const mallory = person('mallory');
+    await server.server.createShare(mallory, shareId, trip, 'k', serializeShare(trip, { [trip]: { ...B.createBoard(), name: 'Trip' } }), 'm');
+    server.shares.get(shareId)!.people.push(person('bob'));
+    const again = device('bob', bob.storage);
+    await settle();
+    expect(again.sharing.shareOf(trip)).toBeNull();
+    expect(shareInfo(again.store)).toEqual([]);
+    expect(server.shares.get(shareId)!.rev).toBe(1);
+  });
+});

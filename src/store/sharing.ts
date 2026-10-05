@@ -119,11 +119,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   /** The shares this device had (see sharesKey). */
-  function readRemembered(): { id: string; owner: boolean }[] {
+  function readRemembered(): { id: string; owner: boolean; ownerUid: string }[] {
     try {
       const got = JSON.parse(opts.storage?.getItem(sharesKey(backend.me.uid)) ?? '[]') as unknown;
       if (!Array.isArray(got)) return [];
-      return got.filter((x): x is { id: string; owner: boolean } => typeof x?.id === 'string' && typeof x?.owner === 'boolean');
+      return got.filter((x): x is { id: string; owner: boolean; ownerUid: string } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
     } catch {
       return [];
     }
@@ -132,7 +132,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   let remembered = '';
   function remember() {
     if (stopped) return;
-    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner })));
+    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner, ownerUid: s.ownerUid })));
     if (list === remembered) return;
     remembered = list;
     try {
@@ -289,7 +289,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   /** A new version arrived from the server. */
   function received(s: Share, doc: ShareDoc | null) {
     if (stopped) return;
-    if (!doc) return gone(s, 'deleted');
+    // Someone else's share now (security review fix): this one was deleted and its id used again.
+    if (!doc || (s.ownerUid && doc.owner !== s.ownerUid)) return gone(s, 'deleted');
     s.owner = doc.owner === backend.me.uid;
     s.ownerUid = doc.owner;
     s.link = doc.link;
@@ -365,14 +366,14 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     remember();
   }
 
-  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; link: string }, owner = false) {
+  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; link: string }, owner = false, ownerUid = '') {
     if (shares.has(id) || stopped) return shares.get(id);
     const saved = start ?? readBase(id);
     const s: Share = {
       id,
       root: saved?.root ?? null,
       owner: start?.owner ?? owner,
-      ownerUid: start ? backend.me.uid : '',
+      ownerUid: start ? backend.me.uid : ownerUid,
       link: start?.link ?? null,
       people: start ? [backend.me] : [],
       base: saved?.boards ?? null,
@@ -416,7 +417,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   // The shares this device had, straight away: their boards are known as shared before the server
   // answers (or if it can't), so the person's own boards never take them as theirs.
-  for (const r of readRemembered()) open(r.id, undefined, r.owner);
+  for (const r of readRemembered()) open(r.id, undefined, r.owner, r.ownerUid);
 
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {

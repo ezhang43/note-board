@@ -1,5 +1,12 @@
 # Changelog
 
+## Sharing made safe (2026-10-06)
+
+- A share link can no longer touch your own boards: whatever someone saves in a board they share with you, it can't take in, overwrite or delete any of your other boards. A link that tries to is refused.
+- Removing someone from a shared board changes its link in the same step, so the old link never lets them back in.
+- Shared boards are recognised the moment the page opens, so a slow connection can't make the app treat them as yours, and a page can never send everyone a version with the shared board missing.
+- When a shared board is deleted, the record of who had it goes too.
+
 ## Editing together, step 2: sharing a board by link (2026-10-05)
 
 - A new Share button (two people, next to Sign out; on a phone in ⋯) shares the open board with a link. Anyone who opens the link and signs in with Google can see and edit that board and every board inside it, at the same time as you. Each person’s changes show on everyone’s screen within a second or two, and changes made at the same moment are all kept.

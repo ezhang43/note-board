@@ -212,7 +212,13 @@ export function collabRemote(user: User): CollabBackend {
     },
     setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
     async deleteShare(id) {
-      await deleteDoc(shareRef(id));
+      // Its member records go with it (security review fix), so if its id were ever used again they
+      // wouldn't let anyone into the new one.
+      const members = await getDocs(collection(db, 'shared', id, 'members'));
+      const batch = writeBatch(db);
+      for (const m of members.docs) batch.delete(m.ref);
+      batch.delete(shareRef(id));
+      await batch.commit();
       await deleteDoc(mineRef(id)).catch(() => {});
     },
   };

@@ -687,7 +687,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .hill-ant { fill: var(--ant); stroke: var(--ant); }
 /* While walking, the ant's body bobs a little in step. */
 .hill-ant.walking .hill-ant-body { animation: ant-step 180ms ease-in-out infinite alternate; }
-@keyframes ant-step { to { transform: translateY(-22px); } }
+@keyframes ant-step { to { transform: translateY(-18px); } }
 .hill-caption { font-size: calc(12px * var(--fs, 1)); color: var(--ink-faint); }
 
 /* ---------- columns ---------- */

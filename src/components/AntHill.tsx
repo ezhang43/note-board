@@ -31,10 +31,10 @@ export function AntHill({ count }: { count: number }) {
   );
 }
 
-/** The BusyAnts ant from the app icon, facing right, about 15 wide, its feet at 0,0. */
+/** The BusyAnts ant from the app icon, facing right, about 20 wide, its feet at 0,0. */
 function AntArt() {
   return (
-    <g transform="scale(-0.045 0.045) translate(-300 -396)">
+    <g transform="scale(-0.06 0.06) translate(-300 -396)">
       <g className="hill-ant-legs" fill="none" strokeWidth={20} strokeLinecap="round">
         <path d="M250 334 L240 380 M292 338 L298 384 M346 362 L364 400" />
       </g>

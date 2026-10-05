@@ -1,5 +1,9 @@
 # Changelog
 
+## Auto-publish for low-risk changes (2026-10-05)
+
+- Small, low-risk changes now go live by themselves a few minutes after they are merged and pass their tests. Anything touching saving, sync, undo or deleting, or labelled `high-risk`, still waits for you to say "publish".
+
 ## Owner requests: icon, no Link button, sub-boards, Alt + arrows (2026-10-05)
 
 - The icon files have new names, so the installed app, the browser tab and phone home screens pick up the ant instead of an old saved picture. iPhones and iPads now get the ant on the home screen too.

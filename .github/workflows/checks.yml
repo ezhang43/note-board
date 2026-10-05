@@ -1,6 +1,7 @@
 # Runs every check (typecheck, unit tests, browser tests) on each pull request into build/v1 and
 # on build/v1 itself. A pull request shows pass / fail on GitHub, and one with auto-merge turned on
-# merges by itself once this passes (build rule 9). Nothing here changes the live site.
+# merges by itself once this passes (build rule 9). On a push to build/v1 that passes, the Publish job
+# puts it live when every unpublished change is a low-risk pull request (owner chose this on 2026-10-05).
 name: Checks
 
 on:
@@ -12,15 +13,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: checks-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   checks:
     name: All tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # A newer push cancels the tests of an older one (only the tests: a publish under way finishes).
+    concurrency:
+      group: checks-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,3 +42,38 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
+
+  # Auto-publish (build rule 9): after All tests passes on a push to build/v1, fast-forward main to
+  # that commit and start the Pages deploy, but only when every change main lacks is a merged pull
+  # request that isn't labelled high-risk and touches no saving / sync / undo / deleting file
+  # (scripts/publish-rules.mjs). Anything else waits for the owner's "publish".
+  publish:
+    name: Publish
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # move main
+      actions: write # start the deploy
+      pull-requests: read
+    concurrency:
+      group: auto-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: decide
+        run: node scripts/auto-publish.mjs "${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # A push made with the job's own token doesn't start deploy.yml by itself, so start it by hand.
+      - if: steps.decide.outputs.publish == 'true'
+        run: |
+          git push origin "${{ github.sha }}:refs/heads/main"
+          gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

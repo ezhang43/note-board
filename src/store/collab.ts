@@ -43,7 +43,11 @@ export class NotAllowed extends Error {
 export interface CollabBackend {
   readonly me: Person;
   /** The shares this person has (shared by them or joined). */
-  watchMyShares(onChange: (ids: string[]) => void, onError: (e: unknown) => void): () => void;
+  /**
+   * The shares this person has (shared by them or joined). `confirmed` is false for a list from
+   * the device's offline copy, which may be out of date: a share missing from it isn't taken as left.
+   */
+  watchMyShares(onChange: (ids: string[], confirmed: boolean) => void, onError: (e: unknown) => void): () => void;
   /** A shared board as it changes; null once it is deleted. onError gets NotAllowed once access is lost. */
   watchShare(id: string, onChange: (doc: ShareDoc | null) => void, onError: (e: unknown) => void): () => void;
   /** Everyone who has a shared board (its owner first). */
@@ -58,8 +62,11 @@ export interface CollabBackend {
   /** Joins with a share link's key (refused if the link is wrong or turned off). */
   join(id: string, key: string): Promise<void>;
   leave(id: string): Promise<void>;
-  /** Owner only. */
-  removePerson(id: string, uid: string): Promise<void>;
+  /**
+   * Owner only: removes someone and sets the link to `link` (a new key, or null for off) in one
+   * go, so the copy of the link they have never lets them back in, not even for a moment.
+   */
+  removePerson(id: string, uid: string, link: string | null): Promise<void>;
   /** Owner only: a new link key, or null to turn the link off. */
   setLink(id: string, key: string | null): Promise<void>;
   /** Owner only. */
@@ -80,7 +87,7 @@ export interface CollabServer {
   createShare(who: Person, id: string, root: string, link: string, data: string, client: string): Promise<void>;
   join(who: Person, id: string, key: string): Promise<void>;
   leave(who: Person, id: string): Promise<void>;
-  removePerson(who: Person, id: string, uid: string): Promise<void>;
+  removePerson(who: Person, id: string, uid: string, link: string | null): Promise<void>;
   setLink(who: Person, id: string, key: string | null): Promise<void>;
   deleteShare(who: Person, id: string): Promise<void>;
 }
@@ -89,7 +96,7 @@ export interface CollabServer {
 export function serverBackend(server: CollabServer, me: Person): CollabBackend {
   return {
     me,
-    watchMyShares: (onChange, onError) => server.watchMyShares(me, onChange, onError),
+    watchMyShares: (onChange, onError) => server.watchMyShares(me, (ids) => onChange(ids, true), onError),
     watchShare: (id, onChange, onError) => server.watchShare(me, id, onChange, onError),
     watchPeople: (id, onChange, onError) => server.watchPeople(me, id, onChange, onError),
     async updateShare(id, change, client) {
@@ -104,7 +111,7 @@ export function serverBackend(server: CollabServer, me: Person): CollabBackend {
     createShare: (id, root, link, data, client) => server.createShare(me, id, root, link, data, client),
     join: (id, key) => server.join(me, id, key),
     leave: (id) => server.leave(me, id),
-    removePerson: (id, uid) => server.removePerson(me, id, uid),
+    removePerson: (id, uid, link) => server.removePerson(me, id, uid, link),
     setLink: (id, key) => server.setLink(me, id, key),
     deleteShare: (id) => server.deleteShare(me, id),
   };
@@ -225,10 +232,11 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       dropMine(who.uid, id);
       notify();
     },
-    async removePerson(who, id, uid) {
+    async removePerson(who, id, uid, link) {
       const s = shares.get(id);
       check(Boolean(s && s.owner === who.uid && uid !== who.uid));
       s!.people = s!.people.filter((p) => p.uid !== uid);
+      s!.link = link;
       notify();
     },
     async setLink(who, id, key) {

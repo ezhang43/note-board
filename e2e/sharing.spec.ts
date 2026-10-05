@@ -163,3 +163,84 @@ test('on a phone, Share is in the ⋯ menu', async ({ browser }) => {
   await alice.getByRole('button', { name: 'Share' }).click();
   await expect(sharePanel(alice)).toBeVisible();
 });
+
+// Security review fix (2026-10-05): whatever is saved online in a share can't take, replace or
+// delete one of the boards of the person opening its link.
+test('a share link can’t take or overwrite one of your own boards', async ({ browser }) => {
+  const t = tag();
+  const bob = await person(browser, `Bob${t}`);
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'New board' }).click();
+  await boardName(bob).fill('Diary');
+  await add(bob, 'Note');
+  await bob.keyboard.type('secret');
+  await bob.keyboard.press('Escape');
+  // Bob's diary as saved on his device: its id, and a board to build the hostile share from.
+  await expect
+    .poll(() => bob.evaluate(() => Object.values(localStorage).some((v) => v.includes('"Diary"') && v.includes('secret'))))
+    .toBe(true);
+  const { diaryId, diary } = await bob.evaluate(() => {
+    for (const v of Object.values(localStorage)) {
+      try {
+        const ws = JSON.parse(v) as { boards?: Record<string, { name: string }> };
+        for (const [id, b] of Object.entries(ws.boards ?? {})) if (b.name === 'Diary') return { diaryId: id, diary: b as Record<string, unknown> };
+      } catch {
+        // Not a workspace.
+      }
+    }
+    throw new Error('Diary not saved');
+  });
+  // Mallory's share: its board opens Bob's diary, and it holds a board with the diary's id.
+  const card = { id: 'k-bait', kind: 'board', boardId: diaryId, color: 'stone', collapsed: false, x: 40, y: 40, w: null, h: null };
+  const bait = { ...diary, name: 'Bait', cards: { 'k-bait': card }, columns: {}, order: ['k-bait'] };
+  const overwritten = { ...diary, name: 'Overwritten', cards: {}, columns: {}, order: [] };
+  const data = JSON.stringify({ version: 3, home: 'm1', boards: { m1: bait, [diaryId]: overwritten } });
+  const mallory = { uid: `demo-mallory${t}`, name: `Mallory${t}`, photo: null };
+  const shareId = `sbad${t}`;
+  const res = await bob.request.post('/__collab/call', { data: { who: mallory, method: 'createShare', args: [shareId, 'm1', 'badkey', data, 'mallory'] } });
+  expect(await res.json()).toEqual({ ok: null });
+
+  await bob.goto(`/?join=${shareId}.badkey&demo-user=Bob${t}`);
+  await expect(boardName(bob)).toHaveValue('Bait');
+  // Mallory deletes her share: Bob's diary stays, as it was.
+  await bob.request.post('/__collab/call', { data: { who: mallory, method: 'deleteShare', args: [shareId] } });
+  await expect(boardName(bob)).not.toHaveValue('Bait', { timeout: 8000 });
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Diary' }).click();
+  await expect(boardName(bob)).toHaveValue('Diary');
+  await expect(noteTexts(bob)).toHaveValue('secret');
+});
+
+test('a share link whose board is one of your own doesn’t open, and leaves it alone', async ({ browser }) => {
+  const t = tag();
+  const bob = await person(browser, `Bob${t}`);
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'New board' }).click();
+  await boardName(bob).fill('Diary');
+  await add(bob, 'Note');
+  await bob.keyboard.type('secret');
+  await bob.keyboard.press('Escape');
+  await expect.poll(() => bob.evaluate(() => Object.values(localStorage).some((v) => v.includes('"Diary"') && v.includes('secret')))).toBe(true);
+  const diaryId = await bob.evaluate(() => {
+    for (const v of Object.values(localStorage)) {
+      try {
+        const ws = JSON.parse(v) as { boards?: Record<string, { name: string }> };
+        for (const [id, b] of Object.entries(ws.boards ?? {})) if (b.name === 'Diary') return id;
+      } catch {
+        // Not a workspace.
+      }
+    }
+    throw new Error('Diary not saved');
+  });
+  const empty = { version: 3, home: 'm1', boards: { m1: { name: 'Bait', snap: true, cards: {}, columns: {}, order: [] } } };
+  const mallory = { uid: `demo-mallory${t}`, name: `Mallory${t}`, photo: null };
+  const shareId = `sroot${t}`;
+  await bob.request.post('/__collab/call', { data: { who: mallory, method: 'createShare', args: [shareId, diaryId, 'badkey', JSON.stringify(empty), 'mallory'] } });
+
+  await bob.goto(`/?join=${shareId}.badkey&demo-user=Bob${t}`);
+  await expect(bob.getByRole('status').filter({ hasText: 'This share link doesn’t work' })).toBeVisible({ timeout: 8000 });
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Diary' }).click();
+  await expect(boardName(bob)).toHaveValue('Diary');
+  await expect(noteTexts(bob)).toHaveValue('secret');
+});

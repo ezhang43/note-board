@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StorageLike } from '../model/persist';
-import type { NoteCard } from '../model/types';
+import * as B from '../model/board';
+import { createBoardCard } from '../model/cards';
+import { serializeShare } from '../model/sharing';
+import type { Board, NoteCard } from '../model/types';
 import { memoryServer, type Person } from './collab';
 import { startSharing } from './sharing';
 import { createStore, type Store } from './store';
@@ -273,5 +276,140 @@ describe('review fixes (2026-10-05)', () => {
     alice.store.deleteBoard(sub);
     await settle();
     expect(shareInfo(alice.store)[0].boards).toEqual([trip]);
+  });
+});
+
+describe('security review fixes: a share never takes this person’s own boards (2026-10-05)', () => {
+  const mallory = person('mallory');
+  const opening = (b: Board, to: string) => B.addCard(b, createBoardCard(to, `card-${to}`), { type: 'loose', x: 0, y: 0 });
+  const named = (name: string) => ({ ...B.createBoard(), name });
+
+  /** Bob, with a private board "Diary" (one note in it). */
+  async function bobWithDiary() {
+    const bob = device('bob');
+    await settle();
+    const diary = bob.store.newBoard();
+    bob.store.renameBoard('Diary');
+    bob.store.addCard('note');
+    bob.store.openBoard(bob.store.workspace().home);
+    const before = bob.store.workspace().boards[diary];
+    return { bob, diary, before };
+  }
+
+  /** Mallory puts a share online as she likes (any root, any boards) and Bob opens its link. */
+  async function malloryShares(root: string, boards: Record<string, Board>) {
+    await server.server.createShare(mallory, 'sbad', root, 'badkey', serializeShare(Object.keys(boards)[0], boards), 'mallory-page');
+  }
+
+  it('a share whose starting board isn’t one of its boards can’t be opened, and takes nothing', async () => {
+    const { bob, diary, before } = await bobWithDiary();
+    await malloryShares(diary, { m1: named('Bait') });
+    const joined = bob.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(bob.sharing.isShared(diary)).toBe(false);
+    expect(bob.store.workspace().boards[diary]).toEqual(before);
+    expect(bob.store.workspace().boards.m1).toBeUndefined();
+  });
+
+  it('a board card in the share pointing at one of their boards doesn’t take that board in', async () => {
+    const { bob, diary, before } = await bobWithDiary();
+    await malloryShares('m1', { m1: opening(named('Bait'), diary) });
+    const joined = bob.sharing.join('sbad', 'badkey');
+    await settle();
+    expect(await joined).toBe('m1');
+    expect(bob.sharing.isShared(diary)).toBe(false);
+    expect(shareInfo(bob.store)[0].boards).toEqual(['m1']);
+    // Bob edits the shared board: his diary is still not sent.
+    bob.store.openBoard('m1');
+    bob.store.addCard('note');
+    await settle();
+    expect(server.shares.get('sbad')!.data).not.toContain('Diary');
+    // Mallory deletes it: Bob’s diary stays.
+    await server.server.deleteShare(mallory, 'sbad');
+    await settle();
+    expect(bob.store.workspace().boards[diary]).toEqual(before);
+  });
+
+  it('a board in the share with the id of one of their boards doesn’t replace it', async () => {
+    const { bob, diary, before } = await bobWithDiary();
+    await malloryShares('m1', { m1: opening(named('Bait'), diary), [diary]: named('Overwritten') });
+    const joined = bob.sharing.join('sbad', 'badkey');
+    await settle();
+    await joined;
+    expect(bob.store.workspace().boards[diary]).toEqual(before);
+    expect(bob.sharing.isShared(diary)).toBe(false);
+  });
+
+  it('a card pointing at one of their boards, added online later, doesn’t take it in either', async () => {
+    const { bob, diary, before } = await bobWithDiary();
+    await malloryShares('m1', { m1: named('Bait') });
+    const joined = bob.sharing.join('sbad', 'badkey');
+    await settle();
+    await joined;
+    const s = server.shares.get('sbad')!;
+    await server.server.write(mallory, 'sbad', serializeShare('m1', { m1: opening(named('Bait'), diary), [diary]: named('Overwritten') }), 'mallory-page', s.rev);
+    await settle();
+    expect(bob.sharing.isShared(diary)).toBe(false);
+    expect(bob.store.workspace().boards[diary]).toEqual(before);
+    expect(bob.store.workspace().boards.m1.cards[`card-${diary}`]).toBeDefined();
+  });
+});
+
+describe('security review fixes: removing someone and opening a page again (2026-10-05)', () => {
+  it('removing someone and changing the link happen in one go: the old link never lets them back in', async () => {
+    const { alice, shareId } = await together();
+    const oldKey = server.shares.get(shareId)!.link!;
+    // Bob tries the old link at every step of Alice’s change.
+    const bobBackend = server.backendFor(person('bob'));
+    const original = { ...server.server };
+    for (const step of ['removePerson', 'setLink'] as const) {
+      (server.server as unknown as Record<string, unknown>)[step] = async (...args: unknown[]) => {
+        await (original[step] as (...a: unknown[]) => Promise<void>)(...args);
+        await bobBackend.join(shareId, oldKey).catch(() => {});
+      };
+    }
+    await alice.sharing.removePerson(shareId, 'bob');
+    await settle();
+    expect(server.shares.get(shareId)!.people.map((p) => p.uid)).toEqual(['alice']);
+    expect(server.shares.get(shareId)!.link).not.toBe(oldKey);
+  });
+
+  it('if removing someone fails, nothing changes', async () => {
+    const { alice, shareId } = await together();
+    const oldKey = server.shares.get(shareId)!.link!;
+    server.control.offline = true;
+    await expect(alice.sharing.removePerson(shareId, 'bob')).rejects.toThrow();
+    server.control.offline = false;
+    expect(server.shares.get(shareId)!.people.map((p) => p.uid)).toEqual(['alice', 'bob']);
+    expect(server.shares.get(shareId)!.link).toBe(oldKey);
+  });
+
+  it('on a page opened again, the shared boards are known as shared straight away, even when the list can’t be read', async () => {
+    const { bob, trip, sub } = await together();
+    bob.sharing.stop();
+    bob.store.flush();
+    server.control.offline = true;
+    const again = device('bob', bob.storage);
+    // Before anything arrives: the person’s own boards must not take these as theirs.
+    expect(again.sharing.isShared(trip)).toBe(true);
+    expect(again.sharing.isShared(sub)).toBe(true);
+    await settle();
+    expect(again.sharing.isShared(trip)).toBe(true);
+  });
+
+  it('shared boards missing on a page opened again are never deleted for everyone: they come back', async () => {
+    const { alice, bob, trip, sub, shareId } = await together();
+    bob.sharing.stop();
+    // The boards went from Bob’s device while the page was closed.
+    bob.store.replaceBoards({ [trip]: null, [sub]: null });
+    bob.store.flush();
+    const again = device('bob', bob.storage);
+    await settle();
+    await settle();
+    expect(server.shares.get(shareId)!.data).toContain('Trip');
+    expect(alice.store.workspace().boards[sub]).toBeDefined();
+    expect(again.store.workspace().boards[trip]?.name).toBe('Trip');
   });
 });

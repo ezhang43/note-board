@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard } from './cards';
-import { groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
+import { boardsToShare, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
 import type { Board } from './types';
 import type { Workspace } from './workspace';
 
@@ -22,24 +22,74 @@ function sample(): Workspace {
   };
 }
 
-describe('which boards a shared board takes with it', () => {
+describe('which boards sharing a board takes with it', () => {
   it('the board and every board inside it, however deep', () => {
-    expect(groupBoardIds(sample(), 'trip', [], new Set()).sort()).toEqual(['days', 'hotel', 'trip']);
-  });
-
-  it('boards it had before stay in it, even once no card opens them', () => {
-    expect(groupBoardIds(sample(), 'trip', ['loose'], new Set()).sort()).toEqual(['days', 'hotel', 'loose', 'trip']);
+    expect(boardsToShare(sample(), 'trip', new Set()).sort()).toEqual(['days', 'hotel', 'trip']);
   });
 
   it('never the home board, nor a board another share already holds', () => {
     const ws = sample();
     ws.boards.hotel = opening(ws.boards.hotel, 'home');
-    expect(groupBoardIds(ws, 'trip', [], new Set(['days'])).sort()).toEqual(['trip']);
-    expect(groupBoardIds(ws, 'trip', [], new Set()).sort()).toEqual(['days', 'hotel', 'trip']);
+    expect(boardsToShare(ws, 'trip', new Set(['days'])).sort()).toEqual(['trip']);
+    expect(boardsToShare(ws, 'trip', new Set()).sort()).toEqual(['days', 'hotel', 'trip']);
+    expect(boardsToShare(ws, 'home', new Set())).toEqual([]);
   });
 
   it('nothing when the board isn’t here', () => {
-    expect(groupBoardIds(sample(), 'gone', [], new Set())).toEqual([]);
+    expect(boardsToShare(sample(), 'gone', new Set())).toEqual([]);
+  });
+});
+
+describe('which boards a shared board holds (security review fix, 2026-10-05)', () => {
+  /** The share as last agreed online: trip and days (days opens hotel, which isn’t in it). */
+  const agreed = (ws: Workspace) => ({ trip: ws.boards.trip, days: ws.boards.days });
+
+  it('the boards in its data that are here', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'trip', { ...agreed(ws), elsewhere: B.createBoard() }, new Set()).sort()).toEqual(['days', 'trip']);
+  });
+
+  it('boards it had stay in it, even once no card opens them', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'trip', { ...agreed(ws), loose: ws.boards.loose }, new Set()).sort()).toEqual(['days', 'loose', 'trip']);
+  });
+
+  it('nothing when its starting board isn’t one of its boards', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'work', agreed(ws), new Set())).toEqual([]);
+    expect(groupBoardIds(ws, 'trip', {}, new Set())).toEqual([]);
+  });
+
+  it('a board card that came with its data never takes in a board outside it', () => {
+    const ws = sample();
+    // days opens hotel in the agreed data too: hotel stays this person’s own.
+    expect(groupBoardIds(ws, 'trip', agreed(ws), new Set())).not.toContain('hotel');
+    // Nor a card whose board was changed online to one of this person’s own.
+    const sneaky = { ...ws.boards.trip, cards: { ...ws.boards.trip.cards, 'card-days': { ...ws.boards.trip.cards['card-days'], boardId: 'work' } } } as Board;
+    const here = { ...ws, boards: { ...ws.boards, trip: sneaky } };
+    expect(groupBoardIds(here, 'trip', { trip: sneaky }, new Set())).toEqual(['trip']);
+  });
+
+  it('a board card added here since takes its board in, with the boards inside that', () => {
+    const ws = sample();
+    const before = { trip: B.createBoard() };
+    // trip now opens days (added here), and days opens hotel.
+    expect(groupBoardIds(ws, 'trip', before, new Set()).sort()).toEqual(['days', 'hotel', 'trip']);
+  });
+
+  it('never the home board, nor a board another share holds', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'trip', { ...agreed(ws), home: ws.boards.home }, new Set(['days']))).toEqual(['trip']);
+    expect(groupBoardIds(ws, 'home', { home: ws.boards.home }, new Set())).toEqual([]);
+  });
+});
+
+describe('boards in a share that clash with this person’s own', () => {
+  it('a board in the share’s data with the id of a board here that isn’t in the share', () => {
+    const ws = sample();
+    const incoming = { trip: B.createBoard(), work: B.createBoard(), fresh: B.createBoard() };
+    expect(clashingBoards(ws, incoming, ['trip']).sort()).toEqual(['work']);
+    expect(clashingBoards(ws, incoming, []).sort()).toEqual(['trip', 'work']);
   });
 });
 

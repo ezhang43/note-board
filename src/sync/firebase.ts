@@ -132,7 +132,13 @@ export function collabRemote(user: User): CollabBackend {
   return {
     me,
     watchMyShares(onChange, onError) {
-      return onSnapshot(collection(db, 'boards', me.uid, 'shared'), (snap) => onChange(snap.docs.map((d) => d.id).sort()), onError);
+      // With metadata changes, so the list confirmed by the server arrives after the offline copy's.
+      return onSnapshot(
+        collection(db, 'boards', me.uid, 'shared'),
+        { includeMetadataChanges: true },
+        (snap) => onChange(snap.docs.map((d) => d.id).sort(), !snap.metadata.fromCache),
+        onError,
+      );
     },
     watchShare(id, onChange, onError) {
       return onSnapshot(
@@ -194,7 +200,13 @@ export function collabRemote(user: User): CollabBackend {
       // Already gone when the board was deleted or the person removed.
       await deleteDoc(memberRef(id, me.uid)).catch(() => {});
     },
-    removePerson: (id, uid) => deleteDoc(memberRef(id, uid)),
+    async removePerson(id, uid, link) {
+      // One batch: removed and the link changed together, or neither.
+      const batch = writeBatch(db);
+      batch.delete(memberRef(id, uid));
+      batch.update(shareRef(id), { link });
+      await batch.commit();
+    },
     setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
     async deleteShare(id) {
       await deleteDoc(shareRef(id));

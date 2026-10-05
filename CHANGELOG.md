@@ -18,6 +18,10 @@
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
 
+## Ant hill moved onto the board (2026-10-05)
+
+- The ant hill is no longer inside the Completed card. It now sits at the top middle of the board and stays there while you move or zoom the board. It can't be clicked or moved; clicks go straight through to anything under it. It shows from the start, even before your first Clean up. Each board has its own hill.
+
 ## Simplest code that works (2026-10-06)
 
 - No change to the app. Claude now follows a "simplest code that works" rule while it writes: reuse what the app already has, use what the browser and React already do, add no new packages for small jobs, and write no extra layers or options nobody asked for. Smaller changes mean fewer tokens spent writing and reviewing them. It never cuts features in the spec, the tests, or anything that protects your saved boards.

@@ -678,9 +678,22 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   text-overflow: ellipsis;
 }
 
-/* The ant hill: one step up for every item cleaned up (owner request). */
-.ant-hill { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 0 4px; }
-.ant-hill svg { display: block; width: 100%; height: 72px; overflow: visible; }
+/* The ant hill: one step up for every item cleaned up (owner request). Fixed at the top middle of
+   the board, over the cards, and never in the way of a click. */
+.ant-hill {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  /* Over the cards, under the toolbar's menus and every panel. */
+  z-index: 1;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.ant-hill svg { display: block; width: 216px; height: 72px; overflow: visible; }
 .hill-ground { fill: var(--hill); stroke: var(--hill-edge); stroke-width: 1.5; stroke-linejoin: round; }
 .hill-trail { fill: none; stroke: var(--hill-trail); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; }
 .hill-flag-pole { stroke: var(--ink-soft); stroke-width: 1.5; stroke-linecap: round; }

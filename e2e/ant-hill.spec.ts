@@ -4,10 +4,10 @@ import { add, box, clickEmpty, freshBoardEachTest } from './helpers';
 freshBoardEachTest();
 
 // Owner request (2026-10-05): every item Clean up sends into the Completed card moves an ant a step
-// higher up a hill drawn at the top of the Completed card.
+// higher up a hill. The hill sits at the top of the board, fixed on screen, and can't be clicked.
 
 const cleanUpButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Clean up', exact: true });
-const hill = (page: Page) => page.locator('.completed-card-body .ant-hill');
+const hill = (page: Page) => page.getByTestId('canvas').locator('.ant-hill');
 const ant = (page: Page) => hill(page).locator('.hill-ant');
 
 async function makeList(page: Page, items: string[]) {
@@ -94,11 +94,73 @@ test('with motion allowed the ant walks up slowly instead of jumping', async ({ 
   expect(early.y).toBeGreaterThan(end.y + 5); // just after Clean up it was still on its way
 });
 
-test('a collapsed Completed card hides the hill', async ({ page }) => {
+test('the hill is on the board from the start, at the top, not inside any card', async ({ page }) => {
+  await expect(hill(page)).toHaveCount(1);
+  await expect(hill(page)).toHaveAttribute('aria-label', 'Ant on hill 1: 0 of 10 steps to the top');
+  await expect(hill(page).locator('.hill-caption')).toHaveText('Hill 1 · 0 of 10');
+  await expect(page.locator('[data-card-id] .ant-hill')).toHaveCount(0);
+  const canvas = await box(page.getByTestId('canvas'));
+  const h = await box(hill(page));
+  expect(h.y - canvas.y).toBeLessThan(40); // near the top
+  expect(Math.abs(h.x + h.width / 2 - (canvas.x + canvas.width / 2))).toBeLessThan(2); // centred
+
+  // Collapsing the Completed card leaves it alone.
   const list = await makeList(page, ['a']);
   await tick(list, 'a');
   await cleanUpButton(page).click();
-  await expect(hill(page)).toBeVisible();
   await page.locator('.card').filter({ has: page.locator('.completed-card-body') }).getByRole('button', { name: 'Collapse card' }).click();
-  await expect(hill(page)).toHaveCount(0);
+  await expect(hill(page)).toHaveAttribute('aria-label', 'Ant on hill 1: 1 of 10 steps to the top');
 });
+
+test('the hill stays put while the board is panned or zoomed, and clicks go through it', async ({ page }) => {
+  const before = await box(hill(page));
+  const canvas = await box(page.getByTestId('canvas'));
+  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.mouse.wheel(120, 200);
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  expect(await box(hill(page))).toEqual(before);
+
+  // Nothing on it takes the pointer: a card under it can still be clicked.
+  await expect(hill(page)).toHaveCSS('pointer-events', 'none');
+  await page.getByRole('button', { name: 'Reset zoom' }).click();
+  await clickEmpty(page);
+  await add(page, 'Note');
+  const id = await page.locator('.card.selected').getAttribute('data-card-id');
+  const note = page.locator(`[data-card-id="${id}"]`);
+  const n = await box(note);
+  // Drag the note up under the hill, by its header.
+  await page.mouse.move(n.x + n.width / 2, n.y + 6);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width / 2, before.y + 6, { steps: 8 });
+  await page.mouse.up();
+  await clickEmpty(page);
+  await expect(page.locator('.card.selected')).toHaveCount(0);
+  await page.mouse.click(before.x + before.width / 2, before.y + 20);
+  await expect(note).toHaveClass(/selected/);
+});
+
+test('each board has its own hill; opening another board puts the ant there at once, without walking', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const list = await makeList(page, ['a', 'b', 'c']);
+  for (const t of ['a', 'b', 'c']) await tick(list, t);
+  await expect(list.locator('.completed [data-item-id]')).toHaveCount(3);
+  await cleanUpButton(page).click();
+  await expect(ant(page)).not.toHaveClass(/walking/, { timeout: 5000 });
+  await expect(hill(page)).toHaveAttribute('aria-label', 'Ant on hill 1: 3 of 10 steps to the top');
+
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await page.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
+  await page.locator('[data-kind="board"]').getByRole('button', { name: 'Open board' }).click();
+  await expect(hill(page)).toHaveAttribute('aria-label', 'Ant on hill 1: 0 of 10 steps to the top');
+  await expectStill(page);
+  await page.getByRole('button', { name: /^Back to/ }).click();
+  await expect(hill(page)).toHaveAttribute('aria-label', 'Ant on hill 1: 3 of 10 steps to the top');
+  await expectStill(page);
+});
+
+/** The ant is already where it belongs: it doesn't move over the next half second. */
+async function expectStill(page: Page) {
+  const now = await box(ant(page));
+  await page.waitForTimeout(500);
+  expect(await box(ant(page))).toEqual(now);
+}

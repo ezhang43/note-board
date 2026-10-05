@@ -159,7 +159,7 @@ export function ColourControl() {
   // When the menu opens over the block being coloured, move the board down so the block stays in view.
   useEffect(() => {
     if (!open || !lastSelected || !menu.current) return;
-    const block = document.querySelector(`[data-card-id="${lastSelected}"], [data-col-id="${lastSelected}"]`);
+    const block = document.querySelector(`[data-card-id="${CSS.escape(lastSelected)}"], [data-col-id="${CSS.escape(lastSelected)}"]`);
     if (!block) return;
     const m = menu.current.getBoundingClientRect();
     const b = block.getBoundingClientRect();

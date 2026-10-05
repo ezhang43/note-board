@@ -87,7 +87,7 @@ function jumpToCard(dir: Direction) {
   const selectedId = sel.length === 1 ? sel[0] : null;
   const from =
     typingIn ??
-    (selectedId ? document.querySelector<HTMLElement>(`[data-card-id="${selectedId}"], [data-col-id="${selectedId}"]`) : null);
+    (selectedId ? document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(selectedId)}"], [data-col-id="${CSS.escape(selectedId)}"]`) : null);
 
   const toRect = (r: DOMRect) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
   const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-card-id]')).filter((c) => c !== from);

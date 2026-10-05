@@ -1,5 +1,9 @@
 # Changelog
 
+## Housekeeping: decisions list moved (2026-10-05)
+
+- No change to the app. The long list of past decisions moved out of `CLAUDE.md` into its own file, `docs/decisions.md`, so each new Claude session starts with shorter instructions. Claude reads the list when it needs it.
+
 ## Fix: boards with unusual card ids (2026-10-05)
 
 - A board loaded from an old save or a backup whose cards or items have ids with quotes or brackets in them no longer breaks search, Shift+click on checklist items, Alt + arrows or the Colour menu.

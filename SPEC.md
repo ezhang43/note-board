@@ -268,7 +268,7 @@ After step 5 (owner additions): dragging new blocks from the toolbar, keyboard n
 - The Delete key asks for confirmation when the selection includes a column.
 - Version 1 supports one board only (changed on 5 Oct 2026: several boards, and boards inside boards).
 
-Later decisions, with dates and reasons, are listed under "Decisions" in `CLAUDE.md`.
+Later decisions, with dates and reasons, are listed in `docs/decisions.md`.
 
 ## Phone layout
 

@@ -1,0 +1,43 @@
+# Runs every check (typecheck, unit tests, browser tests) on each pull request into build/v1 and
+# on build/v1 itself. A pull request shows pass / fail on GitHub, and one with auto-merge turned on
+# merges by itself once this passes (build rule 9). Nothing here changes the live site.
+name: Checks
+
+on:
+  pull_request:
+    branches: [build/v1]
+  push:
+    branches: [build/v1]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: All tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      # A failed browser test keeps its trace, screenshot and video; download them from the run's page.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7

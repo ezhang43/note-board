@@ -11,6 +11,10 @@
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
 
+## Simplest code that works (2026-10-06)
+
+- No change to the app. Claude now follows a "simplest code that works" rule while it writes: reuse what the app already has, use what the browser and React already do, add no new packages for small jobs, and write no extra layers or options nobody asked for. Smaller changes mean fewer tokens spent writing and reviewing them. It never cuts features in the spec, the tests, or anything that protects your saved boards.
+
 ## Reports sized to the change (2026-10-05)
 
 - No change to the app. Claude's report after each step now matches the size of the change: a few lines for a tiny fix or a wording change, the full report for a normal feature, and the full report plus what happens to your saved boards for anything touching saving, sync, undo or deleting.

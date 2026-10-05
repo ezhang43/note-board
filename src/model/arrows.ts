@@ -68,6 +68,24 @@ export function connectorDots(r: Rect, offset: number): { side: Side; x: number;
 }
 
 /**
+ * The dots that don't lie over any of `blocks`, each dot a circle of `radius` round its point, so a
+ * dot never covers another block's text (owner request, 2026-10-05). When every dot would, the one
+ * least covered is kept, so an arrow can still be drawn from a block boxed in by others.
+ */
+export function clearDots<D extends Point>(dots: D[], radius: number, blocks: Rect[]): D[] {
+  // How much of the square round a dot lies over the blocks.
+  const covered = (d: D) =>
+    blocks.reduce((sum, b) => {
+      const w = Math.min(d.x + radius, b.x + b.w) - Math.max(d.x - radius, b.x);
+      const h = Math.min(d.y + radius, b.y + b.h) - Math.max(d.y - radius, b.y);
+      return w > 0 && h > 0 ? sum + w * h : sum;
+    }, 0);
+  const clear = dots.filter((d) => covered(d) === 0);
+  if (clear.length || !dots.length) return clear;
+  return [dots.reduce((best, d) => (covered(d) < covered(best) ? d : best))];
+}
+
+/**
  * The curve drawn for an arrow from block `a` to block `b`, `gap` pixels clear of each. It joins the
  * two sides that face each other: left / right when the blocks are further apart side to side than
  * up and down, otherwise top / bottom. null when the blocks overlap or nearly touch.

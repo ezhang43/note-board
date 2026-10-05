@@ -4,6 +4,11 @@
 
 - No change to the app. Claude now has a few helpers while it builds: a warning to itself before it edits a file where a bug could lose your data, a type check after every code edit, a `/finish-step` routine so every step ends the same way (tests, review, a security check whenever sign-in, sync, sharing, imports or links change, spec check, changelog, your report), a `/check-pr` routine for checking another session's pull request, and a spec checker that compares each change with SPEC.md.
 
+## Quieter arrow dots (2026-10-05)
+
+- The dots for drawing arrows are smaller and soft grey, and fade in after a moment instead of popping up on every card the pointer passes. The one under the pointer turns amber.
+- A dot that would sit on top of another card or a column's title is no longer shown, so dots don't cover text. Cards in a column still have their left and right dots, and any dot draws the same arrow. A card hemmed in on every side keeps one dot, so you can always draw an arrow from it.
+
 ## Ant hill on the Completed card (2026-10-05)
 
 - The Completed card now has a little hill with the BusyAnts ant on it. Every item Clean up sends into Completed moves the ant one step higher, and it walks up slowly. The first hill takes 10 items, the next 20, then 30, and so on; reaching the flag says "Top of hill 1!". Sending an item back to its list (or undoing) moves the ant back down.

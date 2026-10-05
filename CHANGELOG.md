@@ -4,6 +4,10 @@
 
 - The ant hill is no longer inside the Completed card. It now sits at the top middle of the board and stays there while you move or zoom the board. It can't be clicked or moved; clicks go straight through to anything under it. It shows from the start, even before your first Clean up. Each board has its own hill.
 
+## Crew coordinator for Claude (2026-10-05)
+
+- No change to the app. One Claude session can now run the others: type `/crew` and a request, and it splits the request into jobs, starts a helper for each in its own copy of the code (up to 3 at once), keeps a log of where every job is (working, pull request open, waiting for you, merged), and `/crew` on its own gives you one plain-English status. Browser tests in each copy now use their own ports, so helpers testing at the same time can't test each other's work by mistake.
+
 ## Helpers for Claude (2026-10-05)
 
 - No change to the app. Claude now has a few helpers while it builds: a warning to itself before it edits a file where a bug could lose your data, a type check after every code edit, a `/finish-step` routine so every step ends the same way (tests, review, a security check whenever sign-in, sync, sharing, imports or links change, spec check, changelog, your report), a `/check-pr` routine for checking another session's pull request, and a spec checker that compares each change with SPEC.md.

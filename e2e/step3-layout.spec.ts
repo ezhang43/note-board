@@ -167,7 +167,7 @@ test('a note growing as you type pushes the block under it out of the way', asyn
   await add(page, 'Note');
   const top = looseCards(page).first();
   await clickEmpty(page);
-  await add(page, 'Link');
+  await add(page, 'Note');
   const other = looseCards(page).nth(1);
   // Put the link just below the note.
   const t = await box(top);
@@ -186,7 +186,7 @@ test('adding cards to a column pushes a loose card below it out of the way', asy
   await add(page, 'New column');
   const col = columns(page).first();
   await clickEmpty(page);
-  await add(page, 'Link');
+  await add(page, 'Note');
   const link = looseCards(page).first();
   const c = await box(col);
   const g = await grabPoint(link);

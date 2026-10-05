@@ -9,7 +9,7 @@ const header = { position: { x: 200, y: 26 } };
 const idOf = (l: Locator) => l.getAttribute('data-card-id');
 const byId = (page: Page, id: string | null) => page.locator(`[data-card-id="${id}"]`);
 
-/** A column holding a note, a to-do list and a link, top to bottom. */
+/** A column holding a note and two to-do lists, top to bottom. */
 async function columnOfThree(page: Page) {
   await add(page, 'New column');
   const col = columns(page).first();
@@ -18,15 +18,16 @@ async function columnOfThree(page: Page) {
   await add(page, 'To-do list');
   await page.keyboard.type('item one');
   await col.click(header);
-  await add(page, 'Link');
+  await add(page, 'To-do list');
+  await page.keyboard.type('item two');
   const cards = col.locator('[data-card-id]');
-  return { col, note: cards.nth(0), list: cards.nth(1), link: cards.nth(2) };
+  return { col, note: cards.nth(0), list: cards.nth(1), last: cards.nth(2) };
 }
 
 const caret = (l: Locator) => l.evaluate((el) => (el as HTMLInputElement).selectionStart);
 
 test('Down / Up move through every field of the cards in a column, selecting each card on the way', async ({ page }) => {
-  const { note, list, link } = await columnOfThree(page);
+  const { note, list, last } = await columnOfThree(page);
   await note.getByLabel('Note text').fill('hello');
 
   await page.keyboard.press('ArrowDown');
@@ -35,12 +36,12 @@ test('Down / Up move through every field of the cards in a column, selecting eac
   await page.keyboard.press('ArrowDown');
   await expect(list.getByLabel('Item text')).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(link.getByLabel('Link title')).toBeFocused();
-  await expect(link).toHaveClass(/selected/);
+  await expect(last.getByLabel('List title')).toBeFocused();
+  await expect(last).toHaveClass(/selected/);
   await page.keyboard.press('ArrowDown');
-  await expect(link.getByLabel('Link address')).toBeFocused();
+  await expect(last.getByLabel('Item text')).toBeFocused();
   await page.keyboard.press('ArrowDown'); // bottom of the column: stays
-  await expect(link.getByLabel('Link address')).toBeFocused();
+  await expect(last.getByLabel('Item text')).toBeFocused();
 
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
@@ -54,11 +55,11 @@ test('Down / Up move through every field of the cards in a column, selecting eac
 });
 
 test('collapsed cards are skipped; a loose card stays put at its last field', async ({ page }) => {
-  const { note, list, link } = await columnOfThree(page);
+  const { note, list, last } = await columnOfThree(page);
   await list.getByRole('button', { name: 'Collapse card' }).click();
   await note.getByLabel('Note text').click();
   await page.keyboard.press('ArrowDown');
-  await expect(link.getByLabel('Link title')).toBeFocused();
+  await expect(last.getByLabel('List title')).toBeFocused();
 
   await clickEmpty(page);
   await add(page, 'Note');
@@ -69,15 +70,16 @@ test('collapsed cards are skipped; a loose card stays put at its last field', as
 });
 
 test('Alt + arrows jump to the nearest card in that direction, select it, and put the cursor in it', async ({ page }) => {
-  const { col, note, link } = await columnOfThree(page);
-  // A loose note to the right of the column.
+  const { col, note, last } = await columnOfThree(page);
+  // A loose note to the right of the column, level with the column's first note.
   await clickEmpty(page);
   await add(page, 'Note');
   const loose = looseCards(page).first();
   const c = await box(col);
+  const n = await box(note);
   const g = await grabPoint(loose);
   const l = await box(loose);
-  await dragPointer(page, g, { x: c.x + c.width + 80 + (g.x - l.x), y: c.y + (g.y - l.y) });
+  await dragPointer(page, g, { x: c.x + c.width + 80 + (g.x - l.x), y: n.y + (g.y - l.y) });
 
   await note.getByLabel('Note text').click();
   await page.keyboard.type('typing here');
@@ -94,15 +96,15 @@ test('Alt + arrows jump to the nearest card in that direction, select it, and pu
 
   await page.keyboard.press('Alt+ArrowDown');
   await page.keyboard.press('Alt+ArrowDown');
-  await expect(link).toHaveClass(/selected/);
-  await expect(link.getByLabel('Link title')).toBeFocused();
+  await expect(last).toHaveClass(/selected/);
+  await expect(last.getByLabel('List title')).toBeFocused();
 });
 
 test('Alt + arrows also work from a selected card, and with nothing selected start near the middle', async ({ page }) => {
   await add(page, 'Note');
   const first = looseCards(page).first();
   await clickEmpty(page);
-  await add(page, 'Link');
+  await add(page, 'Note');
   const second = byId(page, await idOf(page.locator('.card.selected')));
   await clickEmpty(page);
 
@@ -117,7 +119,7 @@ test('Alt + arrows also work from a selected card, and with nothing selected sta
   const dir = Math.abs(b.y - a.y) > Math.abs(b.x - a.x) ? (b.y > a.y ? 'ArrowDown' : 'ArrowUp') : b.x > a.x ? 'ArrowRight' : 'ArrowLeft';
   await page.keyboard.press(`Alt+${dir}`);
   await expect(second).toHaveClass(/selected/);
-  await expect(second.getByLabel('Link title')).toBeFocused();
+  await expect(second.getByLabel('Note text')).toBeFocused();
 });
 
 test('Alt + arrow pans the board to a card that is off-screen', async ({ page }) => {

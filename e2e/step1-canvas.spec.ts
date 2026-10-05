@@ -52,7 +52,6 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Same width',
     'Note',
     'To-do list',
-    'Link',
     'New column',
     'File',
     'Backup file',

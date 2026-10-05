@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { add, cards, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
+import { add, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard } from './helpers';
 
 // Design fixes from the 2026-10-02 Impeccable review.
 
 freshBoardEachTest();
 
-test('typing straight after adding a note, link or column goes into it', async ({ page }) => {
+test('typing straight after adding a note, to-do list or column goes into it', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'To-do list');
   await page.keyboard.type('first item');
@@ -17,15 +17,10 @@ test('typing straight after adding a note, link or column goes into it', async (
   await expect(page.getByLabel('Item text').first()).toHaveValue('first item');
 
   await clickEmpty(page);
-  await add(page, 'Link');
-  await page.keyboard.type('Recipes');
-  await expect(page.getByLabel('Link title')).toHaveValue('Recipes');
-
-  await clickEmpty(page);
   await add(page, 'New column');
   await page.keyboard.type('Ideas');
   await expect(page.getByLabel('Column title')).toHaveValue('Ideas');
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(2);
   await expect(columns(page)).toHaveCount(1);
 });
 
@@ -73,9 +68,9 @@ test('cards in an uncoloured column use the usual teal title band', async ({ pag
   expect(await style(inColumn, '--band')).toBe(looseBand);
 });
 
-test('Add Note / To-do list / Link are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
+test('Add Note / To-do list are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
   const plain = await style(toolbarButton(page, 'Undo (Ctrl+Z)'), 'background-color');
-  for (const name of ['Note', 'To-do list', 'Link']) {
+  for (const name of ['Note', 'To-do list']) {
     const b = toolbarButton(page, name);
     expect(await style(b, 'background-color')).toBe(plain);
     await expect(b.locator('.add-dot')).toHaveCount(0);
@@ -201,9 +196,9 @@ test('a long board name shrinks (with …) instead of pushing buttons off a 1280
 });
 
 test('"Open link" is faded until the link has an address', async ({ page }) => {
-  await clickEmpty(page);
-  await add(page, 'Link');
+  await importLinkCard(page);
   const open = page.locator('.link-open');
+  await page.getByLabel('Link address').fill('');
   expect(await style(open, 'opacity')).toBe('0.45');
   await page.getByLabel('Link address').fill('https://example.com');
   expect(await style(open, 'opacity')).toBe('1');

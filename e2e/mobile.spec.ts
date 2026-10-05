@@ -86,7 +86,7 @@ test.describe('on a phone-sized screen', () => {
     await expect(page.getByRole('button', { name: 'Keyboard shortcuts' })).toBeHidden();
   });
 
-  test('+ adds a note, a to-do list, a link or a column, and the menu closes', async ({ page }) => {
+  test('+ adds a note, a to-do list, a column or a sub-board (no link), and the menu closes', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
     await page.getByRole('menuitem', { name: 'To-do list' }).tap();
@@ -95,9 +95,12 @@ test.describe('on a phone-sized screen', () => {
     await expect(card).toHaveCount(1);
     const b = (await card.boundingBox())!;
     expect(b.x).toBeGreaterThanOrEqual(0); // in view
-    for (const kind of ['Note', 'Link', 'Column']) {
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    await expect(page.getByRole('menuitem', { name: 'Link' })).toHaveCount(0);
+    await bar.getByRole('button', { name: 'Add', exact: true }).tap();
+    for (const kind of ['Note', 'Sub-board', 'Column']) {
       await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-      await page.getByRole('menuitem', { name: kind }).tap();
+      await page.getByRole('menuitem', { name: kind, exact: true }).tap();
     }
     await expect(page.locator('[data-card-id]')).toHaveCount(3);
     await expect(page.locator('[data-col-id]')).toHaveCount(1);

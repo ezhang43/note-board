@@ -14,7 +14,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, UndoIcon } from './icons';
 
-/** Add Note / To-do list / Link: click to add, or press and drag onto the board to place it. */
+/** Add Note / To-do list: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   const drag = useNewCardDrag(kind);
   return (
@@ -350,7 +350,7 @@ export function SnapButton() {
 
 /** The BusyAnts ant from the app icon (owner request: the toolbar matches the icon). */
 function Logo() {
-  return <img className="toolbar-logo" src={`${import.meta.env.BASE_URL}icon.svg`} alt="BusyAnts" width={30} height={30} />;
+  return <img className="toolbar-logo" src={`${import.meta.env.BASE_URL}busyants-icon.svg`} alt="BusyAnts" width={30} height={30} />;
 }
 
 function BoardName() {
@@ -418,7 +418,6 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
 
       <AddCardButton kind="note" label="Note" />
       <AddCardButton kind="todo" label="To-do list" />
-      <AddCardButton kind="link" label="Link" />
       <NewColumnButton />
 
       <div className="toolbar-divider" aria-hidden="true" />

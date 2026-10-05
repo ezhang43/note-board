@@ -33,12 +33,23 @@ export const columns = (page: Page) => page.locator('[data-col-id]');
  * Clicks a toolbar Add button. A new to-do list takes the cursor in its title; unless `stayInTitle`,
  * Enter then moves it to the first item, so typing straight after adds items.
  */
-export async function add(page: Page, name: 'Note' | 'To-do list' | 'Link' | 'New column', opts: { stayInTitle?: boolean } = {}) {
+export async function add(page: Page, name: 'Note' | 'To-do list' | 'New column', opts: { stayInTitle?: boolean } = {}) {
   await page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
   if (name === 'To-do list' && !opts.stayInTitle) {
     await expect(page.locator('.card.selected').getByLabel('List title')).toBeFocused();
     await page.keyboard.press('Enter');
   }
+}
+
+/**
+ * Puts a link card on the board. The toolbar no longer adds links (owner request, 2026-10-05), but
+ * boards can still hold them: from before, or from a Milanote import, which is used here.
+ */
+export async function importLinkCard(page: Page, title = 'Inspiration', url = 'https://www.example.com/ideas') {
+  await page.getByLabel('Milanote Markdown file').setInputFiles({ name: 'board.md', mimeType: 'text/markdown', buffer: Buffer.from(`[${title}](${url})\n`) });
+  const link = page.locator('[data-kind="link"]').last();
+  await expect(link).toBeVisible();
+  return link;
 }
 
 export async function box(l: Locator) {

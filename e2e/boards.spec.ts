@@ -35,10 +35,10 @@ test('New board opens an empty board; the Boards menu switches between boards, a
   await expect(boardsMenu(page).getByRole('menuitem', { name: 'Recipes' })).toBeVisible();
 });
 
-test('Add a board here puts a board card on the board; Open board goes in, and the path above goes back out', async ({ page }) => {
+test('Add a sub-board here puts a board card on the board; Open board goes in, and the path above goes back out', async ({ page }) => {
   await boardName(page).fill('Home');
   await openBoardsMenu(page);
-  await boardsMenu(page).getByRole('menuitem', { name: 'Add a board here' }).click();
+  await boardsMenu(page).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
   const card = cards(page).first();
   await expect(card).toHaveAttribute('data-kind', 'board');
   await expect(card).toContainText('Untitled board');
@@ -60,7 +60,7 @@ test('Add a board here puts a board card on the board; Open board goes in, and t
 test('deleting a board (after a confirmation) removes it and its card', async ({ page }) => {
   await boardName(page).fill('Home');
   await openBoardsMenu(page);
-  await boardsMenu(page).getByRole('menuitem', { name: 'Add a board here' }).click();
+  await boardsMenu(page).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
   await cards(page).first().getByRole('button', { name: 'Open board' }).click();
   await boardName(page).fill('Old plans');
   await page.getByRole('button', { name: 'Back to Home' }).click();

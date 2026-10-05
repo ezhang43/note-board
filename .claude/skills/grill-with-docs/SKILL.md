@@ -1,6 +1,6 @@
 ---
 name: grill-with-docs
-description: A thorough interview to settle a bigger Note Board feature before building it, recording each answer in SPEC.md and the Decisions list in CLAUDE.md as it is settled.
+description: A thorough interview to settle a bigger Note Board feature before building it, recording each answer in SPEC.md and docs/decisions.md as it is settled.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Adapted from Matt Pocock's `grill-with-docs` / `grilling` / `domain-modeling` skills
 (https://github.com/mattpocock/skills, MIT licence). Changed for this project: decisions and terms go
-into `SPEC.md` and the "Decisions" list in `CLAUDE.md`, not a separate glossary or ADR folder, and the
+into `SPEC.md` and `docs/decisions.md`, not a separate glossary or ADR folder, and the
 questions are written for an owner who reads code at a beginner level.
 
 ## The interview
@@ -58,7 +58,7 @@ them and wait.
 Don't save them up until the end. As each decision is settled:
 
 - Update `SPEC.md` so it describes the agreed behaviour (it is the source of truth; build rule 8).
-- Add a line under "Decisions" in `CLAUDE.md`, marked with today's date and "owner request" or
+- Add a line at the end of `docs/decisions.md`, marked with today's date and "owner request" or
   "my call", the same way as the existing entries.
 
 Write in plain English with no code. Only record what was actually decided. Don't add anything the

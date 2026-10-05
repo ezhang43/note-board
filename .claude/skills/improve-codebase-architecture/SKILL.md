@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Adapted from Matt Pocock's `improve-codebase-architecture` skill (https://github.com/mattpocock/skills,
 MIT licence). Changed for this project: the domain language is `SPEC.md` (not `GLOSSARY.md`), past
-decisions are the "Decisions" list in `CLAUDE.md` (not `docs/adr/`), and the grilling step uses this
+decisions are `docs/decisions.md` (not `docs/adr/`), and the grilling step uses this
 project's `grill-with-docs` skill. Write for an owner who reads code at a beginner level.
 
 Surface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
@@ -16,7 +16,7 @@ Surface architectural friction and propose **deepening opportunities**: refactor
 This command is _informed_ by the project's domain model and built on a shared design vocabulary:
 
 - Call the Skill tool with "codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
-- The domain language in `SPEC.md` gives names to good seams (card, column, checklist item, Completed card, settle, snap…). The "Decisions" list in `CLAUDE.md` records decisions this command should not re-litigate.
+- The domain language in `SPEC.md` gives names to good seams (card, column, checklist item, Completed card, settle, snap…). `docs/decisions.md` records decisions this command should not re-litigate.
 - `CLAUDE.md`'s code layout is a given: pure rules in `src/model/`, one store in `src/store/`, display-only components in `src/components/`. Prefer candidates that move rules into `src/model/` where they can be unit tested.
 
 ## Process
@@ -28,7 +28,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 - If the owner named a direction (a module, a subsystem, a pain point), take it, and skip the inference below.
 - Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.
 
-Read `SPEC.md` and the Decisions in `CLAUDE.md` for the area you're touching first.
+Read `SPEC.md` and `docs/decisions.md` for the area you're touching first.
 
 Then spawn a sub-agent to walk the codebase. Don't follow rigid heuristics; explore organically and note where you experience friction:
 
@@ -59,9 +59,9 @@ End the report with a **Top recommendation** section: which candidate you'd tack
 
 **Use SPEC.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** Talk about "the checklist module" or "the settle module," not "the FooBarHandler."
 
-**Decision conflicts**: if a candidate contradicts an entry in CLAUDE.md's Decisions, only surface it when the friction is real enough to warrant revisiting it. Mark it clearly in the card (e.g. a warning callout: _"contradicts the 2026-10-02 decision on …, but worth reopening because…"_). Don't list every theoretical refactor a decision forbids.
+**Decision conflicts**: if a candidate contradicts an entry in `docs/decisions.md`, only surface it when the friction is real enough to warrant revisiting it. Mark it clearly in the card (e.g. a warning callout: _"contradicts the 2026-10-02 decision on …, but worth reopening because…"_). Don't list every theoretical refactor a decision forbids.
 
-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance (where it says GLOSSARY.md or ADR, read SPEC.md or Decisions).
+See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance (where it says GLOSSARY.md or ADR, read SPEC.md or `docs/decisions.md`).
 
 Do NOT propose interfaces yet. After the file is written, ask the owner: "Which of these would you like to explore?"
 
@@ -72,6 +72,6 @@ Once the owner picks a candidate, call the Skill tool with "grill-with-docs" to 
 Side effects happen inline as decisions crystallize:
 
 - **Naming a deepened module after a concept not in `SPEC.md`?** Add the term to `SPEC.md` if the owner would see it; otherwise a code comment is enough.
-- **Owner rejects the candidate with a load-bearing reason?** Offer to record it under "Decisions" in `CLAUDE.md`, so future architecture reviews don't re-suggest it. Only offer when a future reviewer would need the reason; skip ephemeral ones ("not worth it right now").
+- **Owner rejects the candidate with a load-bearing reason?** Offer to record it in `docs/decisions.md`, so future architecture reviews don't re-suggest it. Only offer when a future reviewer would need the reason; skip ephemeral ones ("not worth it right now").
 - **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "codebase-design" and use its design-it-twice parallel sub-agent pattern.
 - Any refactor that follows still obeys CLAUDE.md: tests first, `npm test` and `npm run test:e2e` pass, a CHANGELOG entry, one step at a time.

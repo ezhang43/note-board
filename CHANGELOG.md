@@ -2,7 +2,7 @@
 
 ## Helpers for Claude (2026-10-05)
 
-- No change to the app. Claude now has a few helpers while it builds: a warning to itself before it edits a file where a bug could lose your data, a type check after every code edit, a `/finish-step` routine so every step ends the same way (tests, review, spec check, changelog, your report), a `/check-pr` routine for checking another session's pull request, and a spec checker that compares each change with SPEC.md.
+- No change to the app. Claude now has a few helpers while it builds: a warning to itself before it edits a file where a bug could lose your data, a type check after every code edit, a `/finish-step` routine so every step ends the same way (tests, review, a security check whenever sign-in, sync, sharing, imports or links change, spec check, changelog, your report), a `/check-pr` routine for checking another session's pull request, and a spec checker that compares each change with SPEC.md.
 
 ## Ant hill on the Completed card (2026-10-05)
 

@@ -271,3 +271,15 @@ export function CoffeeIcon() {
     </svg>
   );
 }
+
+/** Share: two people (owner request: editing together). */
+export function ShareIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M16.2 14.1c2.4-.3 4.1 1.2 4.6 4" />
+    </svg>
+  );
+}

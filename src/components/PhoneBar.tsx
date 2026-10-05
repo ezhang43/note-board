@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ShareButton } from './SharePanel';
 import { appStore, useAppState } from '../store/appStore';
 import { CoffeeIcon, HistoryIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, UndoIcon } from './icons';
 import {
@@ -102,6 +103,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <CoffeeIcon />
             Buy me a coffee
           </a>
+          <ShareButton phone />
           {onSignOut && (
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out

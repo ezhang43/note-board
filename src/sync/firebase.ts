@@ -12,9 +12,13 @@ import {
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
+  runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
+import type { CollabBackend, Person } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 
@@ -109,6 +113,92 @@ export function versionsRemote(uid: string): VersionStore {
     async remove(id) {
       await deleteDoc(doc(metas, id));
       await deleteDoc(doc(datas, id));
+    },
+  };
+}
+
+/**
+ * Shared boards (owner request: editing together). shared/{id} holds the boards (as in
+ * serializeShare) with who shared them, the shared board and the link key; shared/{id}/members/{uid}
+ * everyone who has it; boards/{uid}/shared/{id} the shares each person has. firestore.rules lets
+ * only members read or change a shared board, and someone join only with the current link's key.
+ */
+export function collabRemote(user: User): CollabBackend {
+  const me: Person = { uid: user.uid, name: user.displayName || user.email || 'Someone', photo: user.photoURL };
+  const shareRef = (id: string) => doc(db, 'shared', id);
+  const memberRef = (id: string, uid: string) => doc(db, 'shared', id, 'members', uid);
+  const mineRef = (id: string) => doc(db, 'boards', me.uid, 'shared', id);
+  const notAllowed = () => Object.assign(new Error('Not allowed'), { code: 'permission-denied' });
+  return {
+    me,
+    watchMyShares(onChange, onError) {
+      return onSnapshot(collection(db, 'boards', me.uid, 'shared'), (snap) => onChange(snap.docs.map((d) => d.id).sort()), onError);
+    },
+    watchShare(id, onChange, onError) {
+      return onSnapshot(
+        shareRef(id),
+        (snap) => {
+          if (!snap.exists()) {
+            // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
+            if (!snap.metadata.fromCache) onChange(null);
+            return;
+          }
+          const d = snap.data();
+          if (typeof d.data !== 'string' || typeof d.root !== 'string') return;
+          onChange({ owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) });
+        },
+        onError,
+      );
+    },
+    watchPeople(id, onChange, onError) {
+      return onSnapshot(
+        collection(db, 'shared', id, 'members'),
+        (snap) => {
+          const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
+          const people = snap.docs
+            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
+            .sort((a, b) => a.at - b.at)
+            .map(({ uid, name, photo }) => ({ uid, name, photo }));
+          onChange(people);
+        },
+        onError,
+      );
+    },
+    updateShare(id, change, client) {
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(shareRef(id));
+        if (!snap.exists()) throw notAllowed();
+        const data = String(snap.data().data);
+        const rev = Number(snap.data().rev ?? 0);
+        const next = change(data);
+        if (next === null || next === data) return { data, rev };
+        tx.update(shareRef(id), { data: next, client, rev: rev + 1, updatedAt: serverTimestamp() });
+        return { data: next, rev: rev + 1 };
+      });
+    },
+    async createShare(id, root, link, data, client) {
+      const batch = writeBatch(db);
+      batch.set(shareRef(id), { owner: me.uid, root, link, data, client, rev: 1, updatedAt: serverTimestamp() });
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key: link, joinedAt: serverTimestamp() });
+      batch.set(mineRef(id), { joinedAt: serverTimestamp() });
+      await batch.commit();
+    },
+    async join(id, key) {
+      const batch = writeBatch(db);
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
+      batch.set(mineRef(id), { joinedAt: serverTimestamp() });
+      await batch.commit();
+    },
+    async leave(id) {
+      await deleteDoc(mineRef(id));
+      // Already gone when the board was deleted or the person removed.
+      await deleteDoc(memberRef(id, me.uid)).catch(() => {});
+    },
+    removePerson: (id, uid) => deleteDoc(memberRef(id, uid)),
+    setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
+    async deleteShare(id) {
+      await deleteDoc(shareRef(id));
+      await deleteDoc(mineRef(id)).catch(() => {});
     },
   };
 }

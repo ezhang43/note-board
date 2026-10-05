@@ -1,5 +1,12 @@
 # Changelog
 
+## Editing together, step 2: sharing a board by link (2026-10-05)
+
+- A new Share button (two people, next to Sign out; on a phone in ⋯) shares the open board with a link. Anyone who opens the link and signs in with Google can see and edit that board and every board inside it, at the same time as you. Each person’s changes show on everyone’s screen within a second or two, and changes made at the same moment are all kept.
+- The Share panel shows who has the board. Whoever shared it can turn the link off, remove people, rename or delete the board, and restore old versions of it; everyone else can leave it.
+- Your home board can’t be shared, and your other boards stay private: only the boards you share are seen by anyone else.
+- Before this works on the live site, the new online rules in `firestore.rules` need pasting into the Firebase console.
+
 ## Editing together, step 1: combining edits (2026-10-05)
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.

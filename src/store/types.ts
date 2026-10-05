@@ -4,6 +4,7 @@ import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
 import type { ListSelection } from '../model/multiSelect';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
+import type { Person } from './collab';
 
 // The shapes of the store's state: board data, view, and what is on screen (ui).
 
@@ -140,6 +141,24 @@ export interface Ui {
   dueOpen: boolean;
   /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
   arrowSel: string | null;
+  /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
+  shares: ShareInfo[];
+}
+
+/** A shared board as the screen shows it. */
+export interface ShareInfo {
+  id: string;
+  /** The shared board, and every board that goes with it (the boards inside it). */
+  root: string;
+  boards: string[];
+  /** Whether this person shared it (and so manages it). */
+  owner: boolean;
+  /** Who shared it. */
+  ownerUid: string;
+  /** Everyone who has it, the person who shared it first. */
+  people: Person[];
+  /** The current share link's key, or null when the link is turned off. */
+  link: string | null;
 }
 
 /**
@@ -186,4 +205,5 @@ export const emptyUi: Ui = {
   dueFor: null,
   dueOpen: false,
   arrowSel: null,
+  shares: [],
 };

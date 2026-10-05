@@ -305,3 +305,41 @@ describe('review fixes: several boards (2026-10-05)', () => {
     expect(store.getState().board.name).toBe('Mine online');
   });
 });
+
+describe('shared boards (owner request: editing together)', () => {
+  function sharedSetup() {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const shared = new Set<string>();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id) });
+    fake.send(null);
+    return { store, fake, shared };
+  }
+
+  it('a shared board is not uploaded with the person’s own boards', () => {
+    const { store, fake, shared } = sharedSetup();
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    shared.add(trip);
+    store.newBoard();
+    store.renameBoard('Diary');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const sent = JSON.parse(fake.writes.at(-1)!.data);
+    expect(Object.keys(sent.boards)).not.toContain(trip);
+    expect(Object.values(sent.boards).map((b) => (b as { name: string }).name)).toContain('Diary');
+  });
+
+  it('the person’s boards arriving from another device leave the shared boards as they are', () => {
+    const { store, fake, shared } = sharedSetup();
+    const home = store.getState().boards.open;
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    shared.add(trip);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    // The other device still has an old copy of Trip among its own boards: it is ignored.
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home on phone' }, [trip]: { ...createBoard(), name: 'Old trip' } } }), client: 'phone' });
+    expect(store.boardName(home)).toBe('Home on phone');
+    expect(store.boardName(trip)).toBe('Trip');
+    expect(store.getState().boards.open).toBe(trip);
+  });
+});

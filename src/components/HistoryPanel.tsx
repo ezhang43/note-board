@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { canRestoreOpenBoard } from './SharePanel';
 import { createBoard } from '../model/board';
 import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
@@ -145,9 +146,13 @@ export function PreviewBar() {
         <button type="button" className="tb-button" onClick={appStore.endPreview}>
           Back to current
         </button>
-        <button type="button" className="tb-button add-column" aria-busy={busy} onClick={restore}>
-          Restore this version
-        </button>
+        {canRestoreOpenBoard() ? (
+          <button type="button" className="tb-button add-column" aria-busy={busy} onClick={restore}>
+            Restore this version
+          </button>
+        ) : (
+          <span className="preview-note">Only the person who shared this board can restore it.</span>
+        )}
       </div>
     </section>
   );

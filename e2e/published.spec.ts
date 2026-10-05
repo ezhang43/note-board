@@ -82,3 +82,10 @@ test('a new version of the offline copy clears out the old one (so new icons sho
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).includes('note-board-v1'))).toBe(false);
 });
+
+test('a share link opened before signing in says a board was shared, and keeps the link for after (owner request: editing together)', async ({ page }) => {
+  await page.goto('./?join=sabc123.k3y');
+  await expect(page.getByText('Sign in to open the board shared with you.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('join')).toBe('sabc123.k3y');
+});

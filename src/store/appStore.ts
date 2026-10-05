@@ -1,9 +1,12 @@
 import { useSyncExternalStore } from 'react';
+import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
 
 function browserStorage() {
   try {
-    return window.localStorage;
+    // Running locally with ?demo-user=: each demo person keeps their own boards on this device.
+    const demo = demoUser();
+    return demo ? demoStorage(window.localStorage, demo) : window.localStorage;
   } catch {
     return null;
   }

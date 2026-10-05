@@ -44,8 +44,26 @@ export function startSync(
      * online, 'failed' when an upload was refused (until a later one is saved).
      */
     onSaveState?: (state: SaveState) => void;
+    /**
+     * Boards shared with other people (owner request: editing together). They sync through their
+     * share instead, so they are neither uploaded here nor replaced by what arrives here.
+     */
+    isShared?: (boardId: string) => boolean;
   },
 ) {
+  const isShared = opts.isShared ?? (() => false);
+  /** This person's own boards: every board but the shared ones. */
+  const own = (ws: Workspace): Workspace => ({
+    home: ws.home,
+    boards: Object.fromEntries(Object.entries(ws.boards).filter(([id]) => id === ws.home || !isShared(id))),
+  });
+  const ownData = (ws: Workspace) => serializeWorkspace(own(ws));
+  /** Boards from the online copy, with the shared boards as they are here. */
+  const withShared = (ws: Workspace): Workspace => {
+    const here = store.workspace().boards;
+    const shared = Object.keys(here).filter((id) => id !== ws.home && isShared(id));
+    return { home: ws.home, boards: { ...own(ws).boards, ...Object.fromEntries(shared.map((id) => [id, here[id]])) } };
+  };
   let ready = false;
   /** Set when the online copy can't be read: nothing more is sent or applied. */
   let stopped = false;
@@ -85,7 +103,7 @@ export function startSync(
     if (timer) clearTimeout(timer);
     timer = null;
     if (stopped) return;
-    const data = serializeWorkspace(store.workspace());
+    const data = ownData(store.workspace());
     if (data === lastSynced) {
       if (!failed) opts.onSaveState?.('saved');
       return;
@@ -113,7 +131,7 @@ export function startSync(
       const remoteWs = waiting;
       waiting = null;
       // The drag ended with a drop: that is newer than the waiting version, so it wins and is uploaded.
-      if (!changed) return store.replaceWorkspace(remoteWs);
+      if (!changed) return store.replaceWorkspace(withShared(remoteWs));
     }
     if (!changed) return;
     if (!ready || stopped) return;
@@ -154,21 +172,21 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       ready = true;
-      lastSynced = serializeWorkspace(ws);
-      store.replaceWorkspace(ws);
+      lastSynced = ownData(ws);
+      store.replaceWorkspace(withShared(ws));
       return opts.onReady();
     }
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.
     if (!doc || doc.client === opts.client || failed) return;
     const ws = read(doc.data);
     if (!ws) return;
-    const data = serializeWorkspace(ws);
+    const data = ownData(ws);
     if (data === lastSynced) return;
     // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
-    if (timer && serializeWorkspace(store.workspace()) !== lastSynced) return upload();
+    if (timer && ownData(store.workspace()) !== lastSynced) return upload();
     lastSynced = data;
     if (busy()) waiting = ws;
-    else store.replaceWorkspace(ws);
+    else store.replaceWorkspace(withShared(ws));
   }, opts.onError);
 
   return {

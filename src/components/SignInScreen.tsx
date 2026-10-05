@@ -1,3 +1,4 @@
+import { parseJoin } from '../model/sharing';
 import type { SessionStatus } from '../sync/session';
 
 interface Props {
@@ -16,7 +17,8 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
         {(status === 'checking' || status === 'loading') && <p className="sign-in-text">Opening your board…</p>}
         {status === 'signed-out' && (
           <>
-            <p className="sign-in-text">Sign in to open your board.</p>
+            {/* Opened from a share link (owner request: editing together); it is joined after signing in. */}
+            <p className="sign-in-text">{parseJoin(location.search) ? 'Sign in to open the board shared with you.' : 'Sign in to open your board.'}</p>
             <button type="button" className="tb-button sign-in-button" onClick={onSignIn}>
               Sign in with Google
             </button>

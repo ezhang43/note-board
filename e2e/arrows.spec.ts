@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, cards, clickEmpty, dragPointer, freshBoardEachTest, grabPoint } from './helpers';
+import { add, box, cards, clickEmpty, dragPointer, freshBoardEachTest, grabPoint, tooClose } from './helpers';
 
 // Arrows between cards and columns (owner request, 2026-10-05).
 
@@ -106,4 +106,56 @@ test('cards whose saved ids hold odd characters still get their arrow, without e
   await page.reload();
   await expect(cards(page)).toHaveCount(2);
   await expect(arrows(page)).toHaveCount(1);
+});
+
+test('dots never sit on top of another card or a column title (owner request)', async ({ page }) => {
+  await add(page, 'New column');
+  const col = page.locator('[data-col-id]');
+  await add(page, 'Note');
+  const g = await grabPoint(col);
+  await page.mouse.click(g.x, g.y);
+  await add(page, 'Note');
+  const inCol = col.locator('[data-card-id]');
+  await expect(inCol).toHaveCount(2);
+  await clickEmpty(page);
+
+  const header = await box(col.locator('.column-header'));
+  for (const i of [0, 1]) {
+    const c = await box(inCol.nth(i));
+    await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
+    // The side dots stay, so an arrow can still be drawn from a card in a column.
+    await expect(page.getByRole('button', { name: 'Draw an arrow from the right' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Draw an arrow from the left' })).toBeVisible();
+    // The top dot would lie on the column title (first card) or on the card above (second card).
+    await expect(page.getByRole('button', { name: 'Draw an arrow from the top' })).toHaveCount(0);
+    const others = [header, await box(inCol.nth(1 - i))];
+    for (const d of await page.locator('.arrow-dot').all()) {
+      const r = await box(d);
+      for (const o of others) expect(tooClose(r, o)).toBe(false);
+    }
+  }
+});
+
+test('dots are small and quiet until the pointer is on one (owner request)', async ({ page }) => {
+  await add(page, 'Note');
+  const dot = page.getByRole('button', { name: 'Draw an arrow from the right' });
+  const look = () =>
+    dot.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { w: el.getBoundingClientRect().width, border: s.borderTopColor, bg: s.backgroundColor };
+    });
+  const accent = await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--accent)';
+    document.body.append(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  });
+  const quiet = await look();
+  expect(quiet.w).toBeLessThanOrEqual(10);
+  expect(quiet.border).not.toBe(accent);
+  const r = await box(dot);
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+  await expect.poll(async () => (await look()).bg).toBe(accent);
 });

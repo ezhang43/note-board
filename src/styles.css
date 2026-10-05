@@ -1523,18 +1523,31 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   cursor: pointer;
   touch-action: none;
 }
-/* Connection dots, as in Miro: one just outside the middle of each side (placed by Arrows.tsx). */
+/* Connection dots, as in Miro: one just outside the middle of each side (placed by Arrows.tsx).
+   Small and soft grey, fading in after a moment, so passing over cards doesn't flash them
+   (owner request, 2026-10-05); amber and a little bigger under the pointer. */
 .arrow-dot {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   padding: 0;
-  border: 2px solid var(--accent);
+  border: 1.5px solid var(--ink-faint);
   background: var(--surface);
-  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.2);
+  opacity: 0.7;
+  transition: opacity 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  animation: arrow-dot-in 160ms ease-out 120ms both;
 }
-.arrow-dot:hover { background: var(--accent); }
+.arrow-dot:hover {
+  opacity: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-50%, -50%) scale(calc(1.4 / var(--zoom, 1)));
+}
+@keyframes arrow-dot-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .arrow-dot { animation: none; transition: none; }
+}
 /* A wider invisible ring so the small dot is easy to press. */
-.arrow-dot::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+.arrow-dot::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
 .arrow-delete {
   width: 24px;
   height: 24px;

@@ -194,7 +194,7 @@ function ReadOnlyEvent({ event, onBack }: { event: CalEvent; onBack: () => void 
       <p className="cal-detail-when">
         {event.allDay ? dayLabel(event.start) : dayLabel(event.start.slice(0, 10))} · {timeLabel(event)}
       </p>
-      <p className="history-note">Repeating events, events with guests and events with their own reminders can only be changed in Google Calendar.</p>
+      <p className="history-note">Repeating events, events with guests or their own reminders, and events from others can only be changed in Google Calendar.</p>
       <a className="tb-button cal-open" href={event.link} target="_blank" rel="noopener noreferrer">
         <ExternalIcon />
         Open in Google Calendar

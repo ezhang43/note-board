@@ -470,6 +470,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   justify-content: center;
 }
 .icon-button:hover { background: var(--hover); }
+/* A card's or column's delete button: the same faint trash can as a checklist item's, red on hover. */
+.block-trash { color: var(--ink-faint); }
 
 .card, .column { cursor: default; }
 .card input:not([type='checkbox']), .card textarea, .column input { cursor: text; }
@@ -875,7 +877,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .item-trash:focus-visible { opacity: 1; }
 .item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
 .item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 /*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
  * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.

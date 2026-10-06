@@ -1,5 +1,9 @@
 # Changelog
 
+## Trash can on cards and columns (2026-10-06)
+
+- The delete button at the top right of cards and columns is now a small trash can, the same as on checklist items, instead of an ×. It works exactly as before: a card goes at once (Ctrl+Z brings it back), a column asks first. Other × buttons (closing panels, deleting a board in the Boards menu, removing an arrow) stay as they were.
+
 ## Google Calendar beside the board (2026-10-06)
 
 - Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Ticking tests made steady; Clean up right after ticking (2026-10-06)
+
+- Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.
+- The browser tests of the tick animation now control the page's clock, so they no longer fail now and then when the computer is busy.
+
 ## Claude can read your boards (2026-10-06)
 
 - A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.

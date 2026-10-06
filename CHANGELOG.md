@@ -6,6 +6,13 @@
 - Drag every item out of a list into another list (or onto the board): the emptied list now disappears instead of keeping one blank item.
 - Drop items on a collapsed checklist: they go into it (it stays collapsed and shows the dashed outline while you hover). Drop items on a collapsed column: they become a new checklist at the end of that column.
 
+## Google Calendar beside the board (2026-10-06)
+
+- Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.
+- The first time, Google asks you to let BusyAnts see and change your calendar events. You can add an event (the + on a day), and click a simple event to rename it, change its day or time, or delete it (it asks first: Keep / Delete). Repeating events, events with guests and events with their own reminders are shown but open in Google Calendar to change.
+- Calendar events aren't part of your boards: Ctrl+Z doesn't undo calendar changes and they aren't in Version history. If Google Calendar can't be reached, the panel says "Google Calendar isn’t connected yet. Try again later." and everything else works as before.
+- Locally, `npm run dev` with `?demo-user=Alice` shows a pretend calendar to try it with.
+
 ## The crew checks risky pull requests by itself (2026-10-06)
 
 - When a worker finishes a high-risk pull request (saving, sync, undo or deleting), the main session now runs the full check on it straight away (combine with the latest build/v1, all tests, review, spec check) and brings the owner its verdict. The owner still decides every high-risk merge and every publish.

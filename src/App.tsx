@@ -14,8 +14,10 @@ import { usePhone } from './components/usePhone';
 import { appStore, useAppState } from './store/appStore';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
+import { CalendarPanel } from './components/CalendarPanel';
 
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
+const closeCalendar = () => appStore.toggleSidePanel('calendar');
 import { useShortcuts } from './components/useShortcuts';
 
 /**
@@ -43,6 +45,11 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       {sidePanel === 'pomodoro' && (
         <SidePanel title="Focus timer" onClose={closeSidePanel}>
           <PomodoroPanel />
+        </SidePanel>
+      )}
+      {sidePanel === 'calendar' && (
+        <SidePanel title="Google Calendar" onClose={closeCalendar}>
+          <CalendarPanel />
         </SidePanel>
       )}
       <DuePicker />

@@ -271,6 +271,16 @@ export function CalendarIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** Google Calendar panel: a calendar page with a grid of days (Due has the plain calendar). */
+export function CalendarDaysIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4M8 13.5h.01M12 13.5h.01M16 13.5h.01M8 17h.01M12 17h.01" />
+    </svg>
+  );
+}
+
 /** Buy me a coffee: a cup with a handle and steam. */
 export function CoffeeIcon() {
   return (

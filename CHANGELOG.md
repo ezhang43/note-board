@@ -1,5 +1,12 @@
 # Changelog
 
+## Google Calendar beside the board (2026-10-06)
+
+- Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.
+- The first time, Google asks you to let BusyAnts see and change your calendar events. You can add an event (the + on a day), and click a simple event to rename it, change its day or time, or delete it (it asks first: Keep / Delete). Repeating events, events with guests and events with their own reminders are shown but open in Google Calendar to change.
+- Calendar events aren't part of your boards: Ctrl+Z doesn't undo calendar changes and they aren't in Version history. If Google Calendar can't be reached, the panel says "Google Calendar isn’t connected yet. Try again later." and everything else works as before.
+- Locally, `npm run dev` with `?demo-user=Alice` shows a pretend calendar to try it with.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

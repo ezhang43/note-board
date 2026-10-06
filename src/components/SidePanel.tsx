@@ -13,7 +13,9 @@ export function SidePanel({ title, onClose, children }: { title: string; onClose
     // or a "Delete …?" question) leaves it open.
     const key = (e: KeyboardEvent) => {
       const { dueFor, shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
-      if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen && !confirm && !deleteCompleted) onClose();
+      // A "Delete …?" question inside the panel (Google Calendar) answers its own Escape.
+      const asking = e.target instanceof Element && e.target.closest('[role="alertdialog"]');
+      if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen && !confirm && !deleteCompleted && !asking) onClose();
     };
     // Capture: seen before the page's own shortcuts close the list or picker that Escape was for.
     window.addEventListener('keydown', key, true);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard } from './cards';
-import { boardsToShare, canRestoreBoard, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
+import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
 import type { Board } from './types';
 import type { Workspace } from './workspace';
 
@@ -163,13 +163,24 @@ describe('which boards a shared board holds: a card to one of your own boards (2
   });
 });
 
-describe('who can restore a version of the open board', () => {
+describe('what this person may do with a board', () => {
   const share = (owner: boolean) => ({ id: 's1', root: 'trip', boards: ['trip', 'days'], owner, ownerUid: 'a', people: [], link: null });
 
-  it('only the person who shared it, on a shared board; anyone on their own boards', () => {
-    expect(canRestoreBoard([share(false)], 'days')).toBe(false);
-    expect(canRestoreBoard([share(true)], 'days')).toBe(true);
-    expect(canRestoreBoard([share(false)], 'home')).toBe(true);
-    expect(canRestoreBoard([], 'trip')).toBe(true);
+  it('their own boards: everything, but the home board can’t be deleted', () => {
+    expect(boardRights([], 'trip', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: false, restore: true });
+    expect(boardRights([share(false)], 'home', 'home')).toEqual({ rename: true, delete: false, deleteForEveryone: false, restore: true });
+  });
+
+  it('a board they shared: everything, and deleting it deletes it for everyone', () => {
+    expect(boardRights([share(true)], 'trip', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: true, restore: true });
+    expect(boardRights([share(true)], 'days', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: false, restore: true });
+  });
+
+  it('a board someone shared with them: no renaming, deleting or restoring it', () => {
+    expect(boardRights([share(false)], 'trip', 'home')).toEqual({ rename: false, delete: false, deleteForEveryone: false, restore: false });
+  });
+
+  it('a board inside one shared with them: renamed and deleted like any board, but not restored', () => {
+    expect(boardRights([share(false)], 'days', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: false, restore: false });
   });
 });

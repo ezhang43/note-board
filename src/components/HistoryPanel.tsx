@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { canRestoreOpenBoard } from './SharePanel';
 import { createBoard } from '../model/board';
+import { boardRights } from '../model/sharing';
 import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
 import { appStore, useAppState } from '../store/appStore';
@@ -116,6 +116,7 @@ export function HistoryPanel() {
 /** The bar shown while looking at an earlier version: what it is, Restore, and Back. */
 export function PreviewBar() {
   const preview = useAppState((s) => s.ui.preview);
+  const canRestore = useAppState((s) => boardRights(s.ui.shares, s.boards.open, s.boards.home).restore);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   if (!preview) return null;
@@ -146,7 +147,7 @@ export function PreviewBar() {
         <button type="button" className="tb-button" onClick={appStore.endPreview}>
           Back to current
         </button>
-        {canRestoreOpenBoard() ? (
+        {canRestore ? (
           <button type="button" className="tb-button add-column" aria-busy={busy} onClick={restore}>
             Restore this version
           </button>

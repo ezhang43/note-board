@@ -53,9 +53,20 @@ export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string
   return out;
 }
 
-/** Whether a version of the open board may be restored here: on a shared board, only by the person who shared it. */
-export function canRestoreBoard(shares: { boards: string[]; owner: boolean }[], boardId: string): boolean {
-  return !shares.some((s) => s.boards.includes(boardId) && !s.owner);
+/**
+ * What this person may do with board `boardId` (owner request: editing together). A board someone
+ * shared with them is renamed and deleted only by whoever shared it, and versions of any board in
+ * that share are restored only by them. Deleting a board this person shared deletes it for everyone.
+ * The home board is never deleted.
+ */
+export function boardRights(shares: { root: string; boards: string[]; owner: boolean }[], boardId: string, home: string) {
+  const sharedWithMe = shares.some((s) => s.root === boardId && !s.owner);
+  return {
+    rename: !sharedWithMe,
+    delete: boardId !== home && !sharedWithMe,
+    deleteForEveryone: shares.some((s) => s.root === boardId && s.owner),
+    restore: !shares.some((s) => s.boards.includes(boardId) && !s.owner),
+  };
 }
 
 const cardKey = (cardId: string, boardId: string) => `${cardId}>${boardId}`;

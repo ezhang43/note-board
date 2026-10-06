@@ -16,7 +16,10 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  waitForPendingWrites,
   writeBatch,
+  type DocumentSnapshot,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import { personFrom, type CollabBackend } from '../store/collab';
 import type { Remote } from '../store/sync';
@@ -117,6 +120,46 @@ export function versionsRemote(uid: string): VersionStore {
   };
 }
 
+/** The longest a refused shared board waits for this device's saves before it is watched again. */
+const RECHECK_MS = 10_000;
+
+/**
+ * Watches a shared board, or its people, through `listen` (an onSnapshot call), giving `next` each
+ * version. Firestore checks the rules when a watch starts, and a share made or joined here shows on
+ * this device before the save that makes this person one of its people has reached the server, so
+ * the server can refuse the watch for a moment (job 22: a board just shared vanished with "no
+ * longer shared with you"). So a refusal before the server has shown it is only passed on if it is
+ * refused again once this device's saves have arrived (or after RECHECK_MS, as another tab's saves
+ * may never be reported here); till then nothing is said. Once the server has shown it, a refusal
+ * is believed at once.
+ */
+function watchAllowed<S extends { metadata: { fromCache: boolean } }>(listen: (next: (snap: S) => void, refused: (e: { code?: string }) => void) => () => void, next: (snap: S) => void, onError: (e: unknown) => void) {
+  let stopped = false;
+  let checked = false;
+  let stop = () => {};
+  const again = () => {
+    if (!stopped) start();
+  };
+  const start = () => {
+    stop = listen(
+      (snap) => {
+        if (!snap.metadata.fromCache) checked = true;
+        next(snap);
+      },
+      (e) => {
+        if (e?.code !== 'permission-denied' || checked) return onError(e);
+        checked = true;
+        void Promise.race([waitForPendingWrites(db), new Promise((done) => setTimeout(done, RECHECK_MS))]).then(again, again);
+      },
+    );
+  };
+  start();
+  return () => {
+    stopped = true;
+    stop();
+  };
+}
+
 /**
  * Shared boards (owner request: editing together). shared/{id} holds the boards (as in
  * serializeShare) with who shared them, the shared board and the link key; shared/{id}/members/{uid}
@@ -141,9 +184,9 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchShare(id, onChange, onError) {
-      return onSnapshot(
-        shareRef(id),
-        (snap) => {
+      return watchAllowed(
+        (next, refused) => onSnapshot(shareRef(id), next, refused),
+        (snap: DocumentSnapshot) => {
           if (!snap.exists()) {
             // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
             if (!snap.metadata.fromCache) onChange(null);
@@ -157,9 +200,9 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchPeople(id, onChange, onError) {
-      return onSnapshot(
-        collection(db, 'shared', id, 'members'),
-        (snap) => {
+      return watchAllowed(
+        (next, refused) => onSnapshot(collection(db, 'shared', id, 'members'), next, refused),
+        (snap: QuerySnapshot) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
           const people = snap.docs
             .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))

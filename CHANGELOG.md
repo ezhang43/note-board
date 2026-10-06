@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: a board just shared no longer vanishes (2026-10-06)
+
+- On the published site, sharing a board could make it disappear a few seconds later with "“X” is no longer shared with you". Right after sharing (or joining by link), the server could briefly refuse to show the board because the share hadn't fully reached it yet, and the app took that as being removed. Now a refusal only counts if it happens again once this device's saves have reached the server.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

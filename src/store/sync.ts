@@ -45,30 +45,14 @@ export function startSync(
      */
     onSaveState?: (state: SaveState) => void;
     /**
-     * Boards shared with other people (owner request: editing together). They sync through their
-     * share instead, so they are neither uploaded here nor replaced by what arrives here.
+     * Boards shared with other people (owner request: editing together), or that may be until the
+     * shares are known (ownBoardsGuard in sharing.ts). They sync through their share instead, so
+     * they are neither uploaded here nor replaced by what arrives here.
      */
     isShared?: (boardId: string) => boolean;
-    /**
-     * False while it isn't known yet which boards are shared (the share list hasn't answered; see
-     * sharesKnown below; main session check, 2026-10-06). Until then these may be shared boards, so
-     * they are neither uploaded with the person's own boards nor dropped by a version from there:
-     * a board that came with a share (`cameWithShare`), and, after the first online version, a board
-     * that was in none (made here meanwhile). Any other board here on first load is dropped as usual
-     * when there is an online copy (it may be another account's).
-     */
-    sharesKnown?: boolean;
-    /** Whether board `id` is in a share's data kept on this device. */
-    cameWithShare?: (boardId: string) => boolean;
   },
 ) {
-  let known = opts.sharesKnown ?? true;
-  /** The first online version (or "there is none") has been dealt with. */
-  let loaded = false;
-  /** Every board id in an online version seen here, or uploaded from here on first load. */
-  const online = new Set<string>();
-  const cameWithShare = opts.cameWithShare ?? (() => false);
-  const isShared = (id: string) => (opts.isShared?.(id) ?? false) || (!known && (cameWithShare(id) || (loaded && !online.has(id))));
+  const isShared = opts.isShared ?? (() => false);
   /** This person's own boards: every board but the shared ones. */
   const own = (ws: Workspace): Workspace => ({
     home: ws.home,
@@ -102,20 +86,19 @@ export function startSync(
   /** The person's own boards here (as ownKey) when `waiting` arrived. */
   let waitingFrom = '';
   let lastBoards = store.workspace().boards;
-  /**
-   * Whether any board changed since last time (opening another board changes none: which board is
-   * open isn't synced).
-   */
   let sharesSeen = store.getState().ui.shares;
   const sharedKey = () => JSON.stringify(store.getState().ui.shares.map((s) => s.boards));
   let lastShared = sharedKey();
-  /** 'boards': a board changed. 'shared': which boards are shared changed. false: neither. */
-  const boardsChanged = (): 'boards' | 'shared' | false => {
+  /**
+   * Whether any board changed since last time, or which boards are shared did (opening another
+   * board changes none: which board is open isn't synced).
+   */
+  const boardsChanged = () => {
     const boards = store.workspace().boards;
     const ids = Object.keys(boards);
     const same = boards === lastBoards || (ids.length === Object.keys(lastBoards).length && ids.every((id) => boards[id] === lastBoards[id]));
     lastBoards = boards;
-    if (!same) return 'boards';
+    if (!same) return true;
     // Which boards are shared changed: the person's own boards to upload change with it (a board
     // just shared leaves them straight away). Only the boards count: a new list of people or a
     // link turned off isn't a change here (main session check: "Saving…" flickered).
@@ -124,7 +107,7 @@ export function startSync(
     const key = sharedKey();
     if (key === lastShared) return false;
     lastShared = key;
-    return 'shared';
+    return true;
   };
   let timer: ReturnType<typeof setTimeout> | null = null;
   /**
@@ -196,7 +179,6 @@ export function startSync(
    */
   function read(data: string) {
     const got = readWorkspace(data);
-    if (got) Object.keys(got.ws.boards).forEach((id) => online.add(id));
     if (got && (!got.legacy || !ready)) return got.ws;
     if (got) {
       const ws = store.workspace();
@@ -215,9 +197,6 @@ export function startSync(
     if (!ready) {
       if (!doc) {
         ready = true;
-        // This device's boards become the online copy (but not ones that came with a share).
-        for (const id of Object.keys(store.workspace().boards)) if (!cameWithShare(id)) online.add(id);
-        loaded = true;
         upload();
         return opts.onReady();
       }
@@ -226,7 +205,6 @@ export function startSync(
       ready = true;
       lastSynced = ownKey(ws);
       store.replaceWorkspace(withShared(ws));
-      loaded = true;
       return opts.onReady();
     }
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.
@@ -249,10 +227,8 @@ export function startSync(
     flush() {
       if (timer) upload();
     },
-    /** Which boards are shared is known now: the person's own boards are all synced from here on. */
-    sharesKnown() {
-      if (known) return;
-      known = true;
+    /** Which boards are shared changed without the store showing it: upload the person's own boards if they now differ. */
+    sharedChanged() {
       if (ready && !stopped && ownKey(store.workspace()) !== lastSynced) schedule();
     },
     stop() {

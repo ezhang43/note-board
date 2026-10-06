@@ -1,5 +1,5 @@
 import { appStore } from '../store/appStore';
-import { boardsInKeptShares, startSharing, type Sharing } from '../store/sharing';
+import { boardsInKeptShares, ownBoardsGuard, startSharing, type Sharing } from '../store/sharing';
 import { startSync, type SaveState } from '../store/sync';
 import { activeVersionStore, startVersions } from '../store/versions';
 import { collab, joinFromAddress } from './collabSession';
@@ -52,19 +52,16 @@ watchUser((user) => {
   // without them, so it must be known which boards are shared before those are.
   const backend = collabRemote(user);
   let started = false;
-  let sharesKnown = false;
-  /** The boards of the shares kept on this device (read once, before anything changes them). */
-  const kept = boardsInKeptShares(localStorage, user.uid);
+  // Started by the timer below before the shared boards are known, own-board sync leaves alone the
+  // boards that may be shared until they are (main session check, 2026-10-06). The boards of the
+  // shares kept on this device are read once, before anything changes them.
+  const guard = ownBoardsGuard(appStore, boardRemote(user.uid), (id) => active.isShared(id), boardsInKeptShares(localStorage, user.uid));
   const startOwnBoards = () => {
     if (started || sharing !== active) return;
     started = true;
-    sync = startSync(appStore, boardRemote(user.uid), {
+    sync = startSync(appStore, guard.remote, {
       client,
-      isShared: (id) => active.isShared(id),
-      // Started by the timer below before the shared boards are known: boards it can't tell apart
-      // are left alone until they are (main session check, 2026-10-06).
-      sharesKnown,
-      cameWithShare: (id) => kept.has(id),
+      isShared: guard.isShared,
       onReady: () => {
         // Version history starts once the online board is in, so its arrival isn't taken for an edit.
         versions = startVersions(appStore, versionsRemote(user.uid));
@@ -82,8 +79,8 @@ watchUser((user) => {
     client,
     storage: localStorage,
     onReady: () => {
-      sharesKnown = true;
-      if (started) sync?.sharesKnown();
+      guard.known();
+      if (started) sync?.sharedChanged();
       else startOwnBoards();
     },
     // Before version history has started (a share gone while the page was closed), straight online.

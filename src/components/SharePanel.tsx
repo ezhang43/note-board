@@ -83,18 +83,20 @@ function SharePanel({ onClose }: { onClose: () => void }) {
   const me = collab.me();
   if (!sharing) return null;
 
-  /** Runs an action, showing what went wrong if it fails. */
+  /** Runs an action, showing what went wrong if it fails. Resolves to whether it worked. */
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
     try {
       await action();
+      return true;
     } catch (e) {
       setError(
         (e as { code?: string })?.code === 'permission-denied'
           ? 'That wasn’t allowed. If you just set up sharing, the new online rules may still need pasting into Firebase.'
           : 'That didn’t work. Check your connection and try again.',
       );
+      return false;
     } finally {
       setBusy(false);
     }
@@ -178,10 +180,10 @@ function SharePanel({ onClose }: { onClose: () => void }) {
               type="button"
               className="tb-button quiet share-leave"
               disabled={busy}
-              onClick={() => {
+              onClick={async () => {
                 if (!window.confirm(`Leave “${rootName}”? It will go from your boards. Whoever shared it can share it with you again.`)) return;
-                onClose();
-                void run(() => sharing.leave(share.id));
+                // Closed only once it worked, so an error shows in the panel.
+                if (await run(() => sharing.leave(share.id))) onClose();
               }}
             >
               Leave this board

@@ -125,6 +125,20 @@ test('someone it was shared with can’t rename or delete the shared board, but 
   await expect(sharePanel(alice).getByText(`Bob${t}`)).toHaveCount(0, { timeout: 8000 });
 });
 
+test('leaving a board that doesn’t work says so, and the board stays', async ({ browser }) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  // No connection for leaving: the pretend server never hears it.
+  await bob.route('**/call', (route) => (route.request().postData()?.includes('"method":"leave"') ? route.abort() : route.continue()));
+  await openShare(bob);
+  bob.once('dialog', (d) => d.accept());
+  await sharePanel(bob).getByRole('button', { name: 'Leave this board' }).click();
+  await expect(sharePanel(bob).getByRole('alert')).toHaveText('That didn’t work. Check your connection and try again.');
+  await expect(boardName(bob)).toHaveValue('Trip');
+});
+
 test('deleting a shared board (by the person who shared it) deletes it for everyone', async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`);

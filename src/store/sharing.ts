@@ -2,10 +2,10 @@ import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
-import type { Workspace } from '../model/workspace';
+import { readWorkspace, type Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
 import type { Store } from './store';
-import { SYNC_DELAY, type SaveState } from './sync';
+import { SYNC_DELAY, type Remote, type SaveState } from './sync';
 import type { ShareInfo } from './types';
 import { saveSafetyVersion, type VersionStore } from './versions';
 
@@ -48,6 +48,46 @@ export function boardsInKeptShares(storage: { length: number; key(i: number): st
     // Storage that can't be read: nothing known.
   }
   return out;
+}
+
+/**
+ * Which boards the person's own-board sync (startSync) leaves alone: the shared ones (`shared`) and,
+ * until `known()` says the shares are known, the boards that may be shared (main session check,
+ * 2026-10-06): a board that came with a share kept on this device (`kept`, see boardsInKeptShares)
+ * and, after the first online version, a board in none of the online versions (made here
+ * meanwhile). Any other board here on first load gives way to the online copy as usual (it may be
+ * another account's). Give sync `remote` in place of the online copy: that is how this learns which
+ * boards the online copy has.
+ */
+export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: string) => boolean, kept: Set<string>) {
+  let known = false;
+  /** The first online version (or "there is none") has been dealt with. */
+  let loaded = false;
+  /** Every board id in an online version seen here, or uploaded from here on first load. */
+  const seen = new Set<string>();
+  const remote: Remote = {
+    write: (doc) => online.write(doc),
+    watch: (onChange, onError) =>
+      online.watch((doc) => {
+        if (!known) {
+          // No online copy yet: this device's boards become it (but not ones that came with a share).
+          if (!doc && !loaded) Object.keys(store.workspace().boards).forEach((id) => !kept.has(id) && seen.add(id));
+          if (doc) Object.keys(readWorkspace(doc.data)?.ws.boards ?? {}).forEach((id) => seen.add(id));
+        }
+        try {
+          onChange(doc);
+        } finally {
+          loaded = true;
+        }
+      }, onError),
+  };
+  return {
+    remote,
+    isShared: (id: string) => shared(id) || (!known && (kept.has(id) || (loaded && !seen.has(id)))),
+    known() {
+      known = true;
+    },
+  };
 }
 
 /** A save that failed (no connection, say) is tried again after this long. */

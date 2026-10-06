@@ -4,6 +4,7 @@ import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
+import { ownBoardsGuard } from './sharing';
 import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
@@ -434,14 +435,15 @@ describe('main session check fixes (2026-10-06)', () => {
       const stray = store.newBoard();
       store.renameBoard('Left on this device');
       store.openBoard(home);
-      const sync = startSync(store, fake.remote, {
-        client: 'me',
-        onReady: vi.fn(),
-        onError: vi.fn(),
-        isShared: (id) => shared.has(id),
-        sharesKnown: false,
-        cameWithShare: (id) => id === local,
-      });
+      // The sharing module tells sync which boards may be shared (src/store/sharing.ts).
+      const guard = ownBoardsGuard(store, fake.remote, (id) => shared.has(id), new Set([local]));
+      const own = startSync(store, guard.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: guard.isShared });
+      const sync = {
+        sharesKnown() {
+          guard.known();
+          own.sharedChanged();
+        },
+      };
       return { store, home, fake, shared, local, stray, sync };
     }
     const sentIds = (fake: ReturnType<typeof fakeRemote>) => Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards).sort();

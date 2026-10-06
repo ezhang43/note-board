@@ -1,5 +1,10 @@
 # Changelog
 
+## Sharing, tidied (2026-10-06)
+
+- If leaving a shared board fails, the Share panel now stays open and says so (it used to close and show nothing).
+- Behind the scenes: the rules for which boards might be shared, while the app is still finding out, now live in one place. Nothing else changes for you.
+
 ## Sharing, checked again (2026-10-06)
 
 - Pasting or moving a card for one of your own boards onto a shared board no longer shares that board: the card just opens it, for you only. A sub-board made on a shared board is still shared, as before.

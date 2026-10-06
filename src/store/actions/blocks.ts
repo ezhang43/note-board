@@ -131,7 +131,10 @@ export function blockActions(ctx: StoreContext) {
     },
 
     // ---------- version history (owner request) ----------
-    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
+    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, sidePanel: null, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
+    /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history and Due. */
+    toggleSidePanel: (panel: 'pomodoro') =>
+      updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, dueOpen: false, preview: null }),
     /** Show an old version on the board, read-only (the real board is untouched). */
     previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
     endPreview: () => updateUi({ preview: null }),

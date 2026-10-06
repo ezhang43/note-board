@@ -20,6 +20,7 @@ export type Store = ReturnType<typeof createStore>;
 
 export function createStore(storage: StorageLike | null, schedule: Schedule = later) {
   const { ctx, api } = createCore(storage, schedule);
+  const boards = boardActions(ctx);
   return {
     ...api,
     /** The checklist item or new block that was asked to take the cursor has taken it. */
@@ -29,7 +30,12 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (focusBlock === id) ctx.updateUi({ focusBlock: null });
     },
     ...blockActions(ctx),
-    ...boardActions(ctx),
+    ...boards,
+    /** The Due panel takes the side panel's place (one at a time), as Version history does. */
+    toggleDuePanel: () => {
+      ctx.updateUi({ sidePanel: null });
+      boards.toggleDuePanel();
+    },
     ...gestureActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),

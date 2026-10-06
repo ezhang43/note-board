@@ -4,6 +4,13 @@
 
 - If someone shared a board with you, restoring an old version or a backup file no longer changes it, for you or for them. Your own boards are restored as before, and a note says which shared board was left as it is. Only the person who shared a board can restore it.
 
+## Focus timer (2026-10-06)
+
+- A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.
+- It keeps running when the panel is closed (the button then shows the time left, like 18:42), and after a page reload.
+- When a round ends a soft chime plays (it can be switched off in the panel), and, if the tab is behind another, a notification shows, once you allow them (asked on the first Start). The next round waits for Start.
+- The lengths can be changed in the panel and are remembered on this device. None of it is part of a board: not undone by Ctrl+Z, not synced.
+
 ## Delete completed items in one go (2026-10-06)
 
 - Ctrl+Shift+Backspace (Control+Shift+Backspace on a Mac too) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
@@ -12,6 +19,7 @@
 ## Sharing permissions in one place (2026-10-06)
 
 - Behind the scenes: who may rename, delete or restore a shared board is now decided in one place, and deleting a board always saves Version history first by the same route. The Restore button also updates straight away if a board stops being shared while you look at an old version. Nothing else changes for you.
+
 ## Slower scrolling (2026-10-06)
 
 - Scrolling with a mouse wheel or swiping on a trackpad now moves the board half as far as before, so it is easier to control. Zooming (Ctrl + scroll or pinch) is unchanged.

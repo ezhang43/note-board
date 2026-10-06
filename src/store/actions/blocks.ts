@@ -129,7 +129,7 @@ export function blockActions(ctx: StoreContext) {
     // ---------- version history (owner request) ----------
     toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Show an old version on the board, read-only (the real board is untouched). */
-    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null }),
+    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
     endPreview: () => updateUi({ preview: null }),
     /** Whether `text` is a BusyAnts backup (one board, or every board, that this version can read). */
     isBackup: (text: string) => readWorkspace(text) !== null,

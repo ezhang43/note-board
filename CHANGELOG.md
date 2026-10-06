@@ -2,7 +2,7 @@
 
 ## Delete completed items in one go (2026-10-06)
 
-- Ctrl+Shift+Backspace (⌘+Shift+Backspace on a Mac) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
+- Ctrl+Shift+Backspace (Control+Shift+Backspace on a Mac too) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
 - With nothing completed it says "No completed items on this board" and changes nothing. It's listed in the Keyboard shortcuts panel (?).
 
 ## Slower scrolling (2026-10-06)

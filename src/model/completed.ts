@@ -1,6 +1,6 @@
 import { addCard, type Placement } from './board';
 import { newId, type MakeId } from './cards';
-import { MAX_DEPTH, editItems, findItem, refill, setItemsDone, subtreeHeight } from './checklist';
+import { MAX_DEPTH, editItems, findItem, flatIds, refill, sections, setItemsDone, subtreeHeight } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
@@ -40,10 +40,9 @@ export function hasTickedItems(board: Board): boolean {
 
 /** How many items are in the lists' Completed sections (ticked top-level items), sub-items included. */
 export function completedSectionCount(board: Board): number {
-  const count = (items: TodoItem[]): number => items.reduce((n, it) => n + 1 + count(it.children), 0);
   return listsInOrder(board).reduce((n, id) => {
     const c = board.cards[id];
-    return n + (c.kind === 'todo' ? count(c.items.filter((it) => it.done)) : 0);
+    return n + (c.kind === 'todo' ? flatIds(sections(c.items).done).length : 0);
   }, 0);
 }
 
@@ -56,7 +55,7 @@ export function deleteCompletedSections(board: Board, makeId: MakeId = newId): B
   let b = board;
   for (const id of listsInOrder(board)) {
     const card = board.cards[id];
-    if (card.kind === 'todo' && card.items.some((it) => it.done)) b = editItems(b, id, (items) => refill(items.filter((it) => !it.done), makeId));
+    if (card.kind === 'todo' && sections(card.items).done.length) b = editItems(b, id, (items) => refill(sections(items).open, makeId));
   }
   return b;
 }

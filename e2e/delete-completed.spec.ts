@@ -58,6 +58,23 @@ test('Keep (or Escape) cancels and deletes nothing; one item says "1 completed i
   expect(await texts(groceries)).toEqual(['milk', 'bread']);
 });
 
+test('⌘+Shift+Backspace (the browser’s Clear browsing data on a Mac) does not ask; other keys wait while it asks', async ({ page }) => {
+  const groceries = await checklist(page, 'Groceries', ['bread', 'milk'], 1);
+  await clickEmpty(page);
+  await page.keyboard.press('Meta+Shift+Backspace');
+  await expect(dialog(page)).toHaveCount(0);
+
+  // The list is selected; Delete while the question is open doesn't delete the list behind it.
+  await groceries.getByLabel('Item text').first().click();
+  await page.keyboard.press('Escape');
+  await expect(groceries).toHaveClass(/selected/);
+  await page.keyboard.press('Control+Shift+Backspace');
+  await expect(dialog(page)).toBeVisible();
+  await page.keyboard.press('Delete');
+  await expect(groceries).toHaveCount(1);
+  await expect(dialog(page)).toBeVisible();
+});
+
 test('does not fire while typing in a text field', async ({ page }) => {
   const groceries = await checklist(page, 'Groceries', ['bread', 'milk'], 1);
   await groceries.getByLabel('Item text').first().click();

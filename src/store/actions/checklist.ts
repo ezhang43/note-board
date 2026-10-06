@@ -220,12 +220,14 @@ export function checklistActions(ctx: StoreContext) {
     uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */
     askDeleteCompleted() {
+      if (ctx.state.ui.preview) return; // an old version is being looked at: nothing can be changed
       ctx.flushPendingTick(); // an item still on its way to Completed counts
       updateUi({ deleteCompleted: completedSectionCount(ctx.state.board) ? 'ask' : 'none' });
     },
     cancelDeleteCompleted: () => updateUi({ deleteCompleted: null }),
     /** Delete every item in the open board's Completed sections. One undo step. */
-    confirmDeleteCompleted: () => commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null } }) ?? updateUi({ deleteCompleted: null }),
+    confirmDeleteCompleted: () =>
+      commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null, itemSel: null } }) ?? updateUi({ deleteCompleted: null }),
 
     // ---------- selecting several checklist items ----------
     selectItemRange,

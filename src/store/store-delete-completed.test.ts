@@ -58,6 +58,29 @@ describe('Delete completed items', () => {
     expect(texts()).toBe('c');
   });
 
+  it('clears a checklist item selection when it deletes', () => {
+    const { s } = setup();
+    const cardId = s.getState().ui.selection[0];
+    const ids = (s.getState().board.cards[cardId] as TodoCard).items.map((i) => i.id);
+    s.selectItemRange(cardId, ids[0], ids[2]);
+    expect(s.getState().ui.itemSel).not.toBeNull();
+    s.askDeleteCompleted();
+    s.confirmDeleteCompleted();
+    expect(s.getState().ui.itemSel).toBeNull();
+  });
+
+  it('does not ask while an old version is being looked at, and looking at one closes the question', () => {
+    const { s, texts } = setup();
+    s.askDeleteCompleted();
+    s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
+    expect(s.getState().ui.deleteCompleted).toBeNull();
+    s.askDeleteCompleted();
+    expect(s.getState().ui.deleteCompleted).toBeNull();
+    s.confirmDeleteCompleted();
+    s.endPreview();
+    expect(texts()).toBe('+a +b c');
+  });
+
   it('works on the open board only', () => {
     const { s, texts } = setup();
     const home = s.getState().boards.open;

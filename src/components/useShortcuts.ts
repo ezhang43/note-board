@@ -63,8 +63,11 @@ export function useShortcuts() {
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
       if (key === 'escape' && state.ui.shortcutsOpen) return appStore.closeShortcuts();
       // Ctrl+Shift+Backspace: delete every item in the board's Completed sections, after asking.
-      if (mod && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);
+      // The Control key on a Mac too: there ⌘+Shift+Backspace is the browser's Clear browsing data.
+      if (e.ctrlKey && !e.metaKey && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);
       if (key === 'escape' && state.ui.deleteCompleted) return appStore.cancelDeleteCompleted();
+      // While it asks, no other board key acts behind the question (Tab, Enter and Space work its buttons).
+      if (state.ui.deleteCompleted === 'ask') return;
 
       // Several checklist items selected: these keys act on the items.
       if (state.ui.itemSel) {

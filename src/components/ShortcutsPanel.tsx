@@ -46,7 +46,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Shift+click, or press and drag', 'Select several items (drag on into the next cards of a column)'],
       ['Ctrl+A again and again', "Select the item text, the list, the column's lists, then the whole board"],
       ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste selected items'],
-      ['Ctrl+Shift+Backspace', 'Delete every item in the Completed sections on this board (asks first)'],
+      ['Ctrl+Shift+Backspace', 'Delete every item in the Completed sections on this board (asks first; Control on a Mac too)'],
     ],
   },
 ];

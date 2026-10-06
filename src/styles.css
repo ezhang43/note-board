@@ -26,11 +26,6 @@
   --nest-mark: #b07a0e;
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
   --colour-dot: #efece6;
-  /* The ant hill on the Completed card (owner request). */
-  --hill: #f6e6b4;
-  --hill-edge: #dcc27a;
-  --hill-trail: #c49a3a;
-  --ant: #3a2614;
   --toolbar-height: 64px;
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   /* Typefaces a text box can be given (text formatting, owner request). */
@@ -68,10 +63,6 @@
   --on-accent: #241a08;
   --drop-bg: #3a3020;
   --link-url-bg: rgba(0, 0, 0, 0.22);
-  --hill: #3a3020;
-  --hill-edge: #5c4b28;
-  --hill-trail: #8a6a2a;
-  --ant: #f2c14e;
 }
 
 * { box-sizing: border-box; }
@@ -676,33 +667,6 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   text-overflow: ellipsis;
 }
 
-/* The ant hill: one step up for every item cleaned up (owner request). Fixed at the top middle of
-   the board, over the cards, and never in the way of a click. */
-.ant-hill {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  /* Over the cards, under the toolbar's menus and every panel. */
-  z-index: 1;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-}
-.ant-hill svg { display: block; width: 216px; height: 72px; overflow: visible; }
-.hill-ground { fill: var(--hill); stroke: var(--hill-edge); stroke-width: 1.5; stroke-linejoin: round; }
-.hill-trail { fill: none; stroke: var(--hill-trail); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; }
-.hill-flag-pole { stroke: var(--ink-soft); stroke-width: 1.5; stroke-linecap: round; }
-.hill-flag-cloth { fill: var(--accent); opacity: 0.4; }
-.hill-flag.reached .hill-flag-cloth { opacity: 1; }
-.hill-ant { fill: var(--ant); stroke: var(--ant); }
-/* While walking, the ant's body bobs a little in step. */
-.hill-ant.walking .hill-ant-body { animation: ant-step 180ms ease-in-out infinite alternate; }
-@keyframes ant-step { to { transform: translateY(-18px); } }
-.hill-caption { font-size: calc(12px * var(--fs, 1)); color: var(--ink-faint); }
-
 /* ---------- columns ---------- */
 
 .column {
@@ -1004,7 +968,6 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hill-ant.walking .hill-ant-body { animation: none; }
   .card.loose,
   .column,
   .landing-spot {

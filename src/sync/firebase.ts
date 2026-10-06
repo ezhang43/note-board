@@ -18,6 +18,8 @@ import {
   updateDoc,
   waitForPendingWrites,
   writeBatch,
+  type DocumentSnapshot,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import { personFrom, type CollabBackend } from '../store/collab';
 import type { Remote } from '../store/sync';
@@ -118,30 +120,38 @@ export function versionsRemote(uid: string): VersionStore {
   };
 }
 
+/** The longest a refused shared board waits for this device's saves before it is watched again. */
+const RECHECK_MS = 10_000;
+
 /**
- * Watches a shared board, or its people, through `listen` (an onSnapshot call). Firestore checks
- * the rules when a watch starts, and a share made or joined here shows on this device before the
- * save that makes this person one of its people has reached the server, so the server can refuse
- * the watch for a moment (job 22: a board just shared vanished with "no longer shared with you").
- * A refusal is only passed on once this device's saves have all arrived and the watch is refused
- * again; till then it is watched again, and nothing is said.
+ * Watches a shared board, or its people, through `listen` (an onSnapshot call), giving `next` each
+ * version. Firestore checks the rules when a watch starts, and a share made or joined here shows on
+ * this device before the save that makes this person one of its people has reached the server, so
+ * the server can refuse the watch for a moment (job 22: a board just shared vanished with "no
+ * longer shared with you"). So a refusal before the server has shown it is only passed on if it is
+ * refused again once this device's saves have arrived (or after RECHECK_MS, as another tab's saves
+ * may never be reported here); till then nothing is said. Once the server has shown it, a refusal
+ * is believed at once.
  */
-function watchAllowed(listen: (refused: (e: { code?: string }) => void) => () => void, onError: (e: unknown) => void) {
+function watchAllowed<S extends { metadata: { fromCache: boolean } }>(listen: (next: (snap: S) => void, refused: (e: { code?: string }) => void) => () => void, next: (snap: S) => void, onError: (e: unknown) => void) {
   let stopped = false;
   let checked = false;
   let stop = () => {};
+  const again = () => {
+    if (!stopped) start();
+  };
   const start = () => {
-    stop = listen((e) => {
-      if (e?.code !== 'permission-denied' || checked) return onError(e);
-      // simple: checked once per watch (the moment right after sharing or joining); a refusal
-      // after that is believed at once.
-      checked = true;
-      void waitForPendingWrites(db)
-        .catch(() => {})
-        .then(() => {
-          if (!stopped) start();
-        });
-    });
+    stop = listen(
+      (snap) => {
+        if (!snap.metadata.fromCache) checked = true;
+        next(snap);
+      },
+      (e) => {
+        if (e?.code !== 'permission-denied' || checked) return onError(e);
+        checked = true;
+        void Promise.race([waitForPendingWrites(db), new Promise((done) => setTimeout(done, RECHECK_MS))]).then(again, again);
+      },
+    );
   };
   start();
   return () => {
@@ -174,9 +184,9 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchShare(id, onChange, onError) {
-      return watchAllowed((refused) => onSnapshot(
-        shareRef(id),
-        (snap) => {
+      return watchAllowed(
+        (next, refused) => onSnapshot(shareRef(id), next, refused),
+        (snap: DocumentSnapshot) => {
           if (!snap.exists()) {
             // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
             if (!snap.metadata.fromCache) onChange(null);
@@ -186,13 +196,13 @@ export function collabRemote(user: User): CollabBackend {
           if (typeof d.data !== 'string' || typeof d.root !== 'string') return;
           onChange({ owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) });
         },
-        refused,
-      ), onError);
+        onError,
+      );
     },
     watchPeople(id, onChange, onError) {
-      return watchAllowed((refused) => onSnapshot(
-        collection(db, 'shared', id, 'members'),
-        (snap) => {
+      return watchAllowed(
+        (next, refused) => onSnapshot(collection(db, 'shared', id, 'members'), next, refused),
+        (snap: QuerySnapshot) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
           const people = snap.docs
             .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
@@ -200,8 +210,8 @@ export function collabRemote(user: User): CollabBackend {
             .map(({ uid, name, photo }) => ({ uid, name, photo }));
           onChange(people);
         },
-        refused,
-      ), onError);
+        onError,
+      );
     },
     updateShare(id, change, client) {
       return runTransaction(db, async (tx) => {

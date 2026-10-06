@@ -17,7 +17,7 @@ const fs = vi.hoisted(() => {
     path: string;
     answered: boolean;
     deliver: () => void;
-    refuse: () => void;
+    refuse: (code?: string) => void;
   }>();
   const kids = (path: string) => [...local.keys()].filter((k) => k.startsWith(path + '/') && !k.slice(path.length + 1).includes('/'));
   /** The rules, as in firestore.rules: a shared board (and its people) only for its people. */
@@ -48,9 +48,14 @@ const fs = vi.hoisted(() => {
       changed();
       return new Promise<void>((done) => pending.push({ writes, done }));
     },
-    /** The server answers the watches started since last time (checking the rules). */
+    /** The server answers the watches started since last time, and stops those no longer allowed (checking the rules). */
     answerWatches() {
-      for (const w of [...watches]) if (!w.answered) allowed(w.path, fs.uid) ? ((w.answered = true), w.deliver()) : w.refuse();
+      for (const w of [...watches]) if (!allowed(w.path, fs.uid)) w.refuse();
+      else if (!w.answered) (w.answered = true), w.deliver();
+    },
+    /** Every watch fails with `code` (the connection, say). */
+    fail(code: string) {
+      for (const w of [...watches]) w.refuse(code);
     },
     /** The saves on their way arrive. */
     arrive() {
@@ -127,13 +132,9 @@ vi.mock('firebase/firestore', () => {
                 },
           );
         },
-        refuse: () => {
+        refuse: (code = 'permission-denied') => {
           fs.watches.delete(w);
-          error(
-            Object.assign(new Error('Missing or insufficient permissions.'), {
-              code: 'permission-denied',
-            }),
-          );
+          error(Object.assign(new Error(code), { code }));
         },
       };
       fs.watches.add(w);
@@ -259,6 +260,69 @@ describe('sharing a new board on the published site (job 22)', () => {
     expect(notices).toEqual([]);
     expect(store.workspace().boards[trip]?.name).toBe('Trip');
     expect(fs.server.has('shared/s1/members/u1')).toBe(true);
+  });
+
+  it('the people on a board just shared: the same moment of refusal isn’t passed on', async () => {
+    void fs.write([['shared/s1/members/u1', { name: 'Eric', photo: null, key: 'k', joinedAt: 0 }]]);
+    const errors: unknown[] = [];
+    const seen: string[][] = [];
+    collabRemote(user).watchPeople('s1', (people) => seen.push(people.map((p) => p.uid)), (e) => errors.push(e));
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    fs.arrive();
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    expect(errors).toEqual([]);
+    expect(seen.at(-1)).toEqual(['u1']);
+  });
+
+  it('other errors (no connection, say) are passed on at once', async () => {
+    void fs.write([['boards/u1/shared/s1', { joinedAt: 0 }]]);
+    const errors: unknown[] = [];
+    collabRemote(user).watchShare('s1', () => {}, (e) => errors.push(e));
+    await ticks();
+    fs.fail('unavailable');
+    await ticks();
+    expect(errors).toMatchObject([{ code: 'unavailable' }]);
+  });
+
+  it('once the server has shown the board, a refusal is believed at once, whatever is still on its way', async () => {
+    fs.server.set('shared/s1', { owner: 'u2', root: 'b1', link: 'k', data: '{}', client: '', rev: 1 });
+    fs.server.set('shared/s1/members/u1', { name: 'Eric', photo: null, key: 'k', joinedAt: 0 });
+    fs.server.forEach((v, k) => fs.local.set(k, v));
+    const errors: unknown[] = [];
+    collabRemote(user).watchShare('s1', () => {}, (e) => errors.push(e));
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    // A save of this person's own board is still on its way when they are removed.
+    void fs.write([['boards/u1', { data: '{}' }]]);
+    fs.server.delete('shared/s1/members/u1');
+    fs.answerWatches();
+    await ticks();
+    expect(errors).toMatchObject([{ code: 'permission-denied' }]);
+  });
+
+  it('saves that never arrive (another tab’s, say) don’t stop it being watched again after a while', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      void fs.write([['boards/u1', { data: '{}' }]]);
+      const errors: unknown[] = [];
+      collabRemote(user).watchShare('s1', () => {}, (e) => errors.push(e));
+      await ticks();
+      fs.answerWatches();
+      await ticks();
+      expect(fs.watches.size).toBe(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fs.watches.size).toBe(1);
+      fs.answerWatches();
+      await ticks();
+      expect(errors).toMatchObject([{ code: 'permission-denied' }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stopped while waiting: it isn’t watched again', async () => {

@@ -55,7 +55,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'New column',
     'File',
     'Backup file',
-    'Milanote Markdown file',
+    'File to import',
     'Clean up',
     'Dark mode',
   ]);

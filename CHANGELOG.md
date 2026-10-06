@@ -7,6 +7,14 @@
 - In the app, the ? panel ends with links to the pages, and on a phone ⋯ has About BusyAnts.
 - Opening one of the pages no longer replaces the app's offline copy.
 
+## The crew checks risky pull requests by itself (2026-10-06)
+
+- When a worker finishes a high-risk pull request (saving, sync, undo or deleting), the main session now runs the full check on it straight away (combine with the latest build/v1, all tests, review, spec check) and brings the owner its verdict. The owner still decides every high-risk merge and every publish.
+
+## Fix: a board just shared no longer vanishes (2026-10-06)
+
+- On the published site, sharing a board could make it disappear a few seconds later with "“X” is no longer shared with you". Right after sharing (or joining by link), the server could briefly refuse to show the board because the share hadn't fully reached it yet, and the app took that as being removed. Now a refusal only counts if it happens again once this device's saves have reached the server.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

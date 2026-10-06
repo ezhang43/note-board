@@ -1,11 +1,17 @@
 # Changelog
 
+<<<<<<< HEAD
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.
 - It keeps running when the panel is closed (the button then shows the time left, like 18:42), and after a page reload.
 - When a round ends a soft chime plays (it can be switched off in the panel), and, if the tab is behind another, a notification shows, once you allow them (asked on the first Start). The next round waits for Start.
 - The lengths can be changed in the panel and are remembered on this device. None of it is part of a board: not undone by Ctrl+Z, not synced.
+=======
+## Slower scrolling (2026-10-06)
+
+- Scrolling with a mouse wheel or swiping on a trackpad now moves the board half as far as before, so it is easier to control. Zooming (Ctrl + scroll or pinch) is unchanged.
+>>>>>>> origin/build/v1
 
 ## Sharing, tidied (2026-10-06)
 

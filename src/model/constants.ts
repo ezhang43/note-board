@@ -9,6 +9,9 @@ export const ZOOM_STEP = 1.2;
 /** How strongly Ctrl+scroll and trackpad pinch zoom. */
 export const WHEEL_ZOOM_SPEED = 0.0025;
 
+/** How far scroll / trackpad swipe pans the board, as a share of the scroll distance (owner request: half). */
+export const WHEEL_PAN_SPEED = 0.5;
+
 export const DEFAULT_BOARD_NAME = 'My first board';
 
 /** Block sizes, in board pixels. */

@@ -1,6 +1,8 @@
 import type { StorageLike } from '../model/persist';
 import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
 import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { boardRights } from '../model/sharing';
+import type { Sharing } from './sharing';
 import type { Store } from './store';
 
 // Version history (owner request, like Google Docs). When editing starts after a quiet spell, every
@@ -186,18 +188,16 @@ export async function restoreFromBackup(store: Store, versions: VersionStore | n
 }
 
 /**
- * Delete a board (owner request: several boards). Every board as it is now is saved as a version
- * first (when version history is on), so the deleted board can be brought back from there.
+ * Delete a board (owner request: several boards), if this person may (boardRights). Every board as
+ * it is now is saved as a version first (when version history is on), so the deleted board can be
+ * brought back from there. A board this person shared is deleted for everyone, through `sharing`.
  */
-export async function deleteBoardSafely(
-  store: Store,
-  versions: VersionStore | null,
-  id: string,
-  now: () => number = Date.now,
-  /** How to delete it (a shared board is deleted for everyone instead). */
-  remove: () => unknown = () => store.deleteBoard(id),
-) {
+export async function deleteBoardSafely(store: Store, versions: VersionStore | null, id: string, sharing: Sharing | null = null, now: () => number = Date.now) {
+  const { ui, boards } = store.getState();
+  if (!boardRights(ui.shares, id, boards.home).delete) return;
   // Saving the version may fail or wait (offline): the board is deleted anyway, as the person asked.
   if (versions) await saveSafetyVersion(store, versions, now);
-  await remove();
+  const share = ui.shares.find((s) => s.root === id && s.owner);
+  if (share && sharing) await sharing.deleteShare(share.id);
+  else store.deleteBoard(id);
 }

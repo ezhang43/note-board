@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { shownName } from '../model/board';
 import { dayKey } from '../model/completed';
 import { addDays, dueItems, dueLabel, dueState } from '../model/due';
 import type { TodoItem } from '../model/types';
@@ -193,7 +194,7 @@ export function DuePanel() {
             <button key={`${d.boardId}:${d.itemId}`} type="button" className="history-row due-row" onClick={() => go(d.boardId, d.cardId, d.itemId)}>
               <span className="history-time">{d.text.trim() || 'Untitled item'}</span>
               <span className="history-detail">
-                {[several && (d.boardName.trim() || 'Untitled board'), d.listTitle.trim() || 'List', d.state === 'overdue' && dueLabel(d.due, now)].filter(Boolean).join(' · ')}
+                {[several && shownName(d.boardName), d.listTitle.trim() || 'List', d.state === 'overdue' && dueLabel(d.due, now)].filter(Boolean).join(' · ')}
               </span>
             </button>
           ))}

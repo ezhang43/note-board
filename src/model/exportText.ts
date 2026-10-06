@@ -1,3 +1,4 @@
+import { shownName } from './board';
 import { hrefOf } from './cards';
 import type { Board, Card, TodoItem } from './types';
 
@@ -14,7 +15,7 @@ export type BoardNameOf = (boardId: string) => string;
 function cardText(card: Card, nameOf: BoardNameOf): string[] {
   switch (card.kind) {
     case 'board':
-      return [`Board: ${nameOf(card.boardId).trim() || 'Untitled board'}`];
+      return [`Board: ${shownName(nameOf(card.boardId))}`];
     case 'note':
       return card.text.trim() ? [card.text.trim()] : [];
     case 'link': {

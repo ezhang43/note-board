@@ -32,9 +32,6 @@ export interface ShareDoc {
   rev: number;
 }
 
-/** Why a shared board can't be opened any more. */
-export type GoneReason = 'removed' | 'deleted';
-
 /** A thing that was refused because the person isn't allowed to (not a member, not the owner, wrong link). */
 export class NotAllowed extends Error {
   code = 'permission-denied';
@@ -42,7 +39,6 @@ export class NotAllowed extends Error {
 
 export interface CollabBackend {
   readonly me: Person;
-  /** The shares this person has (shared by them or joined). */
   /**
    * The shares this person has (shared by them or joined). `confirmed` is false for a list from
    * the device's offline copy, which may be out of date: a share missing from it isn't taken as left.

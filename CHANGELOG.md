@@ -1,5 +1,11 @@
 # Changelog
 
+## Import files from other apps (2026-10-06)
+
+- File → "Import from Milanote…" is now "Import file…". It takes Markdown (.md: Milanote, Obsidian, Notion, Bear…), plain text (.txt) and web pages (.html: Evernote or Google Keep exports, saved pages), and works out which it is.
+- Milanote exports come in as before. In any Markdown file, plain bullet lists right under a heading now also become checklist items. A text file with no Markdown becomes one note per paragraph. In a web page, headings become list titles, lists become items (nesting and ticked boxes kept), paragraphs become notes and a link on its own becomes a link card; its scripts never run and nothing is loaded.
+- As before: the cards are added (nothing else changes), selected, and one Ctrl+Z removes them all. A file it can't read says "BusyAnts can’t read that file yet."; files over 5 MB are refused; at most 300 cards and 2,000 items come in from one file.
+
 ## Claude can read your boards (2026-10-06)
 
 - A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.

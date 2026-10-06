@@ -6,6 +6,11 @@
 - Milanote exports come in as before. In any Markdown file, plain bullet lists right under a heading now also become checklist items. A text file with no Markdown becomes one note per paragraph. In a web page, headings become list titles, lists become items (nesting and ticked boxes kept), paragraphs become notes and a link on its own becomes a link card; its scripts never run and nothing is loaded.
 - As before: the cards are added (nothing else changes), selected, and one Ctrl+Z removes them all. A file it can't read says "BusyAnts can’t read that file yet."; files over 5 MB are refused; at most 300 cards and 2,000 items come in from one file.
 
+## Claude can read your boards (2026-10-06)
+
+- A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.
+- `npm run mcp:check` shows whether it can reach your boards, and `npm run mcp:logout` removes the sign-in (Claude stops reading straight away). Setup steps are in `mcp/README.md`. The website itself is unchanged.
+
 ## Trash can on cards and columns (2026-10-06)
 
 - The delete button at the top right of cards and columns is now a small trash can, the same as on checklist items, instead of an ×. It works exactly as before: a card goes at once (Ctrl+Z brings it back), a column asks first. Other × buttons (closing panels, deleting a board in the Boards menu, removing an arrow) stay as they were.

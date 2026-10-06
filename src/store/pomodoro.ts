@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { StorageLike } from '../model/persist';
 import * as model from '../model/pomodoro';
-import { POMODORO_KEY, readPomodoro, type Phase, type Pomodoro } from '../model/pomodoro';
+import { DEFAULT_POMODORO, MAX_MINUTES, POMODORO_KEY, readPomodoro, type Phase, type Pomodoro } from '../model/pomodoro';
 
 // The focus timer on this device (owner request, 2026-10-06). Kept apart from the board store:
 // it is a per-device setting, not board data, so it is never undone, synced or saved with a board.
@@ -13,20 +13,33 @@ export interface PomodoroHooks {
   askToNotify?: () => void;
 }
 
+/** Longest a round can have left: anything more means the computer's clock was wrong. */
+const LONGEST = MAX_MINUTES * 60_000;
+
 export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks = {}) {
-  let state = readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
+  /** What is saved on this device (another tab may have changed it), made safe to use now. */
+  function saved(): Pomodoro {
+    let p = readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
+    const now = Date.now();
+    if (model.timeLeft(p, now) > LONGEST) p = { ...p, timer: DEFAULT_POMODORO.timer };
+    // A round that ran out while the page was closed has simply moved on (no chime for it now).
+    return model.roundEnded(p, now) ? model.skip(p) : p;
+  }
+
+  let state = saved();
   const listeners = new Set<() => void>();
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
-  // A round that ran out while the page was closed has simply moved on (no chime for it now).
-  if (model.roundEnded(state, Date.now())) state = model.skip(state);
+  function show(next: Pomodoro) {
+    state = next;
+    schedule();
+    listeners.forEach((l) => l());
+  }
 
   function set(next: Pomodoro) {
     if (next === state) return;
-    state = next;
-    safe(() => storage?.setItem(POMODORO_KEY, JSON.stringify(state)));
-    schedule();
-    listeners.forEach((l) => l());
+    safe(() => storage?.setItem(POMODORO_KEY, JSON.stringify(next)));
+    show(next);
   }
 
   // One timeout to the end of a running round (a single long timeout isn't slowed down in a
@@ -35,12 +48,18 @@ export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks
     clearTimeout(timeout);
     const { endsAt } = state.timer;
     if (endsAt === null) return;
-    timeout = setTimeout(() => {
-      if (!model.roundEnded(state, Date.now())) return schedule();
-      const ended = state.timer.phase;
-      set(model.skip(state));
-      hooks.onRoundEnd?.(ended, state);
-    }, Math.max(0, endsAt - Date.now()));
+    timeout = setTimeout(roundEnd, Math.min(LONGEST, Math.max(0, endsAt - Date.now())));
+  }
+
+  function roundEnd() {
+    if (!model.roundEnded(state, Date.now())) return schedule();
+    // Another tab may have ended this round already: then just show what it saved, without a chime.
+    // simple: two tabs ending it at the very same moment may both chime.
+    const stored = readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
+    if (storage && stored.timer.endsAt !== state.timer.endsAt) return show(saved());
+    const ended = state.timer.phase;
+    set(model.skip(state));
+    hooks.onRoundEnd?.(ended, state);
   }
   schedule();
 
@@ -50,6 +69,8 @@ export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    /** Another tab changed the saved timer: show that. */
+    reload: () => show(saved()),
     start() {
       if (!state.asked) {
         hooks.askToNotify?.();

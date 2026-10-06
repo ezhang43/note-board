@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
+import { appStore } from '../store/appStore';
 import { CloseIcon } from './icons';
+import { isTextField } from './textField';
 
 /**
  * A panel beside the board, in the right-hand spot Version history and Due also use (one at a
@@ -7,7 +9,11 @@ import { CloseIcon } from './icons';
  */
 export function SidePanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Escape meant for something else (leaving a text box, closing a date picker or the shortcuts list) leaves it open.
+    const key = (e: KeyboardEvent) => {
+      const { dueFor, shortcutsOpen } = appStore.getState().ui;
+      if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen) onClose();
+    };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [onClose]);

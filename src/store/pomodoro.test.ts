@@ -77,7 +77,7 @@ describe('the focus timer on this device', () => {
     createPomodoro(storage).start();
     vi.advanceTimersByTime(10 * MIN);
     const onRoundEnd = vi.fn();
-    const again = createPomodoro(storage, { onRoundEnd });
+    const again = createPomodoro(memory(storage.data), { onRoundEnd }); // the old page is gone: a copy of what it saved
     expect(timeLeft(again.get(), Date.now())).toBe(15 * MIN);
     vi.advanceTimersByTime(15 * MIN);
     expect(onRoundEnd).toHaveBeenCalledTimes(1);
@@ -110,6 +110,31 @@ describe('the focus timer on this device', () => {
     t.setLength('focus', 40);
     t.setMuted(true);
     expect(createPomodoro(storage).get().settings).toEqual({ focus: 40, short: 5, long: 15, muted: true });
+  });
+
+  it('a saved round longer than any allowed length (the clock was wrong) starts again stopped', () => {
+    const storage = memory();
+    createPomodoro(storage).start();
+    vi.setSystemTime(Date.now() - 365 * 24 * 60 * MIN); // the clock is put back a year
+    const again = createPomodoro(storage, { onRoundEnd: vi.fn() });
+    expect(again.get().timer).toEqual({ phase: 'focus', round: 1, endsAt: null, left: null });
+  });
+
+  it('follows changes made in another tab, and only one tab chimes for a round', () => {
+    const storage = memory();
+    const ends = vi.fn();
+    const a = createPomodoro(storage, { onRoundEnd: ends });
+    const b = createPomodoro(storage, { onRoundEnd: ends });
+    a.start();
+    b.reload(); // the browser tells tab B that the saved timer changed
+    expect(b.get().timer.endsAt).toBe(a.get().timer.endsAt);
+    b.setLength('short', 7); // doesn't stop tab A's round
+    a.reload();
+    expect(a.get().timer.endsAt).not.toBeNull();
+    vi.advanceTimersByTime(25 * MIN);
+    expect(a.get().timer.phase).toBe('short');
+    expect(b.get().timer.phase).toBe('short');
+    expect(ends).toHaveBeenCalledTimes(1); // the second tab finds it already done
   });
 
   it('works without storage', () => {

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
-import type { Phase } from '../model/pomodoro';
+import { POMODORO_KEY, type Phase } from '../model/pomodoro';
 import { askToNotify, chime, notifyIfHidden } from './env';
 import { createPomodoro } from './pomodoro';
 
@@ -77,3 +77,5 @@ export const pomodoro = createPomodoro(
     },
   },
 );
+// With the board open in two tabs, each follows what the other does with the timer.
+if (typeof window !== 'undefined') window.addEventListener('storage', (e) => e.key === POMODORO_KEY && pomodoro.reload());

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { box, fontsLoaded } from './helpers';
+import { add, box, fontsLoaded } from './helpers';
 
 // Focus timer (Pomodoro), owner request 2026-10-06: a toolbar button opens a side panel with a
 // 25 / 5 / 15 minute timer that keeps running when the panel is closed and across a reload.
@@ -124,6 +124,11 @@ test('it shares the right-hand spot with Version history: one at a time; Escape 
   await expect(page.getByRole('complementary', { name: 'Version history' })).toBeVisible();
   await button(page).click();
   await expect(page.getByRole('complementary', { name: 'Version history' })).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  // Escape while typing in a card only leaves the text box.
+  await add(page, 'Note');
+  await page.keyboard.type('Plan');
+  await page.keyboard.press('Escape');
   await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel(page)).toHaveCount(0);

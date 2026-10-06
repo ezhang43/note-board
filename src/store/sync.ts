@@ -49,13 +49,29 @@ export function startSync(
      * share instead, so they are neither uploaded here nor replaced by what arrives here.
      */
     isShared?: (boardId: string) => boolean;
+    /**
+     * False while it isn't known yet which boards are shared (the share list hasn't answered; see
+     * sharesKnown below). Until then a board here that was never in the online copy may be a shared
+     * one: it is neither uploaded with the person's own boards nor dropped by a version from there.
+     */
+    sharesKnown?: boolean;
   },
 ) {
-  const isShared = opts.isShared ?? (() => false);
-  /** This person's own boards: every board but the shared ones. */
+  let known = opts.sharesKnown ?? true;
+  /** Every board id in an online version seen here (main session check, 2026-10-06). */
+  const online = new Set<string>();
+  const isShared = (id: string) => (opts.isShared?.(id) ?? false) || (!known && !online.has(id));
+  /**
+   * This person's own boards: every board but the shared ones, in id order, so the same boards always
+   * give the same JSON (comparing with what was last synced doesn't depend on which board is open).
+   */
   const own = (ws: Workspace): Workspace => ({
     home: ws.home,
-    boards: Object.fromEntries(Object.entries(ws.boards).filter(([id]) => id === ws.home || !isShared(id))),
+    boards: Object.fromEntries(
+      Object.entries(ws.boards)
+        .filter(([id]) => id === ws.home || !isShared(id))
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    ),
   });
   const ownData = (ws: Workspace) => serializeWorkspace(own(ws));
   /** Boards from the online copy, with the shared boards as they are here. */
@@ -79,23 +95,25 @@ export function startSync(
    * Whether any board changed since last time (opening another board changes none: which board is
    * open isn't synced).
    */
-  let lastShares = store.getState().ui.shares;
-  const boardsChanged = () => {
-    // Which boards are shared changed: the person's own boards to upload change with it (a board
-    // just shared leaves them straight away).
-    const shares = store.getState().ui.shares;
-    if (shares !== lastShares) {
-      lastShares = shares;
-      lastBoards = store.workspace().boards;
-      return true;
-    }
+  const sharedKey = () => JSON.stringify(store.getState().ui.shares.map((s) => s.boards));
+  let lastShared = sharedKey();
+  /** 'boards': a board changed. 'shared': which boards are shared changed. false: neither. */
+  const boardsChanged = (): 'boards' | 'shared' | false => {
     const boards = store.workspace().boards;
-    if (boards === lastBoards) return false;
     const ids = Object.keys(boards);
-    const same = ids.length === Object.keys(lastBoards).length && ids.every((id) => boards[id] === lastBoards[id]);
+    const same = boards === lastBoards || (ids.length === Object.keys(lastBoards).length && ids.every((id) => boards[id] === lastBoards[id]));
     lastBoards = boards;
-    return !same;
+    if (!same) return 'boards';
+    // Which boards are shared changed: the person's own boards to upload change with it (a board
+    // just shared leaves them straight away). Only the boards count: a new list of people or a
+    // link turned off isn't a change here (main session check: "Saving…" flickered).
+    const key = sharedKey();
+    if (key === lastShared) return false;
+    lastShared = key;
+    return 'shared';
   };
+  /** A board changed here while a newer version waited for a drag to end (see subscribe). */
+  let editedWhileWaiting = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   /**
    * The last upload was refused: this device's board is newer than the online copy until a later
@@ -136,19 +154,27 @@ export function startSync(
     );
   }
 
-  const unsubscribe = store.subscribe(() => {
-    const changed = boardsChanged();
-    if (waiting && !busy()) {
-      const remoteWs = waiting;
-      waiting = null;
-      // The drag ended with a drop: that is newer than the waiting version, so it wins and is uploaded.
-      if (!changed) return store.replaceWorkspace(withShared(remoteWs));
-    }
-    if (!changed) return;
+  function schedule() {
     if (!ready || stopped) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(upload, SYNC_DELAY);
     if (!failed) opts.onSaveState?.('saving');
+  }
+
+  const unsubscribe = store.subscribe(() => {
+    const changed = boardsChanged();
+    if (waiting && changed === 'boards') editedWhileWaiting = true;
+    if (waiting && !busy()) {
+      const remoteWs = waiting;
+      waiting = null;
+      const edited = editedWhileWaiting;
+      editedWhileWaiting = false;
+      // A change made here during the drag (its drop, or one made while it went on, as a resize can)
+      // is newer than the waiting version: it wins and is uploaded. Otherwise the waiting one is shown.
+      if (!edited) return store.replaceWorkspace(withShared(remoteWs));
+      return schedule();
+    }
+    if (changed) schedule();
   });
 
   /**
@@ -159,6 +185,7 @@ export function startSync(
    */
   function read(data: string) {
     const got = readWorkspace(data);
+    if (got) Object.keys(got.ws.boards).forEach((id) => online.add(id));
     if (got && (!got.legacy || !ready)) return got.ws;
     if (got) {
       const ws = store.workspace();
@@ -204,6 +231,12 @@ export function startSync(
     /** Upload any waiting change now (used when the page is closed). */
     flush() {
       if (timer) upload();
+    },
+    /** Which boards are shared is known now: the person's own boards are all synced from here on. */
+    sharesKnown() {
+      if (known) return;
+      known = true;
+      if (ready && !stopped && ownData(store.workspace()) !== lastSynced) schedule();
     },
     stop() {
       if (timer) clearTimeout(timer);

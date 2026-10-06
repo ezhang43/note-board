@@ -184,3 +184,40 @@ describe('review fixes (2026-10-05)', () => {
     expect(s.getState().ui.find).toEqual({ query: 'milk', current: null });
   });
 });
+
+describe('boards changed by others, and shared boards (main session check, 2026-10-06)', () => {
+  it('a board others changed starts undo afresh; other boards keep theirs', () => {
+    const { s } = setup();
+    const home = s.getState().boards.home;
+    s.renameBoard('Home');
+    const trip = s.newBoard();
+    s.renameBoard('Trip');
+    s.openBoard(home);
+    s.renameBoard('Home again');
+    // Others changed Trip: Trip's undo starts over, home's stays.
+    s.replaceBoards({ [trip]: { ...createBoard(), name: 'Trip from Bob' } });
+    expect(s.getState().ui.canUndo).toBe(true);
+    s.openBoard(trip);
+    expect(s.getState().board.name).toBe('Trip from Bob');
+    expect(s.getState().ui.canUndo).toBe(false);
+    // And when the open board itself is changed by others.
+    s.renameBoard('Trip, mine');
+    expect(s.getState().ui.canUndo).toBe(true);
+    s.replaceBoards({ [trip]: { ...createBoard(), name: 'Trip from Bob again' } });
+    expect(s.getState().board.name).toBe('Trip from Bob again');
+    expect(s.getState().ui.canUndo).toBe(false);
+  });
+
+  it('an empty, unnamed shared board that no card opens is kept when another board opens', () => {
+    const { s } = setup();
+    const home = s.getState().boards.home;
+    const blank = s.newBoard();
+    s.setShares([{ id: 's1', root: blank, boards: [blank], owner: false, ownerUid: 'a', people: [], link: null }]);
+    s.openBoard(home);
+    expect(s.workspace().boards[blank]).toBeDefined();
+    // Not shared: dropped, as before.
+    const other = s.newBoard();
+    s.openBoard(home);
+    expect(s.workspace().boards[other]).toBeUndefined();
+  });
+});

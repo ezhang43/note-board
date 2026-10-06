@@ -65,17 +65,19 @@ export function demoBackend(person: Person) {
 
 /** Starts editing together for a demo person (local runs only). */
 export async function startDemo(person: Person) {
-  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }] = await Promise.all([
+  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }, { activeVersionStore }] = await Promise.all([
     import('../store/appStore'),
     import('../store/sharing'),
     import('./collabSession'),
     import('./pageHide'),
+    import('../store/versions'),
   ]);
   const sharing = startSharing(appStore, demoBackend(person), {
     client: crypto.randomUUID(),
     storage: demoStorage(localStorage, person),
     onNotice: collab.setNotice,
     onReady: () => joinFromAddress(appStore, sharing),
+    versions: activeVersionStore,
   });
   collab.set(sharing, person);
   flushWhenHidden(document, window, sharing.flush);

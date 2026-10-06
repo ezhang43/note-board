@@ -2,11 +2,12 @@ import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
-import type { Workspace } from '../model/workspace';
+import { isLeftoverBoard, type Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
 import type { Store } from './store';
 import { SYNC_DELAY, type SaveState } from './sync';
 import type { ShareInfo } from './types';
+import { saveSafetyVersion, type VersionStore } from './versions';
 
 // Shared boards (owner request, 2026-10-05: several people editing at once). A shared board, with
 // every board inside it, is kept online apart from its owner's other boards. Every page that has it
@@ -64,6 +65,8 @@ export interface SharingOptions {
   onSaveState?: (state: SaveState) => void;
   /** A message for the person (a board is no longer shared with them, say). */
   onNotice?: (text: string) => void;
+  /** Version history in use, if on: a shared board going from this device is saved there first. */
+  versions?: () => VersionStore | null;
 }
 
 export function startSharing(store: Store, backend: CollabBackend, opts: SharingOptions) {
@@ -72,6 +75,14 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   let readyFired = false;
   let applying = false;
   let stopped = false;
+  /**
+   * Boards seen here as this person's own (in no share; not a new empty board no card opens yet).
+   * A board card put on a shared board never takes one of these into the share (main session
+   * check, 2026-10-06): pasting or moving in a card to one of your boards only opens it, for you.
+   * Noted only once the shares this device had are open, so their boards aren't taken for own.
+   */
+  const own = new Set<string>();
+  let noting = false;
 
   const busy = () => {
     const ui = store.getState().ui;
@@ -92,10 +103,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const out = new Map<string, string[]>();
     const taken = new Set<string>();
     for (const s of shares.values()) {
-      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, taken, s.cameWith) : [];
+      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, taken, s.cameWith, own) : [];
       ids.forEach((id) => taken.add(id));
       out.set(s.id, ids);
     }
+    if (noting) for (const id of Object.keys(ws.boards)) if (id !== ws.home && !taken.has(id) && !isLeftoverBoard(ws, id)) own.add(id);
     groupCache = { ws, key, groups: out };
     return out;
   }
@@ -332,6 +344,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const ws = store.workspace();
     const ids = idsOf(s);
     const name = (s.root && ws.boards[s.root]?.name.trim()) || 'A shared board';
+    // Like deleting any board (main session check, 2026-10-06): every board as it is now is saved as
+    // a version first, so Version history can bring these back. Not waited for (the boards are read
+    // at once); the owner's delete on this page has saved one already (deleteBoardSafely).
+    const versions = opts.versions?.();
+    if (versions && !s.deleting && ids.length) void saveSafetyVersion(store, versions, Date.now);
     close(s);
     try {
       opts.storage?.setItem(baseKey(s.id), '');
@@ -418,6 +435,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   // The shares this device had, straight away: their boards are known as shared before the server
   // answers (or if it can't), so the person's own boards never take them as theirs.
   for (const r of readRemembered()) open(r.id, undefined, r.owner, r.ownerUid);
+  noting = true;
+  groupCache = null;
+  groups();
 
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {

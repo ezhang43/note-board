@@ -1,7 +1,7 @@
 import { appStore } from '../store/appStore';
 import { startSharing, type Sharing } from '../store/sharing';
 import { startSync, type SaveState } from '../store/sync';
-import { startVersions } from '../store/versions';
+import { activeVersionStore, startVersions } from '../store/versions';
 import { collab, joinFromAddress } from './collabSession';
 import { boardRemote, collabRemote, signInWithGoogle, signOutUser, versionsRemote, watchUser } from './firebase';
 import { flushWhenHidden } from './pageHide';
@@ -52,12 +52,16 @@ watchUser((user) => {
   // without them, so it must be known which boards are shared before those are.
   const backend = collabRemote(user);
   let started = false;
+  let sharesKnown = false;
   const startOwnBoards = () => {
     if (started || sharing !== active) return;
     started = true;
     sync = startSync(appStore, boardRemote(user.uid), {
       client,
       isShared: (id) => active.isShared(id),
+      // Started by the timer below before the shared boards are known: boards it can't tell apart
+      // are left alone until they are (main session check, 2026-10-06).
+      sharesKnown,
       onReady: () => {
         // Version history starts once the online board is in, so its arrival isn't taken for an edit.
         versions = startVersions(appStore, versionsRemote(user.uid));
@@ -74,7 +78,12 @@ watchUser((user) => {
   const active = startSharing(appStore, backend, {
     client,
     storage: localStorage,
-    onReady: startOwnBoards,
+    onReady: () => {
+      sharesKnown = true;
+      if (started) sync?.sharesKnown();
+      else startOwnBoards();
+    },
+    versions: activeVersionStore,
     onSaveState: (state) => {
       shareSaveState = state;
       listeners.forEach((l) => l());

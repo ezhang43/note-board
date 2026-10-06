@@ -8,6 +8,7 @@ import { memoryServer, type Person } from './collab';
 import { startSharing } from './sharing';
 import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
 import { createStore, type Store } from './store';
+import { localVersionStore, type VersionStore } from './versions';
 
 // Sharing a board and editing it together (owner request, 2026-10-05), with a pretend server.
 
@@ -30,10 +31,10 @@ async function settle() {
   for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(1000);
 }
 
-function device(uid: string, storage = memoryStorage()) {
+function device(uid: string, storage = memoryStorage(), versions: VersionStore | null = null) {
   const store = createStore(storage, (fn) => fn());
   const notices: string[] = [];
-  const sharing = startSharing(store, server.backendFor(person(uid)), { client: `${uid}-page-${Math.random()}`, storage, onNotice: (t) => notices.push(t) });
+  const sharing = startSharing(store, server.backendFor(person(uid)), { client: `${uid}-page-${Math.random()}`, storage, onNotice: (t) => notices.push(t), versions: () => versions });
   return { store, sharing, storage, notices };
 }
 
@@ -522,5 +523,108 @@ describe('security review fix: a deleted share’s id used again (2026-10-06)', 
     expect(again.sharing.shareOf(trip)).toBeNull();
     expect(shareInfo(again.store)).toEqual([]);
     expect(server.shares.get(shareId)!.rev).toBe(1);
+  });
+});
+
+describe('main session check fixes (2026-10-06)', () => {
+  /** Bob makes a sub-board "Diary" on his home board, with a note "secret" in it. */
+  function bobDiary(bob: ReturnType<typeof device>) {
+    const home = bob.store.workspace().home;
+    bob.store.openBoard(home);
+    const diary = bob.store.addBoardCard();
+    bob.store.openBoard(diary);
+    bob.store.renameBoard('Diary');
+    bob.store.addCard('note');
+    bob.store.setNoteText(notes(bob.store, diary)[0].id, 'secret');
+    bob.store.openBoard(home);
+    const cardId = Object.values(bob.store.workspace().boards[home].cards).find((c) => c.kind === 'board' && c.boardId === diary)!.id;
+    return { diary, cardId, before: bob.store.workspace().boards[diary] };
+  }
+
+  it('a card to one of your own boards, pasted into a shared board, keeps that board yours: it isn’t sent, nor deleted on removal', async () => {
+    const { alice, bob, trip, shareId } = await together();
+    const { diary, cardId, before } = bobDiary(bob);
+    await settle();
+    bob.store.select(cardId);
+    expect(bob.store.copySelection()).toBe(true);
+    bob.store.openBoard(trip);
+    expect(bob.store.paste()).toBe(true);
+    await settle();
+    expect(bob.sharing.isShared(diary)).toBe(false);
+    expect(server.shares.get(shareId)!.data).not.toContain('secret');
+    expect(alice.store.workspace().boards[diary]).toBeUndefined();
+    // The card itself is on the shared board (it only opens the board for Bob).
+    expect(Object.values(alice.store.workspace().boards[trip].cards).some((c) => c.kind === 'board' && c.boardId === diary)).toBe(true);
+    await alice.sharing.removePerson(shareId, 'bob');
+    await settle();
+    expect(bob.store.workspace().boards[diary]).toEqual(before);
+  });
+
+  it('a sub-board made inside a shared board, before a reload, is still shared after it', async () => {
+    const { bob, trip, shareId } = await together();
+    bob.store.openBoard(trip);
+    server.control.offline = true;
+    const added = bob.store.addBoardCard();
+    await settle();
+    bob.sharing.stop();
+    bob.store.flush();
+    const again = device('bob', bob.storage);
+    expect(again.sharing.isShared(added)).toBe(true);
+    server.control.offline = false;
+    await settle();
+    expect(again.sharing.shareOf(added)).toBe(shareId);
+    expect(server.shares.get(shareId)!.data).toContain(added);
+  });
+
+  /** Alice shares Trip; Bob (keeping versions) joins it. */
+  async function togetherWithVersions(versions: VersionStore) {
+    const shared = await aliceShares();
+    const bob = device('bob', memoryStorage(), versions);
+    await settle();
+    const joined = bob.sharing.join(shared.shareId, server.shares.get(shared.shareId)!.link!);
+    await settle();
+    await joined;
+    return { ...shared, bob };
+  }
+
+  const newestHasTrip = async (versions: VersionStore) => {
+    const [newest] = await versions.list();
+    return Boolean(newest && (await versions.get(newest.id))?.includes('"Trip"'));
+  };
+
+  for (const why of ['removed', 'left', 'deleted'] as const) {
+    it(`a shared board that goes from this device (${why}) is saved as a version first`, async () => {
+      const versions = localVersionStore(memoryStorage());
+      const { alice, bob, trip, shareId } = await togetherWithVersions(versions);
+      if (why === 'removed') await alice.sharing.removePerson(shareId, 'bob');
+      if (why === 'left') await bob.sharing.leave(shareId);
+      if (why === 'deleted') await alice.sharing.deleteShare(shareId);
+      await settle();
+      expect(bob.store.workspace().boards[trip]).toBeUndefined();
+      expect(await newestHasTrip(versions)).toBe(true);
+    });
+  }
+
+  it('the owner’s other device, where the share is deleted, saves a version first too', async () => {
+    const versions = localVersionStore(memoryStorage());
+    const { alice, trip, shareId } = await aliceShares();
+    alice.store.flush();
+    const laptop = memoryStorage();
+    alice.storage.data.forEach((v, k) => laptop.setItem(k, v));
+    const other = device('alice', laptop, versions);
+    await settle();
+    expect(other.sharing.shareOf(trip)).toBe(shareId);
+    await alice.sharing.deleteShare(shareId);
+    await settle();
+    expect(other.store.workspace().boards[trip]).toBeUndefined();
+    expect(await newestHasTrip(versions)).toBe(true);
+  });
+
+  it('a version that can’t be saved doesn’t hold the boards’ going', async () => {
+    const hanging: VersionStore = { list: () => new Promise(() => {}), get: async () => null, save: () => new Promise(() => {}), remove: async () => {} };
+    const { alice, bob, trip, shareId } = await togetherWithVersions(hanging);
+    await alice.sharing.removePerson(shareId, 'bob');
+    await settle();
+    expect(bob.store.workspace().boards[trip]).toBeUndefined();
   });
 });

@@ -29,11 +29,13 @@ export function boardsToShare(ws: Workspace, root: string, taken: Set<string>): 
  *   the boards inside those.
  * A board card that came with the share's data (on any of its boards, or in an earlier version:
  * `cameWith`, see boardCardKeys) never takes in a board outside it, even once moved, so whatever is
- * saved online can't make one of this person's own boards part of a share. With its starting
- * board gone from here, it still holds its other boards. Never the home board, nor a board in
- * `taken` (held by another share).
+ * saved online can't make one of this person's own boards part of a share. Nor does a card added
+ * here to a board in `own` (already one of this person's own boards when the card was added: a card
+ * pasted or moved in from elsewhere just opens it, for them only; main session check, 2026-10-06).
+ * With its starting board gone from here, it still holds its other boards. Never the home board,
+ * nor a board in `taken` (held by another share).
  */
-export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string, Board>, taken: Set<string>, cameWith = new Set<string>()): string[] {
+export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string, Board>, taken: Set<string>, cameWith = new Set<string>(), own = new Set<string>()): string[] {
   const ok = (id: string) => Boolean(ws.boards[id]) && id !== ws.home && !taken.has(id);
   if (!agreed[root] || root === ws.home || taken.has(root)) return [];
   const came = new Set([...cameWith, ...boardCardKeys(agreed)]);
@@ -45,10 +47,15 @@ export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string
     out.push(id);
     for (const card of Object.values(ws.boards[id].cards)) {
       // A card that came with the data: only boards in the data count (they are queued already).
-      if (card.kind === 'board' && !came.has(cardKey(card.id, card.boardId))) queue.push(card.boardId);
+      if (card.kind === 'board' && !came.has(cardKey(card.id, card.boardId)) && !own.has(card.boardId)) queue.push(card.boardId);
     }
   }
   return out;
+}
+
+/** Whether a version of the open board may be restored here: on a shared board, only by the person who shared it. */
+export function canRestoreBoard(shares: { boards: string[]; owner: boolean }[], boardId: string): boolean {
+  return !shares.some((s) => s.boards.includes(boardId) && !s.owner);
 }
 
 const cardKey = (cardId: string, boardId: string) => `${cardId}>${boardId}`;

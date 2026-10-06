@@ -1,5 +1,14 @@
 # Changelog
 
+## Sharing, checked again (2026-10-06)
+
+- Pasting or moving a card for one of your own boards onto a shared board no longer shares that board: the card just opens it, for you only. A sub-board made on a shared board is still shared, as before.
+- When a shared board goes from your screen (you leave, you are removed, or it is deleted), all your boards are saved in Version history first, so it can be brought back from there.
+- A change you make while a drag is going on is no longer lost when another device saved at the same moment, and "Saving…" no longer gets stuck or flickers.
+- On a device that doesn't know yet which boards are shared, those boards are left alone until it does (they used to vanish, or be copied into your own boards).
+- Leaving a shared board now works fully or not at all; if it fails, the panel says so and nothing changes.
+- The Share panel button reads "Turn link on".
+
 ## Sharing made safe (2026-10-06)
 
 - A share link can no longer touch your own boards: whatever someone saves in a board they share with you, it can't take in, overwrite or delete any of your other boards. A link that tries to is refused.
@@ -17,6 +26,7 @@
 ## Editing together, step 1: combining edits (2026-10-05)
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
+
 ## Crew: one coordinator at a time (2026-10-06)
 
 - No change to the app. The crew log now names its one coordinator, and a new coordinator checks that the old one's helpers have really stopped (asking the old session, looking at the job's folder, or asking you) before restarting their jobs, so two helpers never end up editing the same folder.

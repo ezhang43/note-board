@@ -383,3 +383,98 @@ describe('code review fixes: shared boards and a drag (2026-10-06)', () => {
     expect(fake.writes.slice(sent).every((w) => w.data.includes('From phone'))).toBe(true);
   });
 });
+
+describe('main session check fixes (2026-10-06)', () => {
+  it('a change made mid-drag while a newer version waits is kept and uploaded, and the note settles', async () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    // A change that lands while the drag goes on (as a resize or an item drag can make).
+    store.renameBoard('Changed mid-drag');
+    expect(store.getState().ui.drag).not.toBeNull();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    store.cancelDrag();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(store.getState().board.name).toBe('Changed mid-drag');
+    expect(JSON.parse(fake.writes.at(-1)!.data).boards.home.name).toBe('Changed mid-drag');
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+  });
+
+  it('a new list of people on a shared board isn’t a change to upload', () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    const share = { id: 's1', root: 'x', boards: ['x'], owner: true, ownerUid: 'me', people: [], link: 'k' };
+    store.setShares([share]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const writes = fake.writes.length;
+    onSaveState.mockClear();
+    store.setShares([{ ...share, people: [{ uid: 'bob', name: 'Bob', photo: null }] }]);
+    store.setShares([{ ...share, link: null }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(onSaveState).not.toHaveBeenCalledWith('saving');
+    expect(fake.writes.length).toBe(writes);
+  });
+
+  describe('before the shared boards are known', () => {
+    function unknownSetup() {
+      const store = createStore(null, (fn) => fn());
+      const home = store.getState().boards.home;
+      const fake = fakeRemote();
+      const shared = new Set<string>();
+      const local = store.newBoard();
+      store.renameBoard('Maybe shared');
+      store.openBoard(home);
+      const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id), sharesKnown: false });
+      return { store, home, fake, shared, local, sync };
+    }
+    const sentIds = (fake: ReturnType<typeof fakeRemote>) => Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards);
+
+    it('a board here that isn’t in the online copy is neither dropped nor uploaded as the person’s own', () => {
+      const { store, home, fake, local } = unknownSetup();
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home online' } } }), client: 'phone' });
+      expect(store.boardName(local)).toBe('Maybe shared');
+      store.renameBoard('Home edited');
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(fake)).toEqual([home]);
+    });
+
+    it('with no online copy yet, it isn’t uploaded either', () => {
+      const { fake, home } = unknownSetup();
+      fake.send(null);
+      expect(sentIds(fake)).toEqual([home]);
+    });
+
+    it('once known: uploaded if it is the person’s own, kept apart if shared', () => {
+      const a = unknownSetup();
+      a.fake.send(null);
+      a.sync.sharesKnown();
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(a.fake)).toContain(a.local);
+
+      const b = unknownSetup();
+      b.fake.send(null);
+      b.shared.add(b.local);
+      b.sync.sharesKnown();
+      b.store.renameBoard('Home edited');
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(b.fake)).toEqual([b.home]);
+      expect(b.store.boardName(b.local)).toBe('Maybe shared');
+    });
+
+    it('a board in the online copy that another device deleted still goes from here', () => {
+      const { store, home, fake } = unknownSetup();
+      const diary = { ...createBoard(), name: 'Diary' };
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard(), d1: diary } }), client: 'phone' });
+      expect(store.boardName('d1')).toBe('Diary');
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard() } }), client: 'phone' });
+      expect(store.workspace().boards.d1).toBeUndefined();
+    });
+  });
+});

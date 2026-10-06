@@ -196,9 +196,13 @@ export function collabRemote(user: User): CollabBackend {
       await batch.commit();
     },
     async leave(id) {
-      await deleteDoc(mineRef(id));
-      // Already gone when the board was deleted or the person removed.
-      await deleteDoc(memberRef(id, me.uid)).catch(() => {});
+      // One batch (main session check, 2026-10-06): off the board and off their list together, or
+      // neither, so leaving never half works. The rules let a person delete their own member record
+      // even once the board is deleted or they were removed (deleting a missing record is fine).
+      const batch = writeBatch(db);
+      batch.delete(memberRef(id, me.uid));
+      batch.delete(mineRef(id));
+      await batch.commit();
     },
     removePerson(id, uid, newKey) {
       // One transaction: removed and the link changed together, or neither; whether the link is on

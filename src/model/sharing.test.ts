@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard } from './cards';
-import { boardsToShare, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
+import { boardsToShare, canRestoreBoard, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
 import type { Board } from './types';
 import type { Workspace } from './workspace';
 
@@ -141,5 +141,35 @@ describe('which boards a shared board holds: code review fixes (2026-10-06)', ()
     const { trip: _gone, ...rest } = ws.boards;
     const here = { ...ws, boards: rest };
     expect(groupBoardIds(here, 'trip', { trip: ws.boards.trip, days: ws.boards.days }, new Set())).toEqual(['days']);
+  });
+});
+
+describe('which boards a shared board holds: a card to one of your own boards (2026-10-06)', () => {
+  it('a board card added here to a board that was already one of this person’s own doesn’t take it in', () => {
+    const ws = sample();
+    // trip opens days; days was one of this person’s own boards before the card was added.
+    const before = { trip: B.createBoard() };
+    expect(groupBoardIds(ws, 'trip', before, new Set(), new Set(), new Set(['days']))).toEqual(['trip']);
+  });
+
+  it('a board new here (a sub-board made on the shared board) is still taken in', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'trip', { trip: B.createBoard() }, new Set(), new Set(), new Set(['work'])).sort()).toEqual(['days', 'hotel', 'trip']);
+  });
+
+  it('a board in the share’s own data stays in it, whatever this person had', () => {
+    const ws = sample();
+    expect(groupBoardIds(ws, 'trip', { trip: ws.boards.trip, days: ws.boards.days }, new Set(), new Set(), new Set(['days'])).sort()).toEqual(['days', 'trip']);
+  });
+});
+
+describe('who can restore a version of the open board', () => {
+  const share = (owner: boolean) => ({ id: 's1', root: 'trip', boards: ['trip', 'days'], owner, ownerUid: 'a', people: [], link: null });
+
+  it('only the person who shared it, on a shared board; anyone on their own boards', () => {
+    expect(canRestoreBoard([share(false)], 'days')).toBe(false);
+    expect(canRestoreBoard([share(true)], 'days')).toBe(true);
+    expect(canRestoreBoard([share(false)], 'home')).toBe(true);
+    expect(canRestoreBoard([], 'trip')).toBe(true);
   });
 });

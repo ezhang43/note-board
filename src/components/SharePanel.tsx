@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { canRestoreBoard } from '../model/sharing';
 import type { Person } from '../store/collab';
 import { appStore, useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
@@ -142,7 +143,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
           )}
           {share.owner && (
             <button type="button" className="tb-button quiet share-link-toggle" disabled={busy} onClick={() => run(() => sharing.setLinkOn(share.id, !link))}>
-              {link ? 'Turn link off' : 'Turn link on (a new link)'}
+              {link ? 'Turn link off' : 'Turn link on'}
             </button>
           )}
 
@@ -224,5 +225,5 @@ export function NoticeBanner() {
 /** Whether the open board's share lets this person restore old versions of it (only who shared it). */
 export function canRestoreOpenBoard(): boolean {
   const { boards, ui } = appStore.getState();
-  return !ui.shares.some((s) => s.boards.includes(boards.open) && !s.owner);
+  return canRestoreBoard(ui.shares, boards.open);
 }

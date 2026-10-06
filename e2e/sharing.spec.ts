@@ -244,3 +244,80 @@ test('a share link whose board is one of your own doesn’t open, and leaves it 
   await expect(boardName(bob)).toHaveValue('Diary');
   await expect(noteTexts(bob)).toHaveValue('secret');
 });
+
+// Main session check fixes (2026-10-06).
+const boardsMenu = (page: Page) => page.getByRole('menu', { name: 'Boards' });
+const historyPanel = (page: Page) => page.getByRole('complementary', { name: 'Version history' });
+const previewBar = (page: Page) => page.getByRole('region', { name: 'Looking at an earlier version' });
+
+test('someone a board is shared with can look at its old versions but not restore them', async ({ browser }) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  await add(bob, 'Note');
+  await bob.keyboard.type('Bob’s note');
+  await bob.keyboard.press('Escape');
+  await bob.getByRole('button', { name: 'Version history', exact: true }).click();
+  await historyPanel(bob).getByRole('button', { name: /card|Empty board/ }).first().click();
+  await expect(previewBar(bob)).toContainText('Only the person who shared this board can restore it.');
+  await expect(previewBar(bob).getByRole('button', { name: 'Restore this version' })).toHaveCount(0);
+});
+
+test('a card to one of your own boards, pasted onto a shared board, doesn’t share that board', async ({ browser }) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  // Bob makes "Diary" inside his home board.
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(bob).getByRole('menuitem').first().click();
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(bob).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
+  const diaryCard = bob.locator('[data-card-id][data-kind="board"]').first();
+  await diaryCard.getByRole('button', { name: 'Open board' }).click();
+  await boardName(bob).fill('Diary');
+  await add(bob, 'Note');
+  await bob.keyboard.type('secret');
+  await bob.keyboard.press('Escape');
+  await bob.getByRole('button', { name: /^Back to/ }).click();
+  // He copies its card onto the shared board.
+  await diaryCard.click({ position: { x: 12, y: 12 } });
+  await bob.keyboard.press('Control+c');
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(bob).getByRole('menuitem', { name: /Trip/ }).click();
+  await expect(boardName(bob)).toHaveValue('Trip');
+  await bob.keyboard.press('Control+v');
+  await expect(bob.locator('[data-card-id][data-kind="board"]')).toHaveCount(1);
+  // Alice gets the card, but not the board.
+  await expect(alice.locator('[data-card-id][data-kind="board"]')).toHaveCount(1, { timeout: 8000 });
+  await alice.waitForTimeout(1500);
+  expect(await alice.evaluate(() => Object.values(localStorage).some((v) => v.includes('secret')))).toBe(false);
+  await alice.getByRole('button', { name: 'Boards', exact: true }).click();
+  await expect(boardsMenu(alice).getByRole('menuitem', { name: 'Diary' })).toHaveCount(0);
+});
+
+test('a shared board you leave can be brought back from Version history', async ({ browser }) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  await openShare(bob);
+  bob.once('dialog', (d) => d.accept());
+  await sharePanel(bob).getByRole('button', { name: 'Leave this board' }).click();
+  await expect(boardName(bob)).not.toHaveValue('Trip');
+  await bob.keyboard.press('Escape');
+  await bob.getByRole('button', { name: 'Version history', exact: true }).click();
+  await historyPanel(bob).getByRole('button', { name: /card|Empty board/ }).first().click();
+  await previewBar(bob).getByRole('button', { name: 'Restore this version' }).click();
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await expect(boardsMenu(bob).getByRole('menuitem', { name: /Trip/ })).toBeVisible();
+});
+
+test('the link can be turned off and on again', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  await aliceSharesTrip(alice);
+  await sharePanel(alice).getByRole('button', { name: 'Turn link off' }).click();
+  await sharePanel(alice).getByRole('button', { name: 'Turn link on', exact: true }).click();
+  await expect(sharePanel(alice).getByLabel('Share link')).toHaveValue(/\?join=/);
+});

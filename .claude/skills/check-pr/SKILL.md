@@ -2,7 +2,6 @@
 name: check-pr
 description: Check another session's pull request into build/v1 for the owner (CLAUDE.md rule 9) - combine it with the latest build/v1, run all tests, review it, and report in plain words whether it is safe to merge. Never merges.
 argument-hint: <pull request number>
-disable-model-invocation: true
 ---
 
 # Check pull request #$ARGUMENTS

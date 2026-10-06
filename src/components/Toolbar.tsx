@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
+import { boardRights } from '../model/sharing';
 import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
-import { ShareButton, useSharedWithMe } from './SharePanel';
+import { ShareButton } from './SharePanel';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
@@ -357,15 +358,15 @@ function Logo() {
 function BoardName() {
   const name = useAppState((s) => s.board.name);
   // A board someone shared is renamed only by them (owner request: editing together).
-  const sharedWithMe = useSharedWithMe();
+  const canRename = useAppState((s) => boardRights(s.ui.shares, s.boards.open, s.boards.home).rename);
   return (
     <AutoSizeInput
       className="board-name"
       aria-label="Board name"
       placeholder="Untitled board"
       value={name}
-      readOnly={sharedWithMe}
-      title={sharedWithMe ? 'Only the person who shared this board can rename it' : undefined}
+      readOnly={!canRename}
+      title={!canRename ? 'Only the person who shared this board can rename it' : undefined}
       onChange={appStore.renameBoard}
     />
   );

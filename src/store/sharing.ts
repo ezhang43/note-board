@@ -421,7 +421,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const boards = safeBoards(s, got.boards, doc.root);
       // A version without its starting board: one it had before stays as it was (anyone it is
       // shared with can save anything in it); one never opened here can't be used.
-      if (!boards[doc.root] || (s.root && doc.root !== s.root)) return s.base ? undefined : refuse(s);
+      if (!boards[doc.root] || (s.root && doc.root !== s.root)) {
+        if (!s.base) refuse(s);
+        return;
+      }
       const next = s.base && !missing ? mergeBoardSets(s.base, now, boards) : boards;
       s.root = doc.root;
       agree(s, boards, doc.rev);
@@ -444,9 +447,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const name = (s.root && ws.boards[s.root]?.name.trim()) || 'A shared board';
     // Like deleting any board (main session check, 2026-10-06): every board as it is now is saved as
     // a version first, so Version history can bring these back. Not waited for (the boards are read
-    // at once); the owner's delete on this page has saved one already (deleteBoardSafely).
+    // at once). After the owner's delete on this page (deleteBoardSafely saved one first), this one
+    // matches the newest version, so none is added.
     const versions = opts.versions?.();
-    if (versions && !s.deleting && ids.length) void saveSafetyVersion(store, versions, Date.now);
+    if (versions && ids.length) void saveSafetyVersion(store, versions, Date.now);
     close(s);
     try {
       opts.storage?.setItem(baseKey(s.id), '');

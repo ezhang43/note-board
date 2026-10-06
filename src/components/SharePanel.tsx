@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { canRestoreBoard } from '../model/sharing';
+import { shownName } from '../model/board';
 import type { Person } from '../store/collab';
-import { appStore, useAppState } from '../store/appStore';
+import { useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
 import { collab, useNotice, useSharing } from '../sync/collabSession';
 import { CloseIcon, ShareIcon } from './icons';
@@ -11,8 +11,6 @@ import { CloseIcon, ShareIcon } from './icons';
 // has it and, for the person who shared it, turn the link off and remove people. Everyone else can
 // leave the board. Shown only where boards can be shared (signed in, or a demo person locally).
 
-const shownName = (name: string) => name.trim() || 'Untitled board';
-
 /** The page address a share link starts from. */
 const pageAddress = () => new URL(import.meta.env.BASE_URL, location.origin).href;
 
@@ -20,12 +18,6 @@ const pageAddress = () => new URL(import.meta.env.BASE_URL, location.origin).hre
 function useOpenShare() {
   const open = useAppState((s) => s.boards.open);
   return useAppState((s) => s.ui.shares.find((share) => share.boards.includes(open)) ?? null);
-}
-
-/** Whether the open board is a shared board this person didn't share (then it can't be renamed). */
-export function useSharedWithMe(): boolean {
-  const open = useAppState((s) => s.boards.open);
-  return useAppState((s) => s.ui.shares.some((share) => share.root === open && !share.owner));
 }
 
 /** The Share button and its panel. `phone`: shown as a full-width sheet (from the ⋯ menu). */
@@ -222,10 +214,4 @@ export function NoticeBanner() {
       </button>
     </p>
   );
-}
-
-/** Whether the open board's share lets this person restore old versions of it (only who shared it). */
-export function canRestoreOpenBoard(): boolean {
-  const { boards, ui } = appStore.getState();
-  return canRestoreBoard(ui.shares, boards.open);
 }

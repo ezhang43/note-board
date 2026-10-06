@@ -11,6 +11,9 @@ export function createBoard(): Board {
   return { name: DEFAULT_BOARD_NAME, snap: true, cards: {}, columns: {}, order: [] };
 }
 
+/** A board's name as shown: "Untitled board" while it has none. */
+export const shownName = (name: string) => name.trim() || 'Untitled board';
+
 export function renameBoard(board: Board, name: string): Board {
   return name === board.name ? board : { ...board, name };
 }

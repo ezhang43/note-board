@@ -2,9 +2,33 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { saveToken } from './auth';
-import { runCheck } from './main';
+import { deleteToken, saveToken } from './auth';
+import { boardsLoader, runCheck } from './main';
 import { ownRaw } from './sample';
+
+describe('the connector’s sign-in', () => {
+  it('after npm run mcp:logout, reading stops straight away (no restart needed)', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me' });
+    const load = boardsLoader(file, fakeGoogle(ownRaw()));
+    expect((await load()).snapshot.own).toBe(ownRaw());
+    await deleteToken(file);
+    await expect(load()).rejects.toThrow(/Not signed in/);
+  });
+
+  it('a new sign-in is used without a restart, and the id token is kept between calls', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me' });
+    const calls: string[] = [];
+    const load = boardsLoader(file, fakeGoogle(ownRaw(), calls));
+    await load();
+    await load();
+    expect(calls.filter((c) => c.includes('securetoken'))).toHaveLength(1);
+    await saveToken(file, { refreshToken: 'R2', uid: 'me' });
+    await load();
+    expect(calls.filter((c) => c.includes('securetoken'))).toHaveLength(2);
+  });
+});
 
 async function tempFile() {
   return join(await mkdtemp(join(tmpdir(), 'busyants-')), 'token.json');

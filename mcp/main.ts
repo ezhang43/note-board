@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { WEB_API_KEY, deleteToken, idTokens, loadToken, saveToken, tokenPath } from './auth';
+import { WEB_API_KEY, deleteToken, idTokens, loadToken, saveToken, tokenPath, type TokenFile } from './auth';
 import { collectBoards, safeToEdit, type Snapshot } from './boards';
 import { firestoreReader, readSnapshot } from './firestore';
 import { API_KEY_SHAPE, startLogin } from './login/login';
@@ -11,15 +11,28 @@ import { createServer } from './server';
 
 const NOT_SIGNED_IN = 'Not signed in. Run npm run mcp:login first.';
 
-/** Reads everything for the signed-in owner, signing in from the saved token the first time. */
-function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
-  let session: { uid: string; email?: string; read: () => Promise<Snapshot> } | null = null;
+/**
+ * Reads everything for the signed-in owner. The saved sign-in is read on every call, so a logout
+ * stops reading at once and a new sign-in is used without restarting; the id token is kept while
+ * the sign-in stays the same.
+ */
+export function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
+  let session: { refreshToken: string; uid: string; email?: string; read: () => Promise<Snapshot> } | null = null;
   return async () => {
-    if (!session) {
-      const token = await loadToken(tokenFile);
-      if (!token) throw new Error(NOT_SIGNED_IN);
-      const db = firestoreReader(idTokens(token, { fetch: fetchFn, save: (t) => saveToken(tokenFile, t) }), fetchFn);
-      session = { uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid) };
+    const token = await loadToken(tokenFile);
+    if (!token) {
+      session = null;
+      throw new Error(NOT_SIGNED_IN);
+    }
+    if (!session || session.refreshToken !== token.refreshToken || session.uid !== token.uid) {
+      const s = { refreshToken: token.refreshToken, uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid) };
+      const save = async (t: TokenFile) => {
+        // Google gave a new refresh token: this session goes on with it.
+        s.refreshToken = t.refreshToken;
+        await saveToken(tokenFile, t);
+      };
+      const db = firestoreReader(idTokens(token, { fetch: fetchFn, save }), fetchFn);
+      session = s;
     }
     const s = session;
     try {

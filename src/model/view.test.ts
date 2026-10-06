@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_ZOOM, MIN_ZOOM } from './constants';
-import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo } from './view';
+import { MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED } from './constants';
+import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelPan, wheelPixels, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo } from './view';
+
+describe('wheel scrolling', () => {
+  it('pans at half the scroll distance, the opposite way (owner request: scrolling was too fast)', () => {
+    expect(WHEEL_PAN_SPEED).toBe(0.5);
+    expect(wheelPan({ deltaX: 120, deltaY: 80, deltaMode: 0 }, 600)).toEqual({ x: -60, y: -40 });
+  });
+
+  it('turns mouse-wheel lines and pages into pixels', () => {
+    expect(wheelPixels({ deltaX: 0, deltaY: 3, deltaMode: 1 }, 600)).toEqual({ dx: 0, dy: 48 });
+    expect(wheelPixels({ deltaX: 1, deltaY: -1, deltaMode: 2 }, 600)).toEqual({ dx: 600, dy: -600 });
+    expect(wheelPan({ deltaX: 0, deltaY: 3, deltaMode: 1 }, 600)).toEqual({ x: -0, y: -24 });
+  });
+});
 
 describe('pan', () => {
   it('moves the board by the drag distance', () => {

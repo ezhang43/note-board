@@ -143,15 +143,15 @@ test('Ctrl + scroll zooms around the cursor', async ({ page }) => {
   expect((cursor.y - v.panY) / v.zoom).toBeCloseTo(200, 0);
 });
 
-test('scrolling pans the board with either tool', async ({ page }) => {
+test('scrolling pans the board with either tool, at half the scroll distance', async ({ page }) => {
   const box = await canvasBox(page);
   await page.mouse.move(box.x + 400, box.y + 300);
   await page.mouse.wheel(120, 80);
-  await expect.poll(async () => view(page)).toEqual({ panX: -120, panY: -80, zoom: 1 });
+  await expect.poll(async () => view(page)).toEqual({ panX: -60, panY: -40, zoom: 1 });
 
   await page.keyboard.press('v');
   await page.mouse.wheel(0, -30);
-  await expect.poll(async () => (await view(page)).panY).toBe(-50);
+  await expect.poll(async () => (await view(page)).panY).toBe(-25);
 });
 
 test('Hand tool drags the board; Select tool does not', async ({ page }) => {

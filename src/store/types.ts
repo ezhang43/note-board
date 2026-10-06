@@ -145,7 +145,7 @@ export interface Ui {
    * The side panel beside the board (owner request: focus timer), in the right-hand spot that
    * Version history and Due also use: one of them at a time.
    */
-  sidePanel: 'pomodoro' | null;
+  sidePanel: 'pomodoro' | 'calendar' | null;
   /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
   arrowSel: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */

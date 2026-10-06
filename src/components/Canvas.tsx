@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { FONT_SCALE } from '../model/font';
-import { gridStyle, wheelZoomFactor } from '../model/view';
+import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point, View } from '../model/types';
 import { clientToCanvas, setCanvasElement } from './canvasDom';
@@ -11,12 +11,6 @@ import { Arrows } from './Arrows';
 
 const NO_GUIDES: never[] = [];
 const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New column' } as const;
-
-/** Wheel deltas can be in pixels, lines or pages; turn them into pixels. */
-function wheelPixels(e: WheelEvent, pageHeight: number) {
-  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? pageHeight : 1;
-  return { dx: e.deltaX * unit, dy: e.deltaY * unit };
-}
 
 export function Canvas() {
   const view = useAppState((s) => s.view);
@@ -89,8 +83,8 @@ export function Canvas() {
       }
       if (!overCanvas) return;
       e.preventDefault();
-      const { dx, dy } = wheelPixels(e, el.clientHeight);
-      appStore.panBy(-dx, -dy);
+      const { x, y } = wheelPan(e, el.clientHeight);
+      appStore.panBy(x, y);
     };
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);

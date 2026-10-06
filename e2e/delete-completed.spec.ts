@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, clickEmpty, freshBoardEachTest } from './helpers';
 
-// Delete completed items (owner request, 2026-10-06): Ctrl+Shift+Backspace (⌘+Shift+Backspace on
-// a Mac) asks first, then removes every item in the Completed sections on the open board.
+// Delete completed items (owner request, 2026-10-06): Ctrl+Shift+Backspace (the Control key on a
+// Mac too) asks first, then removes every item in the Completed sections on the open board.
 
 freshBoardEachTest();
 

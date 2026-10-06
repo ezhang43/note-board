@@ -33,6 +33,8 @@ interface Gis {
 let cached: { token: string; expiresAt: number } | null = null;
 let pending: Promise<string> | null = null;
 let script: Promise<Gis> | null = null;
+/** Google's script once loaded, so a click can ask for access straight away (browsers block windows opened after a wait). */
+let loaded: Gis | null = null;
 
 // Signing out (or another person signing in) drops the token.
 let uid: string | null | undefined;
@@ -48,6 +50,7 @@ function loadGis(): Promise<Gis> {
     tag.async = true;
     tag.onload = () => {
       const gis = (window as unknown as { google?: Gis }).google;
+      loaded = gis ?? null;
       if (gis) done(gis);
       else fail(new Error('Google sign-in did not load'));
     };
@@ -60,32 +63,39 @@ function loadGis(): Promise<Gis> {
   return script;
 }
 
+/** Loads Google's script before it is needed (when the calendar button shows). */
+export function prepare() {
+  if (CLIENT_ID) loadGis().catch(() => {});
+}
+
+/** Asks Google for a token, opening its window at once (in the same click when called from one). */
+function request(gis: Gis): Promise<string> {
+  return new Promise<string>((done, fail) => {
+    const client = gis.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPE,
+      login_hint: getAuth().currentUser?.email ?? undefined,
+      callback(r) {
+        // The person may untick calendar access on Google's screen.
+        if (r.error || !r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new Error(r.error ?? 'Calendar access not given'));
+        cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000 };
+        done(r.access_token);
+      },
+      // The window was blocked or closed.
+      error_callback: (e) => fail(new Error(e.type ?? 'Google sign-in window failed')),
+    });
+    // Empty prompt: Google asks only the first time; after that a new token comes without asking.
+    client.requestAccessToken({ prompt: '' });
+  });
+}
+
 /** A token for the person's calendar: the one in memory while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
   if (cached && cached.expiresAt > Date.now() + 60_000) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
-  pending ??= loadGis()
-    .then(
-      (gis) =>
-        new Promise<string>((done, fail) => {
-          const client = gis.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPE,
-            login_hint: getAuth().currentUser?.email ?? undefined,
-            callback(r) {
-              // The person may untick calendar access on Google's screen.
-              if (r.error || !r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new Error(r.error ?? 'Calendar access not given'));
-              cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000 };
-              done(r.access_token);
-            },
-            // The window was blocked or closed.
-            error_callback: (e) => fail(new Error(e.type ?? 'Google sign-in window failed')),
-          });
-          // Empty prompt: Google asks only the first time; after that a new token comes without asking.
-          client.requestAccessToken({ prompt: '' });
-        }),
-    )
-    .finally(() => (pending = null));
+  // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
+  // wait and may be blocked; the panel then says so and Try again works.
+  pending ??= (loaded ? request(loaded) : loadGis().then(request)).finally(() => (pending = null));
   return pending;
 }
 

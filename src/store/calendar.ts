@@ -16,6 +16,8 @@ export interface CalendarSource {
   token(): Promise<string>;
   /** The token was refused: get a new one next time. */
   forget(): void;
+  /** Gets ready before the panel opens, so the click can ask for access with no wait. */
+  prepare?(): void;
 }
 
 export interface CalendarApi {
@@ -60,7 +62,11 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       ok(await call(events, { method: 'POST', body: JSON.stringify(body) }));
     },
     async update(id, body) {
-      ok(await call(one(id), { method: 'PATCH', body: JSON.stringify(body) }));
+      // Google merges a changed start / end with the old one: clear the kind not used now, else a
+      // timed event made all-day (or back) would have both a date and a time, which Google refuses.
+      const clear = { date: null, dateTime: null, timeZone: null };
+      const patch = { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } };
+      ok(await call(one(id), { method: 'PATCH', body: JSON.stringify(patch) }));
     },
     async remove(id) {
       const res = await call(one(id), { method: 'DELETE' });
@@ -133,9 +139,11 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       return load();
     },
     pickDay(day: DayKey) {
-      const { from, to } = viewRange(state.view, state.day);
+      const before = viewRange(state.view, state.day);
       set({ day });
-      return day >= from && day < to ? Promise.resolve() : load();
+      // A greyed day from the month before or after shows that month: fetch it.
+      const after = viewRange(state.view, day);
+      return after.from === before.from && after.to === before.to ? Promise.resolve() : load();
     },
     /** Adds (`id` null) or changes a simple event. Resolves to a note to show, or null when it worked. */
     async save(id: string | null, draft: Draft): Promise<string | null> {
@@ -173,8 +181,16 @@ const GOOGLE_API = 'https://www.googleapis.com/calendar/v3';
  */
 function defaultSource(): CalendarSource | null {
   if (import.meta.env.VITE_SYNC === 'on') {
-    const google = () => import('../calendar/google');
-    return { base: GOOGLE_API, token: () => google().then((g) => g.token()), forget: () => void google().then((g) => g.forget()) };
+    // Kept once loaded, so a click on the button reaches Google without waiting (a window opened
+    // after a wait may be blocked, Safari especially).
+    let ready: typeof import('../calendar/google') | null = null;
+    const google = () => import('../calendar/google').then((g) => (ready = g));
+    return {
+      base: GOOGLE_API,
+      token: () => (ready ? ready.token() : google().then((g) => g.token())),
+      forget: () => ready?.forget(),
+      prepare: () => void google().then((g) => g.prepare()),
+    };
   }
   const demo = demoUser();
   if (!demo) return null;
@@ -182,7 +198,7 @@ function defaultSource(): CalendarSource | null {
 }
 
 const source = defaultSource();
-export const calendar = createCalendar(source && calendarApi(source));
+export const calendar = Object.assign(createCalendar(source && calendarApi(source)), { prepare: () => source?.prepare?.() });
 
 export function useCalendar(): CalendarState {
   return useSyncExternalStore(calendar.subscribe, calendar.get);

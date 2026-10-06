@@ -83,6 +83,16 @@ describe('the calendar panel', () => {
     expect(api.calls.length).toBe(2);
   });
 
+  it('picking a greyed day from another month in the month view shows that month, fetched', async () => {
+    const api = fakeApi();
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.setView('month');
+    await cal.pickDay('2026-09-28');
+    expect(cal.get().day).toBe('2026-09-28');
+    expect(api.calls[2]).toBe('list 2026-08-31 2026-10-05');
+  });
+
   it('when Google can’t be reached it shows one plain note, and Try again tries again', async () => {
     const api = fakeApi();
     api.fail = true;
@@ -215,6 +225,13 @@ describe('talking to the Calendar API', () => {
       ['PATCH', 'https://api.test/calendar/v3/calendars/primary/events/a%2Fb'],
     ]);
     expect(JSON.parse(String(f.calls[0].init.body))).toEqual(body);
+    // Google merges a changed start / end with the old one, so the kind not used now is cleared
+    // (else a timed event made all-day would have both a date and a time, which Google refuses).
+    expect(JSON.parse(String(f.calls[1].init.body))).toEqual({
+      summary: 'S',
+      start: { date: '2026-10-08', dateTime: null, timeZone: null },
+      end: { date: '2026-10-09', dateTime: null, timeZone: null },
+    });
     const del = fakeFetch(204);
     await calendarApi(source(), del.fn).remove('a');
     expect(del.calls[0].init.method).toBe('DELETE');

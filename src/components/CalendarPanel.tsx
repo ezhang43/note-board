@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   dayKey,
   dayLabel,
@@ -28,6 +28,8 @@ import { CalendarDaysIcon, ExternalIcon, PlusIcon } from './icons';
  */
 export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolean; onOpen?: () => void }) {
   const open = useAppState((s) => s.ui.sidePanel === 'calendar');
+  // Google's sign-in script, loaded ahead so the click can open its window straight away.
+  useEffect(() => calendar.prepare(), []);
   if (!calendar.available) return null;
   return (
     <button

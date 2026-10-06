@@ -112,6 +112,21 @@ test('rename a simple event and move it to another day', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('a timed event can be made all-day, and back', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = day(page, new Date());
+  await today.getByRole('button', { name: '10:00 – 11:00 Dentist' }).click();
+  await form(page).getByLabel('All day').check();
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(today.getByRole('button', { name: 'All day Dentist' })).toBeVisible();
+  await today.getByRole('button', { name: 'All day Dentist' }).click();
+  await form(page).getByLabel('All day').uncheck();
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(today.getByRole('button', { name: '09:00 – 10:00 Dentist' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('delete asks first (Keep / Delete); Escape keeps the panel open; Ctrl+Z doesn’t bring it back', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();

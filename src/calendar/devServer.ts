@@ -88,7 +88,14 @@ export function devCalendarPlugin(): Plugin {
           if (found < 0) return send(id ? 410 : 404, { error: { code: 410, message: 'Resource has been deleted' } });
           if (req.method === 'PATCH') {
             const body = JSON.parse(await readBody(req)) as Partial<Event>;
-            events[found] = { ...events[found], ...(body.summary !== undefined && { summary: body.summary }), ...(body.start && { start: body.start }), ...(body.end && { end: body.end }) };
+            // Like Google: a changed start / end is merged into the old one, null clearing a field;
+            // one with both a date and a time is refused.
+            const merge = (old: When, change?: When): When =>
+              Object.fromEntries(Object.entries({ ...old, ...change }).filter(([, v]) => v !== null && v !== undefined));
+            const start = merge(events[found].start, body.start);
+            const end = merge(events[found].end, body.end);
+            if ((start.date && start.dateTime) || (end.date && end.dateTime)) return send(400, { error: { code: 400, message: 'Invalid start time.' } });
+            events[found] = { ...events[found], ...(body.summary !== undefined && { summary: body.summary }), start, end };
             return send(200, events[found]);
           }
           if (req.method === 'DELETE') {

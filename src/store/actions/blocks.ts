@@ -133,7 +133,7 @@ export function blockActions(ctx: StoreContext) {
     // ---------- version history (owner request) ----------
     toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Show an old version on the board, read-only (the real board is untouched). */
-    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null }),
+    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
     endPreview: () => updateUi({ preview: null }),
     /** Whether `text` is a BusyAnts backup (one board, or every board, that this version can read). */
     isBackup: (text: string) => readWorkspace(text) !== null,
@@ -188,7 +188,7 @@ export function blockActions(ctx: StoreContext) {
     /** Ctrl+A: every column and loose card. */
     selectAll: () => updateUi({ selection: [...ctx.state.board.order], itemSel: null }),
     /** Click on empty board or Escape: clear the selection and close menus. */
-    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, arrowSel: null }),
+    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, deleteCompleted: null, arrowSel: null }),
     toggleColourMenu() {
       if (!ctx.state.ui.selection.length) return;
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });

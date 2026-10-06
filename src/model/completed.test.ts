@@ -3,7 +3,7 @@ import * as B from './board';
 import { createCard, createColumn } from './cards';
 import { editItems } from './checklist';
 import { copyBlocks } from './clipboard';
-import { cleanUp, completedCardOf, dayKey, dayLabel, hasTickedItems, restoreEntry } from './completed';
+import { cleanUp, completedCardOf, completedSectionCount, dayKey, dayLabel, deleteCompletedSections, hasTickedItems, restoreEntry } from './completed';
 import { parseBoard, serializeBoard } from './persist';
 import type { Board, CompletedCard, TodoCard, TodoItem } from './types';
 
@@ -175,5 +175,55 @@ describe('unticking in the Completed card never leaves an open item under a tick
     b = B.updateCard(b, 'g', (c) => ({ ...(c as TodoCard), items: (c as TodoCard).items.map((i) => (i.id === 'fruit' ? { ...i, done: true } : i)) }));
     const r = restoreEntry(b, 'pears', here, makeId);
     expect(outline(items(r.board, 'g'))).toBe('bread fruit(apples pears(seeds))');
+  });
+});
+
+// Delete completed items (owner request, 2026-10-06): Ctrl+Shift+Backspace empties every list's
+// Completed section on the open board.
+describe('Delete completed items', () => {
+  /** board() plus "Done" (loose): +a(b, +c), +d, e(+f). Its Completed section holds a (with b, c) and d. */
+  function withDone(): Board {
+    return B.addCard(board(), list('d', 'Done', [it_('a', true, [it_('b'), it_('c', true)]), it_('d', true), it_('e', false, [it_('f', true)])]), {
+      type: 'loose',
+      x: 0,
+      y: 800,
+    });
+  }
+
+  it('counts every item in the Completed sections, sub-items included', () => {
+    // milk, sweep, a, b, c, d. pears (ticked, under open fruit) and f (under open e) are not in a Completed section.
+    expect(completedSectionCount(withDone())).toBe(6);
+    expect(completedSectionCount(B.createBoard())).toBe(0);
+  });
+
+  it('removes only the Completed sections’ items, with their sub-items, and leaves open items as they are', () => {
+    const b = deleteCompletedSections(withDone(), makeId);
+    expect(outline(items(b, 'g'))).toBe('bread fruit(apples +pears(seeds))');
+    expect(outline(items(b, 'c'))).toBe('dust');
+    expect(outline(items(b, 'd'))).toBe('e(+f)');
+    expect(completedSectionCount(b)).toBe(0);
+    expect(B.problems(b)).toEqual([]);
+  });
+
+  it('gives a list left empty one blank item', () => {
+    let b = B.addCard(B.createBoard(), list('x', 'All done', [it_('p', true), it_('q', true)]), here);
+    b = deleteCompletedSections(b, () => 'blank');
+    expect(items(b, 'x')).toEqual([{ id: 'blank', text: '', done: false, children: [] }]);
+  });
+
+  it('leaves the Completed card, notes and every other card alone', () => {
+    let b = cleanUp(withDone(), '2026-10-02', here, makeId).board;
+    b = C_tick(b, 'd', 'e');
+    b = B.addCard(b, createCard('note', 'n'), here);
+    const after = deleteCompletedSections(b, makeId);
+    expect(completedCardOf(after)).toBe(completedCardOf(b));
+    expect(after.cards.n).toBe(b.cards.n);
+    expect(after.cards.g).toBe(b.cards.g);
+    expect(items(after, 'd').map((i) => i.text)).toEqual(['']);
+  });
+
+  it('returns the same board when nothing is in a Completed section', () => {
+    const b = B.addCard(B.createBoard(), list('x', 'Open', [it_('p', false, [it_('q', true)])]), here);
+    expect(deleteCompletedSections(b, makeId)).toBe(b);
   });
 });

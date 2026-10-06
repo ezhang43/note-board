@@ -14,8 +14,9 @@ export function SidePanel({ title, onClose, children }: { title: string; onClose
       const { dueFor, shortcutsOpen } = appStore.getState().ui;
       if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen) onClose();
     };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
+    // Capture: seen before the page's own shortcuts close the list or picker that Escape was for.
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
   }, [onClose]);
 
   return (

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, fontsLoaded } from './helpers';
+import { add, box, clickEmpty, fontsLoaded } from './helpers';
 
 // Focus timer (Pomodoro), owner request 2026-10-06: a toolbar button opens a side panel with a
 // 25 / 5 / 15 minute timer that keeps running when the panel is closed and across a reload.
@@ -130,8 +130,27 @@ test('it shares the right-hand spot with Version history: one at a time; Escape 
   await page.keyboard.type('Plan');
   await page.keyboard.press('Escape');
   await expect(panel(page)).toBeVisible();
+  // Escape with the shortcuts list open over it closes only the list.
+  await clickEmpty(page);
+  await page.keyboard.press('?');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel(page)).toHaveCount(0);
+});
+
+test('undo leaves the timer alone', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('Plan');
+  await clickEmpty(page);
+  await button(page).click();
+  await panel(page).getByRole('button', { name: 'Start' }).click();
+  await page.keyboard.press('Control+z');
+  await expect(page.getByLabel('Note text')).toHaveValue('');
+  await expect(panel(page).getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(panel(page).getByRole('timer')).toHaveText('25:00');
 });
 
 test('its button sits by the zoom control, right of Version history, and widens to show the time', async ({ page }) => {

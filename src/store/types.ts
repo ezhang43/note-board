@@ -21,6 +21,8 @@ export interface Drag {
   group: string[];
   /** The column a dragged card is over (it will drop into it), if any. */
   overColumn: string | null;
+  /** The checklist a dragged checklist is over (dropping pours its items into it), if any. */
+  intoList: string | null;
   /** Where the block will land if dropped now, when that differs from x / y (shown as a dashed outline). */
   land: Rect | null;
   /** Blocks pushed out of the way to make room, and where they would go (shown live while dragging). */
@@ -83,7 +85,8 @@ export interface ItemSelection {
 /** Where dragged checklist items would go if dropped now, and which row shows the drop mark. */
 export type ItemHint =
   | { cardId: string; drop: ItemDrop; markId: string | null; markMode: 'before' | 'after' | 'nest' | null }
-  | { newList: Point };
+  /** A new list: loose at this point, or at the end of a (collapsed) column. */
+  | { newList: Point; columnId?: string };
 
 /** Checklist items being dragged by their grip. */
 export interface ItemDrag {

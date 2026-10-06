@@ -1,4 +1,5 @@
 import * as B from '../../model/board';
+import { pourList } from '../../model/checklist';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
 import { overlaps, snapIf } from '../../model/geometry';
 import { alignTo } from '../../model/align';
@@ -78,20 +79,28 @@ export function gestureActions(ctx: StoreContext) {
       const group = topLevel && sel.includes(id) ? sel.filter((s) => s !== id && board.order.includes(s)) : [];
       dragPreview = null;
       updateUi({
-        drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, land: null, bumped: {}, guides: [], exactX: false, exactY: false },
+        drag: { kind, id, x, y, startX: x, startY: y, group, overColumn: null, intoList: null, land: null, bumped: {}, guides: [], exactX: false, exactY: false },
         confirm: null,
       });
     },
-    moveDrag(px: number, py: number, overColumn: string | null) {
+    /**
+     * The pointer moved. `overColumn`: the column it is over; `overList`: the checklist whose body it
+     * is over (a dragged checklist pours into a loose one, owner request). Lists inside a column are
+     * not poured into, so cards still drop into and move within columns as before.
+     */
+    moveDrag(px: number, py: number, overColumn: string | null, overList: string | null = null) {
       const d = ctx.state.ui.drag;
       if (!d) return;
       const { board } = ctx.state;
-      // Several blocks move as one: they don't drop into columns.
-      const over = d.group.length ? null : overColumn;
-      if (over) {
+      // Several blocks move as one: they don't drop into columns or lists.
+      const loose = !!overList && overList !== d.id && board.order.includes(overList);
+      const pours = !d.group.length && loose && board.cards[d.id]?.kind === 'todo' && board.cards[overList!]?.kind === 'todo';
+      const intoList = pours ? overList : null;
+      const over = d.group.length || intoList ? null : overColumn;
+      if (over || intoList) {
         dragPreview = null;
-        if (d.x === px && d.y === py && d.overColumn === over) return;
-        return updateUi({ drag: { ...d, x: px, y: py, overColumn: over, land: null, bumped: {}, guides: [], exactX: false, exactY: false } });
+        if (d.x === px && d.y === py && d.overColumn === over && d.intoList === intoList) return;
+        return updateUi({ drag: { ...d, x: px, y: py, overColumn: over, intoList, land: null, bumped: {}, guides: [], exactX: false, exactY: false } });
       }
       // The dragged block lines up with nearby blocks' edges and middles (alignment guides), leaving
       // out blocks it is on top of: those are about to move out of its way. Several blocks dragged
@@ -101,7 +110,7 @@ export function gestureActions(ctx: StoreContext) {
       const box = alignTo(rect, topLevelRects(board, measured, [d.id, ...d.group]).filter((o) => !overlaps(rect, o)));
       const aligned = { ...box, x: px + box.x - rect.x, y: py + box.y - rect.y };
       const { x, y } = aligned;
-      if (d.x === x && d.y === y && d.overColumn === null && d.guides.length === aligned.guides.length) return;
+      if (d.x === x && d.y === y && d.overColumn === null && d.intoList === null && d.guides.length === aligned.guides.length) return;
       // The block follows the pointer exactly. It will land on the grid spot under it (dashed
       // outline), and takes priority there: blocks in the way are shown moving aside right away.
       // Within the same grid spot the preview is unchanged, so it isn't worked out again.
@@ -114,7 +123,7 @@ export function gestureActions(ctx: StoreContext) {
       }
       const { at, bumped } = dragPreview!;
       const land = !d.group.length && (at.x !== x || at.y !== y) ? { ...at, ...draggedSize(d) } : null;
-      updateUi({ drag: { ...d, x, y, overColumn: null, land, bumped, guides: aligned.guides, exactX: aligned.alignedX, exactY: aligned.alignedY } });
+      updateUi({ drag: { ...d, x, y, overColumn: null, intoList: null, land, bumped, guides: aligned.guides, exactX: aligned.alignedX, exactY: aligned.alignedY } });
     },
     cancelDrag() {
       updateUi({ drag: null });
@@ -127,6 +136,10 @@ export function gestureActions(ctx: StoreContext) {
     dropDrag(index: number | null) {
       const d = ctx.state.ui.drag;
       if (!d) return;
+      if (d.intoList) {
+        commit((b) => pourList(b, d.id, d.intoList!), { ui: { drag: null, selection: [d.intoList] } });
+        return requestSettle([d.intoList]);
+      }
       if (d.overColumn && index != null) {
         commit((b) => B.moveCard(b, d.id, { type: 'column', columnId: d.overColumn!, index }), { ui: { drag: null } });
         return requestSettle([d.overColumn]);

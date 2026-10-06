@@ -131,6 +131,16 @@ export function CloseIcon() {
   );
 }
 
+/** A stopwatch: the focus timer. */
+export function TimerIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <circle cx="12" cy="13.5" r="7.5" />
+      <path d="M12 9.5v4l2.5 2M10 3h4M12 3v3" />
+    </svg>
+  );
+}
+
 export function ExternalIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" strokeWidth="1.8" {...common}>

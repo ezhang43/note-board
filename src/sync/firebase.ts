@@ -16,6 +16,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  waitForPendingWrites,
   writeBatch,
 } from 'firebase/firestore';
 import { personFrom, type CollabBackend } from '../store/collab';
@@ -118,6 +119,38 @@ export function versionsRemote(uid: string): VersionStore {
 }
 
 /**
+ * Watches a shared board, or its people, through `listen` (an onSnapshot call). Firestore checks
+ * the rules when a watch starts, and a share made or joined here shows on this device before the
+ * save that makes this person one of its people has reached the server, so the server can refuse
+ * the watch for a moment (job 22: a board just shared vanished with "no longer shared with you").
+ * A refusal is only passed on once this device's saves have all arrived and the watch is refused
+ * again; till then it is watched again, and nothing is said.
+ */
+function watchAllowed(listen: (refused: (e: { code?: string }) => void) => () => void, onError: (e: unknown) => void) {
+  let stopped = false;
+  let checked = false;
+  let stop = () => {};
+  const start = () => {
+    stop = listen((e) => {
+      if (e?.code !== 'permission-denied' || checked) return onError(e);
+      // simple: checked once per watch (the moment right after sharing or joining); a refusal
+      // after that is believed at once.
+      checked = true;
+      void waitForPendingWrites(db)
+        .catch(() => {})
+        .then(() => {
+          if (!stopped) start();
+        });
+    });
+  };
+  start();
+  return () => {
+    stopped = true;
+    stop();
+  };
+}
+
+/**
  * Shared boards (owner request: editing together). shared/{id} holds the boards (as in
  * serializeShare) with who shared them, the shared board and the link key; shared/{id}/members/{uid}
  * everyone who has it; boards/{uid}/shared/{id} the shares each person has. firestore.rules lets
@@ -141,7 +174,7 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchShare(id, onChange, onError) {
-      return onSnapshot(
+      return watchAllowed((refused) => onSnapshot(
         shareRef(id),
         (snap) => {
           if (!snap.exists()) {
@@ -153,11 +186,11 @@ export function collabRemote(user: User): CollabBackend {
           if (typeof d.data !== 'string' || typeof d.root !== 'string') return;
           onChange({ owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) });
         },
-        onError,
-      );
+        refused,
+      ), onError);
     },
     watchPeople(id, onChange, onError) {
-      return onSnapshot(
+      return watchAllowed((refused) => onSnapshot(
         collection(db, 'shared', id, 'members'),
         (snap) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
@@ -167,8 +200,8 @@ export function collabRemote(user: User): CollabBackend {
             .map(({ uid, name, photo }) => ({ uid, name, photo }));
           onChange(people);
         },
-        onError,
-      );
+        refused,
+      ), onError);
     },
     updateShare(id, change, client) {
       return runTransaction(db, async (tx) => {

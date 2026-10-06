@@ -35,7 +35,7 @@ test('Clean up moves ticked items into a Completed card under today, and unticki
   await expect(done.locator('.completed-entry')).toHaveCount(1);
   await expect(done.locator('.completed-text')).toHaveText(['milk']);
   await expect(done.locator('.completed-from')).toHaveText(['Groceries']);
-  await expect(done.getByRole('button', { name: 'Delete card' })).toHaveCount(0); // no ×
+  await expect(done.getByRole('button', { name: 'Delete card' })).toHaveCount(0); // no trash can
   await expect(cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
 
   // Delete key with it selected does nothing to it.

@@ -5,6 +5,10 @@
 - A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.
 - `npm run mcp:check` shows whether it can reach your boards, and `npm run mcp:logout` removes the sign-in (Claude stops reading straight away). Setup steps are in `mcp/README.md`. The website itself is unchanged.
 
+## Trash can on cards and columns (2026-10-06)
+
+- The delete button at the top right of cards and columns is now a small trash can, the same as on checklist items, instead of an ×. It works exactly as before: a card goes at once (Ctrl+Z brings it back), a column asks first. Other × buttons (closing panels, deleting a board in the Boards menu, removing an arrow) stay as they were.
+
 ## Checklists pour into each other (2026-10-06)
 
 - Drag a whole checklist onto another loose checklist (over its title or items): the other list gets a dashed amber outline, and letting go moves every item across, sub-items and ticks included (ticked ones go to its Completed section). The dragged list, and its title, are gone. Ctrl+Z puts it back.

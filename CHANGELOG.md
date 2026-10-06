@@ -1,5 +1,9 @@
 # Changelog
 
+## Slower scrolling (2026-10-06)
+
+- Scrolling with a mouse wheel or swiping on a trackpad now moves the board half as far as before, so it is easier to control. Zooming (Ctrl + scroll or pinch) is unchanged.
+
 ## Sharing, tidied (2026-10-06)
 
 - If leaving a shared board fails, the Share panel now stays open and says so (it used to close and show nothing).

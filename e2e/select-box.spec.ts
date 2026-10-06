@@ -15,7 +15,7 @@ test('the board area never scrolls, so the selection box starts right at the poi
   // (the browser scrolls to keep the cursor in view).
   const card = (await looseCards(page).first().boundingBox())!;
   await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
-  await page.mouse.wheel(0, -(c.y + c.height - card.y - 70));
+  await page.mouse.wheel(0, -2 * (c.y + c.height - card.y - 70)); // the board pans half the scroll distance
   await page.getByLabel('Note text').first().click();
   for (let i = 0; i < 8; i++) await page.keyboard.press('Enter');
   await page.keyboard.type('end');

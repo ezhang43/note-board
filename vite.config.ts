@@ -12,7 +12,7 @@ export default defineConfig(({ command, isPreview }) => ({
   build: { chunkSizeWarningLimit: 700 },
   server: { port: 5173, strictPort: true },
   test: {
-    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'mcp/**/*.test.ts'],
     environment: 'node',
   },
 }));

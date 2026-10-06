@@ -1,5 +1,10 @@
 # Changelog
 
+## Claude can read your boards (2026-10-06)
+
+- A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.
+- `npm run mcp:check` shows whether it can reach your boards, and `npm run mcp:logout` removes the sign-in. Setup steps are in `mcp/README.md`. The website itself is unchanged.
+
 ## Google Calendar beside the board (2026-10-06)
 
 - Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.

@@ -62,6 +62,9 @@ export function useShortcuts() {
       // ? opens the keyboard shortcuts panel; Escape closes it.
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
       if (key === 'escape' && state.ui.shortcutsOpen) return appStore.closeShortcuts();
+      // Ctrl+Shift+Backspace: delete every item in the board's Completed sections, after asking.
+      if (mod && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);
+      if (key === 'escape' && state.ui.deleteCompleted) return appStore.cancelDeleteCompleted();
 
       // Several checklist items selected: these keys act on the items.
       if (state.ui.itemSel) {

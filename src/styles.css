@@ -1620,3 +1620,16 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   color: var(--ink);
   font-size: 14px;
 }
+
+/* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
+.confirm.delete-completed {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--toolbar-height) + 12px);
+  z-index: 30;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+}
+.delete-completed-note { padding: 8px 14px; }

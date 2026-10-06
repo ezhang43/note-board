@@ -101,6 +101,7 @@ export interface StoreContext {
 const BOARD_SWITCH_UI: Partial<Ui> = {
   selection: [],
   confirm: null,
+  deleteCompleted: null,
   drag: null,
   resize: null,
   marquee: null,

@@ -38,6 +38,29 @@ export function hasTickedItems(board: Board): boolean {
   });
 }
 
+/** How many items are in the lists' Completed sections (ticked top-level items), sub-items included. */
+export function completedSectionCount(board: Board): number {
+  const count = (items: TodoItem[]): number => items.reduce((n, it) => n + 1 + count(it.children), 0);
+  return listsInOrder(board).reduce((n, id) => {
+    const c = board.cards[id];
+    return n + (c.kind === 'todo' ? count(c.items.filter((it) => it.done)) : 0);
+  }, 0);
+}
+
+/**
+ * Delete completed items (Ctrl+Shift+Backspace): every list on the board loses the items in its
+ * Completed section, with their sub-items. Ticked sub-items under open items stay, and so does the
+ * Completed card. Lists left empty get one blank item. Returns the same board when there is nothing to delete.
+ */
+export function deleteCompletedSections(board: Board, makeId: MakeId = newId): Board {
+  let b = board;
+  for (const id of listsInOrder(board)) {
+    const card = board.cards[id];
+    if (card.kind === 'todo' && card.items.some((it) => it.done)) b = editItems(b, id, (items) => refill(items.filter((it) => !it.done), makeId));
+  }
+  return b;
+}
+
 /**
  * Takes every ticked item out of a list: ticked top-level items (the Completed section) and ticked
  * sub-items under open items, each with everything under it. Returns what is left and what was taken.

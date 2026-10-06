@@ -1,5 +1,10 @@
 # Changelog
 
+## Delete completed items in one go (2026-10-06)
+
+- Ctrl+Shift+Backspace (⌘+Shift+Backspace on a Mac) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
+- With nothing completed it says "No completed items on this board" and changes nothing. It's listed in the Keyboard shortcuts panel (?).
+
 ## Sharing, tidied (2026-10-06)
 
 - If leaving a shared board fails, the Share panel now stays open and says so (it used to close and show nothing).

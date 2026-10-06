@@ -16,6 +16,7 @@ import {
 import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
 import { DuePanelButton } from './Due';
+import { PomodoroButton } from './PomodoroPanel';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
@@ -76,6 +77,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <CleanUpButton />
           <FileMenu />
           <DuePanelButton labelled />
+          <PomodoroButton labelled onOpen={() => setOpen(null)} />
           <DarkModeButton labelled />
           <button
             type="button"

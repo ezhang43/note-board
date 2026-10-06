@@ -5,10 +5,11 @@ import { appStore, useAppState } from '../store/appStore';
 import { CoffeeIcon, FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
 import { DuePanelButton } from './Due';
+import { PomodoroButton } from './PomodoroPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * (A− / A+), the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
+ * (A− / A+), Search, Due, Version history, the focus timer, the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
@@ -32,6 +33,7 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <button type="button" className="help-button" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
         <HistoryIcon />
       </button>
+      <PomodoroButton />
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?
       </button>

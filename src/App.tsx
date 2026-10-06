@@ -11,7 +11,11 @@ import { ShortcutsPanel } from './components/ShortcutsPanel';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { usePhone } from './components/usePhone';
-import { useAppState } from './store/appStore';
+import { appStore, useAppState } from './store/appStore';
+import { PomodoroPanel } from './components/PomodoroPanel';
+import { SidePanel } from './components/SidePanel';
+
+const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 import { useShortcuts } from './components/useShortcuts';
 
 /**
@@ -22,7 +26,9 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   useShortcuts();
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
-  const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.dueOpen);
+  const sidePanel = useAppState((s) => s.ui.sidePanel);
+  // Anything in the right-hand spot (history, Due, the side panel) moves the corner controls aside.
+  const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.dueOpen || s.ui.sidePanel !== null);
   const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
   return (
     <div className={classes}>
@@ -34,6 +40,11 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <FindBar />
       <HistoryPanel />
       <DuePanel />
+      {sidePanel === 'pomodoro' && (
+        <SidePanel title="Focus timer" onClose={closeSidePanel}>
+          <PomodoroPanel />
+        </SidePanel>
+      )}
       <DuePicker />
       <PreviewBar />
       <FormatBar />

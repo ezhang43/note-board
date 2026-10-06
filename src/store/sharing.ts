@@ -2,7 +2,7 @@ import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
-import { isLeftoverBoard, type Workspace } from '../model/workspace';
+import type { Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
 import type { Store } from './store';
 import { SYNC_DELAY, type SaveState } from './sync';
@@ -23,6 +23,33 @@ import { saveSafetyVersion, type VersionStore } from './versions';
 export const baseKey = (id: string) => `note-board:share-base:${id}`;
 /** Which shares this device had for person `uid`, so they are known as shared before the server answers. */
 export const sharesKey = (uid: string) => `note-board:shares:${uid}`;
+/** Boards this device has seen as person `uid`'s own (see `own` in startSharing). */
+export const ownBoardsKey = (uid: string) => `note-board:own-boards:${uid}`;
+
+/**
+ * Every board in the shares' data kept on this device (see baseKey) for person `uid`, read straight
+ * from storage, so their own-board sync can leave them alone before the shares are known. Only the
+ * shares on their list kept here (sharesKey), so another account's shares on this device don't
+ * count; with no list kept yet (an older version of the app), every share kept here counts.
+ */
+export function boardsInKeptShares(storage: { length: number; key(i: number): string | null; getItem(key: string): string | null }, uid: string): Set<string> {
+  const out = new Set<string>();
+  try {
+    const list = JSON.parse(storage.getItem(sharesKey(uid)) || 'null') as unknown;
+    const mine = Array.isArray(list) ? new Set(list.map((x) => baseKey(String((x as { id?: unknown })?.id)))) : null;
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key?.startsWith(baseKey('')) || (mine && !mine.has(key))) continue;
+      const saved = JSON.parse(storage.getItem(key) || 'null') as { data?: unknown } | null;
+      const got = typeof saved?.data === 'string' ? readShare(saved.data) : null;
+      Object.keys(got?.boards ?? {}).forEach((id) => out.add(id));
+    }
+  } catch {
+    // Storage that can't be read: nothing known.
+  }
+  return out;
+}
+
 /** A save that failed (no connection, say) is tried again after this long. */
 export const RETRY_MS = 5000;
 
@@ -76,13 +103,44 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   let applying = false;
   let stopped = false;
   /**
-   * Boards seen here as this person's own (in no share; not a new empty board no card opens yet).
-   * A board card put on a shared board never takes one of these into the share (main session
-   * check, 2026-10-06): pasting or moving in a card to one of your boards only opens it, for you.
-   * Noted only once the shares this device had are open, so their boards aren't taken for own.
+   * Boards seen here as this person's own: opened by a card on one of their own boards (one in no
+   * share, home included). A board card put on a shared board never takes one of these into the
+   * share (main session check, 2026-10-06): pasting or moving in a card to one of your boards only
+   * opens it, for you. A sub-board made on a shared board is opened only from there, so it is never
+   * one of these. Kept on the device (a card pasted offline is still not followed after a reload),
+   * and noted only once the shares this device had are open, so their boards aren't taken for own.
    */
-  const own = new Set<string>();
+  const own = new Set<string>(readOwn());
   let noting = false;
+
+  function readOwn(): string[] {
+    try {
+      const got = JSON.parse(opts.storage?.getItem(ownBoardsKey(backend.me.uid)) ?? '[]') as unknown;
+      return Array.isArray(got) ? got.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Notes the boards that cards on this person's own boards open (see `own`). */
+  function noteOwn(ws: Workspace, taken: Set<string>) {
+    let grew = false;
+    for (const [id, b] of Object.entries(ws.boards)) {
+      if (taken.has(id)) continue;
+      for (const c of Object.values(b.cards)) {
+        if (c.kind === 'board' && ws.boards[c.boardId] && !taken.has(c.boardId) && !own.has(c.boardId)) {
+          own.add(c.boardId);
+          grew = true;
+        }
+      }
+    }
+    if (!grew) return;
+    try {
+      opts.storage?.setItem(ownBoardsKey(backend.me.uid), JSON.stringify([...own].filter((id) => ws.boards[id])));
+    } catch {
+      // Storage full: still known on this page.
+    }
+  }
 
   const busy = () => {
     const ui = store.getState().ui;
@@ -107,7 +165,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       ids.forEach((id) => taken.add(id));
       out.set(s.id, ids);
     }
-    if (noting) for (const id of Object.keys(ws.boards)) if (id !== ws.home && !taken.has(id) && !isLeftoverBoard(ws, id)) own.add(id);
+    if (noting) noteOwn(ws, taken);
     groupCache = { ws, key, groups: out };
     return out;
   }

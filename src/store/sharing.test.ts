@@ -5,16 +5,24 @@ import { createBoardCard } from '../model/cards';
 import { serializeShare } from '../model/sharing';
 import type { Board, NoteCard } from '../model/types';
 import { memoryServer, type Person } from './collab';
-import { startSharing } from './sharing';
+import { boardsInKeptShares, startSharing } from './sharing';
 import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
 import { createStore, type Store } from './store';
 import { localVersionStore, type VersionStore } from './versions';
 
 // Sharing a board and editing it together (owner request, 2026-10-05), with a pretend server.
 
-function memoryStorage(): StorageLike & { data: Map<string, string> } {
+function memoryStorage(): StorageLike & { data: Map<string, string>; length: number; key(i: number): string | null } {
   const data = new Map<string, string>();
-  return { data, getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v) };
+  return {
+    data,
+    getItem: (k) => data.get(k) ?? null,
+    setItem: (k, v) => void data.set(k, v),
+    get length() {
+      return data.size;
+    },
+    key: (i) => [...data.keys()][i] ?? null,
+  };
 }
 
 const person = (uid: string): Person => ({ uid, name: uid[0].toUpperCase() + uid.slice(1), photo: null });
@@ -626,5 +634,74 @@ describe('main session check fixes (2026-10-06)', () => {
     await alice.sharing.removePerson(shareId, 'bob');
     await settle();
     expect(bob.store.workspace().boards[trip]).toBeUndefined();
+  });
+});
+
+describe('code review of the main session check fixes (2026-10-06)', () => {
+  /** Bob makes a sub-board "Diary" on his home board, with a note "secret" in it; returns its card. */
+  function diaryOn(bob: ReturnType<typeof device>) {
+    const home = bob.store.workspace().home;
+    bob.store.openBoard(home);
+    const diary = bob.store.addBoardCard();
+    bob.store.openBoard(diary);
+    bob.store.renameBoard('Diary');
+    bob.store.addCard('note');
+    bob.store.setNoteText(notes(bob.store, diary)[0].id, 'secret');
+    bob.store.openBoard(home);
+    const cardId = Object.values(bob.store.workspace().boards[home].cards).find((c) => c.kind === 'board' && c.boardId === diary)!.id;
+    return { diary, cardId };
+  }
+
+  it('a card to your own board pasted onto a shared board offline stays yours after a reload', async () => {
+    const { bob, trip, shareId } = await together();
+    const { diary, cardId } = diaryOn(bob);
+    await settle();
+    server.control.offline = true;
+    bob.store.select(cardId);
+    bob.store.copySelection();
+    bob.store.openBoard(trip);
+    bob.store.paste();
+    await settle();
+    bob.sharing.stop();
+    bob.store.flush();
+    const again = device('bob', bob.storage);
+    expect(again.sharing.isShared(diary)).toBe(false);
+    server.control.offline = false;
+    await settle();
+    expect(again.sharing.isShared(diary)).toBe(false);
+    expect(server.shares.get(shareId)!.data).not.toContain('secret');
+  });
+
+  it('a sub-board made on a shared board and moved to another of its boards stays shared', async () => {
+    const { bob, trip, sub, shareId } = await together();
+    bob.store.openBoard(trip);
+    server.control.offline = true;
+    const made = bob.store.addBoardCard();
+    bob.store.openBoard(made);
+    bob.store.renameBoard('Packing');
+    bob.store.openBoard(trip);
+    const cardId = Object.values(bob.store.workspace().boards[trip].cards).find((c) => c.kind === 'board' && c.boardId === made)!.id;
+    // Cut (copy, then delete) and paste onto the sub-board.
+    bob.store.select(cardId);
+    bob.store.copySelection();
+    bob.store.deleteSelection();
+    bob.store.openBoard(sub);
+    bob.store.paste();
+    server.control.offline = false;
+    bob.sharing.retry();
+    await settle();
+    expect(bob.sharing.isShared(made)).toBe(true);
+    expect(server.shares.get(shareId)!.data).toContain('Packing');
+  });
+
+  it('the boards in shares kept on this device can be listed before anything is open', async () => {
+    const { bob, trip, sub } = await together();
+    bob.sharing.stop();
+    expect([...boardsInKeptShares(bob.storage, 'bob')].sort()).toEqual([sub, trip].sort());
+    // Another person on this device, with a list of their own: not theirs.
+    bob.storage.setItem('note-board:shares:carol', '[]');
+    expect(boardsInKeptShares(bob.storage, 'carol').size).toBe(0);
+    // No list kept yet (an older version of the app): every share kept here counts.
+    expect(boardsInKeptShares(bob.storage, 'dave').size).toBe(2);
   });
 });

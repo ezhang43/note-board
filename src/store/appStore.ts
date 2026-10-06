@@ -1,6 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
+import type { Phase } from '../model/pomodoro';
+import { askToNotify, chime, notifyIfHidden } from './env';
+import { createPomodoro } from './pomodoro';
 
 function browserStorage() {
   try {
@@ -50,3 +53,27 @@ function shownState(): AppState {
 export function useAppState<T>(select: (s: AppState) => T): T {
   return useSyncExternalStore(appStore.subscribe, () => select(shownState()));
 }
+
+const ROUND_NAME: Record<Phase, string> = { focus: 'focus round', short: 'short break', long: 'long break' };
+
+/**
+ * The focus timer on this device (owner request, 2026-10-06). Kept in the browser's own storage,
+ * not the board's: never synced, and the same for every demo person.
+ */
+export const pomodoro = createPomodoro(
+  (() => {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  })(),
+  {
+    askToNotify,
+    onRoundEnd(ended, next) {
+      if (!next.settings.muted) chime();
+      const { phase } = next.timer;
+      notifyIfHidden(ended === 'focus' ? 'Focus round done' : 'Break over', `Next: a ${next.settings[phase]}-minute ${ROUND_NAME[phase]}.`);
+    },
+  },
+);

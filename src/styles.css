@@ -1620,3 +1620,30 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   color: var(--ink);
   font-size: 14px;
 }
+
+/* Focus timer (owner request: Pomodoro), shown in the side panel (the right-hand spot, like Version history). */
+.pomodoro { display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 0; font-size: 14px; }
+.pomodoro-phase { margin: 0; font-weight: 600; color: var(--accent-ink); }
+.pomodoro-clock { font-size: 56px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; padding: 8px 0; }
+.pomodoro-actions { display: flex; gap: 8px; justify-content: center; }
+.tb-button.pomodoro-start { min-width: 88px; justify-content: center; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pomodoro-heading { margin: 14px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.pomodoro-length { display: flex; align-items: center; gap: 8px; }
+.pomodoro-length > span:first-child { flex: 1; }
+.pomodoro-length input {
+  width: 64px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  text-align: right;
+}
+.pomodoro-unit { color: var(--ink-soft); font-size: 13px; }
+.pomodoro-chime { display: flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer; }
+.pomodoro-chime input { width: 16px; height: 16px; accent-color: var(--accent); }
+/* Its round button by the zoom control widens to show the time left while a round runs or is paused. */
+.help-button.pomodoro-button.with-time { width: auto; padding: 0 10px; gap: 6px; border-radius: 17px; color: var(--accent-ink); }
+.pomodoro-left { font-variant-numeric: tabular-nums; font-weight: 600; }

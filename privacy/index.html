@@ -1,0 +1,100 @@
+<!doctype html>
+<!--
+  Draft for the owner to review; not legal advice.
+  Written from what the code does (src/sync/firebase.ts, src/store/collab.ts, firestore.rules, public/sw.js) on 2026-10-06.
+  Fill every [OWNER: …] before relying on it, and update this page whenever what is stored changes.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BusyAnts: privacy policy</title>
+    <meta name="description" content="What BusyAnts stores about you, where it is kept, who can see it, and how to get it deleted. No ads, no tracking, no selling of data." />
+    <link rel="icon" href="/busyants-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/busyants-apple-180.png" />
+    <meta name="theme-color" content="#FFF1C2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2A2416" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="/src/site.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav aria-label="Site">
+        <a class="site-brand" href="../about/"><img src="/busyants-icon.svg" alt="" width="32" height="32" />BusyAnts</a>
+        <a href="../about/">About</a>
+        <a href="../faq/">FAQ</a>
+        <a href="../terms/">Terms</a>
+        <a href="../privacy/" aria-current="page">Privacy</a>
+        <a href="../">Open BusyAnts</a>
+      </nav>
+    </header>
+    <main class="text">
+      <h1>Privacy policy</h1>
+      <p class="updated">Effective from [OWNER: effective date]</p>
+
+      <h2>The short version</h2>
+      <ul>
+        <li>BusyAnts stores your boards and the few details from your Google account it needs to sign you in and show who you share a board with.</li>
+        <li>Your boards are private to you, unless you share one.</li>
+        <li>No ads, no analytics or tracking, and your data is never sold or given to anyone for marketing.</li>
+      </ul>
+
+      <h2>Who runs BusyAnts</h2>
+      <p>BusyAnts is made and run by [OWNER: your name or business name], in [OWNER: country]. Questions about this policy or your data: [OWNER: contact email].</p>
+
+      <h2>What is stored when you sign in</h2>
+      <h3>From your Google account</h3>
+      <p>You sign in with Google. Google tells BusyAnts your name, email address, profile photo address and an account number. Firebase Authentication keeps these for your account. Your email address is only used to sign you in: it isn't shown to anyone you share a board with.</p>
+      <h3>Your boards</h3>
+      <p>Everything on your boards (names, cards, columns, checklist items, links, arrows, colours, sizes and positions), stored online so your boards open on every device you sign in on. With it are kept the time of the last save and a random number for the browser tab that saved it.</p>
+      <h3>Version history</h3>
+      <p>Earlier copies of your boards, saved automatically as you work, so you can look at or restore an old version. The newest 100 are kept; older ones are deleted.</p>
+      <h3>Shared boards</h3>
+      <p>When you share a board, or open a board shared with you, these are stored with it: the board and the boards inside it, who shared it, the current link, and a list of the people who have it, with each person's Google name, profile photo address, when they joined and the link they joined with. Your own account also keeps a list of the shared boards you have. Everyone a board is shared with can see everything on that board and the names and photos of the others who have it.</p>
+
+      <h2>What is kept on your device</h2>
+      <p>A copy of your boards, your version history and your sign-in, so BusyAnts opens quickly and works offline; which board is open and where you were on it; your light or dark choice and focus timer settings; and a copy of the site's files for offline use. These stay in your browser and can be removed by clearing this site's data in your browser's settings.</p>
+
+      <h2>Where it is kept, and who helps run it</h2>
+      <ul>
+        <li><strong>Google Firebase</strong> (Firebase Authentication and Cloud Firestore, run by Google) stores your account details and boards, in [OWNER: Firestore location, shown in the Firebase console under Firestore, then Settings].</li>
+        <li><strong>GitHub Pages</strong> (run by GitHub) serves the site's pages and files. Like any web host, it receives your IP address and browser details when a page loads.</li>
+        <li><strong>Google Fonts</strong> supplies the typefaces, so Google also receives your IP address when the fonts load.</li>
+      </ul>
+      <p>Each of these follows its own privacy policy. BusyAnts uses no other services, no advertising and no analytics.</p>
+
+      <h2>Who can see your data</h2>
+      <p>Only you can read your own boards and version history; the security rules on the database turn everyone else away. A shared board can be read and changed by everyone it is shared with. The maker can technically see stored data in the Firebase console, and only looks when you ask for help or the law requires it.</p>
+
+      <h2>How long it is kept</h2>
+      <p>Your boards and version history are kept for as long as you use BusyAnts. A board you delete leaves your online copy at the next save, though it may stay in your version history until it becomes older than the newest 100 versions. A shared board deleted by the person who shared it is deleted for everyone.</p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>See and download everything: File, then Download backup.</li>
+        <li>Delete boards, cards and columns, leave a board shared with you, or delete a board you shared.</li>
+        <li>Delete your account and everything stored online: there is no button for this yet, so email [OWNER: contact email] and it will be done within [OWNER: how many days].</li>
+        <li>[OWNER: any rights your country's law gives people, for example under the GDPR, the UK GDPR or California law, and how to use them]</li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>BusyAnts is not meant for children under 13 (or the minimum age for a Google account where you live).</p>
+
+      <h2>Buy Me a Coffee</h2>
+      <p>The coffee link opens Buy Me a Coffee, a separate service with its own privacy policy. BusyAnts learns nothing about you from it beyond what you choose to give there.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>If what BusyAnts stores changes, this page is updated and the date at the top changes with it.</p>
+    </main>
+    <footer class="site-footer">
+      <nav aria-label="More links">
+        <a href="../faq/">FAQ</a>
+        <a href="../terms/">Terms of use</a>
+        <a href="../privacy/">Privacy policy</a>
+        <a href="https://buymeacoffee.com/ezcookie" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+      </nav>
+    </footer>
+  </body>
+</html>

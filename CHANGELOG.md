@@ -1,5 +1,12 @@
 # Changelog
 
+## A small website for BusyAnts (2026-10-06)
+
+- New pages beside the app: About (what BusyAnts is, with a picture of a board and a big "Start your board, free" button), FAQ, Terms of use and Privacy policy. They are at about/, faq/, terms/ and privacy/ on the site; the app stays where it is, so installed apps and share links keep working.
+- Terms and Privacy are drafts for the owner to finish: the gaps are marked [OWNER: …].
+- In the app, the ? panel ends with links to the pages, and on a phone ⋯ has About BusyAnts.
+- Opening one of the pages no longer replaces the app's offline copy.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

@@ -1031,6 +1031,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .shortcuts-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .shortcuts-group dl { margin: 0; }
+.shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.shortcuts-site a { color: var(--accent-ink); }
 .shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
 .shortcut dd { margin: 0; color: var(--ink-soft); }
 .shortcut kbd {

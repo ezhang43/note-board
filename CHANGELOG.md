@@ -1,5 +1,9 @@
 # Changelog
 
+## Ant hill removed (2026-10-06)
+
+- The ant climbing a hill at the top of the board is gone. Clean up and the Completed card work exactly as before, and your saved boards open as they were.
+
 ## Crew: one coordinator at a time (2026-10-06)
 
 - No change to the app. The crew log now names its one coordinator, and a new coordinator checks that the old one's helpers have really stopped (asking the old session, looking at the job's folder, or asking you) before restarting their jobs, so two helpers never end up editing the same folder.

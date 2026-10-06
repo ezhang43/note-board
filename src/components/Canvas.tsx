@@ -8,7 +8,6 @@ import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { Arrows } from './Arrows';
-import { AntHill } from './AntHill';
 
 const NO_GUIDES: never[] = [];
 const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New column' } as const;
@@ -238,8 +237,6 @@ export function Canvas() {
       {order.length === 0 && (
         <p className="empty-hint">Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
       )}
-      {/* The ant hill (owner request): fixed at the top of the board, never moves or takes a click. */}
-      <AntHill />
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`, '--zoom': view.zoom } as CSSProperties}>
         {order.map((id) => {
           if (id === draggedCard || id === draggedColumn) return null;

@@ -17,6 +17,8 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
 ```markdown
 # Crew log
 
+**Coordinator:** <this session's title and id>
+
 | # | Job | Kind | Risk | Stage | Branch | PR | Worker | Files it touches | Notes |
 |---|-----|------|------|-------|--------|----|--------|------------------|-------|
 ```
@@ -32,6 +34,16 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
   - `merged`: in `build/v1`; low-risk ones go live by themselves (auto-publish)
   - `done`: scout report given, or job dropped by the owner
 - **Worker**: the background agent's name, or the session's title and id for `session` jobs.
+
+### One coordinator at a time
+
+There is only ever one coordinator, named at the top of the log. A session that isn't it does not start, stop or restart jobs; it only becomes coordinator when the owner says so, and then writes its own title and id there.
+
+A new coordinator cannot see the old one's workers (background workers show only in the session that started them), so a job marked `working` may still be running. Before restarting any job it didn't start:
+
+1. Check the old coordinator: is its session still open and running (`list_sessions`)? If so, message it and ask whether the worker is alive.
+2. Check the job's folder: recent commits or uncommitted changes (`git log -3`, `git status`) mean someone may still be working there.
+3. Restart only when it is clearly abandoned. If unsure, ask the owner instead of guessing: two workers in one folder overwrite each other's work.
 
 ## 1. Take in a request
 

@@ -17,6 +17,9 @@
 ## Editing together, step 1: combining edits (2026-10-05)
 
 - Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
+## Crew: one coordinator at a time (2026-10-06)
+
+- No change to the app. The crew log now names its one coordinator, and a new coordinator checks that the old one's helpers have really stopped (asking the old session, looking at the job's folder, or asking you) before restarting their jobs, so two helpers never end up editing the same folder.
 
 ## Ant hill moved onto the board (2026-10-05)
 

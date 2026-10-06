@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { shownName } from '../model/board';
+import { boardRights } from '../model/sharing';
 import { boardTree } from '../model/workspace';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely } from '../store/versions';
@@ -10,8 +12,6 @@ import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
 // inside this one, or deletes a board (never the home board). The path above the open board shows
 // before its name, to go back out. Shared boards (owner request: editing together) are marked; only
 // the person who shared one can delete it, and that deletes it for everyone.
-
-const shownName = (name: string) => name.trim() || 'Untitled board';
 
 /** Boards button and menu. */
 export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
@@ -37,20 +37,15 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
     setOpen(false);
     action();
   };
-  const sharedRoot = (id: string) => shares.find((s) => s.root === id);
   const remove = (id: string) => {
     setOpen(false);
-    const share = sharedRoot(id);
     const sharing = collab.sharing();
-    if (share && sharing) {
-      if (!window.confirm(`Delete the shared board “${nameOf(id)}” for everyone it’s shared with? Boards inside it are kept on your boards. You can bring it back from Version history.`)) return;
-      void deleteBoardSafely(appStore, activeVersionStore(), id, Date.now, () =>
-        sharing.deleteShare(share.id).catch(() => collab.setNotice(`“${nameOf(id)}” couldn’t be deleted. Check your connection and try again.`)),
-      );
-      return;
-    }
-    if (!window.confirm(`Delete the board “${nameOf(id)}” and everything on it? Boards inside it are kept. You can bring it back from Version history.`)) return;
-    void deleteBoardSafely(appStore, activeVersionStore(), id);
+    const ask =
+      boardRights(shares, id, home).deleteForEveryone && sharing
+        ? `Delete the shared board “${nameOf(id)}” for everyone it’s shared with? Boards inside it are kept on your boards. You can bring it back from Version history.`
+        : `Delete the board “${nameOf(id)}” and everything on it? Boards inside it are kept. You can bring it back from Version history.`;
+    if (!window.confirm(ask)) return;
+    deleteBoardSafely(appStore, activeVersionStore(), id, sharing).catch(() => collab.setNotice(`“${nameOf(id)}” couldn’t be deleted. Check your connection and try again.`));
   };
 
   return (
@@ -81,7 +76,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
                     </span>
                   )}
                 </button>
-                {id !== home && !(sharedRoot(id) && !sharedRoot(id)!.owner) && (
+                {boardRights(shares, id, home).delete && (
                   <button type="button" className="icon-button" aria-label={`Delete board ${nameOf(id)}`} title="Delete this board" onClick={() => remove(id)}>
                     <CloseIcon />
                   </button>

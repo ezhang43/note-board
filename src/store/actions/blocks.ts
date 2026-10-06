@@ -7,6 +7,7 @@ import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRe
 import { addImported, estimateHeight, packInLanes, parseMilanote } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
+import { boardRights } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
@@ -84,7 +85,10 @@ export function blockActions(ctx: StoreContext) {
 
   return {
     // ---------- board ----------
-    renameBoard: (name: string) => commit((b) => B.renameBoard(b, name), { merge: 'board-name' }),
+    renameBoard(name: string) {
+      const { ui, boards } = ctx.state;
+      if (boardRights(ui.shares, boards.open, boards.home).rename) commit((b) => B.renameBoard(b, name), { merge: 'board-name' });
+    },
     /** Turning snapping back on moves every block (position and resized sizes) onto the grid. */
     toggleSnap() {
       const on = !ctx.state.board.snap;

@@ -144,6 +144,19 @@ describe('boards inside boards', () => {
     s.deleteBoard(home);
     expect(s.getState().boards.open).toBe(home);
   });
+
+  it('a board someone shared with this person can’t be renamed by them; one they shared can', () => {
+    const { s } = setup();
+    const trip = s.newBoard();
+    s.renameBoard('Trip');
+    const share = (owner: boolean) => ({ id: 's1', root: trip, boards: [trip], owner, ownerUid: 'a', people: [], link: null });
+    s.setShares([share(false)]);
+    s.renameBoard('Mine now');
+    expect(s.getState().board.name).toBe('Trip');
+    s.setShares([share(true)]);
+    s.renameBoard('Trip 2026');
+    expect(s.getState().board.name).toBe('Trip 2026');
+  });
 });
 
 describe('boards from elsewhere', () => {

@@ -1,6 +1,7 @@
 import { styleCss } from '../model/textStyle';
 import { boxProps } from './textBox';
 import { memo, useRef, type CSSProperties } from 'react';
+import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { dayLabel } from '../model/completed';
@@ -23,7 +24,7 @@ const KIND_LABEL = { note: 'Note', todo: 'Checklist', link: 'Link', completed: '
 /** What a screen reader calls a card: its kind, and its title where it has one. */
 function cardName(card: Card, boardName: string): string {
   if (card.kind === 'todo' || card.kind === 'link') return `${KIND_LABEL[card.kind]}: ${card.title || 'Untitled'}`;
-  if (card.kind === 'board') return `Board: ${boardName.trim() || 'Untitled board'}`;
+  if (card.kind === 'board') return `Board: ${shownName(boardName)}`;
   return KIND_LABEL[card.kind];
 }
 
@@ -143,7 +144,7 @@ function CardBody({ card }: { card: Card }) {
 /** The name of board `boardId`, kept up to date (on the board itself it is renamed). */
 function BoardCardName({ boardId }: { boardId: string }) {
   const name = useAppState((s) => (s.boards.open === boardId ? s.board.name : (s.boards.others[boardId]?.name ?? '')));
-  return <>{name.trim() || 'Untitled board'}</>;
+  return <>{shownName(name)}</>;
 }
 
 /**

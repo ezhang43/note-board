@@ -5,6 +5,9 @@
 - Ctrl+Shift+Backspace (Control+Shift+Backspace on a Mac too) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
 - With nothing completed it says "No completed items on this board" and changes nothing. It's listed in the Keyboard shortcuts panel (?).
 
+## Sharing permissions in one place (2026-10-06)
+
+- Behind the scenes: who may rename, delete or restore a shared board is now decided in one place, and deleting a board always saves Version history first by the same route. The Restore button also updates straight away if a board stops being shared while you look at an old version. Nothing else changes for you.
 ## Slower scrolling (2026-10-06)
 
 - Scrolling with a mouse wheel or swiping on a trackpad now moves the board half as far as before, so it is easier to control. Zooming (Ctrl + scroll or pinch) is unchanged.

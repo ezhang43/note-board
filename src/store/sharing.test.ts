@@ -8,7 +8,7 @@ import { memoryServer, type Person } from './collab';
 import { boardsInKeptShares, startSharing } from './sharing';
 import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
 import { createStore, type Store } from './store';
-import { localVersionStore, type VersionStore } from './versions';
+import { deleteBoardSafely, localVersionStore, type VersionStore } from './versions';
 
 // Sharing a board and editing it together (owner request, 2026-10-05), with a pretend server.
 
@@ -626,6 +626,49 @@ describe('main session check fixes (2026-10-06)', () => {
     await settle();
     expect(other.store.workspace().boards[trip]).toBeUndefined();
     expect(await newestHasTrip(versions)).toBe(true);
+  });
+
+  it('deleting a board picks the way: the owner’s shared board goes for everyone, with one version saved first', async () => {
+    const versions = localVersionStore(memoryStorage());
+    const alice = device('alice', memoryStorage(), versions);
+    await settle();
+    const trip = alice.store.newBoard();
+    alice.store.renameBoard('Trip');
+    const shareId = await alice.sharing.share(trip);
+    await settle();
+    await deleteBoardSafely(alice.store, versions, trip, alice.sharing);
+    await settle();
+    expect(alice.store.workspace().boards[trip]).toBeUndefined();
+    expect(server.shares.has(shareId)).toBe(false);
+    expect(await newestHasTrip(versions)).toBe(true);
+    expect(await versions.list()).toHaveLength(1);
+  });
+
+  it('the owner’s delete for everyone saves its version before the shared board is deleted online', async () => {
+    const versions = localVersionStore(memoryStorage());
+    const alice = device('alice', memoryStorage(), versions);
+    await settle();
+    const trip = alice.store.newBoard();
+    alice.store.renameBoard('Trip');
+    const shareId = await alice.sharing.share(trip);
+    await settle();
+    let savedFirst = false;
+    const deleteShare = alice.sharing.deleteShare;
+    alice.sharing.deleteShare = async (id) => {
+      savedFirst = await newestHasTrip(versions);
+      return deleteShare(id);
+    };
+    await deleteBoardSafely(alice.store, versions, trip, alice.sharing);
+    expect(savedFirst).toBe(true);
+    expect(server.shares.has(shareId)).toBe(false);
+  });
+
+  it('deleting a board someone shared with this person does nothing (only they can delete it)', async () => {
+    const { bob, trip, shareId } = await together();
+    await deleteBoardSafely(bob.store, null, trip, bob.sharing);
+    await settle();
+    expect(bob.store.workspace().boards[trip]).toBeDefined();
+    expect(server.shares.has(shareId)).toBe(true);
   });
 
   it('a version that can’t be saved doesn’t hold the boards’ going', async () => {

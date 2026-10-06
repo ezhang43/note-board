@@ -1,5 +1,11 @@
 # Changelog
 
+## Checklists pour into each other (2026-10-06)
+
+- Drag a whole checklist onto another loose checklist (over its title or items): the other list gets a dashed amber outline, and letting go moves every item across, sub-items and ticks included (ticked ones go to its Completed section). The dragged list, and its title, are gone. Ctrl+Z puts it back.
+- Drag every item out of a list into another list (or onto the board): the emptied list now disappears instead of keeping one blank item.
+- Drop items on a collapsed checklist: they go into it (it stays collapsed and shows the dashed outline while you hover). Drop items on a collapsed column: they become a new checklist at the end of that column.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

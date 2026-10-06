@@ -1,4 +1,4 @@
-import { addCard, updateCard } from './board';
+import { addCard, deleteCard, updateCard } from './board';
 import { createItem, newId, type MakeId } from './cards';
 import type { Board, TodoCard, TodoItem } from './types';
 
@@ -435,47 +435,55 @@ export function toggleCompletedSection(board: Board, cardId: string): Board {
   return updateCard(board, cardId, (c) => (c.kind === 'todo' ? { ...c, completedOpen: !c.completedOpen } : c));
 }
 
-/** Where dragged items are dropped: into a list, or onto the board as a new list. */
-export type ItemDestination = { cardId: string; drop: ItemDrop } | { newList: { id: string; x: number; y: number } };
+/**
+ * Where dragged items are dropped: into a list, or as a new list: loose on the board, or at the end
+ * of a column (items dropped on a collapsed column).
+ */
+export type ItemDestination = { cardId: string; drop: ItemDrop } | { newList: { id: string; x: number; y: number; columnId?: string } };
 
 /**
  * Moves items (with their sub-items) from one list to a drop position, possibly in another list,
- * or onto empty board as a new untitled list in the source list's colour. A list left empty gets one
- * blank item. Returns the same board if the move isn't allowed.
+ * or as a new untitled list in the source list's colour. A list emptied this way is removed, title
+ * or not (owner request, 2026-10-06). Returns the same board if the move isn't allowed.
  */
-export function moveItems(board: Board, fromCardId: string, rootIds: string[], to: ItemDestination, makeId: MakeId = newId): Board {
+export function moveItems(board: Board, fromCardId: string, rootIds: string[], to: ItemDestination): Board {
   const src = board.cards[fromCardId];
   if (!src || src.kind !== 'todo') return board;
   const { rest, moving } = extractItems(src.items, rootIds);
   if (!moving.length) return board;
-
-  if ('newList' in to) {
-    const card: TodoCard = {
-      id: to.newList.id,
-      kind: 'todo',
-      color: src.color,
-      collapsed: false,
-      x: to.newList.x,
-      y: to.newList.y,
-      w: null,
-      h: null,
-      title: '',
-      items: moving,
-      completedOpen: true,
-    };
-    const b = editItems(board, fromCardId, () => refill(rest, makeId));
-    return addCard(b, card, { type: 'loose', x: card.x, y: card.y });
-  }
-
-  if (to.cardId === fromCardId) {
+  if ('cardId' in to && to.cardId === fromCardId) {
     const items = insertItems(rest, to.drop, moving);
     return items ? editItems(board, fromCardId, () => items) : board;
   }
+  const leftBehind = (b: Board) => (rest.length ? editItems(b, fromCardId, () => rest) : deleteCard(b, fromCardId));
+
+  if ('newList' in to) {
+    const { id, x, y, columnId } = to.newList;
+    if (columnId && !board.columns[columnId]) return board; // the column went meanwhile: nothing moves
+    const card: TodoCard = { id, kind: 'todo', color: src.color, collapsed: false, x, y, w: null, h: null, title: '', items: moving, completedOpen: true };
+    // Into a column: at its end (addCard opens a collapsed column, as dropping a card into one does).
+    const place = columnId ? { type: 'column' as const, columnId, index: Infinity } : { type: 'loose' as const, x, y };
+    return addCard(leftBehind(board), card, place);
+  }
+
   const dst = board.cards[to.cardId];
   if (!dst || dst.kind !== 'todo') return board;
   const items = insertItems(dst.items, to.drop, moving);
   if (!items) return board;
-  return editItems(editItems(board, fromCardId, () => refill(rest, makeId)), to.cardId, () => items);
+  return leftBehind(editItems(board, to.cardId, () => items));
+}
+
+/**
+ * A whole list dropped onto another (owner request, 2026-10-06): its items, with their sub-items and
+ * ticks, go to the end of the target (open ones after its open items, ticked ones into Completed),
+ * leaving out blank items; the dropped list and its title are gone. Only between two checklists.
+ */
+export function pourList(board: Board, fromCardId: string, toCardId: string): Board {
+  const src = board.cards[fromCardId];
+  const dst = board.cards[toCardId];
+  if (fromCardId === toCardId || src?.kind !== 'todo' || dst?.kind !== 'todo') return board;
+  const moving = src.items.filter((it) => !isBlank(it) || anyText(it.children));
+  return deleteCard(editItems(board, toCardId, (items) => [...items, ...structuredClone(moving)]), fromCardId);
 }
 
 /** Uncheck all (owner request, to reuse a list): every item and sub-item unticked; null if none was ticked. */

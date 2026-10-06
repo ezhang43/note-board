@@ -19,6 +19,11 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
 
 **Coordinator:** <this session's title and id>
 
+## Needs you
+
+- [decision] <a question waiting for the owner's answer>
+- [do] <a next step only the owner can do>
+
 | # | Job | Kind | Risk | Stage | Branch | PR | Worker | Files it touches | Notes |
 |---|-----|------|------|-------|--------|----|--------|------------------|-------|
 ```
@@ -34,6 +39,7 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
   - `merged`: in `build/v1`; low-risk ones go live by themselves (auto-publish)
   - `done`: scout report given, or job dropped by the owner
 - **Worker**: the background agent's name, or the session's title and id for `session` jobs.
+- **Needs you**: only what truly waits on the owner (the work board's "Needs me" shows exactly this list, plus `blocked` and `waiting-owner` jobs). Add a `[decision]` line whenever you ask the owner something you can't go ahead without (a high-impact or unsure call, a blocked worker's question, a high-risk merge), and a `[do]` line for a next step only the owner can do (paste Firestore rules, say "publish", a setting only they can change). Offers and optional click-throughs don't go here. Remove the line as soon as it is answered or done.
 
 ### One coordinator at a time
 
@@ -53,7 +59,7 @@ For each request:
 2. **Split** it into jobs: one job per change the owner could check on its own. Keep tiny changes to the same screen together in one job; split unrelated ones.
 3. For each job, decide **kind** and **risk**, and guess the **files** it will touch (read the code to check, briefly).
 4. **Check for clashes** with every job in `working` or `pr-open`. If two jobs will change the same files, run them one after the other: the second stays `queued` until the first is `merged`, so it starts from the newer `build/v1`.
-5. If the spec or `docs/decisions.md` already settles a question, follow it. Otherwise pick the recommended option (rule 4's exception) and pass it to the worker as a decision.
+5. If the spec or `docs/decisions.md` already settles a question, follow it. Otherwise pick the recommended option (rule 4's exception) and pass it to the worker as a decision, unless you are unsure or it is high-impact (rule 4: data loss or exposure, hard to undo, saving / sync / sharing / security, a change the owner must make outside the code, or something the owner sees that the spec doesn't settle). Then ask the owner first, with your recommendation, and keep the job `queued` until they answer.
 6. Add each job to the log, then start the ones that can run (step 2). Tell the owner in two or three lines: the jobs, which started and which wait, and why.
 
 ## 2. Start a worker
@@ -85,8 +91,10 @@ runs the tests, the review at the right level, the spec check, the changelog, an
 pull request into build/v1; if the review level is high it adds --label high-risk and does
 not merge). For a low-risk pull request, wait for "All tests" (gh pr checks <n> --watch),
 fix it if it fails, and merge it with a merge commit once it passes.
-If a question has no recommended answer and would change what the owner sees, stop and report
-it instead of guessing.
+Go ahead with the recommended option by default, but stop and report it as BLOCKED, with your
+recommendation, when unsure or when the choice is high-impact (CLAUDE.md rule 4): data loss or
+exposure, hard to undo, saving / sync / sharing / security, a change the owner must make outside
+the code, or something the owner sees that the spec doesn't settle.
 For a scout job: change nothing, open no pull request; just investigate and report.
 
 End with this report and nothing after it:

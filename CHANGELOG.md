@@ -1,5 +1,9 @@
 # Changelog
 
+## Crew: a "Needs you" list (2026-10-06)
+
+- No change to the app. The crew log now keeps a short "Needs you" list: only questions waiting for your answer and next steps only you can do (like pasting Firestore rules or saying "publish"). Each line comes off as soon as it is answered or done. Your work board's "Needs me" shows exactly this list.
+
 ## Asking first on big decisions (2026-10-06)
 
 - No change to the app. Claude still goes ahead with the recommended choice by default, but now asks you first (with its recommendation) when it is unsure what you would want, or when a choice is high-impact: it could lose or expose your data, is hard to undo, changes saving, sync, sharing or security, needs something only you can do (like the Firebase console), or changes what you see in a way the spec doesn't settle. Crew workers stop and report such questions instead of guessing.

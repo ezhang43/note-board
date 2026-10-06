@@ -19,6 +19,11 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
 
 **Coordinator:** <this session's title and id>
 
+## Needs you
+
+- [decision] <a question waiting for the owner's answer>
+- [do] <a next step only the owner can do>
+
 | # | Job | Kind | Risk | Stage | Branch | PR | Worker | Files it touches | Notes |
 |---|-----|------|------|-------|--------|----|--------|------------------|-------|
 ```
@@ -34,6 +39,7 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
   - `merged`: in `build/v1`; low-risk ones go live by themselves (auto-publish)
   - `done`: scout report given, or job dropped by the owner
 - **Worker**: the background agent's name, or the session's title and id for `session` jobs.
+- **Needs you**: only what truly waits on the owner (the work board's "Needs me" shows exactly this list, plus `blocked` and `waiting-owner` jobs). Add a `[decision]` line whenever you ask the owner something you can't go ahead without (a high-impact or unsure call, a blocked worker's question, a high-risk merge), and a `[do]` line for a next step only the owner can do (paste Firestore rules, say "publish", a setting only they can change). Offers and optional click-throughs don't go here. Remove the line as soon as it is answered or done.
 
 ### One coordinator at a time
 

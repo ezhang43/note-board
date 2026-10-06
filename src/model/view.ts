@@ -1,4 +1,4 @@
-import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_ZOOM_SPEED } from './constants';
+import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
@@ -67,6 +67,20 @@ export function viewShowing(rects: Rect[], size: Size, view: View, minZoom = OPE
   const place = (start: number, length: number, screen: number, room: number) =>
     length * zoom <= room ? (screen - length * zoom) / 2 - start * zoom : OPEN_MARGIN - start * zoom;
   return { ...view, zoom, panX: Math.round(place(left, w, size.width, roomW)), panY: Math.round(place(top, h, size.height, roomH)) };
+}
+
+type WheelDelta = { deltaX: number; deltaY: number; deltaMode: number };
+
+/** Wheel deltas can be in pixels, lines or pages; turn them into pixels. */
+export function wheelPixels(e: WheelDelta, pageHeight: number) {
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? pageHeight : 1;
+  return { dx: e.deltaX * unit, dy: e.deltaY * unit };
+}
+
+/** How far one scroll / swipe moves the board: the opposite way, at WHEEL_PAN_SPEED. */
+export function wheelPan(e: WheelDelta, pageHeight: number) {
+  const { dx, dy } = wheelPixels(e, pageHeight);
+  return { x: -dx * WHEEL_PAN_SPEED, y: -dy * WHEEL_PAN_SPEED };
 }
 
 /** Zoom factor for one wheel / pinch event. Scrolling up (negative deltaY) zooms in. */

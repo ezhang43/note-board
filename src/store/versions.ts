@@ -161,7 +161,8 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
 /**
  * Put version `id` back: the open board as it was then, and any board deleted since. Every board
  * as it is now is saved as a version first, so restoring never loses anything (and Ctrl+Z undoes
- * the restore of the open board).
+ * the restore of the open board). Boards shared with this person by someone else stay as they are:
+ * returns those shares' starting boards (see restorable).
  */
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
   const data = await versions.get(id);
@@ -171,14 +172,15 @@ export async function restoreVersion(store: Store, versions: VersionStore, id: s
   // A version from before there were several boards is of the home board: home opens to take it.
   const { home } = store.getState().boards;
   if (got.legacy) store.openBoard(home);
-  store.restoreVersion(got.legacy ? { home, boards: { [home]: Object.values(got.ws.boards)[0] } } : got.ws);
+  return store.restoreVersion(got.legacy ? { home, boards: { [home]: Object.values(got.ws.boards)[0] } } : got.ws);
 }
 
 /**
  * Put a backup file in place (owner request): a single board's backup replaces the open board; a
  * backup of every board replaces every board. The board as it is now is saved
  * as a version first (when version history is on), as for restoring a version, so it is never
- * lost even after undo history is gone. Returns false, changing nothing, if `text` isn't a backup.
+ * lost even after undo history is gone. Returns false, changing nothing, if `text` isn't a backup;
+ * otherwise the starting boards of shares left as they are (see store.restoreBackup).
  */
 export async function restoreFromBackup(store: Store, versions: VersionStore | null, text: string, now: () => number = Date.now) {
   if (!store.isBackup(text)) return false;

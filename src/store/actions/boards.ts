@@ -4,6 +4,7 @@ import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { spotForNewBlock } from '../../model/layout';
 import type { Board } from '../../model/types';
 import { pathTo, withoutBoard, type Workspace } from '../../model/workspace';
+import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
 
 // Several boards, and boards inside boards (owner request, 2026-10-05): opening, adding and
@@ -81,16 +82,21 @@ export function boardActions(ctx: StoreContext) {
     },
     /**
      * Put an old version back (version history): the open board as it was then (one change, so
-     * Ctrl+Z undoes it), and any board deleted since comes back too. Other boards are left as they are.
+     * Ctrl+Z undoes it), and any board deleted since comes back too. Other boards are left as they are,
+     * and so are boards of a share someone else shared with this person (owner, 2026-10-06; see
+     * restorable). Returns those shares' starting boards.
      */
-    restoreVersion(ws: Workspace) {
+    restoreVersion(ws: Workspace): string[] {
       ctx.updateUi({ preview: null });
       const open = ctx.state.boards.open;
       const missing = Object.keys(ws.boards).filter((id) => id !== open && !ctx.workspace().boards[id]);
-      if (missing.length) setOthers((o) => ({ ...o, ...Object.fromEntries(missing.map((id) => [id, ws.boards[id]])) }));
-      const then = ws.boards[open];
+      const { ids, kept } = restorable(ctx.state.ui.shares, ws.boards[open] ? [open, ...missing] : missing);
+      const back = ids.filter((id) => id !== open);
+      if (back.length) setOthers((o) => ({ ...o, ...Object.fromEntries(back.map((id) => [id, ws.boards[id]])) }));
+      const then = ids.includes(open) ? ws.boards[open] : undefined;
       if (then) commit(() => then, { ui: { historyOpen: false, selection: [], itemSel: null } });
       else ctx.updateUi({ historyOpen: false });
+      return kept;
     },
   };
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Restoring leaves boards shared with you alone (2026-10-06)
+
+- If someone shared a board with you, restoring an old version or a backup file no longer changes it, for you or for them. Your own boards are restored as before, and a note says which shared board was left as it is. Only the person who shared a board can restore it.
+
 ## Delete completed items in one go (2026-10-06)
 
 - Ctrl+Shift+Backspace (Control+Shift+Backspace on a Mac too) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.

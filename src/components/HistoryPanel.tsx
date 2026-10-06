@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createBoard } from '../model/board';
-import { boardRights } from '../model/sharing';
+import { boardRights, keptNotice } from '../model/sharing';
 import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion } from '../store/versions';
+import { collab } from '../sync/collabSession';
 import { CloseIcon } from './icons';
 import { usePhone } from './usePhone';
 
@@ -127,7 +128,8 @@ export function PreviewBar() {
     setBusy(true);
     setError('');
     try {
-      await restoreVersion(appStore, store, meta.id);
+      const kept = await restoreVersion(appStore, store, meta.id);
+      if (kept.length) collab.setNotice(keptNotice(kept, appStore.boardName));
     } catch {
       setError('Couldn’t restore it. Try again.');
     } finally {

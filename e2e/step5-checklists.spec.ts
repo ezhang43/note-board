@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, cards, clickEmpty, freshBoardEachTest, looseCards } from './helpers';
+import { add, box, cards, clickEmpty, freshBoardEachTest, grabPoint, looseCards } from './helpers';
 
 // Step 5: checklists — items, nesting, Completed section, item drag, multi-select and drop-to-board.
 
@@ -233,13 +233,79 @@ test('drag an item into another list, or onto empty list space to append', async
 
   const title = await box(b.getByLabel('List title'));
   await dragItem(page, rowWithText(a, 'a2'), { x: title.x + title.width - 20, y: title.y + 10 } /* the title band, past the text */, async () => {
-    await expect(b.locator('.todo-body')).toHaveClass(/append-target/);
+    await expect(b).toHaveClass(/append-target/);
     // The whole card is outlined, top included, so you can tell the item goes into it (owner request).
     const ring = await b.evaluate((el) => { const s = getComputedStyle(el); return [s.outlineStyle, s.outlineWidth]; });
     expect(ring).toEqual(['dashed', '2px']);
   });
   expect(await texts(b)).toEqual(['b1', 'a1', 'a2']);
-  expect(await texts(a)).toEqual(['']); // emptied list gets a blank item
+  // Its last item dragged away, the emptied list is gone (owner request, 2026-10-06); undo brings it back.
+  await expect(a).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(a).toHaveCount(1);
+  expect(await texts(a)).toEqual(['a2']);
+});
+
+test('dragging a whole list onto another list pours its items in, and the dragged list goes; one undo', async ({ page }) => {
+  const a = await makeList(page, ['a1', 'a1 sub', 'a2', 'a3']);
+  await rowWithText(a, 'a1 sub').getByLabel('Item text').press('Tab');
+  await rowWithText(a, 'a3').getByLabel('Done').click();
+  await expect(a.locator('.completed [data-item-id]')).toHaveCount(1);
+  await a.getByLabel('List title').fill('Trip');
+  const b = await makeList(page, ['b1', 'b2']);
+  await clickEmpty(page);
+  const target = await box(rowWithText(b, 'b2'));
+  const grab = await grabPoint(a);
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x + 40, target.y + target.height / 2, { steps: 12 });
+  await expect(b).toHaveClass(/append-target/);
+  const ring = await b.evaluate((el) => { const s = getComputedStyle(el); return [s.outlineStyle, s.outlineWidth]; });
+  expect(ring).toEqual(['dashed', '2px']);
+  await page.mouse.up();
+
+  await expect(a).toHaveCount(0);
+  expect(await texts(b)).toEqual(['b1', 'b2', 'a1', 'a1 sub', 'a2', 'a3']);
+  expect(await depthOf(rowWithText(b, 'a1 sub'))).toBe(1);
+  await expect(b.locator('.completed [data-item-id]')).toHaveCount(1);
+  await expect(b.getByLabel('List title')).toHaveValue('');
+
+  await page.keyboard.press('Control+z');
+  await expect(a).toHaveCount(1);
+  expect(await texts(a)).toEqual(['a1', 'a1 sub', 'a2', 'a3']);
+  expect(await texts(b)).toEqual(['b1', 'b2']);
+});
+
+test('items dropped on a collapsed list go into it; it stays collapsed', async ({ page }) => {
+  const a = await makeList(page, ['a1', 'a2']);
+  const b = await makeList(page, ['b1']);
+  await b.getByRole('button', { name: 'Collapse card' }).click();
+  await clickEmpty(page);
+  const target = await box(b);
+  await dragItem(page, rowWithText(a, 'a1'), { x: target.x + target.width / 2, y: target.y + target.height / 2 }, async () => {
+    await expect(b).toHaveClass(/append-target/);
+    await expect(page.getByTestId('item-ghost')).not.toContainText('Drop to make a new list');
+  });
+  await expect(cards(page)).toHaveCount(2);
+  await expect(b).toHaveClass(/collapsed/);
+  await b.getByRole('button', { name: 'Expand card' }).click();
+  expect(await texts(b)).toEqual(['b1', 'a1']);
+  expect(await texts(a)).toEqual(['a2']);
+});
+
+test('items dropped on a collapsed column make a new list at the end of that column', async ({ page }) => {
+  const a = await makeList(page, ['a1', 'a2']);
+  await clickEmpty(page);
+  await add(page, 'New column');
+  await clickEmpty(page);
+  const col = page.locator('[data-col-id]');
+  await col.getByRole('button', { name: 'Collapse column' }).click();
+  const target = await box(col);
+  await dragItem(page, rowWithText(a, 'a2'), { x: target.x + target.width / 2, y: target.y + target.height / 2 });
+  const inside = col.locator('[data-card-id]');
+  await expect(inside).toHaveCount(1);
+  expect(await texts(inside)).toEqual(['a2']);
+  await expect(looseCards(page)).toHaveCount(1);
 });
 
 test('dropping items on empty board makes a new untitled list', async ({ page }) => {

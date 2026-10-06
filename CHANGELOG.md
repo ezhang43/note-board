@@ -1,5 +1,11 @@
 # Changelog
 
+## Checklists pour into each other (2026-10-06)
+
+- Drag a whole checklist onto another loose checklist (over its title or items): the other list gets a dashed amber outline, and letting go moves every item across, sub-items and ticks included (ticked ones go to its Completed section). The dragged list, and its title, are gone. Ctrl+Z puts it back.
+- Drag every item out of a list into another list (or onto the board): the emptied list now disappears instead of keeping one blank item.
+- Drop items on a collapsed checklist: they go into it (it stays collapsed and shows the dashed outline while you hover). Drop items on a collapsed column: they become a new checklist at the end of that column.
+
 ## Google Calendar beside the board (2026-10-06)
 
 - Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.

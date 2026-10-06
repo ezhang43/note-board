@@ -287,7 +287,10 @@ export function checklistActions(ctx: StoreContext) {
       if (d) updateUi({ itemDrag: { ...d, at, hint } });
     },
     cancelItemDrag: () => updateUi({ itemDrag: null }),
-    /** Drop dragged items where the hint says: into a list, or onto the board as a new list. */
+    /**
+     * Drop dragged items where the hint says: into a list, or as a new list (on the board, or at the
+     * end of a collapsed column). A list emptied by the drag is gone; the list they went into is then selected.
+     */
     dropItems() {
       const d = ctx.state.ui.itemDrag;
       if (!d) return;
@@ -297,13 +300,16 @@ export function checklistActions(ctx: StoreContext) {
       if ('newList' in h) {
         const id = newId('k');
         const snap = (v: number) => snapIf(ctx.state.board.snap, v);
-        commit((b) => C.moveItems(b, d.cardId, d.roots, { newList: { id, x: snap(h.newList.x), y: snap(h.newList.y) } }), {
+        const columnId = h.columnId;
+        commit((b) => C.moveItems(b, d.cardId, d.roots, { newList: { id, x: snap(h.newList.x), y: snap(h.newList.y), columnId } }), {
           ui: { itemDrag: null, itemSel: null, selection: [id] },
         });
-        return requestSettle([id]);
+        return requestSettle([columnId ?? id]);
       }
-      commit((b) => C.moveItems(b, d.cardId, d.roots, { cardId: h.cardId, drop: h.drop }), {
-        ui: { itemDrag: null, itemSel: keep ? { cardId: h.cardId, anchor: d.roots[0], ids: keep } : null },
+      commit((b) => {
+        const board = C.moveItems(b, d.cardId, d.roots, { cardId: h.cardId, drop: h.drop });
+        const ui = { itemDrag: null, itemSel: keep ? { cardId: h.cardId, anchor: d.roots[0], ids: keep } : null };
+        return { board, ui: board.cards[d.cardId] ? ui : { ...ui, selection: [h.cardId] } };
       });
     },
   };

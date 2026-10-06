@@ -828,10 +828,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* ---------- checklists (step 5) ---------- */
 
 .todo-body { border-radius: 6px; }
-/* Items about to be added to the end of a list: the whole card is ringed, top included (owner request;
+/* Items (or a whole dragged list) about to be added to the end of a list, open or collapsed: the whole card is ringed, top included (owner request;
    a ring on the list itself was hidden under the title band). Dashed, like a column taking a card, so
    it never looks like the solid ring of a selected card. */
-.card:has(> .todo-body.append-target) { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.card.append-target { outline: 2px dashed var(--accent); outline-offset: 2px; }
 
 .todo-item { position: relative; }
 .todo-item.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }

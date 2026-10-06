@@ -195,26 +195,25 @@ describe('dragging items', () => {
   const itemsOf = (b: Board, id: string) => (b.cards[id] as TodoCard).items;
 
   it('moves items into another list', () => {
-    const b = C.moveItems(twoLists(), 'L1', ['a', 'b'], { cardId: 'L2', drop: { mode: 'before', targetId: 'x' } }, makeId);
+    const b = C.moveItems(twoLists(), 'L1', ['a', 'b'], { cardId: 'L2', drop: { mode: 'before', targetId: 'x' } });
     expect(ids(itemsOf(b, 'L2'))).toBe('a(a1 a2) b x');
     expect(ids(itemsOf(b, 'L1'))).toBe('c(c1)');
   });
 
-  it('dropping on the board makes an untitled list in the source colour; an emptied source gets a blank item', () => {
-    const b = C.moveItems(twoLists(), 'L2', ['x'], { newList: { id: 'N', x: 800, y: 40 } }, makeId);
+  it('dropping on the board makes an untitled list in the source colour; an emptied source is gone', () => {
+    const b = C.moveItems(twoLists(), 'L2', ['x'], { newList: { id: 'N', x: 800, y: 40 } });
     const list = b.cards.N as TodoCard;
     expect(list).toMatchObject({ title: '', x: 800, y: 40, color: 'mint' });
     expect(ids(list.items)).toBe('x');
-    expect(itemsOf(b, 'L2')).toHaveLength(1);
-    expect(itemsOf(b, 'L2')[0].text).toBe('');
+    expect(b.cards.L2).toBeUndefined();
     expect(B.problems(b)).toEqual([]);
 
-    const fromRose = C.moveItems(twoLists(), 'L1', ['b'], { newList: { id: 'R', x: 0, y: 400 } }, makeId);
+    const fromRose = C.moveItems(twoLists(), 'L1', ['b'], { newList: { id: 'R', x: 0, y: 400 } });
     expect(fromRose.cards.R.color).toBe('rose');
   });
 
   it('reorders within the same list', () => {
-    const b = C.moveItems(twoLists(), 'L1', ['b'], { cardId: 'L1', drop: { mode: 'nest', targetId: 'a2' } }, makeId);
+    const b = C.moveItems(twoLists(), 'L1', ['b'], { cardId: 'L1', drop: { mode: 'nest', targetId: 'a2' } });
     expect(ids(itemsOf(b, 'L1'))).toBe('a(a1 a2(b)) c(c1)');
   });
 
@@ -222,6 +221,117 @@ describe('dragging items', () => {
     let b = twoLists();
     b = C.toggleCompletedSection(b, 'L1');
     expect((b.cards.L1 as TodoCard).completedOpen).toBe(false);
+  });
+});
+
+describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
+  /*
+    L1 (rose, titled "Trip"):  a (a1, a2), b, c ticked (c1)
+    L2:                        x, y ticked
+  */
+  function lists(): Board {
+    let b = B.createBoard();
+    b = B.addCard(b, { ...(createCard('todo', 'L1') as TodoCard), title: 'Trip', color: 'rose', items: sample() }, { type: 'loose', x: 0, y: 0 });
+    b = B.addCard(b, { ...(createCard('todo', 'L2') as TodoCard), items: [item('x'), item('y', [], true)] }, { type: 'loose', x: 400, y: 0 });
+    return b;
+  }
+  const itemsOf = (b: Board, id: string) => (b.cards[id] as TodoCard).items;
+  const shown = (b: Board, id: string) => C.displayOrder(itemsOf(b, id));
+  const column = (collapsed: boolean) => ({ id: 'K', title: '', x: 800, y: 0, w: 300, h: null, color: null, collapsed, cardIds: [] });
+
+  describe('a whole list dropped onto another', () => {
+    it('pours every item in, keeping order, nesting and ticks; the dragged list is gone', () => {
+      const b = C.pourList(lists(), 'L1', 'L2');
+      expect(b.cards.L1).toBeUndefined();
+      expect(b.order).not.toContain('L1');
+      // Open items go to the end of the open items, ticked ones into Completed.
+      expect(shown(b, 'L2')).toEqual(['x', 'a', 'a1', 'a2', 'b', 'y', 'c', 'c1']);
+      expect(ids(itemsOf(b, 'L2'))).toBe('x y a(a1 a2) b c(c1)');
+      expect(C.findItem(itemsOf(b, 'L2'), 'c')!.item.done).toBe(true);
+      expect(B.problems(b)).toEqual([]);
+    });
+
+    it("drops the dragged list's title and its blank items", () => {
+      let b = lists();
+      b = C.editItems(b, 'L1', (items) => [...items, { id: 'blank', text: '  ', done: false, children: [] }]);
+      b = C.pourList(b, 'L1', 'L2');
+      expect(C.findItem(itemsOf(b, 'L2'), 'blank')).toBeNull();
+      expect(JSON.stringify(b)).not.toContain('Trip');
+    });
+
+    it('a list in a column leaves the column; arrows to it go', () => {
+      let b = lists();
+      b = B.addColumn(b, column(false));
+      b = B.moveCard(b, 'L1', { type: 'column', columnId: 'K', index: 0 });
+      b = { ...b, arrows: [{ id: 'r', from: 'L1', to: 'L2' }] };
+      b = C.pourList(b, 'L1', 'L2');
+      expect(b.columns.K.cardIds).toEqual([]);
+      expect(b.arrows ?? []).toEqual([]);
+      expect(B.problems(b)).toEqual([]);
+    });
+
+    it('nothing happens onto itself, or when either card is not a checklist (the Completed card is never consumed)', () => {
+      let b = lists();
+      b = B.addCard(b, { id: 'N', kind: 'note', text: 'hi', color: 'butter', collapsed: false, x: 0, y: 400, w: null, h: null }, { type: 'loose', x: 0, y: 400 });
+      b = B.addCard(b, { id: 'D', kind: 'completed', color: 'stone', collapsed: false, x: 0, y: 800, w: null, h: null, groups: [] }, { type: 'loose', x: 0, y: 800 });
+      expect(C.pourList(b, 'L1', 'L1')).toBe(b);
+      expect(C.pourList(b, 'N', 'L2')).toBe(b);
+      expect(C.pourList(b, 'L1', 'N')).toBe(b);
+      expect(C.pourList(b, 'D', 'L2')).toBe(b);
+      expect(C.pourList(b, 'L1', 'D')).toBe(b);
+      expect(C.pourList(b, 'L1', 'gone')).toBe(b);
+    });
+  });
+
+  describe('moving the last items out of a list', () => {
+    it('into another list: the emptied list is gone, title or not', () => {
+      const b = C.moveItems(lists(), 'L1', ['a', 'b', 'c'], { cardId: 'L2', drop: { mode: 'append' } });
+      expect(b.cards.L1).toBeUndefined();
+      expect(b.order).not.toContain('L1');
+      expect(shown(b, 'L2')).toEqual(['x', 'a', 'a1', 'a2', 'b', 'y', 'c', 'c1']);
+      expect(B.problems(b)).toEqual([]);
+    });
+
+    it('onto the board as a new list: the emptied list is gone', () => {
+      const b = C.moveItems(lists(), 'L2', ['x', 'y'], { newList: { id: 'N', x: 0, y: 600 } });
+      expect(b.cards.L2).toBeUndefined();
+      expect(ids(itemsOf(b, 'N'))).toBe('x y');
+      expect(B.problems(b)).toEqual([]);
+    });
+
+    it('a list with items left (open or ticked) stays; moving within one list never removes it', () => {
+      const kept = C.moveItems(lists(), 'L1', ['a', 'b'], { cardId: 'L2', drop: { mode: 'append' } });
+      expect(ids(itemsOf(kept, 'L1'))).toBe('c(c1)');
+      const same = C.moveItems(lists(), 'L2', ['y'], { cardId: 'L2', drop: { mode: 'nest', targetId: 'x' } });
+      expect(ids(itemsOf(same, 'L2'))).toBe('x(y)');
+    });
+
+    it('a list in a column leaves the column when emptied', () => {
+      let b = lists();
+      b = B.addColumn(b, column(false));
+      b = B.moveCard(b, 'L2', { type: 'column', columnId: 'K', index: 0 });
+      b = C.moveItems(b, 'L2', ['x', 'y'], { cardId: 'L1', drop: { mode: 'append' } });
+      expect(b.columns.K.cardIds).toEqual([]);
+      expect(B.problems(b)).toEqual([]);
+    });
+  });
+
+  it('items dropped on a collapsed column make a new list at the end of that column, which opens', () => {
+    let b = lists();
+    b = B.addColumn(b, column(false));
+    b = B.moveCard(b, 'L2', { type: 'column', columnId: 'K', index: 0 });
+    b = B.updateColumn(b, 'K', { collapsed: true });
+    b = C.moveItems(b, 'L1', ['b'], { newList: { id: 'N', x: 0, y: 0, columnId: 'K' } });
+    expect(b.columns.K.cardIds).toEqual(['L2', 'N']);
+    expect(b.columns.K.collapsed).toBe(false);
+    expect(b.order).not.toContain('N');
+    expect(ids(itemsOf(b, 'N'))).toBe('b');
+    expect(B.problems(b)).toEqual([]);
+  });
+
+  it('items dropped on a column that is gone (deleted on another device meanwhile) stay where they were', () => {
+    const b = lists();
+    expect(C.moveItems(b, 'L2', ['x', 'y'], { newList: { id: 'N', x: 0, y: 0, columnId: 'gone' } })).toBe(b);
   });
 });
 

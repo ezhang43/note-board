@@ -56,6 +56,30 @@ export function columnUnder(clientX: number, clientY: number): string | null {
   return columnAt({ x: clientX, y: clientY }, cols, COLUMN_DROP_REACH * appStore.getState().view.zoom);
 }
 
+/**
+ * The loose checklist whose body (title and items, not the header strip) is under the pointer, other
+ * than `dragId`, for pouring a dragged list into. Tested where each list sits when not pushed aside
+ * by the drag, so a list doesn't move away from under the pointer.
+ */
+export function listUnder(clientX: number, clientY: number, dragId: string): string | null {
+  if (!canvasEl) return null;
+  const { board, view, ui } = appStore.getState();
+  let found: string | null = null;
+  for (const el of canvasEl.querySelectorAll<HTMLElement>('[data-todo-of]')) {
+    const id = el.dataset.todoOf!;
+    const card = board.cards[id];
+    if (id === dragId || !card || !board.order.includes(id)) continue;
+    const pushed = ui.drag?.bumped[id];
+    const dx = pushed ? (card.x - pushed.x) * view.zoom : 0;
+    const dy = pushed ? (card.y - pushed.y) * view.zoom : 0;
+    const r = el.getBoundingClientRect();
+    // simple: the last list found is taken as the one on top, and a note lying over a list doesn't
+    // hide it. Fine while lists rarely overlap (they are pushed apart); use elementsFromPoint if they do.
+    if (clientX >= r.left + dx && clientX <= r.right + dx && clientY >= r.top + dy && clientY <= r.bottom + dy) found = id;
+  }
+  return found;
+}
+
 /** Where in a column a card dropped at this height goes. */
 export function dropIndex(columnId: string, clientY: number): number {
   const col = columnElements().find((el) => el.dataset.colId === columnId);

@@ -30,7 +30,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `npm run dev -- --port ${ports.dev}`,
+      command: `npm run dev -- --port ${ports.dev} --strictPort`,
       url: `http://localhost:${ports.dev}`,
       reuseExistingServer: true,
     },

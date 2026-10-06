@@ -12,9 +12,13 @@ import {
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
+  runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
+import { personFrom, type CollabBackend } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 
@@ -109,6 +113,117 @@ export function versionsRemote(uid: string): VersionStore {
     async remove(id) {
       await deleteDoc(doc(metas, id));
       await deleteDoc(doc(datas, id));
+    },
+  };
+}
+
+/**
+ * Shared boards (owner request: editing together). shared/{id} holds the boards (as in
+ * serializeShare) with who shared them, the shared board and the link key; shared/{id}/members/{uid}
+ * everyone who has it; boards/{uid}/shared/{id} the shares each person has. firestore.rules lets
+ * only members read or change a shared board, and someone join only with the current link's key.
+ */
+export function collabRemote(user: User): CollabBackend {
+  const me = personFrom(user);
+  const shareRef = (id: string) => doc(db, 'shared', id);
+  const memberRef = (id: string, uid: string) => doc(db, 'shared', id, 'members', uid);
+  const mineRef = (id: string) => doc(db, 'boards', me.uid, 'shared', id);
+  const notAllowed = () => Object.assign(new Error('Not allowed'), { code: 'permission-denied' });
+  return {
+    me,
+    watchMyShares(onChange, onError) {
+      // With metadata changes, so the list confirmed by the server arrives after the offline copy's.
+      return onSnapshot(
+        collection(db, 'boards', me.uid, 'shared'),
+        { includeMetadataChanges: true },
+        (snap) => onChange(snap.docs.map((d) => d.id).sort(), !snap.metadata.fromCache),
+        onError,
+      );
+    },
+    watchShare(id, onChange, onError) {
+      return onSnapshot(
+        shareRef(id),
+        (snap) => {
+          if (!snap.exists()) {
+            // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
+            if (!snap.metadata.fromCache) onChange(null);
+            return;
+          }
+          const d = snap.data();
+          if (typeof d.data !== 'string' || typeof d.root !== 'string') return;
+          onChange({ owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) });
+        },
+        onError,
+      );
+    },
+    watchPeople(id, onChange, onError) {
+      return onSnapshot(
+        collection(db, 'shared', id, 'members'),
+        (snap) => {
+          const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
+          const people = snap.docs
+            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
+            .sort((a, b) => a.at - b.at)
+            .map(({ uid, name, photo }) => ({ uid, name, photo }));
+          onChange(people);
+        },
+        onError,
+      );
+    },
+    updateShare(id, change, client) {
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(shareRef(id));
+        if (!snap.exists()) throw notAllowed();
+        const data = String(snap.data().data);
+        const rev = Number(snap.data().rev ?? 0);
+        const next = change(data);
+        if (next === null || next === data) return { data, rev };
+        tx.update(shareRef(id), { data: next, client, rev: rev + 1, updatedAt: serverTimestamp() });
+        return { data: next, rev: rev + 1 };
+      });
+    },
+    async createShare(id, root, link, data, client) {
+      const batch = writeBatch(db);
+      batch.set(shareRef(id), { owner: me.uid, root, link, data, client, rev: 1, updatedAt: serverTimestamp() });
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key: link, joinedAt: serverTimestamp() });
+      batch.set(mineRef(id), { joinedAt: serverTimestamp() });
+      await batch.commit();
+    },
+    async join(id, key) {
+      const batch = writeBatch(db);
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
+      batch.set(mineRef(id), { joinedAt: serverTimestamp() });
+      await batch.commit();
+    },
+    async leave(id) {
+      // One batch (main session check, 2026-10-06): off the board and off their list together, or
+      // neither, so leaving never half works. The rules let a person delete their own member record
+      // even once the board is deleted or they were removed (deleting a missing record is fine).
+      const batch = writeBatch(db);
+      batch.delete(memberRef(id, me.uid));
+      batch.delete(mineRef(id));
+      await batch.commit();
+    },
+    removePerson(id, uid, newKey) {
+      // One transaction: removed and the link changed together, or neither; whether the link is on
+      // is read online, so a link turned off on another device stays off.
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(shareRef(id));
+        if (!snap.exists()) throw notAllowed();
+        tx.delete(memberRef(id, uid));
+        if (typeof snap.data().link === 'string') tx.update(shareRef(id), { link: newKey });
+      });
+    },
+    setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
+    async deleteShare(id) {
+      // Its member records go with it (security review fix), so if its id were ever used again they
+      // wouldn't let anyone into the new one.
+      const members = await getDocs(collection(db, 'shared', id, 'members'));
+      const batch = writeBatch(db);
+      for (const m of members.docs) batch.delete(m.ref);
+      batch.delete(shareRef(id));
+      await batch.commit();
+      await deleteDoc(mineRef(id)).catch(() => {});
     },
   };
 }

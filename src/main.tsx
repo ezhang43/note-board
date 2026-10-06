@@ -4,6 +4,7 @@ import { App } from './App';
 import { appStore } from './store/appStore';
 import { flushWhenHidden } from './sync/pageHide';
 import { localVersionStore, startVersions } from './store/versions';
+import { demoStorage, demoUser, startDemo } from './sync/demo';
 import './styles.css';
 
 // Save any board change or pan/zoom still waiting when the tab is closed or hidden.
@@ -23,8 +24,11 @@ if (import.meta.env.VITE_SYNC === 'on') {
   );
   registerOfflineCache(loaded);
 } else {
-  // Local-only: version history is kept on this device.
-  startVersions(appStore, localVersionStore(localStorage));
+  // Local-only: version history is kept on this device. With ?demo-user=Alice (`npm run dev`),
+  // boards can be shared between demo people through a pretend server (src/sync/demo.ts).
+  const demo = demoUser();
+  startVersions(appStore, localVersionStore(demo ? demoStorage(localStorage, demo) : localStorage));
+  if (demo) void startDemo(demo);
   // `npm run dev` with ?signed-in shows the published site's Sign out button, to check how the
   // toolbar fits (it doesn't sign anything out here).
   const demoSignOut =

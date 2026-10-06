@@ -2,7 +2,8 @@ rules_version = '2';
 
 // Paste this into Firebase console → Firestore Database → Rules, then Publish.
 // Open to everyone: any signed-in Google account can read and write its own board (and its
-// version history), never anyone else's. Saves are capped so no one can fill the storage.
+// version history), never anyone else's, except boards someone shared with it by link (below).
+// Saves are capped so no one can fill the storage.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(uid) {
@@ -37,6 +38,65 @@ service cloud.firestore {
       allow create, update: if isOwner(uid)
         && request.resource.data.keys().hasOnly(['data'])
         && boardText(request.resource.data.data);
+    }
+
+    // ---------- Shared boards (editing together) ----------
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Each person's list of the shared boards they have (shared by them or joined).
+    match /boards/{uid}/shared/{sid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && request.resource.data.keys().hasOnly(['joinedAt']);
+    }
+
+    // A shared board (with the boards inside it): only the people it is shared with can read or
+    // change it. Only the person who shared it can change the link or delete it.
+    match /shared/{sid} {
+      function memberPath(uid) {
+        return /databases/$(database)/documents/shared/$(sid)/members/$(uid);
+      }
+      function isMember() {
+        return signedIn() && exists(memberPath(request.auth.uid));
+      }
+      function shareFields() {
+        return request.resource.data.keys().hasOnly(['owner', 'root', 'link', 'data', 'client', 'rev', 'updatedAt'])
+          && boardText(request.resource.data.data)
+          && request.resource.data.client is string
+          && (request.resource.data.link == null || request.resource.data.link is string);
+      }
+
+      allow read: if isMember();
+      allow create: if signedIn() && shareFields()
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.root is string
+        && request.resource.data.rev == 1
+        && existsAfter(memberPath(request.auth.uid));
+      // Every save counts up by one, so a page can't save over a newer version it hasn't seen.
+      allow update: if isMember() && shareFields()
+        && request.resource.data.owner == resource.data.owner
+        && request.resource.data.root == resource.data.root
+        && (request.resource.data.rev == resource.data.rev + 1
+          || (request.resource.data.rev == resource.data.rev && request.resource.data.data == resource.data.data))
+        && (request.resource.data.link == resource.data.link || resource.data.owner == request.auth.uid);
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+
+      // Everyone who has it. Joining needs the current link's key (or being the person who shared it).
+      match /members/{uid} {
+        function share() {
+          return getAfter(/databases/$(database)/documents/shared/$(sid)).data;
+        }
+        allow read: if isMember();
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['name', 'photo', 'key', 'joinedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 200
+          && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 2000
+            && request.resource.data.photo.matches('https://.*')))
+          && (share().owner == uid || (share().link != null && request.resource.data.key == share().link));
+        allow delete: if signedIn()
+          && (request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid);
+      }
     }
   }
 }

@@ -4,6 +4,7 @@ import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
+import { ownBoardsGuard } from './sharing';
 import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
@@ -303,5 +304,221 @@ describe('review fixes: several boards (2026-10-05)', () => {
     fake.send({ data: boardJson('Mine online'), client: 'laptop' });
     expect(Object.keys(store.getState().boards.others)).toHaveLength(0);
     expect(store.getState().board.name).toBe('Mine online');
+  });
+});
+
+describe('shared boards (owner request: editing together)', () => {
+  function sharedSetup() {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const shared = new Set<string>();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id) });
+    fake.send(null);
+    return { store, fake, shared };
+  }
+
+  it('a shared board is not uploaded with the person’s own boards', () => {
+    const { store, fake, shared } = sharedSetup();
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    shared.add(trip);
+    store.newBoard();
+    store.renameBoard('Diary');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const sent = JSON.parse(fake.writes.at(-1)!.data);
+    expect(Object.keys(sent.boards)).not.toContain(trip);
+    expect(Object.values(sent.boards).map((b) => (b as { name: string }).name)).toContain('Diary');
+  });
+
+  it('the person’s boards arriving from another device leave the shared boards as they are', () => {
+    const { store, fake, shared } = sharedSetup();
+    const home = store.getState().boards.open;
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    shared.add(trip);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    // The other device still has an old copy of Trip among its own boards: it is ignored.
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home on phone' }, [trip]: { ...createBoard(), name: 'Old trip' } } }), client: 'phone' });
+    expect(store.boardName(home)).toBe('Home on phone');
+    expect(store.boardName(trip)).toBe('Trip');
+    expect(store.getState().boards.open).toBe(trip);
+  });
+});
+
+describe('review fixes: shared boards (2026-10-05)', () => {
+  it('a board just shared is taken out of the person’s own online copy straight away', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const shared = new Set<string>();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id) });
+    fake.send(null);
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).toContain(trip);
+    // Shared now: nothing else changes on the person's boards.
+    shared.add(trip);
+    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], link: 'k' }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).not.toContain(trip);
+  });
+});
+
+describe('code review fixes: shared boards and a drag (2026-10-06)', () => {
+  it('a change in which boards are shared, mid-drag, doesn’t send this device’s older boards over a newer version', () => {
+    const { store, fake } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const sent = fake.writes.length;
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    store.setShares([{ id: 's1', root: 'x', boards: [], owner: true, ownerUid: 'me', people: [], link: 'k' }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes.length).toBe(sent);
+    store.cancelDrag();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(store.getState().board.name).toBe('From phone');
+    expect(fake.writes.slice(sent).every((w) => w.data.includes('From phone'))).toBe(true);
+  });
+});
+
+describe('main session check fixes (2026-10-06)', () => {
+  it('a change made mid-drag while a newer version waits is kept and uploaded, and the note settles', async () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    fake.send({ data: boardJson('From phone'), client: 'phone' });
+    // A change that lands while the drag goes on (as a resize or an item drag can make).
+    store.renameBoard('Changed mid-drag');
+    expect(store.getState().ui.drag).not.toBeNull();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    store.cancelDrag();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(store.getState().board.name).toBe('Changed mid-drag');
+    expect(JSON.parse(fake.writes.at(-1)!.data).boards.home.name).toBe('Changed mid-drag');
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+  });
+
+  it('a new list of people on a shared board isn’t a change to upload', () => {
+    const { store, fake, onSaveState } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    const share = { id: 's1', root: 'x', boards: ['x'], owner: true, ownerUid: 'me', people: [], link: 'k' };
+    store.setShares([share]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const writes = fake.writes.length;
+    onSaveState.mockClear();
+    store.setShares([{ ...share, people: [{ uid: 'bob', name: 'Bob', photo: null }] }]);
+    store.setShares([{ ...share, link: null }]);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(onSaveState).not.toHaveBeenCalledWith('saving');
+    expect(fake.writes.length).toBe(writes);
+  });
+
+  describe('before the shared boards are known', () => {
+    /** A board kept here that came with a share (in a share's data kept on the device), and one that didn't. */
+    function unknownSetup() {
+      const store = createStore(null, (fn) => fn());
+      const home = store.getState().boards.home;
+      const fake = fakeRemote();
+      const shared = new Set<string>();
+      const local = store.newBoard();
+      store.renameBoard('Maybe shared');
+      const stray = store.newBoard();
+      store.renameBoard('Left on this device');
+      store.openBoard(home);
+      // The sharing module tells sync which boards may be shared (src/store/sharing.ts).
+      const guard = ownBoardsGuard(store, fake.remote, (id) => shared.has(id), new Set([local]));
+      const own = startSync(store, guard.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: guard.isShared });
+      const sync = {
+        sharesKnown() {
+          guard.known();
+          own.sharedChanged();
+        },
+      };
+      return { store, home, fake, shared, local, stray, sync };
+    }
+    const sentIds = (fake: ReturnType<typeof fakeRemote>) => Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards).sort();
+
+    it('a board that came with a share is neither dropped nor uploaded as the person’s own; the online copy still wins over other boards', () => {
+      const { store, home, fake, local, stray } = unknownSetup();
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home online' } } }), client: 'phone' });
+      expect(store.boardName(local)).toBe('Maybe shared');
+      expect(store.workspace().boards[stray]).toBeUndefined();
+      store.renameBoard('Home edited');
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(fake)).toEqual([home]);
+    });
+
+    it('with no online copy yet, this device’s boards are uploaded, but not one that came with a share', () => {
+      const { fake, home, stray } = unknownSetup();
+      fake.send(null);
+      expect(sentIds(fake)).toEqual([home, stray].sort());
+    });
+
+    it('a board made here meanwhile is held back until the shares are known', () => {
+      const { store, fake, home } = unknownSetup();
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard() } }), client: 'phone' });
+      const fresh = store.newBoard();
+      store.renameBoard('Fresh');
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(fake.writes.length ? sentIds(fake) : []).not.toContain(fresh);
+    });
+
+    it('once known: uploaded if it is the person’s own, kept apart if shared', () => {
+      const a = unknownSetup();
+      a.fake.send(null);
+      a.sync.sharesKnown();
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(a.fake)).toContain(a.local);
+
+      const b = unknownSetup();
+      b.fake.send(null);
+      b.shared.add(b.local);
+      b.sync.sharesKnown();
+      b.store.renameBoard('Home edited');
+      vi.advanceTimersByTime(SYNC_DELAY);
+      expect(sentIds(b.fake)).not.toContain(b.local);
+      expect(b.store.boardName(b.local)).toBe('Maybe shared');
+    });
+
+    it('a board in the online copy that another device deleted still goes from here', () => {
+      const { store, home, fake } = unknownSetup();
+      const diary = { ...createBoard(), name: 'Diary' };
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard(), d1: diary } }), client: 'phone' });
+      expect(store.boardName('d1')).toBe('Diary');
+      fake.send({ data: serializeWorkspace({ home, boards: { [home]: createBoard() } }), client: 'phone' });
+      expect(store.workspace().boards.d1).toBeUndefined();
+    });
+  });
+
+  it('a drop that changes only a shared board doesn’t throw away a newer version of the person’s own boards', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const home = store.getState().boards.home;
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    store.addCard('note');
+    const shared = new Set([trip]);
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), isShared: (id) => shared.has(id) });
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home' } } }), client: 'phone' });
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    store.startDrag('card', id, card.x, card.y);
+    store.moveDrag(card.x + 400, card.y + 400, null);
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: { ...createBoard(), name: 'Home from phone' } } }), client: 'phone' });
+    store.dropDrag(null);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(store.boardName(home)).toBe('Home from phone');
+    expect(fake.writes.every((w) => !w.data.includes('"Home"') || w.data.includes('Home from phone'))).toBe(true);
   });
 });

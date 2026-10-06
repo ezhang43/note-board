@@ -6,6 +6,7 @@ import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
+import { ShareButton, useSharedWithMe } from './SharePanel';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
@@ -355,7 +356,19 @@ function Logo() {
 
 function BoardName() {
   const name = useAppState((s) => s.board.name);
-  return <AutoSizeInput className="board-name" aria-label="Board name" placeholder="Untitled board" value={name} onChange={appStore.renameBoard} />;
+  // A board someone shared is renamed only by them (owner request: editing together).
+  const sharedWithMe = useSharedWithMe();
+  return (
+    <AutoSizeInput
+      className="board-name"
+      aria-label="Board name"
+      placeholder="Untitled board"
+      value={name}
+      readOnly={sharedWithMe}
+      title={sharedWithMe ? 'Only the person who shared this board can rename it' : undefined}
+      onChange={appStore.renameBoard}
+    />
+  );
 }
 
 export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
@@ -424,6 +437,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <FileMenu />
       <CleanUpButton />
       <DarkModeButton />
+      <ShareButton />
 
       {onSignOut && (
         <>

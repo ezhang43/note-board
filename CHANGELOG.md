@@ -1,5 +1,37 @@
 # Changelog
 
+## Sharing, tidied (2026-10-06)
+
+- If leaving a shared board fails, the Share panel now stays open and says so (it used to close and show nothing).
+- Behind the scenes: the rules for which boards might be shared, while the app is still finding out, now live in one place. Nothing else changes for you.
+
+## Sharing, checked again (2026-10-06)
+
+- Pasting or moving a card for one of your own boards onto a shared board no longer shares that board: the card just opens it, for you only. A sub-board made on a shared board is still shared, as before.
+- When a shared board goes from your screen (you leave, you are removed, or it is deleted), all your boards are saved in Version history first, so it can be brought back from there.
+- A change you make while a drag is going on is no longer lost when another device saved at the same moment, and "Saving…" no longer gets stuck or flickers.
+- On a device that doesn't know yet which boards are shared, those boards are left alone until it does (they used to vanish, or be copied into your own boards).
+- Leaving a shared board now works fully or not at all; if it fails, the panel says so and nothing changes.
+- The Share panel button reads "Turn link on".
+
+## Sharing made safe (2026-10-06)
+
+- A share link can no longer touch your own boards: whatever someone saves in a board they share with you, it can't take in, overwrite or delete any of your other boards. A link that tries to is refused.
+- Removing someone from a shared board changes its link in the same step, so the old link never lets them back in.
+- Shared boards are recognised the moment the page opens, so a slow connection can't make the app treat them as yours, and a page can never send everyone a version with the shared board missing.
+- When a shared board is deleted, the record of who had it goes too.
+
+## Editing together, step 2: sharing a board by link (2026-10-05)
+
+- A new Share button (two people, next to Sign out; on a phone in ⋯) shares the open board with a link. Anyone who opens the link and signs in with Google can see and edit that board and every board inside it, at the same time as you. Each person’s changes show on everyone’s screen within a second or two, and changes made at the same moment are all kept.
+- The Share panel shows who has the board. Whoever shared it can turn the link off, remove people, rename or delete the board, and restore old versions of it; everyone else can leave it.
+- Your home board can’t be shared, and your other boards stay private: only the boards you share are seen by anyone else.
+- Before this works on the live site, the new online rules in `firestore.rules` need pasting into the Firebase console.
+
+## Editing together, step 1: combining edits (2026-10-05)
+
+- Groundwork for several people editing one board at once: when two people change a board at the same time, all their changes to different things are kept, and only a change to the very same thing goes to the later one. Nothing you can see changes yet: sharing comes in the next step.
+
 ## Ant hill removed (2026-10-06)
 
 - The ant climbing a hill at the top of the board is gone. Clean up and the Completed card work exactly as before, and your saved boards open as they were.

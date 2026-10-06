@@ -27,8 +27,11 @@ const LIST_KEY = 'note-board:versions:v1';
  */
 export const VERSION_SAVE_WAIT_MS = 3000;
 
-/** Saves every board as a version, waiting at most VERSION_SAVE_WAIT_MS; never fails. */
-function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number) {
+/**
+ * Saves every board as a version, waiting at most VERSION_SAVE_WAIT_MS; never fails. The boards are
+ * read straight away, so what is saved is how they are at the call, even if they change meanwhile.
+ */
+export function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number) {
   const saving = saveVersion(versions, serializeWorkspace(store.workspace()), now()).catch(() => null);
   return Promise.race([saving, new Promise((done) => setTimeout(done, VERSION_SAVE_WAIT_MS))]);
 }
@@ -186,8 +189,15 @@ export async function restoreFromBackup(store: Store, versions: VersionStore | n
  * Delete a board (owner request: several boards). Every board as it is now is saved as a version
  * first (when version history is on), so the deleted board can be brought back from there.
  */
-export async function deleteBoardSafely(store: Store, versions: VersionStore | null, id: string, now: () => number = Date.now) {
+export async function deleteBoardSafely(
+  store: Store,
+  versions: VersionStore | null,
+  id: string,
+  now: () => number = Date.now,
+  /** How to delete it (a shared board is deleted for everyone instead). */
+  remove: () => unknown = () => store.deleteBoard(id),
+) {
   // Saving the version may fail or wait (offline): the board is deleted anyway, as the person asked.
   if (versions) await saveSafetyVersion(store, versions, now);
-  store.deleteBoard(id);
+  await remove();
 }

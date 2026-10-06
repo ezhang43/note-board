@@ -364,8 +364,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     const others = { ...boards.others, [left]: state.board };
     const board = others[id];
     delete others[id];
-    // A new board left empty and unnamed, that no card opens, isn't kept.
-    if (isLeftoverBoard(workspaceFrom(board, { home: boards.home, open: id, others }), left)) {
+    // A new board left empty and unnamed, that no card opens, isn't kept (a shared one always is).
+    const shared = state.ui.shares.some((s) => s.boards.includes(left));
+    if (!shared && isLeftoverBoard(workspaceFrom(board, { home: boards.home, open: id, others }), left)) {
       delete others[left];
       histories.delete(left);
     }
@@ -393,6 +394,46 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     histories.clear();
     history = emptyHistory;
     restore({ history, board: next.board }, false, next.boards);
+  }
+
+  /**
+   * Swap in some boards from elsewhere (a shared board others changed), leaving the rest as they
+   * are: `null` removes a board. A removed open board opens home instead. The home board is never
+   * replaced or removed here. Undo starts over on the boards that changed.
+   */
+  function replaceBoards(changes: Record<string, Board | null>) {
+    const { boards } = state;
+    let board = state.board;
+    const others = { ...boards.others };
+    let openGone = false;
+    let changed = false;
+    for (const [id, next] of Object.entries(changes)) {
+      if (id === boards.home) continue;
+      const now = id === boards.open ? board : others[id];
+      if (next === now || (!next && !now)) continue;
+      changed = true;
+      histories.delete(id);
+      if (id === boards.open) {
+        if (next) board = next;
+        else openGone = true;
+      } else if (next) others[id] = next;
+      else delete others[id];
+    }
+    if (!changed) return;
+    outsideChanges++;
+    if (openGone) {
+      forgetShownBoard();
+      const home = others[boards.home];
+      delete others[boards.home];
+      history = histories.get(boards.home) ?? emptyHistory;
+      histories.delete(boards.home);
+      centreOnArrival = true;
+      write(OPEN_BOARD_KEY, boards.home);
+      set({ ...state, board: home, boards: { ...boards, open: boards.home, others }, ui: uiWith(BOARD_SWITCH_UI) });
+      return;
+    }
+    if (board !== state.board) history = emptyHistory;
+    restore({ history, board }, false, { ...boards, others });
   }
 
   function setOthers(fn: (others: Record<string, Board>) => Record<string, Board>) {
@@ -466,6 +507,11 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
      */
     workspace,
     replaceWorkspace,
+    replaceBoards,
+    /** The shared boards' details, as the screen shows them (not saved, not undone). */
+    setShares(shares: Ui['shares']) {
+      set({ ...state, ui: uiWith({ shares }) });
+    },
     replaceBoard(board: Board) {
       // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.
       if (!state.board.order.length && board.order.length) centreOnArrival = true;

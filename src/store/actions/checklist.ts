@@ -1,6 +1,7 @@
 import { createItem, newId } from '../../model/cards';
 import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
+import { completedSectionCount, deleteCompletedSections } from '../../model/completed';
 import { withDue } from '../../model/due';
 import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDoneAcross, visibleItems, type ListSelection } from '../../model/multiSelect';
 import { snapIf } from '../../model/geometry';
@@ -217,6 +218,16 @@ export function checklistActions(ctx: StoreContext) {
       commit((b) => C.editItems(b, cardId, (items) => withDue(items, itemId, due)), { ui: { dueFor: null } }) ?? ctx.updateUi({ dueFor: null }),
     /** Uncheck all (owner request): every item in the list unticked, to use it again. One undo step. */
     uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
+    /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */
+    askDeleteCompleted() {
+      if (ctx.state.ui.preview) return; // an old version is being looked at: nothing can be changed
+      ctx.flushPendingTick(); // an item still on its way to Completed counts
+      updateUi({ deleteCompleted: completedSectionCount(ctx.state.board) ? 'ask' : 'none' });
+    },
+    cancelDeleteCompleted: () => updateUi({ deleteCompleted: null }),
+    /** Delete every item in the open board's Completed sections. One undo step. */
+    confirmDeleteCompleted: () =>
+      commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null, itemSel: null } }) ?? updateUi({ deleteCompleted: null }),
 
     // ---------- selecting several checklist items ----------
     selectItemRange,

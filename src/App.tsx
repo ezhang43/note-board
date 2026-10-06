@@ -1,4 +1,5 @@
 import { Canvas } from './components/Canvas';
+import { DeleteCompleted } from './components/DeleteCompleted';
 import { FindBar } from './components/FindBar';
 import { FormatBar } from './components/FormatBar';
 import { HistoryPanel, PreviewBar } from './components/HistoryPanel';
@@ -48,6 +49,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <PreviewBar />
       <FormatBar />
       <ShortcutsPanel />
+      <DeleteCompleted />
       <NoticeBanner />
     </div>
   );

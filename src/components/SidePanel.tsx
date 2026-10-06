@@ -9,10 +9,11 @@ import { isTextField } from './textField';
  */
 export function SidePanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    // Escape meant for something else (leaving a text box, closing a date picker or the shortcuts list) leaves it open.
+    // Escape meant for something else (leaving a text box, closing a date picker, the shortcuts list
+    // or a "Delete …?" question) leaves it open.
     const key = (e: KeyboardEvent) => {
-      const { dueFor, shortcutsOpen } = appStore.getState().ui;
-      if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen) onClose();
+      const { dueFor, shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
+      if (e.key === 'Escape' && !isTextField(e.target) && !dueFor && !shortcutsOpen && !confirm && !deleteCompleted) onClose();
     };
     // Capture: seen before the page's own shortcuts close the list or picker that Escape was for.
     window.addEventListener('keydown', key, true);

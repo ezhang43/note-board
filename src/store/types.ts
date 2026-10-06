@@ -118,6 +118,8 @@ export interface Ui {
   /** The keyboard shortcuts panel (? button or ? key). */
   shortcutsOpen: boolean;
   confirm: ConfirmDelete | null;
+  /** Ctrl+Shift+Backspace (owner request): asking "Delete N completed items?", or saying there are none. */
+  deleteCompleted: 'ask' | 'none' | null;
   drag: Drag | null;
   /** A new card being dragged from a toolbar Add button. */
   newDrag: NewDrag | null;
@@ -198,6 +200,7 @@ export const emptyUi: Ui = {
   colourMenuOpen: false,
   shortcutsOpen: false,
   confirm: null,
+  deleteCompleted: null,
   drag: null,
   newDrag: null,
   resize: null,

@@ -137,6 +137,18 @@ test('it shares the right-hand spot with Version history: one at a time; Escape 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
+  // Escape on a "Delete …?" question only cancels the question.
+  await clickEmpty(page);
+  await add(page, 'Checklist');
+  await page.keyboard.type('milk');
+  await page.locator('.card.selected').getByRole('checkbox', { name: 'Done' }).click();
+  await clickEmpty(page);
+  await page.keyboard.press('Control+Shift+Backspace');
+  const question = page.getByRole('alertdialog', { name: 'Delete completed items?' });
+  await expect(question).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(question).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel(page)).toHaveCount(0);
 });

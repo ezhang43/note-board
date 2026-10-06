@@ -7,6 +7,11 @@
 - When a round ends a soft chime plays (it can be switched off in the panel), and, if the tab is behind another, a notification shows, once you allow them (asked on the first Start). The next round waits for Start.
 - The lengths can be changed in the panel and are remembered on this device. None of it is part of a board: not undone by Ctrl+Z, not synced.
 
+## Delete completed items in one go (2026-10-06)
+
+- Ctrl+Shift+Backspace (Control+Shift+Backspace on a Mac too) deletes every item in the Completed sections of the lists on the open board. It asks first ("Delete 12 completed items?" · Keep · Delete), and Ctrl+Z brings them all back. Other boards are left alone.
+- With nothing completed it says "No completed items on this board" and changes nothing. It's listed in the Keyboard shortcuts panel (?).
+
 ## Sharing permissions in one place (2026-10-06)
 
 - Behind the scenes: who may rename, delete or restore a shared board is now decided in one place, and deleting a board always saves Version history first by the same route. The Restore button also updates straight away if a board stops being shared while you look at an old version. Nothing else changes for you.

@@ -9,7 +9,13 @@ export default defineConfig(({ command, isPreview }) => ({
   // A pretend sharing server and a pretend Google Calendar, for `npm run dev` only (?demo-user=Alice).
   plugins: [react(), devCollabPlugin(), devCalendarPlugin()],
   // Firebase (sign-in and sync) is about 180 KB zipped, loaded only on the published site.
-  build: { chunkSizeWarningLimit: 700 },
+  // The website pages (SPEC "Website") are built beside the app, which stays at the site's address.
+  build: {
+    chunkSizeWarningLimit: 700,
+    rolldownOptions: {
+      input: ['index.html', 'about/index.html', 'faq/index.html', 'terms/index.html', 'privacy/index.html'],
+    },
+  },
   server: { port: 5173, strictPort: true },
   test: {
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'mcp/**/*.test.ts'],

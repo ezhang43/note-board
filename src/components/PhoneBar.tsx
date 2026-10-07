@@ -107,6 +107,9 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <CoffeeIcon />
             Buy me a coffee
           </a>
+          <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
+            About BusyAnts
+          </a>
           <ShareButton phone />
           {onSignOut && (
             <button type="button" className="tb-button" onClick={onSignOut}>

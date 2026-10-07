@@ -285,7 +285,8 @@ export function DarkModeButton({ labelled = false }: { labelled?: boolean }) {
 
 /** Clean up: moves every ticked item into the Completed card. Faded when nothing is ticked. */
 export function CleanUpButton() {
-  const any = useAppState((s) => hasTickedItems(s.board));
+  // An item still easing out to Completed counts as ticked (Clean up applies it first).
+  const any = useAppState((s) => hasTickedItems(s.board) || s.ui.completing.length > 0);
   return (
     <button
       type="button"

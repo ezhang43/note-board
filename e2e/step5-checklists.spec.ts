@@ -461,18 +461,31 @@ test.describe('with motion allowed', () => {
 
   test('a ticked item eases out and into the Completed section, and Ctrl+Z undoes it', async ({ page }) => {
     const list = await makeList(page, ['first', 'second']);
+    // The page's clock stands still and moves only when told, so a busy computer can't skip past
+    // the 280 ms and 450 ms steps before they are checked.
+    await page.clock.install();
+    await page.clock.pauseAt(Date.now() + 60_000);
     await rowWithText(list, 'first').getByLabel('Done').click();
-    // Briefly still in the list, ticked and fading.
+    // Still in the list for 280 ms, ticked and fading.
     await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
     await expect(list.locator('.todo-item.leaving').getByLabel('Done')).toBeChecked();
-    // Then in Completed, arriving.
+    await page.clock.runFor(279);
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
+    // Then in Completed, arriving, for 450 ms.
+    await page.clock.runFor(1);
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(0);
     await expect(list.locator('.completed .todo-item.arrived')).toHaveCount(1);
-    await expect(list.locator('.todo-item.arrived')).toHaveCount(0);
     expect(await texts(list)).toEqual(['second', 'first']);
+    await page.clock.runFor(450);
+    await expect(list.locator('.todo-item.arrived')).toHaveCount(0);
 
     await rowWithText(list, 'second').getByLabel('Done').click();
-    await page.keyboard.press('Control+z'); // straight away, while it is still leaving
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
+    await page.keyboard.press('Control+z'); // while it is still leaving
+    await page.clock.runFor(1000); // nothing is left to land later
     await expect(list.locator('.completed [data-item-id]')).toHaveCount(1);
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(0);
+    await expect(rowWithText(list, 'second').getByLabel('Done')).not.toBeChecked();
     expect(await texts(list)).toEqual(['second', 'first']);
   });
 });

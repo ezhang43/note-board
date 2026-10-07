@@ -245,6 +245,22 @@ describe('the put-back check', () => {
     expect(log.at(-1)).toMatch(/put back/i);
   });
 
+  it('reading back failing (offline) still says it was saved', async () => {
+    const { fs, deps } = setup();
+    const real = fs.fetch;
+    let saved = false;
+    fs.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (saved && (init?.method ?? 'GET') === 'GET') return new Response('{}', { status: 503 });
+      const r = await real(input, init);
+      if (String(init?.body ?? '').includes('documents/boards/me"')) saved = true;
+      return r;
+    }) as typeof fetch;
+    deps.db = ownDb(async () => 'ID', 'me', fs.fetch);
+    const r = await saveChange(deps, addApples());
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toMatch(/^Saved:\n- Added "Apples"[\s\S]*couldn’t be checked/);
+  });
+
   it('saved over again after putting it back: reported, not tried a third time', async () => {
     const { fs, deps } = setup();
     fs.hooks.afterCommit = (n) => {

@@ -1,9 +1,11 @@
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { dirname, join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { deleteToken, saveToken } from './auth';
-import { activityLog, activityPath, boardsLoader, runCheck } from './main';
+import { addItems } from './edits';
+import { fakeFirestore } from './fakeFirestore';
+import { activityLog, activityPath, boardsLoader, boardsWriter, runCheck } from './main';
 import { ownRaw } from './sample';
 
 describe('the connector’s sign-in', () => {
@@ -41,6 +43,37 @@ describe('the activity log', () => {
     await log('Saved: one');
     await log('Saved: two');
     expect(await readFile(file, 'utf8')).toBe('2026-10-06T12:00:00.000Z Saved: one\n2026-10-06T12:00:00.000Z Saved: two\n');
+  });
+});
+
+describe('saving through the signed-in connector', () => {
+  it('saves to the signed-in owner’s boards with an mcp- client name, logs it, and stops after logout', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const file = await tempFile();
+      await saveToken(file, { refreshToken: 'R', uid: 'me' });
+      const fs = fakeFirestore('me');
+      fs.setOwn(ownRaw());
+      const google = (async (input: string | URL | Request, init?: RequestInit) =>
+        String(input).startsWith('https://securetoken.googleapis.com/')
+          ? new Response(JSON.stringify({ id_token: 'ID', refresh_token: 'R', expires_in: '3600', user_id: 'me' }), { status: 200 })
+          : fs.fetch(input, init)) as typeof fetch;
+      const logFile = join(dirname(file), 'activity.log');
+      const write = boardsWriter(boardsLoader(file, google), logFile);
+      let done = false;
+      const saving = write(addItems('home', 'Groceries', [{ text: 'Apples' }], ['n1'])).finally(() => (done = true));
+      // The put-back check's wait (file reads and writes happen meanwhile, so step until it ends).
+      while (!done) await vi.advanceTimersByTimeAsync(1000);
+      const r = await saving;
+      expect(r.isError).toBeFalsy();
+      expect(fs.own()).toContain('"id":"n1"');
+      expect(String(fs.field('boards/me', 'client'))).toMatch(/^mcp-\w{8}$/);
+      expect(await readFile(logFile, 'utf8')).toMatch(/Z Saved: Added "Apples" \(id: n1\) to Groceries\n$/);
+      await deleteToken(file);
+      await expect(write(addItems('home', 'Groceries', [{ text: 'Pears' }], ['n2']))).rejects.toThrow(/Not signed in/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

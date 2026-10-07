@@ -1,5 +1,10 @@
 # Changelog
 
+## Ticking tests made steady; Clean up right after ticking (2026-10-06)
+
+- Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.
+- The browser tests of the tick animation now control the page's clock, so they no longer fail now and then when the computer is busy.
+
 ## Import files from other apps (2026-10-06)
 
 - File → "Import from Milanote…" is now "Import file…". It takes Markdown (.md: Milanote, Obsidian, Notion, Bear…), plain text (.txt) and web pages (.html: Evernote or Google Keep exports, saved pages), and works out which it is.

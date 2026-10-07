@@ -1,0 +1,133 @@
+/*
+ * The website pages beside the app (about/, faq/, terms/, privacy/). Plain pages in the app's look:
+ * the same colours as src/styles.css (SPEC "Look and feel"), following the computer's light / dark setting.
+ */
+:root {
+  --canvas: #faf6ec;
+  --toolbar-bg: #fff1c2;
+  --toolbar-edge: #ecd897;
+  --line: #e2ddd4;
+  --ink: #1f1d1a;
+  --ink-soft: #5f5a52;
+  --card-bg: #ffffff;
+  --accent: #8a5a00;
+  --accent-ink: #6b4400;
+  --on-accent: #ffffff;
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: #1d1b17;
+    --toolbar-bg: #2a2416;
+    --toolbar-edge: #3d3422;
+    --line: #3a3733;
+    --ink: #ece8e1;
+    --ink-soft: #c2bcb2;
+    --card-bg: #2b2926;
+    --accent: #f2c14e;
+    --accent-ink: #ffd97a;
+    --on-accent: #241a08;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--canvas);
+  overflow-wrap: anywhere;
+}
+
+a { color: var(--accent-ink); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.site-header {
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-edge);
+}
+.site-header nav,
+.site-footer nav {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+}
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.site-brand img { width: 32px; height: 32px; border-radius: 8px; }
+.site-header nav a:not(.site-brand) { color: var(--ink); font-weight: 500; text-decoration: none; }
+.site-header nav a:not(.site-brand):hover,
+.site-header nav a[aria-current='page'] { text-decoration: underline; text-underline-offset: 4px; }
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+main.text { max-width: 720px; }
+
+h1 { font-size: 32px; line-height: 1.25; font-weight: 600; margin: 16px 0 8px; }
+h2 { font-size: 21px; line-height: 1.3; font-weight: 600; margin: 32px 0 6px; }
+h3 { font-size: 17px; font-weight: 600; margin: 20px 0 4px; }
+p, li { color: var(--ink); }
+.lead { font-size: 20px; color: var(--ink-soft); margin: 0 0 24px; }
+.updated { color: var(--ink-soft); font-size: 14px; }
+
+.start {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.start:hover { filter: brightness(1.08); }
+
+.shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 32px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(31, 29, 26, 0.08);
+}
+
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.features li {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.features h3 { margin: 0 0 4px; }
+.features p { margin: 0; color: var(--ink-soft); }
+
+.site-footer { border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 14px; }
+.site-footer nav a { color: var(--ink-soft); }

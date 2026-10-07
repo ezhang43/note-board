@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { problems } from '../model/board';
 import { CARD_W } from '../model/constants';
+import { CANT_READ } from '../model/importFile';
 import { IMPORT_GAP } from '../model/milanote';
 import { createStore } from './store';
 
@@ -21,7 +22,7 @@ describe('importing a Milanote export', () => {
     const s = store();
     s.addCard('note');
     const existing = s.getState().ui.selection[0];
-    expect(s.importMilanote(sample)).toBe(7);
+    expect(s.importFile(sample).added).toBe(7);
     const { board, ui } = s.getState();
     expect(board.cards[existing]).toBeDefined();
     expect(ui.selection).toHaveLength(7);
@@ -33,21 +34,35 @@ describe('importing a Milanote export', () => {
     const s = store();
     s.addCard('note');
     const before = s.getState().board;
-    s.importMilanote(sample);
+    s.importFile(sample);
     s.undo();
     expect(s.getState().board).toBe(before);
   });
 
   it('adds nothing from a file with no content', () => {
     const s = store();
-    expect(s.importMilanote('\n\n')).toBe(0);
+    expect(s.importFile('\n\n')).toEqual({ added: 0, note: '' });
     expect(s.getState().board.order).toEqual([]);
     expect(s.getState().ui.canUndo).toBe(false);
   });
 
+  it('adds nothing from a file it can’t read, and says so', () => {
+    const s = store();
+    expect(s.importFile('%PDF-1.7', 'report.pdf')).toEqual({ added: 0, note: CANT_READ });
+    expect(s.getState().board.order).toEqual([]);
+    expect(s.getState().ui.canUndo).toBe(false);
+  });
+
+  it('reads a plain text file as notes, one undo for the lot', () => {
+    const s = store();
+    expect(s.importFile('one\n\ntwo\n\nthree', 'notes.txt')).toEqual({ added: 3, note: '' });
+    s.undo();
+    expect(s.getState().board.order).toEqual([]);
+  });
+
   it('lays the lanes out again with the real heights once every card is drawn', () => {
     const s = store();
-    s.importMilanote('## A\n- [ ] a\n\n## B\n- [ ] b\n\n## C\n- [ ] c\n\n## D\n- [ ] d\n\n## E\n- [ ] e');
+    s.importFile('## A\n- [ ] a\n\n## B\n- [ ] b\n\n## C\n- [ ] c\n\n## D\n- [ ] d\n\n## E\n- [ ] e');
     const ids = s.getState().ui.selection;
     const first = s.getState().board.cards[ids[0]];
     ids.forEach((id, i) => s.setMeasuredHeight(id, i === 0 ? 300 : 100));
@@ -63,7 +78,7 @@ describe('importing a Milanote export', () => {
     s.addColumn();
     const col = s.getState().board.columns[s.getState().ui.selection[0]];
     s.setMeasuredHeight(col.id, 220);
-    s.importMilanote(sample);
+    s.importFile(sample);
     const b = s.getState().board;
     for (const id of s.getState().ui.selection) {
       const c = b.cards[id];

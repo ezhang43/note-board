@@ -1,5 +1,10 @@
 # Changelog
 
+## Moving online data to the US: the checking tool (2026-10-07)
+
+- Nothing changes in BusyAnts yet. This adds a small read-only tool, run in Google Cloud Shell, that counts every saved board, version and shared board in the online database and checks that a copy has exactly the same contents. It is used to prove the copy is complete before and after moving the online data from Sydney to the United States.
+- The step-by-step plan for the move, with the owner's choices, is in docs/plans/firestore-us-move-plan.md.
+
 ## Import PDFs (2026-10-07)
 
 - File → Import file… now also takes PDF files. Their text comes in as cards: big lines become list titles (or the first line of a note), bulleted and checkbox lines become checklist items (ticked boxes ticked, indented ones as sub-items), and other text becomes notes, a new note for each page. Layout, pictures and tables are not brought in.

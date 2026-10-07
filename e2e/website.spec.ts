@@ -105,7 +105,9 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
   await page.goto('/privacy/');
   const privacy = page.locator('main');
   await expect(privacy).toContainText('Effective from October 6, 2026');
-  await expect(privacy).toContainText('us-central (United States)');
+  await expect(privacy).toContainText('australia-southeast1 (Sydney, Australia)');
+  await expect(privacy).toContainText('may be processed outside your own country');
+  await expect(privacy).not.toContainText('us-central');
   await expect(privacy).toContainText('within 30 days');
   await expect(privacy).toContainText('Some US states give their residents extra privacy rights');
   await expect(privacy.getByRole('link', { name: 'ezhang43@gmail.com' }).first()).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');

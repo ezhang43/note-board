@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { problems } from '../src/model/board';
+import { addCard, addColumn, createBoard, problems } from '../src/model/board';
+import { createCard, createColumn } from '../src/model/cards';
 import { findItem } from '../src/model/checklist';
+import { CARD_W } from '../src/model/constants';
+import { estimateHeight } from '../src/model/milanote';
 import type { NoteCard, TodoCard, TodoItem } from '../src/model/types';
 import { readWorkspace, serializeWorkspace, type Workspace } from '../src/model/workspace';
 import { addItems, addNote, editItems, moveItems, setItemsDone, type Edit } from './edits';
@@ -127,6 +130,17 @@ describe('set_items_done', () => {
 });
 
 describe('move_items', () => {
+  it('items from several lists keep the order they were given in, list by list', () => {
+    const ws = sample();
+    // "Other" was made before Groceries in card order, but its item is given second.
+    ws.boards.home.cards = { listOther: { ...list(ws, 'listGroceries'), id: 'listOther', title: 'Other', items: [{ id: 'o1', text: 'One', done: false, children: [] }] }, ...ws.boards.home.cards };
+    ws.boards.home.order = [...ws.boards.home.order, 'listOther'];
+    ws.boards.home.cards.listWork = { ...list(ws, 'listGroceries'), id: 'listWork', title: 'Dest', items: [{ id: 'd1', text: 'D', done: false, children: [] }] };
+    ws.boards.home.order.push('listWork');
+    const r = ok(moveItems('home', ['iBread', 'o1'], { list: 'Dest' }), ws);
+    expect(list(r.ws, 'listWork').items.map((i) => i.id)).toEqual(['d1', 'iBread', 'o1']);
+  });
+
   it('moves items (with their sub-items) to another list on the board, at its end', () => {
     const ws = ok(addItems('home', 'Groceries', [{ text: 'x' }], ['n'])).ws;
     ws.boards.home.cards.listOther = { ...list(ws, 'listGroceries'), id: 'listOther', title: 'Other', items: [{ id: 'o1', text: 'One', done: false, children: [] }] };
@@ -189,6 +203,31 @@ describe('add_note', () => {
       expect(r.ws.boards.home.order).toContain('k1');
       expect(r.changed[0]).toMatch(/^Added a note \(id: k1\)/);
     }
+  });
+
+  it('loose: never over a long column (its height guessed from its cards)', () => {
+    // A column at (40, 40) with 9 two-line notes: far taller than an empty column. Walls left, above
+    // and right of it, so the only free room near the top left is below it.
+    let b = addColumn(createBoard(), { ...createColumn('colIdeas'), x: 40, y: 40 });
+    for (let i = 0; i < 9; i++) b = addCard(b, { ...(createCard('note', `x${i}`) as NoteCard), text: `Idea ${i}\nwith a second line` }, { type: 'column', columnId: 'colIdeas', index: i });
+    const c0 = b.columns.colIdeas;
+    const wall = (id: string, x: number, y: number, w: number, h: number) => addCard(b, { ...(createCard('note', id) as NoteCard), w, h }, { type: 'loose', x, y });
+    b = wall('wl', c0.x - 5000, -5000, 4900, 20000);
+    b = wall('wu', c0.x - 100, -5000, c0.w + 200, 4900 + c0.y);
+    b = wall('wr', c0.x + c0.w + 10, -5000, 5000, 20000);
+    const r = ok(addNote('home', 'Loose', {}, 'k1'), { home: 'home', boards: { home: b } });
+    const note = r.ws.boards.home.cards.k1;
+    const col = r.ws.boards.home.columns.colIdeas;
+    const columnBottom = col.y + col.cardIds.reduce((h, id) => h + estimateHeight(r.ws.boards.home.cards[id]), 0);
+    const noteBottom = note.y + estimateHeight(note);
+    const apart = note.x >= col.x + col.w || note.x + CARD_W <= col.x || note.y >= columnBottom || noteBottom <= col.y;
+    expect(apart, JSON.stringify({ note: [note.x, note.y], col: [col.x, col.y, col.w, columnBottom] })).toBe(true);
+  });
+
+  it('near a column: beside it, loose (not inside it)', () => {
+    const r = ok(addNote('home', 'Beside', { near: 'colIdeas' }, 'k1'));
+    expect(r.ws.boards.home.columns.colIdeas.cardIds).not.toContain('k1');
+    expect(r.ws.boards.home.order).toContain('k1');
   });
 
   it('runs again without adding a second note', () => {

@@ -71,7 +71,7 @@ export function firestoreReader(idToken: () => Promise<string>, fetchFn: typeof 
 // ---------- writing own boards (job B) ----------
 
 const ROOT = DOCS.slice(0, -1);
-const NAME ='projects/note-board-a672a/databases/(default)/documents/';
+const NAME = DOCS.slice(DOCS.indexOf('projects/'));
 
 /** The person's own boards as saved: the text and Firestore's time of that save. */
 export interface OwnDoc {

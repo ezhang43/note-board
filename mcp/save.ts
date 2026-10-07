@@ -73,12 +73,16 @@ async function commit(deps: SaveDeps, edit: Edit, before?: (raw: string) => Prom
   throw new Stop('Nothing was changed: the boards kept changing while saving (BusyAnts is probably open and busy). Try again in a moment.');
 }
 
-/** Whether `edit` is still on the boards (making it again changes nothing). */
-async function stillThere(db: OwnDb, edit: Edit): Promise<boolean> {
+/**
+ * Whether `edit` is still on the boards (making it again changes nothing): true, false, or why it
+ * can't be told (the boards changed so it no longer applies, say the list was deleted).
+ */
+async function stillThere(db: OwnDb, edit: Edit): Promise<boolean | string> {
   const { raw } = await db.read();
-  if (!safeToEdit(raw).ok) return false;
+  const safe = safeToEdit(raw);
+  if (!safe.ok) return safe.reason;
   const r = edit(readWorkspace(raw)!.ws);
-  return !('error' in r) && r.changed.length === 0;
+  return 'error' in r ? r.error : r.changed.length === 0;
 }
 
 const list = (changed: string[]) => changed.map((c) => `- ${c}`).join('\n');
@@ -115,7 +119,13 @@ export async function saveChange(deps: SaveDeps, edit: Edit): Promise<SaveResult
 
 async function checkAfter(deps: SaveDeps, edit: Edit, changed: string[], saved: string): Promise<SaveResult> {
   await deps.wait(PUT_BACK_MS);
-  if (await stillThere(deps.db, edit)) return { text: saved };
+  const there = await stillThere(deps.db, edit);
+  if (there === true) return { text: saved };
+  if (typeof there === 'string') {
+    // Changed on purpose in the app (the list deleted, say): not put back over that.
+    await deps.log(`Changed in BusyAnts since; not put back: ${changed.join('; ')} (${there})`);
+    return { text: `${saved}\n\n(The board has changed in BusyAnts since, so this can’t be checked or put back: ${there} Read the board to see it now.)` };
+  }
   try {
     await commit(deps, edit);
   } catch (e) {
@@ -124,7 +134,7 @@ async function checkAfter(deps: SaveDeps, edit: Edit, changed: string[], saved: 
     return { text: `${saved}\n\nBut BusyAnts saved over it a moment later, and it couldn’t be put back: ${e.message}`, isError: true };
   }
   await deps.wait(PUT_BACK_MS);
-  if (await stillThere(deps.db, edit)) {
+  if ((await stillThere(deps.db, edit)) === true) {
     await deps.log(`Saved over by the app; put back: ${changed.join('; ')}`);
     return { text: `${saved}\n\n(BusyAnts saved over this a moment later; the connector put it back.)` };
   }

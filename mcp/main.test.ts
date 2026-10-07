@@ -69,6 +69,15 @@ describe('saving through the signed-in connector', () => {
       expect(fs.own()).toContain('"id":"n1"');
       expect(String(fs.field('boards/me', 'client'))).toMatch(/^mcp-\w{8}$/);
       expect(await readFile(logFile, 'utf8')).toMatch(/Z Saved: Added "Apples" \(id: n1\) to Groceries\n$/);
+      // A different account signed in without a restart gets its own safety version before its first change.
+      fs.addVersion('recent', Date.now() - 1000, 'other');
+      await saveToken(file, { refreshToken: 'R2', uid: 'me' });
+      const before = fs.versions().length;
+      done = false;
+      const again = write(addItems('home', 'Groceries', [{ text: 'Pears' }], ['n2'])).finally(() => (done = true));
+      while (!done) await vi.advanceTimersByTimeAsync(1000);
+      expect((await again).isError).toBeFalsy();
+      expect(fs.versions().length).toBe(before + 1);
       await deleteToken(file);
       await expect(write(addItems('home', 'Groceries', [{ text: 'Pears' }], ['n2']))).rejects.toThrow(/Not signed in/);
     } finally {

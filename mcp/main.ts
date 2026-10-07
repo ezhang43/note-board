@@ -7,7 +7,7 @@ import { WEB_API_KEY, deleteToken, idTokens, loadToken, saveToken, tokenPath, ty
 import { collectBoards, safeToEdit, type Snapshot } from './boards';
 import { firestoreReader, ownDb, readSnapshot, type OwnDb } from './firestore';
 import { API_KEY_SHAPE, startLogin } from './login/login';
-import { saveChange } from './save';
+import { saveChange, type SaveDeps } from './save';
 import { createServer, type Write } from './server';
 
 // `node mcp/dist/server.js` runs the connector for Claude; with login / logout / check it is the
@@ -21,7 +21,7 @@ const NOT_SIGNED_IN = 'Not signed in. Run npm run mcp:login first.';
  * the sign-in stays the same.
  */
 export function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
-  let session: { refreshToken: string; uid: string; email?: string; read: () => Promise<Snapshot>; own: OwnDb } | null = null;
+  let session: { refreshToken: string; uid: string; email?: string; read: () => Promise<Snapshot>; own: OwnDb; memory: SaveDeps['memory'] } | null = null;
   const signedIn = async () => {
     const token = await loadToken(tokenFile);
     if (!token) {
@@ -36,7 +36,7 @@ export function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
       };
       const tokens = idTokens(token, { fetch: fetchFn, save });
       const db = firestoreReader(tokens, fetchFn);
-      const s = { refreshToken: token.refreshToken, uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid), own: ownDb(tokens, token.uid, fetchFn) };
+      const s = { refreshToken: token.refreshToken, uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid), own: ownDb(tokens, token.uid, fetchFn), memory: { lastEditAt: null } };
       session = s;
     }
     return session;
@@ -52,7 +52,8 @@ export function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
     }
   };
   const load = () => withSession(async (s) => ({ snapshot: await s.read(), email: s.email ?? s.uid }));
-  return Object.assign(load, { withOwn: <T>(use: (db: OwnDb) => Promise<T>) => withSession((s) => use(s.own)) });
+  // The save memory is per sign-in: a new one (another account, say) gets a safety version before its first change.
+  return Object.assign(load, { withOwn: <T>(use: (db: OwnDb, memory: SaveDeps['memory']) => Promise<T>) => withSession((s) => use(s.own, s.memory)) });
 }
 
 /** %APPDATA%\busyants-mcp\activity.log, beside the saved sign-in: what the connector changed. */
@@ -74,11 +75,10 @@ export function activityLog(file: string, now: () => number = Date.now) {
 
 /** Saves the connector's changes to the signed-in owner's own boards, logging them to `logFile`. */
 export function boardsWriter(loader: ReturnType<typeof boardsLoader>, logFile: string): Write {
-  const memory = { lastEditAt: null as number | null };
   const log = activityLog(logFile);
   const client = `mcp-${crypto.randomUUID().slice(0, 8)}`;
   const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
-  return (edit) => loader.withOwn((db) => saveChange({ db, client, now: Date.now, wait, log, memory }, edit));
+  return (edit) => loader.withOwn((db, memory) => saveChange({ db, client, now: Date.now, wait, log, memory }, edit));
 }
 
 /** npm run mcp:check: read only. Exit code 0 when the boards could be read. */

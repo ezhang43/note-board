@@ -6,7 +6,8 @@ import { readWorkspace } from '../src/model/workspace';
 import type { Snapshot } from './boards';
 import { fakeFirestore } from './fakeFirestore';
 import { ownDb } from './firestore';
-import { ownRaw, sampleSnapshot } from './sample';
+import { serializeShare } from '../src/model/sharing';
+import { ownRaw, sampleSnapshot, workBoard } from './sample';
 import { saveChange } from './save';
 import { createServer, type Write } from './server';
 
@@ -121,6 +122,18 @@ describe('the connector’s write tools', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/shared.*read-only/);
     expect(fs.calls.some((c) => c.path === ':commit')).toBe(false);
+  });
+
+  it('a board that is in a share is read-only even while an old copy is still in the own boards', async () => {
+    const fs = fakeFirestore('me');
+    fs.setOwn(ownRaw());
+    const snap = sampleSnapshot();
+    // The owner just shared "Work": the share holds it, the own boards still have the old copy.
+    const shared = { id: 'shareWork', owner: 'me', ownerName: 'you', mine: true, raw: serializeShare('work', { work: workBoard() }) };
+    const client = await connect(async () => ({ ...snap, own: fs.own(), shares: [...snap.shares, shared] }), noSaving);
+    const r = await client.callTool({ name: 'add_items', arguments: { board: 'work', list: 'Tasks', items: [{ text: 'x' }] } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/shared.*read-only/);
   });
 
   it('at most 50 changes in one call, and 5,000 characters per text', async () => {

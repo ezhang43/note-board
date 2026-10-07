@@ -34,7 +34,7 @@ Run these in the project folder (`C:\Users\ezhan\Projects\note-board`).
 4. **Claude Desktop:** Settings → Developer → Edit Config, and add (inside the outer `{ }`, keeping anything already there):
    ```json
    "mcpServers": {
-     "busyants": { "command": "node", "args": ["C:\Users\ezhan\Projects\note-board\mcp\dist\server.js"] }
+     "busyants": { "command": "node", "args": ["C:\\Users\\ezhan\\Projects\\note-board\\mcp\\dist\\server.js"] }
    }
    ```
    Save, quit Claude Desktop from the tray (right-click its icon → Quit) and open it again. Ask: "List my BusyAnts boards."

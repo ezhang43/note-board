@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { newId } from '../src/model/cards';
+import { readShare } from '../src/model/sharing';
 import { boardOutline, collectBoards, findBoard, listBoardsText, type Snapshot } from './boards';
 import { addItems, addNote, editItems, moveItems, setItemsDone, type Edit } from './edits';
 
@@ -41,9 +42,13 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
   /** Finds the board, refuses shared ones, and saves `make(boardId)` to the owner's boards. */
   const change = (board: string, make: (boardId: string) => Edit) =>
     safely(async () => {
-      const found = findBoard(collectBoards(await load()).entries, board);
+      const snap = await load();
+      const found = findBoard(collectBoards(snap).entries, board);
       if ('error' in found) return { text: found.error, isError: true };
-      if (found.entry.sharedBy) return { text: `${found.entry.name} is a shared board: shared boards are read-only for this connector. Nothing was changed.`, isError: true };
+      // A board in any share counts as shared, even while an old copy is still in the own boards
+      // (just shared): the app shows the share's copy, so a change to the old one would be lost.
+      const inShare = snap.shares.some((s) => readShare(s.raw)?.boards[found.entry.id]);
+      if (found.entry.sharedBy || inShare) return { text: `${found.entry.name} is a shared board: shared boards are read-only for this connector. Nothing was changed.`, isError: true };
       return write(make(found.entry.id));
     });
 

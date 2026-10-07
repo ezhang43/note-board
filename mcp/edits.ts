@@ -1,9 +1,9 @@
 import { addCard, placementForNewCard, setItemText } from '../src/model/board';
 import { createCard, createItem } from '../src/model/cards';
 import { editItems as changeItems, extractItems, findItem, insertItems, refill, rootsOf, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
-import { CARD_W } from '../src/model/constants';
+import { CARD_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
 import { isDueDate, withDue } from '../src/model/due';
-import { blockRect, spotForNewBlock } from '../src/model/layout';
+import { blockRect, spotForNewBlock, type MeasuredHeight } from '../src/model/layout';
 import { estimateHeight } from '../src/model/milanote';
 import type { Board, NoteCard, TodoCard, TodoItem } from '../src/model/types';
 import type { Workspace } from '../src/model/workspace';
@@ -180,8 +180,9 @@ export function moveItems(boardId: string, ids: string[], to: MoveTo): Edit {
     // Take the items out of every list they are in (the destination too), in the order shown.
     const moving: TodoItem[] = [];
     const sources = new Map<string, TodoItem[]>();
-    for (const id of ids) listOf(b, id);
-    for (const list of todos(b)) {
+    // Lists in the order their items were given (each list's items in the order shown).
+    const lists = [...new Set(ids.map((id) => listOf(b, id)))];
+    for (const list of lists) {
       const mine = ids.filter((id) => findItem(list.items, id));
       if (!mine.length) continue;
       const { rest, moving: out } = extractItems(list.items, rootsOf(list.items, mine));
@@ -213,6 +214,20 @@ export function moveItems(boardId: string, ids: string[], to: MoveTo): Edit {
 }
 
 /**
+ * Blocks' drawn heights, guessed (the connector never sees the board drawn): a card from its
+ * contents, a column from its title and cards. The app moves blocks apart if a guess was short.
+ */
+function guessedHeights(b: Board): MeasuredHeight {
+  return (id) => {
+    const col = b.columns[id];
+    if (col) return Math.max(NEW_BLOCK_H.column, COLUMN_TITLE_GUESS + col.cardIds.reduce((h, c) => h + (b.cards[c] ? estimateHeight(b.cards[c]) + GRID : 0), 0));
+    const card = b.cards[id];
+    return card ? (card.h ?? estimateHeight(card)) : undefined;
+  };
+}
+const COLUMN_TITLE_GUESS = 60;
+
+/**
  * add_note: a note at the end of a column (by id or title), just below a card in a column (`near`),
  * beside a loose card or column (`near`), or else loose near the board's top left; never over
  * another block. `id` is the new note's id.
@@ -227,25 +242,28 @@ export function addNote(boardId: string, text: string, where: { column?: string;
     if (where.column !== undefined) {
       const cols = Object.values(b.columns);
       const name = (t: string) => t.trim() || 'Untitled column';
-      const named = cols.filter((c) => c.id === where.column!.trim() || norm(name(c.title)) === norm(where.column!));
-      const choices = cols.map((c) => `- ${name(c.title)} (id: ${c.id})`).join('\n');
-      if (named.length > 1) refuse(`${named.length} columns are called "${name(named[0].title)}". Say which by id:\n${choices}`);
-      if (!named.length) refuse(`No column called "${where.column.trim()}" on this board.${cols.length ? ` The columns are:\n${choices}` : ''}`);
+      const byId = b.columns[where.column.trim()];
+      const named = byId ? [byId] : cols.filter((c) => norm(name(c.title)) === norm(where.column!));
+      const choices = (cs: typeof cols) => cs.map((c) => `- ${name(c.title)} (id: ${c.id})`).join('\n');
+      if (named.length > 1) refuse(`${named.length} columns are called "${name(named[0].title)}". Say which by id:\n${choices(named)}`);
+      if (!named.length) refuse(`No column called "${where.column.trim()}" on this board.${cols.length ? ` The columns are:\n${choices(cols)}` : ''}`);
       const col = named[0];
       changed.push(`Added a note (id: ${id}) to the column ${name(col.title)}: ${preview}`);
       return addCard(b, note, { type: 'column', columnId: col.id, index: col.cardIds.length });
     }
     const near = where.near?.trim();
     if (near !== undefined && !b.cards[near] && !b.columns[near]) refuse(`No card or column with id "${near}" on this board.`);
-    const inColumn = near ? placementForNewCard(b, near) : null;
+    // Near a card in a column: just below it in the column. Near a column or a loose card: beside it.
+    const inColumn = near && b.cards[near] ? placementForNewCard(b, near) : null;
     if (inColumn) {
-      changed.push(`Added a note (id: ${id}) to a column, ${near && b.columns[near] ? 'at its end' : 'below the card'}: ${preview}`);
+      changed.push(`Added a note (id: ${id}) to a column, below the card: ${preview}`);
       return addCard(b, note, inColumn);
     }
     const h = estimateHeight(note);
-    const r = near ? blockRect(b, near, () => undefined) : null;
+    const measured = guessedHeights(b);
+    const r = near ? blockRect(b, near, measured) : null;
     const centre = r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : { x: 40 + CARD_W / 2, y: 40 + h / 2 };
-    const spot = spotForNewBlock(b, CARD_W, h, centre, () => undefined);
+    const spot = spotForNewBlock(b, CARD_W, h, centre, measured);
     changed.push(`Added a note (id: ${id}) on the board: ${preview}`);
     return addCard(b, note, { type: 'loose', ...spot });
   });

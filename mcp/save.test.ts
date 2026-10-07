@@ -245,6 +245,24 @@ describe('the put-back check', () => {
     expect(log.at(-1)).toMatch(/put back/i);
   });
 
+  it('the owner changing the board so the change no longer applies (list deleted): said plainly, not put back', async () => {
+    const { fs, deps } = setup();
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) {
+        const ws = readWorkspace(fs.own())!.ws;
+        const home = ws.boards.home;
+        const { listGroceries: _gone, ...cards } = home.cards;
+        const columns = { ...home.columns, colTodo: { ...home.columns.colTodo, cardIds: home.columns.colTodo.cardIds.filter((id) => id !== 'listGroceries') } };
+        fs.setOwn(serializeWorkspace({ ...ws, boards: { ...ws.boards, home: { ...home, cards, columns } } }));
+      }
+    };
+    const r = await saveChange(deps, addApples());
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toMatch(/^Saved:[\s\S]*changed in BusyAnts since[\s\S]*No checklist called "Groceries"/);
+    expect(r.text).not.toMatch(/saved over/);
+    expect(boardCommits(fs)).toHaveLength(1);
+  });
+
   it('reading back failing (offline) still says it was saved', async () => {
     const { fs, deps } = setup();
     const real = fs.fetch;

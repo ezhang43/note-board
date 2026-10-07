@@ -238,12 +238,12 @@ export function blockActions(ctx: StoreContext) {
     },
 
     /**
-     * File → Import file…: a Markdown (Milanote, Obsidian…), text or HTML file's cards are added
-     * loose to this board, in lanes, at the top middle of the screen (or the nearest free space),
-     * and selected. One undo removes them all. Returns how many cards were added, and a note to
-     * show when the file couldn't be read or was cut short.
+     * File → Import file…: a Markdown (Milanote, Obsidian…), text, HTML, JSON or PDF file's cards
+     * (a PDF comes as its pages of text) are added loose to this board, in lanes, at the top middle
+     * of the screen (or the nearest free space), and selected. One undo removes them all. Returns
+     * how many cards were added, and a note to show when the file couldn't be read or was cut short.
      */
-    importFile(text: string, name = 'board.md'): { added: number; note: string } {
+    importFile(text: Parameters<typeof readImport>[1], name = 'board.md'): { added: number; note: string } {
       // The browser's parser only builds a tree: no scripts run and nothing is loaded.
       const { cards, note } = readImport(name, text, (html) => new DOMParser().parseFromString(html, 'text/html'));
       if (!cards.length) return { added: 0, note };

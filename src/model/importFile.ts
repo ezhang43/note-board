@@ -1,13 +1,14 @@
 import { newId, type MakeId } from './cards';
 import { readJson } from './importJson';
-import { parseMilanote } from './milanote';
+import { NO_TEXT, pdfToMarkdown, type PdfText } from './importPdf';
+import { escapeMarkdown, parseMilanote } from './milanote';
 import type { Card, TodoItem } from './types';
 
 // File → Import file… (owner, 2026-10-06): one importer for files from other apps. It works out
 // the kind of file from its name and content, then reads it into cards. Markdown (Milanote,
 // Obsidian, Notion, Bear…) and text go through the Markdown reader; HTML (Evernote, Google Keep,
-// saved web pages) is turned into Markdown first; JSON (Trello, Google Keep) is read by `importJson`.
-// New kinds (PDF) plug into `kindOf` and the switch in `readImport`.
+// saved web pages) is turned into Markdown first; JSON (Trello, Google Keep) is read by `importJson`;
+// a PDF's text (read by pdf.js in the browser) is turned into Markdown by `importPdf`.
 
 /** Files bigger than this are refused. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -22,7 +23,10 @@ export const TOO_LONG = 'That file is very long, so only its first part was adde
 export const UNKNOWN_JSON = 'BusyAnts can only import JSON files from Trello or Google Keep.';
 
 /** What the file picker offers. */
-export const IMPORT_ACCEPT = '.md,.markdown,.txt,.html,.htm,.json,text/markdown,text/plain,text/html,application/json';
+export const IMPORT_ACCEPT = '.md,.markdown,.txt,.html,.htm,.json,.pdf,text/markdown,text/plain,text/html,application/json,application/pdf';
+
+/** A PDF, by its name or its first bytes ("%PDF-"): its text is read with pdf.js before `readImport`. */
+export const isPdf = (name: string, start: string) => start.startsWith('%PDF-') || /\.pdf$/i.test(name);
 
 // A heading or a checklist line makes a .txt file Markdown; a dashed line alone doesn't.
 const MARKDOWN = /^\s*(#{1,6}(\s|$)|[-*+]\s+\[[ xX]\])/m;
@@ -39,15 +43,20 @@ function kindOf(name: string, text: string): 'markdown' | 'text' | 'html' | 'jso
 }
 
 /**
- * Reads a file's text into cards (positions all 0,0), with a short note to show when it can't be
- * read or was cut short. `parseHtml` is the browser's DOMParser (passed in so this stays testable).
+ * Reads a file's text (or a PDF's pages of text) into cards (positions all 0,0), with a short note
+ * to show when it can't be read or was cut short. `parseHtml` is the browser's DOMParser (passed in
+ * so this stays testable).
  */
 export function readImport(
   name: string,
-  text: string,
+  text: string | PdfText[][],
   parseHtml: (html: string) => Document,
   makeId: MakeId = newId,
 ): { cards: Card[]; note: string } {
+  if (typeof text !== 'string') {
+    const cards = parseMilanote(pdfToMarkdown(text), makeId, { splitNotes: true });
+    return cards.length ? cap(cards) : { cards: [], note: NO_TEXT }; // a scan, or only a page number
+  }
   // simple: counts characters, not bytes; the File menu checks the real size before reading.
   if (text.length > IMPORT_MAX_BYTES) return { cards: [], note: TOO_BIG };
   let cards: Card[];
@@ -93,8 +102,6 @@ function cap(cards: Card[]): { cards: Card[]; note: string } {
 
 const SKIP = new Set(['SCRIPT', 'STYLE', 'NAV', 'HEAD', 'NOSCRIPT', 'TEMPLATE', 'IFRAME', 'SVG']);
 const BLOCK = /^(P|DIV|SECTION|ARTICLE|MAIN|HEADER|FOOTER|ASIDE|BLOCKQUOTE|PRE|TABLE|TR|FORM|FIGURE|DL|DT|DD|HR|ADDRESS)$/;
-/** Text from HTML must not be read as Markdown: escape what the Markdown reader would act on. */
-const escape = (s: string) => s.replace(/[\\`*_{}[\]()#+\-.!|~]/g, '\\$&');
 
 /**
  * An HTML document as Markdown the reader understands: h1–h6 → "## title", ul/ol/li → "- [ ]"
@@ -114,10 +121,10 @@ export function htmlToMarkdown(doc: Document): string {
     // Only a link (an <a>, or a bare address): a link card.
     const whole = words.map((p) => p.text).join('').trim();
     const href = words.length === 1 && words[0].href ? words[0].href : (/^<?(https?:\/\/[^\s<>]+?)>?$/.exec(whole)?.[1] ?? '');
-    if (/^https?:\/\/[^)\s]+$/.test(href)) out.push(whole.replace(/^<|>$/g, '') === href ? href : `[${escape(whole)}](${href})`);
+    if (/^https?:\/\/[^)\s]+$/.test(href)) out.push(whole.replace(/^<|>$/g, '') === href ? href : `[${escapeMarkdown(whole)}](${href})`);
     else {
       const text = parts
-        .map((p) => (p.href && /^https?:/.test(p.href) && p.text.trim() !== p.href ? `${escape(p.text)} \\(${escape(p.href)}\\)` : escape(p.text)))
+        .map((p) => (p.href && /^https?:/.test(p.href) && p.text.trim() !== p.href ? `${escapeMarkdown(p.text)} \\(${escapeMarkdown(p.href)}\\)` : escapeMarkdown(p.text)))
         .join('')
         .split('\n')
         .map((l) => l.replace(/\s+/g, ' ').trim())
@@ -160,7 +167,7 @@ export function htmlToMarkdown(doc: Document): string {
       if (tag !== 'LI') continue;
       const text = textOf(li);
       const box = Array.from(li.querySelectorAll('input')).find((b) => b.getAttribute('type')?.toLowerCase() === 'checkbox' && b.closest('li') === li);
-      out.push(`${'    '.repeat(depth)}- [${box?.hasAttribute('checked') ? 'x' : ' '}] ${escape(text)}`);
+      out.push(`${'    '.repeat(depth)}- [${box?.hasAttribute('checked') ? 'x' : ' '}] ${escapeMarkdown(text)}`);
       for (const sub of Array.from(li.querySelectorAll('ul, ol'))) if (sub.parentElement?.closest('li') === li) list(sub, depth + 1);
     }
   };
@@ -173,7 +180,7 @@ export function htmlToMarkdown(doc: Document): string {
     if (/^H[1-6]$/.test(tag)) {
       flush();
       const title = textOf(el);
-      if (title) out.push(`## ${escape(title)}`, ''); // an empty one (a logo) is skipped
+      if (title) out.push(`## ${escapeMarkdown(title)}`, ''); // an empty one (a logo) is skipped
     } else if (tag === 'UL' || tag === 'OL') {
       flush();
       list(el, 0);

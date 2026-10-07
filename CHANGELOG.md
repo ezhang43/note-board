@@ -1,5 +1,12 @@
 # Changelog
 
+## A small website for BusyAnts (2026-10-06)
+
+- New pages beside the app: About (what BusyAnts is, with a picture of a board and a big "Start your board, free" button), FAQ, Terms of use and Privacy policy. They are at about/, faq/, terms/ and privacy/ on the site; the app stays where it is, so installed apps and share links keep working.
+- Terms and Privacy are filled in (2026-10-07): run by BusyAnts in the United States, effective October 6, 2026, Maryland law, data kept in the US (Firestore us-central), account deletion within 30 days of an email to ezhang43@gmail.com, and how to ask to see, correct, delete or get a copy of your data. The Privacy policy also says what the Google Calendar panel does with your calendar (reads and changes events only when you use it, keeps no copy). The FAQ's "delete my account" answer gives the same email.
+- In the app, the ? panel ends with links to the pages, and on a phone ⋯ has About BusyAnts.
+- Opening one of the pages no longer replaces the app's offline copy.
+
 ## Ticking tests made steady; Clean up right after ticking (2026-10-06)
 
 - Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.

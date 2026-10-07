@@ -51,6 +51,14 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
   },
 ];
 
+/** The website pages beside the app (SPEC "Website"), opened in a new tab so the board stays open. */
+const SITE_LINKS = [
+  ['About BusyAnts', 'about'],
+  ['FAQ', 'faq'],
+  ['Terms of use', 'terms'],
+  ['Privacy policy', 'privacy'],
+];
+
 /** The keyboard shortcuts panel: opened by the ? button (bottom right) or the ? key; Escape closes it. */
 export function ShortcutsPanel() {
   const open = useAppState((s) => s.ui.shortcutsOpen);
@@ -79,6 +87,13 @@ export function ShortcutsPanel() {
             </dl>
           </div>
         ))}
+        <nav className="shortcuts-site" aria-label="About BusyAnts">
+          {SITE_LINKS.map(([name, page]) => (
+            <a key={page} href={`${import.meta.env.BASE_URL}${page}/`} target="_blank" rel="noopener noreferrer">
+              {name}
+            </a>
+          ))}
+        </nav>
       </section>
     </div>
   );

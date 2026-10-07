@@ -1,5 +1,11 @@
 # Changelog
 
+## Import PDFs (2026-10-07)
+
+- File → Import file… now also takes PDF files. Their text comes in as cards: big lines become list titles (or the first line of a note), bulleted and checkbox lines become checklist items (ticked boxes ticked, indented ones as sub-items), and other text becomes notes, a new note for each page. Layout, pictures and tables are not brought in.
+- A PDF with no text (a scanned page) adds nothing and says so. As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+- The PDF reader is only downloaded the first time a PDF is imported, so BusyAnts opens as fast as before.
+
 ## Import from Trello and Google Keep (2026-10-07)
 
 - File → Import file… now also takes JSON files from Trello and Google Keep.

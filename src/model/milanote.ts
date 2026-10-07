@@ -31,6 +31,9 @@ export function plainText(s: string): string {
     .replace(/\\([\\`*_{}[\]()#+\-.!|>~<])/g, '$1');
 }
 
+/** Text from another kind of file (HTML, PDF) must not be read as Markdown: escapes what the reader would act on. */
+export const escapeMarkdown = (s: string) => s.replace(/[\\`*_{}[\]()#+\-.!|~]/g, '\\$&');
+
 /** A note's text is only a web address (bare, <…> or [title](…)): it becomes a link card. */
 function asLink(text: string): { title: string; url: string } | null {
   const t = text.trim();

@@ -1,5 +1,10 @@
 # Changelog
 
+## Moving online data to the US: the checking tool (2026-10-07)
+
+- Nothing changes in BusyAnts yet. This adds a small read-only tool, run in Google Cloud Shell, that counts every saved board, version and shared board in the online database and checks that a copy has exactly the same contents. It is used to prove the copy is complete before and after moving the online data from Sydney to the United States.
+- The step-by-step plan for the move, with the owner's choices, is in docs/plans/firestore-us-move-plan.md.
+
 ## Privacy policy: where the data is stored (2026-10-07)
 
 - The Privacy policy now says boards and account details are stored in Sydney, Australia (Cloud Firestore australia-southeast1), not the United States, and that your data may be processed outside your own country. Nothing about the app changes.

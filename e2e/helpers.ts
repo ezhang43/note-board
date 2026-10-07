@@ -46,7 +46,7 @@ export async function add(page: Page, name: 'Note' | 'Checklist' | 'New column',
  * boards can still hold them: from before, or from a Milanote import, which is used here.
  */
 export async function importLinkCard(page: Page, title = 'Inspiration', url = 'https://www.example.com/ideas') {
-  await page.getByLabel('Milanote Markdown file').setInputFiles({ name: 'board.md', mimeType: 'text/markdown', buffer: Buffer.from(`[${title}](${url})\n`) });
+  await page.getByLabel('File to import').setInputFiles({ name: 'board.md', mimeType: 'text/markdown', buffer: Buffer.from(`[${title}](${url})\n`) });
   const link = page.locator('[data-kind="link"]').last();
   await expect(link).toBeVisible();
   return link;

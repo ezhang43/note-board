@@ -5,7 +5,8 @@ import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { boardRights } from '../model/sharing';
 import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
-import { IMPORT_ACCEPT, IMPORT_MAX_BYTES, TOO_BIG } from '../model/importFile';
+import { CANT_READ, IMPORT_ACCEPT, IMPORT_MAX_BYTES, isPdf, TOO_BIG } from '../model/importFile';
+import { readPdf } from './readPdf';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
 import { ShareButton } from './SharePanel';
@@ -98,7 +99,7 @@ export function FileMenu() {
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
             Restore from backup…
           </button>
-          <button type="button" role="menuitem" title="Add cards from a Markdown, text or web page file (Milanote, Obsidian, Notion, Evernote, Google Keep…)" onClick={pick(() => importer.current?.click())}>
+          <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
             Import file…
           </button>
         </div>
@@ -135,7 +136,15 @@ export function FileMenu() {
           e.currentTarget.value = ''; // so picking the same file again imports it again
           if (!file) return;
           if (file.size > IMPORT_MAX_BYTES) return void window.alert(TOO_BIG); // before reading it all in
-          const { note } = appStore.importFile(await file.text(), file.name);
+          let source: Awaited<ReturnType<typeof readPdf>> | string;
+          if (isPdf(file.name, await file.slice(0, 5).text())) {
+            try {
+              source = await readPdf(await file.arrayBuffer());
+            } catch {
+              return void window.alert(CANT_READ); // broken, or locked with a password
+            }
+          } else source = await file.text();
+          const { note } = appStore.importFile(source, file.name);
           if (note) window.alert(note);
         }}
       />

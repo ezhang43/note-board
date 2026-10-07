@@ -6,6 +6,19 @@
 - Every change is checked with the app's own rules before it is saved, and never saves over something you changed since Claude read the board. Before Claude's first change (and after 10 quiet minutes) the boards as they were are saved in version history, so you can always go back. At most 50 changes at a time.
 - If BusyAnts is open and saves over Claude's change a moment later, the connector puts it back once and tells Claude. Every change is listed in `%APPDATA%\busyants-mcp\activity.log`. Run `npm run mcp:build` once and restart Claude to get it.
 
+## Import PDFs (2026-10-07)
+
+- File → Import file… now also takes PDF files. Their text comes in as cards: big lines become list titles (or the first line of a note), bulleted and checkbox lines become checklist items (ticked boxes ticked, indented ones as sub-items), and other text becomes notes, a new note for each page. Layout, pictures and tables are not brought in.
+- A PDF with no text (a scanned page) adds nothing and says so. As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+- The PDF reader is only downloaded the first time a PDF is imported, so BusyAnts opens as fast as before.
+
+## Import from Trello and Google Keep (2026-10-07)
+
+- File → Import file… now also takes JSON files from Trello and Google Keep.
+- A Trello board export: each open list becomes a checklist, its cards become items (ticked when marked complete), and a card's checklists become sub-items with their ticks. A card's description becomes a note next to its list. Archived cards and lists are left out.
+- A Google Keep note (from Google Takeout): a list note becomes a checklist with its ticks, a text note becomes a note (titled on its first line), and a note that is only a web address becomes a link card. Notes in the bin are left out.
+- Any other JSON file adds nothing and says "BusyAnts can only import JSON files from Trello or Google Keep." As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+
 ## A small website for BusyAnts (2026-10-06)
 
 - New pages beside the app: About (what BusyAnts is, with a picture of a board and a big "Start your board, free" button), FAQ, Terms of use and Privacy policy. They are at about/, faq/, terms/ and privacy/ on the site; the app stays where it is, so installed apps and share links keep working.

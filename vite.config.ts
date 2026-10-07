@@ -17,6 +17,9 @@ export default defineConfig(({ command, isPreview }) => ({
     },
   },
   server: { port: 5173, strictPort: true },
+  // pdf.js is only imported when a PDF is picked; prepared up front so `npm run dev` doesn't
+  // reload the page the first time that happens.
+  optimizeDeps: { include: ['pdfjs-dist'] },
   test: {
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'mcp/**/*.test.ts'],
     environment: 'node',

@@ -1,6 +1,25 @@
 import { expect, test } from '@playwright/test';
+import { readdirSync, readFileSync } from 'node:fs';
 
 // The published site: only a sign-in screen until the owner signs in, and it opens offline.
+
+test('the PDF reader is published under /note-board/ and kept out of the first load (job 28)', async ({ page, request }) => {
+  const asked: string[] = [];
+  page.on('request', (r) => asked.push(r.url()));
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  expect(asked.filter((u) => /\/assets\/pdf/.test(u))).toEqual([]);
+
+  // The app asks for pdf.js's worker at its /note-board/ address, and it is served as a script
+  // (a module worker refuses anything else).
+  const worker = readdirSync('dist/assets').find((f) => /^pdf\.worker\.min-.*\.mjs$/.test(f));
+  expect(worker).toBeTruthy();
+  const pointer = readdirSync('dist/assets').filter((f) => f.endsWith('.js')).map((f) => readFileSync(`dist/assets/${f}`, 'utf8'));
+  expect(pointer.some((js) => js.includes(`"/note-board/assets/${worker}"`) || js.includes(`\`/note-board/assets/${worker}\``))).toBe(true);
+  const res = await request.get(`assets/${worker}`);
+  expect(res.ok()).toBe(true);
+  expect(res.headers()['content-type']).toMatch(/javascript/);
+});
 
 test('shows only a sign-in screen to someone who is not signed in', async ({ page }) => {
   const errors: string[] = [];

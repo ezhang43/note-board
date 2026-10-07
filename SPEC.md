@@ -63,7 +63,7 @@ The board is an endless canvas with a dotted 20px grid under a fixed top toolbar
 - **Download backup:** every board (every card, position, size, colour and setting) in one file, named like "BusyAnts - Home - 2026-10-05.json" ("All boards" in place of the name when there are several).
 - **Download as text:** the open board as readable Markdown (a board card is written as "Board: its name"): its name, each column (left to right) with its cards, then the loose cards top to bottom; to-do items as "- [ ]" / "- [x]", sub-items indented.
 - **Restore from backup…:** pick a backup file; after a confirmation it replaces the board. A backup of one board, with one board here, replaces the open board: the board as it was is saved in Version history first, and Ctrl+Z brings it back. A backup of several boards (or any backup while there are several boards here) replaces every board, after asking "Replace all your boards…?": every board is saved in Version history first, and undo starts over. A backup made before there were several boards replaces the open board. A file that isn't a BusyAnts backup changes nothing and says so. The restored board is brought into view.
-- **Import file…** (on a phone, in the File menu under ⋯): pick a file from another app: Markdown (.md, .markdown: Milanote, Obsidian, Notion, Bear…), text (.txt) or a web page (.html, .htm: Evernote or Google Keep exports, saved pages). The kind of file is worked out from its name and content. Its cards are added to the current board; nothing already there is changed or replaced.
+- **Import file…** (on a phone, in the File menu under ⋯): pick a file from another app: Markdown (.md, .markdown: Milanote, Obsidian, Notion, Bear…), text (.txt), a web page (.html, .htm: Evernote or Google Keep exports, saved pages), a JSON export (.json: a Trello board, Google Keep notes from Google Takeout) or a PDF (.pdf). The kind of file is worked out from its name and content. Its cards are added to the current board; nothing already there is changed or replaced.
 
 On an iPhone with BusyAnts on the home screen, the downloads open the Share sheet (Save to Files) instead.
 
@@ -78,11 +78,26 @@ On an iPhone with BusyAnts on the home screen, the downloads open the Share shee
 
 **Web pages (HTML):** h1–h6 become checklist titles; lists (ul / ol / li) become items, keeping nesting; a ticked checkbox in an item ticks it; each paragraph becomes its own note (a heading right above it starts the note, line breaks kept); a paragraph that is only a link becomes a link card; links inside text show as "text (address)". Scripts, styles, menus (nav), the page head, comments, noscript, template, iframe and svg are ignored, and so is a heading with no text (such as a logo). Only web addresses (http, https) are shown after a link's text; other links keep just their text. The page is only read as text: it is never shown, its scripts never run and its pictures and other files are never loaded.
 
+**JSON (Trello, Google Keep):**
+
+- A Trello board export: each open list (in Trello's order) becomes a checklist titled with its name; its open cards become items, ticked when the card's due date is marked complete; a card's checklist items become its sub-items with their ticks (a card with several checklists gets one sub-item per checklist, its items under it). A card's description becomes a note (the card's name on its first line) placed after its list. Archived (closed) lists and cards are left out; a list with no cards becomes an empty list. Labels, dates, members and attachments are not brought in.
+- Google Keep notes (one note per file, or a file holding a list of notes): a list note becomes a checklist titled with the note's title, keeping its ticks; a text note becomes a note, its title on the first line; a text note that is only a web address becomes a link card titled with the note's title. Notes in the bin are left out; archived notes come in.
+- Any other JSON, or a .json file that isn't valid JSON (including a BusyAnts backup, which goes through Restore from backup…), adds nothing and says "BusyAnts can only import JSON files from Trello or Google Keep."
+- All of it is read as plain text: nothing in the file is run, shown as a web page or loaded.
+
+**PDF:** only the text is read; layout, pictures and tables are lost. A file is read as a PDF by its .pdf name or its content.
+
+- Lines clearly bigger than most of the text (and not too long) are headings: the title of the checklist below them, or the first line of the note below them (an empty checklist when nothing follows). A heading over two lines stays one.
+- Bulleted lines ("•", "-", "*", "1.", "1)", and the bullets Word puts in PDFs) and checkbox lines ("☐", "[ ]" unticked; "☑", "☒", "✓", "[x]" ticked; similar marks work too) become items of a checklist titled by a heading right above (or untitled); a line indented under an item is a sub-item, and a wrapped item line joins its item.
+- Other text becomes notes: a heading right above starts the note, the lines of a paragraph are joined into one (a word broken with "-" is joined keeping the "-"), and separate paragraphs are lines of the same note; a list, a heading or a new page starts a new note. A note that is only a web address becomes a link card. A page number alone at the top or bottom of a page, set apart in the margin and no bigger than the text, is left out.
+- A PDF with no text in it (a scan, or only a page number) adds nothing and says "That PDF has no text BusyAnts can read (it may be a scan), so nothing was added."
+- The PDF reader (pdf.js) is loaded only when a PDF is imported, so the app's first load doesn't grow. All of the file is read as plain text: nothing in it is run, shown or loaded.
+
 **Every import:**
 
 - The file has no positions, sizes or colours: cards are laid out loose in up to 4 lanes 20px apart (each card at the bottom of the shortest lane, in file order), starting at the top middle of the screen, or the nearest free space (the board then pans to show them). Once drawn, the lanes are tidied to the cards' real heights.
 - The imported cards are selected, so they can be dragged or deleted together. One undo removes the whole import. A file with nothing in it adds nothing.
-- A file it can't read (another kind, such as a PDF or a picture) adds nothing and says "BusyAnts can’t read that file yet." A file over 5 MB is refused with a short note. At most 300 cards and 2,000 checklist items come in from one file; a longer file adds its first part and says so.
+- A file it can't read (another kind, such as a picture, or a broken or password-locked PDF) adds nothing and says "BusyAnts can’t read that file yet." A file over 5 MB is refused with a short note. At most 300 cards and 2,000 checklist items come in from one file; a longer file adds its first part and says so.
 
 ## Blocks: cards and columns
 

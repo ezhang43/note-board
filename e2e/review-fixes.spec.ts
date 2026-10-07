@@ -60,7 +60,11 @@ test.describe('with motion allowed', () => {
 
   test('Clean up straight after ticking still takes the ticked item', async ({ page }) => {
     const list = await makeList(page, ['first', 'second']);
+    // The clock stands still, so the tick is surely still on its way when Clean up is clicked.
+    await page.clock.install();
+    await page.clock.pauseAt(Date.now() + 60_000);
     await list.locator('[data-item-id]').first().getByLabel('Done').click();
+    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
     await page.locator('header.toolbar').getByRole('button', { name: 'Clean up' }).click();
     await expect(list.getByLabel('Item text')).toHaveCount(1);
     await expect(page.locator('.card', { hasText: 'Completed' }).getByText('first')).toBeVisible();

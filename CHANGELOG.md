@@ -6,6 +6,11 @@
 - Every change is checked with the app's own rules before it is saved, and never saves over something you changed since Claude read the board. Before Claude's first change (and after 10 quiet minutes) the boards as they were are saved in version history, so you can always go back. At most 50 changes at a time.
 - If BusyAnts is open and saves over Claude's change a moment later, the connector puts it back once and tells Claude. Every change is listed in `%APPDATA%\busyants-mcp\activity.log`. Run `npm run mcp:build` once and restart Claude to get it.
 
+## Ticking tests made steady; Clean up right after ticking (2026-10-06)
+
+- Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.
+- The browser tests of the tick animation now control the page's clock, so they no longer fail now and then when the computer is busy.
+
 ## Import files from other apps (2026-10-06)
 
 - File → "Import from Milanote…" is now "Import file…". It takes Markdown (.md: Milanote, Obsidian, Notion, Bear…), plain text (.txt) and web pages (.html: Evernote or Google Keep exports, saved pages), and works out which it is.

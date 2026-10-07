@@ -1,5 +1,9 @@
 # Changelog
 
+## Privacy policy: where the data is stored (2026-10-07)
+
+- The Privacy policy now says boards and account details are stored in Sydney, Australia (Cloud Firestore australia-southeast1), not the United States, and that your data may be processed outside your own country. Nothing about the app changes.
+
 ## Import PDFs (2026-10-07)
 
 - File → Import file… now also takes PDF files. Their text comes in as cards: big lines become list titles (or the first line of a note), bulleted and checkbox lines become checklist items (ticked boxes ticked, indented ones as sub-items), and other text becomes notes, a new note for each page. Layout, pictures and tables are not brought in.

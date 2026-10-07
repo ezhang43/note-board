@@ -98,7 +98,7 @@ export function FileMenu() {
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
             Restore from backup…
           </button>
-          <button type="button" role="menuitem" title="Add cards from a Markdown, text or web page file (Milanote, Obsidian, Notion, Evernote, Google Keep…)" onClick={pick(() => importer.current?.click())}>
+          <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page or JSON file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
             Import file…
           </button>
         </div>

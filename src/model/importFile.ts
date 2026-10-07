@@ -1,12 +1,13 @@
 import { newId, type MakeId } from './cards';
+import { readJson } from './importJson';
 import { parseMilanote } from './milanote';
 import type { Card, TodoItem } from './types';
 
 // File → Import file… (owner, 2026-10-06): one importer for files from other apps. It works out
 // the kind of file from its name and content, then reads it into cards. Markdown (Milanote,
 // Obsidian, Notion, Bear…) and text go through the Markdown reader; HTML (Evernote, Google Keep,
-// saved web pages) is turned into Markdown first. New kinds (JSON, PDF) plug into `kindOf` and the
-// switch in `readImport`.
+// saved web pages) is turned into Markdown first; JSON (Trello, Google Keep) is read by `importJson`.
+// New kinds (PDF) plug into `kindOf` and the switch in `readImport`.
 
 /** Files bigger than this are refused. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -18,19 +19,21 @@ export const IMPORT_MAX_ITEMS = 2000;
 export const CANT_READ = 'BusyAnts can’t read that file yet.';
 export const TOO_BIG = 'That file is too big to import (the limit is 5 MB).';
 export const TOO_LONG = 'That file is very long, so only its first part was added.';
+export const UNKNOWN_JSON = 'BusyAnts can only import JSON files from Trello or Google Keep.';
 
 /** What the file picker offers. */
-export const IMPORT_ACCEPT = '.md,.markdown,.txt,.html,.htm,text/markdown,text/plain,text/html';
+export const IMPORT_ACCEPT = '.md,.markdown,.txt,.html,.htm,.json,text/markdown,text/plain,text/html,application/json';
 
 // A heading or a checklist line makes a .txt file Markdown; a dashed line alone doesn't.
 const MARKDOWN = /^\s*(#{1,6}(\s|$)|[-*+]\s+\[[ xX]\])/m;
 
-function kindOf(name: string, text: string): 'markdown' | 'text' | 'html' | null {
+function kindOf(name: string, text: string): 'markdown' | 'text' | 'html' | 'json' | null {
   if (text.includes('\u0000')) return null; // binary (a picture, a PDF…)
   if (/^\s*<(!doctype\s+html|html[\s>])/i.test(text)) return 'html';
   const ext = /\.([a-z]+)$/i.exec(name)?.[1].toLowerCase();
   if (ext === 'html' || ext === 'htm') return 'html';
   if (ext === 'md' || ext === 'markdown') return 'markdown';
+  if (ext === 'json') return 'json';
   if (ext === 'txt') return MARKDOWN.test(text) ? 'markdown' : 'text';
   return null;
 }
@@ -55,6 +58,12 @@ export function readImport(
     case 'text':
       cards = parseMilanote(text, makeId, { splitNotes: true });
       break;
+    case 'json': {
+      const read = readJson(text, makeId);
+      if (!read) return { cards: [], note: UNKNOWN_JSON };
+      cards = read;
+      break;
+    }
     case 'html':
       cards = parseMilanote(htmlToMarkdown(parseHtml(text)), makeId, { splitNotes: true });
       break;

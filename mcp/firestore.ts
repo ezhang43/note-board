@@ -1,7 +1,9 @@
+import type { VersionMeta } from '../src/model/versions';
 import type { Snapshot } from './boards';
 
-// Reading the app's Firestore over its REST API, signed in as the owner (an id token), so
-// firestore.rules decide what may be read, exactly as in the app. Read only: nothing here writes.
+// The app's Firestore over its REST API, signed in as the owner (an id token), so firestore.rules
+// decide what may be read and written, exactly as in the app. Only the owner's own boards and
+// their version history are ever written (ownDb); nothing is ever deleted.
 
 const DOCS = 'https://firestore.googleapis.com/v1/projects/note-board-a672a/databases/(default)/documents/';
 
@@ -62,6 +64,101 @@ export function firestoreReader(idToken: () => Promise<string>, fetchFn: typeof 
         page = typeof body?.nextPageToken === 'string' ? body.nextPageToken : '';
       } while (page);
       return ids;
+    },
+  };
+}
+
+// ---------- writing own boards (job B) ----------
+
+const ROOT = DOCS.slice(0, -1);
+const NAME ='projects/note-board-a672a/databases/(default)/documents/';
+
+/** The person's own boards as saved: the text and Firestore's time of that save. */
+export interface OwnDoc {
+  raw: string | null;
+  updateTime: string;
+}
+
+/** What saving needs: own boards (read and write) and their version history (read newest, add). */
+export interface OwnDb {
+  read(): Promise<OwnDoc>;
+  /** Saves `data` only if the boards are still as saved at `updateTime`; false if they changed since. */
+  write(data: string, client: string, updateTime: string): Promise<boolean>;
+  newestVersion(): Promise<{ savedAt: number; hash?: string } | null>;
+  /** Adds a version (its board first, then its list entry, in one commit); never replaces one. */
+  addVersion(meta: VersionMeta, data: string): Promise<void>;
+}
+
+const str = (v: string) => ({ stringValue: v });
+const int = (n: number) => ({ integerValue: String(n) });
+
+export function ownDb(idToken: () => Promise<string>, uid: string, fetchFn: typeof fetch = fetch): OwnDb {
+  // A uid goes into document names (not escaped there): Firebase uids are letters and digits.
+  if (!/^[\w-]+$/.test(uid)) throw new Error('The saved sign-in has an unexpected account id. Run npm run mcp:login again.');
+  const reader = firestoreReader(idToken, fetchFn);
+  const own = `boards/${uid}`;
+
+  async function post(path: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> | unknown[] }> {
+    const res = await fetchFn(ROOT + path, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${await idToken()}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let got: Record<string, unknown> | unknown[] = {};
+    try {
+      got = await res.json();
+    } catch {
+      // checked by status below
+    }
+    return { status: res.status, body: got };
+  }
+  const failed = (status: number) =>
+    new FirestoreError(
+      status === 403 ? 'Firestore refused (permission denied). Is this Google account on the invite list in firestore.rules?' : `Firestore didn’t save it (status ${status}). Nothing was changed; try again in a moment.`,
+      status,
+    );
+
+  return {
+    async read() {
+      const doc = await reader.getDoc(own);
+      return { raw: typeof doc?.fields.data === 'string' ? doc.fields.data : null, updateTime: doc?.updateTime ?? '' };
+    },
+    async write(data, client, updateTime) {
+      const r = await post(':commit', {
+        writes: [
+          {
+            update: { name: NAME + own, fields: { data: str(data), client: str(client) } },
+            updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }],
+            currentDocument: { updateTime },
+          },
+        ],
+      });
+      if (r.status === 200) return true;
+      const status = (r.body as { error?: { status?: string } }).error?.status;
+      if (status === 'FAILED_PRECONDITION' || status === 'ABORTED') return false;
+      throw failed(r.status);
+    },
+    async newestVersion() {
+      const r = await post(`/${own}:runQuery`, {
+        structuredQuery: { from: [{ collectionId: 'versions' }], orderBy: [{ field: { fieldPath: 'savedAt' }, direction: 'DESCENDING' }], limit: 1 },
+      });
+      if (r.status !== 200 || !Array.isArray(r.body)) throw failed(r.status);
+      const doc = (r.body[0] as { document?: { fields?: Record<string, Record<string, unknown>> } } | undefined)?.document;
+      if (!doc?.fields) return null;
+      const savedAt = Number(plain(doc.fields.savedAt ?? {}));
+      const hash = plain(doc.fields.hash ?? {});
+      return { savedAt: Number.isFinite(savedAt) ? savedAt : 0, ...(typeof hash === 'string' ? { hash } : {}) };
+    },
+    async addVersion(meta, data) {
+      const fresh = { currentDocument: { exists: false } };
+      const fields = { savedAt: int(meta.savedAt), cards: int(meta.cards), columns: int(meta.columns), ...(meta.boards ? { boards: int(meta.boards) } : {}), ...(meta.hash ? { hash: str(meta.hash) } : {}) };
+      const r = await post(':commit', {
+        writes: [
+          { update: { name: `${NAME}${own}/versionData/${meta.id}`, fields: { data: str(data) } }, ...fresh },
+          { update: { name: `${NAME}${own}/versions/${meta.id}`, fields }, ...fresh },
+        ],
+      });
+      if (r.status !== 200) throw failed(r.status);
     },
   };
 }

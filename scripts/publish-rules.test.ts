@@ -19,12 +19,15 @@ describe('risky files', () => {
       'src/model/versions.ts',
       'src/model/workspace.ts',
       'firestore.rules',
+      'mcp/save.ts',
+      'mcp/server.ts',
+      'mcp/login/login.ts',
     ])
       expect(isRiskyFile(f), f).toBe(true);
   });
 
   it('test files never count, and other files are low-risk', () => {
-    for (const f of ['src/model/persist.test.ts', 'src/sync/pageHide.test.ts', 'src/store/sync.test.ts', 'e2e/sync.spec.ts', 'src/components/Toolbar.tsx', 'src/model/arrows.ts', 'CHANGELOG.md', 'src/store/actions/blocks.ts'])
+    for (const f of ['src/model/persist.test.ts', 'src/sync/pageHide.test.ts', 'src/store/sync.test.ts', 'e2e/sync.spec.ts', 'src/components/Toolbar.tsx', 'src/model/arrows.ts', 'CHANGELOG.md', 'src/store/actions/blocks.ts', 'mcp/save.test.ts'])
       expect(isRiskyFile(f), f).toBe(false);
   });
 });

@@ -1,9 +1,9 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deleteToken, saveToken } from './auth';
-import { boardsLoader, runCheck } from './main';
+import { activityLog, activityPath, boardsLoader, runCheck } from './main';
 import { ownRaw } from './sample';
 
 describe('the connector’s sign-in', () => {
@@ -27,6 +27,20 @@ describe('the connector’s sign-in', () => {
     await saveToken(file, { refreshToken: 'R2', uid: 'me' });
     await load();
     expect(calls.filter((c) => c.includes('securetoken'))).toHaveLength(2);
+  });
+});
+
+describe('the activity log', () => {
+  it('is %APPDATA%\\busyants-mcp\\activity.log, beside the sign-in', () => {
+    expect(activityPath({ APPDATA: 'C:\\Users\\x\\AppData\\Roaming' })).toBe(join('C:\\Users\\x\\AppData\\Roaming', 'busyants-mcp', 'activity.log'));
+  });
+
+  it('gets plain lines with the time, the folder made if needed', async () => {
+    const file = join(await mkdtemp(join(tmpdir(), 'busyants-')), 'busyants-mcp', 'activity.log');
+    const log = activityLog(file, () => Date.UTC(2026, 9, 6, 12));
+    await log('Saved: one');
+    await log('Saved: two');
+    expect(await readFile(file, 'utf8')).toBe('2026-10-06T12:00:00.000Z Saved: one\n2026-10-06T12:00:00.000Z Saved: two\n');
   });
 });
 

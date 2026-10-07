@@ -3,9 +3,37 @@
 ## A small website for BusyAnts (2026-10-06)
 
 - New pages beside the app: About (what BusyAnts is, with a picture of a board and a big "Start your board, free" button), FAQ, Terms of use and Privacy policy. They are at about/, faq/, terms/ and privacy/ on the site; the app stays where it is, so installed apps and share links keep working.
-- Terms and Privacy are drafts for the owner to finish: the gaps are marked [OWNER: …].
+- Terms and Privacy are filled in (2026-10-07): run by BusyAnts in the United States, effective October 6, 2026, Maryland law, data kept in the US (Firestore us-central), account deletion within 30 days of an email to ezhang43@gmail.com, and how to ask to see, correct, delete or get a copy of your data. The Privacy policy also says what the Google Calendar panel does with your calendar (reads and changes events only when you use it, keeps no copy). The FAQ's "delete my account" answer gives the same email.
 - In the app, the ? panel ends with links to the pages, and on a phone ⋯ has About BusyAnts.
 - Opening one of the pages no longer replaces the app's offline copy.
+
+## Import files from other apps (2026-10-06)
+
+- File → "Import from Milanote…" is now "Import file…". It takes Markdown (.md: Milanote, Obsidian, Notion, Bear…), plain text (.txt) and web pages (.html: Evernote or Google Keep exports, saved pages), and works out which it is.
+- Milanote exports come in as before. In any Markdown file, plain bullet lists right under a heading now also become checklist items. A text file with no Markdown becomes one note per paragraph. In a web page, headings become list titles, lists become items (nesting and ticked boxes kept), paragraphs become notes and a link on its own becomes a link card; its scripts never run and nothing is loaded.
+- As before: the cards are added (nothing else changes), selected, and one Ctrl+Z removes them all. A file it can't read says "BusyAnts can’t read that file yet."; files over 5 MB are refused; at most 300 cards and 2,000 items come in from one file.
+
+## Claude can read your boards (2026-10-06)
+
+- A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.
+- `npm run mcp:check` shows whether it can reach your boards, and `npm run mcp:logout` removes the sign-in (Claude stops reading straight away). Setup steps are in `mcp/README.md`. The website itself is unchanged.
+
+## Trash can on cards and columns (2026-10-06)
+
+- The delete button at the top right of cards and columns is now a small trash can, the same as on checklist items, instead of an ×. It works exactly as before: a card goes at once (Ctrl+Z brings it back), a column asks first. Other × buttons (closing panels, deleting a board in the Boards menu, removing an arrow) stay as they were.
+
+## Checklists pour into each other (2026-10-06)
+
+- Drag a whole checklist onto another loose checklist (over its title or items): the other list gets a dashed amber outline, and letting go moves every item across, sub-items and ticks included (ticked ones go to its Completed section). The dragged list, and its title, are gone. Ctrl+Z puts it back.
+- Drag every item out of a list into another list (or onto the board): the emptied list now disappears instead of keeping one blank item.
+- Drop items on a collapsed checklist: they go into it (it stays collapsed and shows the dashed outline while you hover). Drop items on a collapsed column: they become a new checklist at the end of that column.
+
+## Google Calendar beside the board (2026-10-06)
+
+- Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.
+- The first time, Google asks you to let BusyAnts see and change your calendar events. You can add an event (the + on a day), and click a simple event to rename it, change its day or time, or delete it (it asks first: Keep / Delete). Repeating events, events with guests and events with their own reminders are shown but open in Google Calendar to change.
+- Calendar events aren't part of your boards: Ctrl+Z doesn't undo calendar changes and they aren't in Version history. If Google Calendar can't be reached, the panel says "Google Calendar isn’t connected yet. Try again later." and everything else works as before.
+- Locally, `npm run dev` with `?demo-user=Alice` shows a pretend calendar to try it with.
 
 ## The crew checks risky pull requests by itself (2026-10-06)
 

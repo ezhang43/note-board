@@ -13,7 +13,7 @@ import { GrowTextarea } from './GrowTextarea';
 import { FindMarks } from './FindMarks';
 import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
-import { ChevronIcon, CloseIcon, ExternalIcon, ResizeIcon } from './icons';
+import { ChevronIcon, ExternalIcon, ResizeIcon, TrashIcon } from './icons';
 import { TodoBody } from './TodoList';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizeKeyDown, resizePointerDown } from './useResize';
@@ -41,6 +41,11 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   // Where to draw it while something is being dragged (pushed aside, or moving with a group).
   const dragPos = useDragPosition(id, card ?? { x: 0, y: 0 });
   const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
+  // A list about to take dragged items at its end, or a whole dragged list: dashed outline.
+  const takes = useAppState((s) => {
+    const h = s.ui.itemDrag?.hint;
+    return s.ui.drag?.intoList === id || (!!h && 'cardId' in h && h.cardId === id && h.drop.mode === 'append');
+  });
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
   if (!card) return null;
@@ -64,6 +69,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     // While following the pointer, don't glide (it would lag behind).
     (inGroupDrag || resize) && 'following',
     sizeMatch && 'size-match',
+    takes && 'append-target',
     card.collapsed && 'collapsed',
     // Notes have no title: a coloured note gets the band across its header instead.
     ((card.kind !== 'note' && card.kind !== 'board') || band) && 'titled',
@@ -94,16 +100,16 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         >
           <ChevronIcon collapsed={card.collapsed} />
         </button>
-        {/* The Completed card can never be deleted, so it has no ×. */}
+        {/* The Completed card can never be deleted, so it has no trash can. */}
         {!isPermanent(card) && (
           <button
             type="button"
-            className="icon-button"
+            className="icon-button block-trash"
             aria-label="Delete card"
             title="Delete card (Ctrl+Z brings it back)"
             onClick={() => appStore.deleteCard(id)}
           >
-            <CloseIcon />
+            <TrashIcon />
           </button>
         )}
       </div>

@@ -6,7 +6,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useTakeFocus } from './useTakeFocus';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
-import { ChevronIcon, CloseIcon, ResizeIcon } from './icons';
+import { ChevronIcon, ResizeIcon, TrashIcon } from './icons';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
@@ -73,7 +73,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       onPointerDown={blockPointerDown('column', id)}
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
-      {/* Title and count centred; collapse arrow and × on the right. */}
+      {/* Title and count centred; collapse arrow and trash can on the right. */}
       <div className="column-header">
         <div aria-hidden="true" />
         <div className="column-heading">
@@ -104,12 +104,12 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           </button>
           <button
             type="button"
-            className="icon-button"
+            className="icon-button block-trash"
             aria-label="Delete column and its cards"
             title="Delete column and its cards"
             onClick={() => appStore.askDeleteColumn(id)}
           >
-            <CloseIcon />
+            <TrashIcon />
           </button>
         </div>
       </div>

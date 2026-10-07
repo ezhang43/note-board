@@ -5,6 +5,7 @@ import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { boardRights } from '../model/sharing';
 import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
+import { IMPORT_ACCEPT, IMPORT_MAX_BYTES, TOO_BIG } from '../model/importFile';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
 import { ShareButton } from './SharePanel';
@@ -58,11 +59,11 @@ async function saveFile(name: string, text: string, type: string) {
 
 /**
  * File menu (owner request): download the board as a backup file (everything, to restore later)
- * or as readable text (Markdown); restore a backup; import a Milanote board exported as Markdown.
+ * or as readable text (Markdown); restore a backup; import cards from another app's file.
  */
 export function FileMenu() {
   const [open, setOpen] = useState(false);
-  const milanote = useRef<HTMLInputElement>(null);
+  const importer = useRef<HTMLInputElement>(null);
   const backup = useRef<HTMLInputElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -97,8 +98,8 @@ export function FileMenu() {
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
             Restore from backup…
           </button>
-          <button type="button" role="menuitem" title="Add the cards from a Milanote board exported as Markdown (.md)" onClick={pick(() => milanote.current?.click())}>
-            Import from Milanote…
+          <button type="button" role="menuitem" title="Add cards from a Markdown, text or web page file (Milanote, Obsidian, Notion, Evernote, Google Keep…)" onClick={pick(() => importer.current?.click())}>
+            Import file…
           </button>
         </div>
       )}
@@ -124,15 +125,18 @@ export function FileMenu() {
         }}
       />
       <input
-        ref={milanote}
+        ref={importer}
         type="file"
-        accept=".md,.markdown,.txt,text/markdown,text/plain"
-        aria-label="Milanote Markdown file"
+        accept={IMPORT_ACCEPT}
+        aria-label="File to import"
         hidden
         onChange={async (e) => {
           const file = e.currentTarget.files?.[0];
           e.currentTarget.value = ''; // so picking the same file again imports it again
-          if (file) appStore.importMilanote(await file.text());
+          if (!file) return;
+          if (file.size > IMPORT_MAX_BYTES) return void window.alert(TOO_BIG); // before reading it all in
+          const { note } = appStore.importFile(await file.text(), file.name);
+          if (note) window.alert(note);
         }}
       />
     </div>

@@ -16,6 +16,9 @@ import type { Board, Card, Point, TodoItem } from './types';
 //   by a heading right above it).
 
 const ITEM = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
+// A plain bullet or numbered line ("- a", "* a", "1. a"): an item when right under a heading or
+// inside a list (other Markdown apps, owner 2026-10-06); otherwise part of a note.
+const BULLET = /^(\s*)(?:[-*+]|\d{1,3}[.)])\s+(.*)$/;
 // Closing #s only count after a space ("## Learn C#" keeps its #); a bare "##" has an empty title.
 const HEADING = /^(#{1,6})(?:\s+(.*?))?(?:\s+#+)?\s*$/;
 
@@ -33,16 +36,17 @@ function asLink(text: string): { title: string; url: string } | null {
   const t = text.trim();
   let m = /^<?(https?:\/\/\S+?)>?$/.exec(t);
   if (m) return { title: '', url: m[1] };
-  m = /^\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/.exec(t);
+  m = /^\[((?:\\.|[^\]\\])*)\]\((https?:\/\/[^)\s]+)\)$/.exec(t); // escaped [ ] allowed in the title
   if (m) return { title: m[1] === m[2] ? '' : plainText(m[1]), url: m[2] };
   return null;
 }
 
 /**
- * Turns a Milanote Markdown export into cards, in reading order. Positions are all 0,0;
- * `packInLanes` lays them out.
+ * Turns a Milanote Markdown export (or any Markdown) into cards, in reading order. Positions are
+ * all 0,0; `packInLanes` lays them out. `splitNotes`: a blank line ends a note (plain text and
+ * HTML imports) instead of separating its paragraphs.
  */
-export function parseMilanote(markdown: string, makeId: MakeId = newId): Card[] {
+export function parseMilanote(markdown: string, makeId: MakeId = newId, { splitNotes = false } = {}): Card[] {
   const lines = markdown.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
   const cards: Card[] = [];
   let title: string | null = null; // heading waiting for its list
@@ -96,7 +100,9 @@ export function parseMilanote(markdown: string, makeId: MakeId = newId): Card[] 
     }
     if (line.trim()) first = false;
 
-    const item = ITEM.exec(line);
+    const ticked = ITEM.exec(line);
+    const bullet = !ticked && (list || (title !== null && !text.length)) ? BULLET.exec(line) : null;
+    const item = ticked ?? (bullet && [bullet[0], bullet[1], ' ', bullet[2]]);
     if (item) {
       flushText();
       if (!list) {
@@ -120,7 +126,8 @@ export function parseMilanote(markdown: string, makeId: MakeId = newId): Card[] 
       // A blank line ends a list (more items after it make a new, untitled list); inside a note it
       // separates paragraphs.
       flushList();
-      if (text.length) text.push('');
+      if (splitNotes) flushText();
+      else if (text.length) text.push('');
       continue;
     }
 

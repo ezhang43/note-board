@@ -34,6 +34,7 @@ export function rowAt(clientX: number, clientY: number): { cardId: string; itemI
  */
 export function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | null {
   const { board, view } = appStore.getState();
+  let columnId: string | undefined;
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     const row = el.closest<HTMLElement>('[data-item-id]');
     if (row) {
@@ -47,9 +48,17 @@ export function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemH
     }
     const list = el.closest<HTMLElement>('[data-todo-of]');
     if (list) return { cardId: list.dataset.todoOf!, drop: { mode: 'append' }, markId: null, markMode: null };
-    if (el.closest('[data-card-id], [data-col-id], [data-testid="canvas"]')) break;
+    // A collapsed list takes the items at its end (owner request); a collapsed column gets a new list at its end.
+    const block = el.closest<HTMLElement>('[data-card-id], [data-col-id]');
+    const card = board.cards[block?.dataset.cardId ?? ''];
+    if (card?.kind === 'todo' && card.collapsed) return { cardId: card.id, drop: { mode: 'append' }, markId: null, markMode: null };
+    const column = board.columns[block?.dataset.colId ?? ''];
+    if (block || el.closest('[data-testid="canvas"]')) {
+      if (column?.collapsed) columnId = column.id;
+      break;
+    }
   }
   if (!isOverCanvas(clientX, clientY)) return null;
   const p = clientToBoard(clientX, clientY);
-  return { newList: { x: p.x - 20, y: p.y - 20 } };
+  return { newList: { x: p.x - 20, y: p.y - 20 }, columnId };
 }

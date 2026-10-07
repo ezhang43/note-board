@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="strict-origin" />
+    <title>BusyAnts connector sign-in</title>
+    <style>
+      body { font-family: system-ui, sans-serif; background: #faf8f3; color: #2b2a27; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+      main { max-width: 26rem; padding: 2rem; text-align: center; }
+      button { font: inherit; padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #c9c2b2; background: #fff1c2; cursor: pointer; }
+      #status { margin-top: 1rem; min-height: 1.5em; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>BusyAnts connector</h1>
+      <p>Sign in with the Google account you use for BusyAnts. Claude will then be able to read your boards.</p>
+      <button id="go" type="button">Sign in with Google</button>
+      <p id="status" role="status"></p>
+    </main>
+    <script type="module">
+      // Firebase from Google's own address for it, the same version the app uses.
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+      import { GoogleAuthProvider, getAuth, inMemoryPersistence, setPersistence, signInWithPopup } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+
+      const NONCE = __NONCE__;
+      const auth = getAuth(initializeApp({ apiKey: __API_KEY__, authDomain: 'note-board-a672a.firebaseapp.com', projectId: 'note-board-a672a' }));
+      const status = document.getElementById('status');
+      const button = document.getElementById('go');
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        status.textContent = 'Signing in…';
+        try {
+          // Nothing is kept in this browser: the sign-in goes only to the helper on this computer.
+          await setPersistence(auth, inMemoryPersistence);
+          const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
+          const res = await fetch('/token', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ nonce: NONCE, refreshToken: user.refreshToken, uid: user.uid, email: user.email ?? undefined }),
+          });
+          status.textContent = res.ok ? 'Done, you can close this tab.' : 'The helper refused this sign-in. Run npm run mcp:login again.';
+        } catch (e) {
+          status.textContent = `That didn’t work: ${e && e.code ? e.code : e}. Run npm run mcp:login again to retry.`;
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

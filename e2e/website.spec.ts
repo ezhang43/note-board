@@ -55,6 +55,12 @@ for (const p of PAGES) {
     }
   });
 
+  test(`${p.path} has no gaps left for the owner to fill`, async ({ page }) => {
+    const res = await page.goto(p.path);
+    // The whole source, comments included, so a gap can't hide anywhere.
+    expect(await res!.text()).not.toContain('[OWNER');
+  });
+
   test(`${p.path} fits a phone screen without sideways scrolling`, async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto(p.path);
@@ -87,6 +93,28 @@ test('the landing page says what BusyAnts is, shows a picture of a board and has
   await start.click();
   await expect(page).toHaveURL('/');
   await expect(page.getByTestId('canvas')).toBeVisible();
+});
+
+test('the legal pages name BusyAnts, the date, the law and a way to get in touch', async ({ page }) => {
+  await page.goto('/terms/');
+  const terms = page.locator('main');
+  await expect(terms).toContainText('Effective from October 6, 2026');
+  await expect(terms).toContainText('State of Maryland, United States');
+  await expect(terms.getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
+
+  await page.goto('/privacy/');
+  const privacy = page.locator('main');
+  await expect(privacy).toContainText('Effective from October 6, 2026');
+  await expect(privacy).toContainText('us-central (United States)');
+  await expect(privacy).toContainText('within 30 days');
+  await expect(privacy).toContainText('Some US states give their residents extra privacy rights');
+  await expect(privacy.getByRole('link', { name: 'ezhang43@gmail.com' }).first()).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
+  // The Google Calendar panel asks for calendar access, so the policy says what it does with it.
+  await expect(privacy.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
+  await expect(privacy).toContainText('never saved with your boards');
+
+  await page.goto('/faq/');
+  await expect(page.locator('#delete + p').getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
 });
 
 test('the app still opens at its own address, and a share link in the existing format still opens the app', async ({ page }) => {

@@ -118,3 +118,35 @@ test('a file it can’t read, or one over 5 MB, adds nothing and says so', async
   expect(dialogs[1]).toMatch(/too big/);
   await expect(cards(page)).toHaveCount(0);
 });
+
+test('imports a Trello board export and a Google Keep note; other JSON adds nothing and says so', async ({ page }) => {
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
+  const trello = {
+    name: 'Home jobs',
+    lists: [{ id: 'L1', name: 'To do', closed: false, pos: 1 }, { id: 'L2', name: 'Old', closed: true, pos: 2 }],
+    cards: [
+      { id: 'c1', name: 'Paint fence', desc: 'White <img src=x onerror="alert(1)">', closed: false, idList: 'L1', pos: 1 },
+      { id: 'c2', name: 'Gone', desc: '', closed: true, idList: 'L1', pos: 2 },
+    ],
+    checklists: [{ id: 'k1', idCard: 'c1', name: 'Steps', pos: 1, checkItems: [{ id: 'i1', name: 'Sand', state: 'complete', pos: 1 }] }],
+  };
+  await importFile(page, 'trello.json', JSON.stringify(trello));
+  await expect(cards(page)).toHaveCount(2);
+  await expect(page.locator('.card.selected')).toHaveCount(2);
+  await expect(page.getByLabel('List title')).toHaveValue('To do');
+  const list = cards(page).filter({ has: page.locator('input[value="To do"]') });
+  await expect(list.locator('textarea').first()).toHaveValue('Paint fence');
+  await expect(page.getByLabel('Note text')).toHaveValue('Paint fence\nWhite <img src=x onerror="alert(1)">');
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+
+  await importFile(page, 'Groceries.json', JSON.stringify({ isTrashed: false, title: 'Groceries', listContent: [{ text: 'Milk', isChecked: false }, { text: 'Eggs', isChecked: true }] }));
+  await expect(cards(page)).toHaveCount(1);
+  await expect(page.getByLabel('List title')).toHaveValue('Groceries');
+  await expect(cards(page).getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Eggs was ticked
+
+  await importFile(page, 'other.json', '{"hello": "world"}');
+  await expect.poll(() => dialogs).toEqual(['BusyAnts can only import JSON files from Trello or Google Keep.']);
+  await expect(cards(page)).toHaveCount(1);
+});

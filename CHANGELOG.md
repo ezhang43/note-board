@@ -1,5 +1,12 @@
 # Changelog
 
+## Import from Trello and Google Keep (2026-10-07)
+
+- File → Import file… now also takes JSON files from Trello and Google Keep.
+- A Trello board export: each open list becomes a checklist, its cards become items (ticked when marked complete), and a card's checklists become sub-items with their ticks. A card's description becomes a note next to its list. Archived cards and lists are left out.
+- A Google Keep note (from Google Takeout): a list note becomes a checklist with its ticks, a text note becomes a note (titled on its first line), and a note that is only a web address becomes a link card. Notes in the bin are left out.
+- Any other JSON file adds nothing and says "BusyAnts can only import JSON files from Trello or Google Keep." As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+
 ## Ticking tests made steady; Clean up right after ticking (2026-10-06)
 
 - Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.

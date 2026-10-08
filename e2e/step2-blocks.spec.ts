@@ -276,7 +276,7 @@ test("Colour is faded with nothing selected; it colours a card's title band (car
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
 });
 
-test('card × deletes it; column × asks first, then deletes the column and its cards', async ({ page }) => {
+test('card trash can deletes it; column trash can asks first, then deletes the column and its cards', async ({ page }) => {
   await add(page, 'Note');
   await cards(page).first().getByRole('button', { name: 'Delete card' }).click();
   await expect(cards(page)).toHaveCount(0);

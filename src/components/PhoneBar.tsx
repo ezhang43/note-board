@@ -17,6 +17,7 @@ import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
 import { DuePanelButton } from './Due';
 import { PomodoroButton } from './PomodoroPanel';
+import { CalendarButton } from './CalendarPanel';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
@@ -78,6 +79,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <FileMenu />
           <DuePanelButton labelled />
           <PomodoroButton labelled onOpen={() => setOpen(null)} />
+          <CalendarButton labelled onOpen={() => setOpen(null)} />
           <DarkModeButton labelled />
           <button
             type="button"
@@ -104,6 +106,9 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <a className="tb-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
             <CoffeeIcon />
             Buy me a coffee
+          </a>
+          <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
+            About BusyAnts
           </a>
           <ShareButton phone />
           {onSignOut && (

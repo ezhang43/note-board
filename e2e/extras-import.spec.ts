@@ -9,7 +9,7 @@ const sample = fileURLToPath(new URL('./fixtures/milanote-sample.md', import.met
 async function importSample(page: import('@playwright/test').Page) {
   const chooser = page.waitForEvent('filechooser');
   await page.locator('header.toolbar').getByRole('button', { name: 'File', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Import from Milanote…' }).click();
+  await page.getByRole('menuitem', { name: 'Import file…' }).click();
   await (await chooser).setFiles(sample);
 }
 
@@ -54,4 +54,141 @@ test('one undo removes the whole import, and it is saved', async ({ page }) => {
   await expect(cards(page)).toHaveCount(14);
   await page.keyboard.press('Control+z');
   await expect(cards(page)).toHaveCount(7);
+});
+
+/** Picks a file through File → Import file… */
+async function importFile(page: import('@playwright/test').Page, name: string, text: string | Buffer) {
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('header.toolbar').getByRole('button', { name: 'File', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Import file…' }).click();
+  await (await chooser).setFiles({ name, mimeType: 'text/plain', buffer: Buffer.isBuffer(text) ? text : Buffer.from(text) });
+}
+
+test('imports an Obsidian-style Markdown file: titled lists from headings and bullets, selected, one undo', async ({ page }) => {
+  await importFile(page, 'Errands.md', '## Errands\n- [ ] Post office\n    - [x] Stamps\n\n## Packing\n- Socks\n- Hat\n\nCall Sam.\n');
+  await expect(cards(page)).toHaveCount(3);
+  await expect(page.locator('.card.selected')).toHaveCount(3);
+  await expect(page.getByLabel('List title').nth(0)).toHaveValue('Errands');
+  await expect(page.getByLabel('List title').nth(1)).toHaveValue('Packing');
+  const packing = cards(page).filter({ has: page.locator('input[value="Packing"]') });
+  await expect(packing.locator('textarea')).toHaveCount(2);
+  await expect(page.getByLabel('Note text')).toHaveValue('Call Sam.');
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test('imports a plain text file as one note per paragraph', async ({ page }) => {
+  await importFile(page, 'notes.txt', 'Buy milk\n\nRing the bank\nabout the card\n\nhttps://example.com/recipe\n');
+  await expect(cards(page)).toHaveCount(3);
+  await expect(page.locator('.card.selected')).toHaveCount(3);
+  await expect(page.getByLabel('Note text').nth(1)).toHaveValue('Ring the bank\nabout the card');
+  await expect(page.locator('[data-kind="link"]')).toHaveCount(1);
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test('imports an HTML file without running its scripts: headings, nested lists with ticks, paragraphs', async ({ page }) => {
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
+  await importFile(
+    page,
+    'keep.html',
+    `<html><head><title>T</title><script>alert('ran')</script></head><body>
+     <h2>Trip</h2><ul><li><input type="checkbox" checked>Passport</li><li>Clothes<ul><li>Socks</li></ul></li></ul>
+     <p>Hotel by the sea</p><img src="https://example.invalid/x.png" onerror="alert('img')"><script>alert('ran')</script></body></html>`,
+  );
+  await expect(cards(page)).toHaveCount(2);
+  await expect(page.locator('.card.selected')).toHaveCount(2);
+  const trip = cards(page).filter({ has: page.locator('input[value="Trip"]') });
+  await expect(trip.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Passport was ticked
+  await expect(page.getByLabel('Note text')).toHaveValue('Hotel by the sea');
+  await page.waitForTimeout(200);
+  expect(dialogs).toEqual([]);
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test('a file it can’t read, or one over 5 MB, adds nothing and says so', async ({ page }) => {
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
+  await importFile(page, 'scan.pdf', '%PDF-1.7');
+  await expect.poll(() => dialogs, { timeout: 20_000 }).toEqual(['BusyAnts can’t read that file yet.']); // a broken PDF: the reader loads first
+  await importFile(page, 'huge.txt', Buffer.alloc(5 * 1024 * 1024 + 1, 'a'));
+  await expect.poll(() => dialogs.length).toBe(2);
+  expect(dialogs[1]).toMatch(/too big/);
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test('imports a Trello board export and a Google Keep note; other JSON adds nothing and says so', async ({ page }) => {
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
+  const trello = {
+    name: 'Home jobs',
+    lists: [{ id: 'L1', name: 'To do', closed: false, pos: 1 }, { id: 'L2', name: 'Old', closed: true, pos: 2 }],
+    cards: [
+      { id: 'c1', name: 'Paint fence', desc: 'White <img src=x onerror="alert(1)">', closed: false, idList: 'L1', pos: 1 },
+      { id: 'c2', name: 'Gone', desc: '', closed: true, idList: 'L1', pos: 2 },
+    ],
+    checklists: [{ id: 'k1', idCard: 'c1', name: 'Steps', pos: 1, checkItems: [{ id: 'i1', name: 'Sand', state: 'complete', pos: 1 }] }],
+  };
+  await importFile(page, 'trello.json', JSON.stringify(trello));
+  await expect(cards(page)).toHaveCount(2);
+  await expect(page.locator('.card.selected')).toHaveCount(2);
+  await expect(page.getByLabel('List title')).toHaveValue('To do');
+  const list = cards(page).filter({ has: page.locator('input[value="To do"]') });
+  await expect(list.locator('textarea').first()).toHaveValue('Paint fence');
+  await expect(page.getByLabel('Note text')).toHaveValue('Paint fence\nWhite <img src=x onerror="alert(1)">');
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+
+  await importFile(page, 'Groceries.json', JSON.stringify({ isTrashed: false, title: 'Groceries', listContent: [{ text: 'Milk', isChecked: false }, { text: 'Eggs', isChecked: true }] }));
+  await expect(cards(page)).toHaveCount(1);
+  await expect(page.getByLabel('List title')).toHaveValue('Groceries');
+  await expect(cards(page).getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Eggs was ticked
+
+  await importFile(page, 'other.json', '{"hello": "world"}');
+  await expect.poll(() => dialogs).toEqual(['BusyAnts can only import JSON files from Trello or Google Keep.']);
+  await expect(cards(page)).toHaveCount(1);
+});
+
+/** Picks a file from e2e/fixtures through File → Import file… */
+async function importFixture(page: import('@playwright/test').Page, name: string) {
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('header.toolbar').getByRole('button', { name: 'File', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Import file…' }).click();
+  await (await chooser).setFiles(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)));
+}
+
+test('imports a PDF: headings, lists (ticked ones too) and text become cards, selected, one undo; the PDF reader loads only then', async ({ page }) => {
+  const asked: string[] = [];
+  page.on('request', (r) => asked.push(r.url()));
+  await page.reload();
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  expect(asked.filter((u) => /pdfjs|pdf.worker/i.test(u))).toEqual([]); // not part of the first load
+
+  await importFixture(page, 'pdf-sample.pdf');
+  // The first PDF downloads the reader (about 1.7 MB), which takes a while on a busy computer.
+  await expect(cards(page)).toHaveCount(4, { timeout: 20_000 });
+  await expect(page.locator('.card.selected')).toHaveCount(4);
+  await expect(page.getByLabel('List title').nth(0)).toHaveValue('Packing');
+  await expect(page.getByLabel('List title').nth(1)).toHaveValue('Bookings');
+  const packing = cards(page).filter({ has: page.locator('input[value="Packing"]') });
+  await expect(packing.locator('textarea')).toHaveCount(3);
+  const bookings = cards(page).filter({ has: page.locator('input[value="Bookings"]') });
+  await expect(bookings.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // "[x] Train tickets"
+  await expect(page.getByLabel('Note text').nth(0)).toHaveValue('Weekend trip\nWe leave on Friday after work and come back on Sunday evening.');
+  await expect(page.getByLabel('Note text').nth(1)).toHaveValue('Notes\nAsk Sam to feed the cat. Water the plants on Saturday.');
+  expect(asked.some((u) => /pdf\.worker/.test(u))).toBe(true);
+  await page.waitForTimeout(300);
+  await expectNoOverlaps(page);
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test('a PDF with no text (a scan) adds nothing and says so', async ({ page }) => {
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
+  await importFixture(page, 'pdf-scan.pdf');
+  await expect.poll(() => dialogs, { timeout: 20_000 }).toEqual(['That PDF has no text BusyAnts can read (it may be a scan), so nothing was added.']);
+  await expect(cards(page)).toHaveCount(0);
 });

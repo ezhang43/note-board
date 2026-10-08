@@ -4,6 +4,76 @@
 
 - If someone shared a board with you, restoring an old version or a backup file no longer changes it, for you or for them. Your own boards are restored as before, and a note says which shared board was left as it is. Only the person who shared a board can restore it.
 
+## Moving online data to the US: the checking tool (2026-10-07)
+
+- Nothing changes in BusyAnts yet. This adds a small read-only tool, run in Google Cloud Shell, that counts every saved board, version and shared board in the online database and checks that a copy has exactly the same contents. It is used to prove the copy is complete before and after moving the online data from Sydney to the United States.
+- The step-by-step plan for the move, with the owner's choices, is in docs/plans/firestore-us-move-plan.md.
+
+## Privacy policy: where the data is stored (2026-10-07)
+
+- The Privacy policy now says boards and account details are stored in Sydney, Australia (Cloud Firestore australia-southeast1), not the United States, and that your data may be processed outside your own country. Nothing about the app changes.
+
+## Import PDFs (2026-10-07)
+
+- File → Import file… now also takes PDF files. Their text comes in as cards: big lines become list titles (or the first line of a note), bulleted and checkbox lines become checklist items (ticked boxes ticked, indented ones as sub-items), and other text becomes notes, a new note for each page. Layout, pictures and tables are not brought in.
+- A PDF with no text (a scanned page) adds nothing and says so. As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+- The PDF reader is only downloaded the first time a PDF is imported, so BusyAnts opens as fast as before.
+
+## Import from Trello and Google Keep (2026-10-07)
+
+- File → Import file… now also takes JSON files from Trello and Google Keep.
+- A Trello board export: each open list becomes a checklist, its cards become items (ticked when marked complete), and a card's checklists become sub-items with their ticks. A card's description becomes a note next to its list. Archived cards and lists are left out.
+- A Google Keep note (from Google Takeout): a list note becomes a checklist with its ticks, a text note becomes a note (titled on its first line), and a note that is only a web address becomes a link card. Notes in the bin are left out.
+- Any other JSON file adds nothing and says "BusyAnts can only import JSON files from Trello or Google Keep." As with every import: added and selected, one Ctrl+Z removes it, the same size limits, and all text is kept as plain text.
+
+## A small website for BusyAnts (2026-10-06)
+
+- New pages beside the app: About (what BusyAnts is, with a picture of a board and a big "Start your board, free" button), FAQ, Terms of use and Privacy policy. They are at about/, faq/, terms/ and privacy/ on the site; the app stays where it is, so installed apps and share links keep working.
+- Terms and Privacy are filled in (2026-10-07): run by BusyAnts in the United States, effective October 6, 2026, Maryland law, data kept in the US (Firestore us-central), account deletion within 30 days of an email to ezhang43@gmail.com, and how to ask to see, correct, delete or get a copy of your data. The Privacy policy also says what the Google Calendar panel does with your calendar (reads and changes events only when you use it, keeps no copy). The FAQ's "delete my account" answer gives the same email.
+- In the app, the ? panel ends with links to the pages, and on a phone ⋯ has About BusyAnts.
+- Opening one of the pages no longer replaces the app's offline copy.
+
+## Ticking tests made steady; Clean up right after ticking (2026-10-06)
+
+- Clean up in the toolbar is no longer faded (and ignored) for the moment a just-ticked item is easing out to Completed: clicking it straight away now moves that item too.
+- The browser tests of the tick animation now control the page's clock, so they no longer fail now and then when the computer is busy.
+
+## Import files from other apps (2026-10-06)
+
+- File → "Import from Milanote…" is now "Import file…". It takes Markdown (.md: Milanote, Obsidian, Notion, Bear…), plain text (.txt) and web pages (.html: Evernote or Google Keep exports, saved pages), and works out which it is.
+- Milanote exports come in as before. In any Markdown file, plain bullet lists right under a heading now also become checklist items. A text file with no Markdown becomes one note per paragraph. In a web page, headings become list titles, lists become items (nesting and ticked boxes kept), paragraphs become notes and a link on its own becomes a link card; its scripts never run and nothing is loaded.
+- As before: the cards are added (nothing else changes), selected, and one Ctrl+Z removes them all. A file it can't read says "BusyAnts can’t read that file yet."; files over 5 MB are refused; at most 300 cards and 2,000 items come in from one file.
+
+## Claude can read your boards (2026-10-06)
+
+- A new connector for Claude Desktop and Claude Code (in the `mcp` folder): after a one-time Google sign-in on your computer (`npm run mcp:login`), Claude can list your boards and read one as an outline (columns, cards, checklist items with ticks, due dates and Completed, notes, links). It can't change anything yet. Boards shared with you are shown as read-only.
+- `npm run mcp:check` shows whether it can reach your boards, and `npm run mcp:logout` removes the sign-in (Claude stops reading straight away). Setup steps are in `mcp/README.md`. The website itself is unchanged.
+
+## Trash can on cards and columns (2026-10-06)
+
+- The delete button at the top right of cards and columns is now a small trash can, the same as on checklist items, instead of an ×. It works exactly as before: a card goes at once (Ctrl+Z brings it back), a column asks first. Other × buttons (closing panels, deleting a board in the Boards menu, removing an arrow) stay as they were.
+
+## Checklists pour into each other (2026-10-06)
+
+- Drag a whole checklist onto another loose checklist (over its title or items): the other list gets a dashed amber outline, and letting go moves every item across, sub-items and ticks included (ticked ones go to its Completed section). The dragged list, and its title, are gone. Ctrl+Z puts it back.
+- Drag every item out of a list into another list (or onto the board): the emptied list now disappears instead of keeping one blank item.
+- Drop items on a collapsed checklist: they go into it (it stays collapsed and shows the dashed outline while you hover). Drop items on a collapsed column: they become a new checklist at the end of that column.
+
+## Google Calendar beside the board (2026-10-06)
+
+- Signed in, a new calendar button by the zoom control (bottom right, right of the focus timer; on a phone in ⋯) opens your Google Calendar in the panel at the right: a week (each day with its events) or a month (a grid of days; pick one to see its events), with back / forward and Today.
+- The first time, Google asks you to let BusyAnts see and change your calendar events. You can add an event (the + on a day), and click a simple event to rename it, change its day or time, or delete it (it asks first: Keep / Delete). Repeating events, events with guests and events with their own reminders are shown but open in Google Calendar to change.
+- Calendar events aren't part of your boards: Ctrl+Z doesn't undo calendar changes and they aren't in Version history. If Google Calendar can't be reached, the panel says "Google Calendar isn’t connected yet. Try again later." and everything else works as before.
+- Locally, `npm run dev` with `?demo-user=Alice` shows a pretend calendar to try it with.
+
+## The crew checks risky pull requests by itself (2026-10-06)
+
+- When a worker finishes a high-risk pull request (saving, sync, undo or deleting), the main session now runs the full check on it straight away (combine with the latest build/v1, all tests, review, spec check) and brings the owner its verdict. The owner still decides every high-risk merge and every publish.
+
+## Fix: a board just shared no longer vanishes (2026-10-06)
+
+- On the published site, sharing a board could make it disappear a few seconds later with "“X” is no longer shared with you". Right after sharing (or joining by link), the server could briefly refuse to show the board because the share hadn't fully reached it yet, and the app took that as being removed. Now a refusal only counts if it happens again once this device's saves have reached the server.
+
 ## Focus timer (2026-10-06)
 
 - A new focus timer (Pomodoro): a stopwatch button by the zoom control (bottom right, beside Version history; on a phone in ⋯) opens it in a panel at the right. 25 minutes of focus, a 5-minute break, and a 15-minute long break after every 4 focus rounds, with Start / Pause, Reset and Skip.

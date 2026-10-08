@@ -21,16 +21,12 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
 
 /** A to-do list's body: title, open items, and the "Completed" section. */
 export function TodoBody({ card }: { card: TodoCard }) {
-  const appendTarget = useAppState((s) => {
-    const h = s.ui.itemDrag?.hint;
-    return !!h && 'cardId' in h && h.cardId === card.id && h.drop.mode === 'append';
-  });
   const { open, done } = sections(card.items);
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
 
   return (
-    <div className={`todo-body${appendTarget ? ' append-target' : ''}`} data-todo-of={card.id}>
+    <div className="todo-body" data-todo-of={card.id}>
       <AutoSizeInput
         className="card-title"
         ref={title}

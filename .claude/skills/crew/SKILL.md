@@ -34,7 +34,7 @@ Everything about the crew lives in `.claude/crew-log.md` in the main folder (not
   - `queued`: waiting for a free worker or for a clashing job to land
   - `working`: worker building, testing, reviewing
   - `pr-open`: pull request open, "All tests" running
-  - `waiting-owner`: high-risk pull request; needs the owner, then `/check-pr`
+  - `waiting-owner`: high-risk pull request; the coordinator runs `/check-pr` on it, then it needs the owner's merge decision
   - `blocked`: the worker stopped and needs the owner (say why in Notes)
   - `merged`: in `build/v1`; low-risk ones go live by themselves (auto-publish)
   - `done`: scout report given, or job dropped by the owner
@@ -117,7 +117,8 @@ You are told automatically when a background worker finishes; never poll it. The
 1. Read its report. Check the pull request (`gh pr view <n> --json state,labels,statusCheckRollup`) so the log says what GitHub says, not what the worker hoped.
 2. Update the log (stage, PR link, notes).
 3. Tell the owner, short: job, stage, PR link, and the CLICK steps for anything merged.
-4. Start the next `queued` job whose clash has landed.
+4. For a high-risk pull request, run `/check-pr` on it now (section 5).
+5. Start the next `queued` job whose clash has landed.
 
 A `blocked` worker can be continued with its decision: SendMessage to its name with the owner's answer.
 
@@ -129,7 +130,7 @@ A `blocked` worker can be continued with its decision: SendMessage to its name w
 
 ## 5. High-risk pull requests
 
-When the owner says to check one, run `/check-pr <n>` (it reports, never merges). Merge only when the owner says so, then mark it `merged`. A merged high-risk one holds auto-publish back until the owner says "publish".
+As soon as a worker reports one ready, run `/check-pr <n>` yourself without waiting to be asked (owner decision, 2026-10-06); it reports, never merges. Check one at a time, and re-run any browser test that fails while other worktrees are testing before calling it a failure. Then give the owner the verdict and ask whether to merge (a `[decision]` line). Merge only when the owner says so, then mark it `merged`. A merged high-risk one holds auto-publish back until the owner says "publish".
 
 ## Rules for the coordinator
 

@@ -470,6 +470,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   justify-content: center;
 }
 .icon-button:hover { background: var(--hover); }
+/* A card's or column's delete button: the same faint trash can as a checklist item's, red on hover. */
+.block-trash { color: var(--ink-faint); }
 
 .card, .column { cursor: default; }
 .card input:not([type='checkbox']), .card textarea, .column input { cursor: text; }
@@ -826,10 +828,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* ---------- checklists (step 5) ---------- */
 
 .todo-body { border-radius: 6px; }
-/* Items about to be added to the end of a list: the whole card is ringed, top included (owner request;
+/* Items (or a whole dragged list) about to be added to the end of a list, open or collapsed: the whole card is ringed, top included (owner request;
    a ring on the list itself was hidden under the title band). Dashed, like a column taking a card, so
    it never looks like the solid ring of a selected card. */
-.card:has(> .todo-body.append-target) { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.card.append-target { outline: 2px dashed var(--accent); outline-offset: 2px; }
 
 .todo-item { position: relative; }
 .todo-item.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -875,7 +877,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .item-trash:focus-visible { opacity: 1; }
 .item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
 .item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 /*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
  * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
@@ -1031,6 +1033,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .shortcuts-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .shortcuts-group dl { margin: 0; }
+.shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.shortcuts-site a { color: var(--accent-ink); }
 .shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
 .shortcut dd { margin: 0; color: var(--ink-soft); }
 .shortcut kbd {
@@ -1660,3 +1664,83 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   margin: 0;
 }
 .delete-completed-note { padding: 8px 14px; }
+
+/* Google Calendar side panel (owner request, 2026-10-06): a week (one row of events per day) or a month grid. */
+.cal { display: flex; flex-direction: column; gap: 8px; padding: 0 2px; font-size: 14px; }
+.cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cal .tb-button { height: 32px; font-size: 13px; }
+.cal .tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.cal-views { display: flex; gap: 4px; }
+.cal-range { flex: 1; margin: 0; text-align: center; font-size: 14px; font-weight: 600; }
+.cal-step { font-size: 20px; line-height: 1; color: var(--ink); }
+.cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.cal-note .history-note { margin: 4px; }
+.cal-day { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; border-top: 1px solid var(--line); }
+.cal-day h3 { display: flex; align-items: center; margin: 0; padding: 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.cal-day.today h3 { color: var(--accent-ink); }
+.cal-today { margin-left: 4px; font-weight: 500; }
+.cal-add { margin-left: auto; width: 24px; height: 24px; color: var(--ink-soft); }
+.cal-event {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.cal-event:hover { border-color: var(--accent); }
+.cal-event.read-only { background: var(--hover); border-left-color: var(--control-edge); }
+.cal-event svg { flex-shrink: 0; align-self: center; color: var(--ink-soft); }
+.cal-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
+.cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cal-month { display: flex; flex-direction: column; gap: 2px; }
+.cal-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+.cal-cell {
+  position: relative;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.cal-cell:hover { background: var(--hover); }
+.cal-cell.outside { color: var(--placeholder); }
+.cal-cell.today { font-weight: 600; color: var(--accent-ink); }
+.cal-cell[aria-selected='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.cal-dot { position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--accent); }
+.cal-detail-title { margin: 4px 2px 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.cal-detail-when { margin: 0 2px; color: var(--ink-soft); }
+a.cal-open { align-self: flex-start; }
+.cal-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.cal-field input {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.cal-when { display: flex; gap: 6px; }
+.cal-when input[type='date'] { flex: 1; min-width: 0; }
+.cal-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cal-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.cal-error { margin: 0 2px; color: var(--danger); font-size: 13px; }
+.cal-actions { display: flex; gap: 6px; }
+.tb-button.cal-save { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tb-button.cal-delete { margin-left: auto; color: var(--danger); }
+.confirm.cal-confirm { margin: 4px 0 0; }

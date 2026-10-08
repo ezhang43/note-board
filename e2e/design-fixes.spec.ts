@@ -93,7 +93,7 @@ test('the board name keeps at least 140px in a narrower window', async ({ page }
   expect(name!.width).toBeGreaterThanOrEqual(140);
 });
 
-test('collapse and × buttons on cards and columns say what they do when hovered', async ({ page }) => {
+test('collapse and delete buttons on cards and columns say what they do when hovered', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Note');
   await expect(page.getByRole('button', { name: 'Collapse card' })).toHaveAttribute('title', 'Collapse card');
@@ -237,4 +237,30 @@ test('a keyboard shortcuts panel opens from the ? button or the ? key, and close
   await page.keyboard.type('Why?');
   await expect(page.getByLabel('Note text')).toHaveValue('Why?');
   await expect(panel).toHaveCount(0);
+});
+
+test('card and column delete buttons show the same trash can as checklist items, and still delete or ask', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Checklist');
+  await page.keyboard.type('first item');
+  const trash = await page.locator('.item-trash svg').first().innerHTML();
+  const card = cards(page).first();
+  expect(await card.getByRole('button', { name: 'Delete card' }).locator('svg').innerHTML()).toBe(trash);
+  const faint = await page.locator('.item-trash').first().evaluate((el) => getComputedStyle(el).color);
+  await expect(card.getByRole('button', { name: 'Delete card' })).toHaveCSS('color', faint);
+
+  await clickEmpty(page);
+  await add(page, 'New column');
+  const col = columns(page).first();
+  const colDelete = col.getByRole('button', { name: 'Delete column and its cards' });
+  expect(await colDelete.locator('svg').innerHTML()).toBe(trash);
+  await expect(colDelete).toHaveCSS('color', faint);
+
+  await colDelete.click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete column' }).click();
+  await expect(columns(page)).toHaveCount(0);
+
+  await card.getByRole('button', { name: 'Delete card' }).click();
+  await expect(cards(page)).toHaveCount(0);
 });

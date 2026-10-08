@@ -4,7 +4,8 @@ import { copyBlocks, pasteBlocks, type ClipEntry } from '../../model/clipboard';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/completed';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
 import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
-import { addImported, estimateHeight, packInLanes, parseMilanote } from '../../model/milanote';
+import { readImport } from '../../model/importFile';
+import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { boardRights, restorable } from '../../model/sharing';
@@ -133,7 +134,7 @@ export function blockActions(ctx: StoreContext) {
     // ---------- version history (owner request) ----------
     toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, sidePanel: null, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history and Due. */
-    toggleSidePanel: (panel: 'pomodoro') =>
+    toggleSidePanel: (panel: 'pomodoro' | 'calendar') =>
       updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, dueOpen: false, preview: null }),
     /** Show an old version on the board, read-only (the real board is untouched). */
     previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
@@ -250,13 +251,15 @@ export function blockActions(ctx: StoreContext) {
     },
 
     /**
-     * Import a board exported from Milanote as Markdown: its cards are added loose to this board,
-     * in lanes, at the top middle of the screen (or the nearest free space), and selected.
-     * One undo removes them all. Returns how many cards were added.
+     * File → Import file…: a Markdown (Milanote, Obsidian…), text, HTML, JSON or PDF file's cards
+     * (a PDF comes as its pages of text) are added loose to this board, in lanes, at the top middle
+     * of the screen (or the nearest free space), and selected. One undo removes them all. Returns
+     * how many cards were added, and a note to show when the file couldn't be read or was cut short.
      */
-    importMilanote(markdown: string): number {
-      const cards = parseMilanote(markdown);
-      if (!cards.length) return 0;
+    importFile(text: Parameters<typeof readImport>[1], name = 'board.md'): { added: number; note: string } {
+      // The browser's parser only builds a tree: no scripts run and nothing is loaded.
+      const { cards, note } = readImport(name, text, (html) => new DOMParser().parseFromString(html, 'text/html'));
+      if (!cards.length) return { added: 0, note };
       const ids = cards.map((c) => c.id);
       const guess = new Map(cards.map((c) => [c.id, estimateHeight(c)]));
       const size = packInLanes(ids, (id) => guess.get(id)!, { x: 0, y: 0 });
@@ -271,7 +274,7 @@ export function blockActions(ctx: StoreContext) {
       const z = ctx.state.view.zoom;
       if (Math.abs(want.x - origin.x) > GRID || Math.abs(want.y - origin.y) > GRID)
         updateView((v) => panBy(v, Math.round((want.x - origin.x) * z), Math.round((want.y - origin.y) * z)));
-      return cards.length;
+      return { added: cards.length, note };
     },
 
     /** Clean up (toolbar): every ticked checklist item moves into the board's Completed card, under today's date. */

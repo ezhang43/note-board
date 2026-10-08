@@ -2,7 +2,8 @@
 // The board's data is kept offline separately, by Firebase.
 // Bump the version when files without a unique name (icons, manifest) change: the new worker
 // then starts a fresh copy and deletes the old ones, so returning visitors get the new files.
-const CACHE = 'busyants-v4';
+// v5: a worker from before the website pages could keep one of them as the app's offline page.
+const CACHE = 'busyants-v5';
 const SCOPE = self.registration.scope;
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -43,6 +44,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || !wanted(req.url)) return;
 
   if (req.mode === 'navigate') {
+    // Only the app's own page (any ?join= link included) is kept for offline: a website page
+    // (about/, faq/, terms/, privacy/) must never take its place. Those just load from the network.
+    if (new URL(req.url).pathname !== new URL(SCOPE).pathname) return;
     // The newest page when online (and keep it); the saved page when offline.
     event.respondWith(
       fetch(req)

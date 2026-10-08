@@ -15,6 +15,8 @@ const RISKY = [
   /^src\/model\/versions\.ts$/,
   /^src\/model\/workspace\.ts$/,
   /^firestore\.rules$/,
+  // The Claude connector changes the owner's saved boards.
+  /^mcp\//,
 ];
 
 /** Test files never count: they change nothing on the live site. */

@@ -1,10 +1,14 @@
 import { spawn } from 'node:child_process';
+import { appendFile, mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { WEB_API_KEY, deleteToken, idTokens, loadToken, saveToken, tokenPath, type TokenFile } from './auth';
 import { collectBoards, safeToEdit, type Snapshot } from './boards';
-import { firestoreReader, readSnapshot } from './firestore';
+import { firestoreReader, ownDb, readSnapshot, type OwnDb } from './firestore';
 import { API_KEY_SHAPE, startLogin } from './login/login';
-import { createServer } from './server';
+import { saveChange, type SaveDeps } from './save';
+import { createServer, type Write } from './server';
 
 // `node mcp/dist/server.js` runs the connector for Claude; with login / logout / check it is the
 // owner's setup helper (npm run mcp:login, mcp:logout, mcp:check).
@@ -17,32 +21,64 @@ const NOT_SIGNED_IN = 'Not signed in. Run npm run mcp:login first.';
  * the sign-in stays the same.
  */
 export function boardsLoader(tokenFile: string, fetchFn: typeof fetch) {
-  let session: { refreshToken: string; uid: string; email?: string; read: () => Promise<Snapshot> } | null = null;
-  return async () => {
+  let session: { refreshToken: string; uid: string; email?: string; read: () => Promise<Snapshot>; own: OwnDb; memory: SaveDeps['memory'] } | null = null;
+  const signedIn = async () => {
     const token = await loadToken(tokenFile);
     if (!token) {
       session = null;
       throw new Error(NOT_SIGNED_IN);
     }
     if (!session || session.refreshToken !== token.refreshToken || session.uid !== token.uid) {
-      const s = { refreshToken: token.refreshToken, uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid) };
       const save = async (t: TokenFile) => {
         // Google gave a new refresh token: this session goes on with it.
         s.refreshToken = t.refreshToken;
         await saveToken(tokenFile, t);
       };
-      const db = firestoreReader(idTokens(token, { fetch: fetchFn, save }), fetchFn);
+      const tokens = idTokens(token, { fetch: fetchFn, save });
+      const db = firestoreReader(tokens, fetchFn);
+      const s = { refreshToken: token.refreshToken, uid: token.uid, email: token.email, read: () => readSnapshot(db, token.uid), own: ownDb(tokens, token.uid, fetchFn), memory: { lastEditAt: null } };
       session = s;
     }
-    const s = session;
+    return session;
+  };
+  /** Runs `use` with the session; on failure the saved sign-in is read again next time (the owner may have signed in again meanwhile). */
+  const withSession = async <T>(use: (s: NonNullable<typeof session>) => Promise<T>): Promise<T> => {
+    const s = await signedIn();
     try {
-      return { snapshot: await s.read(), email: s.email ?? s.uid };
+      return await use(s);
     } catch (e) {
-      // Read the saved sign-in again next time (the owner may have signed in again meanwhile).
       session = null;
       throw e;
     }
   };
+  const load = () => withSession(async (s) => ({ snapshot: await s.read(), email: s.email ?? s.uid }));
+  // The save memory is per sign-in: a new one (another account, say) gets a safety version before its first change.
+  return Object.assign(load, { withOwn: <T>(use: (db: OwnDb, memory: SaveDeps['memory']) => Promise<T>) => withSession((s) => use(s.own, s.memory)) });
+}
+
+/** %APPDATA%\busyants-mcp\activity.log, beside the saved sign-in: what the connector changed. */
+export function activityPath(env: Record<string, string | undefined> = process.env): string {
+  return join(env.APPDATA ?? join(homedir(), '.config'), 'busyants-mcp', 'activity.log');
+}
+
+/** Adds plain lines with the time to the activity log; a log that can't be written never stops a save. */
+export function activityLog(file: string, now: () => number = Date.now) {
+  return async (line: string) => {
+    try {
+      await mkdir(dirname(file), { recursive: true });
+      await appendFile(file, `${new Date(now()).toISOString()} ${line}\n`);
+    } catch (e) {
+      console.error(`Couldn’t write the activity log (${file}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+}
+
+/** Saves the connector's changes to the signed-in owner's own boards, logging them to `logFile`. */
+export function boardsWriter(loader: ReturnType<typeof boardsLoader>, logFile: string): Write {
+  const log = activityLog(logFile);
+  const client = `mcp-${crypto.randomUUID().slice(0, 8)}`;
+  const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+  return (edit) => loader.withOwn((db, memory) => saveChange({ db, client, now: Date.now, wait, log, memory }, edit));
 }
 
 /** npm run mcp:check: read only. Exit code 0 when the boards could be read. */
@@ -110,8 +146,8 @@ export async function main(args: string[]): Promise<number | null> {
     case undefined: {
       // Claude talks to the server over stdin / stdout, so nothing else may be printed there.
       const load = boardsLoader(file, fetch);
-      await createServer(async () => (await load()).snapshot).connect(new StdioServerTransport());
-      console.error('BusyAnts connector running (read only).');
+      await createServer(async () => (await load()).snapshot, boardsWriter(load, activityPath())).connect(new StdioServerTransport());
+      console.error('BusyAnts connector running.');
       return null;
     }
     default:

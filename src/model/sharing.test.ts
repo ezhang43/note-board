@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard } from './cards';
-import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, parseJoin, readShare, serializeShare } from './sharing';
+import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, keptNotice, parseJoin, readShare, restorable, serializeShare } from './sharing';
 import type { Board } from './types';
 import type { Workspace } from './workspace';
 
@@ -182,5 +182,31 @@ describe('what this person may do with a board', () => {
 
   it('a board inside one shared with them: renamed and deleted like any board, but not restored', () => {
     expect(boardRights([share(false)], 'days', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: false, restore: false });
+  });
+});
+
+describe('which boards a restore may put back (owner, 2026-10-06)', () => {
+  const share = (owner: boolean, root = 'trip', boards = ['trip', 'days']) => ({ root, boards, owner });
+
+  it('their own boards and boards they shared: all of them', () => {
+    expect(restorable([], ['home', 'trip'])).toEqual({ ids: ['home', 'trip'], kept: [] });
+    expect(restorable([share(true)], ['home', 'trip', 'days'])).toEqual({ ids: ['home', 'trip', 'days'], kept: [] });
+  });
+
+  it('a share someone shared with them: its starting board and every board in it are left as they are', () => {
+    expect(restorable([share(false)], ['home', 'trip', 'days', 'work'])).toEqual({ ids: ['home', 'work'], kept: ['trip'] });
+    // Only a board inside it is touched: the share is still named by its starting board, once.
+    expect(restorable([share(false)], ['days'])).toEqual({ ids: [], kept: ['trip'] });
+  });
+
+  it('a starting board missing from its own board list still counts as shared with them', () => {
+    expect(restorable([share(false, 'trip', [])], ['trip'])).toEqual({ ids: [], kept: ['trip'] });
+  });
+
+  it('the notice names what was left as it is', () => {
+    expect(keptNotice(['trip'], () => 'Trip')).toBe('“Trip” is shared with you, so it was left as it is.');
+    expect(keptNotice(['trip', 'work'], (id) => ({ trip: 'Trip', work: 'Work' })[id]!)).toBe('“Trip” and “Work” are shared with you, so they were left as they are.');
+    expect(keptNotice(['a', 'b', 'c'], (id) => id.toUpperCase())).toBe('“A”, “B” and “C” are shared with you, so they were left as they are.');
+    expect(keptNotice(['x'], () => '')).toBe('“Untitled board” is shared with you, so it was left as it is.');
   });
 });

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
-import { boardRights } from '../model/sharing';
+import { boardRights, keptNotice } from '../model/sharing';
 import { swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { CANT_READ, IMPORT_ACCEPT, IMPORT_MAX_BYTES, isPdf, TOO_BIG } from '../model/importFile';
@@ -14,6 +14,7 @@ import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreFromBackup } from '../store/versions';
+import { collab } from '../sync/collabSession';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
@@ -116,11 +117,14 @@ export function FileMenu() {
           if (!file) return;
           const text = await file.text();
           if (!appStore.isBackup(text)) return void window.alert('That file isn’t a BusyAnts backup, so nothing was changed.');
+          const { ui, boards } = appStore.getState();
+          if (!appStore.isFullBackup(text) && !boardRights(ui.shares, boards.open, boards.home).restore) return void collab.setNotice('Only the person who shared this board can restore it.');
           const question = appStore.isFullBackup(text)
             ? 'Replace all your boards with the ones in the backup? Your boards as they are now are kept in Version history.'
             : 'Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.';
           if (!window.confirm(question)) return;
-          await restoreFromBackup(appStore, activeVersionStore(), text);
+          const kept = await restoreFromBackup(appStore, activeVersionStore(), text);
+          if (kept && kept.length) collab.setNotice(keptNotice(kept, appStore.boardName));
           // Bring the restored board into view once it has been drawn.
           requestAnimationFrame(() => requestAnimationFrame(() => appStore.showWholeBoard()));
         }}

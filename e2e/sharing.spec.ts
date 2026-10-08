@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Dialog, type Page } from '@playwright/test';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { add, box, fontsLoaded } from './helpers';
 
 // Sharing a board and editing it together (owner request, 2026-10-05). Locally, `npm run dev` has
@@ -334,4 +335,67 @@ test('the link can be turned off and on again', async ({ browser }) => {
   await sharePanel(alice).getByRole('button', { name: 'Turn link off' }).click();
   await sharePanel(alice).getByRole('button', { name: 'Turn link on', exact: true }).click();
   await expect(sharePanel(alice).getByLabel('Share link')).toHaveValue(/\?join=/);
+});
+
+test('someone it was shared with restores an old backup: their own boards come back, the shared board stays as it is', async ({ browser }, info) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  await expect(noteTexts(bob)).toHaveValue('Tent');
+  const fileMenu = async (item: string) => {
+    await toolbar(bob).getByRole('button', { name: 'File', exact: true }).click();
+    await bob.getByRole('menuitem', { name: item }).click();
+  };
+
+  // Bob downloads a backup holding his boards and the shared board as it is now.
+  const waiting = bob.waitForEvent('download');
+  await fileMenu('Download backup');
+  const backup = readFileSync((await (await waiting).path())!, 'utf8');
+  expect(backup).toContain('Tent');
+
+  // A one-board backup (from before there were several boards) while Trip is open: not even asked.
+  const saved = JSON.parse(backup);
+  const tripId = Object.keys(saved.boards).find((id) => saved.boards[id].name === 'Trip')!;
+  const single = info.outputPath('trip-only.json');
+  writeFileSync(single, JSON.stringify({ version: 2, board: { ...saved.boards[tripId], name: 'Trip from a file' } }));
+  let asked = false;
+  const ask = (d: Dialog) => ((asked = true), void d.dismiss());
+  bob.on('dialog', ask);
+  const picking = bob.waitForEvent('filechooser');
+  await fileMenu('Restore from backup…');
+  await (await picking).setFiles(single);
+  await expect(bob.getByRole('status').filter({ hasText: 'Only the person who shared this board can restore it.' })).toBeVisible();
+  bob.off('dialog', ask);
+  expect(asked).toBe(false);
+  await expect(boardName(bob)).toHaveValue('Trip');
+  await bob.getByRole('status').getByRole('button', { name: 'Dismiss' }).click();
+
+  // Alice changes the shared board; Bob renames his home board.
+  await noteTexts(alice).first().fill('Tent and stove');
+  await expect(noteTexts(bob)).toHaveValue('Tent and stove', { timeout: 8000 });
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'My first board' }).click();
+  await boardName(bob).fill('Bob later');
+
+  // Bob restores the old backup.
+  const file = info.outputPath('bob-backup.json');
+  writeFileSync(file, backup);
+  bob.once('dialog', (d) => d.accept());
+  const chooser = bob.waitForEvent('filechooser');
+  await fileMenu('Restore from backup…');
+  await (await chooser).setFiles(file);
+  await expect(bob.getByRole('status').filter({ hasText: '“Trip” is shared with you, so it was left as it is.' })).toBeVisible();
+  await expect(boardName(bob)).toHaveValue('My first board');
+
+  // The shared board is as Alice left it, for both of them.
+  await bob.getByRole('button', { name: 'Boards', exact: true }).click();
+  await bob.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Trip' }).click();
+  await expect(noteTexts(bob)).toHaveValue('Tent and stove');
+  // Once a later edit of Bob's reaches Alice, anything the restore sent would have too.
+  await add(bob, 'Note');
+  await bob.keyboard.type('After the restore');
+  await expect(noteTexts(alice)).toHaveCount(2, { timeout: 8000 });
+  await expect(noteTexts(alice).first()).toHaveValue('Tent and stove');
+  expect([...alice.errors, ...bob.errors]).toEqual([]);
 });

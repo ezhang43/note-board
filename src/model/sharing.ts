@@ -1,3 +1,4 @@
+import { shownName } from './board';
 import type { Board } from './types';
 import { boardLinks, readWorkspace, serializeWorkspace, type Workspace } from './workspace';
 
@@ -65,8 +66,32 @@ export function boardRights(shares: { root: string; boards: string[]; owner: boo
     rename: !sharedWithMe,
     delete: boardId !== home && !sharedWithMe,
     deleteForEveryone: shares.some((s) => s.root === boardId && s.owner),
-    restore: !shares.some((s) => s.boards.includes(boardId) && !s.owner),
+    restore: !restorable(shares, [boardId]).kept.length,
   };
+}
+
+/**
+ * Which of the boards `ids` that a restore (a version or a backup file) would put in place or remove
+ * this person may restore (owner, 2026-10-06): all but the boards of a share someone else shared
+ * with them (its starting board and every board in it), which stay as they are. `kept`: the
+ * starting boards of those shares, once each, to tell the person.
+ */
+export function restorable(shares: { root: string; boards: string[]; owner: boolean }[], ids: string[]) {
+  const theirs = shares.filter((s) => !s.owner);
+  const shareOf = (id: string) => theirs.find((s) => s.root === id || s.boards.includes(id));
+  const kept = new Set<string>();
+  for (const id of ids) {
+    const s = shareOf(id);
+    if (s) kept.add(s.root);
+  }
+  return { ids: ids.filter((id) => !shareOf(id)), kept: [...kept] };
+}
+
+/** The notice after a restore that left the shares starting at boards `roots` as they are. */
+export function keptNotice(roots: string[], nameOf: (id: string) => string): string {
+  const quoted = roots.map((id) => `“${shownName(nameOf(id))}”`);
+  if (quoted.length === 1) return `${quoted[0]} is shared with you, so it was left as it is.`;
+  return `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)} are shared with you, so they were left as they are.`;
 }
 
 const cardKey = (cardId: string, boardId: string) => `${cardId}>${boardId}`;

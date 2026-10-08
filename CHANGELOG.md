@@ -1,5 +1,9 @@
 # Changelog
 
+## Restoring leaves boards shared with you alone (2026-10-06)
+
+- If someone shared a board with you, restoring an old version or a backup file no longer changes it, for you or for them. Your own boards are restored as before, and a note says which shared board was left as it is. Only the person who shared a board can restore it.
+
 ## Claude can change your boards (2026-10-07)
 
 - The Claude connector can now add checklist items, change their text and due dates, tick and untick them, move them between lists on the same board, and add notes, on your own boards. Shared boards stay read-only, and notes can only be added.

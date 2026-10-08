@@ -8,7 +8,7 @@ import { readImport } from '../../model/importFile';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
-import { boardRights } from '../../model/sharing';
+import { boardRights, restorable } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { THEME_KEY } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
@@ -152,20 +152,33 @@ export function blockActions(ctx: StoreContext) {
     /**
      * Put a backup file in place (owner request). One board's backup (with one board here) replaces
      * the open board: one change, so Ctrl+Z brings it back. Otherwise every board is replaced (undo
-     * starts over; the boards before are kept in Version history).
+     * starts over; the boards before are kept in Version history). Boards of a share someone else
+     * shared with this person stay as they are (owner, 2026-10-06; see restorable). Returns those
+     * shares' starting boards, or false (changing nothing) if `text` isn't a backup.
      */
-    restoreBackup(text: string): boolean {
+    restoreBackup(text: string): string[] | false {
       const got = readWorkspace(text);
       if (!got) return false;
       updateUi({ preview: null }); // an old version being looked at is put away first
       if (!got.legacy && replacesEveryBoard(got.ws)) {
-        ctx.replaceWorkspace(got.ws);
+        const now = ctx.workspace();
+        const all = [...new Set([...Object.keys(got.ws.boards), ...Object.keys(now.boards)])];
+        const result = restorable(ctx.state.ui.shares, all);
+        const ok = new Set(result.ids);
+        const boards = Object.fromEntries(all.map((id) => [id, ok.has(id) ? got.ws.boards[id] : now.boards[id]]).filter(([, b]) => b));
+        // A backup can't make a board shared with this person their home board: their home stays.
+        const home = ok.has(got.ws.home) ? got.ws.home : now.home;
+        boards[home] ??= now.boards[home];
+        ctx.replaceWorkspace({ home, boards });
         updateUi({ historyOpen: false });
-        return true;
+        return result.kept;
       }
-      const board = Object.values(got.ws.boards)[0];
-      commit(() => board, { ui: { selection: [], itemSel: null, confirm: null, historyOpen: false } });
-      return true;
+      const { kept } = restorable(ctx.state.ui.shares, [ctx.state.boards.open]);
+      if (!kept.length) {
+        const board = Object.values(got.ws.boards)[0];
+        commit(() => board, { ui: { selection: [], itemSel: null, confirm: null, historyOpen: false } });
+      }
+      return kept;
     },
     /** Opening the board (owner request): bring every card and column into view, centred. */
     showWholeBoard: () => updateView((v) => viewShowing(topLevelRects(ctx.state.board, ctx.measured), ctx.viewportSize(), v)),

@@ -84,9 +84,11 @@ export function boardActions(ctx: StoreContext) {
      * Put an old version back (version history): the open board as it was then (one change, so
      * Ctrl+Z undoes it), and any board deleted since comes back too. Other boards are left as they are,
      * and so are boards of a share someone else shared with this person (owner, 2026-10-06; see
-     * restorable). Returns those shares' starting boards.
+     * restorable). Returns those shares' starting boards, or 'loading' (changing nothing) while it
+     * isn't yet known which boards are shared (job #33).
      */
-    restoreVersion(ws: Workspace): string[] {
+    restoreVersion(ws: Workspace): string[] | 'loading' {
+      if (!ctx.state.ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null });
       const open = ctx.state.boards.open;
       const missing = Object.keys(ws.boards).filter((id) => id !== open && !ctx.workspace().boards[id]);

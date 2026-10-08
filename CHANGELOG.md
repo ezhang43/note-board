@@ -1,5 +1,9 @@
 # Changelog
 
+## Restoring is safe for shared boards from the first moment (2026-10-08)
+
+- Right after the page opens, the shared boards this device already knows are protected from a restore straight away. If it isn't known yet which boards are shared with you, a restore waits: nothing changes, and a note says "Your shared boards are still loading, so nothing was restored. Try again in a moment."
+
 ## Restoring leaves boards shared with you alone (2026-10-06)
 
 - If someone shared a board with you, restoring an old version or a backup file no longer changes it, for you or for them. Your own boards are restored as before, and a note says which shared board was left as it is. Only the person who shared a board can restore it.

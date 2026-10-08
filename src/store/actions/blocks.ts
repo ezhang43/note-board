@@ -154,11 +154,13 @@ export function blockActions(ctx: StoreContext) {
      * the open board: one change, so Ctrl+Z brings it back. Otherwise every board is replaced (undo
      * starts over; the boards before are kept in Version history). Boards of a share someone else
      * shared with this person stay as they are (owner, 2026-10-06; see restorable). Returns those
-     * shares' starting boards, or false (changing nothing) if `text` isn't a backup.
+     * shares' starting boards, false (changing nothing) if `text` isn't a backup, or 'loading'
+     * (changing nothing) while it isn't yet known which boards are shared (job #33).
      */
-    restoreBackup(text: string): string[] | false {
+    restoreBackup(text: string): string[] | false | 'loading' {
       const got = readWorkspace(text);
       if (!got) return false;
+      if (!ctx.state.ui.sharesKnown) return 'loading';
       updateUi({ preview: null }); // an old version being looked at is put away first
       if (!got.legacy && replacesEveryBoard(got.ws)) {
         const now = ctx.workspace();

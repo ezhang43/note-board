@@ -165,6 +165,8 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
  * returns those shares' starting boards (see restorable).
  */
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
+  // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
+  if (!store.getState().ui.sharesKnown) return 'loading';
   const data = await versions.get(id);
   const got = data ? readWorkspace(data) : null;
   if (!got) throw new Error('That version could not be read.');
@@ -184,6 +186,7 @@ export async function restoreVersion(store: Store, versions: VersionStore, id: s
  */
 export async function restoreFromBackup(store: Store, versions: VersionStore | null, text: string, now: () => number = Date.now) {
   if (!store.isBackup(text)) return false;
+  if (!store.getState().ui.sharesKnown) return 'loading'; // see restoreVersion
   // Saving the version may fail (offline): the restore still goes ahead, and Ctrl+Z still undoes it.
   if (versions) await saveSafetyVersion(store, versions, now);
   return store.restoreBackup(text);

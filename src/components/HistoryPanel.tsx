@@ -129,7 +129,8 @@ export function PreviewBar() {
     setError('');
     try {
       const kept = await restoreVersion(appStore, store, meta.id);
-      if (kept.length) collab.setNotice(keptNotice(kept, appStore.boardName));
+      const notice = keptNotice(kept, appStore.boardName);
+      if (notice) collab.setNotice(notice);
     } catch {
       setError('Couldn’t restore it. Try again.');
     } finally {

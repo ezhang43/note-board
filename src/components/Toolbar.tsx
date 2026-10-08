@@ -118,13 +118,15 @@ export function FileMenu() {
           const text = await file.text();
           if (!appStore.isBackup(text)) return void window.alert('That file isn’t a BusyAnts backup, so nothing was changed.');
           const { ui, boards } = appStore.getState();
+          if (!ui.sharesKnown) return void collab.setNotice(keptNotice('loading', appStore.boardName));
           if (!appStore.isFullBackup(text) && !boardRights(ui.shares, boards.open, boards.home).restore) return void collab.setNotice('Only the person who shared this board can restore it.');
           const question = appStore.isFullBackup(text)
             ? 'Replace all your boards with the ones in the backup? Your boards as they are now are kept in Version history.'
             : 'Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.';
           if (!window.confirm(question)) return;
           const kept = await restoreFromBackup(appStore, activeVersionStore(), text);
-          if (kept && kept.length) collab.setNotice(keptNotice(kept, appStore.boardName));
+          const notice = kept && keptNotice(kept, appStore.boardName);
+          if (notice) collab.setNotice(notice);
           // Bring the restored board into view once it has been drawn.
           requestAnimationFrame(() => requestAnimationFrame(() => appStore.showWholeBoard()));
         }}

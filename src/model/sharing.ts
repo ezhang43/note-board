@@ -87,8 +87,13 @@ export function restorable(shares: { root: string; boards: string[]; owner: bool
   return { ids: ids.filter((id) => !shareOf(id)), kept: [...kept] };
 }
 
-/** The notice after a restore that left the shares starting at boards `roots` as they are. */
-export function keptNotice(roots: string[], nameOf: (id: string) => string): string {
+/**
+ * The notice after a restore that left the shares starting at boards `roots` as they are ('' for
+ * none), or that restored nothing since the shared boards weren't known yet ('loading', job #33).
+ */
+export function keptNotice(roots: string[] | 'loading', nameOf: (id: string) => string): string {
+  if (roots === 'loading') return 'Your shared boards are still loading, so nothing was restored. Try again in a moment.';
+  if (!roots.length) return '';
   const quoted = roots.map((id) => `“${shownName(nameOf(id))}”`);
   if (quoted.length === 1) return `${quoted[0]} is shared with you, so it was left as it is.`;
   return `${quoted.slice(0, -1).join(', ')} and ${quoted.at(-1)} are shared with you, so they were left as they are.`;

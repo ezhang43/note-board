@@ -1,5 +1,11 @@
 # Changelog
 
+## Claude can change your boards (2026-10-07)
+
+- The Claude connector can now add checklist items, change their text and due dates, tick and untick them, move them between lists on the same board, and add notes, on your own boards. Shared boards stay read-only, and notes can only be added.
+- Every change is checked with the app's own rules before it is saved, and never saves over something you changed since Claude read the board. Before Claude's first change (and after 10 quiet minutes) the boards as they were are saved in version history, so you can always go back. At most 50 changes at a time.
+- If BusyAnts is open and saves over Claude's change a moment later, the connector puts it back once and tells Claude. Every change is listed in `%APPDATA%\busyants-mcp\activity.log`. Run `npm run mcp:build` once and restart Claude to get it.
+
 ## Moving online data to the US: the checking tool (2026-10-07)
 
 - Nothing changes in BusyAnts yet. This adds a small read-only tool, run in Google Cloud Shell, that counts every saved board, version and shared board in the online database and checks that a copy has exactly the same contents. It is used to prove the copy is complete before and after moving the online data from Sydney to the United States.

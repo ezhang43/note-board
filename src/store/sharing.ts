@@ -228,12 +228,21 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     }
   }
 
+  /**
+   * Whether it has been said which shares this person has (job #33): by this device's kept list (read once, at
+   * the start, whole and readable) or by the server. Until then, and while a share's boards aren't
+   * known, the store restores nothing (see publish).
+   */
+  let said = false;
+
   /** The shares this device had (see sharesKey). */
   function readRemembered(): { id: string; owner: boolean; ownerUid: string }[] {
     try {
-      const got = JSON.parse(opts.storage?.getItem(sharesKey(backend.me.uid)) ?? '[]') as unknown;
+      const got = JSON.parse(opts.storage?.getItem(sharesKey(backend.me.uid)) ?? 'null') as unknown;
       if (!Array.isArray(got)) return [];
-      return got.filter((x): x is { id: string; owner: boolean; ownerUid: string } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
+      const ok = got.filter((x): x is { id: string; owner: boolean; ownerUid: string } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
+      said = ok.length === got.length;
+      return ok;
     } catch {
       return [];
     }
@@ -312,7 +321,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const infos: ShareInfo[] = [...shares.values()]
       .filter((s) => s.root && s.ready)
       .map((s) => ({ id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, link: s.link }));
-    if (!deepEqual(infos, store.getState().ui.shares)) store.setShares(infos);
+    const known = said && [...shares.values()].every((s) => s.ready);
+    const ui = store.getState().ui;
+    if (!deepEqual(infos, ui.shares) || known !== ui.sharesKnown) store.setShares(infos, known);
   }
 
   function report() {
@@ -540,19 +551,29 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   noting = true;
   groupCache = null;
   groups();
+  publish();
 
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {
       for (const id of ids) open(id);
-      // Left on another device (only by the server's own list: the offline copy may be out of date).
-      if (confirmed) for (const s of [...shares.values()]) if (!ids.includes(s.id) && s.ready && !s.deleting) gone(s, 'left');
+      if (confirmed) {
+        // Left on another device (only by the server's own list: the offline copy may be out of date).
+        for (const s of [...shares.values()]) if (!ids.includes(s.id) && s.ready && !s.deleting) gone(s, 'left');
+        said = true;
+        // Kept even when empty, so the next page here knows at once (job #33).
+        remember();
+        publish();
+      }
       listLoaded = true;
       checkReady();
     },
     () => {
       // Can't read the list (offline with nothing kept, or sharing not switched on online):
-      // carry on without shared boards rather than keep the page waiting.
+      // carry on without shared boards rather than keep the page waiting. Restoring isn't held
+      // back for good either (job #33): no share can arrive through the list now.
       listLoaded = true;
+      said = true;
+      publish();
       checkReady();
     },
   );

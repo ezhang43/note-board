@@ -510,8 +510,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceWorkspace,
     replaceBoards,
     /** The shared boards' details, as the screen shows them (not saved, not undone). */
-    setShares(shares: Ui['shares']) {
-      set({ ...state, ui: uiWith({ shares }) });
+    setShares(shares: Ui['shares'], sharesKnown: boolean) {
+      set({ ...state, ui: uiWith({ shares, sharesKnown }) });
     },
     replaceBoard(board: Board) {
       // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.

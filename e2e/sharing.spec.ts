@@ -399,3 +399,40 @@ test('someone it was shared with restores an old backup: their own boards come b
   await expect(noteTexts(alice).first()).toHaveValue('Tent and stove');
   expect([...alice.errors, ...bob.errors]).toEqual([]);
 });
+
+test('before the list of shared boards has arrived, a restore changes nothing and says so (job #33)', async ({ browser }, info) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  // The pretend server never answers with Carol's list of shared boards.
+  await page.route((url) => url.pathname.endsWith('/__collab/watch') && url.searchParams.get('what') === 'shares', (route) => route.abort());
+  await page.goto(`/?demo-user=Carol${tag()}`);
+  await fontsLoaded(page);
+  await boardName(page).fill('Now');
+  const backup = info.outputPath('carol.json');
+  writeFileSync(backup, JSON.stringify({ version: 2, board: { name: 'Then', snap: true, cards: {}, columns: {}, order: [] } }));
+  let asked = 0;
+  page.on('dialog', (d) => (asked++, void d.accept()));
+  const restore = async () => {
+    const picking = page.waitForEvent('filechooser');
+    await toolbar(page).getByRole('button', { name: 'File', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Restore from backup…' }).click();
+    await (await picking).setFiles(backup);
+  };
+  await restore();
+  const waitNote = page.getByRole('status').filter({ hasText: 'Your shared boards are still loading, so nothing was restored. Try again in a moment.' });
+  await expect(waitNote).toBeVisible();
+  await expect(boardName(page)).toHaveValue('Now');
+  // Not asked "Replace this board…?" for a restore that won't happen.
+  expect(asked).toBe(0);
+
+  // Once the list has arrived, the same restore goes ahead.
+  await page.unrouteAll();
+  await page.reload();
+  await fontsLoaded(page);
+  await expect(boardName(page)).toHaveValue('Now');
+  await expect(async () => {
+    await restore();
+    await expect(boardName(page)).toHaveValue('Then', { timeout: 1000 });
+  }).toPass({ timeout: 10000 });
+  await context.close();
+});

@@ -150,10 +150,10 @@ describe('boards inside boards', () => {
     const trip = s.newBoard();
     s.renameBoard('Trip');
     const share = (owner: boolean) => ({ id: 's1', root: trip, boards: [trip], owner, ownerUid: 'a', people: [], link: null });
-    s.setShares([share(false)]);
+    s.setShares([share(false)], true);
     s.renameBoard('Mine now');
     expect(s.getState().board.name).toBe('Trip');
-    s.setShares([share(true)]);
+    s.setShares([share(true)], true);
     s.renameBoard('Trip 2026');
     expect(s.getState().board.name).toBe('Trip 2026');
   });
@@ -225,7 +225,7 @@ describe('boards changed by others, and shared boards (main session check, 2026-
     const { s } = setup();
     const home = s.getState().boards.home;
     const blank = s.newBoard();
-    s.setShares([{ id: 's1', root: blank, boards: [blank], owner: false, ownerUid: 'a', people: [], link: null }]);
+    s.setShares([{ id: 's1', root: blank, boards: [blank], owner: false, ownerUid: 'a', people: [], link: null }], true);
     s.openBoard(home);
     expect(s.workspace().boards[blank]).toBeDefined();
     // Not shared: dropped, as before.

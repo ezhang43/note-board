@@ -208,5 +208,8 @@ describe('which boards a restore may put back (owner, 2026-10-06)', () => {
     expect(keptNotice(['trip', 'work'], (id) => ({ trip: 'Trip', work: 'Work' })[id]!)).toBe('“Trip” and “Work” are shared with you, so they were left as they are.');
     expect(keptNotice(['a', 'b', 'c'], (id) => id.toUpperCase())).toBe('“A”, “B” and “C” are shared with you, so they were left as they are.');
     expect(keptNotice(['x'], () => '')).toBe('“Untitled board” is shared with you, so it was left as it is.');
+    // Nothing kept: nothing to say. The shared boards not known yet (job #33): nothing was restored.
+    expect(keptNotice([], () => 'Trip')).toBe('');
+    expect(keptNotice('loading', () => 'Trip')).toBe('Your shared boards are still loading, so nothing was restored. Try again in a moment.');
   });
 });

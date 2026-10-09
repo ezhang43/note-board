@@ -153,6 +153,11 @@ export interface Ui {
   arrowSel: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
   shares: ShareInfo[];
+  /**
+   * Whether `shares` is the whole list (job #33): this device's kept list or the server's has said
+   * which shares this person has, and each one's boards are known. Until then nothing is restored.
+   */
+  sharesKnown: boolean;
 }
 
 /** A shared board as the screen shows it. */
@@ -218,4 +223,5 @@ export const emptyUi: Ui = {
   sidePanel: null,
   arrowSel: null,
   shares: [],
+  sharesKnown: true,
 };

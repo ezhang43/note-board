@@ -4,8 +4,9 @@ import * as B from '../model/board';
 import { createBoardCard } from '../model/cards';
 import { serializeShare } from '../model/sharing';
 import type { Board, NoteCard } from '../model/types';
-import { memoryServer, type Person } from './collab';
-import { boardsInKeptShares, startSharing } from './sharing';
+import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { memoryServer, type Person, type ShareDoc } from './collab';
+import { boardsInKeptShares, sharesKey, startSharing } from './sharing';
 import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
 import { createStore, type Store } from './store';
 import { deleteBoardSafely, localVersionStore, type VersionStore } from './versions';
@@ -746,5 +747,109 @@ describe('code review of the main session check fixes (2026-10-06)', () => {
     expect(boardsInKeptShares(bob.storage, 'carol').size).toBe(0);
     // No list kept yet (an older version of the app): every share kept here counts.
     expect(boardsInKeptShares(bob.storage, 'dave').size).toBe(2);
+  });
+});
+
+describe('restoring before the shared boards are known (job #33)', () => {
+  /** An old backup of every board on `s`, with board `id` and the home board named differently. */
+  function oldBackup(s: Store, id: string) {
+    const ws = s.workspace();
+    const boards = { ...ws.boards, [id]: { ...ws.boards[id], name: 'Old trip' }, [ws.home]: { ...ws.boards[ws.home], name: 'Old home' } };
+    return serializeWorkspace({ home: ws.home, boards });
+  }
+  /** The page is opened again on the same device; nothing from the server has arrived yet. */
+  function reload(d: ReturnType<typeof device>, uid: string) {
+    d.sharing.stop();
+    d.store.flush();
+    return device(uid, d.storage);
+  }
+  const homeNamed = (s: Store, name: string) => {
+    const ws = s.workspace();
+    return serializeWorkspace({ home: ws.home, boards: { [ws.home]: { ...ws.boards[ws.home], name } } });
+  };
+
+  it('on a device that has never heard from the server, a restore waits and changes nothing', async () => {
+    const carol = device('carol');
+    carol.store.renameBoard('Now');
+    const backup = homeNamed(carol.store, 'Then');
+    expect(carol.store.restoreBackup(backup)).toBe('loading');
+    expect(carol.store.restoreVersion(readWorkspace(backup)!.ws)).toBe('loading');
+    expect(carol.store.boardName(carol.store.workspace().home)).toBe('Now');
+    await settle();
+    expect(carol.store.restoreBackup(backup)).toEqual([]);
+    expect(carol.store.boardName(carol.store.workspace().home)).toBe('Then');
+  });
+
+  it('shares kept on this device guard a restore from the first moment', async () => {
+    const { bob, trip } = await together();
+    const backup = oldBackup(bob.store, trip);
+    const again = reload(bob, 'bob');
+    expect(again.store.restoreBackup(backup)).toEqual([trip]);
+    expect(again.store.boardName(trip)).toBe('Trip');
+    expect(again.store.boardName(again.store.workspace().home)).toBe('Old home');
+    again.store.openBoard(trip);
+    expect(again.store.restoreVersion(readWorkspace(backup)!.ws)).toEqual([trip]);
+    expect(again.store.boardName(trip)).toBe('Trip');
+  });
+
+  it('a share on this device’s list whose boards aren’t kept here: the restore waits until it arrives', async () => {
+    const { bob, trip, shareId } = await together();
+    const backup = oldBackup(bob.store, trip);
+    // Another device of Bob's that listed the share but couldn't keep its boards (storage full).
+    const storage = memoryStorage();
+    storage.setItem(sharesKey('bob'), JSON.stringify([{ id: shareId, owner: false, ownerUid: 'alice' }]));
+    const again = device('bob', storage);
+    expect(again.store.restoreBackup(backup)).toBe('loading');
+    expect(again.store.workspace().boards[trip]).toBeUndefined();
+    await settle();
+    expect(again.store.restoreBackup(backup)).toEqual([trip]);
+    expect(again.store.boardName(trip)).toBe('Trip');
+  });
+
+  it('a share joined since on another device: once the server lists it, the restore waits until it arrives', async () => {
+    const { bob, trip } = await together();
+    // Another device of Bob's, which kept his list from before he joined.
+    const storage = memoryStorage();
+    storage.setItem(sharesKey('bob'), '[]');
+    const real = server.backendFor(person('bob'));
+    let release = () => {};
+    const backend = {
+      ...real,
+      watchShare: (id: string, onChange: (doc: ShareDoc | null) => void, onError: (e: unknown) => void) => {
+        let stop = () => {};
+        release = () => void (stop = real.watchShare(id, onChange, onError));
+        return () => stop();
+      },
+    };
+    const store = createStore(storage, (fn) => fn());
+    startSharing(store, backend, { client: 'bob-other', storage });
+    const ws = store.workspace();
+    const version = { home: ws.home, boards: { ...ws.boards, [trip]: { ...bob.store.workspace().boards[trip], name: 'Old trip' } } };
+    await settle();
+    expect(store.restoreVersion(version)).toBe('loading');
+    expect(store.workspace().boards[trip]).toBeUndefined();
+    release();
+    await settle();
+    store.openBoard(trip);
+    expect(store.restoreVersion(version)).toEqual([trip]);
+    expect(store.boardName(trip)).toBe('Trip');
+  });
+
+  it('someone with no shares: once the server has said so, the next page restores at once', async () => {
+    const carol = device('carol');
+    await settle();
+    const again = reload(carol, 'carol');
+    expect(again.store.restoreBackup(homeNamed(again.store, 'Then'))).toEqual([]);
+    expect(again.store.boardName(again.store.workspace().home)).toBe('Then');
+  });
+
+  it('a share list the server won’t give doesn’t stop restoring for good', async () => {
+    const backend = { ...server.backendFor(person('erin')), watchMyShares: (_: unknown, onError: (e: unknown) => void) => (setTimeout(() => onError(new Error('refused'))), () => {}) };
+    const store = createStore(memoryStorage(), (fn) => fn());
+    startSharing(store, backend, { client: 'erin-page', storage: memoryStorage() });
+    const backup = homeNamed(store, 'Then');
+    expect(store.restoreBackup(backup)).toBe('loading');
+    await settle();
+    expect(store.restoreBackup(backup)).toEqual([]);
   });
 });

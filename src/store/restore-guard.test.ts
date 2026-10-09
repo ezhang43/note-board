@@ -40,7 +40,7 @@ function setup(owner: boolean) {
   rename(mine, 'Mine now');
   rename(home, 'Home now');
   // (Set last: a board shared with them can't be renamed here.)
-  store.setShares([{ id: 's1', root: trip, boards: [trip, days], owner, ownerUid: 'alice', people: [], link: null }]);
+  store.setShares([{ id: 's1', root: trip, boards: [trip, days], owner, ownerUid: 'alice', people: [], link: null }], true);
   return { store, versions, home, trip, days, mine, backup };
 }
 
@@ -136,5 +136,19 @@ describe('restoring a version of a board shared with them', () => {
     store.openBoard(trip);
     expect(await restoreVersion(store, versions, 'old')).toEqual([]);
     expect(store.getState().board.name).toBe('Trip');
+  });
+});
+
+describe('restoring while the shared boards aren’t known yet (job #33, code review)', () => {
+  it('a version or a backup: nothing is saved, opened or changed, and it says why', async () => {
+    const { store, versions, mine, backup } = setup(false);
+    await versions.save({ id: 'old', savedAt: 1, cards: 0, columns: 0 }, backup);
+    store.setShares(store.getState().ui.shares, false);
+    store.openBoard(mine);
+    expect(await restoreVersion(store, versions, 'old')).toBe('loading');
+    expect(await restoreFromBackup(store, versions, backup)).toBe('loading');
+    expect(await versions.list()).toHaveLength(1);
+    expect(store.getState().boards.open).toBe(mine);
+    expect(store.getState().board.name).toBe('Mine now');
   });
 });

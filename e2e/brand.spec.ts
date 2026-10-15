@@ -7,7 +7,7 @@ freshBoardEachTest();
 
 test('the toolbar shows the BusyAnts ant and is honey-coloured, with the window bar to match', async ({ page }) => {
   const toolbar = page.locator('.toolbar');
-  await expect(toolbar.getByRole('img', { name: 'BusyAnts' })).toBeVisible();
+  await expect(toolbar.getByRole('link', { name: 'BusyAnts website' }).locator('img.toolbar-logo')).toBeVisible();
   await expect(toolbar).toHaveCSS('background-color', 'rgb(255, 241, 194)');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#FFF1C2');
 });

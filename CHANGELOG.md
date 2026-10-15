@@ -4,6 +4,10 @@
 
 - As a trial to save tokens, crew workers on low-risk jobs now run on the cheaper Sonnet model, at high effort. High-risk jobs (saving, sync, undo, deleting) and pull request checks stay on the stronger default model.
 
+## The toolbar ant opens the website (2026-10-15)
+
+- Clicking the BusyAnts ant at the left of the toolbar now opens the BusyAnts website's About page in a new tab, so you can get to the website from any board while the board stays open. Its tooltip says "BusyAnts website". Works on a phone too.
+
 ## Crew Board updates are batched (2026-10-15)
 
 - The crew coordinator now sends all Crew Board changes from one event in a single update, and skips progress-only updates, to use fewer tokens.

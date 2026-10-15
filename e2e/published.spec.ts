@@ -31,7 +31,7 @@ test('shows only a sign-in screen to someone who is not signed in', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('opens without internet after one visit online', async ({ page, context }) => {
+test('opens without internet after one visit online', async ({ page, context, browserName }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   // Wait until the offline copy is running and has saved this visit's files.
@@ -40,6 +40,9 @@ test('opens without internet after one visit online', async ({ page, context }) 
     .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v5')).keys()).length))
     .toBeGreaterThan(2);
 
+  // Playwright's WebKit can't fake offline for a page with a service worker (it blocks requests
+  // before the worker sees them; the worker itself answers from its saved copy). Checked up to here.
+  test.skip(browserName === 'webkit', "Playwright's WebKit can't fake offline past a service worker");
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();

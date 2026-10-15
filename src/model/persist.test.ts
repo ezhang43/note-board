@@ -20,6 +20,14 @@ describe('saving the board', () => {
     expect(parseBoard(serializeBoard(b))).toEqual(b);
   });
 
+  it('keeps the bold colours on columns and title bands', () => {
+    let b = addColumn(sampleBoard(), { ...createColumn('c2'), x: 700, y: 60, color: 'tomato' });
+    b = { ...b, cards: { ...b.cards, t1: { ...b.cards.t1, titleColor: 'magenta' } } };
+    const back = parseBoard(serializeBoard(b));
+    expect(back.columns.c2.color).toBe('tomato');
+    expect(back.cards.t1.titleColor).toBe('magenta');
+  });
+
   it('starts a fresh, empty board when nothing is saved', () => {
     expect(parseBoard(null)).toEqual(createBoard());
   });

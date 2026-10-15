@@ -22,7 +22,7 @@ test('the website pages are published beside the app, with working links', async
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
 });
 
-test('visiting a website page never replaces the offline copy of the app', async ({ page, context }) => {
+test('visiting a website page never replaces the offline copy of the app', async ({ page, context, browserName }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -33,6 +33,9 @@ test('visiting a website page never replaces the offline copy of the app', async
   await page.goto('faq/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Questions and answers');
 
+  // Playwright's WebKit can't fake offline for a page with a service worker (it blocks requests
+  // before the worker sees them; the worker itself answers from its saved copy). Checked up to here.
+  test.skip(browserName === 'webkit', "Playwright's WebKit can't fake offline past a service worker");
   await context.setOffline(true);
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();

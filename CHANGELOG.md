@@ -4,6 +4,10 @@
 
 - Clicking the BusyAnts ant at the left of the toolbar now opens the BusyAnts website's About page in a new tab, so you can get to the website from any board while the board stays open. Its tooltip says "BusyAnts website". Works on a phone too.
 
+## Offline tests also run on a phone and in Safari's engine (2026-10-15)
+
+- The automatic offline tests now also run on a phone-sized Chrome (Android) and in WebKit, the engine Safari and iPhones use, both on a computer and on GitHub. In WebKit they check that the offline copy installs and saves the app, and that a new version clears the old copy. The test tool can't switch off the internet for WebKit past the offline copy, so opening with no internet is still only tested in Chrome. Setup on a computer now needs `npx playwright install chromium webkit` once.
+
 ## Bold colours (2026-10-15)
 
 - The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.

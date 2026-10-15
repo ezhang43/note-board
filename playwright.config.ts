@@ -30,6 +30,17 @@ export default defineConfig({
     { name: 'chromium', use: desktop, testIgnore: /published/ },
     // The published build (sign-in, offline copy), served as GitHub Pages serves it.
     { name: 'published', use: { ...desktop, baseURL: `http://localhost:${ports.preview}/note-board/` }, testMatch: /published/ },
+    // The offline tests again on a phone (Chrome on Android) and in Safari's engine (iPhone), so the
+    // offline copy is checked there too; the rest of the suite runs on desktop Chrome only.
+    ...[
+      { name: 'published-phone', use: devices['Pixel 7'] },
+      { name: 'published-iphone', use: devices['iPhone 14'] },
+    ].map((p) => ({
+      ...p,
+      use: { ...p.use, baseURL: `http://localhost:${ports.preview}/note-board/` },
+      testMatch: /published/,
+      grep: /offline|without internet/,
+    })),
   ],
   webServer: [
     {

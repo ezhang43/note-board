@@ -1,5 +1,9 @@
 # Changelog
 
+## The toolbar ant opens the website (2026-10-15)
+
+- Clicking the BusyAnts ant at the left of the toolbar now opens the BusyAnts website's About page in a new tab, so you can get to the website from any board while the board stays open. Its tooltip says "BusyAnts website". Works on a phone too.
+
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 
 - Running the browser tests on a computer now opens at most 4 hidden Chrome windows at a time instead of half the processor's threads, so several crew workers testing at once no longer max out the CPU. Tests on GitHub are unchanged.

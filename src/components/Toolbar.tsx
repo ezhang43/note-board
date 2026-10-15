@@ -370,9 +370,13 @@ export function SnapButton() {
   );
 }
 
-/** The BusyAnts ant from the app icon (owner request: the toolbar matches the icon). */
+/** The BusyAnts ant from the app icon (owner request: the toolbar matches the icon). It opens the website's About page in a new tab (job #53). */
 function Logo() {
-  return <img className="toolbar-logo" src={`${import.meta.env.BASE_URL}busyants-icon.svg`} alt="BusyAnts" width={30} height={30} />;
+  return (
+    <a className="toolbar-logo-link" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" aria-label="BusyAnts website" title="BusyAnts website">
+      <img className="toolbar-logo" src={`${import.meta.env.BASE_URL}busyants-icon.svg`} alt="" width={30} height={30} />
+    </a>
+  );
 }
 
 function BoardName() {

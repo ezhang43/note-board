@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import {
+  cellLines,
+  cellTime,
   dayKey,
   dayLabel,
   draftFor,
@@ -113,7 +115,7 @@ export function CalendarPanel() {
           weekDays(s.day).map(dayList)
         ) : (
           <>
-            <MonthGrid day={s.day} today={today} events={s.events} />
+            <MonthGrid day={s.day} today={today} events={s.events} onPick={pick} />
             {dayList(s.day)}
           </>
         ))}
@@ -150,10 +152,24 @@ function DayEvents({ day, today, events, onPick, onAdd }: { day: DayKey; today: 
   );
 }
 
-function MonthGrid({ day, today, events }: { day: DayKey; today: DayKey; events: CalEvent[] }) {
+/** Cells under this width keep two lines, names only: a time leaves no room for the name. */
+const NARROW_CELL = 70;
+
+function MonthGrid({ day, today, events, onPick }: { day: DayKey; today: DayKey; events: CalEvent[]; onPick: (e: CalEvent) => void }) {
   const month = day.slice(0, 7);
+  const [narrow, setNarrow] = useState(true);
+  const [grid, setGrid] = useState<HTMLDivElement | null>(null);
+  // Measured before the first paint, so a wide grid doesn't first show two lines.
+  useLayoutEffect(() => {
+    if (!grid) return;
+    const measure = () => setNarrow(grid.clientWidth / 7 < NARROW_CELL);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(grid);
+    return () => watch.disconnect();
+  }, [grid]);
   return (
-    <div className="cal-month" role="grid" aria-label={rangeLabel('month', day)}>
+    <div ref={setGrid} className={`cal-month${narrow ? ' narrow' : ''}`} role="grid" aria-label={rangeLabel('month', day)}>
       <div role="row" className="cal-row">
         {WEEKDAYS.map((d) => (
           <span key={d} role="columnheader" className="cal-weekday">
@@ -164,21 +180,44 @@ function MonthGrid({ day, today, events }: { day: DayKey; today: DayKey; events:
       {monthGrid(day).map((week) => (
         <div key={week[0]} role="row" className="cal-row">
           {week.map((d) => {
-            const count = eventsOnDay(events, d).length;
+            const list = eventsOnDay(events, d);
+            const { shown, more } = cellLines(list, narrow ? 2 : 3);
+            const count = list.length;
+            const name = `${dayLabel(d)}${count ? `, ${count} ${count === 1 ? 'event' : 'events'}` : ''}`;
             const classes = ['cal-cell', d.slice(0, 7) !== month && 'outside', d === today && 'today'].filter(Boolean).join(' ');
+            const pickDay = () => void calendar.pickDay(d);
             return (
-              <button
-                key={d}
-                type="button"
-                role="gridcell"
-                className={classes}
-                aria-selected={d === day}
-                aria-label={`${dayLabel(d)}${count ? `, ${count} ${count === 1 ? 'event' : 'events'}` : ''}`}
-                onClick={() => void calendar.pickDay(d)}
-              >
-                {Number(d.slice(8))}
-                {count > 0 && <span className="cal-dot" aria-hidden="true" />}
-              </button>
+              // The whole cell picks its day; the date is the button for the keyboard (buttons can't hold the event buttons).
+              <div key={d} role="gridcell" className={classes} aria-selected={d === day} aria-label={name} onClick={pickDay}>
+                <button type="button" className="cal-date" aria-label={`Show ${dayLabel(d)}`} onClick={(e) => (e.stopPropagation(), pickDay())}>
+                  {Number(d.slice(8))}
+                </button>
+                {shown.map((e) => {
+                  const time = cellTime(e, d);
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
+                      aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
+                      title={`${time && `${time} `}${e.title}`}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onPick(e);
+                      }}
+                    >
+                      {!e.allDay && <span className="cal-chip-dot" aria-hidden="true" />}
+                      {time && <span className="cal-chip-time">{time}</span>}
+                      <span className="cal-chip-title">{e.title}</span>
+                    </button>
+                  );
+                })}
+                {more > 0 && (
+                  <button type="button" className="cal-more" onClick={(e) => (e.stopPropagation(), pickDay())}>
+                    +{more} more
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

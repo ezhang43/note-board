@@ -186,6 +186,50 @@ test('week and month views, back and forward, and Today', async ({ page }) => {
   await expect(heading).not.toHaveText(`${monthName} ${now.getFullYear()}`);
 });
 
+test('the month grid shows each day’s event names; clicking one opens it; “+n more” lists the day', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const grid = panel(page).getByRole('grid');
+  const cell = (d: Date) => grid.getByRole('gridcell', { name: new RegExp(`^${label(d)}`) });
+  const now = new Date();
+  // Today: Team stand-up (09:00, repeating) and Dentist (10:00), in time order, by name.
+  const todayCell = cell(now);
+  await expect(todayCell.locator('.cal-chip')).toHaveText([/Team stand-up/, /Dentist/]);
+  await expect(todayCell.getByRole('button', { name: '10:00 – 11:00 Dentist' })).toBeVisible();
+  await expect(todayCell.getByRole('button', { name: /Team stand-up, read-only/ })).toHaveClass(/read-only/);
+  // An all-day event is a filled chip, first on its day.
+  const holiday = daysFromToday(3);
+  if (holiday.getMonth() === now.getMonth()) {
+    await expect(cell(holiday).locator('.cal-chip').first()).toHaveText('Holiday');
+    await expect(cell(holiday).locator('.cal-chip').first()).toHaveClass(/all-day/);
+  }
+
+  // Clicking a name opens that event: Dentist's change form, then back to the month.
+  await todayCell.getByRole('button', { name: /Dentist/ }).click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // A read-only event opens read-only.
+  await todayCell.getByRole('button', { name: /Team stand-up/ }).click();
+  await expect(panel(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
+  await panel(page).getByRole('button', { name: 'Back' }).click();
+
+  // A third event today: the narrow panel keeps two lines, the last saying "+2 more".
+  await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
+  await page.keyboard.type('Swim');
+  await form(page).getByLabel('Start time').fill('07:00');
+  await form(page).getByLabel('End time').fill('07:45');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(todayCell.locator('.cal-chip')).toHaveText([/Swim/]);
+  await expect(todayCell.getByRole('button', { name: '+2 more' })).toBeVisible();
+  // Clicking another day, then "+2 more", lists all of today's events under the grid.
+  await cell(now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1)).locator('.cal-date').click();
+  await todayCell.getByRole('button', { name: '+2 more' }).click();
+  await expect(todayCell).toHaveAttribute('aria-selected', 'true');
+  await expect(day(page, now).locator('.cal-event')).toHaveCount(3);
+  expect(errors).toEqual([]);
+});
+
 test('when Google Calendar can’t be reached, one plain note shows and nothing breaks', async ({ page }) => {
   const errors = await openAs(page);
   await page.route('**/__calendar/**', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403,"message":"accessNotConfigured"}}' }));
@@ -220,6 +264,29 @@ for (const [kind, note] of [
     expect(errors).toEqual([]);
   });
 }
+
+test.describe('on a wide phone-layout screen (month cells 70px or wider)', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 590, height: 1000 } });
+
+  test('month cells show start times and up to three lines', async ({ page }) => {
+    await openAs(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
+    await panel(page).getByRole('button', { name: 'Month', exact: true }).tap();
+    const now = new Date();
+    const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
+    await expect(todayCell.locator('.cal-chip')).toHaveText(['09:00Team stand-up', '10:00Dentist']);
+    await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
+    // A third event still fits: three lines, no "+n more".
+    await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).tap();
+    await page.keyboard.type('Swim');
+    await form(page).getByLabel('Start time').fill('07:00');
+    await form(page).getByLabel('End time').fill('07:45');
+    await form(page).getByRole('button', { name: 'Save' }).tap();
+    await expect(todayCell.locator('.cal-chip')).toHaveText(['07:00Swim', '09:00Team stand-up', '10:00Dentist']);
+    await expect(todayCell.getByRole('button', { name: /more$/ })).toHaveCount(0);
+  });
+});
 
 test.describe('on a phone-sized screen', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });

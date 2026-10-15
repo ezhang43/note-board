@@ -188,6 +188,17 @@ export function eventsOnDay(events: CalEvent[], key: DayKey): CalEvent[] {
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
 }
 
+/** A day in the month grid shows up to `max` lines; when more events than that, the last line says "+n more". */
+export function cellLines(events: CalEvent[], max: number): { shown: CalEvent[]; more: number } {
+  if (events.length <= max) return { shown: events, more: 0 };
+  return { shown: events.slice(0, max - 1), more: events.length - (max - 1) };
+}
+
+/** "10:00" on the day a timed event starts; nothing on the days it runs over into, or for all-day events. */
+export function cellTime(e: CalEvent, key: DayKey): string {
+  return !e.allDay && e.start.startsWith(key) ? e.start.slice(11) : '';
+}
+
 /** "10:00 – 11:00", or "All day". */
 export function timeLabel(e: CalEvent): string {
   return e.allDay ? 'All day' : `${e.start.slice(11)} – ${e.end.slice(11)}`;

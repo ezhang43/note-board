@@ -1,5 +1,10 @@
 # Changelog
 
+## Calendar month shows event names (2026-10-15)
+
+- In the Google Calendar panel's Month view, each day now shows its events by name, like Google Calendar's own month: all-day events first as small filled chips, then timed ones. Where a day has more than fit, the last line says "+2 more"; clicking it (or the day) lists all its events under the grid. Clicking a name opens that event.
+- In the narrow side panel a day shows two lines, names only; on a wider phone screen it shows three, with start times ("10:00 Dentist").
+
 ## The crew works from the cloud too (2026-10-15)
 
 - Claude's crew coordinator can now run on this computer or in a Claude Code cloud session, whichever one you are talking to, and picks up where the other left off. Its job list lives on the private Crew Board page instead of a file here. Nothing in the app changes.

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   addMonths,
+  cellLines,
+  cellTime,
   dayKey,
   dayLabel,
   draftBody,
@@ -172,6 +174,27 @@ describe('a day’s events', () => {
   it('shows times on the 24-hour clock', () => {
     expect(timeLabel(timed())).toBe('10:00 – 11:00');
     expect(timeLabel(allDay)).toBe('All day');
+  });
+});
+
+describe('a day in the month grid (job #47)', () => {
+  const ev = (id: string) => timed({ id });
+  it('shows every event when they fit', () => {
+    expect(cellLines([ev('a'), ev('b')], 2)).toEqual({ shown: [ev('a'), ev('b')], more: 0 });
+    expect(cellLines([ev('a'), ev('b'), ev('c')], 3)).toEqual({ shown: [ev('a'), ev('b'), ev('c')], more: 0 });
+    expect(cellLines([], 3)).toEqual({ shown: [], more: 0 });
+  });
+
+  it('when more than fit, the last line says how many more', () => {
+    expect(cellLines([ev('a'), ev('b'), ev('c'), ev('d'), ev('e')], 3)).toEqual({ shown: [ev('a'), ev('b')], more: 3 });
+    expect(cellLines([ev('a'), ev('b'), ev('c')], 2)).toEqual({ shown: [ev('a')], more: 2 });
+  });
+
+  it('a timed event shows its start time on the day it starts only', () => {
+    const overnight = timed({ start: '2026-10-06T22:00', end: '2026-10-07T02:00' });
+    expect(cellTime(overnight, '2026-10-06')).toBe('22:00');
+    expect(cellTime(overnight, '2026-10-07')).toBe('');
+    expect(cellTime(timed({ allDay: true, start: '2026-10-08', end: '2026-10-09' }), '2026-10-08')).toBe('');
   });
 });
 

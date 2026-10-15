@@ -1,5 +1,9 @@
 # Changelog
 
+## Ctrl+Enter ticks a checklist item (2026-10-15)
+
+- While typing in a checklist item, Ctrl+Enter (⌘+Enter on a Mac) ticks it, just like clicking its box, and the cursor moves on to the next open item so you can keep going. On a ticked item it unticks it. Ctrl+Z undoes it. It is listed in the keyboard shortcuts panel (press ?).
+
 ## Google Calendar is connected on the live site (2026-10-15)
 
 - The calendar panel now uses the site's Google sign-in key, so it can show and change your Google Calendar instead of saying it "isn't connected yet".

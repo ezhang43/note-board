@@ -1,5 +1,6 @@
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD' keys
-// in the person's own time zone, times 'HH:MM' on the 24-hour clock; weeks start on Monday.
+// in the person's own time zone, times 'HH:MM' on the 24-hour clock. The week view is seven days
+// from the day it starts on (today when it opens); the month grid's weeks start on Monday.
 // Calendar events aren't board data: they are never undone, synced with boards or kept in versions.
 
 export type DayKey = string;
@@ -18,6 +19,13 @@ export interface CalEvent {
   editable: boolean;
   /** Where to open it in Google Calendar. */
   link: string;
+}
+
+/** No calendar access: Google's window was blocked or closed, or access wasn't given. */
+export class NoAccess extends Error {
+  constructor(readonly reason: 'window' | 'refused') {
+    super(reason === 'window' ? 'Google window blocked or closed' : 'Calendar access not given');
+  }
 }
 
 /** What the add / change form holds. Dates are 'YYYY-MM-DD', times 'HH:MM'; an all-day event's end is its last day. */
@@ -71,9 +79,9 @@ export function addMonths(key: DayKey, n: number): DayKey {
 
 const weekStart = (key: DayKey) => addDays(key, -((toDate(key).getUTCDay() + 6) % 7));
 
+/** Seven days from `key`: the week view (today and the next six when it opens), or a row of the month grid. */
 export function weekDays(key: DayKey): DayKey[] {
-  const monday = weekStart(key);
-  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  return Array.from({ length: 7 }, (_, i) => addDays(key, i));
 }
 
 /** Whole weeks (Monday to Sunday) covering every day of the month `key` is in. */
@@ -87,10 +95,7 @@ export function monthGrid(key: DayKey): DayKey[][] {
 
 /** The days shown, `to` not included. */
 export function viewRange(view: CalView, key: DayKey): { from: DayKey; to: DayKey } {
-  if (view === 'week') {
-    const from = weekStart(key);
-    return { from, to: addDays(from, 7) };
-  }
+  if (view === 'week') return { from: key, to: addDays(key, 7) };
   const grid = monthGrid(key);
   return { from: grid[0][0], to: addDays(grid[grid.length - 1][6], 1) };
 }
@@ -105,16 +110,16 @@ export function dayLabel(key: DayKey): string {
   return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/** "5 – 11 Oct 2026", "28 Sep – 4 Oct 2026", "October 2026" */
+/** "Thu 15 – Wed 21 Oct 2026", "Wed 30 Sep – Tue 6 Oct 2026", "October 2026" */
 export function rangeLabel(view: CalView, key: DayKey): string {
-  const d = toDate(key);
-  if (view === 'month') return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-  const days = weekDays(key);
-  const [a, b] = [toDate(days[0]), toDate(days[6])];
-  const end = `${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
-  if (a.getUTCFullYear() !== b.getUTCFullYear()) return `${a.getUTCDate()} ${MONTHS[a.getUTCMonth()]} ${a.getUTCFullYear()} – ${end}`;
-  if (a.getUTCMonth() !== b.getUTCMonth()) return `${a.getUTCDate()} ${MONTHS[a.getUTCMonth()]} – ${end}`;
-  return `${a.getUTCDate()} – ${end}`;
+  const a = toDate(key);
+  if (view === 'month') return `${MONTH_NAMES[a.getUTCMonth()]} ${a.getUTCFullYear()}`;
+  const last = addDays(key, 6);
+  const b = toDate(last);
+  const end = `${dayLabel(last)} ${b.getUTCFullYear()}`;
+  if (a.getUTCFullYear() !== b.getUTCFullYear()) return `${dayLabel(key)} ${a.getUTCFullYear()} – ${end}`;
+  if (a.getUTCMonth() !== b.getUTCMonth()) return `${dayLabel(key)} – ${end}`;
+  return `${DAYS[a.getUTCDay()]} ${a.getUTCDate()} – ${end}`;
 }
 
 const isDay = (s: unknown): s is DayKey => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && fromDate(toDate(s)) === s;

@@ -52,10 +52,10 @@ describe('day maths', () => {
     expect(addMonths('2026-01-15', -1)).toBe('2025-12-15');
   });
 
-  it('a week runs Monday to Sunday', () => {
-    expect(weekDays('2026-10-06')).toEqual(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']);
-    expect(weekDays('2026-10-11')[0]).toBe('2026-10-05'); // Sunday belongs to the week before
-    expect(weekDays('2026-10-12')[0]).toBe('2026-10-12');
+  it('the week view is seven days from the day it starts on (today when it opens), not Monday to Sunday', () => {
+    expect(weekDays('2026-10-15')).toEqual(['2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21']);
+    expect(weekDays('2026-10-11')[0]).toBe('2026-10-11');
+    expect(weekDays('2026-12-29')[6]).toBe('2027-01-04');
   });
 
   it('a month grid is whole weeks covering every day of the month', () => {
@@ -68,7 +68,7 @@ describe('day maths', () => {
   });
 
   it('the range to fetch is the days shown, the end day not included', () => {
-    expect(viewRange('week', '2026-10-06')).toEqual({ from: '2026-10-05', to: '2026-10-12' });
+    expect(viewRange('week', '2026-10-15')).toEqual({ from: '2026-10-15', to: '2026-10-22' });
     expect(viewRange('month', '2026-10-06')).toEqual({ from: '2026-09-28', to: '2026-11-02' });
   });
 
@@ -80,9 +80,9 @@ describe('day maths', () => {
 
   it('labels days and ranges', () => {
     expect(dayLabel('2026-10-06')).toBe('Tue 6 Oct');
-    expect(rangeLabel('week', '2026-10-06')).toBe('5 – 11 Oct 2026');
-    expect(rangeLabel('week', '2026-09-30')).toBe('28 Sep – 4 Oct 2026');
-    expect(rangeLabel('week', '2026-12-30')).toBe('28 Dec 2026 – 3 Jan 2027');
+    expect(rangeLabel('week', '2026-10-15')).toBe('Thu 15 – Wed 21 Oct 2026');
+    expect(rangeLabel('week', '2026-09-30')).toBe('Wed 30 Sep – Tue 6 Oct 2026');
+    expect(rangeLabel('week', '2026-12-30')).toBe('Wed 30 Dec 2026 – Tue 5 Jan 2027');
     expect(rangeLabel('month', '2026-10-06')).toBe('October 2026');
   });
 });

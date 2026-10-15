@@ -1,5 +1,9 @@
 # Changelog
 
+## Browser tests use at most 4 browsers on a computer (2026-10-15)
+
+- Running the browser tests on a computer now opens at most 4 hidden Chrome windows at a time instead of half the processor's threads, so several crew workers testing at once no longer max out the CPU. Tests on GitHub are unchanged.
+
 ## Wider calendar panel for the Month view (2026-10-15)
 
 - While the Google Calendar panel shows the Month view, it is wider (560px instead of 300px), so each day has room for event names with their start times ("10:00 Dentist") and up to three lines. Switching to Week brings it back to the usual width. In a small window it shrinks so some board stays visible. Other panels and the phone layout are unchanged.

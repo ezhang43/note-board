@@ -9,6 +9,9 @@ const ports = testPorts({ isWorktree: isGitWorktree(), folder: process.cwd(), en
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // At most 4 browsers at once on a computer, so several crew workers testing together don't max out
+  // the CPU (the default is half the processor threads); GitHub (CI) keeps the default.
+  workers: process.env.CI ? undefined : 4,
   // A failed or flaky test is retried once; its trace (every step, with snapshots of the page),
   // screenshot and video are kept in test-results/ and shown in the report (npm run test:e2e:report).
   retries: 1,

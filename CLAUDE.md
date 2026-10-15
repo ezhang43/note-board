@@ -42,7 +42,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Commands
 
-- `npm install` then `npx playwright install chromium` (once)
+- `npm install` then `npx playwright install chromium webkit` (once)
 - `npm run dev` — run the app at http://localhost:5173
 - `npm test` — unit tests
 - `npm run test:e2e` — browser tests

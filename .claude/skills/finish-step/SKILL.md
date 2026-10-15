@@ -9,7 +9,7 @@ Follow CLAUDE.md; this is its end-of-step rules in order. Do every step; say in 
 
 ## 1. Up to date
 
-`git fetch`. Note which session this is: the **main session** is the one on the owner's Windows computer in `C:\Users\ezhan\Projects\note-board`; any other session (cloud, worktree, another computer) works on its own branch (rule 9).
+`git fetch`. Note which session this is: the **crew coordinator** is the session named in the Crew Board's `meta/crew` (on the owner's Windows computer or a cloud session the owner is talking to); any other session (a worker, a worktree, another chat) works on its own branch (rule 9).
 
 ## 2. Tests pass
 
@@ -61,7 +61,7 @@ Use the `spec-checker` subagent on the change. Fix anything it lists, or say in 
 
 ## 7. Land it
 
-- **Main session:** commit on `build/v1`, fetch again, push. A commit pushed straight to `build/v1` holds auto-publish back until the owner says "publish"; for a change that should go live by itself, use a branch and a low-risk pull request instead.
+- **Crew coordinator:** commit on `build/v1`, fetch again, push. A commit pushed straight to `build/v1` holds auto-publish back until the owner says "publish"; for a change that should go live by itself, use a branch and a low-risk pull request instead.
 - **Any other session:** commit on the job's branch, push, open a pull request into `build/v1`. If step 3 said `high`, add `--label high-risk` and do not merge: give the owner the link. Otherwise watch "All tests", fix it if it fails, and merge (merge commit) once it passes.
 
 ## 8. Report to the owner

@@ -89,7 +89,7 @@ export function checklistActions(ctx: StoreContext) {
     return true;
   }
 
-  return {
+  const actions = {
     // ---------- selecting items in one list or several (Ctrl+A ladder, owner request) ----------
     /** Ctrl+A in an item whose text is all selected: every item shown in that list. */
     selectWholeList(cardId: string) {
@@ -202,6 +202,23 @@ export function checklistActions(ctx: StoreContext) {
       };
       ctx.pending.tick = { timer: setTimeout(finish, COMPLETE_LEAVE_MS), apply: finish };
     },
+    /**
+     * Ctrl+Enter while typing in an item (owner request, 2026-10-15): the same as its Done box. After a
+     * tick the cursor moves to the next open item (below, else above); after an untick it stays at
+     * `caret`. Returns false when no open item is left: the field should let go, the list stays selected.
+     */
+    tickFromKeyboard(cardId: string, itemId: string, caret: number): boolean {
+      ctx.flushPendingTick();
+      const card = ctx.state.board.cards[cardId];
+      const item = card?.kind === 'todo' ? C.findItem(card.items, itemId)?.item : null;
+      if (card?.kind !== 'todo' || !item) return false;
+      const ticking = !item.done;
+      const ids = listsIncluding(cardId, itemId)?.find((l) => l.cardId === cardId)?.ids ?? selectedItemsIncluding(cardId, itemId) ?? [itemId];
+      actions.toggleItem(cardId, itemId);
+      const focus = ticking ? C.nextOpenItem(card.items, C.setItemsDone(card.items, ids, true), itemId) : itemId;
+      updateUi({ focusItem: focus, focusOffset: ticking ? null : caret, ...(focus ? {} : { selection: [cardId] }) });
+      return !!focus;
+    },
     /** Trash can: deletes the item and everything under it (or every selected item, if it is one of them). */
     trashItem(cardId: string, itemId: string) {
       const lists = listsIncluding(cardId, itemId);
@@ -313,4 +330,5 @@ export function checklistActions(ctx: StoreContext) {
       });
     },
   };
+  return actions;
 }

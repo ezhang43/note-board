@@ -62,6 +62,17 @@ export function displayOrder(items: TodoItem[]): string[] {
   return [...flatIds(open), ...flatIds(done)];
 }
 
+/**
+ * Ctrl+Enter (owner request, 2026-10-15): after `id` is ticked (`before` → `after`), the open item
+ * the cursor moves to: the nearest one that was below it, else the nearest above, else null.
+ */
+export function nextOpenItem(before: TodoItem[], after: TodoItem[], id: string): string | null {
+  const stillOpen = new Set(flatIds(sections(after).open).filter((x) => !findItem(after, x)!.item.done));
+  const order = flatIds(sections(before).open);
+  const i = order.indexOf(id);
+  return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0)).reverse()].find((x) => stillOpen.has(x)) ?? null;
+}
+
 /** Items shown from `a` to `b` inclusive (either way round), across open and completed items. */
 export function itemRange(items: TodoItem[], a: string, b: string): string[] {
   const order = displayOrder(items);

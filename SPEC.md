@@ -171,6 +171,7 @@ A checklist is an editable title plus a tree of items up to 6 levels deep, with 
 - On hover, each item shows a small drag grip and a trash can at the right end of its first line, in a narrow strip every item keeps free for them, so they never cover the text and the text never moves on hover. Neither shows otherwise. On a touch screen (no hover) they show only on the item being typed in; tapping its trash deletes it, and its grip drags with a finger.
 - Up / Down arrows move between items as if the list were one long text: Up goes to the end of the item above, Down to the start of the item below. Inside a multi-line item they move line by line first. Items hidden in a collapsed Completed section are skipped.
 - Ctrl+Shift+Up / Down move the item being typed in (with its sub-items) past the item above / below at the same level, keeping the cursor in it. A top-level item never passes into or out of the Completed section; at the top or bottom of its level nothing happens.
+- Ctrl+Enter (⌘+Enter on a Mac) in an item ticks it, exactly as clicking its Done box does (the same move into Completed, sub-item rules, selected items and one undo step); on a ticked item it unticks it and the cursor stays where it was. After a tick the cursor moves to the nearest open item below it in the same list, or else the nearest one above; with no open item left it leaves the field and the list stays selected. It never splits the item or adds one.
 
 **Completed section**
 

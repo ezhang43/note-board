@@ -80,7 +80,7 @@ At most **3 workers at a time** (each runs browser tests and a build; more slows
 
 Start each with the Agent tool: `subagent_type: general-purpose`, `isolation: worktree`, `run_in_background: true`, a short `description`, and a `name` matching the job (`job-3-dots`). In a cloud session use `isolation: worktree` as usual (the cloud machine is its own computer). Use `isolation: remote` (a cloud worker) only when the owner asks for it.
 
-**Model** (owner, 2026-10-15, a trial to save tokens): a `low`-risk job's worker gets `model: sonnet`; a `high`-risk job's worker keeps the default model, and so does the coordinator's own `/check-pr`. If a Sonnet worker fails its tests twice in a row or its review finds real bugs, finish that job with a default-model worker (SendMessage won't change the model: start a fresh one from its branch) and tell the owner, so the trial can be judged.
+**Model** (owner, 2026-10-15, a trial to save tokens): a `low`-risk job's worker gets `model: sonnet` and `effort: high`; a `high`-risk job's worker keeps the default model, and so does the coordinator's own `/check-pr`. If a Sonnet worker fails its tests twice in a row or its review finds real bugs, finish that job with a default-model worker (SendMessage won't change the model: start a fresh one from its branch) and tell the owner, so the trial can be judged.
 
 The worker starts cold, so the prompt must stand alone. Fill in this template:
 

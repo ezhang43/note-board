@@ -1,5 +1,9 @@
 # Changelog
 
+## Low-risk crew workers use Sonnet (2026-10-15)
+
+- As a trial to save tokens, crew workers on low-risk jobs now run on the cheaper Sonnet model. High-risk jobs (saving, sync, undo, deleting) and pull request checks stay on the stronger default model.
+
 ## Crew Board updates are batched (2026-10-15)
 
 - The crew coordinator now sends all Crew Board changes from one event in a single update, and skips progress-only updates, to use fewer tokens.

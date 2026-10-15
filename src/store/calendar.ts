@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { dayKey, draftBody, moveView, parseEvent, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody } from '../model/calendar';
+import { dayKey, draftBody, moveView, NoAccess, parseEvent, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -7,6 +7,9 @@ import { demoUser } from '../sync/demo';
 // Version history. It talks to the Calendar API (v3) directly with fetch.
 
 export const NOT_CONNECTED = 'Google Calendar isn’t connected yet. Try again later.';
+/** Without access yet (`needsAccess`), the panel offers Connect Google Calendar instead of Try again. */
+export const NO_WINDOW = 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.';
+export const NOT_GIVEN = 'Calendar access wasn’t given. Click Connect Google Calendar to allow it.';
 export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try again later.';
 export const BAD_TIMES = 'The end must be after the start.';
 
@@ -84,10 +87,12 @@ export interface CalendarState {
   events: CalEvent[] | null;
   loading: boolean;
   note: string | null;
+  /** No calendar access yet (Google's window blocked or closed, or access refused): offer Connect. */
+  needsAccess: boolean;
 }
 
 export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date())) {
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null };
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false };
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
   let asked = 0;
@@ -102,12 +107,14 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     if (!api) return;
     const n = ++asked;
     const { from, to } = viewRange(state.view, state.day);
-    set({ loading: true, note: null });
+    set({ loading: true, note: null, needsAccess: false });
     try {
       const events = await api.list(from, to);
       if (n === asked) set({ events, loading: false });
-    } catch {
-      if (n === asked) set({ events: null, loading: false, note: NOT_CONNECTED });
+    } catch (e) {
+      const needsAccess = e instanceof NoAccess;
+      const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
+      if (n === asked) set({ events: null, loading: false, note, needsAccess });
     }
   }
 
@@ -124,7 +131,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       set({ day: today(), events: null });
       return load();
     },
-    /** Try again after a note. */
+    /** Try again (or Connect Google Calendar) after a note. */
     load,
     setView(view: CalView) {
       set({ view });
@@ -194,7 +201,19 @@ function defaultSource(): CalendarSource | null {
   }
   const demo = demoUser();
   if (!demo) return null;
-  return { base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`, token: async () => demo.uid, forget() {} };
+  // Locally, ?demo-calendar=blocked (or =refused) makes the first ask for access fail as Google's
+  // window does when it is blocked or closed (or access isn't given), to try Connect Google Calendar.
+  let noAccess = new URLSearchParams(location.search).get('demo-calendar');
+  return {
+    base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
+    async token() {
+      const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
+      noAccess = null;
+      if (reason) throw new NoAccess(reason);
+      return demo.uid;
+    },
+    forget() {},
+  };
 }
 
 const source = defaultSource();

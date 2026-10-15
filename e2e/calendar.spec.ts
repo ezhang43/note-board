@@ -12,11 +12,10 @@ const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const label = (d: Date) => `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
-/** Another day in this week (Monday, or Tuesday when today is Monday), so it shows in the week view. */
-function otherDayThisWeek() {
+/** A day `n` days from today. */
+function daysFromToday(n: number) {
   const d = new Date();
-  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getDay() === 1 ? new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 1) : monday;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
 async function openAs(page: Page, name = `Cal${tag()}`, path = '/') {
@@ -100,7 +99,7 @@ test('rename a simple event and move it to another day', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   const today = new Date();
-  const other = otherDayThisWeek();
+  const other = daysFromToday(2);
   await day(page, today).getByRole('button', { name: '10:00 – 11:00 Dentist' }).click();
   await form(page).getByLabel('Title').fill('Dentist check-up');
   await form(page).getByLabel('Start date').fill(key(other));
@@ -157,11 +156,23 @@ test('week and month views, back and forward, and Today', async ({ page }) => {
   await button(page).click();
   await expect(panel(page).getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const heading = panel(page).locator('.cal-range');
+  // The week starts today (no past days of this week) and runs seven days.
+  const days = panel(page).locator('.cal-day');
+  await expect(days).toHaveCount(7);
+  await expect(days.first()).toHaveAttribute('aria-label', label(new Date()));
+  await expect(days.last()).toHaveAttribute('aria-label', label(daysFromToday(6)));
+  const dayAndDate = (d: Date) => label(d).split(' ').slice(0, 2).join(' '); // "Thu 15"
+  await expect(heading).toHaveText(new RegExp(`^${dayAndDate(new Date())}\\b.* – ${dayAndDate(daysFromToday(6))}\\b`));
   const thisWeek = await heading.textContent();
   await panel(page).getByRole('button', { name: 'Next week' }).click();
   await expect(heading).not.toHaveText(thisWeek!);
+  await expect(days.first()).toHaveAttribute('aria-label', label(daysFromToday(7)));
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
   await expect(heading).toHaveText(thisWeek!);
+  await panel(page).getByRole('button', { name: 'Previous week' }).click();
+  await expect(days.first()).toHaveAttribute('aria-label', label(daysFromToday(-7)));
+  await expect(days.last()).toHaveAttribute('aria-label', label(daysFromToday(-1)));
+  await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
 
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
   const now = new Date();
@@ -180,11 +191,35 @@ test('when Google Calendar can’t be reached, one plain note shows and nothing 
   await page.route('**/__calendar/**', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403,"message":"accessNotConfigured"}}' }));
   await button(page).click();
   await expect(panel(page).getByText('Google Calendar isn’t connected yet. Try again later.')).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: 'Connect Google Calendar' })).toHaveCount(0);
   await page.unroute('**/__calendar/**');
   await panel(page).getByRole('button', { name: 'Try again' }).click();
   await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+// Locally, ?demo-calendar=blocked (or =refused) makes the first ask for calendar access fail the way
+// Google's window does when it is blocked or closed (or when access isn't given).
+for (const [kind, note] of [
+  ['blocked', 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.'],
+  ['refused', 'Calendar access wasn’t given. Click Connect Google Calendar to allow it.'],
+] as const) {
+  test(`without calendar access (${kind}) it says why, and Connect Google Calendar asks again`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(`/?demo-user=Cal${tag()}&demo-calendar=${kind}`);
+    await fontsLoaded(page);
+    await button(page).click();
+    await expect(panel(page).getByText(note)).toBeVisible();
+    await expect(panel(page).getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    const connect = panel(page).getByRole('button', { name: 'Connect Google Calendar' });
+    await expect(connect).toHaveClass(/cal-connect/);
+    await connect.click();
+    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(connect).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
 
 test.describe('on a phone-sized screen', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });

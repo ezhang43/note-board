@@ -1741,6 +1741,6 @@ a.cal-open { align-self: flex-start; }
 .cal-check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .cal-error { margin: 0 2px; color: var(--danger); font-size: 13px; }
 .cal-actions { display: flex; gap: 6px; }
-.tb-button.cal-save { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tb-button.cal-save, .tb-button.cal-connect { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .tb-button.cal-delete { margin-left: auto; color: var(--danger); }
 .confirm.cal-confirm { margin: 4px 0 0; }

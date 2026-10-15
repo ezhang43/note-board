@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
-import { calendarApi, createCalendar, NOT_CONNECTED, SAVE_FAILED, BAD_TIMES, type CalendarApi } from './calendar';
+import { NoAccess } from '../model/calendar';
+import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: nothing here is undone, synced with boards or kept in versions.
@@ -18,11 +19,13 @@ const ev = (id: string, over: Partial<CalEvent> = {}): CalEvent => ({
 
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; fail: boolean } = {
+  const api: CalendarApi & { calls: string[]; fail: boolean; noAccess: 'window' | 'refused' | null } = {
     calls,
     fail: false,
+    noAccess: null,
     async list(from, to) {
       calls.push(`list ${from} ${to}`);
+      if (api.noAccess) throw new NoAccess(api.noAccess);
       if (api.fail) throw new Error('403');
       return events;
     },
@@ -51,11 +54,11 @@ describe('the calendar panel', () => {
     expect(createCalendar(fakeApi(), today).available).toBe(true);
   });
 
-  it('opening it shows this week’s events', async () => {
+  it('opening it shows the events of today and the next six days (not the past days of this week)', async () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(api.calls).toEqual(['list 2026-10-05 2026-10-12']);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
     expect(cal.get()).toMatchObject({ view: 'week', day: '2026-10-06', note: null, loading: false });
     expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
   });
@@ -70,7 +73,18 @@ describe('the calendar panel', () => {
     await cal.step(-1);
     expect(cal.get().day).toBe('2026-09-13');
     await cal.goToday();
-    expect(api.calls).toEqual(['list 2026-10-05 2026-10-12', 'list 2026-10-12 2026-10-19', 'list 2026-09-28 2026-11-02', 'list 2026-08-31 2026-10-05', 'list 2026-09-28 2026-11-02']);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'list 2026-10-13 2026-10-20', 'list 2026-09-28 2026-11-02', 'list 2026-08-31 2026-10-05', 'list 2026-09-28 2026-11-02']);
+  });
+
+  it('in the week view back goes to the seven days before, and Today comes back to today', async () => {
+    const api = fakeApi();
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.step(-1);
+    expect(cal.get().day).toBe('2026-09-29');
+    await cal.goToday();
+    expect(cal.get().day).toBe('2026-10-06');
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'list 2026-09-29 2026-10-06', 'list 2026-10-06 2026-10-13']);
   });
 
   it('picking a day in the month only selects it (no new fetch while it is in the month shown)', async () => {
@@ -98,11 +112,31 @@ describe('the calendar panel', () => {
     api.fail = true;
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(cal.get()).toMatchObject({ note: NOT_CONNECTED, events: null, loading: false });
+    expect(cal.get()).toMatchObject({ note: NOT_CONNECTED, needsAccess: false, events: null, loading: false });
     api.fail = false;
     await cal.load();
     expect(cal.get().note).toBeNull();
     expect(cal.get().events?.length).toBe(1);
+  });
+
+  it('when Google’s window was blocked or closed it says so; Connect asks again', async () => {
+    const api = fakeApi();
+    api.noAccess = 'window';
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(cal.get()).toMatchObject({ note: NO_WINDOW, needsAccess: true, events: null, loading: false });
+    api.noAccess = null;
+    await cal.load();
+    expect(cal.get().note).toBeNull();
+    expect(cal.get().events?.length).toBe(1);
+  });
+
+  it('when calendar access was refused it says so', async () => {
+    const api = fakeApi();
+    api.noAccess = 'refused';
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(cal.get()).toMatchObject({ note: NOT_GIVEN, needsAccess: true });
   });
 
   it('opening it again forgets what was shown before (a different person may have signed in)', async () => {
@@ -119,7 +153,7 @@ describe('the calendar panel', () => {
   it('only the answer for the days now shown is used', async () => {
     let release: (v: CalEvent[]) => void = () => {};
     const api = fakeApi();
-    api.list = vi.fn((from: string) => (from === '2026-10-05' ? new Promise<CalEvent[]>((r) => (release = r)) : Promise.resolve([ev('next')])));
+    api.list = vi.fn((from: string) => (from === '2026-10-06' ? new Promise<CalEvent[]>((r) => (release = r)) : Promise.resolve([ev('next')])));
     const cal = createCalendar(api, today);
     const first = cal.open();
     await cal.step(1);
@@ -137,7 +171,7 @@ describe('changing events', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(null, draft)).toBeNull();
-    expect(api.calls.slice(1)).toEqual(['create Swim', 'list 2026-10-05 2026-10-12']);
+    expect(api.calls.slice(1)).toEqual(['create Swim', 'list 2026-10-06 2026-10-13']);
   });
 
   it('renames or moves a simple event', async () => {
@@ -154,7 +188,7 @@ describe('changing events', () => {
     await cal.open();
     expect(await cal.save('r', draft)).toBe(SAVE_FAILED);
     expect(await cal.remove('r')).toBe(SAVE_FAILED);
-    expect(api.calls).toEqual(['list 2026-10-05 2026-10-12']);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
   });
 
   it('refuses an end before the start, without asking Google', async () => {

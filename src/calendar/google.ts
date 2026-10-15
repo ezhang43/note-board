@@ -1,4 +1,5 @@
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { NoAccess } from '../model/calendar';
 
 // Calendar access on the published site (owner request, 2026-10-06), asked for only when the
 // Google Calendar panel first opens, not at sign-in. Google Identity Services' token client gives a
@@ -76,13 +77,15 @@ function request(gis: Gis): Promise<string> {
       scope: SCOPE,
       login_hint: getAuth().currentUser?.email ?? undefined,
       callback(r) {
-        // The person may untick calendar access on Google's screen.
-        if (r.error || !r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new Error(r.error ?? 'Calendar access not given'));
+        // The person may say no, or untick calendar access, on Google's screen.
+        if (r.error === 'access_denied') return fail(new NoAccess('refused'));
+        if (r.error) return fail(new Error(r.error));
+        if (!r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new NoAccess('refused'));
         cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000 };
         done(r.access_token);
       },
-      // The window was blocked or closed.
-      error_callback: (e) => fail(new Error(e.type ?? 'Google sign-in window failed')),
+      // The window was blocked or closed (Google's types popup_failed_to_open, popup_closed).
+      error_callback: (e) => fail(e.type === 'popup_failed_to_open' || e.type === 'popup_closed' ? new NoAccess('window') : new Error(e.type ?? 'Google sign-in window failed')),
     });
     // Empty prompt: Google asks only the first time; after that a new token comes without asking.
     client.requestAccessToken({ prompt: '' });
@@ -94,7 +97,7 @@ export function token(): Promise<string> {
   if (cached && cached.expiresAt > Date.now() + 60_000) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
-  // wait and may be blocked; the panel then says so and Try again works.
+  // wait and may be blocked; the panel then says so and Connect Google Calendar works.
   pending ??= (loaded ? request(loaded) : loadGis().then(request)).finally(() => (pending = null));
   return pending;
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## Calendar week starts today; clearer Connect button (2026-10-15)
+
+- The Google Calendar panel's Week view now shows today and the next six days, so days already gone this week are left out. ‹ still goes back seven days if you want them, and Today comes back.
+- If Google's permission window was blocked or closed, or calendar access wasn't given, the panel now says so and shows a **Connect Google Calendar** button that asks again.
+
 ## Ctrl+Enter ticks a checklist item (2026-10-15)
 
 - While typing in a checklist item, Ctrl+Enter (⌘+Enter on a Mac) ticks it, just like clicking its box, and the cursor moves on to the next open item so you can keep going. On a ticked item it unticks it. Ctrl+Z undoes it. It is listed in the keyboard shortcuts panel (press ?).

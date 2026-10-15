@@ -99,8 +99,9 @@ export function CalendarPanel() {
       {s.note ? (
         <div className="cal-note" role="status">
           <p className="history-note">{s.note}</p>
-          <button type="button" className="tb-button" onClick={() => void calendar.load()}>
-            Try again
+          {/* Straight from the click, so Google's window isn't blocked. */}
+          <button type="button" className={`tb-button${s.needsAccess ? ' cal-connect' : ''}`} onClick={() => void calendar.load()}>
+            {s.needsAccess ? 'Connect Google Calendar' : 'Try again'}
           </button>
         </div>
       ) : (

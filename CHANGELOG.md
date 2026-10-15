@@ -1,5 +1,9 @@
 # Changelog
 
+## Offline tests also run on a phone and in Safari's engine (2026-10-15)
+
+- The automatic offline tests now also run on a phone-sized Chrome (Android) and in WebKit, the engine Safari and iPhones use, both on a computer and on GitHub. In WebKit they check that the offline copy installs and saves the app, and that a new version clears the old copy. The test tool can't switch off the internet for WebKit past the offline copy, so opening with no internet is still only tested in Chrome. Setup on a computer now needs `npx playwright install chromium webkit` once.
+
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 
 - Running the browser tests on a computer now opens at most 4 hidden Chrome windows at a time instead of half the processor's threads, so several crew workers testing at once no longer max out the CPU. Tests on GitHub are unchanged.

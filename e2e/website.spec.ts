@@ -95,6 +95,52 @@ test('the landing page says what BusyAnts is, shows a picture of a board and has
   await expect(page.getByTestId('canvas')).toBeVisible();
 });
 
+// Job 55 (owner request 2026-10-15): the owner's "Why I made BusyAnts" intro, three highlights and the fuller feature list.
+test('the About page tells why BusyAnts was made, right under the headline and start button, before the screenshot', async ({ page }) => {
+  await page.goto('/about/');
+  const why = page.getByRole('heading', { level: 2, name: 'Why I made BusyAnts' });
+  await expect(why).toBeVisible();
+  const main = page.locator('main');
+  await expect(main).toContainText('I wake up most mornings feeling like an ant');
+  await expect(main).toContainText('Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist');
+  await expect(main).toContainText('a calm canvas centered on checklists');
+  await expect(main).toContainText('Tick something off and it slides into Completed');
+  await expect(page.getByRole('heading', { name: 'Why BusyAnts', exact: true })).toHaveCount(0);
+  const y = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!.y;
+  expect(await y(why)).toBeGreaterThan(await y(page.getByRole('link', { name: 'Start your board, free' })));
+  expect(await y(why)).toBeLessThan(await y(page.getByRole('img', { name: /BusyAnts board/ })));
+});
+
+test('the About page has three highlights under the intro', async ({ page }) => {
+  await page.goto('/about/');
+  const highlights = page.locator('ul.highlights > li');
+  await expect(highlights).toHaveCount(3);
+  await expect(highlights.locator('h3')).toHaveText(['Shape it your way', "Fold away what you're not doing", 'Built for checklists']);
+  await expect(highlights.nth(0)).toContainText('five typefaces, snap-to-grid or free placement');
+  await expect(highlights.nth(1)).toContainText('bring it back in one click');
+  await expect(highlights.nth(2)).toContainText('tick with Ctrl+Enter');
+});
+
+test('the About page lists everything else under "Also in BusyAnts", with no duplicates', async ({ page }) => {
+  await page.goto('/about/');
+  await expect(page.getByRole('heading', { level: 2, name: 'Also in BusyAnts' })).toBeVisible();
+  const items = page.locator('ul.also > li');
+  await expect(items).toHaveCount(9);
+  const texts = await items.allInnerTexts();
+  expect(new Set(texts).size).toBe(9);
+  await expect(items.nth(0)).toHaveText('Free, with no card or board limits');
+  await expect(items.nth(4)).toContainText('Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs');
+  await expect(items.nth(4).getByRole('link')).toHaveAttribute('href', '../faq/#import');
+  await expect(items.nth(8)).toContainText('24 column colours, including 8 bold ones, with Auto-colour');
+});
+
+test('the new About sections fit a phone with no sideways scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto('/about/');
+  await expect(page.getByRole('heading', { name: 'Also in BusyAnts' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('the legal pages name BusyAnts, the date, the law and a way to get in touch', async ({ page }) => {
   await page.goto('/terms/');
   const terms = page.locator('main');

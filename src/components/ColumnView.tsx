@@ -1,6 +1,7 @@
 import { boxProps } from './textBox';
 import { memo, useRef, type CSSProperties } from 'react';
 import { swatchFor } from '../model/theme';
+import { isBold } from '../model/palette';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { useTakeFocus } from './useTakeFocus';
@@ -60,6 +61,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     dropTarget && 'drop-target',
     col.collapsed && 'collapsed',
     col.color === null && 'uncoloured',
+    isBold(col.color) && 'bold',
     findTarget && 'find-target',
   ];
 
@@ -69,7 +71,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={col.title ? `Column: ${col.title}` : 'Untitled column'}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge } as CSSProperties}
+      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge, '--col-text': colors.text } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >

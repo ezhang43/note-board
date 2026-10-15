@@ -1,5 +1,12 @@
 # Changelog
 
+## Bold colours (2026-10-15)
+
+- The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.
+- On a bold column or title band, the card count, icons and empty-title hint use a dark shade of the colour instead of grey, so they stay readable.
+- Auto-colour now hands out the bold colours first, then the soft ones, so columns only repeat a colour beyond 24.
+- An older copy of the app (say, a tab left open from before this update) shows a bold colour as its usual colour, and if it saves that board, the column goes back to that colour.
+
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 
 - Running the browser tests on a computer now opens at most 4 hidden Chrome windows at a time instead of half the processor's threads, so several crew workers testing at once no longer max out the CPU. Tests on GitHub are unchanged.

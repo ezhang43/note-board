@@ -132,6 +132,12 @@ describe('safe to edit (round trip)', () => {
     data.boards.home.cards.noteIdea.sticker = 'star';
     expect(safeToEdit(JSON.stringify(data))).toMatchObject({ ok: false, reason: expect.stringMatching(/newer/) });
   });
+  it('yes for boards using the bold colours', () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.columns.colIdeas.color = 'tomato';
+    data.boards.home.cards.noteIdea.titleColor = 'ocean';
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
   it('key order alone doesn’t matter', () => {
     const data = JSON.parse(ownRaw());
     const reordered = { boards: data.boards, home: data.home, version: data.version };

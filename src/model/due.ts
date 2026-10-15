@@ -3,7 +3,7 @@ import type { Board, TodoItem } from './types';
 import type { Workspace } from './workspace';
 
 // Due dates on checklist items (owner request, 2026-10-05): a day, "YYYY-MM-DD", with no time and
-// no reminders. The Due list shows what is due today or overdue, from every board.
+// no reminders. The Due list shows every unticked item with a date, from every board (2026-10-15).
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,11 +43,15 @@ export function dueLabel(due: string, today: string): string {
   if (n === 0) return 'Today';
   if (n === 1) return 'Tomorrow';
   if (n === -1) return 'Yesterday';
+  if (n > 1 && n < 7) return WEEKDAYS[utc(due).getUTCDay()];
+  return dayLabel(due, today);
+}
+
+/** The day written out: "Tue 20 Oct", with the year when not this year. */
+export function dayLabel(due: string, today: string): string {
   const d = utc(due);
-  const weekday = WEEKDAYS[d.getUTCDay()];
-  if (n > 1 && n < 7) return weekday;
   const year = due.slice(0, 4) === today.slice(0, 4) ? '' : ` ${d.getUTCFullYear()}`;
-  return `${weekday} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${year}`;
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${year}`;
 }
 
 /** The items with item `id` given due date `due` (null: no due date); null when nothing changes. */
@@ -70,7 +74,7 @@ export function withDue(items: TodoItem[], id: string, due: string | null): Todo
   return changed ? result : null;
 }
 
-/** An item that is due today or overdue, and where it is. */
+/** An unticked item with a due date, and where it is. */
 export interface DueItem {
   boardId: string;
   boardName: string;
@@ -79,7 +83,7 @@ export interface DueItem {
   itemId: string;
   text: string;
   due: string;
-  state: 'overdue' | 'today';
+  state: DueState;
 }
 
 /** Lists in board order: columns left to right (their cards top to bottom), then loose lists. */
@@ -92,9 +96,8 @@ function listsOf(board: Board) {
 }
 
 /**
- * Every unticked item due today or before, on every board (the home board's first), overdue ones
- * first (oldest first), then today's; within a day in board order. A ticked item's sub-items count
- * as done.
+ * Every unticked item with a due date, on every board (the home board's first), soonest date first
+ * (so overdue ones oldest first); within a day in board order. A ticked item's sub-items count as done.
  */
 export function dueItems(ws: Workspace, today: string): DueItem[] {
   const out: DueItem[] = [];
@@ -106,8 +109,8 @@ export function dueItems(ws: Workspace, today: string): DueItem[] {
       const walk = (items: TodoItem[]) => {
         for (const it of items) {
           if (it.done) continue;
-          if (it.due && it.due <= today) {
-            out.push({ boardId, boardName: board.name, cardId: card.id, listTitle: card.title, itemId: it.id, text: it.text, due: it.due, state: it.due < today ? 'overdue' : 'today' });
+          if (it.due) {
+            out.push({ boardId, boardName: board.name, cardId: card.id, listTitle: card.title, itemId: it.id, text: it.text, due: it.due, state: dueState(it.due, today) });
           }
           walk(it.children);
         }
@@ -116,4 +119,17 @@ export function dueItems(ws: Workspace, today: string): DueItem[] {
     }
   }
   return out.sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
+}
+
+/** The Due panel's groups: Overdue, Today, Tomorrow, then one per later day ("Wed 7 Oct"), soonest first. */
+export function dueGroups(items: DueItem[], today: string): { title: string; rows: DueItem[] }[] {
+  const tomorrow = addDays(today, 1);
+  const groups: { title: string; rows: DueItem[] }[] = [];
+  for (const d of items) {
+    const title = d.due < today ? 'Overdue' : d.due === today ? 'Today' : d.due === tomorrow ? 'Tomorrow' : dayLabel(d.due, today);
+    const last = groups[groups.length - 1];
+    if (last?.title === title) last.rows.push(d);
+    else groups.push({ title, rows: [d] });
+  }
+  return groups;
 }

@@ -28,6 +28,13 @@ describe('due dates', () => {
     expect(firstItem(s, cardId).due).toBe('2026-10-07');
   });
 
+  it('a date that is not a real YYYY-MM-DD day (a 5-digit year typed in the box) is not saved', () => {
+    const { s, cardId, itemId } = setup();
+    s.openDuePicker(cardId, itemId);
+    s.setItemDue(cardId, itemId, '20261-01-01');
+    expect(firstItem(s, cardId).due).toBeUndefined();
+  });
+
   it('the Due panel opens and closes; going to an item opens its board, selects its list and puts the cursor in it', () => {
     const { s, cardId, itemId } = setup();
     const home = s.getState().boards.open;

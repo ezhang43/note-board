@@ -38,7 +38,7 @@ test('Due date → Today puts a "Today" chip on the item, and the Due panel list
 
   await row.getByRole('checkbox', { name: 'Done' }).check();
   await expect(panel(page).getByRole('button', { name: /Pay rent/ })).toHaveCount(0);
-  await expect(panel(page)).toContainText('Nothing is due today');
+  await expect(panel(page)).toContainText('No open item has a due date');
 });
 
 test('a date picked in the calendar box: yesterday shows as overdue; No due date clears it', async ({ page }) => {
@@ -74,6 +74,30 @@ test('clicking an item in the Due panel opens the board it is on', async ({ page
   await panel(page).getByRole('button', { name: /Renew passport/ }).click();
   await expect(page.getByLabel('Board name')).toHaveValue('Home');
   await expect(cards(page).first().getByLabel('Item text').first()).toBeFocused();
+});
+
+test('the Due panel lists later dates too: Tomorrow, then one heading per day, soonest first', async ({ page }) => {
+  const card = await listWith(page, 'Far off');
+  await card.getByLabel('Item text').first().press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Soon');
+  const rows = card.locator('[data-item-id]');
+  const due = async (i: number, n: number) => {
+    await rows.nth(i).hover();
+    await rows.nth(i).getByRole('button', { name: 'Due date' }).click();
+    await picker(page).getByLabel('Pick a day').fill(await day(page, n));
+    await page.keyboard.press('Escape');
+  };
+  await due(0, 10);
+  await due(1, 1);
+
+  await page.getByRole('button', { name: 'Due today and overdue (0)' }).click();
+  const headings = panel(page).getByRole('heading', { level: 3 });
+  await expect(headings).toHaveCount(2);
+  await expect(headings.first()).toHaveText('Tomorrow');
+  await expect(headings.nth(1)).toHaveText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+ [A-Z][a-z]{2}( \d{4})?$/);
+  await expect(panel(page).getByRole('region', { name: 'Tomorrow' }).getByRole('button', { name: /Soon/ })).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: /Far off/ })).toBeVisible();
 });
 
 test('if the item vanishes while its date menu is open (Ctrl+Z), the menu goes and Escape still closes the Due list', async ({ page }) => {

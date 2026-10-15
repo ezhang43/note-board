@@ -1,5 +1,9 @@
 # Changelog
 
+## Due panel lists every date ahead (2026-10-15)
+
+- The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier. A date typed in the date box that isn't a real day (such as a 5-digit year) is no longer saved.
+
 ## Why I made BusyAnts on the About page (2026-10-16)
 
 - The About page now opens with the owner's short story of why BusyAnts was made, right under the headline and start button, followed by three highlights (shape it your way, fold away what you're not doing, built for checklists). Below the board picture, an "Also in BusyAnts" list of nine features replaces the old four feature cards and the separate import line. Nothing in the app changed.

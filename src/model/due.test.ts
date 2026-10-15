@@ -3,7 +3,7 @@ import { addCard, addColumn, createBoard } from './board';
 import { createCard, createColumn } from './cards';
 import { parseBoard, serializeBoard } from './persist';
 import type { Board, TodoCard, TodoItem } from './types';
-import { addDays, dueItems, dueLabel, dueState, isDueDate, withDue } from './due';
+import { addDays, dayLabel, dueGroups, dueItems, dueLabel, dueState, isDueDate, withDue } from './due';
 
 // Due dates on checklist items, and the Due today / Overdue list (owner request, 2026-10-05).
 
@@ -60,8 +60,8 @@ describe('due dates', () => {
   });
 });
 
-describe('the Due today / Overdue list', () => {
-  it('lists unticked items due today or before, from every board, overdue first (oldest first), with where they are', () => {
+describe('the Due list', () => {
+  it('lists every unticked item with a due date, from every board, oldest first, with where they are', () => {
     const today = '2026-10-05';
     let home = addColumn(createBoard(), { ...createColumn('c1'), x: 0, y: 0 });
     home = addCard(
@@ -80,11 +80,46 @@ describe('the Due today / Overdue list', () => {
       ['e', 'overdue', 'h', 'Home', 'Jobs', 'Sub-item'],
       ['f', 'overdue', 'b2', 'Trips', '', 'Book hotel'],
       ['a', 'today', 'h', 'Home', 'Jobs', 'Pay rent'],
+      ['c', 'later', 'h', 'Home', 'Jobs', 'Later'],
     ]);
   });
 
   it('a ticked parent hides its sub-items too', () => {
     const b = addCard(createBoard(), list('t1', 'L', [item('a', 'A', undefined, { done: true, children: [item('b', 'B', '2026-10-01')] })]), { type: 'loose', x: 0, y: 0 });
     expect(dueItems({ home: 'h', boards: { h: b } }, '2026-10-05')).toEqual([]);
+  });
+
+  it('groups them: Overdue, Today, Tomorrow, then one heading per later day, soonest first', () => {
+    const today = '2026-10-05'; // a Monday
+    const b = addCard(
+      createBoard(),
+      list('t1', 'L', [
+        item('a', 'Next year', '2027-01-04'),
+        item('b', 'Wednesday', '2026-10-07'),
+        item('c', 'Today', '2026-10-05'),
+        item('d', 'Tomorrow', '2026-10-06'),
+        item('e', 'Late', '2026-10-01'),
+        item('f', 'Also Wednesday', '2026-10-07'),
+        item('g', 'Later late', '2026-10-04'),
+      ]),
+      { type: 'loose', x: 0, y: 0 },
+    );
+    const got = dueGroups(dueItems({ home: 'h', boards: { h: b } }, today), today);
+    expect(got.map((g) => [g.title, g.rows.map((r) => r.itemId)])).toEqual([
+      ['Overdue', ['e', 'g']],
+      ['Today', ['c']],
+      ['Tomorrow', ['d']],
+      ['Wed 7 Oct', ['b', 'f']],
+      ['Mon 4 Jan 2027', ['a']],
+    ]);
+    expect(dueGroups([], today)).toEqual([]);
+    // A list worked out yesterday (the panel left open over midnight) is grouped by today's date.
+    const stale = dueItems({ home: 'h', boards: { h: b } }, '2026-10-04');
+    expect(dueGroups(stale, today).map((g) => g.title)).toEqual(['Overdue', 'Today', 'Tomorrow', 'Wed 7 Oct', 'Mon 4 Jan 2027']);
+  });
+
+  it('a later day reads as weekday and date, with the year only when not this year', () => {
+    expect(dayLabel('2026-10-07', '2026-10-05')).toBe('Wed 7 Oct');
+    expect(dayLabel('2027-01-04', '2026-10-05')).toBe('Mon 4 Jan 2027');
   });
 });

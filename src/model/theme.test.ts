@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLOR_KEYS, COLUMN_DEFAULT, PALETTE } from './palette';
+import { AUTO_COLOUR_ORDER, BOLD_KEYS, COLOR_KEYS, COLUMN_DEFAULT, PALETTE } from './palette';
 import { DARK_COLUMN_DEFAULT, DARK_PALETTE, DARK_INK, startingTheme, swatchFor } from './theme';
 
 /** WCAG contrast ratio between two #RRGGBB colours. */
@@ -51,5 +51,56 @@ describe('column colours in dark mode', () => {
       expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(4.5);
       expect(contrast('#000000', s.bg)).toBeLessThan(3); // genuinely dark, not a pastel
     }
+  });
+});
+
+/** CSS color-mix(in srgb, a p, b): the share p of a, the rest b. */
+function mix(a: string, b: string, p: number) {
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  return '#' + [1, 3, 5].map((i) => Math.round(ch(a, i) * p + ch(b, i) * (1 - p)).toString(16).padStart(2, '0')).join('');
+}
+
+describe('bold colours (owner request, 2026-10-15)', () => {
+  const PASTELS = ['butter', 'sand', 'peach', 'coral', 'rose', 'orchid', 'lavender', 'periwinkle', 'sky', 'aqua', 'teal', 'mint', 'sage', 'lime', 'slate', 'stone'];
+  const BOLD = ['tomato', 'tangerine', 'sunflower', 'grass', 'emerald', 'ocean', 'violet', 'magenta'];
+
+  it('keeps the 16 pastels unchanged and adds a third row of 8 bold colours', () => {
+    expect([...COLOR_KEYS]).toEqual([...PASTELS, ...BOLD]);
+    expect([...BOLD_KEYS]).toEqual(BOLD);
+    expect(BOLD_KEYS.map((k) => PALETTE[k].label)).toEqual(['Tomato', 'Tangerine', 'Sunflower', 'Grass', 'Emerald', 'Ocean', 'Violet', 'Magenta']);
+    expect(PALETTE.butter).toEqual({ label: 'Butter', bg: '#FFF3CF', edge: '#EED9A0', text: '#6B4600' });
+    expect(PALETTE.stone).toEqual({ label: 'Stone', bg: '#F7F5F1', edge: '#E2DDD4', text: '#3F3B35' });
+  });
+
+  it('are vivid and all different, yet readable: column text, its own text, card title bands and placeholders', () => {
+    const bgs = COLOR_KEYS.map((k) => PALETTE[k].bg.toLowerCase());
+    expect(new Set(bgs).size).toBe(COLOR_KEYS.length);
+    for (const key of BOLD_KEYS) {
+      const s = PALETTE[key];
+      expect(contrast('#FFFFFF', s.bg)).toBeGreaterThanOrEqual(1.3); // clearly coloured: the pastels sit near 1.1 to 1.2
+      expect(contrast('#1F1D1A', s.bg)).toBeGreaterThanOrEqual(7); // column title
+      expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(7); // count, hints and icons on the column
+      expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5); // "Column title" placeholder
+      expect(contrast('#1F1D1A', mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // card title band
+      expect(contrast(s.text, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // icons and placeholder on that band
+    }
+  });
+
+  it('dark mode has a deep shade of each, readable the same way', () => {
+    for (const key of BOLD_KEYS) {
+      const s = DARK_PALETTE[key];
+      expect(s.label).toBe(PALETTE[key].label);
+      expect(contrast(DARK_INK, s.bg)).toBeGreaterThanOrEqual(7);
+      expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(7);
+      expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(DARK_INK, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(s.text, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('Auto-colour hands out the 8 bold colours first, then the pastels, each once', () => {
+    expect(AUTO_COLOUR_ORDER.slice(0, 8)).toEqual(['ocean', 'tomato', 'emerald', 'violet', 'sunflower', 'magenta', 'grass', 'tangerine']);
+    expect(AUTO_COLOUR_ORDER.slice(8)).toEqual(['sky', 'peach', 'mint', 'lavender', 'butter', 'teal', 'rose', 'lime', 'periwinkle', 'coral', 'aqua', 'orchid', 'sage', 'sand', 'slate', 'stone']);
+    expect(new Set(AUTO_COLOUR_ORDER).size).toBe(24);
   });
 });

@@ -123,12 +123,13 @@ describe('collapse, colour and edit', () => {
 
   it('auto-colour gives every column a different colour, left to right', () => {
     let b = B.createBoard();
-    for (let i = 0; i < 18; i++) b = B.addColumn(b, { ...createColumn(`k${i}`), x: (17 - i) * 300, y: 40 });
+    for (let i = 0; i < 26; i++) b = B.addColumn(b, { ...createColumn(`k${i}`), x: (25 - i) * 300, y: 40 });
     const out = B.autoColour(b);
     const byX = Object.values(out.columns).sort((p, q) => p.x - q.x);
-    expect(byX.slice(0, 3).map((c) => c.color)).toEqual(['sky', 'peach', 'mint']);
-    expect(new Set(byX.slice(0, 16).map((c) => c.color)).size).toBe(16);
-    expect(byX[16].color).toBe('sky'); // only repeats after 16
+    expect(byX.slice(0, 3).map((c) => c.color)).toEqual(['ocean', 'tomato', 'emerald']); // the bold colours first
+    expect(byX[8].color).toBe('sky'); // then the pastels
+    expect(new Set(byX.slice(0, 24).map((c) => c.color)).size).toBe(24);
+    expect(byX[24].color).toBe('ocean'); // only repeats after 24
     expect(B.autoColour(out)).toBe(out); // nothing left to change
     expect(out.cards).toBe(b.cards);
   });

@@ -143,6 +143,19 @@ test('the keyboard shortcuts panel links to the website pages', async ({ page })
   }
 });
 
+// Job #53: the toolbar ant leads back to the website, in a new tab so the board stays open.
+test('the toolbar ant links to the About page in a new tab', async ({ page, context }) => {
+  await page.goto('/');
+  const ant = page.locator('.toolbar').getByRole('link', { name: 'BusyAnts website' });
+  await expect(ant).toHaveAttribute('href', '/about/');
+  await expect(ant).toHaveAttribute('target', '_blank');
+  await expect(ant).toHaveAttribute('title', 'BusyAnts website');
+  const [tab] = await Promise.all([context.waitForEvent('page'), ant.click()]);
+  await tab.waitForLoadState();
+  expect(new URL(tab.url()).pathname).toBe('/about/');
+  await expect(page.getByTestId('canvas')).toBeVisible();
+});
+
 test.describe('on a phone-sized screen', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
@@ -151,5 +164,12 @@ test.describe('on a phone-sized screen', () => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     const link = page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'About BusyAnts' });
     await expect(link).toHaveAttribute('href', '/about/');
+  });
+
+  test('the top bar ant links to the About page in a new tab', async ({ page }) => {
+    await page.goto('/');
+    const ant = page.locator('.toolbar').getByRole('link', { name: 'BusyAnts website' });
+    await expect(ant).toHaveAttribute('href', '/about/');
+    await expect(ant).toHaveAttribute('target', '_blank');
   });
 });

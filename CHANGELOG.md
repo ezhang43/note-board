@@ -4,6 +4,10 @@
 
 - The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier. A date typed in the date box that isn't a real day (such as a 5-digit year) is no longer saved.
 
+## The toolbar ant opens the website (2026-10-15)
+
+- Clicking the BusyAnts ant at the left of the toolbar now opens the BusyAnts website's About page in a new tab, so you can get to the website from any board while the board stays open. Its tooltip says "BusyAnts website". Works on a phone too.
+
 ## Crew Board updates are batched (2026-10-15)
 
 - The crew coordinator now sends all Crew Board changes from one event in a single update, and skips progress-only updates, to use fewer tokens.

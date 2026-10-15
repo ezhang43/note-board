@@ -214,19 +214,52 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   await expect(panel(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
   await panel(page).getByRole('button', { name: 'Back' }).click();
 
-  // A third event today: the narrow panel keeps two lines, the last saying "+2 more".
-  await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
-  await page.keyboard.type('Swim');
-  await form(page).getByLabel('Start time').fill('07:00');
-  await form(page).getByLabel('End time').fill('07:45');
-  await form(page).getByRole('button', { name: 'Save' }).click();
-  await expect(todayCell.locator('.cal-chip')).toHaveText([/Swim/]);
+  // The wide Month panel has room for three lines; a fourth event today makes the last say "+2 more".
+  for (const [title, start, end] of [['Swim', '07:00', '07:45'], ['Run', '06:00', '06:30']]) {
+    await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
+    await page.keyboard.type(title);
+    await form(page).getByLabel('Start time').fill(start);
+    await form(page).getByLabel('End time').fill(end);
+    await form(page).getByRole('button', { name: 'Save' }).click();
+  }
+  await expect(todayCell.locator('.cal-chip')).toHaveText(['06:00Run', '07:00Swim']);
   await expect(todayCell.getByRole('button', { name: '+2 more' })).toBeVisible();
   // Clicking another day, then "+2 more", lists all of today's events under the grid.
   await cell(now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1)).locator('.cal-date').click();
   await todayCell.getByRole('button', { name: '+2 more' }).click();
   await expect(todayCell).toHaveAttribute('aria-selected', 'true');
-  await expect(day(page, now).locator('.cal-event')).toHaveCount(3);
+  await expect(day(page, now).locator('.cal-event')).toHaveCount(4);
+  expect(errors).toEqual([]);
+});
+
+test('the side panel is 560px wide while the Month view is open, back to 300px for Week', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const width = async () => (await panel(page).boundingBox())!.width;
+  const corner = page.locator('.corner-controls');
+  const cornerRight = async () => {
+    const box = (await corner.boundingBox())!;
+    return page.viewportSize()!.width - box.x - box.width;
+  };
+  expect(await width()).toBe(300);
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  await expect.poll(width).toBe(560);
+  // The zoom control and its buttons move aside to stay clear of the wider panel.
+  await expect.poll(cornerRight).toBe(584);
+  // Cells are about 75px, so timed events show their start time.
+  const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(new Date())}`) });
+  await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
+  await panel(page).getByRole('button', { name: 'Week', exact: true }).click();
+  await expect.poll(width).toBe(300);
+  await expect.poll(cornerRight).toBe(324);
+  // A narrow window keeps at least 300px of board beside it.
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  await page.setViewportSize({ width: 760, height: 800 });
+  await expect.poll(width).toBe(460);
+  // Other side panels keep their width.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await corner.getByRole('button', { name: 'Focus timer' }).click();
+  await expect.poll(async () => (await page.getByRole('complementary', { name: 'Focus timer' }).boundingBox())!.width).toBe(300);
   expect(errors).toEqual([]);
 });
 

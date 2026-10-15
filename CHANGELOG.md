@@ -1,5 +1,9 @@
 # Changelog
 
+## Wider calendar panel for the Month view (2026-10-15)
+
+- While the Google Calendar panel shows the Month view, it is wider (560px instead of 300px), so each day has room for event names with their start times ("10:00 Dentist") and up to three lines. Switching to Week brings it back to the usual width. In a small window it shrinks so some board stays visible. Other panels and the phone layout are unchanged.
+
 ## Calendar month shows event names (2026-10-15)
 
 - In the Google Calendar panel's Month view, each day now shows its events by name, like Google Calendar's own month: all-day events first as small filled chips, then timed ones. Where a day has more than fit, the last line says "+2 more"; clicking it (or the day) lists all its events under the grid. Clicking a name opens that event.

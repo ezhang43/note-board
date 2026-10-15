@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { Canvas } from './components/Canvas';
 import { DeleteCompleted } from './components/DeleteCompleted';
 import { FindBar } from './components/FindBar';
@@ -15,6 +16,7 @@ import { appStore, useAppState } from './store/appStore';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
 import { CalendarPanel } from './components/CalendarPanel';
+import { calendar } from './store/calendar';
 
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 const closeCalendar = () => appStore.toggleSidePanel('calendar');
@@ -31,7 +33,10 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const sidePanel = useAppState((s) => s.ui.sidePanel);
   // Anything in the right-hand spot (history, Due, the side panel) moves the corner controls aside.
   const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.dueOpen || s.ui.sidePanel !== null);
-  const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
+  // The calendar's Month view widens the side panel (owner request, 2026-10-15).
+  const monthView = useSyncExternalStore(calendar.subscribe, () => calendar.get().view === 'month');
+  const monthPanel = monthView && sidePanel === 'calendar';
+  const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open', monthPanel && 'month-panel'].filter(Boolean).join(' ');
   return (
     <div className={classes}>
       <Toolbar onSignOut={onSignOut} />

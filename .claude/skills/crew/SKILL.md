@@ -22,6 +22,8 @@ Its data is a small database, read and written with the ArtifactData tool (`url`
 
 Read with `list` or `query`; write with `set`, `update`, `delete` or `batch` (a batch when writing more than a couple), pinning `if_version` as the tool requires. Update it every time a job changes stage, before telling the owner.
 
+**Batch to save tokens** (owner, 2026-10-15): put every Board change from one event (a worker's report, an owner answer, a new request) into **one**  call: the job's stage, its notes, any  added or removed, a newly started job. Write only real stage changes and owner-facing asks, never interim progress. On the owner's computer, update the local mirror in the same single shell command as any other bookkeeping (worktree clean-up, pull).
+
 **Local mirror.** The owner's Needs me strip on the Windows computer reads `.claude/crew-log.md` in `C:\Users\ezhan\Projects\note-board` (not in git). When the coordinator runs on that computer, after each Crew Board change also update that file's `## Needs you` lines and the stages in its job table, so the strip stays right; create it from the template below if missing. A cloud coordinator skips the mirror.
 
 ```markdown

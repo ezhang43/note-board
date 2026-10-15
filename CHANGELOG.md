@@ -1,5 +1,9 @@
 # Changelog
 
+## Crew Board updates are batched (2026-10-15)
+
+- The crew coordinator now sends all Crew Board changes from one event in a single update, and skips progress-only updates, to use fewer tokens.
+
 ## Bold colours (2026-10-15)
 
 - The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.

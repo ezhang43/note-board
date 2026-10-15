@@ -33,6 +33,14 @@ export const DARK_PALETTE: Record<ColorKey, Swatch> = {
   lime: { label: 'Lime', bg: '#2D3420', edge: '#475233', text: '#D2E39D' },
   slate: { label: 'Slate', bg: '#272C32', edge: '#3E4650', text: '#C6D0DB' },
   stone: { label: 'Stone', bg: '#2C2A27', edge: '#45413B', text: '#DDD7CD' },
+  tomato: { label: 'Tomato', bg: '#5E2219', edge: '#8A3527', text: '#FFB8AA' },
+  tangerine: { label: 'Tangerine', bg: '#5A3214', edge: '#86501F', text: '#FFC994' },
+  sunflower: { label: 'Sunflower', bg: '#4C3E0E', edge: '#73601A', text: '#FFE27A' },
+  grass: { label: 'Grass', bg: '#2E4614', edge: '#486A22', text: '#C8F08F' },
+  emerald: { label: 'Emerald', bg: '#11452F', edge: '#1E6948', text: '#8EEBC2' },
+  ocean: { label: 'Ocean', bg: '#173A5E', edge: '#25598C', text: '#A8D4FF' },
+  violet: { label: 'Violet', bg: '#33245E', edge: '#4F3A8C', text: '#D3C4FF' },
+  magenta: { label: 'Magenta', bg: '#561D48', edge: '#80316D', text: '#FFB3EA' },
 };
 
 /** An uncoloured column in dark mode. */

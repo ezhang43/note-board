@@ -525,6 +525,13 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card.in-column { --band: color-mix(in srgb, var(--col-edge) 70%, var(--bg)); }
 /* In an uncoloured column the mixed shade comes out a dull khaki, so cards keep the usual band. */
 .column.uncoloured .card.in-column { --band: var(--accent-soft); }
+/* A bold band is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
+.column.bold .card.in-column { --band-text: var(--col-text); }
+:is(.card.titled.bold-band, .column.bold .card.titled.in-column:not(.own-band)) :is(.card-header, .card-title, .completed-card-title) {
+  --ink-soft: var(--band-text);
+  --ink-faint: var(--band-text);
+  --placeholder: var(--band-text);
+}
 .card.titled .card-header {
   margin: 0 -12px;
   padding: 0 6px 0 12px;
@@ -682,6 +689,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border-radius: 12px;
 }
 .column.collapsed { min-height: 0; }
+/* On a bold column the soft greys would be too faint: the count, hints, icons and placeholder use the colour's own dark (or, in dark mode, light) text. */
+.column.bold :is(.column-header, .column-empty) {
+  --ink-soft: var(--col-text);
+  --ink-faint: var(--col-text);
+  --placeholder: color-mix(in srgb, var(--col-text) 80%, var(--bg));
+}
 .column.drop-target { background: var(--drop-bg); border: 1.5px dashed var(--accent); }
 
 .column-header {

@@ -280,7 +280,7 @@ export function recolour(board: Board, ids: string[], color: ColorKey | null): B
 /**
  * Auto-colour: every column gets a different colour. Columns are taken left to right (top to
  * bottom where they start at the same x), and colours are handed out in AUTO_COLOUR_ORDER, so
- * no two columns share a colour until there are more than 16.
+ * no two columns share a colour until there are more than 24.
  */
 export function autoColour(board: Board): Board {
   const cols = Object.values(board.columns).sort((a, b) => a.x - b.x || a.y - b.y);

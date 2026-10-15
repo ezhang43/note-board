@@ -1,5 +1,12 @@
 # Changelog
 
+## Bold colours (2026-10-15)
+
+- The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.
+- On a bold column or title band, the card count, icons and empty-title hint use a dark shade of the colour instead of grey, so they stay readable.
+- Auto-colour now hands out the bold colours first, then the soft ones, so columns only repeat a colour beyond 24.
+- An older copy of the app (say, a tab left open from before this update) shows a bold colour as its usual colour, and if it saves that board, the column goes back to that colour.
+
 ## Wider calendar panel for the Month view (2026-10-15)
 
 - While the Google Calendar panel shows the Month view, it is wider (560px instead of 300px), so each day has room for event names with their start times ("10:00 Dentist") and up to three lines. Switching to Week brings it back to the usual width. In a small window it shrinks so some board stays visible. Other panels and the phone layout are unchanged.

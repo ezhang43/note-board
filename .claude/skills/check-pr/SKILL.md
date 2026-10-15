@@ -6,7 +6,7 @@ argument-hint: <pull request number>
 
 # Check pull request #$ARGUMENTS
 
-Only the main session does this, for the owner. It reports; it does not merge, and it does not fix what it finds unless the owner says so.
+Only the crew coordinator (CLAUDE.md rule 9) does this, for the owner. It reports; it does not merge, and it does not fix what it finds unless the owner says so.
 
 ## 1. Look at it
 
@@ -64,7 +64,7 @@ Then ask the owner whether to merge. Merge only when they say so.
 ## 6. Clean up
 
 ```
-cd C:/Users/ezhan/Projects/note-board
+cd ../../..   # back to the project folder
 git worktree remove .claude/worktrees/check-pr-$ARGUMENTS --force
 git branch -D check-pr-$ARGUMENTS
 ```

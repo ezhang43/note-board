@@ -308,7 +308,7 @@ Professional but with colour: white cards and soft-tinted columns on a warm neut
 | Violet | #B9A0FF | #8A63F0 | #220E52 |
 | Magenta | #F58BD6 | #D94BB0 | #430732 |
 
-The first 16 are soft pastels; the last 8 are the bold row (owner request, 2026-10-15). On a bold column the card count, hints, icons and the title placeholder use the colour's own text colour instead of the soft greys, so they stay readable; the column title keeps the usual ink (at least 7:1 on every bold colour) and a card title band in a bold colour keeps it too (at least 4.5:1), while the band's icons and empty-title placeholder use the colour's own text colour (a card in a bold column takes the column's band unless it has a band colour of its own). Auto-colour hands out the bold colours first.
+The first 16 are soft pastels; the last 8 are the bold row (owner request, 2026-10-15). On a bold column the card count, hints, icons and the title placeholder use the colour's own text colour instead of the soft greys (the placeholder at 80%), and an empty column's dashed outline a paler mix of it, so they stay readable; the column title keeps the usual ink (at least 7:1 on every bold colour) and a card title band in a bold colour keeps it too (at least 4.5:1), while the band's icons and empty-title placeholder use the colour's own text colour (a card in a bold column takes the column's band unless it has a band colour of its own). Auto-colour hands out the bold colours first.
 
 ## Out of scope and build order
 

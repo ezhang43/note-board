@@ -527,7 +527,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .column.uncoloured .card.in-column { --band: var(--accent-soft); }
 /* A bold band is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
 .column.bold .card.in-column { --band-text: var(--col-text); }
-:is(.card.titled.bold-band, .column.bold .card.titled.in-column:not(.own-band)) :is(.card-header, .card-title, .completed-card-title) {
+:is(.card.titled.bold-band, .column.bold .card.titled.in-column:not(.own-band))
+  :is(.card-header, .todo-body > .card-title:first-child, .link-body > .card-title:first-child, .completed-card-title) {
   --ink-soft: var(--band-text);
   --ink-faint: var(--band-text);
   --placeholder: var(--band-text);
@@ -695,6 +696,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   --ink-faint: var(--col-text);
   --placeholder: color-mix(in srgb, var(--col-text) 80%, var(--bg));
 }
+.column.bold .column-empty { border-color: color-mix(in srgb, var(--col-text) 45%, var(--bg)); }
 .column.drop-target { background: var(--drop-bg); border: 1.5px dashed var(--accent); }
 
 .column-header {

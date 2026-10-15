@@ -2,8 +2,9 @@
 export const BOLD_KEYS = ['tomato', 'tangerine', 'sunflower', 'grass', 'emerald', 'ocean', 'violet', 'magenta'] as const;
 
 /** Whether a colour is one of the bold ones (their soft greys would be too faint on it). */
+const BOLD = new Set<string>(BOLD_KEYS);
 export function isBold(key: string | null | undefined): boolean {
-  return (BOLD_KEYS as readonly (string | null | undefined)[]).includes(key);
+  return key != null && BOLD.has(key);
 }
 
 /**

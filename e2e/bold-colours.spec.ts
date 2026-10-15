@@ -28,6 +28,8 @@ test('the Colour menu has three rows of 8, the third bold; Tomato colours a colu
   await expect(col).toHaveCSS('background-color', rgb('#FF8C78'));
   // The count and placeholder on a bold column use its own dark text colour, so they stay readable.
   await expect(col.locator('.column-count')).toHaveCSS('color', rgb('#400A03'));
+  // The empty column's dashed outline is drawn in the colour's dark tone too, not the faint dot colour.
+  await expect(col.locator('.column-empty')).not.toHaveCSS('border-top-color', rgb('#D6CBB0'));
 });
 
 test('Auto-colour starts with the bold colours', async ({ page }) => {

@@ -183,7 +183,7 @@ export function DuePanel() {
           <CloseIcon />
         </button>
       </header>
-      {!groups.length && <p className="history-note">Nothing has a due date. To give a checklist item a due date, point at it and click the calendar button.</p>}
+      {!groups.length && <p className="history-note">No open item has a due date. To give a checklist item a due date, point at it and click the calendar button.</p>}
       {groups.map((g) => (
         <section key={g.title} className="history-day" aria-label={g.title}>
           <h3>{g.title}</h3>

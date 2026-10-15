@@ -126,7 +126,7 @@ export function dueGroups(items: DueItem[], today: string): { title: string; row
   const tomorrow = addDays(today, 1);
   const groups: { title: string; rows: DueItem[] }[] = [];
   for (const d of items) {
-    const title = d.state === 'overdue' ? 'Overdue' : d.state === 'today' ? 'Today' : d.due === tomorrow ? 'Tomorrow' : dayLabel(d.due, today);
+    const title = d.due < today ? 'Overdue' : d.due === today ? 'Today' : d.due === tomorrow ? 'Tomorrow' : dayLabel(d.due, today);
     const last = groups[groups.length - 1];
     if (last?.title === title) last.rows.push(d);
     else groups.push({ title, rows: [d] });

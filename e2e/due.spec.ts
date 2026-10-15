@@ -38,7 +38,7 @@ test('Due date → Today puts a "Today" chip on the item, and the Due panel list
 
   await row.getByRole('checkbox', { name: 'Done' }).check();
   await expect(panel(page).getByRole('button', { name: /Pay rent/ })).toHaveCount(0);
-  await expect(panel(page)).toContainText('Nothing has a due date');
+  await expect(panel(page)).toContainText('No open item has a due date');
 });
 
 test('a date picked in the calendar box: yesterday shows as overdue; No due date clears it', async ({ page }) => {

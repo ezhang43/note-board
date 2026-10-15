@@ -113,6 +113,9 @@ describe('the Due list', () => {
       ['Mon 4 Jan 2027', ['a']],
     ]);
     expect(dueGroups([], today)).toEqual([]);
+    // A list worked out yesterday (the panel left open over midnight) is grouped by today's date.
+    const stale = dueItems({ home: 'h', boards: { h: b } }, '2026-10-04');
+    expect(dueGroups(stale, today).map((g) => g.title)).toEqual(['Overdue', 'Today', 'Tomorrow', 'Wed 7 Oct', 'Mon 4 Jan 2027']);
   });
 
   it('a later day reads as weekday and date, with the year only when not this year', () => {

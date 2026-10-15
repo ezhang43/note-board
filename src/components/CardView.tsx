@@ -5,6 +5,7 @@ import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { dayLabel } from '../model/completed';
+import { isBold } from '../model/palette';
 import { swatchFor } from '../model/theme';
 import type { BoardCard, Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -57,7 +58,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   // A colour picked for the title band: a deeper shade of it, like the bands inside columns.
   const band = card.titleColor ? swatchFor(card.titleColor, theme) : null;
   const style = {
-    ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})` } : {}),
+    ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})`, '--band-text': band.text } : {}),
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
   const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
@@ -73,6 +74,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     card.collapsed && 'collapsed',
     // Notes have no title: a coloured note gets the band across its header instead.
     ((card.kind !== 'note' && card.kind !== 'board') || band) && 'titled',
+    // Its own band colour: bold, or pastel (which then wins over a bold column's band).
+    band && (isBold(card.titleColor) ? 'bold-band' : 'own-band'),
     // Search: the current match is out of sight inside this card, so the card is marked.
     findTarget && 'find-target',
   ];

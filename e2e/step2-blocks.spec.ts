@@ -271,7 +271,7 @@ test("Colour is faded with nothing selected; it colours a card's title band (car
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
   await expect(colour).not.toHaveAttribute('aria-disabled');
   await colour.click();
-  await expect(menu.locator('.swatch')).toHaveCount(16);
+  await expect(menu.locator('.swatch')).toHaveCount(24);
   await menu.getByRole('button', { name: 'Teal' }).click();
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
 });

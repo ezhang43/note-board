@@ -3,6 +3,16 @@
 ## Due panel lists every date ahead (2026-10-15)
 
 - The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier.
+## Offline tests also run on a phone and in Safari's engine (2026-10-15)
+
+- The automatic offline tests now also run on a phone-sized Chrome (Android) and in WebKit, the engine Safari and iPhones use, both on a computer and on GitHub. In WebKit they check that the offline copy installs and saves the app, and that a new version clears the old copy. The test tool can't switch off the internet for WebKit past the offline copy, so opening with no internet is still only tested in Chrome. Setup on a computer now needs `npx playwright install chromium webkit` once.
+
+## Bold colours (2026-10-15)
+
+- The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.
+- On a bold column or title band, the card count, icons and empty-title hint use a dark shade of the colour instead of grey, so they stay readable.
+- Auto-colour now hands out the bold colours first, then the soft ones, so columns only repeat a colour beyond 24.
+- An older copy of the app (say, a tab left open from before this update) shows a bold colour as its usual colour, and if it saves that board, the column goes back to that colour.
 
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 

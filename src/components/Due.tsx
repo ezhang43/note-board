@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { shownName } from '../model/board';
 import { dayKey } from '../model/completed';
-import { addDays, dueItems, dueLabel, dueState } from '../model/due';
+import { addDays, dueGroups, dueItems, dueLabel, dueState } from '../model/due';
 import type { TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
@@ -9,7 +9,7 @@ import { CalendarIcon, CloseIcon } from './icons';
 import { usePhone } from './usePhone';
 
 // Due dates on checklist items (owner request, 2026-10-05): a chip on the item, a small picker, and
-// the Due panel listing what is due today or overdue on every board. No reminders or notifications.
+// the Due panel listing every unticked item with a date on every board. No reminders or notifications.
 
 /** Today on this computer, as YYYY-MM-DD. */
 export const today = () => dayKey(new Date());
@@ -119,7 +119,7 @@ export function DuePicker() {
   );
 }
 
-/** Items due today or overdue on every board, worked out again only when a board changes. */
+/** Unticked items with a due date on every board, worked out again only when a board changes. */
 function useDueItems(on = true) {
   const board = useAppState((s) => s.board);
   const boards = useAppState((s) => s.boards);
@@ -129,7 +129,7 @@ function useDueItems(on = true) {
 /** The button by the zoom control that opens the Due panel, showing how many items are due. */
 export function DuePanelButton({ labelled = false }: { labelled?: boolean }) {
   const open = useAppState((s) => s.ui.dueOpen);
-  const count = useDueItems().length;
+  const count = useDueItems().filter((d) => d.state !== 'later').length;
   return (
     <button
       type="button"
@@ -146,7 +146,7 @@ export function DuePanelButton({ labelled = false }: { labelled?: boolean }) {
   );
 }
 
-/** The Due panel: unticked items due today or before, on every board. Clicking one goes to it. */
+/** The Due panel: every unticked item with a due date, on every board, grouped by day. Clicking one goes to it. */
 export function DuePanel() {
   const open = useAppState((s) => s.ui.dueOpen);
   const several = useAppState((s) => Object.keys(s.boards.others).length > 0);
@@ -174,10 +174,7 @@ export function DuePanel() {
     requestAnimationFrame(step);
   };
   const now = today();
-  const groups = [
-    { title: 'Overdue', rows: items.filter((d) => d.state === 'overdue') },
-    { title: 'Today', rows: items.filter((d) => d.state === 'today') },
-  ].filter((g) => g.rows.length);
+  const groups = dueGroups(items, now);
   return (
     <aside className="history-panel due-panel" aria-label="Due">
       <header className="history-head">
@@ -186,7 +183,7 @@ export function DuePanel() {
           <CloseIcon />
         </button>
       </header>
-      {!groups.length && <p className="history-note">Nothing is due today. To give a checklist item a due date, point at it and click the calendar button.</p>}
+      {!groups.length && <p className="history-note">Nothing has a due date. To give a checklist item a due date, point at it and click the calendar button.</p>}
       {groups.map((g) => (
         <section key={g.title} className="history-day" aria-label={g.title}>
           <h3>{g.title}</h3>

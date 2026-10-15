@@ -1,5 +1,9 @@
 # Changelog
 
+## Due panel lists every date ahead (2026-10-15)
+
+- The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier.
+
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 
 - Running the browser tests on a computer now opens at most 4 hidden Chrome windows at a time instead of half the processor's threads, so several crew workers testing at once no longer max out the CPU. Tests on GitHub are unchanged.

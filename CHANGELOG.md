@@ -1,5 +1,9 @@
 # Changelog
 
+## Google Calendar is connected on the live site (2026-10-15)
+
+- The calendar panel now uses the site's Google sign-in key, so it can show and change your Google Calendar instead of saying it "isn't connected yet".
+
 ## Restoring is safe for shared boards from the first moment (2026-10-08)
 
 - Right after the page opens, the shared boards this device already knows are protected from a restore straight away. If it isn't known yet which boards are shared with you, a restore waits: nothing changes, and a note says "Your shared boards are still loading, so nothing was restored. Try again in a moment."

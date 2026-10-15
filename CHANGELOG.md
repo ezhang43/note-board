@@ -1,5 +1,9 @@
 # Changelog
 
+## About page says "list" not "sub-list" (2026-10-16)
+
+- The second highlight card on the About page now reads "Collapse any card, column or list, or everything at once, and bring it back in one click." Wording only; nothing in the app changed.
+
 ## Due panel lists every date ahead (2026-10-15)
 
 - The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier. A date typed in the date box that isn't a real day (such as a 5-digit year) is no longer saved.

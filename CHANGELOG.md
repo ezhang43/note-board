@@ -1,5 +1,9 @@
 # Changelog
 
+## Why I made BusyAnts on the About page (2026-10-16)
+
+- The About page now opens with the owner's short story of why BusyAnts was made, right under the headline and start button, followed by three highlights (shape it your way, fold away what you're not doing, built for checklists). Below the board picture, an "Also in BusyAnts" list of nine features replaces the old four feature cards and the separate import line. Nothing in the app changed.
+
 ## Low-risk crew workers use Sonnet (2026-10-15)
 
 - As a trial to save tokens, crew workers on low-risk jobs now run on the cheaper Sonnet model, at high effort. High-risk jobs (saving, sync, undo, deleting) and pull request checks stay on the stronger default model.

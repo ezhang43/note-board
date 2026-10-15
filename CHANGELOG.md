@@ -1,5 +1,9 @@
 # Changelog
 
+## Why I made BusyAnts on the About page (2026-10-16)
+
+- The About page now opens with the owner's short story of why BusyAnts was made, right under the headline and start button, followed by three highlights (shape it your way, fold away what you're not doing, built for checklists). Below the board picture, an "Also in BusyAnts" list of nine features replaces the old four feature cards and the separate import line. Nothing in the app changed.
+
 ## The toolbar ant opens the website (2026-10-15)
 
 - Clicking the BusyAnts ant at the left of the toolbar now opens the BusyAnts website's About page in a new tab, so you can get to the website from any board while the board stays open. Its tooltip says "BusyAnts website". Works on a phone too.

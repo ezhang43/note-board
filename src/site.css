@@ -126,6 +126,11 @@ p, li { color: var(--ink); }
   border-radius: 10px;
   padding: 14px 16px;
 }
+.why { max-width: 65ch; }
+.why p { margin: 0 0 12px; }
+.highlights { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.also { margin: 12px 0 0; padding-left: 22px; max-width: 65ch; }
+.also li { margin: 0 0 6px; }
 .features h3 { margin: 0 0 4px; }
 .features p { margin: 0; color: var(--ink-soft); }
 

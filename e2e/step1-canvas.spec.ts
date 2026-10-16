@@ -46,8 +46,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Undo (Ctrl+Z)',
     'Redo (Ctrl+Y)',
     'Snap to grid',
-    'Colour of selected cards and columns',
-    'Auto-colour',
+    'Color of selected cards and columns',
     'Collapse all',
     'Same width',
     'Note',
@@ -63,7 +62,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Undo (Ctrl+Z)' })).toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByRole('button', { name: 'Redo (Ctrl+Y)' })).toHaveAttribute('aria-disabled', 'true');
-  await expect(page.getByRole('button', { name: 'Colour of selected cards and columns' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Color of selected cards and columns' })).not.toHaveAttribute('aria-disabled'); // opens even with nothing selected: Auto-color lives in its menu
   await expect(zoomLabel(page)).toHaveText('100%');
 });
 

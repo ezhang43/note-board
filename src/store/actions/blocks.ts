@@ -209,7 +209,6 @@ export function blockActions(ctx: StoreContext) {
     /** Click on empty board or Escape: clear the selection and close menus. */
     clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, deleteCompleted: null, arrowSel: null }),
     toggleColourMenu() {
-      if (!ctx.state.ui.selection.length) return;
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });
     },
     closeColourMenu: () => updateUi({ colourMenuOpen: false }),

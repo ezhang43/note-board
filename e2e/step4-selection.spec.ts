@@ -22,7 +22,7 @@ async function threeNotes(page: Page) {
 
 const header = { position: { x: 30, y: 18 } };
 
-test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all selected columns and card title bands', async ({ page }) => {
+test('Ctrl + click and Shift + click add and remove blocks; Color recolors all selected columns and card title bands', async ({ page }) => {
   const [a, b, c] = await threeNotes(page);
   await a.click(header);
   await b.click({ ...header, modifiers: ['Control'] });
@@ -31,10 +31,10 @@ test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all
   await b.click({ ...header, modifiers: ['Control'] });
   await expect(b).not.toHaveClass(/selected/);
 
-  // Cards selected: Colour is available (it colours their title bands).
-  await expect(page.getByRole('button', { name: 'Colour of selected cards and columns' })).not.toHaveAttribute('aria-disabled');
+  // Cards selected: Color is available (it colors their title bands).
+  await expect(page.getByRole('button', { name: 'Color of selected cards and columns' })).not.toHaveAttribute('aria-disabled');
 
-  // With columns in the selection, Colour recolours every selected column.
+  // With columns in the selection, Color recolors every selected column.
   await clickEmpty(page);
   await add(page, 'New column');
   await clickEmpty(page);
@@ -43,12 +43,12 @@ test('Ctrl + click and Shift + click add and remove blocks; Colour recolours all
   await c1.click({ position: { x: 40, y: 80 } });
   await c2.click({ position: { x: 40, y: 80 }, modifiers: ['Control'] });
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
-  await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Sky' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Sky' }).click();
   await expect(c1).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(c2).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(a).toHaveCSS('background-color', 'rgb(255, 255, 255)'); // the card stays white
-  await expect(a.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // its band is coloured
+  await expect(a.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // its band is colored
 });
 
 test('Select tool: dragging a box selects everything it touches, live; Ctrl adds to the selection', async ({ page }) => {
@@ -190,15 +190,15 @@ test('Ctrl + Z undoes a burst of typing as one step, even from inside the text b
   await expect(redoButton(page)).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('undo and redo buttons undo moves, colours and deletes', async ({ page }) => {
+test('undo and redo buttons undo moves, colors and deletes', async ({ page }) => {
   await add(page, 'New column');
   const col = columns(page).first();
   const p0 = await boardPos(col);
   await dragBy(page, col, 200, 100);
   const p1 = await boardPos(col);
   expect(p1).not.toEqual(p0);
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
-  await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Peach' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Peach' }).click();
   await col.getByRole('button', { name: 'Delete column and its cards' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete column' }).click();
   await expect(columns(page)).toHaveCount(0);
@@ -219,14 +219,14 @@ test('undo and redo buttons undo moves, colours and deletes', async ({ page }) =
   expect(await boardPos(columns(page).first())).toEqual(p1);
 });
 
-test('Escape clears the selection and closes the colour menu; Ctrl + A while typing selects text only', async ({ page }) => {
+test('Escape clears the selection and closes the color menu; Ctrl + A while typing selects text only', async ({ page }) => {
   const [a, b] = await threeNotes(page);
   await add(page, 'New column');
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
-  await expect(page.getByRole('group', { name: 'Colours' })).toBeVisible();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await expect(page.getByRole('group', { name: 'Colors' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Colors' })).toHaveCount(0);
   await expect(page.locator('.selected')).toHaveCount(0);
 
   await a.getByLabel('Note text').fill('some text');

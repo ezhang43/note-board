@@ -5,7 +5,7 @@ import { freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
-test('the toolbar shows the BusyAnts ant and is honey-coloured, with the window bar to match', async ({ page }) => {
+test('the toolbar shows the BusyAnts ant and is honey-colored, with the window bar to match', async ({ page }) => {
   const toolbar = page.locator('.toolbar');
   await expect(toolbar.getByRole('link', { name: 'BusyAnts website' }).locator('img.toolbar-logo')).toBeVisible();
   await expect(toolbar).toHaveCSS('background-color', 'rgb(255, 241, 194)');

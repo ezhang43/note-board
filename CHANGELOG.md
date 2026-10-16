@@ -4,6 +4,15 @@
 
 - Undid the change that turned off unused connectors and plugins for Claude Code in this project; the saving was not worth it. Nothing in the app changed.
 
+## Website look: Done List (2026-10-16)
+
+- The website pages have a new look. Titles use a new font (Familjen Grotesk), and everything lines up in one neat column.
+- The About page shows the board picture much bigger, overlapping the honey block. The three highlights are a small checklist you can tick: a ticked one slides under "Completed". There is a second Start your board, free button at the end.
+- On a phone, the comparison table lists every app with its answer instead of hiding some off the side, and the top bar's links are bigger and easier to tap.
+- The FAQ, Terms and Privacy fold each section: tap a heading to open it. A link to one question still opens it. The wording is unchanged.
+- The Delete your account steps are numbered with big round badges so they stand out.
+- The app and your saved boards are untouched.
+
 ## New look: Honey Workshop (2026-10-16)
 
 - The app has a calmer, warmer look in light and dark mode: a cream toolbar, honey-coloured highlights (the pressed Hand or Select tool, the Share button, the selected card's glow) and plain white cards with a bold title. The font stays IBM Plex Sans.

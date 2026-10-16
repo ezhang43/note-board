@@ -11,10 +11,10 @@
     <meta name="theme-color" content="#5A3C14" media="(prefers-color-scheme: dark)" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="/src/site.css" />
   </head>
-  <body class="bold landing">
+  <body>
     <header class="site-header">
       <nav aria-label="Site">
         <a class="site-brand" href="../about/"><img src="/busyants-icon.svg" alt="" width="32" height="32" /><span class="brand-name">BusyAnts</span></a>
@@ -27,91 +27,91 @@
     </header>
     <main>
       <section class="hero">
-        <div class="hero-inner">
-          <h1>BusyAnts</h1>
-          <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
-          <a class="start" href="../">Start your board, free</a>
-        </div>
+        <h1>BusyAnts</h1>
+        <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
+        <a class="start" href="../">Start your board, free</a>
         <picture class="hero-board">
           <source srcset="./board-dark.png" media="(prefers-color-scheme: dark)" />
           <img class="shot" src="./board.png" width="960" height="600" alt="A BusyAnts board: containers of checklists and notes on a warm cream background." />
         </picture>
-        <div class="trail" aria-hidden="true"></div>
       </section>
 
-      <div class="page">
-        <section class="why-section">
-          <h2>Why I made BusyAnts</h2>
-          <div class="why">
-            <p>I wake up most mornings feeling like an ant: a long line of small jobs, and a real need to see them get done.</p>
-            <p>I've tried Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist. Each did part of it. Some were too rigid to shape the way I think, some slowed down once a board got big, and most were built around loose notes, when what I actually live in is checklists.</p>
-            <p>So I built the board I wanted: a calm canvas centered on checklists, with structure when I need it and room to move things around when I don't. Tick something off and it slides into Completed, so at the end of the day there's a record of what got done.</p>
-          </div>
-          <ul class="features highlights">
-            <li>
-              <h3>Shape it your way</h3>
-              <p>Containers, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
-            </li>
-            <li>
-              <h3>Fold away what you're not doing</h3>
-              <p>Collapse any card, container or list, or everything at once, and bring it back in one click.</p>
-            </li>
-            <li>
-              <h3>Built for checklists</h3>
-              <p>Nested sub-items, tick with Ctrl+Enter, and one-click Clean up of everything you've finished.</p>
-            </li>
-          </ul>
-        </section>
-      </div>
+      <section class="column">
+        <h2>Try it: tick one off</h2>
+        <ul class="highlights">
+          <li>
+            <input type="checkbox" id="try-shape" />
+            <h3><label for="try-shape">Shape it your way</label></h3>
+            <p>Containers, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
+          </li>
+          <li>
+            <input type="checkbox" id="try-fold" />
+            <h3><label for="try-fold">Fold away what you're not doing</label></h3>
+            <p>Collapse any card, container or list, or everything at once, and bring it back in one click.</p>
+          </li>
+          <li>
+            <input type="checkbox" id="try-checklists" checked />
+            <h3><label for="try-checklists">Built for checklists</label></h3>
+            <p>Nested sub-items, tick with Ctrl+Enter, and one-click Clean up of everything you've finished.</p>
+          </li>
+        </ul>
+      </section>
 
-      <div class="page">
-        <section class="compare-section">
-          <h2>How BusyAnts stacks up</h2>
-          <div class="compare-scroll" role="region" aria-labelledby="compare-cap" tabindex="0">
-            <table class="compare">
-              <caption id="compare-cap">BusyAnts next to Milanote, Notion, Miro and Trello, on their free plans</caption>
-              <thead>
-                <tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">BusyAnts</th><th scope="col">Milanote</th><th scope="col">Notion</th><th scope="col">Miro</th><th scope="col">Trello</th></tr>
-              </thead>
-              <tbody>
-              <tr>
-                <th scope="row">Free, with no card or board limits</th>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-                <td class="part"><span class="word">Partly</span><small>100-card cap</small></td>
-                <td class="part"><span class="word">Partly</span><small>1,000 blocks when shared</small></td>
-                <td class="part"><span class="word">Partly</span><small>3 editable boards</small></td>
-                <td class="part"><span class="word">Partly</span><small>10 boards per Workspace</small></td>
-              </tr>
-              <tr>
-                <th scope="row">Share by link and edit together</th>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-                <td class="part"><span class="word">Partly</span><small>Free links are view-only</small></td>
-                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
-              </tr>
-              <tr>
-                <th scope="row">Works offline</th>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Installs like an app</small></td>
-                <td class="no"><span aria-hidden="true">&#10007;</span><span class="sr-only">No</span></td>
-                <td class="part"><span class="word">Partly</span><small>Apps only, not the browser</small></td>
-                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
-                <td class="part"><span class="word">Partly</span><small>Phone app only</small></td>
-              </tr>
-              <tr>
-                <th scope="row">Version history</th>
-                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Plus full backups</small></td>
-                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
-                <td class="part"><span class="word">Partly</span><small>7 days</small></td>
-                <td class="paid"><span class="word">Paid</span></td>
-                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
-              </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="compare-note">Compared with each app's free plan and public feature pages, October 2026. A dash means we couldn't confirm it. Features change; tell us if something's out of date: <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a>. More in BusyAnts: Google Calendar beside your board, a focus timer, and imports from other apps (<a href="../faq/#import">how</a>).</p>
-        </section>
-      </div>
+      <section class="column">
+        <h2>Why I made BusyAnts</h2>
+        <div class="why">
+          <p>I wake up most mornings feeling like an ant: a long line of small jobs, and a real need to see them get done.</p>
+          <p>I've tried Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist. Each did part of it. Some were too rigid to shape the way I think, some slowed down once a board got big, and most were built around loose notes, when what I actually live in is checklists.</p>
+          <p>So I built the board I wanted: a calm canvas centered on checklists, with structure when I need it and room to move things around when I don't. Tick something off and it slides into Completed, so at the end of the day there's a record of what got done.</p>
+        </div>
+      </section>
+
+      <section class="compare-section">
+        <h2>How BusyAnts stacks up</h2>
+        <table class="compare">
+          <caption>BusyAnts next to Milanote, Notion, Miro and Trello, on their free plans</caption>
+          <thead>
+            <tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">BusyAnts</th><th scope="col">Milanote</th><th scope="col">Notion</th><th scope="col">Miro</th><th scope="col">Trello</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <th scope="row">Free, with no card or board limits</th>
+            <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+            <td data-app="Milanote" class="part"><span class="word">Partly</span><small>100-card cap</small></td>
+            <td data-app="Notion" class="part"><span class="word">Partly</span><small>1,000 blocks when shared</small></td>
+            <td data-app="Miro" class="part"><span class="word">Partly</span><small>3 editable boards</small></td>
+            <td data-app="Trello" class="part"><span class="word">Partly</span><small>10 boards per Workspace</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Share by link and edit together</th>
+            <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+            <td data-app="Milanote" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+            <td data-app="Notion" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+            <td data-app="Miro" class="part"><span class="word">Partly</span><small>Free links are view-only</small></td>
+            <td data-app="Trello" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Works offline</th>
+            <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Installs like an app</small></td>
+            <td data-app="Milanote" class="no"><span aria-hidden="true">&#10007;</span><span class="sr-only">No</span></td>
+            <td data-app="Notion" class="part"><span class="word">Partly</span><small>Apps only, not the browser</small></td>
+            <td data-app="Miro" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+            <td data-app="Trello" class="part"><span class="word">Partly</span><small>Phone app only</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Version history</th>
+            <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Plus full backups</small></td>
+            <td data-app="Milanote" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+            <td data-app="Notion" class="part"><span class="word">Partly</span><small>7 days</small></td>
+            <td data-app="Miro" class="paid"><span class="word">Paid</span></td>
+            <td data-app="Trello" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+          </tr>
+          </tbody>
+        </table>
+        <p class="compare-note">Compared with each app's free plan and public feature pages, October 2026. A dash means we couldn't confirm it. Features change; tell us if something's out of date: <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a>. More in BusyAnts: Google Calendar beside your board, a focus timer, and imports from other apps (<a href="../faq/#import">how</a>).</p>
+      </section>
+
+      <p class="close"><a class="start" href="../">Start your board, free</a></p>
     </main>
     <footer class="site-footer">
       <nav aria-label="More links">

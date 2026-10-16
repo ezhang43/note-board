@@ -18,7 +18,7 @@ test('the website pages are published beside the app, with working links', async
   }
   await page.goto('about/');
   expect(await page.getByRole('img', { name: /BusyAnts board/ }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await page.getByRole('link', { name: 'Start your board, free' }).click();
+  await page.getByRole('link', { name: 'Start your board, free' }).first().click();
   await expect(page).toHaveURL(/\/note-board\/$/);
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
 });

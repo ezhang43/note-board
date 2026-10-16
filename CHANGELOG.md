@@ -1,5 +1,14 @@
 # Changelog
 
+## Website look: Done List (2026-10-16)
+
+- The website pages have a new look. Titles use a new font (Familjen Grotesk), and everything lines up in one neat column.
+- The About page shows the board picture much bigger, overlapping the honey block. The three highlights are a small checklist you can tick: a ticked one slides under "Completed". There is a second Start your board, free button at the end.
+- On a phone, the comparison table lists every app with its answer instead of hiding some off the side, and the top bar's links are bigger and easier to tap.
+- The FAQ, Terms and Privacy fold each section: tap a heading to open it. A link to one question still opens it. The wording is unchanged.
+- The Delete your account steps are numbered with big round badges so they stand out.
+- The app and your saved boards are untouched.
+
 ## Due dates removed (2026-10-16)
 
 - Checklist items no longer have due dates: the calendar button beside an item's trash, the date under an item, the Due button with its red count, and the Due panel are gone (also from the phone's ⋯ menu). Hovering an item shows just the grip and the trash again, and the text doesn't move.

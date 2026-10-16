@@ -237,6 +237,8 @@ test.describe('the Delete your account web page', () => {
 
   test('is linked from the Privacy policy and every page’s footer', async ({ page }) => {
     await page.goto('/privacy/');
+    // The Privacy policy's sections fold (job #79): open "Your choices" first.
+    await page.locator('details:has(h2:text("Your choices")) > summary').click();
     await page.locator('main').getByRole('link', { name: 'How to delete your account' }).click();
     await expect(page).toHaveURL('/delete-account/');
     for (const path of ['/about/', '/faq/', '/terms/', '/privacy/', '/delete-account/']) {
@@ -248,10 +250,10 @@ test.describe('the Delete your account web page', () => {
     await expect(page.locator('main')).toContainText('File, then Delete account…');
     await expect(page.locator('main')).not.toContainText('there is no button for this yet');
     await page.goto('/faq/');
-    await expect(page.locator('#delete + p')).toContainText('File, then Delete account…');
-    await expect(page.locator('#delete + p')).toContainText('everything saved online except feedback you sent');
-    await expect(page.locator('#delete + p')).toContainText('Feedback you sent isn’t deleted with it');
-    await expect(page.locator('#delete + p')).toContainText('asking by email to delete your account removes it too');
+    await expect(page.locator('details:has(#delete) p')).toContainText('File, then Delete account…');
+    await expect(page.locator('details:has(#delete) p')).toContainText('everything saved online except feedback you sent');
+    await expect(page.locator('details:has(#delete) p')).toContainText('Feedback you sent isn’t deleted with it');
+    await expect(page.locator('details:has(#delete) p')).toContainText('asking by email to delete your account removes it too');
   });
 
   test('fits a phone screen without sideways scrolling', async ({ page }) => {

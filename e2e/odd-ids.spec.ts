@@ -65,7 +65,7 @@ test('cards and items whose saved ids hold odd characters still work with search
   await clickEmpty(page);
   await note.getByLabel('Note text').click();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await expect(page.getByRole('button', { name: 'Default' })).toBeVisible();
   // freshBoardEachTest fails the test if the page threw along the way.
 });

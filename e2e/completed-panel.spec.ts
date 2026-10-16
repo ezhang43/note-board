@@ -106,7 +106,7 @@ test('a Completed card saved in a column (an older board) is not drawn and not c
   await tick(list, 'milk');
   await cleanUpButton(page).click();
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.type('Later');
   await clickEmpty(page);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('note-board:v1') ?? '')).toContain('"Later"');

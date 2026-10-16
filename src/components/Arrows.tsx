@@ -6,7 +6,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { blockEl, blockUnder, boardRect, clientToBoard, dotObstacles } from './canvasDom';
 import { CloseIcon } from './icons';
 
-// Arrows between cards and columns (owner request, 2026-10-05), drawn as in Miro (owner request,
+// Arrows between cards and containers (owner request, 2026-10-05), drawn as in Miro (owner request,
 // same day): hovering a block, or selecting one, shows a dot just outside the middle of each side;
 // drag a dot onto another block to join them. An arrow is a curve between the middles of the two
 // sides that face each other. Where everything is drawn is read from where the blocks are on
@@ -241,7 +241,7 @@ export function Arrows() {
             type="button"
             className="arrow-dot"
             aria-label={`Draw an arrow from the ${dot.side}`}
-            title="Drag onto another card or column to draw an arrow"
+            title="Drag onto another card or container to draw an arrow"
             style={{ left: dot.x, top: dot.y }}
             onPointerDown={(e) => startConnect(e, dot)}
             onPointerMove={moveConnect}

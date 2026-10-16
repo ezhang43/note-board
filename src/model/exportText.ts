@@ -40,7 +40,7 @@ export function boardAsMarkdown(board: Board, nameOf: BoardNameOf = () => ''): s
   const columns = board.order.filter((id) => board.columns[id]).sort((a, b) => board.columns[a].x - board.columns[b].x || board.columns[a].y - board.columns[b].y);
   for (const id of columns) {
     const col = board.columns[id];
-    out.push(`## ${col.title.trim() || 'Untitled column'}`, '');
+    out.push(`## ${col.title.trim() || 'Untitled container'}`, '');
     for (const cardId of col.cardIds) if (board.cards[cardId]) block(cardText(board.cards[cardId], nameOf));
   }
   const loose = board.order.filter((id) => board.cards[id]).sort((a, b) => board.cards[a].y - board.cards[b].y || board.cards[a].x - board.cards[b].x);

@@ -22,7 +22,7 @@ const looseCards = (page: Page) => page.locator('.card.loose');
 const columns = (page: Page) => page.locator('[data-col-id]');
 /** A loose block's position on the board (not on screen), from its style. */
 const boardPos = (l: Locator) => l.evaluate((el) => ({ x: parseFloat((el as HTMLElement).style.left), y: parseFloat((el as HTMLElement).style.top) }));
-const add = (page: Page, name: 'Note' | 'Checklist' | 'New column') =>
+const add = (page: Page, name: 'Note' | 'Checklist' | 'New container') =>
   page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
 
 async function box(l: Locator) {
@@ -101,7 +101,7 @@ test('Link card opens the address in a new tab', async ({ page }) => {
 });
 
 test('new cards and columns never appear on top of existing blocks', async ({ page }) => {
-  for (const kind of ['Note', 'Checklist', 'Note', 'New column', 'Note', 'New column'] as const) {
+  for (const kind of ['Note', 'Checklist', 'Note', 'New container', 'Note', 'New container'] as const) {
     await clickEmpty(page); // nothing selected, so every card goes loose on the board
     await add(page, kind);
   }
@@ -112,10 +112,10 @@ test('new cards and columns never appear on top of existing blocks', async ({ pa
 });
 
 test('adding with a column selected puts the card at the end; with a card in a column, directly below it', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await expect(col).toHaveClass(/selected/);
-  await expect(col.getByLabel('Column title')).toHaveValue('');
+  await expect(col.getByLabel('Container title')).toHaveValue('');
   await expect(col.locator('.column-empty')).toHaveText('Drop cards here');
 
   await add(page, 'Note'); // column selected → end of column
@@ -134,7 +134,7 @@ test('adding with a column selected puts the card at the end; with a card in a c
 });
 
 test('drag a loose card into a column at the pointer, then out again', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   await col.locator('[data-card-id]').first().getByLabel('Note text').fill('top');
@@ -162,9 +162,9 @@ test('drag a loose card into a column at the pointer, then out again', async ({ 
 });
 
 test('dropping a card on a collapsed column opens it', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  await col.getByRole('button', { name: 'Collapse column' }).click();
+  await col.getByRole('button', { name: 'Collapse container' }).click();
   await expect(col).toHaveClass(/collapsed/);
   await clickEmpty(page);
   await add(page, 'Note');
@@ -203,7 +203,7 @@ test('a small nudge only selects; a real drag moves the block and lands on the g
 });
 
 test('dragging a column moves its cards with it', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   const before = await box(col);
@@ -216,7 +216,7 @@ test('dragging a column moves its cards with it', async ({ page }) => {
 });
 
 test('collapse: a note shows its first line; a column hides its cards', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   const note = col.locator('[data-card-id]').first();
@@ -227,15 +227,15 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
   await note.getByRole('button', { name: 'Expand card' }).click();
   await expect(note.getByLabel('Note text')).toHaveValue('Shopping ideas\nmore detail');
 
-  await col.getByRole('button', { name: 'Collapse column' }).click();
+  await col.getByRole('button', { name: 'Collapse container' }).click();
   await expect(col.locator('[data-card-id]')).toHaveCount(0);
   await expect(col.locator('.column-count')).toHaveText('1');
-  await col.getByRole('button', { name: 'Expand column' }).click();
+  await col.getByRole('button', { name: 'Expand container' }).click();
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
 });
 
 test("Color opens with nothing selected (swatches faded, doing nothing); it colors a card's title band (card stays white) and a column", async ({ page }) => {
-  const color = page.getByRole('button', { name: 'Color of selected cards and columns' });
+  const color = page.getByRole('button', { name: 'Color of selected cards and containers' });
   await expect(color).not.toHaveAttribute('aria-disabled');
   await color.click();
   const empty = page.getByRole('group', { name: 'Colors' });
@@ -275,7 +275,7 @@ test("Color opens with nothing selected (swatches faded, doing nothing); it colo
   await expect(note.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await clickEmpty(page);
 
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
   await expect(color).not.toHaveAttribute('aria-disabled');
@@ -290,23 +290,23 @@ test('card trash can deletes it; column trash can asks first, then deletes the c
   await cards(page).first().getByRole('button', { name: 'Delete card' }).click();
   await expect(cards(page)).toHaveCount(0);
 
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  await col.getByLabel('Column title').fill('Ideas');
+  await col.getByLabel('Container title').fill('Ideas');
   await add(page, 'Note');
   await col.click({ position: { x: 240, y: 26 } });
   await add(page, 'Note');
 
-  await col.getByRole('button', { name: 'Delete column and its cards' }).click();
+  await col.getByRole('button', { name: 'Delete container and its cards' }).click();
   const dialog = page.getByRole('alertdialog');
   await expect(dialog).toContainText('Delete “Ideas” and its 2 cards?');
-  await dialog.getByRole('button', { name: 'Keep column' }).click();
+  await dialog.getByRole('button', { name: 'Keep container' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(columns(page)).toHaveCount(1);
 
-  await col.getByRole('button', { name: 'Delete column and its cards' }).click();
-  await expect(dialog.getByRole('button', { name: 'Delete column' })).toHaveCSS('background-color', 'rgb(163, 38, 63)');
-  await dialog.getByRole('button', { name: 'Delete column' }).click();
+  await col.getByRole('button', { name: 'Delete container and its cards' }).click();
+  await expect(dialog.getByRole('button', { name: 'Delete container' })).toHaveCSS('background-color', 'rgb(163, 38, 63)');
+  await dialog.getByRole('button', { name: 'Delete container' }).click();
   await expect(columns(page)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(0);
 });
@@ -326,13 +326,13 @@ test('clicking empty space or pressing Escape clears the selection', async ({ pa
 test('Auto-color, a button inside the Color menu, gives every column its own color, and can be undone', async ({ page }) => {
   // It is not a toolbar button of its own any more.
   await expect(page.getByRole('button', { name: 'Auto-color' })).toHaveCount(0);
-  const colorButton = page.getByRole('button', { name: 'Color of selected cards and columns' });
+  const colorButton = page.getByRole('button', { name: 'Color of selected cards and containers' });
   await colorButton.click();
   const auto = page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Auto-color' });
   await expect(auto).toHaveAttribute('aria-disabled', 'true'); // no columns yet
   await colorButton.click();
   for (let i = 0; i < 3; i++) {
-    await add(page, 'New column');
+    await add(page, 'New container');
     await clickEmpty(page);
   }
   // Nothing is selected, and it still works: Auto-color is about the whole board.
@@ -347,15 +347,15 @@ test('Auto-color, a button inside the Color menu, gives every column its own col
 });
 
 test('everything is kept after reload', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  await col.getByLabel('Column title').fill('This week');
+  await col.getByLabel('Container title').fill('This week');
   await add(page, 'Checklist');
   await page.keyboard.press('Enter'); // from the new list's title to its first item
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);
   await col.click({ position: { x: 200, y: 26 } });
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Rose' }).click();
   await clickEmpty(page);
   await add(page, 'Note');
@@ -365,7 +365,7 @@ test('everything is kept after reload', async ({ page }) => {
 
   await page.reload();
 
-  await expect(columns(page).first().getByLabel('Column title')).toHaveValue('This week');
+  await expect(columns(page).first().getByLabel('Container title')).toHaveValue('This week');
   await expect(columns(page).first().getByLabel('Item text')).toHaveValue('Pack bags');
   const note = looseCards(page).first();
   await expect(note.getByLabel('Note text')).toHaveValue('Loose thought');

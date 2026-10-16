@@ -80,7 +80,7 @@ describe('bold colours (owner request, 2026-10-15)', () => {
       expect(contrast('#FFFFFF', s.bg)).toBeGreaterThanOrEqual(1.3); // clearly coloured: the pastels sit near 1.1 to 1.2
       expect(contrast('#1F1D1A', s.bg)).toBeGreaterThanOrEqual(7); // column title
       expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(7); // count, hints and icons on the column
-      expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5); // "Column title" placeholder
+      expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5); // "Container title" placeholder
       expect(contrast('#1F1D1A', mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // card title band
       expect(contrast(s.text, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // icons and placeholder on that band
     }

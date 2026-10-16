@@ -1,5 +1,10 @@
 # Changelog
 
+## "Column" is now "container" (2026-10-16)
+
+- Everywhere you read it, a column is now called a container: the New container button, the container title and its tooltips, the delete question, the shortcuts list, the welcome tour, the + menu on a phone, the Version history line, the text copy of a board, the FAQ and the Privacy page.
+- Only the words changed. Your saved boards are exactly as they were.
+
 ## Crew rules shared by both coordinators (2026-10-16)
 
 - The crew instructions now include the rules the desktop coordinator was already using: workers say whether their tests failed twice and what happens to saved boards, re-check flaky browser tests, use American English, and stop instead of working around a refused merge. Big visual redesigns now show mockups first. Sonnet workers for low-risk jobs are now standard, not a trial. Nothing in the app changed.

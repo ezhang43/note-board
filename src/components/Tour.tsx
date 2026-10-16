@@ -15,11 +15,11 @@ const STEPS: Step[] = [
     text: 'Note gives you a blank card to jot down anything. Checklist makes a list you can tick off. You can also drag one from here onto the board.',
     target: '.add-note, .add-todo',
     phoneTarget: '.phone-add-button',
-    phoneText: 'Tap + to add a note, a checklist or a column.',
+    phoneText: 'Tap + to add a note, a checklist or a container.',
   },
   {
-    title: 'Move cards, fill columns',
-    text: 'Drag a card to move it. A column is a container that holds your notes and checklists together.',
+    title: 'Move cards, fill containers',
+    text: 'Drag a card to move it. A container holds your notes and checklists together.',
     target: '.add-column',
   },
   {

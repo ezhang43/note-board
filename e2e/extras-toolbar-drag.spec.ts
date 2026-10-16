@@ -58,7 +58,7 @@ test('dragging a to-do list onto another card lands it at the nearest free spot,
 });
 
 test('dragging onto a column puts the card into it at the pointer', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   await col.click({ position: { x: 240, y: 26 } });
@@ -75,7 +75,7 @@ test('dragging onto a column puts the card into it at the pointer', async ({ pag
 
 test('New column can be dragged from the toolbar too; over another column it lands beside it', async ({ page }) => {
   const canvas = await box(page.getByTestId('canvas'));
-  const button = await box(page.locator('header.toolbar').getByRole('button', { name: 'New column' }));
+  const button = await box(page.locator('header.toolbar').getByRole('button', { name: 'New container' }));
   const drag = async (to: { x: number; y: number }, during?: () => Promise<void>) => {
     await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2);
     await page.mouse.down();
@@ -84,7 +84,7 @@ test('New column can be dragged from the toolbar too; over another column it lan
     await page.mouse.up();
   };
   await drag({ x: canvas.x + 300, y: canvas.y + 150 }, async () => {
-    await expect(page.getByTestId('new-card-ghost')).toHaveText('New column');
+    await expect(page.getByTestId('new-card-ghost')).toHaveText('New container');
   });
   await expect(columns(page)).toHaveCount(1);
   const r = await box(columns(page).first());

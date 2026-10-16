@@ -62,7 +62,7 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   );
 }
 
-/** A− / A+: text size on cards and columns, remembered on this device. */
+/** A− / A+: text size on cards and containers, remembered on this device. */
 export function TextSizeButtons() {
   const fontSize = useAppState((s) => s.view.fontSize);
   const smallest = fontSize === FONT_SIZES[0];
@@ -73,7 +73,7 @@ export function TextSizeButtons() {
         type="button"
         className="text-size"
         aria-label="Smaller text"
-        title="Smaller text on cards and columns"
+        title="Smaller text on cards and containers"
         aria-disabled={smallest ? true : undefined}
         onClick={() => appStore.changeFontSize(-1)}
       >
@@ -83,7 +83,7 @@ export function TextSizeButtons() {
         type="button"
         className="text-size"
         aria-label="Larger text"
-        title="Larger text on cards and columns"
+        title="Larger text on cards and containers"
         aria-disabled={largest ? true : undefined}
         onClick={() => appStore.changeFontSize(1)}
       >

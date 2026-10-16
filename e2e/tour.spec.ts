@@ -47,7 +47,7 @@ test('the steps come in the owner order, with the new wording', async ({ page })
   await open(page, '/?demo-user=Alice');
   const steps = [
     ['Add a note or a checklist', 'Note gives you a blank card to jot down anything.'],
-    ['Move cards, fill columns', 'A column is a container that holds your notes and checklists together.'],
+    ['Move cards, fill containers', 'A container holds your notes and checklists together.'],
     ['Share a board', 'Share lets other people'],
     ['Your boards', 'The Boards menu lists all your boards.'],
     ['Keyboard shortcuts', 'Press ? any time'],

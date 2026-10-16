@@ -72,7 +72,10 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
             <CloseIcon />
           </button>
         </header>
-        <p>This permanently deletes your BusyAnts account and everything in it, on every device. It can’t be undone.</p>
+        <p>
+          This permanently deletes your BusyAnts account, everything kept online and the copy on this device. It can’t be undone. Other
+          phones or computers you’re signed in on are signed out but keep the copy saved on them until it’s cleared.
+        </p>
         <ul>
           <li>All your boards ({plural(counts.boards, 'board', 'boards')}) and everything on them</li>
           <li>Version history (the earlier versions of your boards kept online)</li>

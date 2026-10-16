@@ -76,6 +76,9 @@ test('the panel says what goes, offers a backup, and only deletes once DELETE is
   await expect(panel(alice)).toContainText('You leave 1 board someone shared with you; they keep it');
   await expect(panel(alice)).toContainText('Version history');
   await expect(panel(alice)).toContainText('can’t be undone');
+  // Other signed-in devices keep their own copy (owner, 2026-10-16): the panel mustn't promise otherwise.
+  await expect(panel(alice)).not.toContainText('every device');
+  await expect(panel(alice)).toContainText('Other phones or computers you’re signed in on are signed out but keep the copy saved on them until it’s cleared.');
 
   // Download a backup first: the usual full backup file.
   const waiting = alice.waitForEvent('download');

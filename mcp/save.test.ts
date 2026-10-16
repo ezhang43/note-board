@@ -55,6 +55,17 @@ describe('saving a change', () => {
     expect(Object.keys(fs.docs.get('boards/me')!.fields).sort()).toEqual(['client', 'data', 'updatedAt']);
   });
 
+  it('boards saved with arrows (removed, owner 2026-10-16) are saved without them, everything else kept', async () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.arrows = [{ id: 'r1', from: 'noteIdea', to: 'colIdeas' }];
+    const { fs, deps } = setup(JSON.stringify(data));
+    const r = await saveChange(deps, addApples());
+    expect(r.isError).toBeFalsy();
+    expect(fs.own()).not.toContain('arrows');
+    expect(groceries(fs.own()).at(-1)!.text).toBe('Apples');
+    expect(readWorkspace(fs.own())!.ws.boards.home.cards.noteIdea).toEqual(readWorkspace(ownRaw())!.ws.boards.home.cards.noteIdea);
+  });
+
   it('saves under the condition that nothing changed since it read (updateTime precondition)', async () => {
     const { fs, deps } = setup();
     const before = fs.docs.get('boards/me')!.updateTime;

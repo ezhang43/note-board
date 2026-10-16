@@ -1,6 +1,34 @@
 {
   "permissions": {
-    "deny": ["Read(~/AppData/Roaming/busyants-mcp/**)"]
+    "deny": [
+      "Read(~/AppData/Roaming/busyants-mcp/**)",
+      "mcp__Gmail",
+      "mcp__claude_ai_Gmail",
+      "mcp__Google_Calendar",
+      "mcp__claude_ai_Google_Calendar",
+      "mcp__Google_Drive",
+      "mcp__claude_ai_Google_Drive",
+      "mcp__Indeed",
+      "mcp__claude_ai_Indeed",
+      "mcp__apify",
+      "mcp__claude_ai_Apify",
+      "mcp__Claude_Docs",
+      "mcp__claude_ai_Claude_Docs"
+    ]
+  },
+  "deniedMcpServers": [
+    { "serverName": "claude.ai Gmail" },
+    { "serverName": "claude.ai Google Calendar" },
+    { "serverName": "claude.ai Google Drive" },
+    { "serverName": "claude.ai Indeed" },
+    { "serverName": "claude.ai Apify" },
+    { "serverName": "claude.ai Claude Docs" }
+  ],
+  "enabledPlugins": {
+    "design@knowledge-work-plugins": false,
+    "marketing@knowledge-work-plugins": false,
+    "data@knowledge-work-plugins": false,
+    "operations@knowledge-work-plugins": false
   },
   "hooks": {
     "PreToolUse": [

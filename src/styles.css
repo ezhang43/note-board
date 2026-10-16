@@ -1445,63 +1445,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .board-open { height: 32px; }
 
 
-/* Arrows between cards and columns (owner request). */
-.arrows-layer { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 4; }
-.arrow-line { fill: none; stroke: var(--ink-soft); stroke-width: 2; stroke-linecap: round; }
-.arrow-tip { fill: var(--ink-soft); }
-.arrow-tip.on, .arrow.selected .arrow-tip { fill: var(--accent); }
-.arrow.selected .arrow-line, .arrow-pending { stroke: var(--accent); stroke-width: 2.5; }
-.arrow-pending { stroke-dasharray: 6 5; }
-.arrow-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
-.arrow:hover .arrow-line { stroke: var(--accent); }
-.arrow-dot, .arrow-delete {
-  position: absolute;
-  z-index: 6;
-  transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1)));
-  border-radius: 50%;
-  cursor: pointer;
-  touch-action: none;
-}
-/* Connection dots, as in Miro: one just outside the middle of each side (placed by Arrows.tsx).
-   Small and soft grey, fading in after a moment, so passing over cards doesn't flash them
-   (owner request, 2026-10-05); amber and a little bigger under the pointer. */
-.arrow-dot {
-  width: 10px;
-  height: 10px;
-  padding: 0;
-  border: 1.5px solid var(--ink-faint);
-  background: var(--surface);
-  opacity: 0.7;
-  transition: opacity 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
-  animation: arrow-dot-in 160ms ease-out 120ms both;
-}
-.arrow-dot:hover {
-  opacity: 1;
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: translate(-50%, -50%) scale(calc(1.4 / var(--zoom, 1)));
-}
-@keyframes arrow-dot-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .arrow-dot { animation: none; transition: none; }
-}
-/* A wider invisible ring so the small dot is easy to press. */
-.arrow-dot::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
-.arrow-delete {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(31, 29, 26, 0.16);
-}
-.arrow-delete:hover { color: var(--danger); }
-.arrow-target { outline: 2px dashed var(--accent); outline-offset: 3px; }
-
 /* Sharing a board (owner request: editing together). */
 .share-wrap { position: relative; }
 .share-panel {

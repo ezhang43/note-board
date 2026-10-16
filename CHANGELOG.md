@@ -9,6 +9,20 @@
 - The Delete your account steps are numbered with big round badges so they stand out.
 - The app and your saved boards are untouched.
 
+## Claude Code loads fewer connectors and plugins (2026-10-16)
+
+- In this project, Claude Code no longer loads the Gmail, Google Calendar, Google Drive, Indeed, Apify and Claude Docs connectors, or the design, marketing, data and operations plugins, to save tokens. Your personal Claude keeps them. GitHub and the impeccable plugin stay on. Nothing in the app changed.
+
+## Crew coordinator uses fewer tokens (2026-10-16)
+
+- The crew instructions now ask the coordinator to suggest a fresh chat after each publish (when no worker is still running), send heavy reading to a scout worker, keep worker reports to about 15 lines, and keep a short hand-off note on the Crew Board (parked items, owner choices not yet recorded, reminders) so a fresh chat picks up where the last one stopped. Nothing in the app changed.
+
+## Arrows between cards removed (2026-10-16)
+
+- The arrows you could draw between cards and containers are gone, as asked: hovering or selecting a card or container no longer shows the little connection dots.
+- Boards saved with arrows still open normally with every card, container and item as it was; only the arrows are left out. The next time you change anything, your boards are saved without them, so they are erased for good (from all your boards at once, since they are saved together). This also goes for backup files, shared boards and Version history.
+- The arrow keys, the collapse arrows and the normal arrow pointer are something else and work as before.
+
 ## Due dates removed (2026-10-16)
 
 - Checklist items no longer have due dates: the calendar button beside an item's trash, the date under an item, the Due button with its red count, and the Due panel are gone (also from the phone's ⋯ menu). Hovering an item shows just the grip and the trash again, and the text doesn't move.

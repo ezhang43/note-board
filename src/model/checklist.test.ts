@@ -259,14 +259,12 @@ describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
       expect(JSON.stringify(b)).not.toContain('Trip');
     });
 
-    it('a list in a column leaves the column; arrows to it go', () => {
+    it('a list in a column leaves the column', () => {
       let b = lists();
       b = B.addColumn(b, column(false));
       b = B.moveCard(b, 'L1', { type: 'column', columnId: 'K', index: 0 });
-      b = { ...b, arrows: [{ id: 'r', from: 'L1', to: 'L2' }] };
       b = C.pourList(b, 'L1', 'L2');
       expect(b.columns.K.cardIds).toEqual([]);
-      expect(b.arrows ?? []).toEqual([]);
       expect(B.problems(b)).toEqual([]);
     });
 

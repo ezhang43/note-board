@@ -148,8 +148,6 @@ export interface Ui {
    * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.
    */
   sidePanel: SidePanelKind | null;
-  /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
-  arrowSel: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
   shares: ShareInfo[];
   /**
@@ -218,7 +216,6 @@ export const emptyUi: Ui = {
   preview: null,
   find: null,
   sidePanel: null,
-  arrowSel: null,
   shares: [],
   sharesKnown: true,
 };

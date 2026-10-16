@@ -103,13 +103,6 @@ describe('edits to different things are all kept', () => {
     expect(merged.name).toBe('Mine');
     expect(merged.snap).toBe(false);
   });
-
-  it('arrows both drew are kept', () => {
-    const base = sample();
-    const mine = { ...base, arrows: [{ id: 'r1', from: 'n1', to: 'c1' }] };
-    const theirs = { ...base, arrows: [{ id: 'r2', from: 't1', to: 'n1' }] };
-    expect(mergeBoards(base, mine, theirs).arrows?.map((a) => a.id).sort()).toEqual(['r1', 'r2']);
-  });
 });
 
 describe('checklist items', () => {
@@ -190,12 +183,6 @@ describe('deleting', () => {
     const merged = items(mergeBoards(base, mine, theirs), 't1');
     expect(shape(merged)).toBe('a(a1) b');
     expect(merged[0].text).toBe('A!');
-  });
-
-  it('arrows to a block someone deleted go too', () => {
-    const base = { ...sample(), arrows: [{ id: 'r1', from: 'n1', to: 'c1' }] };
-    const merged = mergeBoards(base, setText(base, 'n2', 'x'), B.deleteCard(base, 'n1'));
-    expect(merged.arrows ?? []).toEqual([]);
   });
 });
 
@@ -288,7 +275,6 @@ describe('random edits on both sides', () => {
       expect(B.problems(merged), `seed ${seed}`).toEqual([]);
       const ids = allItems(merged);
       expect(new Set(ids).size, `seed ${seed}: an item in two places`).toBe(ids.length);
-      for (const a of merged.arrows ?? []) expect(merged.cards[a.from] || merged.columns[a.from]).toBeTruthy();
       expect(mergeBoards(base, base, theirs)).toEqual(theirs);
       expect(mergeBoards(base, mine, base)).toEqual(mine);
       // Combining again with the result changes nothing.

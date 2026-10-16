@@ -1351,6 +1351,21 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .delete-account .confirm-actions { margin-top: 12px; }
 .confirm-actions button:disabled { opacity: 0.5; cursor: default; }
 
+/* Send feedback (job #69): in the same frame as Delete your account. */
+.feedback-text {
+  padding: 8px 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+  outline: none;
+}
+.delete-account .feedback-count { margin-top: 2px; text-align: right; }
+.confirm-send { border: none; background: var(--accent); color: var(--on-accent); }
+
 /* Web addresses in a note, as links under its text (owner request). */
 .note-links { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }
 .note-link {

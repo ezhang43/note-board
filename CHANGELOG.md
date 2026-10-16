@@ -4,6 +4,14 @@
 
 - The "Show the tour again" link is gone from the ? shortcuts panel and from the phone ⋯ menu, and the tour's last phone step no longer mentions it. The tour still shows by itself the first time you open the board on a device. Your saved boards are untouched.
 
+## Send feedback (2026-10-16)
+
+- Signed in, you can now send the maker a short note: File, then Send feedback… (on a phone: ⋯, then File). Type up to 1000 characters and press Send; you'll see "Thanks — sent." If it can't be sent, a message says so and what you typed stays, so you can try again. Send is off while you're offline. On a slow connection you can close the box while it is still sending; it carries on.
+- The note is stored with your email address so the maker can reply. Only the maker can read it (in the Firebase console); no one can read, change or delete it from the app.
+- The Privacy policy, the Delete your account page, the FAQ and the delete-account panel say that feedback is kept apart from your account, isn't deleted when you delete your account in the app, and is deleted within 30 days if you email to ask (asking by email to delete your account deletes your feedback too). Wherever they said deleting your account removes "everything", they now say "everything except feedback you sent". The Terms of use say the same (both pages now dated October 16, 2026).
+- Fixed along the way: keys like V, H or Delete no longer change the board hidden behind the Delete account or Send feedback panel, even after a click on the panel's text. While either panel is open, Tab and clicks can't reach the board behind it, Ctrl+F does nothing, Escape closes only the panel, and undo / redo only undo typing in the panel's own box (so they can't change the board unseen). After a failed send or delete the cursor goes back into the box. If a note finishes sending while its panel is closed, opening it again shows how it went. If someone else signs in while a note is still sending, they don't see "Sending…" or "Thanks — sent" for it.
+- The online database's rules gain a new "feedback" section that only allows sending such a note. The owner must paste the updated `firestore.rules` into the Firebase console before sending works on the live site.
+
 ## Delete your account (2026-10-16)
 
 - Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.

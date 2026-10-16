@@ -62,4 +62,21 @@ describe('who can use BusyAnts', () => {
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
     expect(rules).toContain('(request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid)');
   });
+
+  it('feedback (job #69): only a verified signed-in person can send it, as themselves, and no one can read, change or delete it from the app', () => {
+    const start = rules.indexOf('match /feedback/{id} {');
+    expect(start).toBeGreaterThan(-1);
+    const rule = rules.slice(start, rules.indexOf('\n    }', start));
+    expect(rule.match(/allow /g)?.length).toBe(1);
+    expect(rule).toContain('allow create: if signedIn()');
+    expect(rule).toContain("request.resource.data.keys().hasOnly(['text', 'uid', 'email', 'sentAt'])");
+    expect(rule).toContain('request.resource.data.uid == request.auth.uid');
+    expect(rule).toContain('request.resource.data.email == request.auth.token.email');
+    expect(rule).toContain('request.resource.data.text is string');
+    expect(rule).toContain('request.resource.data.text.size() >= 1');
+    expect(rule).toContain('request.resource.data.text.size() <= 1000');
+    expect(rule).toContain('request.resource.data.sentAt == request.time');
+    // signedIn() is the verified-account check the shared-board rules use.
+    expect(rules).toContain('return request.auth != null && request.auth.token.email_verified == true;');
+  });
 });

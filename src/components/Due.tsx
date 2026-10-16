@@ -6,6 +6,7 @@ import type { TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
 import { CalendarIcon, CloseIcon } from './icons';
+import { panelCovers } from './textField';
 import { usePhone } from './usePhone';
 
 // Due dates on checklist items (owner request, 2026-10-05): a chip on the item, a small picker, and
@@ -155,7 +156,7 @@ export function DuePanel() {
 
   useEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && !appStore.getState().ui.dueFor && appStore.toggleDuePanel();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && !appStore.getState().ui.dueFor && !panelCovers() && appStore.toggleDuePanel();
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [open]);

@@ -5,6 +5,7 @@ import { activeVersionStore, startVersions } from '../store/versions';
 import { deleteAccountData } from '../store/account';
 import { account, finishDeletion, takeDeletedNote } from './account';
 import { collab, joinFromAddress } from './collabSession';
+import { feedback } from './feedback';
 import {
   accountRemote,
   boardRemote,
@@ -12,6 +13,7 @@ import {
   collabRemote,
   confirmSignIn,
   currentUser,
+  sendFeedback,
   signInWithGoogle,
   signOutUser,
   versionsRemote,
@@ -66,6 +68,7 @@ function stopAll() {
 watchUser((user) => {
   stopAll();
   collab.set(null, null);
+  feedback.reset();
   if (!user) {
     if (!deleting) update('signed-out');
     return;
@@ -162,6 +165,13 @@ async function deleteAccount() {
   finishDeletion(appStore, localStorage, user.uid, done.shareIds);
 }
 account.setRemover(deleteAccount);
+
+// Send feedback (job #69): saved with the signed-in person's uid and email.
+feedback.setSender(async (text) => {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+  await sendFeedback(user, text);
+});
 
 flushWhenHidden(document, window, () => {
   sync?.flush();

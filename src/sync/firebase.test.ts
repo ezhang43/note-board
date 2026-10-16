@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Leaving a shared board online (main session check, 2026-10-06): all or nothing. Firebase itself
 // is replaced by a stand-in that records what would be written.
 
-const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; committed: boolean }[], deleteDoc: [] as string[], fail: false }));
+const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; committed: boolean }[], deleteDoc: [] as string[], added: [] as { ref: string; data: unknown }[], fail: false }));
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/auth', () => ({
@@ -38,18 +38,37 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(),
   onSnapshot: vi.fn(),
   runTransaction: vi.fn(),
-  serverTimestamp: vi.fn(),
+  serverTimestamp: () => 'SERVER_TIME',
   setDoc: vi.fn(),
   updateDoc: vi.fn(),
+  addDoc: async (ref: string, data: unknown) => {
+    if (calls.fail) throw Object.assign(new Error('denied'), { code: 'permission-denied' });
+    calls.added.push({ ref, data });
+  },
 }));
 
-const { collabRemote } = await import('./firebase');
+const { collabRemote, sendFeedback } = await import('./firebase');
 const user = { uid: 'u1', displayName: 'Bob', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
 beforeEach(() => {
   calls.batches = [];
   calls.deleteDoc = [];
+  calls.added = [];
   calls.fail = false;
+});
+
+describe('sending feedback online (job #69)', () => {
+  const eve = { uid: 'u1', email: 'eve@example.com' } as unknown as Parameters<typeof sendFeedback>[0];
+
+  it('adds one note to the feedback collection: the text, who sent it and when, nothing else', async () => {
+    await sendFeedback(eve, 'Love it');
+    expect(calls.added).toEqual([{ ref: 'feedback', data: { text: 'Love it', uid: 'u1', email: 'eve@example.com', sentAt: 'SERVER_TIME' } }]);
+  });
+
+  it('passes on a refusal, so the panel can say it didn’t send', async () => {
+    calls.fail = true;
+    await expect(sendFeedback(eve, 'Love it')).rejects.toThrow();
+  });
 });
 
 describe('leaving a shared board online', () => {

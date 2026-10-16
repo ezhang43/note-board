@@ -34,6 +34,32 @@ const saved = (storage: { data: Record<string, string> }) => {
   return readWorkspace(storage.data[BOARD_KEY])!.ws;
 };
 
+describe('Ctrl+arrow board switching (owner request, 2026-10-16)', () => {
+  it('moveBoard opens the next / previous / parent / first sub-board and says which; nothing at an end', () => {
+    const { s } = setup();
+    s.renameBoard('Home');
+    const home = s.getState().boards.open;
+    const inner = s.addBoardCard(); // Home > inner
+    s.openBoard(inner);
+    s.renameBoard('Trips');
+    s.openBoard(home);
+    const other = s.newBoard();
+    s.renameBoard('Recipes');
+    s.openBoard(home);
+    expect(s.moveBoard('previous')).toBeNull();
+    expect(s.moveBoard('up')).toBeNull();
+    expect(s.moveBoard('down')).toBe(inner);
+    expect(s.getState().boards.open).toBe(inner);
+    expect(s.moveBoard('down')).toBeNull();
+    expect(s.moveBoard('next')).toBe(other);
+    expect(s.getState().boards.open).toBe(other);
+    expect(s.moveBoard('next')).toBeNull();
+    expect(s.moveBoard('previous')).toBe(inner);
+    expect(s.moveBoard('up')).toBe(home);
+    expect(s.getState().boards.open).toBe(home);
+  });
+});
+
 describe('several boards', () => {
   it('New board opens a fresh, unnamed board; the first board is kept; both are saved', () => {
     const { storage, s } = setup();

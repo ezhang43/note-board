@@ -2,6 +2,7 @@
 <!--
   Draft for the owner to review; not legal advice.
   Written from what the code does (src/sync/firebase.ts, src/store/collab.ts, firestore.rules, public/sw.js) on 2026-10-06.
+  Feedback (job #69) added on 2026-10-16.
   The owner's details were filled in on 2026-10-07. Update this page whenever what is stored changes.
 -->
 <html lang="en">
@@ -33,12 +34,12 @@
     <main class="text">
       <div class="page-head">
         <h1>Privacy policy</h1>
-        <p class="updated">Effective from October 6, 2026</p>
+        <p class="updated">Effective from October 16, 2026</p>
       </div>
 
       <h2>The short version</h2>
       <ul>
-        <li>BusyAnts stores your boards and the few details from your Google account it needs to sign you in and show who you share a board with.</li>
+        <li>BusyAnts stores your boards and the few details from your Google account it needs to sign you in and show who you share a board with, plus any feedback you choose to send.</li>
         <li>Your boards are private to you, unless you share one.</li>
         <li>No ads, no analytics or tracking, and your data is never sold or given to anyone for marketing.</li>
       </ul>
@@ -55,6 +56,8 @@
       <p>Earlier copies of your boards, saved automatically as you work, so you can look at or restore an old version. The newest 100 are kept; older ones are deleted.</p>
       <h3>Shared boards</h3>
       <p>When you share a board, or open a board shared with you, these are stored with it: the board and the boards inside it, who shared it, the current link, and a list of the people who have it, with each person's Google name, profile photo address, when they joined and the link they joined with. Your own account also keeps a list of the shared boards you have. Everyone a board is shared with can see everything on that board and the names and photos of the others who have it.</p>
+      <h3>Feedback you send</h3>
+      <p>If you send feedback (File, then Send feedback…), what you wrote is stored with your email address, your account number and the time you sent it, so the maker can read it and reply to you. Nothing else is sent with it.</p>
 
       <h2>What is kept on your device</h2>
       <p>A copy of your boards, your version history and your sign-in, so BusyAnts opens quickly and works offline; which board is open and where you were on it; your light or dark choice and focus timer settings; and a copy of the site's files for offline use. These stay in your browser and can be removed by clearing this site's data in your browser's settings.</p>
@@ -64,7 +67,7 @@
 
       <h2>Where it is kept, and who helps run it</h2>
       <ul>
-        <li><strong>Google Firebase</strong> (Firebase Authentication and Cloud Firestore, run by Google) stores your account details and boards, in Cloud Firestore in australia-southeast1 (Sydney, Australia). Google also handles sign-in data in its own data centers. BusyAnts is run from the United States and your data is stored in Australia, so it may be processed outside your own country.</li>
+        <li><strong>Google Firebase</strong> (Firebase Authentication and Cloud Firestore, run by Google) stores your account details, boards and any feedback you send, in Cloud Firestore in australia-southeast1 (Sydney, Australia). Google also handles sign-in data in its own data centers. BusyAnts is run from the United States and your data is stored in Australia, so it may be processed outside your own country.</li>
         <li><strong>GitHub Pages</strong> (run by GitHub) serves the site's pages and files. Like any web host, it receives your IP address and browser details when a page loads.</li>
         <li><strong>Google Calendar</strong> (run by Google) holds your calendar events, if you use the calendar panel; BusyAnts reads and changes them there and keeps no copy.</li>
         <li><strong>Google Fonts</strong> supplies the typefaces, so Google also receives your IP address when the fonts load.</li>
@@ -72,11 +75,11 @@
       <p>Each of these follows its own privacy policy. BusyAnts uses no other services, no advertising and no analytics.</p>
 
       <h2>Who can see your data</h2>
-      <p>Only you can read your own boards and version history; the security rules on the database turn everyone else away. A shared board can be read and changed by everyone it is shared with. The maker can technically see stored data in the Firebase console, and only looks when you ask for help or the law requires it.</p>
+      <p>Only you can read your own boards and version history; the security rules on the database turn everyone else away. A shared board can be read and changed by everyone it is shared with. Feedback you send can’t be read by anyone through BusyAnts, including you; only the maker reads it, in the Firebase console. The maker can technically see stored data in the Firebase console, and only looks when you ask for help or the law requires it.</p>
 
       <h2>How long it is kept</h2>
-      <p>Your boards and version history are kept for as long as you use BusyAnts. A board you delete leaves your online copy at the next save, though it may stay in your version history until it becomes older than the newest 100 versions. A shared board deleted by the person who shared it is deleted for everyone.</p>
-      <p>When you delete your account, everything stored online for it is deleted straight away: your boards, version history, the boards you shared (for everyone), your name and photo on shared boards, and your sign-in. Copies in the service's own safety backups, if any were made, are deleted as those backups expire, within 90 days.</p>
+      <p>Your boards and version history are kept for as long as you use BusyAnts. A board you delete leaves your online copy at the next save, though it may stay in your version history until it becomes older than the newest 100 versions. A shared board deleted by the person who shared it is deleted for everyone. Feedback you send is kept until the maker deletes it; to have yours deleted sooner, email <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a> and it will be deleted within 30 days of your request.</p>
+      <p>When you delete your account, everything stored online for it is deleted straight away: your boards, version history, the boards you shared (for everyone), your name and photo on shared boards, and your sign-in. Feedback is the exception: it is kept apart from your account, so deleting your account doesn’t remove it; email to have it deleted, as above. Copies in the service's own safety backups, if any were made, are deleted as those backups expire, within 90 days.</p>
 
       <h2>Your choices</h2>
       <ul>

@@ -269,7 +269,7 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
 
   await page.goto('/privacy/');
   const privacy = page.locator('main');
-  await expect(privacy).toContainText('Effective from October 6, 2026');
+  await expect(privacy).toContainText('Effective from October 16, 2026');
   await expect(privacy).toContainText('australia-southeast1 (Sydney, Australia)');
   await expect(privacy).toContainText('may be processed outside your own country');
   await expect(privacy).not.toContainText('us-central');
@@ -279,6 +279,10 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
   // The Google Calendar panel asks for calendar access, so the policy says what it does with it.
   await expect(privacy.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
   await expect(privacy).toContainText('never saved with your boards');
+  // Feedback (job #69): stored with your email so the maker can reply; deleted on request.
+  await expect(privacy.getByRole('heading', { name: 'Feedback you send' })).toBeVisible();
+  await expect(privacy).toContainText('stored with your email address');
+  await expect(privacy).toContainText('deleting your account doesn’t remove it');
 
   await page.goto('/faq/');
   await expect(page.locator('#delete + p').getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');

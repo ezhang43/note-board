@@ -25,6 +25,8 @@ export function useShortcuts() {
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
+      // Nothing below acts on the board from inside a panel that covers it (Send feedback, Delete account).
+      if (e.target instanceof Element && e.target.closest('[aria-modal="true"]')) return;
       // Shift+1: fit to screen (as in Figma and Miro), outside text fields.
       if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit1' && !isTextField(e.target)) return run(e, appStore.fitToScreen);
 

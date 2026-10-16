@@ -76,6 +76,8 @@ test('the panel says what goes, offers a backup, and only deletes once DELETE is
   await expect(panel(alice)).toContainText('You leave 1 board someone shared with you; they keep it');
   await expect(panel(alice)).toContainText('Version history');
   await expect(panel(alice)).toContainText('can’t be undone');
+  // Feedback is kept apart from the account (job #69): the panel says so rather than promising it goes.
+  await expect(panel(alice)).toContainText('Feedback you sent isn’t deleted with your account: email ezhang43@gmail.com to have it removed.');
   // Other signed-in devices keep their own copy (owner, 2026-10-16): the panel mustn't promise otherwise.
   await expect(panel(alice)).not.toContainText('every device');
   await expect(panel(alice)).toContainText('Other phones or computers you’re signed in on are signed out but keep the copy saved on them until it’s cleared.');
@@ -196,7 +198,7 @@ test.describe('the Delete your account web page', () => {
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /.{40,}/);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Delete your account');
     const main = page.locator('main');
-    for (const text of ['File', '⋯', 'Delete account…', 'DELETE', 'can\'t be undone', 'deleted for everyone you shared them with']) await expect(main).toContainText(text);
+    for (const text of ['File', '⋯', 'Delete account…', 'DELETE', 'can\'t be undone', 'deleted for everyone you shared them with', 'Feedback you sent isn’t deleted with your account']) await expect(main).toContainText(text);
     await expect(main.getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
     // Headings never skip a level; the nav is the site's usual one.
     const levels = await page.locator('h1, h2, h3').evaluateAll((hs) => hs.map((h) => Number(h.tagName[1])));
@@ -219,6 +221,7 @@ test.describe('the Delete your account web page', () => {
     await expect(page.locator('main')).not.toContainText('there is no button for this yet');
     await page.goto('/faq/');
     await expect(page.locator('#delete + p')).toContainText('File, then Delete account…');
+    await expect(page.locator('#delete + p')).toContainText('Feedback you sent isn’t deleted with it');
   });
 
   test('fits a phone screen without sideways scrolling', async ({ page }) => {

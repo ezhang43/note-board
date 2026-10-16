@@ -19,7 +19,7 @@ function watchOnline(onChange: () => void) {
     window.removeEventListener('offline', onChange);
   };
 }
-const useOnline = () => useSyncExternalStore(watchOnline, () => navigator.onLine);
+export const useOnline = () => useSyncExternalStore(watchOnline, () => navigator.onLine);
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -95,6 +95,7 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
           <li>Your name and photo on shared boards</li>
           <li>Your sign-in to BusyAnts (your Google account itself stays)</li>
         </ul>
+        <p className="delete-account-note">Feedback you sent isn’t deleted with your account: email ezhang43@gmail.com to have it removed.</p>
         <p className="delete-account-backup">
           Backup files you download stay on your device.
           <button type="button" className="tb-button" onClick={downloadBackup}>

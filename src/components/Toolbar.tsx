@@ -16,6 +16,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { account, useAccountRemover } from '../sync/account';
+import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
@@ -91,6 +92,8 @@ export function FileMenu() {
   const board = () => appStore.getState().board;
   // Delete your account (job #63): only where there is an account (signed in, or a demo person).
   const canDeleteAccount = useAccountRemover() !== null;
+  // Send feedback (job #69): likewise only signed in.
+  const canSendFeedback = useFeedbackSender() !== null;
   return (
     <div className="file-menu-wrap" ref={wrap}>
       <button type="button" className="tb-button quiet" aria-haspopup="menu" aria-expanded={open} title="Back up, restore or import" onClick={() => setOpen((o) => !o)}>
@@ -110,6 +113,11 @@ export function FileMenu() {
           <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
             Import file…
           </button>
+          {canSendFeedback && (
+            <button type="button" role="menuitem" onClick={pick(feedback.open)}>
+              Send feedback…
+            </button>
+          )}
           {canDeleteAccount && (
             <button type="button" role="menuitem" className="file-menu-danger" onClick={pick(account.open)}>
               Delete account…

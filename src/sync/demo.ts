@@ -65,7 +65,7 @@ export function demoBackend(person: Person) {
 
 /** Starts editing together for a demo person (local runs only). */
 export async function startDemo(person: Person) {
-  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }, { activeVersionStore }, { deleteAccountData }, { account, finishDeletion }] = await Promise.all([
+  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }, { activeVersionStore }, { deleteAccountData }, { account, finishDeletion }, { feedback }] = await Promise.all([
     import('../store/appStore'),
     import('../store/sharing'),
     import('./collabSession'),
@@ -73,7 +73,13 @@ export async function startDemo(person: Person) {
     import('../store/versions'),
     import('../store/account'),
     import('./account'),
+    import('./feedback'),
   ]);
+  // Send feedback, as on the published site (job #69): the dev server takes the note and drops it.
+  feedback.setSender(async (text) => {
+    const res = await fetch(`${import.meta.env.BASE_URL}__collab/feedback`, { method: 'POST', body: JSON.stringify({ text, uid: person.uid }) });
+    if (!res.ok) throw new Error('Not sent');
+  });
   const backend = demoBackend(person);
   const start = () => {
     const next = startSharing(appStore, backend, {

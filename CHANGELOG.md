@@ -1,5 +1,13 @@
 # Changelog
 
+## Send feedback (2026-10-16)
+
+- Signed in, you can now send the maker a short note: File, then Send feedback… (on a phone: ⋯, then File). Type up to 1000 characters and press Send; you'll see "Thanks — sent." If it can't be sent, a message says so and what you typed stays, so you can try again. Send is off while you're offline. On a slow connection you can close the box while it is still sending; it carries on.
+- The note is stored with your email address so the maker can reply. Only the maker can read it (in the Firebase console); no one can read, change or delete it from the app.
+- The Privacy policy, the Delete your account page, the FAQ and the delete-account panel say that feedback is kept apart from your account, isn't deleted with it, and is deleted within 30 days if you email to ask.
+- Fixed along the way: keys like V, H or Delete no longer change the board hidden behind the Delete account panel.
+- The online database's rules gain a new "feedback" section that only allows sending such a note. The owner must paste the updated `firestore.rules` into the Firebase console before sending works on the live site.
+
 ## Delete your account (2026-10-16)
 
 - Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.

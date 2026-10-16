@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { deleteUser, getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
+  addDoc,
   clearIndexedDbPersistence,
   collection,
   deleteDoc,
@@ -115,6 +116,15 @@ export function accountRemote(user: User, shares: CollabBackend): AccountBackend
     },
     deleteUser: () => deleteUser(user),
   };
+}
+
+/**
+ * Feedback (owner request, job #69): one note in the feedback collection, with who sent it (so the
+ * owner can reply) and when. The rules let a person only add their own; the owner reads them in the
+ * Firebase console. Resolves once the server has it; rejects if it is refused.
+ */
+export function sendFeedback(user: User, text: string) {
+  return addDoc(collection(db, 'feedback'), { text, uid: user.uid, email: user.email, sentAt: serverTimestamp() });
 }
 
 /** Clears this device's offline copy of the online data (after deleting an account; never fails). */

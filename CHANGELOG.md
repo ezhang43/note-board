@@ -1,5 +1,9 @@
 # Changelog
 
+## Play Store screenshots say "container" (2026-10-16)
+
+- The Google Play screenshots were retaken so the toolbar shows "New container" instead of "New column", and the Play kit notes were updated. Nothing in the app changed.
+
 ## Wider cards and containers (2026-10-16)
 
 - Cards and containers can now be made up to 1280 pixels wide (they stopped at 640 before). Dragging a corner, the arrow keys on a resize handle, and "Same width" all use the new limit.

@@ -7,6 +7,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { CloseIcon } from './icons';
+import { panelCovers } from './textField';
 import { usePhone } from './usePhone';
 
 const timeOf = (savedAt: number) => new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -65,7 +66,7 @@ export function HistoryPanel() {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || panelCovers()) return;
       if (appStore.getState().ui.preview) appStore.endPreview();
       else appStore.toggleHistory();
     };

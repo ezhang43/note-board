@@ -263,13 +263,14 @@ for (const p of PAGES) {
 test('the legal pages name BusyAnts, the date, the law and a way to get in touch', async ({ page }) => {
   await page.goto('/terms/');
   const terms = page.locator('main');
-  await expect(terms).toContainText('Effective from October 6, 2026');
+  await expect(terms).toContainText('Effective from October 16, 2026');
+  await expect(terms).toContainText('deleting in the app leaves feedback you sent, which is deleted when you ask by email');
   await expect(terms).toContainText('State of Maryland, United States');
   await expect(terms.getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
 
   await page.goto('/privacy/');
   const privacy = page.locator('main');
-  await expect(privacy).toContainText('Effective from October 6, 2026');
+  await expect(privacy).toContainText('Effective from October 16, 2026');
   await expect(privacy).toContainText('australia-southeast1 (Sydney, Australia)');
   await expect(privacy).toContainText('may be processed outside your own country');
   await expect(privacy).not.toContainText('us-central');
@@ -279,6 +280,14 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
   // The Google Calendar panel asks for calendar access, so the policy says what it does with it.
   await expect(privacy.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
   await expect(privacy).toContainText('never saved with your boards');
+  // Feedback (job #69): stored with your email so the maker can reply; deleted on request.
+  await expect(privacy.getByRole('heading', { name: 'Feedback you send' })).toBeVisible();
+  await expect(privacy).toContainText('stored with your email address');
+  await expect(privacy).toContainText('deleting your account in BusyAnts doesn’t remove it');
+  // Nothing promises "everything" goes without saying feedback stays (it goes only when asked by email).
+  await expect(privacy).toContainText('Delete your account and everything stored online except feedback you sent');
+  await expect(privacy).toContainText('your account and everything stored online for it, feedback included, will be deleted within 30 days');
+  await expect(privacy).not.toContainText('and everything will be deleted');
 
   await page.goto('/faq/');
   await expect(page.locator('#delete + p').getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');

@@ -76,6 +76,9 @@ test('the panel says what goes, offers a backup, and only deletes once DELETE is
   await expect(panel(alice)).toContainText('You leave 1 board someone shared with you; they keep it');
   await expect(panel(alice)).toContainText('Version history');
   await expect(panel(alice)).toContainText('can’t be undone');
+  await expect(panel(alice)).toContainText('everything kept online except feedback you sent');
+  // Feedback is kept apart from the account (job #69): the panel says so rather than promising it goes.
+  await expect(panel(alice)).toContainText('Feedback you sent isn’t deleted with your account: email ezhang43@gmail.com to have it removed.');
   // Other signed-in devices keep their own copy (owner, 2026-10-16): the panel mustn't promise otherwise.
   await expect(panel(alice)).not.toContainText('every device');
   await expect(panel(alice)).toContainText('Other phones or computers you’re signed in on are signed out but keep the copy saved on them until it’s cleared.');
@@ -163,6 +166,32 @@ test('if deleting fails, nothing is deleted on the device and the panel says to 
   expect(kept).toBeGreaterThan(0);
 });
 
+test('board keys don’t act behind the panel: after a failed delete, or after clicking its text', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  const select = alice.getByRole('button', { name: 'Select (V)' });
+  // A shared board, so deleting has to reach the (blocked) server and fails.
+  await shareNewBoard(alice, 'Trip');
+  await alice.route('**/__collab/call', (route) => route.abort());
+  await openPanel(alice);
+  await panel(alice).getByLabel('Type DELETE to confirm').fill('DELETE');
+  await panel(alice).getByRole('button', { name: 'Delete my account' }).click();
+  await expect(panel(alice).getByRole('alert')).toBeVisible();
+  // Focus goes back to the DELETE box, to try again.
+  await expect(panel(alice).getByLabel('Type DELETE to confirm')).toBeFocused();
+  await alice.locator('body').focus();
+  await alice.keyboard.press('v');
+  await expect(select).toHaveAttribute('aria-pressed', 'false');
+  await panel(alice).getByText('Version history').click();
+  await alice.keyboard.press('v');
+  await expect(select).toHaveAttribute('aria-pressed', 'false');
+  await expect(panel(alice)).toBeVisible();
+  // Tab, from the page itself, only reaches the panel (the board behind is inert).
+  for (let i = 0; i < 10; i++) {
+    await alice.keyboard.press('Tab');
+    expect(await panel(alice).evaluate((p) => document.activeElement === document.body || p.contains(document.activeElement))).toBe(true);
+  }
+});
+
 test('offline, the Delete button is off with a note', async ({ browser }) => {
   const alice = await person(browser, `Alice${tag()}`);
   await openPanel(alice);
@@ -196,7 +225,8 @@ test.describe('the Delete your account web page', () => {
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /.{40,}/);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Delete your account');
     const main = page.locator('main');
-    for (const text of ['File', '⋯', 'Delete account…', 'DELETE', 'can\'t be undone', 'deleted for everyone you shared them with']) await expect(main).toContainText(text);
+    for (const text of ['File', '⋯', 'Delete account…', 'DELETE', 'can\'t be undone', 'deleted for everyone you shared them with', 'Feedback you sent isn’t deleted when you delete your account in BusyAnts', 'Everything except feedback you sent is deleted straight away', 'Everything, including feedback you sent, is deleted within 30 days', 'asking by email to delete your account deletes your feedback too']) await expect(main).toContainText(text);
+    await expect(main).not.toContainText('all your data');
     await expect(main.getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
     // Headings never skip a level; the nav is the site's usual one.
     const levels = await page.locator('h1, h2, h3').evaluateAll((hs) => hs.map((h) => Number(h.tagName[1])));
@@ -219,6 +249,9 @@ test.describe('the Delete your account web page', () => {
     await expect(page.locator('main')).not.toContainText('there is no button for this yet');
     await page.goto('/faq/');
     await expect(page.locator('#delete + p')).toContainText('File, then Delete account…');
+    await expect(page.locator('#delete + p')).toContainText('everything saved online except feedback you sent');
+    await expect(page.locator('#delete + p')).toContainText('Feedback you sent isn’t deleted with it');
+    await expect(page.locator('#delete + p')).toContainText('asking by email to delete your account removes it too');
   });
 
   test('fits a phone screen without sideways scrolling', async ({ page }) => {

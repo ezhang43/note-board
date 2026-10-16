@@ -98,5 +98,20 @@ service cloud.firestore {
           && (request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid);
       }
     }
+
+    // ---------- Feedback (job #69) ----------
+    // A signed-in person can send a short note, as themselves, with their own email so the owner can
+    // reply. No one can read, change or delete feedback from the app: the owner reads it in the
+    // Firebase console.
+    match /feedback/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text', 'uid', 'email', 'sentAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 1000
+        && request.resource.data.sentAt == request.time;
+    }
   }
 }

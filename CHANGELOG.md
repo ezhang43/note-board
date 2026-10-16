@@ -1,5 +1,9 @@
 # Changelog
 
+## No "Show the tour again" link (2026-10-16)
+
+- The "Show the tour again" link is gone from the ? shortcuts panel and from the phone ⋯ menu, and the tour's last phone step no longer mentions it. The tour still shows by itself the first time you open the board on a device. Your saved boards are untouched.
+
 ## Delete your account (2026-10-16)
 
 - Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.

@@ -19,8 +19,18 @@ describe('resizing', () => {
 
   it('stays within the size limits', () => {
     expect(resizeTo('card', { w: 50, h: 20 }, [], true)).toMatchObject({ w: 200, h: 100 });
-    expect(resizeTo('card', { w: 5000, h: 5000 }, [], true)).toMatchObject({ w: 640, h: 700 });
+    expect(resizeTo('card', { w: 5000, h: 5000 }, [], true)).toMatchObject({ w: 1280, h: 700 });
+    expect(resizeTo('column', { w: 5000, h: null }, [], true)).toMatchObject({ w: 1280, h: null });
     expect(resizeTo('column', { w: 100, h: null }, [], true)).toMatchObject({ w: 240, h: null });
+  });
+
+  it('cards and columns can be resized past 640 wide, up to 1280', () => {
+    expect(resizeTo('card', { w: 900, h: null }, [], true)).toMatchObject({ w: 900 });
+    expect(resizeTo('column', { w: 1100, h: null }, [], true)).toMatchObject({ w: 1100 });
+    // Keyboard resize asks for the saved width plus a step, without snapping.
+    expect(resizeTo('card', { w: 1260 + 20, h: null }, [], false)).toMatchObject({ w: 1280 });
+    expect(resizeTo('card', { w: 1280 + 100, h: null }, [], false)).toMatchObject({ w: 1280 });
+    expect(resizeTo('column', { w: 1240 + 100, h: null }, [], false)).toMatchObject({ w: 1280 });
   });
 
   it('within 8px of other blocks, matches their size exactly and says so', () => {

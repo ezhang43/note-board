@@ -44,6 +44,23 @@ test('a focused resize handle resizes with the arrow keys', async ({ page }) => 
   await expect.poll(async () => (await box(note)).width).toBeCloseTo(w + 20, 0);
 });
 
+test('a card can be made 1280 wide from the keyboard, and no wider', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  const note = cards(page).first();
+  const width = () => note.evaluate((el) => (el as HTMLElement).offsetWidth);
+  await note.getByRole('button', { name: 'Resize card' }).focus();
+  for (let i = 0; i < 10; i++) await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(width).toBe(1240);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(width).toBe(1280);
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.waitForTimeout(400);
+  expect(await width()).toBe(1280);
+});
+
 test('screen readers hear card and column titles, and "Untitled" when there is none', async ({ page }) => {
   await list(page, 'Groceries', ['milk']);
   await expect(page.getByRole('article', { name: 'Checklist: Groceries' })).toHaveCount(1);

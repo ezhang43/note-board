@@ -187,6 +187,8 @@ test('week and month views, back and forward, and Today', async ({ page }) => {
 });
 
 test('the month grid shows each day’s event names; clicking one opens it; “+n more” lists the day', async ({ page }) => {
+  // A short window: the day's list under the month grid starts below the bottom of the panel.
+  await page.setViewportSize({ width: 1440, height: 600 });
   const errors = await openAs(page);
   await button(page).click();
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
@@ -229,37 +231,151 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   await todayCell.getByRole('button', { name: '+2 more' }).click();
   await expect(todayCell).toHaveAttribute('aria-selected', 'true');
   await expect(day(page, now).locator('.cal-event')).toHaveCount(4);
+  // The list is under the grid, so it is scrolled into view (not left below the bottom of the panel).
+  await expect(day(page, now).locator('h3')).toBeInViewport({ ratio: 1 });
+  await expect(day(page, now).locator('.cal-event').last()).toBeInViewport({ ratio: 1 });
   expect(errors).toEqual([]);
 });
 
-test('the side panel is 560px wide while the Month view is open, back to 300px for Week', async ({ page }) => {
+// Panel width (owner request, 2026-10-16, job #56): roomier defaults, and a handle on the panel's left edge.
+const handle = (page: Page) => page.getByRole('separator', { name: 'Resize calendar' });
+const width = async (page: Page) => (await panel(page).boundingBox())!.width;
+const cornerRight = async (page: Page) => {
+  const box = (await page.locator('.corner-controls').boundingBox())!;
+  return page.viewportSize()!.width - box.x - box.width;
+};
+const viewButton = (page: Page, name: 'Week' | 'Month') => panel(page).getByRole('button', { name, exact: true });
+/** Drags the handle so the panel's left edge is at `x`. */
+async function dragTo(page: Page, x: number) {
+  const box = (await handle(page).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(x, box.y + 200, { steps: 6 });
+  await page.mouse.up();
+}
+
+test('the side panel opens 420px wide for Week and 720px for Month, and other panels stay 300px', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const width = async () => (await panel(page).boundingBox())!.width;
-  const corner = page.locator('.corner-controls');
-  const cornerRight = async () => {
-    const box = (await corner.boundingBox())!;
-    return page.viewportSize()!.width - box.x - box.width;
-  };
-  expect(await width()).toBe(300);
-  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
-  await expect.poll(width).toBe(560);
-  // The zoom control and its buttons move aside to stay clear of the wider panel.
-  await expect.poll(cornerRight).toBe(584);
-  // Cells are about 75px, so timed events show their start time.
+  expect(await width(page)).toBe(420);
+  await viewButton(page, 'Month').click();
+  await expect.poll(() => width(page)).toBe(720);
+  // The zoom control and its buttons move aside to stay clear of the panel.
+  await expect.poll(() => cornerRight(page)).toBe(744);
+  // Cells are about 100px, so timed events show their start time.
   const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(new Date())}`) });
   await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
-  await panel(page).getByRole('button', { name: 'Week', exact: true }).click();
-  await expect.poll(width).toBe(300);
-  await expect.poll(cornerRight).toBe(324);
-  // A narrow window keeps at least 300px of board beside it.
-  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  await viewButton(page, 'Week').click();
+  await expect.poll(() => width(page)).toBe(420);
+  await expect.poll(() => cornerRight(page)).toBe(444);
+  // A narrow window keeps at least 300px of board beside it, and the width comes back when it grows.
+  await viewButton(page, 'Month').click();
   await page.setViewportSize({ width: 760, height: 800 });
-  await expect.poll(width).toBe(460);
-  // Other side panels keep their width.
+  await expect.poll(() => width(page)).toBe(460);
   await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(() => width(page)).toBe(720);
+  // Other side panels keep their width and have no handle.
+  const corner = page.locator('.corner-controls');
   await corner.getByRole('button', { name: 'Focus timer' }).click();
   await expect.poll(async () => (await page.getByRole('complementary', { name: 'Focus timer' }).boundingBox())!.width).toBe(300);
+  await expect(handle(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('dragging the panel’s left edge resizes it, within limits, separately for Week and Month, and it is remembered', async ({ page }) => {
+  const name = `Cal${tag()}`;
+  const errors = await openAs(page, name);
+  await button(page).click();
+  await expect(handle(page)).toBeVisible();
+  await dragTo(page, 1440 - 520);
+  await expect.poll(() => width(page)).toBe(520);
+  await expect.poll(() => cornerRight(page)).toBe(544);
+  // Month has its own width.
+  await viewButton(page, 'Month').click();
+  await expect.poll(() => width(page)).toBe(720);
+  await dragTo(page, 1440 - 900);
+  await expect.poll(() => width(page)).toBe(900);
+  await viewButton(page, 'Week').click();
+  await expect.poll(() => width(page)).toBe(520);
+  // At least 300px, and 300px of board stays visible.
+  await dragTo(page, 1430);
+  await expect.poll(() => width(page)).toBe(300);
+  await dragTo(page, 5);
+  await expect.poll(() => width(page)).toBe(1140);
+  await dragTo(page, 1440 - 480);
+  await expect.poll(() => width(page)).toBe(480);
+  // Remembered on this device: a reload opens at the same widths.
+  await page.reload();
+  await fontsLoaded(page);
+  await button(page).click();
+  await expect.poll(() => width(page)).toBe(480);
+  await viewButton(page, 'Month').click();
+  await expect.poll(() => width(page)).toBe(900);
+  expect(errors).toEqual([]);
+});
+
+test('the resize handle works from the keyboard (arrows, 20px a press) and double-click puts the default back', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const bar = handle(page);
+  await expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+  await expect(bar).toHaveAttribute('aria-valuenow', '420');
+  await expect(bar).toHaveAttribute('aria-valuemin', '300');
+  await expect(bar).toHaveAttribute('aria-valuemax', '1140');
+  await bar.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => width(page)).toBe(440);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => width(page)).toBe(480);
+  await expect(bar).toHaveAttribute('aria-valuenow', '480');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => width(page)).toBe(460);
+  for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(() => width(page)).toBe(300);
+  await bar.dblclick();
+  await expect.poll(() => width(page)).toBe(420);
+  expect(errors).toEqual([]);
+});
+
+test('on a phone-sized screen the calendar is full screen and has no resize handle', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await expect(handle(page)).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(handle(page)).toHaveCount(0);
+  await expect.poll(() => width(page)).toBe(390);
+  expect(errors).toEqual([]);
+});
+
+test('a bad remembered width falls back to the defaults', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('note-board:calendar-width', '{"week":"huge","month":5}'));
+  const errors = await openAs(page);
+  await button(page).click();
+  expect(await width(page)).toBe(420);
+  await viewButton(page, 'Month').click();
+  await expect.poll(() => width(page)).toBe(720);
+  expect(errors).toEqual([]);
+});
+
+test('in the Week view an event’s name wraps onto a second line instead of being cut', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const now = new Date();
+  await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
+  await page.keyboard.type('Quarterly planning review with the whole design and engineering teams');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  const title = day(page, now).locator('.cal-title', { hasText: 'Quarterly planning' });
+  const box = await title.evaluate((el) => ({ height: el.clientHeight, full: el.scrollHeight }));
+  expect(box.height).toBeGreaterThan(24); // two lines
+  expect(box.full).toBeLessThanOrEqual(box.height); // nothing cut off
+  // A name too long for two lines is cut after the second.
+  await day(page, now).getByRole('button', { name: /Quarterly planning/ }).click();
+  await form(page).getByLabel('Title').fill('word '.repeat(60));
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  const long = await day(page, now).locator('.cal-title', { hasText: 'word word' }).evaluate((el) => ({ height: el.clientHeight, full: el.scrollHeight }));
+  expect(long.height).toBeLessThan(44);
+  expect(long.full).toBeGreaterThan(long.height);
   expect(errors).toEqual([]);
 });
 

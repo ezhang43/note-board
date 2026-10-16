@@ -1,5 +1,11 @@
 # Changelog
 
+## The calendar panel can be resized, and is roomier (2026-10-16)
+
+- On a computer, drag the left edge of the Google Calendar panel to make it wider or narrower (or focus the edge and use the left and right arrow keys; double-click puts the usual width back). Week and Month remember their own widths on this device. Some board always stays visible.
+- The panel now opens wider: 420px for Week (was 300) and 720px for Month (was 560). In the Week view an event's name can wrap onto a second line, so it is easier to read.
+- Fixed: clicking "+n more" (or a day) in the Month view looked like it did nothing, because the day's list sits under the grid, out of sight. The panel now scrolls to it.
+
 ## Low-risk crew workers use Sonnet (2026-10-15)
 
 - As a trial to save tokens, crew workers on low-risk jobs now run on the cheaper Sonnet model, at high effort. High-risk jobs (saving, sync, undo, deleting) and pull request checks stay on the stronger default model.

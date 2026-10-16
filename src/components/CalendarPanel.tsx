@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import {
   cellLines,
   cellTime,
@@ -9,6 +9,9 @@ import {
   monthGrid,
   moveDraftStart,
   newDraft,
+  clampPanelWidth,
+  PANEL_MIN,
+  PANEL_STEP,
   rangeLabel,
   timeLabel,
   weekDays,
@@ -60,6 +63,8 @@ export function CalendarPanel() {
   const s = useCalendar();
   const [editing, setEditing] = useState<{ event: CalEvent | null; draft: Draft } | null>(null);
   const [viewing, setViewing] = useState<CalEvent | null>(null);
+  // Set when a day is picked in the Month grid: its list sits under the grid, so it is scrolled into view (job #56).
+  const reveal = useRef(false);
   const today = dayKey(new Date());
   const unit = s.view === 'week' ? 'week' : 'month';
 
@@ -68,7 +73,7 @@ export function CalendarPanel() {
 
   const pick = (e: CalEvent) => (e.editable ? setEditing({ event: e, draft: draftFor(e) }) : setViewing(e));
   const dayList = (day: DayKey) => (
-    <DayEvents key={day} day={day} today={day === today} events={s.events ?? []} onPick={pick} onAdd={() => setEditing({ event: null, draft: newDraft(day) })} />
+    <DayEvents key={day} day={day} today={day === today} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={() => setEditing({ event: null, draft: newDraft(day) })} />
   );
 
   return (
@@ -115,7 +120,7 @@ export function CalendarPanel() {
           weekDays(s.day).map(dayList)
         ) : (
           <>
-            <MonthGrid day={s.day} today={today} events={s.events} onPick={pick} />
+            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} />
             {dayList(s.day)}
           </>
         ))}
@@ -123,11 +128,32 @@ export function CalendarPanel() {
   );
 }
 
-function DayEvents({ day, today, events, onPick, onAdd }: { day: DayKey; today: boolean; events: CalEvent[]; onPick: (e: CalEvent) => void; onAdd: () => void }) {
+function DayEvents({
+  day,
+  today,
+  events,
+  reveal,
+  onPick,
+  onAdd,
+}: {
+  day: DayKey;
+  today: boolean;
+  events: CalEvent[];
+  reveal: RefObject<boolean>;
+  onPick: (e: CalEvent) => void;
+  onAdd: () => void;
+}) {
   const label = dayLabel(day);
   const list = eventsOnDay(events, day);
+  const section = useRef<HTMLElement>(null);
+  // Picking a day in the Month grid shows its list (under the grid, maybe below the visible part of the panel).
+  useEffect(() => {
+    if (!reveal.current) return;
+    reveal.current = false;
+    section.current?.scrollIntoView({ block: 'nearest' });
+  });
   return (
-    <section className={`cal-day${today ? ' today' : ''}`} aria-label={label}>
+    <section ref={section} className={`cal-day${today ? ' today' : ''}`} aria-label={label}>
       <h3>
         {label}
         {today && <span className="cal-today">· Today</span>}
@@ -155,7 +181,7 @@ function DayEvents({ day, today, events, onPick, onAdd }: { day: DayKey; today: 
 /** Cells under this width keep two lines, names only: a time leaves no room for the name. */
 const NARROW_CELL = 70;
 
-function MonthGrid({ day, today, events, onPick }: { day: DayKey; today: DayKey; events: CalEvent[]; onPick: (e: CalEvent) => void }) {
+function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today: DayKey; events: CalEvent[]; reveal: RefObject<boolean>; onPick: (e: CalEvent) => void }) {
   const month = day.slice(0, 7);
   const [narrow, setNarrow] = useState(true);
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
@@ -185,7 +211,10 @@ function MonthGrid({ day, today, events, onPick }: { day: DayKey; today: DayKey;
             const count = list.length;
             const name = `${dayLabel(d)}${count ? `, ${count} ${count === 1 ? 'event' : 'events'}` : ''}`;
             const classes = ['cal-cell', d.slice(0, 7) !== month && 'outside', d === today && 'today'].filter(Boolean).join(' ');
-            const pickDay = () => void calendar.pickDay(d);
+            const pickDay = () => {
+              reveal.current = true;
+              void calendar.pickDay(d);
+            };
             return (
               // The whole cell picks its day; the date is the button for the keyboard (buttons can't hold the event buttons).
               <div key={d} role="gridcell" className={classes} aria-selected={d === day} aria-label={name} onClick={pickDay}>
@@ -340,5 +369,47 @@ function EventForm({ event, start, onDone }: { event: CalEvent | null; start: Dr
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * A strip on the panel's left edge to drag (or use the arrow keys on) to make the panel wider or
+ * narrower; double-click puts the usual width back (owner request, 2026-10-16). Week and Month keep
+ * their own widths. Not part of the panel itself, which scrolls and would clip it.
+ */
+export function CalendarResizeHandle() {
+  const s = useCalendar();
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const set = (width: number) => calendar.setWidth(s.view, clampPanelWidth(width, window.innerWidth));
+  const now = clampPanelWidth(s.widths[s.view], windowWidth);
+  return (
+    <div
+      className="cal-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize calendar"
+      aria-valuemin={PANEL_MIN}
+      aria-valuemax={Math.max(PANEL_MIN, windowWidth - PANEL_MIN)}
+      aria-valuenow={now}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && set(window.innerWidth - e.clientX)}
+      onDoubleClick={() => calendar.resetWidth(s.view)}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        // Not a board shortcut: the arrows must not nudge selected blocks.
+        e.preventDefault();
+        e.stopPropagation();
+        set(now + (e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP));
+      }}
+    />
   );
 }

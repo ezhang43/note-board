@@ -19,7 +19,7 @@ export function CompletedButton({ labelled = false, onOpen }: { labelled?: boole
   return (
     <button
       type="button"
-      className={[labelled ? 'tb-button' : 'help-button', findTarget && 'find-target'].filter(Boolean).join(' ')}
+      className={[labelled ? 'tb-button' : 'help-button dock-tool', findTarget && 'find-target'].filter(Boolean).join(' ')}
       aria-label="Completed"
       title="Completed items"
       aria-pressed={open}
@@ -29,7 +29,7 @@ export function CompletedButton({ labelled = false, onOpen }: { labelled?: boole
       }}
     >
       <CompletedIcon />
-      {labelled && 'Completed'}
+      Completed
     </button>
   );
 }

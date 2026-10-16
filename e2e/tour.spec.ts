@@ -126,7 +126,8 @@ test('it works in dark mode', async ({ page }) => {
   await open(page);
   await expect(tour(page)).toBeVisible();
   const bg = await tour(page).evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(bg).toBe('rgb(43, 41, 38)');
+  // The Honey Workshop dark panel colour (2026-10-16).
+  expect(bg).toBe('rgb(36, 34, 30)');
 });
 
 test.describe('on a phone', () => {

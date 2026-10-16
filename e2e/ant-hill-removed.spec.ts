@@ -1,12 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, clickEmpty, freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
 // Owner request (2026-10-06): the ant hill is gone. No hill on the board, before or after Clean up,
 // and Clean up still moves ticked items into Completed as before (now a panel, Job #51).
 
-const cleanUpButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Clean up', exact: true });
+// The toolbar's Clean up, in the Arrange menu (opened first).
+const cleanUpButton = async (page: Page) => (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true });
 const anyHill = (page: Page) => page.locator('.ant-hill, .hill-ant, .hill-caption');
 
 test('there is no ant hill on the board, and Clean up still fills the Completed panel', async ({ page }) => {
@@ -21,7 +22,7 @@ test('there is no ant hill on the board, and Clean up still fills the Completed 
   await list.getByLabel('Item text').first().click();
   await page.keyboard.type('milk');
   await list.getByLabel('Done').first().click();
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
 
   await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
   const done = page.getByRole('complementary', { name: 'Completed' });

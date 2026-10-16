@@ -52,6 +52,16 @@ async function bobJoins(browser: Browser, link: string, name: string) {
   return bob;
 }
 
+test('the Share this board button keeps its own honey look, not the toolbar Container button’s', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  // The home board can't be shared, so open a new one.
+  await alice.getByRole('button', { name: 'Boards', exact: true }).click();
+  await alice.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'New board' }).click();
+  await openShare(alice);
+  await expect(sharePanel(alice).getByRole('button', { name: 'Share this board' })).toHaveCSS('background-color', 'rgb(138, 90, 0)');
+  await alice.context().close();
+});
+
 test('Alice shares a board by link; Bob opens it, and what each one does shows on the other’s screen', async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`);

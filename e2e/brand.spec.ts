@@ -5,15 +5,15 @@ import { freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
-test('the toolbar shows the BusyAnts ant and is honey-colored, with the window bar to match', async ({ page }) => {
+test('the toolbar shows the BusyAnts ant and is warm cream (Honey Workshop, 2026-10-16), with the window bar to match', async ({ page }) => {
   const toolbar = page.locator('.toolbar');
   await expect(toolbar.getByRole('link', { name: 'BusyAnts website' }).locator('img.toolbar-logo')).toBeVisible();
-  await expect(toolbar).toHaveCSS('background-color', 'rgb(255, 241, 194)');
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#FFF1C2');
+  await expect(toolbar).toHaveCSS('background-color', 'rgb(255, 253, 248)');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#FFFDF8');
 });
 
-test('dark mode keeps a warm, darker honey toolbar', async ({ page }) => {
+test('dark mode keeps a warm, dark toolbar', async ({ page }) => {
   await page.getByRole('button', { name: /dark mode/i }).click();
-  await expect(page.locator('.toolbar')).toHaveCSS('background-color', 'rgb(42, 36, 22)');
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#2A2416');
+  await expect(page.locator('.toolbar')).toHaveCSS('background-color', 'rgb(36, 34, 30)');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#24221E');
 });

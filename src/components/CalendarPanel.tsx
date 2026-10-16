@@ -39,7 +39,7 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
   return (
     <button
       type="button"
-      className={labelled ? 'tb-button' : 'help-button'}
+      className={labelled ? 'tb-button' : 'help-button dock-tool'}
       aria-label="Google Calendar"
       title="Google Calendar"
       aria-pressed={open}
@@ -51,7 +51,7 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
       }}
     >
       <CalendarDaysIcon />
-      {labelled && 'Google Calendar'}
+      {labelled ? 'Google Calendar' : 'Calendar'}
     </button>
   );
 }

@@ -58,6 +58,8 @@ export function TodoBody({ card }: { card: TodoCard }) {
               <ChevronIcon collapsed={!card.completedOpen} />
               Completed
             </button>
+            {/* Only while the Completed row is open (owner decision 2026-10-16). */}
+            {card.completedOpen && (
             <div className="completed-actions">
               <button type="button" className="uncheck-all" title="Move this list's ticked items into the Completed panel, under today's date" onClick={() => appStore.cleanUpList(card.id)}>
                 Clean up
@@ -66,6 +68,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
                 Uncheck all
               </button>
             </div>
+            )}
           </div>
           {card.completedOpen &&
             flatten(done).map(({ item, depth }) => <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />)}

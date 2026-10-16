@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, arrange, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
 
 // Completed panel (Job #51, owner OK 2026-10-15): the board's Completed card is no longer drawn on
 // the board. Its contents show in a Completed panel, opened by a round button next to Version history (a line in
@@ -7,7 +7,8 @@ import { add, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
-const cleanUpButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Clean up', exact: true });
+// The toolbar's Clean up, in the Arrange menu (opened first).
+const cleanUpButton = async (page: Page) => (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true });
 const completedButton = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true });
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Completed' });
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
@@ -32,7 +33,7 @@ const tick = (list: Locator, text: string) =>
 test('Clean up fills the Completed panel, not the board; unticking there sends an item back, one undo step', async ({ page }) => {
   const groceries = await makeList(page, 'Groceries', ['bread', 'milk', 'eggs']);
   await tick(groceries, 'milk');
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   expect(await texts(groceries)).toEqual(['bread', 'eggs']);
 
   // Nothing new on the board, and the panel stays shut until asked for.
@@ -80,7 +81,7 @@ test('sub-items show under their item, and the newest day comes first', async ({
   await page.keyboard.type('socks');
   await page.keyboard.press('Tab');
   await tick(list, 'pack');
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   await completedButton(page).click();
   await expect(panel(page).locator('.completed-text')).toHaveText(['pack', 'socks']);
   await expect(panel(page).locator('.completed-from')).toHaveText(['Trip']);
@@ -89,7 +90,7 @@ test('sub-items show under their item, and the newest day comes first', async ({
 test('Find points at the Completed button while the panel is shut, and marks the text when it is open', async ({ page }) => {
   const list = await makeList(page, 'Shop', ['milk', 'bread']);
   await tick(list, 'milk');
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   await page.keyboard.press('Control+f');
   await page.getByRole('searchbox', { name: 'Search the board' }).fill('milk');
   const status = page.getByRole('search').getByRole('status');
@@ -104,7 +105,7 @@ test('Find points at the Completed button while the panel is shut, and marks the
 test('a Completed card saved in a column (an older board) is not drawn and not counted', async ({ page }) => {
   const list = await makeList(page, 'Shop', ['milk', 'bread']);
   await tick(list, 'milk');
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   await clickEmpty(page);
   await add(page, 'New container');
   await page.keyboard.type('Later');

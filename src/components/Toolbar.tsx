@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
@@ -19,13 +19,14 @@ import { account, useAccountRemover } from '../sync/account';
 import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
-import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
+import { ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   const drag = useNewCardDrag(kind);
   return (
     <button type="button" className={`tb-button add-${kind}`} title={`Click to add a ${label.toLowerCase()}, or drag it onto the board`} {...drag}>
+      {kind === 'note' ? <NoteIcon /> : <ChecklistIcon />}
       {label}
     </button>
   );
@@ -35,9 +36,9 @@ function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
 function NewColumnButton() {
   const drag = useNewCardDrag('column');
   return (
-    <button type="button" className="tb-button add-column" title="Click to add a container, or drag it onto the board" {...drag}>
-      <PlusIcon />
-      New container
+    <button type="button" className="tb-button add-column" aria-label="New container" title="Click to add a container, or drag it onto the board" {...drag}>
+      <ContainerIcon />
+      Container
     </button>
   );
 }
@@ -71,19 +72,32 @@ export function downloadBackup() {
  * File menu (owner request): download the board as a backup file (everything, to restore later)
  * or as readable text (Markdown); restore a backup; import cards from another app's file.
  */
-export function FileMenu() {
+/**
+ * A toolbar popover (File, Arrange): a click anywhere else closes it; Escape closes it and puts
+ * focus back on its button (the first button in the wrap).
+ */
+function usePopover() {
   const [open, setOpen] = useState(false);
-  const importer = useRef<HTMLInputElement>(null);
-  const backup = useRef<HTMLInputElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-
-  // A click anywhere else closes the menu.
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
     window.addEventListener('pointerdown', away, true);
     return () => window.removeEventListener('pointerdown', away, true);
   }, [open]);
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || !open) return;
+    e.stopPropagation();
+    setOpen(false);
+    wrap.current?.querySelector('button')?.focus();
+  };
+  return { open, setOpen, wrap, onKeyDown };
+}
+
+export function FileMenu() {
+  const { open, setOpen, wrap, onKeyDown } = usePopover();
+  const importer = useRef<HTMLInputElement>(null);
+  const backup = useRef<HTMLInputElement>(null);
 
   const pick = (action: () => void) => () => {
     setOpen(false);
@@ -92,11 +106,10 @@ export function FileMenu() {
   const board = () => appStore.getState().board;
   // Delete your account (job #63): only where there is an account (signed in, or a demo person).
   const canDeleteAccount = useAccountRemover() !== null;
-  // Send feedback (job #69): likewise only signed in.
-  const canSendFeedback = useFeedbackSender() !== null;
   return (
-    <div className="file-menu-wrap" ref={wrap}>
+    <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
       <button type="button" className="tb-button quiet" aria-haspopup="menu" aria-expanded={open} title="Back up, restore or import" onClick={() => setOpen((o) => !o)}>
+        <FileIcon />
         File
       </button>
       {open && (
@@ -113,11 +126,6 @@ export function FileMenu() {
           <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
             Import file…
           </button>
-          {canSendFeedback && (
-            <button type="button" role="menuitem" onClick={pick(feedback.open)}>
-              Send feedback…
-            </button>
-          )}
           {canDeleteAccount && (
             <button type="button" role="menuitem" className="file-menu-danger" onClick={pick(account.open)}>
               Delete account…
@@ -179,8 +187,30 @@ export function FileMenu() {
 }
 
 /**
- * Color button: recolors the selected columns, and the title band of the selected cards (cards
- * themselves are always white). Its menu opens even with nothing selected: the swatches and Default
+ * Feedback (owner decision 2026-10-16): its own button, next to File on a computer and a row in
+ * ⋯ More on a phone. It opens Send feedback (job #69), offered only when signed in.
+ */
+export function FeedbackButton({ onOpen }: { onOpen?: () => void }) {
+  if (useFeedbackSender() === null) return null;
+  return (
+    <button
+      type="button"
+      className="tb-button quiet"
+      title="Send feedback"
+      onClick={() => {
+        onOpen?.();
+        feedback.open();
+      }}
+    >
+      <FeedbackIcon />
+      Feedback
+    </button>
+  );
+}
+
+/**
+ * Color button: recolors the selected columns, and lightly tints the header of the selected cards
+ * (cards themselves are always white). Its menu opens even with nothing selected: the swatches and Default
  * are then faded and do nothing, and Auto-color (every column a different color) still works.
  */
 export function ColourControl() {
@@ -217,7 +247,7 @@ export function ColourControl() {
         type="button"
         className="tb-button"
         aria-label="Color of selected cards and containers"
-        title={count ? "Color the selected containers, or the selected cards' title bands" : 'Color menu: select a card or container to color it, or use Auto-color'}
+        title={count ? "Color the selected containers, or tint the selected cards' headers" : 'Color menu: select a card or container to color it, or use Auto-color'}
         aria-expanded={open}
         onClick={appStore.toggleColourMenu}
       >
@@ -381,6 +411,31 @@ export function ToolGroup() {
   );
 }
 
+/**
+ * Arrange menu (owner decision 2026-10-16): Snap to grid, Collapse all, Same width and Clean up in
+ * one small popover. Clicks inside keep it open (Snap shows its new state); a click elsewhere closes it.
+ */
+function ArrangeMenu() {
+  const { open, setOpen, wrap, onKeyDown } = usePopover();
+  return (
+    <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
+      <button type="button" className="tb-button quiet" aria-expanded={open} title="Snap to grid, collapse, same width, clean up" onClick={() => setOpen((o) => !o)}>
+        <ArrangeIcon />
+        Arrange
+        <CaretIcon />
+      </button>
+      {open && (
+        <div className="file-menu" role="group" aria-label="Arrange">
+          <SnapButton />
+          <CollapseAllButton labelled />
+          <SameWidthButton labelled />
+          <CleanUpButton />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SnapButton() {
   const snap = useAppState((s) => s.board.snap);
   return (
@@ -464,14 +519,6 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       </button>
 
       <div className="toolbar-divider" aria-hidden="true" />
-
-      <SnapButton />
-
-      <ColourControl />
-      <CollapseAllButton />
-      <SameWidthButton />
-
-      <div className="toolbar-divider" aria-hidden="true" />
       <span className="toolbar-label">Add</span>
 
       <AddCardButton kind="note" label="Note" />
@@ -479,8 +526,12 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <NewColumnButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
+      <ColourControl />
+      <ArrangeMenu />
       <FileMenu />
-      <CleanUpButton />
+      <FeedbackButton />
+
+      <div className="toolbar-divider" aria-hidden="true" />
       <DarkModeButton />
       <ShareButton />
 

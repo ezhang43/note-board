@@ -98,7 +98,7 @@ test.describe('on a phone-sized screen', () => {
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
     await expect(page.getByRole('menuitem', { name: 'Link' })).toHaveCount(0);
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    for (const kind of ['Note', 'Sub-board', 'Column']) {
+    for (const kind of ['Note', 'Sub-board', 'Container']) {
       await bar.getByRole('button', { name: 'Add', exact: true }).tap();
       await page.getByRole('menuitem', { name: kind, exact: true }).tap();
     }
@@ -128,7 +128,7 @@ test.describe('on a phone-sized screen', () => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     const menu = page.getByRole('dialog', { name: 'More' });
     await expect(menu.getByRole('button', { name: 'Auto-color', exact: true })).toHaveCount(0); // not a button of its own
-    await menu.getByRole('button', { name: 'Color of selected cards and columns' }).tap();
+    await menu.getByRole('button', { name: 'Color of selected cards and containers' }).tap();
     const auto = menu.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Auto-color' });
     await expect(auto).toBeVisible();
     await expect(auto).toBeInViewport();
@@ -291,7 +291,7 @@ test.describe('on a phone-sized screen', () => {
   test('a column moves by a quick swipe (the board moves) or by holding first (the column moves)', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'Column' }).tap();
+    await page.getByRole('menuitem', { name: 'Container' }).tap();
     await page.mouse.click(200, 70);
     const col = page.locator('[data-col-id]').first();
     const left = () => col.evaluate((el) => (el as HTMLElement).style.left + ',' + (el as HTMLElement).style.top);

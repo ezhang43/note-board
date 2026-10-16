@@ -73,7 +73,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     <section
       ref={ref}
       data-col-id={id}
-      aria-label={col.title ? `Column: ${col.title}` : 'Untitled column'}
+      aria-label={col.title ? `Container: ${col.title}` : 'Untitled container'}
       className={classes.filter(Boolean).join(' ')}
       style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge, '--col-text': colors.text } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
@@ -86,10 +86,10 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           <AutoSizeInput
             ref={title}
             className="column-title"
-            aria-label="Column title"
+            aria-label="Container title"
             {...boxProps({ columnId: id }, col.style)}
             find={`column:${id}`}
-            placeholder="Column title"
+            placeholder="Container title"
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}
           />
@@ -101,8 +101,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           <button
             type="button"
             className="icon-button"
-            aria-label={col.collapsed ? 'Expand column' : 'Collapse column'}
-            title={col.collapsed ? 'Expand column' : 'Collapse column'}
+            aria-label={col.collapsed ? 'Expand container' : 'Collapse container'}
+            title={col.collapsed ? 'Expand container' : 'Collapse container'}
             aria-expanded={!col.collapsed}
             onClick={() => appStore.toggleCollapsed(id)}
           >
@@ -111,8 +111,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           <button
             type="button"
             className="icon-button block-trash"
-            aria-label="Delete column and its cards"
-            title="Delete column and its cards"
+            aria-label="Delete container and its cards"
+            title="Delete container and its cards"
             onClick={() => appStore.askDeleteColumn(id)}
           >
             <TrashIcon />
@@ -121,16 +121,16 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       </div>
 
       {confirmColumns > 0 && (
-        <div className="confirm" role="alertdialog" aria-label="Delete column?">
+        <div className="confirm" role="alertdialog" aria-label="Delete container?">
           <div className="confirm-title">
             {confirmQuestion(confirmColumns, col.title, confirmCards)}
           </div>
           <div className="confirm-actions">
             <button type="button" className="confirm-cancel" autoFocus onClick={appStore.cancelDelete}>
-              {confirmColumns === 1 ? 'Keep column' : 'Keep columns'}
+              {confirmColumns === 1 ? 'Keep container' : 'Keep containers'}
             </button>
             <button type="button" className="confirm-delete" onClick={appStore.confirmDelete}>
-              {confirmColumns === 1 ? 'Delete column' : 'Delete columns'}
+              {confirmColumns === 1 ? 'Delete container' : 'Delete containers'}
             </button>
           </div>
         </div>
@@ -144,13 +144,13 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         ))}
 
       {/* The width can be changed even when the column is collapsed. */}
-      <button type="button" className="resize-edge" aria-label="Resize column width" onPointerDown={resizePointerDown('column', id, 'width')} onKeyDown={resizeKeyDown('column', id, 'width')} />
+      <button type="button" className="resize-edge" aria-label="Resize container width" onPointerDown={resizePointerDown('column', id, 'width')} onKeyDown={resizeKeyDown('column', id, 'width')} />
       {!col.collapsed && (
         <>
           <button
             type="button"
             className="resize-corner"
-            aria-label="Resize column"
+            aria-label="Resize container"
             onPointerDown={resizePointerDown('column', id, cardIds.length ? 'width' : 'both')}
             onKeyDown={resizeKeyDown('column', id, cardIds.length ? 'width' : 'both')}
           >
@@ -162,9 +162,9 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   );
 });
 
-/** "Delete “Week” and its 2 cards?", or for several columns "Delete 3 columns and their 5 cards?". */
+/** "Delete “Week” and its 2 cards?", or for several containers "Delete 3 containers and their 5 cards?". */
 function confirmQuestion(columns: number, title: string, cards: number): string {
-  const what = columns === 1 ? `“${title || 'Untitled'}”` : `${columns} columns`;
+  const what = columns === 1 ? `“${title || 'Untitled'}”` : `${columns} containers`;
   if (!cards) return `Delete ${what}?`;
   const their = columns === 1 ? 'its' : 'their';
   return `Delete ${what} and ${their} ${cards === 1 ? 'card' : `${cards} cards`}?`;

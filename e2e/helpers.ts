@@ -33,7 +33,7 @@ export const columns = (page: Page) => page.locator('[data-col-id]');
  * Clicks a toolbar Add button. A new to-do list takes the cursor in its title; unless `stayInTitle`,
  * Enter then moves it to the first item, so typing straight after adds items.
  */
-export async function add(page: Page, name: 'Note' | 'Checklist' | 'New column', opts: { stayInTitle?: boolean } = {}) {
+export async function add(page: Page, name: 'Note' | 'Checklist' | 'New container', opts: { stayInTitle?: boolean } = {}) {
   await page.locator('header.toolbar').getByRole('button', { name, exact: true }).click();
   if (name === 'Checklist' && !opts.stayInTitle) {
     await expect(page.locator('.card.selected').getByLabel('List title')).toBeFocused();

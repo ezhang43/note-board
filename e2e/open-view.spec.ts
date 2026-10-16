@@ -24,7 +24,7 @@ async function scrollAway(page: Page) {
 }
 
 test('reopening the board shows its cards and columns, centered, even after scrolling far away', async ({ page }) => {
-  for (const kind of ['Note', 'Checklist', 'New column'] as const) {
+  for (const kind of ['Note', 'Checklist', 'New container'] as const) {
     await clickEmpty(page);
     await add(page, kind);
     await page.keyboard.press('Escape');

@@ -17,9 +17,9 @@ test('typing straight after adding a note, to-do list or column goes into it', a
   await expect(page.getByLabel('Item text').first()).toHaveValue('first item');
 
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.type('Ideas');
-  await expect(page.getByLabel('Column title')).toHaveValue('Ideas');
+  await expect(page.getByLabel('Container title')).toHaveValue('Ideas');
   await expect(cards(page)).toHaveCount(2);
   await expect(columns(page)).toHaveCount(1);
 });
@@ -62,7 +62,7 @@ test('cards in an uncolored column use the usual teal title band', async ({ page
   const loose = page.locator('.card.loose').first();
   const looseBand = await style(loose, '--band');
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await add(page, 'Checklist');
   const inColumn = columns(page).first().locator('.card').first();
   expect(await style(inColumn, '--band')).toBe(looseBand);
@@ -75,7 +75,7 @@ test('Add Note / Checklist are plain buttons (cards are always white); New colum
     expect(await style(b, 'background-color')).toBe(plain);
     await expect(b.locator('.add-dot')).toHaveCount(0);
   }
-  expect(await style(toolbarButton(page, 'New column'), 'background-color')).not.toBe(plain);
+  expect(await style(toolbarButton(page, 'New container'), 'background-color')).not.toBe(plain);
 });
 
 test('the toolbar is grouped by dividers, and rarely used buttons are quiet until hovered', async ({ page }) => {
@@ -99,15 +99,15 @@ test('collapse and delete buttons on cards and columns say what they do when hov
   await expect(page.getByRole('button', { name: 'Collapse card' })).toHaveAttribute('title', 'Collapse card');
   await expect(page.getByRole('button', { name: 'Delete card' })).toHaveAttribute('title', 'Delete card (Ctrl+Z brings it back)');
   await clickEmpty(page);
-  await add(page, 'New column');
-  await expect(page.getByRole('button', { name: 'Collapse column' })).toHaveAttribute('title', 'Collapse column');
-  await expect(page.getByRole('button', { name: 'Delete column and its cards' })).toHaveAttribute('title', 'Delete column and its cards');
+  await add(page, 'New container');
+  await expect(page.getByRole('button', { name: 'Collapse container' })).toHaveAttribute('title', 'Collapse container');
+  await expect(page.getByRole('button', { name: 'Delete container and its cards' })).toHaveAttribute('title', 'Delete container and its cards');
 });
 
 test('the Color menu names the swatch under the pointer, and rings each swatch in its own edge color', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await add(page, 'New container');
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   const menu = page.locator('.colour-menu');
   const sky = menu.getByRole('button', { name: 'Sky' });
   await sky.hover();
@@ -206,13 +206,13 @@ test('"Open link" is faded until the link has an address', async ({ page }) => {
 
 test('the Color menu has bigger swatches and never covers the block being colored', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
-  const button = (await page.getByRole('button', { name: 'Color of selected cards and columns' }).boundingBox())!;
+  const button = (await page.getByRole('button', { name: 'Color of selected cards and containers' }).boundingBox())!;
   // Put the column right under the Color button, where the menu opens.
   await dragTo(page, col, { x: button.x + 200, y: button.y + button.height + 40 });
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   const menu = page.locator('.colour-menu');
   expect((await menu.getByRole('button', { name: 'Sky' }).boundingBox())!.width).toBeGreaterThanOrEqual(32);
   await expect.poll(async () => (await col.boundingBox())!.y).toBeGreaterThan((await menu.boundingBox())!.y + (await menu.boundingBox())!.height);
@@ -250,15 +250,15 @@ test('card and column delete buttons show the same trash can as checklist items,
   await expect(card.getByRole('button', { name: 'Delete card' })).toHaveCSS('color', faint);
 
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  const colDelete = col.getByRole('button', { name: 'Delete column and its cards' });
+  const colDelete = col.getByRole('button', { name: 'Delete container and its cards' });
   expect(await colDelete.locator('svg').innerHTML()).toBe(trash);
   await expect(colDelete).toHaveCSS('color', faint);
 
   await colDelete.click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete column' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete container' }).click();
   await expect(columns(page)).toHaveCount(0);
 
   await card.getByRole('button', { name: 'Delete card' }).click();

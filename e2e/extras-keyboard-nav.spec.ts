@@ -11,7 +11,7 @@ const byId = (page: Page, id: string | null) => page.locator(`[data-card-id="${i
 
 /** A column holding a note and two to-do lists, top to bottom. */
 async function columnOfThree(page: Page) {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   await col.click(header);

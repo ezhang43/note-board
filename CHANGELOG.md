@@ -1,5 +1,9 @@
 # Changelog
 
+## Google Play kit (2026-10-16)
+
+- Drafts for the Google Play listing are in `docs/play-store/`: the store text, Data safety and content rating answers, a checklist for Play Console, and screenshots of a demo board. Nothing in the app changed; `scripts/play-screenshots.mjs` retakes the screenshots.
+
 ## A shorter, punchier About page (2026-10-16)
 
 - The About page no longer has the giant ant. A small picture of a sample board now sits beside the headline and Start button (under them on a phone), and the big board picture further down is gone.

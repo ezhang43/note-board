@@ -3,6 +3,7 @@ import { findMatches, type Match } from '../model/search';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
 import { ArrowIcon, CloseIcon } from './icons';
+import { panelCovers } from './textField';
 
 /** The element to bring into view for a match: its marked text, or what hides it. */
 function targetOf(m: Match): Element | null {
@@ -47,6 +48,8 @@ export function FindBar() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === 'KeyF') {
         e.preventDefault();
+        // Behind a panel that covers the board it does nothing (neither search could be seen).
+        if (panelCovers()) return;
         appStore.openFind();
         input.current?.focus();
         input.current?.select();

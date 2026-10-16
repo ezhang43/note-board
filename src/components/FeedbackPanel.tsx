@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FEEDBACK_MAX, feedbackText } from '../model/feedback';
 import { feedback, useFeedbackPanel, useFeedbackSender, useFeedbackStatus } from '../sync/feedback';
 import { useOnline } from './DeleteAccountPanel';
 import { CloseIcon } from './icons';
+import { useCoverBoard } from './textField';
 
 // Send feedback (owner request, job #69). File → Send feedback… opens it (on a phone ⋯ → File):
 // a short note, sent with the person's email so the owner can reply.
@@ -21,6 +22,13 @@ function Panel() {
   const sent = status === 'sent';
   // Closing works even while sending: the note carries on, and opening again shows how it went.
   const close = feedback.close;
+  const box = useRef<HTMLTextAreaElement>(null);
+  const backdrop = useRef<HTMLDivElement>(null);
+  useCoverBoard(backdrop);
+  // The box is off while sending, which drops focus; after a failure it goes back there, to try again.
+  useEffect(() => {
+    if (status === 'failed') box.current?.focus();
+  }, [status]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && close();
@@ -32,7 +40,7 @@ function Panel() {
   const submit = () => note && feedback.send(note);
 
   return (
-    <div className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div ref={backdrop} className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <section className="shortcuts-panel delete-account" role="dialog" aria-modal="true" aria-label="Send feedback">
         <header className="shortcuts-header">
           <h2>Send feedback</h2>
@@ -54,6 +62,7 @@ function Panel() {
             <label className="delete-account-type">
               Your feedback
               <textarea
+                ref={box}
                 className="feedback-text"
                 autoFocus
                 rows={6}

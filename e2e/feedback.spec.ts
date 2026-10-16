@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded } from './helpers';
+import { add, fontsLoaded } from './helpers';
 
 // Send feedback (owner request, job #69). On the published site it is saved to Firestore with the
 // person's email; here it is tried with a demo person (?demo-user=), whose note goes to the dev
@@ -120,6 +120,65 @@ test('board keys don’t act behind the open box', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.press('v');
   await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('after a failed send the typing goes back to the box, and board keys still don’t act', async ({ page }) => {
+  await demo(page);
+  await page.route('**/__collab/feedback', (route) => route.abort());
+  await openPanel(page);
+  await box(page).fill('Hi');
+  await send(page).click();
+  await expect(panel(page).getByRole('alert')).toBeVisible();
+  await expect(box(page)).toBeFocused();
+  // Clicking the panel's plain text moves focus off the box: V still leaves the board alone.
+  await panel(page).getByText('Sent with your email address').click();
+  await page.keyboard.press('v');
+  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(panel(page)).toBeVisible();
+});
+
+test('while the box is open, Tab can’t reach the board, and Ctrl+F and Ctrl+Z / Ctrl+Y leave the board alone', async ({ page }) => {
+  await demo(page);
+  await add(page, 'Note');
+  await page.keyboard.type('Keep me');
+  await page.keyboard.press('Escape');
+  await openPanel(page);
+  // Even from the page itself (after a click on the panel's text), Tab only reaches the panel.
+  await panel(page).getByText('Sent with your email address').click();
+  const outsidePanel = () => panel(page).evaluate((p) => document.activeElement !== document.body && !p.contains(document.activeElement));
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab');
+    expect(await outsidePanel()).toBe(false);
+  }
+  await page.keyboard.press('Shift+Tab');
+  expect(await outsidePanel()).toBe(false);
+  await page.keyboard.press('Control+f');
+  await expect(page.getByRole('search', { name: 'Search the board' })).toHaveCount(0);
+  // The box undoes its own typing, and undoing past it changes nothing behind.
+  await box(page).click();
+  await page.keyboard.type('Hi');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
+  await expect(box(page)).toHaveValue('');
+  await page.keyboard.press('Control+y');
+  await page.locator('body').focus();
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-card-id]')).toHaveCount(1);
+  await expect(page.getByLabel('Note text')).toHaveValue('Keep me');
+});
+
+test('Escape closes only the box, not the Due panel behind it', async ({ page }) => {
+  await demo(page);
+  await page.getByRole('button', { name: /^Due today and overdue/ }).click();
+  const due = page.getByRole('complementary', { name: 'Due' });
+  await expect(due).toBeVisible();
+  // The Due panel covers the end of the File menu at this width, so the item is pressed with Enter.
+  await page.locator('header.toolbar').getByRole('button', { name: 'File' }).click();
+  await fileMenu(page).getByRole('menuitem', { name: 'Send feedback…' }).press('Enter');
+  await expect(panel(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toHaveCount(0);
+  await expect(due).toBeVisible();
 });
 
 test('offline, Send is off and says why', async ({ page }) => {

@@ -11,6 +11,8 @@ let panelOpen = false;
 // Kept here, not in the panel, so the panel can be closed while a note is on its way (Firestore
 // waits for the server, which can take long on a poor connection) without it being sent twice.
 let status: Status = '';
+// Goes up on each change of account, so a note the last person started can't show its result to the next.
+let generation = 0;
 const listeners = new Set<() => void>();
 const changed = () => listeners.forEach((l) => l());
 
@@ -26,31 +28,37 @@ export const feedback = {
   status: () => status,
   async send(text: string) {
     if (!sender || status === 'sending') return;
+    const mine = generation;
     status = 'sending';
     changed();
+    let next: Status = 'sent';
     try {
       await sender(text);
-      feedback.draft = '';
-      status = 'sent';
     } catch {
       // The draft stays, to try again.
-      status = 'failed';
+      next = 'failed';
     }
+    if (mine !== generation) return;
+    if (next === 'sent') feedback.draft = '';
+    status = next;
     changed();
   },
   isOpen: () => panelOpen,
   open() {
     panelOpen = true;
-    if (status !== 'sending') status = '';
     changed();
   },
   close() {
     panelOpen = false;
+    // How the last note went stays until the panel has shown it and is closed.
+    if (status !== 'sending') status = '';
     changed();
   },
   /** Another account signed in (or none): nothing of the last person's stays on screen. */
   reset() {
+    generation++;
     feedback.draft = '';
+    status = '';
     feedback.close();
   },
   subscribe(listener: () => void) {

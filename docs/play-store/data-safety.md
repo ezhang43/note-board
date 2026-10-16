@@ -3,7 +3,7 @@
 Worked out from the code and `SPEC.md` on 2026-10-16. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
 
 Files checked:
-- `src/sync/firebase.ts` (Google sign-in with Firebase Authentication, Cloud Firestore, offline cache)
+- `src/sync/firebase.ts` (Google sign-in with Firebase Authentication, Cloud Firestore, offline cache; `sendFeedback`: Send feedback saves the note with the person's email and account number, job #69)
 - `src/store/collab.ts` (what other people see when a board is shared: Google name and photo address, never the email)
 - `src/store/sync.ts`, `src/store/versions.ts` (what is saved online: boards and version history)
 - `firestore.rules` (only the owner reads their boards; shared boards only by the people who have them)
@@ -30,10 +30,10 @@ For each type: Collected = yes. Shared = no. Processed ephemerally = no. Require
 | Play category | Data type | Collected? | Why / where it comes from | Purposes |
 | --- | --- | --- | --- | --- |
 | Personal info | Name | Yes | Google account name, kept by Firebase Authentication; shown to people you share a board with | App functionality, Account management |
-| Personal info | Email address | Yes | Google account email, kept by Firebase Authentication; only used to sign in, never shown to others | Account management |
-| Personal info | User IDs | Yes | The Firebase / Google account number, used to store your boards and to tell who has a shared board | App functionality, Account management |
+| Personal info | Email address | Yes | Google account email, kept by Firebase Authentication; used to sign in and saved with feedback the person sends, so the owner can reply; never shown to others | Account management, plus OWNER CHECK: Developer communications (for replying to feedback) |
+| Personal info | User IDs | Yes | The Firebase / Google account number, used to store your boards, to tell who has a shared board, and saved with feedback the person sends | App functionality, Account management |
 | Photos and videos | Photos | OWNER CHECK, recommended: tick "Photos" | Only the web address of the Google profile picture is stored and shown to people you share a board with; the app does not read your photo library or camera. Google's form has no "profile picture" type. Ticking Photos is the cautious, honest choice. | App functionality |
-| App activity | Other user-generated content | Yes | Everything on the boards: names, notes, checklist items, links, colors, positions, plus version history and shared-board lists | App functionality |
+| App activity | Other user-generated content | Yes | Everything on the boards: names, notes, checklist items, links, colors, positions, plus version history and shared-board lists; and the text of feedback the person chooses to send (File → Send feedback…) | App functionality, plus OWNER CHECK for feedback: Developer communications (or App functionality) |
 | Calendar | Calendar events | No (OWNER CHECK) | If the person connects Google Calendar, events go from Google straight to the device and are kept in memory only; BusyAnts keeps no copy and nothing is sent to BusyAnts's own storage. Google counts data as "collected" when it is sent off the device to you or a third party, so this is likely "not collected". If you want to be extra cautious, tick Calendar events as collected, optional, App functionality, not shared. | (App functionality, if ticked) |
 
 Types that are **not** collected (as far as the code shows): approximate or precise location, physical address, phone number, race, political or religious beliefs, financial info, health and fitness, messages (emails, SMS), contacts, audio or video files, files and docs other than the boards, web browsing history, installed apps, app interactions / analytics, crash logs, diagnostics, device or other IDs (advertising ID). The app has no analytics or crash-reporting library.
@@ -54,7 +54,7 @@ OWNER CHECK: if you read it more strictly, you could answer "Yes" for Name and P
 
 - Encrypted in transit: Yes.
 - Data deletion: Yes. In-app Delete account (job #63) and the website "Delete your account" page: mark both "once #63 is live". Before then, deletion by email only; do not tick the in-app option until it ships.
-- Data deleted when requested: everything stored online (account details, boards, version history, shared-board lists) within 30 days at the latest; the policy says so. Note that a board you shared with others is deleted for everyone when its owner deletes it (SPEC "Sharing").
+- Data deleted when requested: everything stored online (account details, boards, version history, shared-board lists) within 30 days at the latest; the policy says so. Feedback the person sent is the one exception to in-app Delete account (it stays, so the owner can still read and answer it); it is deleted when they ask by email, and asking by email to delete the account deletes it too. Note that a board you shared with others is deleted for everyone when its owner deletes it (SPEC "Sharing").
 - Encrypted at rest: not asked by the form. Firebase encrypts at rest by default, but this is Google's setting, not something the code does.
 
 ## The Claude connector and other items asked about

@@ -1,8 +1,9 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { deletionCounts } from '../model/account';
 import { useAppState } from '../store/appStore';
 import { account, useAccountPanel, useAccountRemover } from '../sync/account';
 import { CloseIcon } from './icons';
+import { useCoverBoard } from './textField';
 import { downloadBackup } from './Toolbar';
 
 // Delete your account and data (job #63, required by Google Play). File → Delete account… opens it
@@ -39,6 +40,13 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const close = () => !busy && account.close();
+  const backdrop = useRef<HTMLDivElement>(null);
+  useCoverBoard(backdrop);
+  const field = useRef<HTMLInputElement>(null);
+  // Focus starts in the DELETE box. It is off while deleting, which drops focus; when it comes back (a failure), so does focus.
+  useEffect(() => {
+    if (!busy) field.current?.focus();
+  }, [busy]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === 'Escape' && close();
@@ -64,7 +72,7 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
   };
 
   return (
-    <div className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+    <div ref={backdrop} className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <section className="shortcuts-panel delete-account" role="dialog" aria-modal="true" aria-label="Delete your account">
         <header className="shortcuts-header">
           <h2>Delete your account</h2>
@@ -73,7 +81,7 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
           </button>
         </header>
         <p>
-          This permanently deletes your BusyAnts account, everything kept online and the copy on this device. It can’t be undone. Other
+          This permanently deletes your BusyAnts account, everything kept online except feedback you sent, and the copy on this device. It can’t be undone. Other
           phones or computers you’re signed in on are signed out but keep the copy saved on them until it’s cleared.
         </p>
         <ul>
@@ -104,7 +112,7 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
         </p>
         <label className="delete-account-type">
           Type DELETE to confirm
-          <input autoFocus value={typed} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder="DELETE" disabled={busy} onChange={(e) => setTyped(e.currentTarget.value)} />
+          <input ref={field} value={typed} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder="DELETE" disabled={busy} onChange={(e) => setTyped(e.currentTarget.value)} />
         </label>
         <p className="delete-account-note">Google will ask you to sign in once more, to check it’s you.</p>
         {!online && <p className="delete-account-note">You’re offline. Connect to the internet to delete your account.</p>}

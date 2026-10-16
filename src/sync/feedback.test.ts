@@ -37,9 +37,11 @@ describe('feedback', () => {
     expect(feedback.draft).toBe('Keep me');
   });
 
-  it('opening again starts fresh after a send, but not while one is on its way', async () => {
+  it('closing after seeing how it went starts fresh next time, but not while a note is on its way', async () => {
     feedback.setSender(() => Promise.resolve());
+    feedback.open();
     await feedback.send('Hi');
+    feedback.close();
     feedback.open();
     expect(feedback.status()).toBe('');
     feedback.setSender(() => new Promise(() => {}));
@@ -49,11 +51,55 @@ describe('feedback', () => {
     expect(feedback.status()).toBe('sending');
   });
 
+  it('a note that finishes while the panel is closed shows how it went when opened again', async () => {
+    let fail = () => {};
+    feedback.setSender(() => new Promise<void>((_, reject) => (fail = () => reject(new Error('no')))));
+    feedback.open();
+    const going = feedback.send('Hi');
+    feedback.close();
+    fail();
+    await going;
+    feedback.open();
+    expect(feedback.status()).toBe('failed');
+  });
+
   it('a change of account closes the panel and forgets what was typed', () => {
     feedback.open();
     feedback.draft = 'Private words';
     feedback.reset();
     expect(feedback.isOpen()).toBe(false);
     expect(feedback.draft).toBe('');
+  });
+
+  it('a change of account mid-send: the next person sees neither “Sending…” nor how the last note went', async () => {
+    let finish = () => {};
+    feedback.setSender(() => new Promise<void>((resolve) => (finish = resolve)));
+    const going = feedback.send('From the last person');
+    feedback.reset();
+    expect(feedback.status()).toBe('');
+    // The next person can send straight away.
+    const sent: string[] = [];
+    feedback.setSender(async (text) => void sent.push(text));
+    await feedback.send('Mine');
+    expect(sent).toEqual(['Mine']);
+    // They see their own thanks and close it, then start another note.
+    feedback.close();
+    feedback.open();
+    feedback.draft = 'Half typed';
+    // The last person's note arriving late changes nothing on screen.
+    finish();
+    await going;
+    expect(feedback.status()).toBe('');
+    expect(feedback.draft).toBe('Half typed');
+  });
+
+  it('a change of account mid-send that then fails shows no error to the next person', async () => {
+    let fail = () => {};
+    feedback.setSender(() => new Promise<void>((_, reject) => (fail = () => reject(new Error('no')))));
+    const going = feedback.send('From the last person');
+    feedback.reset();
+    fail();
+    await going;
+    expect(feedback.status()).toBe('');
   });
 });

@@ -1,6 +1,5 @@
 import { appStore, useAppState } from '../store/appStore';
 import { CloseIcon } from './icons';
-import { startTour } from './Tour';
 
 /** Every keyboard shortcut, grouped. ⌘ works in place of Ctrl on a Mac. */
 const GROUPS: { title: string; keys: [string, string][] }[] = [
@@ -96,16 +95,6 @@ export function ShortcutsPanel() {
               {name}
             </a>
           ))}
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => {
-              appStore.closeShortcuts();
-              startTour();
-            }}
-          >
-            Show the tour again
-          </button>
         </nav>
       </section>
     </div>

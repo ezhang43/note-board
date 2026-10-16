@@ -17,7 +17,6 @@ import { DONATE_URL } from '../model/constants';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
-import { startTour } from './Tour';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
@@ -109,16 +108,6 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
             About BusyAnts
           </a>
-          <button
-            type="button"
-            className="tb-button"
-            onClick={() => {
-              setOpen(null);
-              startTour();
-            }}
-          >
-            Show the tour again
-          </button>
           <ShareButton phone />
           {onSignOut && (
             <button type="button" className="tb-button" onClick={onSignOut}>

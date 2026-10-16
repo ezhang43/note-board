@@ -5,6 +5,7 @@ import { CloseIcon } from './icons';
 // The welcome tour (owner request, 2026-10-16): a spotlight on one control at a time, with a small
 // card beside it. It starts by itself the first time the board is shown on a device, can be skipped
 // at any point, and is remembered per device like the dark-mode choice. It never touches board data.
+// There is no replay (owner request, 2026-10-16).
 
 type Step = { title: string; text: string; target: string; phoneTarget?: string; phoneText?: string };
 
@@ -34,12 +35,12 @@ const STEPS: Step[] = [
     phoneTarget: 'header.toolbar button[aria-label="Boards"]',
   },
   {
-    // Phone only (empty desktop target): ⋯ holds Share there, and stays last so the replay hint comes at the end.
+    // Phone only (empty desktop target): ⋯ holds Share there.
     title: 'More',
     text: '',
     target: '',
     phoneTarget: '.phone-bar [aria-label="More"]',
-    phoneText: 'Tap ⋯ for everything else, like Share, Search and Version history. You can show this tour again there.',
+    phoneText: 'Tap ⋯ for everything else, like Share, Search and Version history.',
   },
   {
     title: 'Keyboard shortcuts',
@@ -48,14 +49,8 @@ const STEPS: Step[] = [
   },
 ];
 
-const TOUR_EVENT = 'note-board:tour';
 const PAD = 6;
 let autoStarted = false;
-
-/** Start the tour from its first step (the "Show the tour again" links). */
-export function startTour() {
-  window.dispatchEvent(new Event(TOUR_EVENT));
-}
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -101,20 +96,17 @@ export function Tour() {
     if (returnTo.current instanceof HTMLElement) returnTo.current.focus();
   }, []);
 
-  // Starts by itself once per device, and again when asked.
+  // Starts by itself once per device.
   useEffect(() => {
-    if (!autoStarted) {
-      autoStarted = true;
-      let pending = false;
-      try {
-        pending = tourPending(() => localStorage.getItem(TOUR_KEY));
-      } catch {
-        // storage blocked: no tour
-      }
-      if (pending) begin();
+    if (autoStarted) return;
+    autoStarted = true;
+    let pending = false;
+    try {
+      pending = tourPending(() => localStorage.getItem(TOUR_KEY));
+    } catch {
+      // storage blocked: no tour
     }
-    window.addEventListener(TOUR_EVENT, begin);
-    return () => window.removeEventListener(TOUR_EVENT, begin);
+    if (pending) begin();
   }, [begin]);
 
   // Which steps have a control on screen right now, and where it is. Redone on resize and whenever

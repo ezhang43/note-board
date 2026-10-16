@@ -91,14 +91,13 @@ test('clicking the dimmed area does nothing to the board, and the tour changes n
   await expect(cards(page)).toHaveCount(0);
 });
 
-test('the shortcuts panel replays the tour', async ({ page }) => {
+test('the shortcuts panel has no way to replay the tour', async ({ page }) => {
   await open(page);
   await page.keyboard.press('Escape');
   await expect(tour(page)).toHaveCount(0);
   await page.keyboard.press('?');
-  await page.getByRole('button', { name: 'Show the tour again' }).click();
-  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveCount(0);
-  await expect(tour(page)).toContainText('Step 1 of 4');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await expect(page.getByText('Show the tour again')).toHaveCount(0);
 });
 
 test('the card stays on screen and follows the control when the window is resized', async ({ page }) => {
@@ -133,7 +132,7 @@ test('it works in dark mode', async ({ page }) => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
 
-  test('points at the phone bar, skips what has no phone equivalent, and replays from the ⋯ menu', async ({ page }) => {
+  test('points at the phone bar, skips what has no phone equivalent, and the ⋯ menu has no replay', async ({ page }) => {
     await open(page);
     await expect(tour(page)).toContainText('Step 1 of 3');
     const spot = (await page.locator('.tour-spot').boundingBox())!;
@@ -145,11 +144,12 @@ test.describe('on a phone', () => {
     await tour(page).getByRole('button', { name: 'Next' }).click();
     await expect(tour(page)).toContainText('Step 3 of 3');
     await expect(tour(page)).toContainText('Tap ⋯');
+    await expect(tour(page)).not.toContainText('tour again');
     await tour(page).getByRole('button', { name: 'Done' }).click();
     await expect(tour(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'More' }).click();
-    await page.getByRole('button', { name: 'Show the tour again' }).click();
-    await expect(tour(page)).toContainText('Step 1 of 3');
+    await expect(page.getByRole('button', { name: 'Version history' })).toBeVisible();
+    await expect(page.getByText('Show the tour again')).toHaveCount(0);
   });
 });
 

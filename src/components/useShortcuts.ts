@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
+import { shownName } from '../model/board';
 import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
+import { collab } from '../sync/collabSession';
 import { handleArrowKey } from './keyboardNav';
 import type { FormatAsk } from '../store/actions/format';
 import { focusedBox } from './textBox';
@@ -26,7 +28,7 @@ export function useShortcuts() {
       // Shift+1: fit to screen (as in Figma and Miro), outside text fields.
       if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit1' && !isTextField(e.target)) return run(e, appStore.fitToScreen);
 
-      // Arrows move between a card's fields and between cards; Ctrl+arrows jump card to card.
+      // Arrows move between a card's fields and between cards; Alt+arrows jump card to card.
       if (handleArrowKey(e)) return e.preventDefault();
 
       // Text formatting (owner request): on the box being typed in, or else on the selected
@@ -68,6 +70,18 @@ export function useShortcuts() {
       if (key === 'escape' && state.ui.deleteCompleted) return appStore.cancelDeleteCompleted();
       // While it asks, no other board key acts behind the question (Tab, Enter and Space work its buttons).
       if (state.ui.deleteCompleted === 'ask') return;
+
+      // Ctrl+arrows switch boards (owner request, 2026-10-16). Control only: on a Mac the system
+      // often keeps these keys for Spaces, and ⌘+arrows are the browser's.
+      const move = BOARD_MOVE[e.key];
+      // A held key doesn't race through the boards, and the shortcuts list stays put behind it.
+      if (move && e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        return run(e, () => {
+          if (e.repeat || e.isComposing || state.ui.shortcutsOpen) return;
+          const id = appStore.moveBoard(move);
+          if (id) toast(`Switched to ${shownName(appStore.boardName(id))}`);
+        });
+      }
 
       // Several checklist items selected: these keys act on the items.
       if (state.ui.itemSel) {
@@ -111,6 +125,20 @@ export function useShortcuts() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+const BOARD_MOVE: Record<string, 'next' | 'previous' | 'up' | 'down'> = { ArrowRight: 'next', ArrowLeft: 'previous', ArrowUp: 'up', ArrowDown: 'down' };
+
+/** A short note that goes by itself (the notice banner, cleared after a moment unless something else replaced it). */
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let toastText: string | null = null;
+function toast(text: string) {
+  // A note someone has to read and dismiss (a failed delete, a share that stopped) is never covered.
+  if (collab.notice() && collab.notice() !== toastText) return;
+  toastText = text;
+  collab.setNotice(text);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => collab.notice() === text && collab.setNotice(null), 2500);
 }
 
 const NUDGE: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };

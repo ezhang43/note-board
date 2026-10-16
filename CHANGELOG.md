@@ -1,5 +1,10 @@
 # Changelog
 
+## Ctrl+arrow keys switch boards (2026-10-16)
+
+- Ctrl+Right and Ctrl+Left open the next and previous board in the Boards menu order (boards inside boards included). Ctrl+Up goes up to the board above, and Ctrl+Down goes into the first board inside the open one. At the ends nothing happens. A short note says which board you switched to, and the keys are in the ? shortcuts list.
+- They don't work while you are typing in a text field. On a Mac the system often keeps Control+arrows for itself, so they may not reach the page there. Your saved boards are untouched.
+
 ## "Column" is now "container" (2026-10-16)
 
 - Everywhere you read it, a column is now called a container: the New container button, the container title and its tooltips, the delete question, the shortcuts list, the welcome tour, the + menu on a phone, the Version history line, the text copy of a board, the FAQ and the Privacy page.

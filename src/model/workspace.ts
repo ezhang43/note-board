@@ -100,6 +100,22 @@ export function boardTree(ws: Workspace): { id: string; depth: number }[] {
   return rows;
 }
 
+/**
+ * The board Ctrl+arrow keys go to from board `id` (owner request, 2026-10-16), or null when there is
+ * none: next / previous in the Boards menu order (sub-boards included, no wrap), up to the board
+ * above, down into the first board inside it.
+ */
+export function boardNeighbor(ws: Workspace, id: string, move: 'next' | 'previous' | 'up' | 'down'): string | null {
+  const rows = boardTree(ws);
+  const at = rows.findIndex((r) => r.id === id);
+  if (at < 0) return null;
+  if (move === 'next') return rows[at + 1]?.id ?? null;
+  if (move === 'previous') return rows[at - 1]?.id ?? null;
+  if (move === 'down') return rows[at + 1]?.depth === rows[at].depth + 1 ? rows[at + 1].id : null;
+  const path = pathTo(ws, id);
+  return path.length > 1 ? path[path.length - 2] : null;
+}
+
 /** The boards from the top down to `id` (as listed by boardTree), for going back up. */
 export function pathTo(ws: Workspace, id: string): string[] {
   const rows = boardTree(ws);

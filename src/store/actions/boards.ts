@@ -3,7 +3,7 @@ import { createBoardCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { spotForNewBlock } from '../../model/layout';
 import type { Board } from '../../model/types';
-import { pathTo, withoutBoard, type Workspace } from '../../model/workspace';
+import { boardNeighbor, pathTo, withoutBoard, type Workspace } from '../../model/workspace';
 import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
 
@@ -25,6 +25,12 @@ export function boardActions(ctx: StoreContext) {
     },
     /** The boards from the top down to the open one, for going back up. */
     pathToOpen: () => pathTo(ctx.workspace(), ctx.state.boards.open),
+    /** Ctrl+arrow keys: opens the next / previous / parent / first inner board and returns its id; null (nothing opens) at an end. */
+    moveBoard(move: Parameters<typeof boardNeighbor>[2]): string | null {
+      const id = boardNeighbor(ctx.workspace(), ctx.state.boards.open, move);
+      if (id) openBoard(id);
+      return id && ctx.state.boards.open === id ? id : null;
+    },
     /** New board: a fresh, unnamed board on its own (not inside another), opened straight away. */
     newBoard(): string {
       const id = newId('b');

@@ -103,7 +103,7 @@ const READABLE_ZOOM = 0.6;
 
 /**
  * Move the board so `el` sits in the middle of what can be seen (above a phone's keyboard),
- * zooming in to 100% first when the board is too small to read (search, the Due list).
+ * zooming in to 100% first when the board is too small to read (search).
  */
 export function revealOnBoard(el: Element) {
   const canvas = canvasEl ?? document.querySelector<HTMLElement>('[data-testid="canvas"]');

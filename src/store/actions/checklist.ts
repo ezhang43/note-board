@@ -2,7 +2,6 @@ import { createItem, newId } from '../../model/cards';
 import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
 import { completedSectionCount, deleteCompletedSections } from '../../model/completed';
-import { isDueDate, withDue } from '../../model/due';
 import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDoneAcross, visibleItems, type ListSelection } from '../../model/multiSelect';
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
@@ -227,14 +226,6 @@ export function checklistActions(ctx: StoreContext) {
       commit((b) => C.editItems(b, cardId, (items) => C.deleteItems(items, ids)), { ui: { itemSel: null } });
     },
     toggleCompletedSection: (cardId: string) => commit((b) => C.toggleCompletedSection(b, cardId)),
-    // ---------- due dates (owner request) ----------
-    openDuePicker: (cardId: string, itemId: string) => ctx.updateUi({ dueFor: { cardId, itemId }, colourMenuOpen: false }),
-    closeDuePicker: () => ctx.updateUi({ dueFor: null }),
-    /** Give an item a due date ("YYYY-MM-DD"), or none (null). One undo step; the picker closes. */
-    setItemDue(cardId: string, itemId: string, due: string | null) {
-      if (due !== null && !isDueDate(due)) return; // e.g. a 5-digit year typed in the date box
-      commit((b) => C.editItems(b, cardId, (items) => withDue(items, itemId, due)), { ui: { dueFor: null } }) ?? ctx.updateUi({ dueFor: null });
-    },
     /** Uncheck all (owner request): every item in the list unticked, to use it again. One undo step. */
     uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */

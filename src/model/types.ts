@@ -47,8 +47,6 @@ export interface TodoItem {
   done: boolean;
   children: TodoItem[];
   style?: TextStyle;
-  /** Due date, "YYYY-MM-DD" (owner request); left out when there is none. */
-  due?: string;
 }
 
 export interface TodoCard extends CardBase {

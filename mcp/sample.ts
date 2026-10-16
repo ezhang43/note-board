@@ -17,7 +17,7 @@ export function homeBoard(): Board {
     ...(createCard('todo', 'listGroceries') as TodoCard),
     title: 'Groceries',
     items: [
-      item('iMilk', 'Milk', { due: '2026-10-07', children: [item('iSkim', 'Semi-skimmed', { done: true })] }),
+      item('iMilk', 'Milk', { children: [item('iSkim', 'Semi-skimmed', { done: true })] }),
       item('iEggs', 'Eggs', { children: [item('iFree', 'Free range', { children: [item('iBox', 'Box of 12')] })] }),
       item('iBread', 'Bread', { done: true }),
     ],

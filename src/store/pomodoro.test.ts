@@ -11,23 +11,20 @@ function memory(initial: Record<string, string> = {}) {
 }
 
 describe('the side panel', () => {
-  it('takes the right-hand spot from Version history and Due, and they take it back: one at a time', () => {
+  it('takes the right-hand spot from Version history, and it takes it back: one at a time', () => {
     const s = createStore(null);
     const open = () => {
-      const { sidePanel, historyOpen, dueOpen } = s.getState().ui;
-      return { sidePanel, historyOpen, dueOpen };
+      const { sidePanel, historyOpen } = s.getState().ui;
+      return { sidePanel, historyOpen };
     };
     s.toggleSidePanel('pomodoro');
-    expect(open()).toEqual({ sidePanel: 'pomodoro', historyOpen: false, dueOpen: false });
+    expect(open()).toEqual({ sidePanel: 'pomodoro', historyOpen: false });
     s.toggleHistory();
-    expect(open()).toEqual({ sidePanel: null, historyOpen: true, dueOpen: false });
+    expect(open()).toEqual({ sidePanel: null, historyOpen: true });
     s.toggleSidePanel('pomodoro');
-    expect(open()).toEqual({ sidePanel: 'pomodoro', historyOpen: false, dueOpen: false });
-    s.toggleDuePanel();
-    expect(open()).toEqual({ sidePanel: null, historyOpen: false, dueOpen: true });
+    expect(open()).toEqual({ sidePanel: 'pomodoro', historyOpen: false });
     s.toggleSidePanel('pomodoro');
-    s.toggleSidePanel('pomodoro');
-    expect(open()).toEqual({ sidePanel: null, historyOpen: false, dueOpen: false });
+    expect(open()).toEqual({ sidePanel: null, historyOpen: false });
   });
 });
 

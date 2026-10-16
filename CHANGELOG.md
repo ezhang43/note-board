@@ -6,6 +6,16 @@
 - Boards saved with arrows still open normally with every card, container and item as it was; only the arrows are left out. The next time you change anything, your boards are saved without them, so they are erased for good (from all your boards at once, since they are saved together). This also goes for backup files, shared boards and Version history.
 - The arrow keys, the collapse arrows and the normal arrow pointer are something else and work as before.
 
+## Due dates removed (2026-10-16)
+
+- Checklist items no longer have due dates: the calendar button beside an item's trash, the date under an item, the Due button with its red count, and the Due panel are gone (also from the phone's ⋯ menu). Hovering an item shows just the grip and the trash again, and the text doesn't move.
+- Due dates you had already set are erased the next time your boards load, wherever they come from (this device, your online copy, a backup file or an old version). Everything else on your boards stays as it was.
+- Google Calendar beside the board stays. The AI connector no longer reads or sets due dates, and the About page and Play Store notes no longer mention them (the About page's board picture and the Play Store screenshots were retaken without them).
+
+## No "Show the tour again" link (2026-10-16)
+
+- The "Show the tour again" link is gone from the ? shortcuts panel and from the phone ⋯ menu, and the tour's last phone step no longer mentions it. The tour still shows by itself the first time you open the board on a device. Your saved boards are untouched.
+
 ## Send feedback (2026-10-16)
 
 - Signed in, you can now send the maker a short note: File, then Send feedback… (on a phone: ⋯, then File). Type up to 1000 characters and press Send; you'll see "Thanks — sent." If it can't be sent, a message says so and what you typed stays, so you can try again. Send is off while you're offline. On a slow connection you can close the box while it is still sending; it carries on.

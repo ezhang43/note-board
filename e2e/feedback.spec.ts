@@ -167,18 +167,18 @@ test('while the box is open, Tab can’t reach the board, and Ctrl+F and Ctrl+Z 
   await expect(page.getByLabel('Note text')).toHaveValue('Keep me');
 });
 
-test('Escape closes only the box, not the Due panel behind it', async ({ page }) => {
+test('Escape closes only the box, not the side panel behind it', async ({ page }) => {
   await demo(page);
-  await page.getByRole('button', { name: /^Due today and overdue/ }).click();
-  const due = page.getByRole('complementary', { name: 'Due' });
-  await expect(due).toBeVisible();
-  // The Due panel covers the end of the File menu at this width, so the item is pressed with Enter.
+  await page.locator('.corner-controls').getByRole('button', { name: /^Focus timer/ }).click();
+  const side = page.getByRole('complementary', { name: 'Focus timer' });
+  await expect(side).toBeVisible();
+  // The side panel covers the end of the File menu at this width, so the item is pressed with Enter.
   await page.locator('header.toolbar').getByRole('button', { name: 'File' }).click();
   await fileMenu(page).getByRole('menuitem', { name: 'Send feedback…' }).press('Enter');
   await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel(page)).toHaveCount(0);
-  await expect(due).toBeVisible();
+  await expect(side).toBeVisible();
 });
 
 test('offline, Send is off and says why', async ({ page }) => {

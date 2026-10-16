@@ -2,7 +2,6 @@ import { addCard, placementForNewCard, setItemText } from '../src/model/board';
 import { createCard, createItem } from '../src/model/cards';
 import { editItems as changeItems, extractItems, findItem, insertItems, refill, rootsOf, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
 import { CARD_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
-import { isDueDate, withDue } from '../src/model/due';
 import { blockRect, spotForNewBlock, type MeasuredHeight } from '../src/model/layout';
 import { estimateHeight } from '../src/model/milanote';
 import type { Board, NoteCard, TodoCard, TodoItem } from '../src/model/types';
@@ -48,10 +47,6 @@ function itemText(text: string): string {
   return t;
 }
 
-function checkDue(due: string | null | undefined) {
-  if (due != null && !isDueDate(due)) refuse(`"${due}" isn’t a date: give due dates as a real day written YYYY-MM-DD.`);
-}
-
 /** A checklist on the board, by id or by its title when only one list has it. */
 function findList(b: Board, query: string): TodoCard {
   const lists = todos(b);
@@ -73,7 +68,6 @@ const withList = (b: Board, list: TodoCard, items: TodoItem[]) => changeItems(b,
 
 export interface NewItem {
   text: string;
-  due?: string;
   /** An item id in the list: the new item goes right after it (several keep their order). */
   after?: string;
   /** An item id in the list: the new item goes as its last sub-item. */
@@ -91,7 +85,6 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
       // Already there: this Edit ran before (the put-back check).
       if (todos(b).some((c) => findItem(c.items, id))) return;
       const text = itemText(n.text);
-      checkDue(n.due);
       if (n.after && n.under) refuse('Give only one of after and under for an item.');
       const anchor = n.after ?? n.under;
       const target = anchor ? findItem(items, anchor) : null;
@@ -102,10 +95,10 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
         const kids = target.item.children;
         drop = kids.length ? { mode: 'after', targetId: kids[kids.length - 1].id } : { mode: 'nest', targetId: target.item.id };
       }
-      const item: TodoItem = { ...createItem(id), text, ...(n.due ? { due: n.due } : {}) };
+      const item: TodoItem = { ...createItem(id), text };
       items = insertItems(items, drop, [item]) ?? refuse('That would nest items deeper than 6 levels.');
       if (n.after) lastAfter[n.after] = id;
-      changed.push(`Added "${short(text)}" (id: ${id}${n.due ? `, due ${n.due}` : ''}) to ${listName(list)}`);
+      changed.push(`Added "${short(text)}" (id: ${id}) to ${listName(list)}`);
     });
     return changed.length ? withList(b, list, items) : b;
   });
@@ -113,33 +106,19 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
 
 export interface ItemChange {
   item: string;
-  text?: string;
-  /** A day, or null to remove the due date. */
-  due?: string | null;
+  text: string;
 }
 
-/** edit_items: new text and / or due dates for items. */
+/** edit_items: new text for items. */
 export function editItems(boardId: string, changes: ItemChange[]): Edit {
   return onBoard(boardId, (b, changed) => {
     for (const ch of changes) {
-      if (ch.text === undefined && ch.due === undefined) refuse(`Say what to change for item "${ch.item}": text, due, or both.`);
       const list = listOf(b, ch.item);
       const old = findItem(list.items, ch.item)!.item;
-      if (ch.text !== undefined) {
-        const text = itemText(ch.text);
-        if (text !== old.text) {
-          b = setItemText(b, list.id, ch.item, text);
-          changed.push(`Changed "${short(old.text)}" to "${short(text)}"`);
-        }
-      }
-      if (ch.due !== undefined) {
-        checkDue(ch.due);
-        const items = withDue((b.cards[list.id] as TodoCard).items, ch.item, ch.due);
-        if (items) {
-          b = withList(b, list, items);
-          const name = short(findItem(items, ch.item)!.item.text);
-          changed.push(ch.due ? `Set "${name}" due ${ch.due}` : `Removed the due date from "${name}"`);
-        }
+      const text = itemText(ch.text);
+      if (text !== old.text) {
+        b = setItemText(b, list.id, ch.item, text);
+        changed.push(`Changed "${short(old.text)}" to "${short(text)}"`);
       }
     }
     return b;

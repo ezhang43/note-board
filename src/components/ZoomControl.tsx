@@ -4,14 +4,13 @@ import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import { CoffeeIcon, FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
-import { DuePanelButton } from './Due';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * (A− / A+), Search, Due, Completed, Version history, the focus timer, Google Calendar (when signed in), the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
+ * (A− / A+), Search, Completed, Version history, the focus timer, Google Calendar (when signed in), the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
@@ -31,7 +30,6 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <button type="button" className="help-button" aria-label="Search" title="Search the board (Ctrl+F)" aria-pressed={findOpen} onClick={() => (findOpen ? appStore.closeFind() : appStore.openFind())}>
         <SearchIcon />
       </button>
-      <DuePanelButton />
       <CompletedButton />
       <button type="button" className="help-button" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
         <HistoryIcon />

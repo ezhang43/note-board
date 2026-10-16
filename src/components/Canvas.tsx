@@ -10,7 +10,7 @@ import { ColumnView } from './ColumnView';
 import { Arrows } from './Arrows';
 
 const NO_GUIDES: never[] = [];
-const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New column' } as const;
+const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New container' } as const;
 
 export function Canvas() {
   const view = useAppState((s) => s.view);
@@ -223,7 +223,7 @@ export function Canvas() {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       style={{
-        // Text size on cards and columns (A− / A+).
+        // Text size on cards and containers (A− / A+).
         '--fs': FONT_SCALE[view.fontSize],
         backgroundImage: `radial-gradient(${dot} ${grid.dotRadius}px, transparent ${grid.dotRadius + 0.2}px)`,
         backgroundSize: `${grid.size}px ${grid.size}px`,
@@ -231,7 +231,7 @@ export function Canvas() {
       } as CSSProperties}
     >
       {empty && (
-        <p className="empty-hint">Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
+        <p className="empty-hint">Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
       )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`, '--zoom': view.zoom } as CSSProperties}>
         {order.map((id) => {

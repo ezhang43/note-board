@@ -29,13 +29,13 @@ function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   );
 }
 
-/** New column: click to add, or press and drag onto the board to place it. */
+/** New container: click to add, or press and drag onto the board to place it. */
 function NewColumnButton() {
   const drag = useNewCardDrag('column');
   return (
-    <button type="button" className="tb-button add-column" title="Click to add a column, or drag it onto the board" {...drag}>
+    <button type="button" className="tb-button add-column" title="Click to add a container, or drag it onto the board" {...drag}>
       <PlusIcon />
-      New column
+      New container
     </button>
   );
 }
@@ -196,8 +196,8 @@ export function ColourControl() {
       <button
         type="button"
         className="tb-button"
-        aria-label="Color of selected cards and columns"
-        title={count ? "Color the selected columns, or the selected cards' title bands" : 'Color menu: select a card or column to color it, or use Auto-color'}
+        aria-label="Color of selected cards and containers"
+        title={count ? "Color the selected containers, or the selected cards' title bands" : 'Color menu: select a card or container to color it, or use Auto-color'}
         aria-expanded={open}
         onClick={appStore.toggleColourMenu}
       >
@@ -242,7 +242,7 @@ export function ColourControl() {
           <button
             type="button"
             className="swatch-default"
-            title={hasColumns ? 'Give every column a different color' : 'Add a column first'}
+            title={hasColumns ? 'Give every container a different color' : 'Add a container first'}
             aria-disabled={hasColumns ? undefined : true}
             onClick={() => hasColumns && appStore.autoColour()}
           >
@@ -255,7 +255,7 @@ export function ColourControl() {
 }
 
 /**
- * Collapse all / Expand all: collapses every card and column, or (when all are collapsed) opens them
+ * Collapse all / Expand all: collapses every card and container, or (when all are collapsed) opens them
  * all. With blocks selected, only those (owner request).
  */
 export function CollapseAllButton({ labelled = false }: { labelled?: boolean }) {
@@ -263,7 +263,7 @@ export function CollapseAllButton({ labelled = false }: { labelled?: boolean }) 
   const selected = useAppState((s) => s.ui.selection.length > 0);
   const expand = useAppState((s) => any && !anyExpanded(s.board, s.ui.selection.length ? s.ui.selection : undefined));
   const label = expand ? 'Expand all' : 'Collapse all';
-  const title = selected ? `${expand ? 'Expand' : 'Collapse'} the selected cards and columns` : `${label} cards and columns`;
+  const title = selected ? `${expand ? 'Expand' : 'Collapse'} the selected cards and containers` : `${label} cards and containers`;
   return (
     <button
       type="button"
@@ -279,7 +279,7 @@ export function CollapseAllButton({ labelled = false }: { labelled?: boolean }) 
   );
 }
 
-/** Same width: the selected loose cards and columns take the first one's width. Faded with fewer than two selected. */
+/** Same width: the selected loose cards and containers take the first one's width. Faded with fewer than two selected. */
 export function SameWidthButton({ labelled = false }: { labelled?: boolean }) {
   const ready = useAppState((s) => s.ui.selection.filter((id) => s.board.order.includes(id)).length >= 2);
   return (
@@ -287,7 +287,7 @@ export function SameWidthButton({ labelled = false }: { labelled?: boolean }) {
       type="button"
       className={`tb-button faded-colour quiet${labelled ? '' : ' icon-only'}`}
       aria-label="Same width"
-      title={ready ? "Make the selected cards and columns as wide as the first one you selected" : 'Select two or more cards or columns first'}
+      title={ready ? "Make the selected cards and containers as wide as the first one you selected" : 'Select two or more cards or containers first'}
       aria-disabled={ready ? undefined : true}
       onClick={() => ready && appStore.matchWidths()}
     >
@@ -351,7 +351,7 @@ export function ToolGroup() {
         type="button"
         className="tool-button"
         aria-label="Select (V)"
-        title="Select (V): drag a rectangle to select several cards and columns"
+        title="Select (V): drag a rectangle to select several cards and containers"
         aria-pressed={tool === 'select'}
         onClick={() => appStore.setTool('select')}
       >

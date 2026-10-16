@@ -22,7 +22,7 @@ import { startTour } from './Tour';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
- * + (add a card or column) and ⋯ (every other toolbar button). Tapping outside an open menu closes it.
+ * + (add a card or container) and ⋯ (every other toolbar button). Tapping outside an open menu closes it.
  */
 export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
   const canUndo = useAppState((s) => s.ui.canUndo);
@@ -58,7 +58,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             Checklist
           </button>
           <button type="button" role="menuitem" onClick={() => add('column')}>
-            Column
+            Container
           </button>
           <button type="button" role="menuitem" onClick={() => add('board')}>
             Sub-board

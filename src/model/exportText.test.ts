@@ -25,6 +25,10 @@ function board() {
 }
 
 describe('the board as readable text (Markdown)', () => {
+  it('calls a container with no title "Untitled container"', () => {
+    const b = addColumn(createBoard(), { ...createColumn('c9'), title: '' });
+    expect(boardAsMarkdown(b)).toContain('## Untitled container');
+  });
   it('has the board name, each column with its cards, then the loose cards top to bottom', () => {
     expect(boardAsMarkdown(board())).toBe(
       [

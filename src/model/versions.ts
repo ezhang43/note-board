@@ -63,12 +63,12 @@ export function summarizeWorkspace(ws: Workspace): { cards: number; columns: num
   return all.length > 1 ? { ...sum, boards: all.length } : sum;
 }
 
-/** e.g. "2 boards · 12 cards · 3 columns". */
+/** e.g. "2 boards · 12 cards · 3 containers". */
 export function describeVersion(v: VersionMeta): string {
   const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
   const boards = v.boards && v.boards > 1 ? n(v.boards, 'board') : '';
   if (!v.cards && !v.columns) return boards || 'Empty board';
-  return [boards, v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'column')].filter(Boolean).join(' · ');
+  return [boards, v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'container')].filter(Boolean).join(' · ');
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

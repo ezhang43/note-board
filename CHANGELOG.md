@@ -1,5 +1,10 @@
 # Changelog
 
+## "Column" is now "container" (2026-10-16)
+
+- Everywhere you read it, a column is now called a container: the New container button, the container title and its tooltips, the delete question, the shortcuts list, the welcome tour, the + menu on a phone, the Version history line, the text copy of a board, the FAQ and the Privacy page.
+- Only the words changed. Your saved boards are exactly as they were.
+
 ## A shorter, punchier About page (2026-10-16)
 
 - The About page no longer has the giant ant. A small picture of a sample board now sits beside the headline and Start button (under them on a phone), and the big board picture further down is gone.

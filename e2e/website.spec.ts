@@ -100,20 +100,72 @@ test('the landing page says what BusyAnts is, shows a picture of a board and has
   await expect(page.getByTestId('canvas')).toBeVisible();
 });
 
-// Job 55 (owner request 2026-10-15): the owner's "Why I made BusyAnts" intro, three highlights and the fuller feature list.
-test('the About page tells why BusyAnts was made, right under the hero (headline, start button and mini board)', async ({ page }) => {
+// Job #86 (owner, 2026-10-16): the closing honey block, the "Why I made BusyAnts" story removed, a sharper board picture.
+test('the About page ends with a honey block: a headline, one line and the start button, just above the footer', async ({ page }) => {
   await page.goto('/about/');
-  const why = page.getByRole('heading', { level: 2, name: 'Why I made BusyAnts' });
-  await expect(why).toBeVisible();
-  const main = page.locator('main');
-  await expect(main).toContainText('I wake up most mornings feeling like an ant');
-  await expect(main).toContainText('Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist');
-  await expect(main).toContainText('a calm canvas centered on checklists');
-  await expect(main).toContainText('Tick something off and it slides into Completed');
-  await expect(page.getByRole('heading', { name: 'Why BusyAnts', exact: true })).toHaveCount(0);
-  const y = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!.y;
-  expect(await y(why)).toBeGreaterThan(await y(page.getByRole('link', { name: 'Start your board, free' }).first()));
-  expect(await y(why)).toBeGreaterThan(await y(page.getByRole('img', { name: /BusyAnts board/ })));
+  await expect(page.getByRole('heading', { name: 'Why I made BusyAnts' })).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('I wake up most mornings');
+  await expect(page.locator('.close')).toHaveCount(0);
+  const block = page.locator('section.closing');
+  await expect(block.getByRole('heading', { level: 2, name: 'Ready to clear your head?' })).toBeVisible();
+  await expect(block).toContainText('Free, no card, no limits. Works offline.');
+  const start = block.getByRole('link', { name: 'Start your board, free' });
+  await expect(start).toHaveAttribute('href', '../');
+  // Honey (#FFCF3F, as at the top; light mode here), and the last thing in the page before the footer.
+  const honey = (l: ReturnType<Page['locator']>) => l.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await honey(block)).toBe('rgb(255, 207, 63)');
+  expect(await block.evaluate((el) => el.nextElementSibling === null && el.parentElement!.nextElementSibling!.matches('footer.site-footer'))).toBe(true);
+  // The button keeps a keyboard focus ring.
+  await start.focus();
+  expect(await start.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+  // It fits a 320px phone with no sideways scrolling.
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const box = (await block.boundingBox())!;
+  expect(box.x).toBe(0);
+  expect(Math.round(box.width)).toBe(320);
+  const link = (await start.boundingBox())!;
+  expect(link.x).toBeGreaterThanOrEqual(16);
+  expect(link.x + link.width).toBeLessThanOrEqual(320 - 16);
+});
+
+test('the About page board picture is sharp: twice the pixels it is shown at, light and dark', async ({ page }) => {
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto('/about/');
+    const img = page.locator('img.shot');
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.currentSrc.split('/').pop()), scheme).toBe(scheme === 'dark' ? 'board-dark.webp' : 'board.webp');
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth), scheme).toBe(1920);
+    await expect(img).toHaveAttribute('width', '960');
+    await expect(img).toHaveAttribute('height', '600');
+  }
+});
+
+test('"Try it: tick one off" folds as a whole section: starts open, folds and unfolds, ticking still works', async ({ page }) => {
+  await page.goto('/about/');
+  const fold = page.locator('main details:has(ul.highlights)');
+  await expect(page.locator('main details')).toHaveCount(1);
+  await expect(fold.locator(':scope > summary > h2')).toHaveText('Try it: tick one off');
+  await expect(fold).toHaveAttribute('open', '');
+  const list = fold.locator('ul.highlights');
+  await expect(list).toBeVisible();
+  expect((await fold.locator('summary').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await fold.locator('summary').click();
+  await expect(fold).not.toHaveAttribute('open', '');
+  await expect(list).toBeHidden();
+  await fold.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(fold).toHaveAttribute('open', '');
+  // Ticking inside it still strikes the item through and moves it under Completed.
+  const shape = page.getByRole('checkbox', { name: 'Shape it your way' });
+  const fold2 = page.getByRole('checkbox', { name: "Fold away what you're not doing" });
+  await shape.check();
+  expect((await shape.boundingBox())!.y).toBeGreaterThan((await fold2.boundingBox())!.y);
+  // Printing shows it open even when it is folded.
+  await fold.locator('summary').click();
+  await expect(list).toBeHidden();
+  await page.emulateMedia({ media: 'print' });
+  await expect(list).toBeVisible();
 });
 
 test('the About page has three highlights under the intro', async ({ page }) => {
@@ -182,13 +234,12 @@ test('the three highlights are a small to-do list you can really tick: ticked on
   expect(await y(built)).toBeLessThan(await y(shape));
 });
 
-test('the story, the to-do list and the table line up on shared left edges on a computer', async ({ page }) => {
+test('the to-do list and the table line up on shared left edges on a computer', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/about/');
   const x = async (sel: string) => Math.round((await page.locator(sel).first().boundingBox())!.x);
-  // The reading column: the list, its heading, the story and its heading share a left edge.
-  const col = await x('ul.highlights');
-  for (const sel of ['.why', 'h2:text("Why I made BusyAnts")', 'h2:text("Try it: tick one off")']) expect(await x(sel), sel).toBe(col);
+  // The reading column: the list and its heading share a left edge.
+  expect(await x('h2:text("Try it: tick one off")')).toBe(await x('ul.highlights'));
   // The wider table section: its heading and the table share a left edge.
   expect(await x('h2:text("How BusyAnts stacks up")')).toBe(await x('table.compare'));
 });

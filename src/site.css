@@ -136,3 +136,323 @@ p, li { color: var(--ink); }
 
 .site-footer { border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 14px; }
 .site-footer nav a { color: var(--ink-soft); }
+
+/*
+ * The bolder look (job #59), on all four pages. body.bold is the shared system: the honey slab (warm brown in
+ * dark mode) holding the nav and the title, heavy display type, ruled rows, a brown footer. body.landing is the
+ * About page's showcase on top of it (giant ant, board on a brown band); the FAQ, Terms and Privacy pages keep to
+ * a calm reading column under their slab. Display voice: Bricolage Grotesque. Colors come from the app icon:
+ * honey #ffcf3f and ant brown #3a2614.
+ */
+body.bold {
+  --display: 'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif;
+  --wide: 1200px;
+  --gutter: clamp(16px, 5vw, 48px);
+  --hero-bg: #ffcf3f;
+  --hero-ink: #3a2614;
+  --btn-bg: #3a2614;
+  --btn-ink: #ffcf3f;
+  --band: #3a2614;
+  --band-ink: #f3e7cc;
+  --rule: #3a2614;
+  --box-fill: #ffcf3f;
+  --box-line: #3a2614;
+  --box-tick: #3a2614;
+}
+@media (prefers-color-scheme: dark) {
+  body.bold {
+    --hero-bg: #5a3c14;
+    --hero-ink: #ffcf3f;
+    --btn-bg: #ffcf3f;
+    --btn-ink: #3a2614;
+    --band: #2a2416;
+    --band-ink: #ece8e1;
+    --rule: #6b5a34;
+    --box-fill: #ffcf3f;
+    --box-line: #ffcf3f;
+    --box-tick: #2a2416;
+  }
+}
+:root:has(body.bold) { scrollbar-color: #8a6a34 var(--canvas); }
+body.bold ::selection { background: var(--btn-bg); color: var(--btn-ink); }
+
+/* Header on the honey field */
+body.bold .site-header { background: var(--hero-bg); border-bottom: 0; }
+body.bold .site-header nav { max-width: var(--wide); padding: 14px var(--gutter); }
+body.bold .site-header a,
+body.bold .site-brand { color: var(--hero-ink); }
+body.bold .site-header a:focus-visible,
+body.bold .hero a:focus-visible { outline: 3px solid var(--hero-ink); outline-offset: 3px; }
+body.bold .site-header nav a:last-child {
+  border: 2px solid var(--hero-ink);
+  border-radius: 999px;
+  padding: 3px 14px;
+  font-weight: 600;
+}
+body.bold .site-header nav a:last-child:hover { background: var(--hero-ink); color: var(--hero-bg); text-decoration: none; }
+
+/* One line of nav on a phone: smaller type and gaps, every link kept */
+@media (max-width: 760px) {
+  body.bold .site-header nav { flex-wrap: nowrap; gap: 0 9px; padding: 12px var(--gutter); font-size: 13px; }
+  body.bold .site-header nav a { white-space: nowrap; }
+  body.bold .site-brand { position: relative; }
+  body.bold .site-brand img { width: 28px; height: 28px; }
+  /* the ant stands for the brand name here; the name stays for screen readers */
+  body.bold .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  body.bold .site-header nav a:last-child { padding: 2px 9px; }
+}
+
+body.landing main { max-width: none; padding: 0; }
+body.landing .page { max-width: var(--wide); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* The poster slab */
+body.landing .hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  min-height: clamp(520px, calc(100svh - 64px), 780px);
+  padding: 48px 0 120px;
+  background: var(--hero-bg);
+  color: var(--hero-ink);
+}
+body.landing .hero-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+body.landing h1 {
+  margin: 0 0 20px;
+  font-family: var(--display);
+  font-size: clamp(3.5rem, 10.5vw, 6rem);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  color: var(--hero-ink);
+}
+body.landing .lead {
+  max-width: 21em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--hero-ink);
+  text-wrap: balance;
+}
+body.landing .start {
+  margin-top: 32px;
+  padding: 16px 30px;
+  border-radius: 14px;
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -6px rgba(58, 38, 20, 0.45);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+body.landing .start:hover { filter: none; transform: translateY(-2px); box-shadow: 0 12px 22px -6px rgba(58, 38, 20, 0.5); }
+body.landing .start:active { transform: translateY(0); box-shadow: 0 4px 10px -4px rgba(58, 38, 20, 0.5); }
+
+body.landing .ant {
+  position: absolute;
+  z-index: 0;
+  /* in line with the right edge of the nav, so the whole ant is always in frame */
+  right: max(var(--gutter), calc((100% - var(--wide)) / 2 + var(--gutter)));
+  bottom: 30px;
+  width: clamp(240px, 40vw, 560px);
+  height: auto;
+  color: var(--hero-ink);
+}
+body.landing .trail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 32px;
+  height: 8px;
+  color: var(--hero-ink);
+  background: radial-gradient(circle at 4px 4px, currentColor 3.5px, transparent 4px) 0 0 / 24px 8px repeat-x;
+}
+@media (prefers-reduced-motion: no-preference) {
+  body.landing .ant { animation: ant-walk-in 1.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes ant-walk-in {
+    from { transform: translateX(-14rem); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+}
+
+/* Why I made BusyAnts: heading beside the story, then ruled rows */
+body.landing h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.25rem, 4.6vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+body.landing .why-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 32px clamp(32px, 6vw, 80px);
+  padding-top: clamp(64px, 10vw, 112px);
+}
+body.landing .why-section h2 { grid-column: 1; }
+body.landing .why { grid-column: 2; grid-row: 1; max-width: 65ch; }
+body.landing .why p { margin: 0 0 18px; font-size: 18px; line-height: 1.6; }
+body.landing .why p:first-child {
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  margin-bottom: 28px;
+  text-wrap: balance;
+}
+body.landing .highlights {
+  grid-column: 1 / -1;
+  display: block;
+  margin: clamp(40px, 6vw, 72px) 0 0;
+  border-bottom: 2px solid var(--rule);
+}
+body.landing .highlights li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 12px clamp(32px, 6vw, 80px);
+  align-items: baseline;
+  padding: 28px 0 32px;
+  border: 0;
+  border-top: 2px solid var(--rule);
+  border-radius: 0;
+  background: none;
+}
+body.landing .highlights h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+body.landing .highlights p { max-width: 52ch; font-size: 18px; color: var(--ink-soft); }
+
+/* The real board on a brown band */
+body.landing .showcase {
+  margin-top: clamp(72px, 10vw, 120px);
+  padding: clamp(40px, 7vw, 88px) var(--gutter);
+  background: var(--band);
+}
+body.landing .showcase picture { display: block; max-width: var(--wide); margin: 0 auto; }
+body.landing .shot {
+  margin: 0;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 28px 48px -16px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* Also in BusyAnts: a checklist whose boxes fill as it scrolls into view */
+body.landing .also-section { padding: clamp(64px, 10vw, 112px) 0 clamp(72px, 10vw, 120px); }
+body.landing .also {
+  list-style: none;
+  max-width: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 clamp(32px, 6vw, 80px);
+  border-top: 2px solid var(--rule);
+}
+body.landing .also li {
+  position: relative;
+  margin: 0;
+  padding: 18px 0 18px 48px;
+  border-bottom: 1px solid var(--line);
+  font-size: 18px;
+  line-height: 1.45;
+}
+body.landing .also li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 19px;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--box-line);
+  border-radius: 7px;
+  background: var(--box-fill);
+}
+body.landing .also li::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 24px;
+  width: 7px;
+  height: 13px;
+  border: solid var(--box-tick);
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    body.landing .also li::before { animation: box-fill linear both; animation-timeline: view(); animation-range: entry 30% entry 100%; }
+    body.landing .also li::after { animation: box-tick linear both; animation-timeline: view(); animation-range: entry 30% entry 100%; }
+    @keyframes box-fill { from { background: transparent; } to { background: var(--box-fill); } }
+    @keyframes box-tick { from { opacity: 0; } to { opacity: 1; } }
+  }
+}
+
+/* FAQ, Terms, Privacy: the title on the slab (it runs the full width), then a calm reading column of ruled sections */
+body.bold main.text { padding-top: 0; padding-bottom: clamp(48px, 8vw, 96px); }
+body.bold .page-head {
+  margin: 0 0 clamp(8px, 2vw, 24px);
+  padding: clamp(24px, 6vw, 56px) 0 clamp(32px, 7vw, 64px);
+  background: var(--hero-bg);
+  color: var(--hero-ink);
+  box-shadow: 0 0 0 100vmax var(--hero-bg);
+  clip-path: inset(0 -100vmax);
+}
+body.bold .page-head h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 8vw, 4.25rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  color: var(--hero-ink);
+  text-wrap: balance;
+}
+body.bold .page-head .updated { margin: 16px 0 0; font-size: 16px; font-weight: 500; color: var(--hero-ink); }
+body.bold main.text h2 {
+  margin: clamp(32px, 5vw, 48px) 0 8px;
+  padding-top: 20px;
+  border-top: 2px solid var(--rule);
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+body.bold main.text h3 { margin: 24px 0 4px; font-size: 18px; }
+body.bold main.text .page-head + h2 { border-top: 0; margin-top: 0; padding-top: 0; }
+
+/* Footer */
+body.bold .site-footer { border-top: 0; background: var(--band); color: var(--band-ink); }
+body.bold .site-footer nav { max-width: var(--wide); padding: 28px var(--gutter); gap: 8px 28px; }
+body.bold .site-footer a { color: var(--band-ink); font-weight: 500; }
+body.bold .site-footer a:focus-visible { outline: 3px solid var(--box-fill); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  body.landing .hero { min-height: 0; padding: 40px 0 290px; align-items: flex-start; }
+  body.landing .ant { bottom: 28px; width: 250px; }
+  body.landing .shot { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: 0 0; }
+  body.landing .why-section { grid-template-columns: 1fr; }
+  body.landing .why { grid-column: 1; grid-row: auto; }
+  body.landing .highlights li { grid-template-columns: 1fr; padding: 22px 0 26px; }
+  body.landing .also { grid-template-columns: 1fr; }
+}

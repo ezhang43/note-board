@@ -5,7 +5,6 @@ import { parseStyle } from './textStyle';
 import { clampZoom, createView } from './view';
 import type { Board, Card, Column, CompletedGroup, TodoItem, View } from './types';
 import { DEFAULT_COLOR } from './cards';
-import { isDueDate } from './due';
 import { readArrows } from './arrows';
 
 export const BOARD_KEY = 'note-board:v1';
@@ -49,11 +48,12 @@ const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fa
 /** A resized width/height, or null for "not resized" (also for anything unreadable). */
 const size = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
+/** Only the fields named here are kept: a `due` saved before due dates were removed (owner, 2026-10-16) is erased. */
 function parseItems(v: unknown, depth = 0): TodoItem[] {
   if (!Array.isArray(v) || depth > 10) return [];
   return v.filter(isObject).flatMap((it) =>
     typeof it.id === 'string'
-      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style), ...(isDueDate(it.due) ? { due: it.due } : {}) }]
+      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style) }]
       : [],
   );
 }

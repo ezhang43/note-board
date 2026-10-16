@@ -87,10 +87,10 @@ describe('read_board outline', () => {
     expect(at('Link')).toBeLessThan(at('Completed card'));
   });
 
-  it('checklists show ticks, nesting, due dates and ids, with a Completed section', () => {
+  it('checklists show ticks, nesting and ids, with a Completed section', () => {
     const text = outline('home');
     expect(text).toContain('### Checklist: Groceries (id: listGroceries)');
-    expect(text).toContain('- [ ] Milk (id: iMilk) (due 2026-10-07)\n  - [x] Semi-skimmed (id: iSkim)');
+    expect(text).toContain('- [ ] Milk (id: iMilk)\n  - [x] Semi-skimmed (id: iSkim)');
     expect(text).toContain('- [ ] Eggs (id: iEggs)\n  - [ ] Free range (id: iFree)\n    - [ ] Box of 12 (id: iBox)');
     expect(text).toContain('Completed:\n- [x] Bread (id: iBread)');
   });
@@ -136,6 +136,11 @@ describe('safe to edit (round trip)', () => {
     const data = JSON.parse(ownRaw());
     data.boards.home.columns.colIdeas.color = 'tomato';
     data.boards.home.cards.noteIdea.titleColor = 'ocean';
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('yes for boards with due dates saved before due dates were removed (the edit erases them)', () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.cards.listGroceries.items[0].due = '2026-10-07';
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
   it('key order alone doesn’t matter', () => {

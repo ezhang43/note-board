@@ -1,5 +1,11 @@
 # Changelog
 
+## Due dates removed (2026-10-16)
+
+- Checklist items no longer have due dates: the calendar button beside an item's trash, the date under an item, the Due button with its red count, and the Due panel are gone (also from the phone's ⋯ menu). Hovering an item shows just the grip and the trash again, and the text doesn't move.
+- Due dates you had already set are erased the next time your boards load, wherever they come from (this device, your online copy, a backup file or an old version). Everything else on your boards stays as it was.
+- Google Calendar beside the board stays. The AI connector no longer reads or sets due dates, and the About page and Play Store notes no longer mention them (the About page's board picture and the Play Store screenshots were retaken without them).
+
 ## Delete your account (2026-10-16)
 
 - Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.

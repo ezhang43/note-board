@@ -92,8 +92,9 @@ describe('the connector’s write tools', () => {
     const { fs, client } = connectWithWrites();
     const r = await (await client).callTool({ name: 'add_items', arguments: { board: 'Home', list: 'Groceries', items: [{ text: 'Apples', due: '2026-10-09' }, { text: 'Small', under: 'iEggs' }] } });
     expect(r.isError).toBeFalsy();
-    expect(text(r)).toMatch(/^Saved:\n- Added "Apples" \(id: \S+, due 2026-10-09\) to Groceries\n- Added "Small" \(id: \S+\) to Groceries$/);
+    expect(text(r)).toMatch(/^Saved:\n- Added "Apples" \(id: \S+\) to Groceries\n- Added "Small" \(id: \S+\) to Groceries$/);
     expect(items(fs).at(-1)!.text).toBe('Apples');
+    expect(items(fs).some((i) => 'due' in i)).toBe(false); // due dates are gone: one given is ignored
   });
 
   it('edit_items, set_items_done and move_items change items by id', async () => {
@@ -102,10 +103,10 @@ describe('the connector’s write tools', () => {
     expect(text(await c.callTool({ name: 'edit_items', arguments: { board: 'home', changes: [{ item: 'iEggs', text: 'Eggs (6)', due: '2026-10-08' }] } }))).toContain('Changed "Eggs" to "Eggs (6)"');
     expect(text(await c.callTool({ name: 'set_items_done', arguments: { board: 'home', items: ['iMilk'], done: true } }))).toContain('Ticked "Milk"');
     expect(text(await c.callTool({ name: 'move_items', arguments: { board: 'home', items: ['iBread'], to: { list: 'Groceries', before: 'iEggs' } } }))).toContain('Moved "Bread" to Groceries');
-    expect(items(fs).map((i) => [i.id, i.text, i.done, i.due])).toEqual([
-      ['iMilk', 'Milk', true, '2026-10-07'],
-      ['iBread', 'Bread', true, undefined],
-      ['iEggs', 'Eggs (6)', false, '2026-10-08'],
+    expect(items(fs).map((i) => [i.id, i.text, i.done, 'due' in i])).toEqual([
+      ['iMilk', 'Milk', true, false],
+      ['iBread', 'Bread', true, false],
+      ['iEggs', 'Eggs (6)', false, false],
     ]);
   });
 

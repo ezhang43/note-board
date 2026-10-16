@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await fontsLoaded(page);
 });
 
-// The toolbar is full at 1280px, so its button is by the zoom control, with Due and Version history.
+// The toolbar is full at 1280px, so its button is by the zoom control, with Completed and Version history.
 const button = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: /^Focus timer/ });
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Focus timer' });
 const spy = (page: Page) => page.evaluate(() => (window as unknown as { spy: Spy }).spy);

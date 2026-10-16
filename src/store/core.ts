@@ -115,7 +115,6 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   focusBlock: null,
   colourMenuOpen: false,
   preview: null,
-  dueFor: null,
   arrowSel: null,
 };
 

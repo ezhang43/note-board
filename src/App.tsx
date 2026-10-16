@@ -9,6 +9,7 @@ import { ItemBar } from './components/ItemBar';
 import { PhoneBar } from './components/PhoneBar';
 import { NoticeBanner } from './components/SharePanel';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
+import { Tour } from './components/Tour';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { usePhone } from './components/usePhone';
@@ -74,6 +75,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <ShortcutsPanel />
       <DeleteCompleted />
       <NoticeBanner />
+      <Tour />
     </div>
   );
 }

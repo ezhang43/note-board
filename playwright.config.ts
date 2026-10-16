@@ -6,6 +6,12 @@ const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height:
 // Each worktree tests on its own ports, so workers testing at the same time never share a dev server.
 const ports = testPorts({ isWorktree: isGitWorktree(), folder: process.cwd(), env: process.env });
 
+// The welcome tour starts by itself on a new device; every test but e2e/tour.spec.ts starts with it already done.
+const tourDone = (port: number) => ({
+  cookies: [],
+  origins: [{ origin: `http://localhost:${port}`, localStorage: [{ name: 'note-board:tour-done', value: '1' }] }],
+});
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -27,9 +33,9 @@ export default defineConfig({
     contextOptions: { reducedMotion: 'reduce' },
   },
   projects: [
-    { name: 'chromium', use: desktop, testIgnore: /published/ },
+    { name: 'chromium', use: { ...desktop, storageState: tourDone(ports.dev) }, testIgnore: /published/ },
     // The published build (sign-in, offline copy), served as GitHub Pages serves it.
-    { name: 'published', use: { ...desktop, baseURL: `http://localhost:${ports.preview}/note-board/` }, testMatch: /published/ },
+    { name: 'published', use: { ...desktop, storageState: tourDone(ports.preview), baseURL: `http://localhost:${ports.preview}/note-board/` }, testMatch: /published/ },
     // The offline tests again on a phone (Chrome on Android) and in Safari's engine (iPhone), so the
     // offline copy is checked there too; the rest of the suite runs on desktop Chrome only.
     ...[
@@ -37,7 +43,7 @@ export default defineConfig({
       { name: 'published-iphone', use: devices['iPhone 14'] },
     ].map((p) => ({
       ...p,
-      use: { ...p.use, baseURL: `http://localhost:${ports.preview}/note-board/` },
+      use: { ...p.use, storageState: tourDone(ports.preview), baseURL: `http://localhost:${ports.preview}/note-board/` },
       testMatch: /published/,
       grep: /offline|without internet/,
     })),

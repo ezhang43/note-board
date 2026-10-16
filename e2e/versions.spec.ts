@@ -6,7 +6,7 @@ import { add, clickEmpty } from './helpers';
 test.beforeEach(async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => (localStorage.clear(), localStorage.setItem('note-board:tour-done', '1')));
   await page.reload();
 });
 

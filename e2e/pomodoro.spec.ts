@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-06T09:00:00') });
   await page.clock.pauseAt(new Date('2026-10-06T09:00:01'));
   await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => (localStorage.clear(), localStorage.setItem('note-board:tour-done', '1')));
   await page.reload();
   await fontsLoaded(page);
 });

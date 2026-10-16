@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, clickEmpty, dragPointer, fontsLoaded, freshBoardEachTest, grabPoint } from './helpers';
+import { add, box, clickEmpty, fontsLoaded, freshBoardEachTest } from './helpers';
 
 // Owner requests, 2026-10-05 (second batch): Sign out no longer cut off, "Checklist" instead of
-// "To-do list", Miro-style arrows, and Clean up on each list beside Uncheck all.
+// "To-do list", and Clean up on each list beside Uncheck all. (Its Miro-style arrows were removed, owner 2026-10-16.)
 
 freshBoardEachTest();
 
@@ -78,126 +78,4 @@ test('Clean up beside Uncheck all moves only that list’s ticked items into the
   await clickEmpty(page);
   await page.keyboard.press('Control+z');
   expect(await texts(groceries)).toEqual(['eggs', 'bread', 'milk']);
-});
-
-/** Two notes, the second 200px below the first; nothing selected. */
-async function noteAbove(page: Page) {
-  await add(page, 'Note');
-  const id = await page.locator('.card.selected').getAttribute('data-card-id');
-  const top = page.locator(`[data-card-id="${id}"]`);
-  await add(page, 'Note');
-  const below = page.locator(`[data-card-id]:not([data-card-id="${id}"])`);
-  await clickEmpty(page);
-  const a = await box(top);
-  const from = await grabPoint(below);
-  const b = await box(below);
-  await dragPointer(page, from, { x: from.x + (a.x - b.x), y: from.y + (a.y + a.height + 200 - b.y) });
-  await clickEmpty(page);
-  return { top, below };
-}
-
-const dots = (page: Page) => page.locator('.arrow-dot');
-
-test('like Miro, hovering a card shows a dot on each side; dragging one onto another card draws a curved arrow side to side', async ({ page }) => {
-  const { top, below } = await noteAbove(page);
-  await expect(dots(page)).toHaveCount(0);
-  const t = await box(top);
-  await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2);
-  await expect(dots(page)).toHaveCount(4);
-  // One just outside the middle of each side.
-  const at = async (side: string) => {
-    const d = await box(page.getByRole('button', { name: `Draw an arrow from the ${side}` }));
-    return { x: d.x + d.width / 2, y: d.y + d.height / 2 };
-  };
-  const bottom = await at('bottom');
-  expect(Math.abs(bottom.x - (t.x + t.width / 2))).toBeLessThan(2);
-  expect(bottom.y).toBeGreaterThan(t.y + t.height);
-  expect(bottom.y).toBeLessThan(t.y + t.height + 24);
-  const right = await at('right');
-  expect(right.x).toBeGreaterThan(t.x + t.width);
-  expect(Math.abs(right.y - (t.y + t.height / 2))).toBeLessThan(2);
-
-  // Moving onto the dot keeps it there; drag it onto the card below.
-  const b = await box(below);
-  await dragPointer(page, bottom, { x: b.x + b.width / 2, y: b.y + b.height / 2 });
-  const arrow = page.locator('[data-arrow-id]');
-  await expect(arrow).toHaveCount(1);
-  // A curve from the middle of the top card's bottom side to the middle of the lower card's top side.
-  const ends = await arrow.locator('.arrow-line').evaluate((el) => {
-    const p = el as SVGPathElement;
-    const m = p.getScreenCTM()!;
-    const pt = (l: number) => {
-      const q = p.getPointAtLength(l);
-      return { x: q.x * m.a + m.e, y: q.y * m.d + m.f };
-    };
-    return { tag: p.tagName, start: pt(0), end: pt(p.getTotalLength()) };
-  });
-  expect(ends.tag).toBe('path');
-  expect(Math.abs(ends.start.x - (t.x + t.width / 2))).toBeLessThan(3);
-  expect(ends.start.y).toBeGreaterThan(t.y + t.height - 1);
-  expect(ends.start.y).toBeLessThan(t.y + t.height + 12);
-  expect(Math.abs(ends.end.x - (b.x + b.width / 2))).toBeLessThan(3);
-  expect(ends.end.y).toBeLessThan(b.y + 1);
-  expect(ends.end.y).toBeGreaterThan(b.y - 12);
-});
-
-test('a selected card shows its four dots too, and they go when the pointer leaves', async ({ page }) => {
-  const { top } = await noteAbove(page);
-  const p = await grabPoint(top);
-  await page.mouse.click(p.x, p.y);
-  await page.mouse.move(5, 500);
-  await expect(dots(page)).toHaveCount(4);
-  await clickEmpty(page);
-  await page.mouse.move(5, 500);
-  await expect(dots(page)).toHaveCount(0);
-});
-
-/** A column holding two notes, "upper" above "lower"; nothing selected, pointer on empty board. */
-async function columnOfTwo(page: Page) {
-  await add(page, 'New container');
-  const c = page.locator(`[data-col-id="${await page.locator('[data-col-id].selected').getAttribute('data-col-id')}"]`);
-  for (const text of ['upper', 'lower']) {
-    await c.click({ position: { x: 200, y: 26 } });
-    await add(page, 'Note');
-    await page.keyboard.type(text);
-  }
-  await clickEmpty(page);
-  const note = (text: string) => c.locator('[data-card-id]').filter({ has: page.locator(`textarea:text-is("${text}")`) });
-  return { column: c, upper: note('upper'), lower: note('lower') };
-}
-
-const dot = (page: Page, side: string) => page.getByRole('button', { name: `Draw an arrow from the ${side}` });
-const middle = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
-
-test('the dots of a card in a column can be reached across the column around it, and drawn from', async ({ page }) => {
-  const { upper } = await columnOfTwo(page);
-  // A loose note to the right of the column.
-  await add(page, 'Note');
-  const loose = page.locator(`[data-card-id="${await page.locator('.card.selected').getAttribute('data-card-id')}"]`);
-  await clickEmpty(page);
-  const u = await box(upper);
-  await page.mouse.move(u.x + u.width / 2, u.y + u.height / 2);
-  const right = middle(await box(dot(page, 'right')));
-  // Still the card's dot: just right of the card, inside the column.
-  expect(right.x).toBeLessThan(u.x + u.width + 20);
-  await page.mouse.move(right.x, right.y, { steps: 10 });
-  expect(middle(await box(dot(page, 'right'))).x).toBeCloseTo(right.x, 0);
-  await dragPointer(page, right, middle(await box(loose)));
-  await expect(page.locator('[data-arrow-id]')).toHaveCount(1);
-});
-
-test('a dot of one card never covers the card below it in a column', async ({ page }) => {
-  const { upper, lower } = await columnOfTwo(page);
-  const u = await box(upper);
-  await page.mouse.move(u.x + u.width / 2, u.y + u.height / 2);
-  // The upper card's bottom dot would lie on the lower card, so it isn't shown (owner request,
-  // later the same day); its side dots are.
-  await expect(dot(page, 'right')).toBeVisible();
-  await expect(dot(page, 'bottom')).toHaveCount(0);
-  // Move down onto the top middle of the lower card: it shows its dots, but no top one, which would
-  // lie on the upper card; its bottom dot is below it.
-  const l = await box(lower);
-  await page.mouse.move(l.x + l.width / 2, l.y + 3, { steps: 10 });
-  await expect.poll(async () => middle(await box(dot(page, 'bottom'))).y).toBeGreaterThan(l.y + l.height);
-  await expect(dot(page, 'top')).toHaveCount(0);
 });

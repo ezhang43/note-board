@@ -1,5 +1,11 @@
 # Changelog
 
+## Arrows between cards removed (2026-10-16)
+
+- The arrows you could draw between cards and containers are gone, as asked: hovering or selecting a card or container no longer shows the little connection dots.
+- Boards saved with arrows still open normally with every card, container and item as it was; only the arrows are left out. The next time you change anything, your boards are saved without them, so they are erased for good (from all your boards at once, since they are saved together). This also goes for backup files, shared boards and Version history.
+- The arrow keys, the collapse arrows and the normal arrow pointer are something else and work as before.
+
 ## Delete your account (2026-10-16)
 
 - Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.

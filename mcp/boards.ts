@@ -170,7 +170,10 @@ export function safeToEdit(raw: string | null): { ok: true } | { ok: false; reas
   const got = readWorkspace(raw);
   if (!got) return { ok: false, reason: 'the saved boards can’t be read (damaged, or from a newer version of the app)' };
   if (got.legacy) return { ok: false, reason: 'the boards were saved by an older version of the app; open BusyAnts once to update them' };
-  if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), JSON.parse(raw))) {
+  const saved = JSON.parse(raw);
+  // Arrows saved before they were removed (owner, 2026-10-16) are known: the next save erases them.
+  for (const b of Object.values(saved.boards)) delete (b as { arrows?: unknown } | null)?.arrows;
+  if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), saved)) {
     return { ok: false, reason: 'the boards hold data this connector doesn’t know (saved by a newer version of the app?)' };
   }
   return { ok: true };

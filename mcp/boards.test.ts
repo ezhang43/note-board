@@ -138,6 +138,11 @@ describe('safe to edit (round trip)', () => {
     data.boards.home.cards.noteIdea.titleColor = 'ocean';
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
+  it('yes for boards saved with arrows, which were removed (owner, 2026-10-16): the next save erases them', () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.arrows = [{ id: 'r1', from: 'noteIdea', to: 'colIdeas' }];
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
   it('key order alone doesn’t matter', () => {
     const data = JSON.parse(ownRaw());
     const reordered = { boards: data.boards, home: data.home, version: data.version };

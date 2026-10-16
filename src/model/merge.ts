@@ -1,12 +1,12 @@
-import type { Arrow, Board, Card, Column, TodoCard, TodoItem } from './types';
+import type { Board, Card, Column, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits to a board (real-time collaboration, owner request 2026-10-05).
 // `base` is the board both started from, `mine` this page's board, `theirs` the one someone else
-// saved. Changes to different things (cards, fields of a card, checklist items, arrows) are all
+// saved. Changes to different things (cards, fields of a card, checklist items) are all
 // kept. When both changed the very same thing, mine wins: it is the later change, since this page
 // sends the combined board straight after. A thing deleted on one side but edited on the other is
 // kept, so nothing typed is lost. The result always keeps the board's rules: every card in exactly
-// one place, every item in one list, no arrow to a missing block.
+// one place, every item in one list.
 
 type Obj = Record<string, unknown>;
 
@@ -221,15 +221,6 @@ function mergeItems(b: Board, m: Board, t: Board, cards: Record<string, Card>): 
   return out;
 }
 
-function mergeArrows(b: Board, m: Board, t: Board, blocks: (id: string) => boolean): Arrow[] | undefined {
-  const byId = (as: Arrow[] = []) => Object.fromEntries(as.map((a) => [a.id, a]));
-  const kept = mergeEntities(byId(b.arrows), byId(m.arrows), byId(t.arrows), (ba, ma, ta) => mergeFields(ba, ma, ta));
-  const ids = (as: Arrow[] = []) => as.map((a) => a.id);
-  const members = new Set(Object.keys(kept).filter((id) => blocks(kept[id].from) && blocks(kept[id].to)));
-  const arrows = orderList(ids(b.arrows), ids(m.arrows), ids(t.arrows), members).map((id) => kept[id]);
-  return arrows.length || m.arrows || t.arrows ? arrows : undefined;
-}
-
 /**
  * Columns and cards `side` deleted but `other` edited are kept, whole: they are put back on `side`
  * as they were in `base`, with what was in them (a column's cards, a list's items), as if `side` had
@@ -278,13 +269,11 @@ export function mergeBoards(base: Board, mineAsIs: Board, theirsAsIs: Board): Bo
   for (const [id, col] of Object.entries(columns)) outColumns[id] = { ...col, cardIds: lists.get(`col:${id}`) ?? [] };
 
   const merged: Board = {
-    ...mergeFields(base, mine, theirs, ['cards', 'columns', 'order', 'arrows']),
+    ...mergeFields(base, mine, theirs, ['cards', 'columns', 'order']),
     cards,
     columns: outColumns,
     order: lists.get('order') ?? [],
   };
-  const arrows = mergeArrows(base, mine, theirs, (id) => Boolean(cards[id] || outColumns[id]));
-  if (arrows) merged.arrows = arrows;
   if (deepEqual(merged, theirsAsIs)) return theirsAsIs;
   if (deepEqual(merged, mineAsIs)) return mineAsIs;
   return merged;

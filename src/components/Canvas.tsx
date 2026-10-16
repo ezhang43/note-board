@@ -7,7 +7,6 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
-import { Arrows } from './Arrows';
 
 const NO_GUIDES: never[] = [];
 const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New container' } as const;
@@ -233,7 +232,7 @@ export function Canvas() {
       {empty && (
         <p className="empty-hint">Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
       )}
-      <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`, '--zoom': view.zoom } as CSSProperties}>
+      <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         {order.map((id) => {
           if (id === draggedCard || id === draggedColumn) return null;
           return columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />;
@@ -241,7 +240,6 @@ export function Canvas() {
         {/* The block being dragged is drawn last so it stays on top. */}
         {draggedColumn && <ColumnView key={draggedColumn} id={draggedColumn} />}
         {draggedCard && <CardView key={draggedCard} id={draggedCard} inColumn={false} />}
-        <Arrows />
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}
         {/* Keyed by place in the list: two guides can share axis, line and start (the block lined up
             with two others at once), and repeated keys made React leave old lines on the board. */}

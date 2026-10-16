@@ -6,6 +6,14 @@
 - The panel now opens wider: 420px for Week (was 300) and 720px for Month (was 560). In the Week view an event's name can wrap onto a second line, so it is easier to read.
 - Fixed: clicking "+n more" (or a day) in the Month view looked like it did nothing, because the day's list sits under the grid, out of sight. The panel now scrolls to it.
 
+## Due panel lists every date ahead (2026-10-15)
+
+- The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier. A date typed in the date box that isn't a real day (such as a 5-digit year) is no longer saved.
+
+## Why I made BusyAnts on the About page (2026-10-16)
+
+- The About page now opens with the owner's short story of why BusyAnts was made, right under the headline and start button, followed by three highlights (shape it your way, fold away what you're not doing, built for checklists). Below the board picture, an "Also in BusyAnts" list of nine features replaces the old four feature cards and the separate import line. Nothing in the app changed.
+
 ## Low-risk crew workers use Sonnet (2026-10-15)
 
 - As a trial to save tokens, crew workers on low-risk jobs now run on the cheaper Sonnet model, at high effort. High-risk jobs (saving, sync, undo, deleting) and pull request checks stay on the stronger default model.

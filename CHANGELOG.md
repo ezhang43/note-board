@@ -1,5 +1,9 @@
 # Changelog
 
+## Connector/plugin block for Claude Code undone (2026-10-16)
+
+- Undid the change that turned off unused connectors and plugins for Claude Code in this project; the saving was not worth it. Nothing in the app changed.
+
 ## Website look: Done List (2026-10-16)
 
 - The website pages have a new look. Titles use a new font (Familjen Grotesk), and everything lines up in one neat column.

@@ -75,7 +75,7 @@ test('tick boxes, resize corners and the item grip are at least 24px to touch', 
   }
 });
 
-test('Ctrl+Shift+Down / Up move an item past its neighbour, keeping the cursor in it', async ({ page }) => {
+test('Ctrl+Shift+Down / Up move an item past its neighbor, keeping the cursor in it', async ({ page }) => {
   const l = await list(page, 'Groceries', ['milk', 'eggs', 'bread']);
   await l.getByLabel('Item text').first().click();
   await page.keyboard.press('Control+Shift+ArrowDown');
@@ -87,10 +87,10 @@ test('Ctrl+Shift+Down / Up move an item past its neighbour, keeping the cursor i
   await expect(l.getByLabel('Item text').first()).toBeFocused();
 });
 
-test('wording: placeholders, empty hint, Select tool tip, Colour label', async ({ page }) => {
+test('wording: placeholders, empty hint, Select tool tip, Color label', async ({ page }) => {
   await expect(page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('title', 'Select (V): drag a rectangle to select several cards and columns');
-  await expect(page.getByRole('button', { name: 'Colour of selected cards and columns' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Color of selected cards and columns' })).toHaveCount(1);
   const l = await list(page, '', []);
   await expect(l.getByLabel('Item text').first()).toHaveAttribute('placeholder', 'Add an item');
   await clickEmpty(page);

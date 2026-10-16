@@ -10,7 +10,7 @@ freshBoardEachTest();
 const toggle = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Dark mode' });
 const bodyBg = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-/** Rough brightness 0–255 of a computed rgb() colour. */
+/** Rough brightness 0–255 of a computed rgb() color. */
 function brightness(rgb: string) {
   const [r, g, b] = rgb.match(/\d+(\.\d+)?/g)!.map(Number);
   return 0.299 * r + 0.587 * g + 0.114 * b;
@@ -41,7 +41,7 @@ test('the toggle switches the whole app to dark and back, and is remembered afte
   await expect.poll(async () => brightness(await bodyBg(page))).toBeGreaterThan(200);
 });
 
-test('in dark mode cards are dark with light text, and columns use deep shades of their colour', async ({ page }) => {
+test('in dark mode cards are dark with light text, and columns use deep shades of their color', async ({ page }) => {
   await toggle(page).click();
   await add(page, 'Note');
   const card = looseCards(page).first();
@@ -50,7 +50,7 @@ test('in dark mode cards are dark with light text, and columns use deep shades o
   expect(brightness(cardStyle.ink)).toBeGreaterThan(200);
 
   await add(page, 'New column');
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
   await page.getByRole('button', { name: 'Rose' }).click();
   await expect(columns(page).first()).toHaveCSS('background-color', hexToRgb(DARK_PALETTE.rose.bg));
 });

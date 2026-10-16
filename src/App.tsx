@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, type CSSProperties } from 'react';
 import { Canvas } from './components/Canvas';
 import { DeleteCompleted } from './components/DeleteCompleted';
 import { FindBar } from './components/FindBar';
@@ -15,7 +15,8 @@ import { usePhone } from './components/usePhone';
 import { appStore, useAppState } from './store/appStore';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
-import { CalendarPanel } from './components/CalendarPanel';
+import { CalendarPanel, CalendarResizeHandle } from './components/CalendarPanel';
+import { PANEL_MIN } from './model/calendar';
 import { calendar } from './store/calendar';
 
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
@@ -33,12 +34,14 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const sidePanel = useAppState((s) => s.ui.sidePanel);
   // Anything in the right-hand spot (history, Due, the side panel) moves the corner controls aside.
   const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.dueOpen || s.ui.sidePanel !== null);
-  // The calendar's Month view widens the side panel (owner request, 2026-10-15).
-  const monthView = useSyncExternalStore(calendar.subscribe, () => calendar.get().view === 'month');
-  const monthPanel = monthView && sidePanel === 'calendar';
-  const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open', monthPanel && 'month-panel'].filter(Boolean).join(' ');
+  // The calendar panel's width is the person's own, for Week and Month separately (owner request,
+  // 2026-10-16). The CSS clamp keeps 300px of board beside it when the window shrinks.
+  const calendarWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().widths[calendar.get().view]);
+  const resizable = sidePanel === 'calendar' && !phone;
+  const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
+  const style = resizable ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${calendarWidth}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
   return (
-    <div className={classes}>
+    <div className={classes} style={style}>
       <Toolbar onSignOut={onSignOut} />
       <Canvas />
       {phone && <PhoneBar onSignOut={onSignOut} />}
@@ -57,6 +60,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
           <CalendarPanel />
         </SidePanel>
       )}
+      {resizable && <CalendarResizeHandle />}
       <DuePicker />
       <PreviewBar />
       <FormatBar />

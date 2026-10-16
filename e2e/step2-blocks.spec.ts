@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { fontsLoaded, importLinkCard } from './helpers';
 
-// Step 2: cards and columns — add, edit, move, drop into columns, collapse, colour, delete with confirmation.
+// Step 2: cards and columns — add, edit, move, drop into columns, collapse, color, delete with confirmation.
 
 type WithErrors = Page & { errors: string[] };
 
@@ -234,20 +234,29 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
 });
 
-test("Colour is faded with nothing selected; it colours a card's title band (card stays white) and a column", async ({ page }) => {
-  const colour = page.getByRole('button', { name: 'Colour of selected cards and columns' });
-  await expect(colour).toHaveAttribute('aria-disabled', 'true');
-  await colour.click({ force: true }); // clicking the faded button does nothing
-  await expect(page.getByRole('group', { name: 'Colours' })).toHaveCount(0);
+test("Color opens with nothing selected (swatches faded, doing nothing); it colors a card's title band (card stays white) and a column", async ({ page }) => {
+  const color = page.getByRole('button', { name: 'Color of selected cards and columns' });
+  await expect(color).not.toHaveAttribute('aria-disabled');
+  await color.click();
+  const empty = page.getByRole('group', { name: 'Colors' });
+  await expect(empty).toBeVisible();
+  await expect(empty.getByRole('button', { name: 'Rose' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(empty.getByRole('button', { name: 'Default' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(empty.getByRole('button', { name: 'Rose' })).toHaveCSS('opacity', '0.45');
+  await empty.getByRole('button', { name: 'Rose' }).click({ force: true }); // does nothing: no card to color, no undo step
+  await expect(page.getByRole('button', { name: 'Undo (Ctrl+Z)' })).toHaveAttribute('aria-disabled', 'true');
+  await color.click(); // closes again
+  await expect(empty).toHaveCount(0);
 
-  // A selected card: Colour tints its title band; the card stays white, text stays black.
+  // A selected card: Color tints its title band; the card stays white, text stays black.
   await add(page, 'Checklist');
   const list = cards(page).first();
   const header = list.locator('.card-header');
   const usual = await header.evaluate((el) => getComputedStyle(el).backgroundColor);
-  await expect(colour).not.toHaveAttribute('aria-disabled');
-  await colour.click();
-  const menu = page.getByRole('group', { name: 'Colours' });
+  await expect(color).not.toHaveAttribute('aria-disabled');
+  await color.click();
+  const menu = page.getByRole('group', { name: 'Colors' });
+  await expect(menu.getByRole('button', { name: 'Rose' })).not.toHaveAttribute('aria-disabled');
   await menu.getByRole('button', { name: 'Rose' }).click();
   await expect(header).not.toHaveCSS('background-color', usual);
   await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
@@ -256,12 +265,12 @@ test("Colour is faded with nothing selected; it colours a card's title band (car
   await menu.getByRole('button', { name: 'Default' }).click();
   await expect(header).toHaveCSS('background-color', usual);
 
-  // A note has no title: a colour tints its header strip.
+  // A note has no title: a color tints its header strip.
   await clickEmpty(page);
   await add(page, 'Note');
   const note = page.locator('.card.selected');
   await expect(note.locator('.card-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await colour.click();
+  await color.click();
   await menu.getByRole('button', { name: 'Sky' }).click();
   await expect(note.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await clickEmpty(page);
@@ -269,8 +278,8 @@ test("Colour is faded with nothing selected; it colours a card's title band (car
   await add(page, 'New column');
   const col = columns(page).first();
   await expect(col).toHaveCSS('background-color', 'rgb(239, 236, 230)');
-  await expect(colour).not.toHaveAttribute('aria-disabled');
-  await colour.click();
+  await expect(color).not.toHaveAttribute('aria-disabled');
+  await color.click();
   await expect(menu.locator('.swatch')).toHaveCount(24);
   await menu.getByRole('button', { name: 'Teal' }).click();
   await expect(col).toHaveCSS('background-color', 'rgb(224, 242, 241)');
@@ -314,13 +323,20 @@ test('clicking empty space or pressing Escape clears the selection', async ({ pa
   await expect(note).not.toHaveClass(/selected/);
 });
 
-test('Auto-colour gives every column its own colour, and can be undone', async ({ page }) => {
-  const auto = page.getByRole('button', { name: 'Auto-colour' });
-  await expect(auto).toHaveAttribute('aria-disabled', 'true');
+test('Auto-color, a button inside the Color menu, gives every column its own color, and can be undone', async ({ page }) => {
+  // It is not a toolbar button of its own any more.
+  await expect(page.getByRole('button', { name: 'Auto-color' })).toHaveCount(0);
+  const colorButton = page.getByRole('button', { name: 'Color of selected cards and columns' });
+  await colorButton.click();
+  const auto = page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Auto-color' });
+  await expect(auto).toHaveAttribute('aria-disabled', 'true'); // no columns yet
+  await colorButton.click();
   for (let i = 0; i < 3; i++) {
     await add(page, 'New column');
     await clickEmpty(page);
   }
+  // Nothing is selected, and it still works: Auto-color is about the whole board.
+  await colorButton.click();
   await expect(auto).not.toHaveAttribute('aria-disabled');
   await auto.click();
   const bgs = await columns(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
@@ -339,8 +355,8 @@ test('everything is kept after reload', async ({ page }) => {
   await page.keyboard.type('Pack bags');
   await clickEmpty(page);
   await col.click({ position: { x: 200, y: 26 } });
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
-  await page.getByRole('group', { name: 'Colours' }).getByRole('button', { name: 'Rose' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Rose' }).click();
   await clickEmpty(page);
   await add(page, 'Note');
   await looseCards(page).first().getByLabel('Note text').fill('Loose thought');
@@ -354,7 +370,7 @@ test('everything is kept after reload', async ({ page }) => {
   const note = looseCards(page).first();
   await expect(note.getByLabel('Note text')).toHaveValue('Loose thought');
   await expect(columns(page).first()).toHaveCSS('background-color', 'rgb(252, 231, 236)');
-  // Same spot on the board and same size (the screen opens centred on the board, so not the same screen spot).
+  // Same spot on the board and same size (the screen opens centered on the board, so not the same screen spot).
   expect(await boardPos(note)).toEqual(notePos);
   const size = await box(note);
   expect([size.width, size.height]).toEqual([noteSize.width, noteSize.height]);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PANEL_DEFAULT,
+  PANEL_STEP,
+  clampPanelWidth,
+  parsePanelWidths,
   addDays,
   addMonths,
   cellLines,
@@ -241,5 +245,34 @@ describe('editing an event', () => {
   it('an empty title is saved as "(No title)" in the list, but sent empty', () => {
     const body = draftBody({ title: '  ', allDay: true, startDate: '2026-10-08', startTime: '', endDate: '2026-10-08', endTime: '' }, 'UTC');
     expect(body?.summary).toBe('');
+  });
+});
+
+describe('the calendar panel’s width', () => {
+  it('starts roomier than the usual 300px: 420px for Week, 720px for Month', () => {
+    expect(PANEL_DEFAULT).toEqual({ week: 420, month: 720 });
+    expect(PANEL_STEP).toBe(20);
+  });
+
+  it('stays between 300px and the window width minus 300px, so 300px of board is left', () => {
+    expect(clampPanelWidth(500, 1440)).toBe(500);
+    expect(clampPanelWidth(100, 1440)).toBe(300);
+    expect(clampPanelWidth(5000, 1440)).toBe(1140);
+    expect(clampPanelWidth(720, 760)).toBe(460);
+    expect(clampPanelWidth(720.4, 1440)).toBe(720);
+  });
+
+  it('never goes below 300px, even in a window too small for both', () => {
+    expect(clampPanelWidth(500, 500)).toBe(300);
+  });
+
+  it('reads the remembered widths, and falls back to the defaults for anything bad', () => {
+    expect(parsePanelWidths('{"week":500,"month":900}')).toEqual({ week: 500, month: 900 });
+    expect(parsePanelWidths('{"week":500}')).toEqual({ week: 500, month: 720 });
+    expect(parsePanelWidths(null)).toEqual({ week: 420, month: 720 });
+    expect(parsePanelWidths('junk')).toEqual({ week: 420, month: 720 });
+    expect(parsePanelWidths('[1,2]')).toEqual({ week: 420, month: 720 });
+    expect(parsePanelWidths('{"week":"wide","month":-5}')).toEqual({ week: 420, month: 720 });
+    expect(parsePanelWidths('{"week":10,"month":1e9}')).toEqual({ week: 420, month: 720 });
   });
 });

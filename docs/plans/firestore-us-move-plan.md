@@ -90,7 +90,7 @@ Not in Firestore, so unaffected: Google sign-in accounts (Firebase Authenticatio
 
 ## 4. How devices behave during a move (from `src/store/sync.ts`, `src/store/sharing.ts`, `src/sync/session.ts`)
 
-These behaviours decide how risky each route is:
+These behaviors decide how risky each route is:
 
 1. **Own boards: on first load, the online copy wins** (`startSync`): "The first online version wins over this device's board; if there is no online copy yet, this device's board is uploaded."
    - If a device opens while the new database is **empty**, it uploads its own copy. An import done after that **overwrites it** with the export, which may be older. So **the app must not be able to reach an empty new database.**
@@ -303,4 +303,4 @@ Who does what: **Owner** = clicks in Firebase / Google Cloud. **Crew** = code, d
 
 - **Job #40: Firestore count script** (done): `scripts/firestore-counts.mjs`, read only, with unit tests in `scripts/firestore-counts.test.ts`.
 - **Job: wording after the move.** Privacy, SPEC, decisions, changelog (step 18). Wording only, after verification.
-- No app code change. If the owner prefers route A instead, a separate **high-risk** job changes `src/sync/firebase.ts` and `mcp/firestore.ts` (labelled `high-risk`, waits for the owner's OK and "publish").
+- No app code change. If the owner prefers route A instead, a separate **high-risk** job changes `src/sync/firebase.ts` and `mcp/firestore.ts` (labeled `high-risk`, waits for the owner's OK and "publish").

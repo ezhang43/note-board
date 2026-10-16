@@ -131,7 +131,7 @@ test('the About page lists everything else under "Also in BusyAnts", with no dup
   await expect(items.nth(0)).toHaveText('Free, with no card or board limits');
   await expect(items.nth(4)).toContainText('Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs');
   await expect(items.nth(4).getByRole('link')).toHaveAttribute('href', '../faq/#import');
-  await expect(items.nth(8)).toContainText('24 column colours, including 8 bold ones, with Auto-colour');
+  await expect(items.nth(8)).toContainText('24 column colors, including 8 bold ones, with Auto-color');
 });
 
 test('the new About sections fit a phone with no sideways scrolling', async ({ page }) => {

@@ -3,7 +3,7 @@ import { createCard, createColumn } from '../../model/cards';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../../model/clipboard';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/completed';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
-import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
+import { blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
 import { readImport } from '../../model/importFile';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
@@ -18,6 +18,7 @@ import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, resetZoom, screenToBoard, viewFitting, viewShowing, zoomBy } from '../../model/view';
 import { readWorkspace, type Workspace } from '../../model/workspace';
 import type { StoreContext } from '../core';
+import type { SidePanelKind } from '../types';
 
 // Board, view, selection and block actions: adding, importing, editing, collapsing, deleting,
 // copying and moving cards and columns.
@@ -64,23 +65,19 @@ export function blockActions(ctx: StoreContext) {
   }
 
   /**
-   * Clean up every list, or only list `onlyCardId`. The first Clean up makes the Completed card, at
-   * the free spot nearest the middle of the screen. The toolbar's selects the Completed card; a
-   * list's own keeps the list selected. One undo step. Returns how many items moved.
+   * Clean up every list, or only list `onlyCardId`. The first Clean up makes the board's Completed
+   * record, shown in the Completed panel and not drawn on the board (so where it is kept doesn't
+   * matter). The toolbar's clears the selection; a list's own keeps the list selected. One undo
+   * step. Returns how many items moved.
    */
   function cleanUpLists(now: Date, onlyCardId?: string): number {
     let count = 0;
-    let made: string | null = null;
     commit((b) => {
-      const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.completed, ctx.screenCentre(), measured) } as const;
-      const result = cleanUp(b, dayKey(now), place, undefined, onlyCardId);
+      const result = cleanUp(b, dayKey(now), { type: 'loose', x: 0, y: 0 }, undefined, onlyCardId);
       if (!result.count) return null;
       count = result.count;
-      if (!completedCardOf(b)) made = result.cardId;
-      const selection = onlyCardId ? [onlyCardId] : result.cardId ? [result.cardId] : [];
-      return { board: result.board, ui: { selection, itemSel: null, confirm: null } };
+      return { board: result.board, ui: { selection: onlyCardId ? [onlyCardId] : [], itemSel: null, confirm: null } };
     });
-    if (made) requestSettle([made]);
     return count;
   }
 
@@ -134,7 +131,7 @@ export function blockActions(ctx: StoreContext) {
     // ---------- version history (owner request) ----------
     toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, dueOpen: false, sidePanel: null, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
     /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history and Due. */
-    toggleSidePanel: (panel: 'pomodoro' | 'calendar') =>
+    toggleSidePanel: (panel: SidePanelKind) =>
       updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, dueOpen: false, preview: null }),
     /** Show an old version on the board, read-only (the real board is untouched). */
     previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
@@ -204,8 +201,8 @@ export function blockActions(ctx: StoreContext) {
       else if (!sel.includes(id)) updateUi({ selection: [id], itemSel: null });
       else updateUi({ itemSel: null });
     },
-    /** Ctrl+A: every column and loose card. */
-    selectAll: () => updateUi({ selection: [...ctx.state.board.order], itemSel: null }),
+    /** Ctrl+A: every column and loose card (not the Completed record, which isn't drawn on the board). */
+    selectAll: () => updateUi({ selection: ctx.state.board.order.filter((id) => ctx.state.board.cards[id]?.kind !== 'completed'), itemSel: null }),
     /** Click on empty board or Escape: clear the selection and close menus. */
     clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, deleteCompleted: null, arrowSel: null }),
     toggleColourMenu() {
@@ -291,16 +288,13 @@ export function blockActions(ctx: StoreContext) {
       return cleanUpLists(now, cardId);
     },
 
-    /** Unticking an item in the Completed card sends it back to its list (or a new list, if that's gone). */
+    /** Unticking an item in the Completed panel sends it back to its list (or a new list, if that's gone). */
     restoreCompleted(itemId: string) {
       let cardId: string | null = null;
       const board = commit((b) => {
-        const done = completedCardOf(b);
-        if (!done) return null;
-        // If its list is gone, the new list goes next to the Completed card.
-        const near = blockRect(b, B.topLevelOf(b, done.id), measured);
-        const centre = near ? { x: near.x + near.w + CARD_W / 2 + 20, y: near.y + NEW_BLOCK_H.todo / 2 } : ctx.screenCentre();
-        const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, centre, measured) } as const;
+        if (!completedCardOf(b)) return null;
+        // If its list is gone, the new list goes at the free spot nearest the middle of the screen.
+        const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, ctx.screenCentre(), measured) } as const;
         const result = restoreEntry(b, itemId, place);
         cardId = result.cardId;
         return cardId ? result.board : null;

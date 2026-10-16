@@ -60,7 +60,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
               Completed
             </button>
             <div className="completed-actions">
-              <button type="button" className="uncheck-all" title="Move this list's ticked items into the Completed card, under today's date" onClick={() => appStore.cleanUpList(card.id)}>
+              <button type="button" className="uncheck-all" title="Move this list's ticked items into the Completed panel, under today's date" onClick={() => appStore.cleanUpList(card.id)}>
                 Clean up
               </button>
               <button type="button" className="uncheck-all" title="Untick every item, to use this list again" onClick={() => appStore.uncheckAll(card.id)}>

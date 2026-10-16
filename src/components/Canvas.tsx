@@ -18,6 +18,8 @@ export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
 
   const order = useAppState((s) => s.board.order);
+  // Nothing drawn (a Completed record is kept but never drawn): show the hint.
+  const empty = useAppState((s) => s.board.order.every((id) => s.board.cards[id]?.kind === 'completed'));
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   const draggedColumn = useAppState((s) => (s.ui.drag?.kind === 'column' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
@@ -228,7 +230,7 @@ export function Canvas() {
         backgroundPosition: `${grid.offsetX}px ${grid.offsetY}px`,
       } as CSSProperties}
     >
-      {order.length === 0 && (
+      {empty && (
         <p className="empty-hint">Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
       )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`, '--zoom': view.zoom } as CSSProperties}>

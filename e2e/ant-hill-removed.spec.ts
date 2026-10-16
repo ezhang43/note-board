@@ -1,15 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, cards, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, clickEmpty, freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
 // Owner request (2026-10-06): the ant hill is gone. No hill on the board, before or after Clean up,
-// and Clean up still moves ticked items into the Completed card as before.
+// and Clean up still moves ticked items into Completed as before (now a panel, Job #51).
 
 const cleanUpButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Clean up', exact: true });
 const anyHill = (page: Page) => page.locator('.ant-hill, .hill-ant, .hill-caption');
 
-test('there is no ant hill on the board, and Clean up still fills the Completed card', async ({ page }) => {
+test('there is no ant hill on the board, and Clean up still fills the Completed panel', async ({ page }) => {
   await expect(page.getByTestId('canvas')).toBeVisible();
   await expect(anyHill(page)).toHaveCount(0);
   await expect(page.getByText(/Hill 1 · /)).toHaveCount(0);
@@ -23,7 +23,8 @@ test('there is no ant hill on the board, and Clean up still fills the Completed 
   await list.getByLabel('Done').first().click();
   await cleanUpButton(page).click();
 
-  const done = cards(page).filter({ has: page.locator('.completed-card-body') });
+  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  const done = page.getByRole('complementary', { name: 'Completed' });
   await expect(done.locator('.completed-text')).toHaveText(['milk']);
   await expect(anyHill(page)).toHaveCount(0);
   await expect(page.getByRole('img', { name: /hill/i })).toHaveCount(0);

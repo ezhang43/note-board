@@ -8,12 +8,15 @@ export type MeasuredHeight = (id: string) => number | undefined;
 /** Search step for free spots: whole grid steps when snapping, finer otherwise. */
 const stepFor = (board: Board) => (board.snap ? GRID : 10);
 
-/** The rectangle a top-level block (column or loose card) covers on the board. */
+/**
+ * The rectangle a top-level block (column or loose card) covers on the board. The Completed record
+ * isn't drawn (it shows in the Completed panel), so it covers nothing.
+ */
 export function blockRect(board: Board, id: string, measured: MeasuredHeight): Rect | null {
   const col = board.columns[id];
   if (col) return { x: col.x, y: col.y, w: col.w, h: measured(id) ?? NEW_BLOCK_H.column };
   const card = board.cards[id];
-  if (card) return { x: card.x, y: card.y, w: card.w ?? CARD_W, h: measured(id) ?? card.h ?? NEW_BLOCK_H[card.kind] };
+  if (card && card.kind !== 'completed') return { x: card.x, y: card.y, w: card.w ?? CARD_W, h: measured(id) ?? card.h ?? NEW_BLOCK_H[card.kind] };
   return null;
 }
 
@@ -66,7 +69,10 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
     return a >= 0 ? a : anchors.length + (board.columns[id] ? 0 : 1);
   };
   const blocks = board.order
-    .map((id, i) => ({ id, i, rect: blockRect(board, id, measured)! }))
+    .flatMap((id, i) => {
+      const rect = blockRect(board, id, measured);
+      return rect ? [{ id, i, rect }] : [];
+    })
     .sort((a, b) => rank(a.id) - rank(b.id) || a.i - b.i);
 
   const placed: Rect[] = [];

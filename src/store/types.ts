@@ -104,6 +104,9 @@ export interface ItemDrag {
   hint: ItemHint | null;
 }
 
+/** What the side panel beside the board can show. */
+export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed';
+
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {
   selection: string[];
@@ -146,9 +149,9 @@ export interface Ui {
   dueOpen: boolean;
   /**
    * The side panel beside the board (owner request: focus timer), in the right-hand spot that
-   * Version history and Due also use: one of them at a time.
+   * Version history and Due also use: one of them at a time. 'completed' is the board's Completed panel.
    */
-  sidePanel: 'pomodoro' | 'calendar' | null;
+  sidePanel: SidePanelKind | null;
   /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
   arrowSel: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */

@@ -315,7 +315,7 @@ export function DarkModeButton({ labelled = false }: { labelled?: boolean }) {
   );
 }
 
-/** Clean up: moves every ticked item into the Completed card. Faded when nothing is ticked. */
+/** Clean up: moves every ticked item into the Completed panel. Faded when nothing is ticked. */
 export function CleanUpButton() {
   // An item still easing out to Completed counts as ticked (Clean up applies it first).
   const any = useAppState((s) => hasTickedItems(s.board) || s.ui.completing.length > 0);
@@ -323,7 +323,7 @@ export function CleanUpButton() {
     <button
       type="button"
       className="tb-button faded-colour quiet"
-      title={any ? "Move every ticked item into the Completed card, under today's date" : 'Nothing is ticked yet'}
+      title={any ? "Move every ticked item into the Completed panel, under today's date" : 'Nothing is ticked yet'}
       aria-disabled={any ? undefined : true}
       onClick={() => any && appStore.cleanUp()}
     >

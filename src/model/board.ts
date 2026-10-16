@@ -258,9 +258,11 @@ export function moveBlocksBy(board: Board, ids: string[], dx: number, dy: number
 export function shiftInColumn(board: Board, cardId: string, step: -1 | 1): Board {
   const col = columnOf(board, cardId);
   if (!col) return board;
-  const index = col.cardIds.indexOf(cardId) + step;
-  if (index < 0 || index >= col.cardIds.length) return board;
-  return moveCard(board, cardId, { type: 'column', columnId: col.id, index });
+  // An older board can keep its Completed record (not drawn) in a column: step past it.
+  const shown = col.cardIds.filter((id) => board.cards[id]?.kind !== 'completed');
+  const past = shown[shown.indexOf(cardId) + step];
+  if (!past) return board;
+  return moveCard(board, cardId, { type: 'column', columnId: col.id, index: col.cardIds.indexOf(past) });
 }
 
 /**

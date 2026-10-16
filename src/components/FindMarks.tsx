@@ -5,7 +5,7 @@ import { useAppState } from '../store/appStore';
 /**
  * Search (owner request): `text` with every match of the search marked, the current one strongly.
  * Inside a text box it is drawn as an invisible copy of the text behind it (`overlay`), so only the
- * marks show; elsewhere (the Completed card) it is the text itself.
+ * marks show; elsewhere (the Completed panel) it is the text itself.
  */
 export function FindMarks({ find, text, overlay = false }: { find: string; text: string; overlay?: boolean }) {
   const query = useAppState((s) => s.ui.find?.query ?? '');

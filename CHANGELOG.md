@@ -1,5 +1,11 @@
 # Changelog
 
+## A bolder look for the website (2026-10-16)
+
+- The About, FAQ, Terms and Privacy pages now share one bolder look: a solid honey top slab, big chunky headlines in a new font (Bricolage Grotesque), and the same warm colors as the app. About is the showpiece, with a huge ant, a dotted trail and real pictures of the app; the other three pages keep the same style but stay calm and easy to read.
+- The big ant stays fully in view at every computer width, the menu stays on one line on a phone (the ant icon stands in for the name there), and in dark mode the slab is a lighter brown that stands out clearly from the page, with text that is easy to read.
+- The board picture on the About page now has a dark version for dark mode. Every word and link is unchanged; nothing in the app or in anyone's saved boards changed.
+
 ## About page says "list" not "sub-list" (2026-10-16)
 
 - The second highlight card on the About page now reads "Collapse any card, column or list, or everything at once, and bring it back in one click." Wording only; nothing in the app changed.

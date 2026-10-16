@@ -7,17 +7,17 @@
     <meta name="description" content="BusyAnts is a calm, free visual board for notes and checklists. Share a board by link and plan together in real time. Works offline and installs like an app." />
     <link rel="icon" href="/busyants-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/busyants-apple-180.png" />
-    <meta name="theme-color" content="#FFF1C2" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#2A2416" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FFCF3F" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#5A3C14" media="(prefers-color-scheme: dark)" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="/src/site.css" />
   </head>
-  <body>
+  <body class="bold landing">
     <header class="site-header">
       <nav aria-label="Site">
-        <a class="site-brand" href="../about/"><img src="/busyants-icon.svg" alt="" width="32" height="32" />BusyAnts</a>
+        <a class="site-brand" href="../about/"><img src="/busyants-icon.svg" alt="" width="32" height="32" /><span class="brand-name">BusyAnts</span></a>
         <a href="../about/" aria-current="page">About</a>
         <a href="../faq/">FAQ</a>
         <a href="../terms/">Terms</a>
@@ -26,45 +26,75 @@
       </nav>
     </header>
     <main>
-      <h1>BusyAnts</h1>
-      <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
-      <a class="start" href="../">Start your board, free</a>
+      <section class="hero">
+        <div class="hero-inner">
+          <h1>BusyAnts</h1>
+          <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
+          <a class="start" href="../">Start your board, free</a>
+        </div>
+        <svg class="ant" viewBox="90 70 350 345" aria-hidden="true" focusable="false">
+          <g fill="currentColor" stroke="currentColor" stroke-linecap="round">
+            <path d="M160 160 Q150 112 116 96" fill="none" stroke-width="14" />
+            <path d="M214 156 Q228 108 264 94" fill="none" stroke-width="14" />
+            <circle cx="114" cy="94" r="16" stroke="none" />
+            <circle cx="266" cy="92" r="16" stroke="none" />
+            <path d="M250 334 L240 380 M292 338 L298 384 M346 362 L364 400" fill="none" stroke-width="20" />
+            <circle cx="350" cy="306" r="76" stroke="none" />
+            <circle cx="268" cy="300" r="34" stroke="none" />
+            <circle cx="186" cy="244" r="94" stroke="none" />
+          </g>
+        </svg>
+        <div class="trail" aria-hidden="true"></div>
+      </section>
 
-      <h2>Why I made BusyAnts</h2>
-      <div class="why">
-        <p>I wake up most mornings feeling like an ant: a long line of small jobs, and a real need to see them get done.</p>
-        <p>I've tried Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist. Each did part of it. Some were too rigid to shape the way I think, some slowed down once a board got big, and most were built around loose notes, when what I actually live in is checklists.</p>
-        <p>So I built the board I wanted: a calm canvas centered on checklists, with structure when I need it and room to move things around when I don't. Tick something off and it slides into Completed, so at the end of the day there's a record of what got done.</p>
+      <div class="page">
+        <section class="why-section">
+          <h2>Why I made BusyAnts</h2>
+          <div class="why">
+            <p>I wake up most mornings feeling like an ant: a long line of small jobs, and a real need to see them get done.</p>
+            <p>I've tried Milanote, Evernote, Notion, Miro, Google Keep, Windows Sticky Notes and Todoist. Each did part of it. Some were too rigid to shape the way I think, some slowed down once a board got big, and most were built around loose notes, when what I actually live in is checklists.</p>
+            <p>So I built the board I wanted: a calm canvas centered on checklists, with structure when I need it and room to move things around when I don't. Tick something off and it slides into Completed, so at the end of the day there's a record of what got done.</p>
+          </div>
+          <ul class="features highlights">
+            <li>
+              <h3>Shape it your way</h3>
+              <p>Columns, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
+            </li>
+            <li>
+              <h3>Fold away what you're not doing</h3>
+              <p>Collapse any card, column or list, or everything at once, and bring it back in one click.</p>
+            </li>
+            <li>
+              <h3>Built for checklists</h3>
+              <p>Nested sub-items, due dates, a Due list, tick with Ctrl+Enter, and one-click Clean up of everything you've finished.</p>
+            </li>
+          </ul>
+        </section>
       </div>
-      <ul class="features highlights">
-        <li>
-          <h3>Shape it your way</h3>
-          <p>Columns, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
-        </li>
-        <li>
-          <h3>Fold away what you're not doing</h3>
-          <p>Collapse any card, column or list, or everything at once, and bring it back in one click.</p>
-        </li>
-        <li>
-          <h3>Built for checklists</h3>
-          <p>Nested sub-items, due dates, a Due list, tick with Ctrl+Enter, and one-click Clean up of everything you've finished.</p>
-        </li>
-      </ul>
 
-      <img class="shot" src="./board.png" width="1280" height="800" alt="A BusyAnts board: columns of checklists and notes on a warm cream background." />
+      <section class="showcase">
+        <picture>
+          <source srcset="./board-dark.png" media="(prefers-color-scheme: dark)" />
+          <img class="shot" src="./board.png" width="1280" height="800" alt="A BusyAnts board: columns of checklists and notes on a warm cream background." />
+        </picture>
+      </section>
 
-      <h2>Also in BusyAnts</h2>
-      <ul class="also">
-        <li>Free, with no card or board limits</li>
-        <li>Share a board by link and edit together in real time</li>
-        <li>Works offline and installs like an app on computer and phone</li>
-        <li>Version history to bring back any earlier version, plus full backups</li>
-        <li>Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs (<a href="../faq/#import">how</a>)</li>
-        <li>Find anything on a board, keyboard shortcuts for everything (press ?), and a focus timer</li>
-        <li>Google Calendar beside your board, to see and edit your week</li>
-        <li>Dark mode, and a layout made for phones</li>
-        <li>24 column colors, including 8 bold ones, with Auto-color</li>
-      </ul>
+      <div class="page">
+        <section class="also-section">
+          <h2>Also in BusyAnts</h2>
+          <ul class="also">
+            <li>Free, with no card or board limits</li>
+            <li>Share a board by link and edit together in real time</li>
+            <li>Works offline and installs like an app on computer and phone</li>
+            <li>Version history to bring back any earlier version, plus full backups</li>
+            <li>Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs (<a href="../faq/#import">how</a>)</li>
+            <li>Find anything on a board, keyboard shortcuts for everything (press ?), and a focus timer</li>
+            <li>Google Calendar beside your board, to see and edit your week</li>
+            <li>Dark mode, and a layout made for phones</li>
+            <li>24 column colors, including 8 bold ones, with Auto-color</li>
+          </ul>
+        </section>
+      </div>
     </main>
     <footer class="site-footer">
       <nav aria-label="More links">

@@ -141,6 +141,78 @@ test('the new About sections fit a phone with no sideways scrolling', async ({ p
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+// Job #59 (owner request 2026-10-16): the bolder look, one system on all four pages: a honey slab (warm
+// brown in dark mode) holds the nav and the page title, set in a heavy display type.
+type Rgb = [number, number, number];
+const toRgb = (css: string): Rgb => css.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(Number) as Rgb;
+const luminance = ([r, g, b]: Rgb) => {
+  const [lr, lg, lb] = [r, g, b].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+};
+const contrast = (a: Rgb, b: Rgb) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+for (const p of PAGES) {
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`${p.path} has the bold slab in ${scheme} mode, standing out from the page, with readable text`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto(p.path);
+      const c = await page.evaluate(() => {
+        const css = (el: Element, prop: string) => getComputedStyle(el).getPropertyValue(prop);
+        const nav = document.querySelector('.site-header a[aria-current="page"]')!;
+        return {
+          slab: css(document.querySelector('.site-header')!, 'background-color'),
+          page: css(document.body, 'background-color'),
+          h1: css(document.querySelector('main h1')!, 'color'),
+          h1Font: css(document.querySelector('main h1')!, 'font-family'),
+          nav: css(nav, 'color'),
+        };
+      });
+      if (scheme === 'light') expect(toRgb(c.slab)).toEqual([255, 207, 63]);
+      expect(c.h1Font).toContain('Bricolage Grotesque');
+      // The slab stands out from the page (honey on cream is a color jump, so it needs less lightness gap than
+      // brown on near-black), and the text on it passes WCAG AA.
+      expect(contrast(toRgb(c.slab), toRgb(c.page))).toBeGreaterThanOrEqual(scheme === 'dark' ? 1.5 : 1.3);
+      expect(contrast(toRgb(c.h1), toRgb(c.slab))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(toRgb(c.nav), toRgb(c.slab))).toBeGreaterThanOrEqual(4.5);
+      // The page title sits on the slab, not on the plain page below it.
+      const bg = await page.evaluate(() => {
+        const h1 = document.querySelector('main h1')!.getBoundingClientRect();
+        const header = document.querySelector('.site-header')!.getBoundingClientRect();
+        return { h1Top: h1.top, headerBottom: header.bottom };
+      });
+      expect(bg.h1Top).toBeGreaterThanOrEqual(bg.headerBottom);
+    });
+  }
+
+  test(`${p.path} keeps the whole nav on one line at 375px, with every link still there`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto(p.path);
+    const nav = page.getByRole('navigation', { name: 'Site' });
+    await expect(nav.getByRole('link')).toHaveCount(6);
+    const tops = await nav.getByRole('link').evaluateAll((as) => as.map((a) => Math.round(a.getBoundingClientRect().top + a.getBoundingClientRect().height / 2)));
+    expect(new Set(tops).size).toBe(1);
+    // No link text broken over two lines.
+    const heights = await nav.getByRole('link').evaluateAll((as) => as.map((a) => a.getBoundingClientRect().height));
+    heights.forEach((h) => expect(h).toBeLessThan(40));
+    await expect(nav.getByRole('link', { name: 'BusyAnts', exact: true })).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+for (const width of [1280, 1440, 1920, 390]) {
+  test(`the giant ant on the About page stays fully in frame at ${width}px wide`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/about/');
+    const box = (await page.locator('svg.ant').boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+  });
+}
+
 test('the legal pages name BusyAnts, the date, the law and a way to get in touch', async ({ page }) => {
   await page.goto('/terms/');
   const terms = page.locator('main');

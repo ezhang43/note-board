@@ -2,8 +2,22 @@ import { appStore } from '../store/appStore';
 import { boardsInKeptShares, ownBoardsGuard, startSharing, type Sharing } from '../store/sharing';
 import { startSync, type SaveState } from '../store/sync';
 import { activeVersionStore, startVersions } from '../store/versions';
+import { deleteAccountData } from '../store/account';
+import { account, finishDeletion, takeDeletedNote } from './account';
 import { collab, joinFromAddress } from './collabSession';
-import { boardRemote, collabRemote, signInWithGoogle, signOutUser, versionsRemote, watchUser } from './firebase';
+import {
+  accountRemote,
+  boardRemote,
+  clearOfflineCopy,
+  collabRemote,
+  confirmSignIn,
+  currentUser,
+  signInWithGoogle,
+  signOutUser,
+  versionsRemote,
+  watchUser,
+  type User,
+} from './firebase';
 import { flushWhenHidden } from './pageHide';
 
 /**
@@ -28,6 +42,10 @@ let sharing: Sharing | null = null;
 const SHARED_WAIT_MS = 5000;
 /** Identifies this open page, so it can ignore its own uploads when they come back. */
 const client = crypto.randomUUID();
+/** This page opened just after the person deleted their account: the sign-in screen says so. */
+let deleted = takeDeletedNote();
+/** Deleting the account is under way: signing out part-way shows nothing till the page reloads. */
+let deleting = false;
 
 function update(next: SessionStatus, error = '') {
   status = next;
@@ -35,19 +53,30 @@ function update(next: SessionStatus, error = '') {
   listeners.forEach((l) => l());
 }
 
-watchUser((user) => {
+/** Stops syncing everything (signed out, or deleting the account). */
+function stopAll() {
   sync?.stop();
   sync = null;
   versions?.stop();
   versions = null;
   sharing?.stop();
   sharing = null;
+}
+
+watchUser((user) => {
+  stopAll();
   collab.set(null, null);
   if (!user) {
-    update('signed-out');
+    if (!deleting) update('signed-out');
     return;
   }
-  update('loading');
+  deleted = false;
+  start(user);
+});
+
+/** Starts syncing `user`'s boards; `quiet`: the board stays on screen meanwhile (after a failed delete). */
+function start(user: User, quiet = false) {
+  if (!quiet) update('loading');
   // Shared boards first (owner request: editing together): the person's own boards are synced
   // without them, so it must be known which boards are shared before those are.
   const backend = collabRemote(user);
@@ -73,6 +102,13 @@ watchUser((user) => {
         listeners.forEach((l) => l());
       },
       onError: (e) => update((e as { code?: string }).code === 'permission-denied' ? 'no-access' : 'error'),
+      // The account was deleted on another device (job #63): this one stops, so nothing is put
+      // back online, and signs out with the note. Its copy on this device is left as it is.
+      onGone: () => {
+        stopAll();
+        deleted = true;
+        void signOutUser();
+      },
     });
   };
   const active = startSharing(appStore, backend, {
@@ -94,7 +130,38 @@ watchUser((user) => {
   sharing = active;
   collab.set(active, backend.me);
   setTimeout(startOwnBoards, SHARED_WAIT_MS);
-});
+}
+
+/**
+ * Deletes the signed-in person's account and data (job #63): Google confirms it is them, syncing
+ * stops (so nothing is sent back meanwhile), everything online is deleted with the sign-in last,
+ * then this device is cleared and the page reloads to the sign-in screen. If it fails, syncing
+ * starts again and nothing on the device is touched.
+ */
+async function deleteAccount() {
+  const user = currentUser();
+  if (!user || !sharing) throw new Error('Not signed in');
+  await confirmSignIn(user);
+  const backend = collabRemote(user);
+  // Changes still waiting are sent first, so if deleting fails and syncing starts again from the
+  // online copy, none are lost.
+  sync?.flush();
+  sharing?.flush();
+  stopAll();
+  deleting = true;
+  let done: { shareIds: string[] };
+  try {
+    done = await deleteAccountData(user.uid, accountRemote(user, backend));
+  } catch (e) {
+    deleting = false;
+    if (currentUser()?.uid === user.uid) start(user, true);
+    else update('signed-out');
+    throw e;
+  }
+  await clearOfflineCopy();
+  finishDeletion(appStore, localStorage, user.uid, done.shareIds);
+}
+account.setRemover(deleteAccount);
 
 flushWhenHidden(document, window, () => {
   sync?.flush();
@@ -119,6 +186,8 @@ function saveNote(): string | null {
 export const session = {
   getStatus: () => status,
   getSignInError: () => signInError,
+  /** Whether to say "Your account and data were deleted." on the sign-in screen. */
+  wasDeleted: () => deleted,
   getSaveFailed: () => saveState === 'failed' || shareSaveState === 'failed',
   getSaveNote: saveNote,
   subscribe(listener: () => void) {

@@ -21,7 +21,7 @@ export interface VersionStore {
   keep?: number;
 }
 
-const LIST_KEY = 'note-board:versions:v1';
+export const LIST_KEY = 'note-board:versions:v1';
 /**
  * How long a delete or a backup restore waits for its safety version to be saved. Offline, an
  * online save only answers once back online: the version is still saved then, but the action
@@ -37,7 +37,7 @@ export function saveSafetyVersion(store: Store, versions: VersionStore, now: () 
   const saving = saveVersion(versions, serializeWorkspace(store.workspace()), now()).catch(() => null);
   return Promise.race([saving, new Promise((done) => setTimeout(done, VERSION_SAVE_WAIT_MS))]);
 }
-const dataKey = (id: string) => `note-board:version:${id}`;
+export const dataKey = (id: string) => `note-board:version:${id}`;
 
 /** Versions kept in this device's storage (local-only use and tests). */
 export function localVersionStore(storage: StorageLike & { removeItem?(key: string): void }, keep = LOCAL_KEEP_VERSIONS): VersionStore {

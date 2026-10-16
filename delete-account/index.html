@@ -1,0 +1,75 @@
+<!doctype html>
+<!--
+  Draft for the owner to review; not legal advice.
+  How to delete a BusyAnts account and its data (job #63, required by Google Play for apps with sign-in).
+  Written from what the app does (src/store/account.ts, src/sync/firebase.ts) on 2026-10-16.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BusyAnts: delete your account</title>
+    <meta name="description" content="How to delete your BusyAnts account and all your data, from inside the app or by email, and what gets deleted." />
+    <link rel="icon" href="/busyants-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/busyants-apple-180.png" />
+    <meta name="theme-color" content="#FFCF3F" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#5A3C14" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="/src/site.css" />
+  </head>
+  <body class="bold">
+    <header class="site-header">
+      <nav aria-label="Site">
+        <a class="site-brand" href="../about/"><img src="/busyants-icon.svg" alt="" width="32" height="32" /><span class="brand-name">BusyAnts</span></a>
+        <a href="../about/">About</a>
+        <a href="../faq/">FAQ</a>
+        <a href="../terms/">Terms</a>
+        <a href="../privacy/">Privacy</a>
+        <a href="../">Open BusyAnts</a>
+      </nav>
+    </header>
+    <main class="text">
+      <div class="page-head">
+        <h1>Delete your account</h1>
+      </div>
+
+      <p>You can delete your BusyAnts account and all your data at any time, from inside BusyAnts. It can't be undone.</p>
+
+      <h2>In BusyAnts</h2>
+      <ol>
+        <li>Open <a href="../">BusyAnts</a> and sign in with the Google account you use for it.</li>
+        <li>On a computer, open the <strong>File</strong> menu at the top. On a phone, press <strong>⋯</strong> at the bottom right, then <strong>File</strong>.</li>
+        <li>Choose <strong>Delete account…</strong>.</li>
+        <li>If you want to keep a copy, press <strong>Download a backup first</strong>.</li>
+        <li>Type <strong>DELETE</strong>, press <strong>Delete my account</strong>, and sign in with Google once more when asked, to show it's you.</li>
+      </ol>
+      <p>Everything is deleted straight away and you are signed out. You need an internet connection for this.</p>
+
+      <h2>If you can't sign in</h2>
+      <p>Email <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a> from the email address of your Google account and ask for your BusyAnts account to be deleted. Everything is deleted within 30 days of your request, and you get a reply when it's done.</p>
+
+      <h2>What gets deleted</h2>
+      <ul>
+        <li>All your boards and everything on them.</li>
+        <li>Your version history (the earlier versions of your boards kept online).</li>
+        <li>Boards you shared, with the boards inside them: they are deleted for everyone you shared them with.</li>
+        <li>Your place on boards others shared with you: you leave them, and they keep the board.</li>
+        <li>Your name and photo on shared boards, and your list of shared boards.</li>
+        <li>Your BusyAnts sign-in. Your Google account itself isn't touched.</li>
+        <li>The copy of your boards kept on the device you delete from.</li>
+      </ul>
+      <p>Backup files you downloaded stay on your own device until you delete them. Copies in the service's own safety backups, if any were made, are deleted as those backups expire, within 90 days. See the <a href="../privacy/">Privacy policy</a> for everything BusyAnts stores.</p>
+    </main>
+    <footer class="site-footer">
+      <nav aria-label="More links">
+        <a href="../faq/">FAQ</a>
+        <a href="../terms/">Terms of use</a>
+        <a href="../privacy/">Privacy policy</a>
+        <a href="../delete-account/">Delete your account</a>
+        <a href="https://buymeacoffee.com/ezcookie" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+      </nav>
+    </footer>
+  </body>
+</html>

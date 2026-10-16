@@ -4,12 +4,14 @@ import type { SessionStatus } from '../sync/session';
 interface Props {
   status: Exclude<SessionStatus, 'ready'>;
   error: string;
+  /** The person just deleted their account (job #63). */
+  deleted?: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
 }
 
 /** Shown instead of the board until an account is signed in and its board has loaded. */
-export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
+export function SignInScreen({ status, error, deleted = false, onSignIn, onSignOut }: Props) {
   return (
     <main className="sign-in">
       <div className="sign-in-panel">
@@ -17,6 +19,11 @@ export function SignInScreen({ status, error, onSignIn, onSignOut }: Props) {
         {(status === 'checking' || status === 'loading') && <p className="sign-in-text">Opening your board…</p>}
         {status === 'signed-out' && (
           <>
+            {deleted && (
+              <p className="sign-in-deleted" role="status">
+                Your account and data were deleted.
+              </p>
+            )}
             {/* Opened from a share link (owner request: editing together); it is joined after signing in. */}
             <p className="sign-in-text">{typeof location !== 'undefined' && parseJoin(location.search) ? 'Sign in to open the board shared with you.' : 'Sign in to open your board.'}</p>
             <button type="button" className="tb-button sign-in-button" onClick={onSignIn}>

@@ -15,6 +15,7 @@ import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
+import { account, useAccountRemover } from '../sync/account';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
 import { CollapseAllIcon, CaretIcon, SameWidthIcon, GridIcon, HandIcon, MoonIcon, PlusIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
@@ -59,6 +60,12 @@ async function saveFile(name: string, text: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Downloads every board as one backup file, named after the board when there is just one. */
+export function downloadBackup() {
+  const name = Object.keys(appStore.getState().boards.others).length ? 'All boards' : appStore.getState().board.name;
+  void saveFile(backupFileName(name, new Date(), 'json'), serializeWorkspace(appStore.workspace()), 'application/json');
+}
+
 /**
  * File menu (owner request): download the board as a backup file (everything, to restore later)
  * or as readable text (Markdown); restore a backup; import cards from another app's file.
@@ -82,8 +89,8 @@ export function FileMenu() {
     action();
   };
   const board = () => appStore.getState().board;
-  /** A backup holds every board: named after the board when there is just one. */
-  const backupName = () => (Object.keys(appStore.getState().boards.others).length ? 'All boards' : board().name);
+  // Delete your account (job #63): only where there is an account (signed in, or a demo person).
+  const canDeleteAccount = useAccountRemover() !== null;
   return (
     <div className="file-menu-wrap" ref={wrap}>
       <button type="button" className="tb-button quiet" aria-haspopup="menu" aria-expanded={open} title="Back up, restore or import" onClick={() => setOpen((o) => !o)}>
@@ -91,7 +98,7 @@ export function FileMenu() {
       </button>
       {open && (
         <div className="file-menu" role="menu" aria-label="File">
-          <button type="button" role="menuitem" onClick={pick(() => saveFile(backupFileName(backupName(), new Date(), 'json'), serializeWorkspace(appStore.workspace()), 'application/json'))}>
+          <button type="button" role="menuitem" onClick={pick(downloadBackup)}>
             Download backup
           </button>
           <button type="button" role="menuitem" title="This board as readable text" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'md'), boardAsMarkdown(board(), appStore.boardName), 'text/markdown'))}>
@@ -103,6 +110,11 @@ export function FileMenu() {
           <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
             Import file…
           </button>
+          {canDeleteAccount && (
+            <button type="button" role="menuitem" className="file-menu-danger" onClick={pick(account.open)}>
+              Delete account…
+            </button>
+          )}
         </div>
       )}
       <input

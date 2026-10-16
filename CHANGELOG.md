@@ -1,5 +1,11 @@
 # Changelog
 
+## Delete your account (2026-10-16)
+
+- Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.
+- If anything goes wrong (no connection, say) nothing is deleted on your device and you can simply try again. Afterwards you are signed out, with a note saying your account and data were deleted. Other phones or computers you're signed in on are signed out too, but keep the copy saved on them until it's cleared.
+- A new "Delete your account" page on the website explains how, and who to email if you can't sign in. The Privacy policy, FAQ and Terms now point to it, and every page's footer links to it.
+
 ## Ctrl+arrow keys switch boards (2026-10-16)
 
 - Ctrl+Right and Ctrl+Left open the next and previous board in the Boards menu order (boards inside boards included). Ctrl+Up goes up to the board above, and Ctrl+Down goes into the first board inside the open one. At the ends nothing happens. A short note says which board you switched to, and the keys are in the ? shortcuts list.

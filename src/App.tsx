@@ -15,12 +15,14 @@ import { usePhone } from './components/usePhone';
 import { appStore, useAppState } from './store/appStore';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
+import { CompletedPanel } from './components/CompletedPanel';
 import { CalendarPanel, CalendarResizeHandle } from './components/CalendarPanel';
 import { PANEL_MIN } from './model/calendar';
 import { calendar } from './store/calendar';
 
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 const closeCalendar = () => appStore.toggleSidePanel('calendar');
+const closeCompleted = () => appStore.toggleSidePanel('completed');
 import { useShortcuts } from './components/useShortcuts';
 
 /**
@@ -58,6 +60,11 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       {sidePanel === 'calendar' && (
         <SidePanel title="Google Calendar" onClose={closeCalendar}>
           <CalendarPanel />
+        </SidePanel>
+      )}
+      {sidePanel === 'completed' && (
+        <SidePanel title="Completed" onClose={closeCompleted}>
+          <CompletedPanel />
         </SidePanel>
       )}
       {resizable && <CalendarResizeHandle />}

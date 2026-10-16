@@ -1,5 +1,12 @@
 # Changelog
 
+## Completed moves into a side panel (2026-10-16)
+
+- Cleaned-up items no longer sit in a Completed card on the board. A new round button by the zoom control, right of Due (on a phone: ⋯ → Completed), opens the Completed panel on the right, grouped by date with the newest first.
+- Unticking an item in the panel still sends it back to its list, and Ctrl+Z still undoes it.
+- Search still finds cleaned-up items: when the panel is shut it rings the Completed button.
+- Boards you already saved keep every cleaned-up item. An old Completed card is simply no longer drawn, and nothing else on the board moves.
+
 ## Auto-color moves into the Color menu, and American spelling everywhere (2026-10-16)
 
 - Auto-color is now a button at the bottom of the Color menu, instead of its own button on the toolbar (and in the ⋯ panel on a phone).

@@ -84,11 +84,19 @@ export function listUnder(clientX: number, clientY: number, dragId: string): str
 export function dropIndex(columnId: string, clientY: number): number {
   const col = columnElements().find((el) => el.dataset.colId === columnId);
   if (!col) return 0;
-  const middles = Array.from(col.querySelectorAll<HTMLElement>('[data-card-id]')).map((el) => {
+  const els = Array.from(col.querySelectorAll<HTMLElement>('[data-card-id]'));
+  const middles = els.map((el) => {
     const r = el.getBoundingClientRect();
     return r.top + r.height / 2;
   });
-  return insertIndex(clientY, middles);
+  const i = insertIndex(clientY, middles);
+  // An older board can keep its Completed record in a column, not drawn: count by the cards' own
+  // places in the column (without the one being dragged), not by what is drawn.
+  const { board, ui } = appStore.getState();
+  const rest = (board.columns[columnId]?.cardIds ?? []).filter((id) => id !== ui.drag?.id);
+  // Before the first drawn card from here on that is in the column's list, else at its end.
+  const before = els.slice(i).map((el) => rest.indexOf(el.dataset.cardId!)).find((n) => n >= 0);
+  return before ?? rest.length;
 }
 
 /** Below this zoom, revealOnBoard zooms in to 100% so the text can be read. */

@@ -218,6 +218,16 @@ export function CheckIcon() {
   );
 }
 
+/** Completed panel: a ticked box. */
+export function CompletedIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M8.5 12.5l2.5 2.5 4.5-5" />
+    </svg>
+  );
+}
+
 /** Version history: a clock with an arrow going back round it. */
 export function HistoryIcon() {
   return (

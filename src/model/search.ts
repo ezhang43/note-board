@@ -1,4 +1,5 @@
 import { sections } from './checklist';
+import { completedCardOf } from './completed';
 import type { Board, Card, TodoItem } from './types';
 
 // Search (owner request): find text anywhere on the board, in board order, so the screen can go
@@ -10,7 +11,10 @@ export interface Match {
   key: string;
   start: number;
   end: number;
-  /** The card or column to show when the box itself is out of sight (collapsed, or in a closed Completed section). */
+  /**
+   * The card or column to show when the box itself is out of sight (collapsed, or in a closed
+   * Completed section), or the Completed record's id for matches in the Completed panel.
+   */
   showInstead: string | null;
 }
 
@@ -27,7 +31,10 @@ export function rangesIn(text: string, query: string): [number, number][] {
   return found;
 }
 
-/** Text boxes on the board, in board order: columns left to right (their cards top to bottom), then loose cards top to bottom. */
+/**
+ * Text boxes on the board, in board order: columns left to right (their cards top to bottom), then
+ * loose cards top to bottom, then the Completed panel's items.
+ */
 function boxes(board: Board): { key: string; text: string; showInstead: string | null }[] {
   const out: { key: string; text: string; showInstead: string | null }[] = [];
   const items = (card: Card, list: TodoItem[], hidden: string | null, prefix: 'item' | 'done') => {
@@ -54,8 +61,7 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
         break;
       }
       case 'completed':
-        for (const g of card.groups) for (const e of g.entries) items(card, [e.item], hidden, 'done');
-        break;
+        break; // not on the board: listed last, below
     }
   };
   const byPlace = (a: { x: number; y: number }, b: { x: number; y: number }) => a.x - b.x || a.y - b.y;
@@ -67,6 +73,9 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
   }
   const loose = board.order.filter((id) => board.cards[id]).sort((a, b) => board.cards[a].y - board.cards[b].y || board.cards[a].x - board.cards[b].x);
   for (const id of loose) cardBoxes(board.cards[id], null);
+  // The Completed record shows in the Completed panel, not on the board: its matches come last.
+  const done = completedCardOf(board);
+  if (done) for (const g of done.groups) for (const e of g.entries) items(done, [e.item], done.id, 'done');
   return out;
 }
 

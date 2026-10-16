@@ -48,13 +48,13 @@ export function returnPushes(board: Board, pushes: Pushes, top: string, measured
     return blk && board.order.includes(id) && blk.x === p.to.x && blk.y === p.to.y;
   });
   const going = new Set([top, ...back.map(([id]) => id)]);
-  const others = board.order.filter((id) => !going.has(id)).map((id) => blockRect(board, id, measured)!);
+  const others = board.order.filter((id) => !going.has(id)).flatMap((id) => blockRect(board, id, measured) ?? []);
   const cards = { ...board.cards };
   const columns = { ...board.columns };
   let moved = false;
   for (const [id, p] of back) {
-    const r = blockRect(board, id, measured)!;
-    if (others.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
+    const r = blockRect(board, id, measured);
+    if (!r || others.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
     if (columns[id]) columns[id] = { ...columns[id], ...p.from };
     else cards[id] = { ...cards[id], ...p.from };
     moved = true;

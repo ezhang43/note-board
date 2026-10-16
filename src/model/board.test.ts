@@ -245,6 +245,10 @@ describe('Same width (owner request)', () => {
     expect(out.cards.b.w).toBe(360);
     expect(out.columns.col.w).toBe(360);
     expect(out.cards.in.w).toBe(b.cards.in.w);
+    // A wide first card carries over past the old 640 limit, up to 1280.
+    const wide = B.matchWidths(B.resizeCard(b, 'a', 1000), ['a', 'b', 'col']);
+    expect(wide.cards.b.w).toBe(1000);
+    expect(wide.columns.col.w).toBe(1000);
     // A narrow first card can't make a column narrower than a column may be.
     const narrow = B.matchWidths(B.resizeCard(b, 'a', 200), ['a', 'col']);
     expect(narrow.columns.col.w).toBe(240);

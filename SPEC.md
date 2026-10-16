@@ -132,7 +132,7 @@ The board holds three card types and containers that stack cards. Cards show no 
 - Cards inside a container cannot be resized and size to their content.
 - Keyboard: a resize handle reached with Tab resizes with the arrow keys: → / ← 20px wider / narrower, ↓ / ↑ taller / shorter (corner handles only); Shift for 100px. Each press is one undo step.
 - While resizing, the edge follows the pointer and eases to the grid size on release; the size label shows the final size.
-- Size limits: cards 200–640 wide, containers 240–640 wide, heights 100–700.
+- Size limits: cards 200–1280 wide, containers 240–1280 wide (owner choice 2026-10-16; was 640), heights 100–700. "Same width" and the keyboard resize use the same limits. Boards already saved are not changed.
 - Size matching: within 8px of another block's width or height, the size snaps to match; matched blocks get a dashed amber outline and a label shows e.g. "240 × 180 · same width as 2 blocks". Otherwise sizes snap to the grid when snapping is on.
 
 **Collapse, add, delete, color**

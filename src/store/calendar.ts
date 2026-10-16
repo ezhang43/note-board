@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { dayKey, draftBody, moveView, NoAccess, parseEvent, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody } from '../model/calendar';
+import { dayKey, draftBody, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -89,10 +89,21 @@ export interface CalendarState {
   note: string | null;
   /** No calendar access yet (Google's window blocked or closed, or access refused): offer Connect. */
   needsAccess: boolean;
+  /** How wide the panel is for each view; kept on this device, never synced (owner request, 2026-10-16). */
+  widths: PanelWidths;
 }
 
-export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date())) {
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false };
+export const WIDTH_KEY = 'note-board:calendar-width';
+type WidthStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: WidthStorage | null = null) {
+  let saved: string | null = null;
+  try {
+    saved = storage?.getItem(WIDTH_KEY) ?? null;
+  } catch {
+    // Blocked storage: the defaults are used.
+  }
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: parsePanelWidths(saved) };
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
   let asked = 0;
@@ -151,6 +162,18 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       // A greyed day from the month before or after shows that month: fetch it.
       const after = viewRange(state.view, day);
       return after.from === before.from && after.to === before.to ? Promise.resolve() : load();
+    },
+    /** The panel was dragged (or nudged) to this width for this view: remembered on this device. */
+    setWidth(view: CalView, width: number) {
+      set({ widths: { ...state.widths, [view]: width } });
+      try {
+        storage?.setItem(WIDTH_KEY, JSON.stringify(state.widths));
+      } catch {
+        // Full or blocked storage: the width still holds until the page is closed.
+      }
+    },
+    resetWidth(view: CalView) {
+      this.setWidth(view, PANEL_DEFAULT[view]);
     },
     /** Adds (`id` null) or changes a simple event. Resolves to a note to show, or null when it worked. */
     async save(id: string | null, draft: Draft): Promise<string | null> {
@@ -217,7 +240,14 @@ function defaultSource(): CalendarSource | null {
 }
 
 const source = defaultSource();
-export const calendar = Object.assign(createCalendar(source && calendarApi(source)), { prepare: () => source?.prepare?.() });
+function deviceStorage(): WidthStorage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+export const calendar = Object.assign(createCalendar(source && calendarApi(source), undefined, deviceStorage()), { prepare: () => source?.prepare?.() });
 
 export function useCalendar(): CalendarState {
   return useSyncExternalStore(calendar.subscribe, calendar.get);

@@ -1,5 +1,11 @@
 # Changelog
 
+## The calendar panel can be resized, and is roomier (2026-10-16)
+
+- On a computer, drag the left edge of the Google Calendar panel to make it wider or narrower (or focus the edge and use the left and right arrow keys; double-click puts the usual width back). Week and Month remember their own widths on this device. Some board always stays visible.
+- The panel now opens wider: 420px for Week (was 300) and 720px for Month (was 560). In the Week view an event's name can wrap onto a second line, so it is easier to read.
+- Fixed: clicking "+n more" (or a day) in the Month view looked like it did nothing, because the day's list sits under the grid, out of sight. The panel now scrolls to it.
+
 ## Due panel lists every date ahead (2026-10-15)
 
 - The Due panel now lists every unticked item with a due date, not just overdue and today's: **Overdue**, **Today**, **Tomorrow**, then one heading per later day ("Mon 20 Oct"), soonest first. The red count on the Due button still counts only items due today or earlier. A date typed in the date box that isn't a real day (such as a 5-digit year) is no longer saved.

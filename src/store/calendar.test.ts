@@ -287,3 +287,46 @@ describe('talking to the Calendar API', () => {
     expect(await calendarApi(source(), fakeFetch(200, { items: 'nope' }).fn).list('2026-10-05', '2026-10-12')).toEqual([]);
   });
 });
+
+describe('the panel width kept on this device', () => {
+  const memory = (start: Record<string, string> = {}) => {
+    const data = { ...start };
+    return { data, getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => void (data[k] = v) };
+  };
+
+  it('starts at the defaults and remembers a width for each view separately', () => {
+    const storage = memory();
+    const c = createCalendar(null, () => '2026-10-06', storage);
+    expect(c.get().widths).toEqual({ week: 420, month: 720 });
+    c.setWidth('week', 500);
+    c.setWidth('month', 900);
+    expect(c.get().widths).toEqual({ week: 500, month: 900 });
+    expect(JSON.parse(storage.data['note-board:calendar-width'])).toEqual({ week: 500, month: 900 });
+    // A later visit reads them back.
+    expect(createCalendar(null, () => '2026-10-06', storage).get().widths).toEqual({ week: 500, month: 900 });
+  });
+
+  it('resetWidth puts one view back to its default', () => {
+    const c = createCalendar(null, () => '2026-10-06', memory());
+    c.setWidth('month', 900);
+    c.setWidth('week', 500);
+    c.resetWidth('month');
+    expect(c.get().widths).toEqual({ week: 500, month: 720 });
+  });
+
+  it('bad stored values, or no storage at all, give the defaults and nothing breaks', () => {
+    expect(createCalendar(null, () => '2026-10-06', memory({ 'note-board:calendar-width': '{oops' })).get().widths).toEqual({ week: 420, month: 720 });
+    const broken = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('full');
+      },
+    };
+    const c = createCalendar(null, () => '2026-10-06', broken);
+    expect(c.get().widths.week).toBe(420);
+    c.setWidth('week', 480);
+    expect(c.get().widths.week).toBe(480);
+  });
+});

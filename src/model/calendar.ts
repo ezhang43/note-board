@@ -236,3 +236,30 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
   if (end <= start) return null;
   return { summary, start: { dateTime: start, timeZone }, end: { dateTime: end, timeZone } };
 }
+
+// The panel's width (owner request, 2026-10-16): kept on this device for each view, so Week and Month
+// can differ. Not board data. The window width is passed in, so this stays free of the DOM.
+export const PANEL_MIN = 300;
+export const PANEL_DEFAULT: Record<CalView, number> = { week: 420, month: 720 };
+export const PANEL_STEP = 20;
+export type PanelWidths = Record<CalView, number>;
+
+/** A width between 300px and the window width minus 300px (so 300px of board stays visible). */
+export function clampPanelWidth(width: number, windowWidth: number): number {
+  return Math.max(PANEL_MIN, Math.min(Math.round(width), windowWidth - PANEL_MIN));
+}
+
+/** The remembered widths; anything missing or bad (not a number from 300 to 4000) is the default. */
+export function parsePanelWidths(raw: string | null): PanelWidths {
+  let data: unknown = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    // simple: a damaged value is ignored; the defaults are used.
+  }
+  const read = (view: CalView) => {
+    const v = data && typeof data === 'object' ? (data as Record<string, unknown>)[view] : undefined;
+    return typeof v === 'number' && v >= PANEL_MIN && v <= 4000 ? Math.round(v) : PANEL_DEFAULT[view];
+  };
+  return { week: read('week'), month: read('month') };
+}

@@ -1162,9 +1162,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .help-button { display: inline-flex; align-items: center; justify-content: center; }
 a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .help-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
-/* The right-hand panel's width: 300px, or 560px for the calendar's Month view, keeping 300px of board beside it. */
+/* The right-hand panel's width: 300px; the calendar sets its own (inline, from App.tsx: the person's width, keeping 300px of board beside it). */
 .app { --side-width: 300px; }
-.app.month-panel { --side-width: clamp(300px, 100vw - 300px, 560px); }
 .app.history-open .corner-controls { right: calc(var(--side-width) + 24px); }
 .history-panel {
   position: fixed;
@@ -1722,7 +1721,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .cal-event.read-only { background: var(--hover); border-left-color: var(--control-edge); }
 .cal-event svg { flex-shrink: 0; align-self: center; color: var(--ink-soft); }
 .cal-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
-.cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* A name may wrap onto a second line, then it is cut (job #56). */
+.cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .cal-month { display: flex; flex-direction: column; gap: 2px; }
 .cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
@@ -1824,3 +1824,20 @@ a.cal-open { align-self: flex-start; }
 .tb-button.cal-save, .tb-button.cal-connect { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .tb-button.cal-delete { margin-left: auto; color: var(--danger); }
 .confirm.cal-confirm { margin: 4px 0 0; }
+
+/* The calendar panel's drag strip (owner request, 2026-10-16): on the panel's left edge, not inside it
+   (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
+.cal-resize {
+  position: fixed;
+  top: var(--toolbar-height);
+  bottom: 0;
+  right: calc(var(--side-width) - 4px);
+  width: 8px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  outline: none;
+}
+.cal-resize:hover, .cal-resize:active { background: var(--accent-soft); }
+.cal-resize:focus-visible { background: var(--accent); opacity: 0.6; }

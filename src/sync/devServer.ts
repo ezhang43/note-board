@@ -7,6 +7,7 @@ import { memoryServer, type CollabServer, type Person } from '../store/collab';
 // ?demo-user=Bob in another. Everything is kept in memory until the dev server stops.
 //   POST /__collab/call   { who, method, args } → { ok } or { error: { code, message } }
 //   GET  /__collab/watch?who=…&what=shares|share|people&id=…   (server-sent events)
+//   POST /__collab/feedback   { text, uid } → {}   (a demo person's feedback, dropped)
 
 export function devCollabPlugin(): Plugin {
   return {
@@ -17,6 +18,8 @@ export function devCollabPlugin(): Plugin {
       vite.middlewares.use('/__collab', (req, res) => {
         if (req.method === 'POST' && req.url?.startsWith('/call')) return void call(server, req, res);
         if (req.method === 'GET' && req.url?.startsWith('/watch')) return watch(server, req, res);
+        // A demo person's feedback (job #69): accepted and dropped.
+        if (req.method === 'POST' && req.url?.startsWith('/feedback')) return void res.end('{}');
         res.statusCode = 404;
         res.end();
       });

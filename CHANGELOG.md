@@ -1,5 +1,9 @@
 # Changelog
 
+## No "Show the tour again" link (2026-10-16)
+
+- The "Show the tour again" link is gone from the ? shortcuts panel and from the phone ⋯ menu, and the tour's last phone step no longer mentions it. The tour still shows by itself the first time you open the board on a device. Your saved boards are untouched.
+
 ## Send feedback (2026-10-16)
 
 - Signed in, you can now send the maker a short note: File, then Send feedback… (on a phone: ⋯, then File). Type up to 1000 characters and press Send; you'll see "Thanks — sent." If it can't be sent, a message says so and what you typed stays, so you can try again. Send is off while you're offline. On a slow connection you can close the box while it is still sending; it carries on.

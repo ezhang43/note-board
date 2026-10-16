@@ -1,5 +1,9 @@
 # Changelog
 
+## Claude Code loads fewer connectors and plugins (2026-10-16)
+
+- In this project, Claude Code no longer loads the Gmail, Google Calendar, Google Drive, Indeed, Apify and Claude Docs connectors, or the design, marketing, data and operations plugins, to save tokens. Your personal Claude keeps them. GitHub and the impeccable plugin stay on. Nothing in the app changed.
+
 ## Crew coordinator uses fewer tokens (2026-10-16)
 
 - The crew instructions now ask the coordinator to suggest a fresh chat after each publish (when no worker is still running), send heavy reading to a scout worker, keep worker reports to about 15 lines, and keep a short hand-off note on the Crew Board (parked items, owner choices not yet recorded, reminders) so a fresh chat picks up where the last one stopped. Nothing in the app changed.

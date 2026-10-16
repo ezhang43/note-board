@@ -11,8 +11,16 @@ function targetOf(m: Match): Element | null {
   return box?.querySelector('mark[data-current]') ?? box;
 }
 
-/** Move the board so `m` sits in the middle of what can be seen (above a phone's keyboard). */
-function reveal(m: Match) {
+/**
+ * Move the board so `m` sits in the middle of what can be seen (above a phone's keyboard). A match
+ * in the Completed panel is scrolled into view there while the panel is open; while it is shut the
+ * Completed button is ringed instead and nothing moves.
+ */
+function reveal(m: Match, inPanel: boolean, panelOpen: boolean) {
+  if (inPanel) {
+    if (panelOpen) document.querySelector(`[data-find="${CSS.escape(m.key)}"]`)?.scrollIntoView({ block: 'nearest' });
+    return;
+  }
   const el = targetOf(m);
   if (el) revealOnBoard(el);
 }
@@ -20,12 +28,14 @@ function reveal(m: Match) {
 /**
  * Search (owner request): Ctrl+F (or the magnifier button, or ⋯ → Search on a phone) opens a bar.
  * Every match is marked; Enter / ↓ and Shift+Enter / ↑ step through them, and the board moves to
- * each one. A match inside a collapsed card or column (or a closed Completed section) marks that
- * card or column instead. Escape closes the bar.
+ * each one. A match inside a collapsed card or column marks that card or column instead; one in
+ * the Completed panel is marked there, or rings the Completed button while the panel is shut.
+ * Escape closes the bar.
  */
 export function FindBar() {
   const find = useAppState((s) => s.ui.find);
   const board = useAppState((s) => s.board);
+  const panelOpen = useAppState((s) => s.ui.sidePanel === 'completed');
   const query = find?.query ?? '';
   const matches = useMemo(() => (query.trim() ? findMatches(board, query) : []), [board, query]);
   const [index, setIndex] = useState(0);
@@ -55,6 +65,7 @@ export function FindBar() {
   const at = matches.length ? Math.min(index, matches.length - 1) : -1;
   const current = at >= 0 ? matches[at] : null;
   const currentId = current && `${current.key}:${current.start}:${current.showInstead}`;
+  const inPanel = !!current?.showInstead && board.cards[current.showInstead]?.kind === 'completed';
 
   useEffect(() => {
     if (!open) return;
@@ -64,9 +75,9 @@ export function FindBar() {
   // Once the current match is marked on screen, bring it into view.
   useLayoutEffect(() => {
     if (!open || !current) return;
-    const frame = requestAnimationFrame(() => reveal(current));
+    const frame = requestAnimationFrame(() => reveal(current, inPanel, panelOpen));
     return () => cancelAnimationFrame(frame);
-  }, [open, currentId, at]);
+  }, [open, currentId, at, panelOpen]);
 
   if (!open) return null;
   const step = (by: 1 | -1) => matches.length && setIndex((at + by + matches.length) % matches.length);
@@ -94,7 +105,7 @@ export function FindBar() {
         }}
       />
       <span className="find-count" role="status">
-        {!query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${current?.showInstead ? ' · in a closed card' : ''}` : 'No matches'}
+        {!query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? ' · in a closed card' : ''}` : 'No matches'}
       </span>
       <button type="button" className="icon-button" aria-label="Previous match" title="Previous (Shift+Enter)" disabled={!matches.length} onClick={() => step(-1)}>
         <ArrowIcon />

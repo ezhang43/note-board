@@ -67,7 +67,8 @@ test.describe('with motion allowed', () => {
     await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
     await page.locator('header.toolbar').getByRole('button', { name: 'Clean up' }).click();
     await expect(list.getByLabel('Item text')).toHaveCount(1);
-    await expect(page.locator('.card', { hasText: 'Completed' }).getByText('first')).toBeVisible();
+    await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Completed' }).getByText('first')).toBeVisible();
   });
 });
 

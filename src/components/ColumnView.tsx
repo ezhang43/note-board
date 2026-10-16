@@ -28,8 +28,12 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   );
   // …and how many cards go with them.
   const confirmCards = useAppState((s) =>
-    s.ui.confirm?.columnId === id ? s.ui.confirm.ids.reduce((n, x) => n + (s.board.columns[x]?.cardIds.length ?? 0), 0) : 0,
+    s.ui.confirm?.columnId === id
+      ? s.ui.confirm.ids.reduce((n, x) => n + (s.board.columns[x]?.cardIds.filter((c) => s.board.cards[c]?.kind !== 'completed').length ?? 0), 0)
+      : 0,
   );
+  // An older board can keep its Completed record in a column: it isn't drawn or counted there.
+  const hidden = useAppState((s) => s.board.columns[id]?.cardIds.find((c) => s.board.cards[c]?.kind === 'completed') ?? null);
   // Where to draw it while something is being dragged (pushed aside, or moving with a group).
   const dragPos = useDragPosition(id, col ?? { x: 0, y: 0 });
   const inGroupDrag = useAppState((s) => !!s.ui.drag?.group.includes(id));
@@ -45,7 +49,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const pos = drag ?? dragPos;
   const w = resize?.liveW ?? col.w;
   // A card being dragged out is drawn on its own until it is dropped.
-  const cardIds = col.cardIds.filter((c) => c !== draggedCard);
+  const cardIds = col.cardIds.filter((c) => c !== draggedCard && c !== hidden);
   // A column with cards is exactly as tall as its cards (no blank space when they collapse);
   // only an empty column keeps a minimum height, which its corner handle sets.
   const minH = col.collapsed ? undefined : cardIds.length ? 0 : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);

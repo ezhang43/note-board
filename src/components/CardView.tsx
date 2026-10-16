@@ -1,17 +1,14 @@
-import { styleCss } from '../model/textStyle';
 import { boxProps } from './textBox';
 import { memo, useRef, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
-import { dayLabel } from '../model/completed';
 import { isBold } from '../model/palette';
 import { swatchFor } from '../model/theme';
-import type { BoardCard, Card, CompletedCard, CompletedEntry, LinkCard, NoteCard, TodoItem } from '../model/types';
+import type { BoardCard, Card, LinkCard, NoteCard } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
-import { FindMarks } from './FindMarks';
 import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, ExternalIcon, ResizeIcon, TrashIcon } from './icons';
@@ -49,7 +46,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   });
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
-  if (!card) return null;
+  // The Completed record shows in the Completed panel, never on the board.
+  if (!card || card.kind === 'completed') return null;
 
   const pos = drag ?? dragPos;
   // Inside a column a card follows the column's width and fits its content.
@@ -103,7 +101,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         >
           <ChevronIcon collapsed={card.collapsed} />
         </button>
-        {/* The Completed card can never be deleted, so it has no trash can. */}
+        {/* Board cards: the Completed record (never drawn) is the only card with no trash can. */}
         {!isPermanent(card) && (
           <button
             type="button"
@@ -144,7 +142,7 @@ function CardBody({ card }: { card: Card }) {
     case 'link':
       return <LinkBody card={card} />;
     case 'completed':
-      return <CompletedBody card={card} />;
+      return null; // never drawn (see above)
     case 'board':
       return <BoardBody card={card} />;
   }
@@ -177,62 +175,6 @@ function BoardBody({ card }: { card: BoardCard }) {
       </button>
     </div>
   );
-}
-
-/** The master Completed card: items moved here by Clean up, grouped by day, newest first. */
-function CompletedBody({ card }: { card: CompletedCard }) {
-  return (
-    <div className="completed-card-body">
-      <div className="completed-card-title">Completed</div>
-      {!card.groups.length && <div className="completed-empty">Nothing cleaned up yet</div>}
-      {card.groups.map((g) => (
-        <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>
-          <h3 className="completed-date">{dayLabel(g.date)}</h3>
-          {g.entries.map((e) => (
-            <CompletedRow key={e.item.id} entry={e} cardId={card.id} />
-          ))}
-        </section>
-      ))}
-    </div>
-  );
-}
-
-/** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
-function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string }) {
-  return (
-    <div className="completed-entry" data-entry-id={entry.item.id}>
-      <div className="completed-row">
-        <label className="tick">
-          <input
-            type="checkbox"
-            aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
-            title="Untick to send it back to its list"
-            checked
-            onChange={() => appStore.restoreCompleted(entry.item.id)}
-          />
-        </label>
-        <span className="completed-text" data-find={`done:${cardId}:${entry.item.id}`} style={styleCss(entry.item.style) as CSSProperties}>
-          <FindMarks find={`done:${cardId}:${entry.item.id}`} text={entry.item.text} />
-        </span>
-        <span className="completed-from">{entry.fromTitle || 'List'}</span>
-      </div>
-      <CompletedChildren items={entry.item.children} depth={1} cardId={cardId} />
-    </div>
-  );
-}
-
-function CompletedChildren({ items, depth, cardId }: { items: TodoItem[]; depth: number; cardId: string }) {
-  return items.map((it) => (
-    <div key={it.id}>
-      <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
-        <input type="checkbox" aria-label="Done" checked={it.done} disabled />
-        <span className="completed-text" data-find={`done:${cardId}:${it.id}`} style={styleCss(it.style) as CSSProperties}>
-          <FindMarks find={`done:${cardId}:${it.id}`} text={it.text} />
-        </span>
-      </div>
-      <CompletedChildren items={it.children} depth={depth + 1} cardId={cardId} />
-    </div>
-  ));
 }
 
 function NoteBody({ card }: { card: NoteCard }) {

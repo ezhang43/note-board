@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, cards, clickEmpty, dragPointer, fontsLoaded, freshBoardEachTest, grabPoint } from './helpers';
+import { add, box, clickEmpty, dragPointer, fontsLoaded, freshBoardEachTest, grabPoint } from './helpers';
 
 // Owner requests, 2026-10-05 (second batch): Sign out no longer cut off, "Checklist" instead of
 // "To-do list", Miro-style arrows, and Clean up on each list beside Uncheck all.
@@ -54,7 +54,7 @@ async function checklist(page: Page, title: string, items: string[], ticked: num
 
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
 
-test('Clean up beside Uncheck all moves only that list’s ticked items into the Completed card', async ({ page }) => {
+test('Clean up beside Uncheck all moves only that list’s ticked items into the Completed panel', async ({ page }) => {
   const groceries = await checklist(page, 'Groceries', ['bread', 'milk', 'eggs'], 2);
   const chores = await checklist(page, 'Chores', ['sweep', 'dust'], 1);
   const cleanUp = groceries.getByRole('button', { name: 'Clean up', exact: true });
@@ -70,7 +70,8 @@ test('Clean up beside Uncheck all moves only that list’s ticked items into the
   expect(await texts(groceries)).toEqual(['eggs']);
   await expect(groceries.getByRole('button', { name: 'Clean up', exact: true })).toHaveCount(0);
   expect(await texts(chores)).toEqual(['dust', 'sweep']);
-  const done = cards(page).filter({ has: page.locator('.completed-card-body') });
+  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  const done = page.getByRole('complementary', { name: 'Completed' });
   await expect(done.locator('.completed-text')).toHaveText(['bread', 'milk']);
 
   // One Ctrl+Z puts it back.

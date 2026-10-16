@@ -1,5 +1,10 @@
 # Changelog
 
+## Wider cards and containers (2026-10-16)
+
+- Cards and containers can now be made up to 1280 pixels wide (they stopped at 640 before). Dragging a corner, the arrow keys on a resize handle, and "Same width" all use the new limit.
+- Boards you already saved are not changed: nothing is resized, and saving and loading work as before.
+
 ## "Column" is now "container" (2026-10-16)
 
 - Everywhere you read it, a column is now called a container: the New container button, the container title and its tooltips, the delete question, the shortcuts list, the welcome tour, the + menu on a phone, the Version history line, the text copy of a board, the FAQ and the Privacy page.

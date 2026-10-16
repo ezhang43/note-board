@@ -1,5 +1,10 @@
 # Changelog
 
+## Tour wording and order (2026-10-16)
+
+- The welcome tour now goes: add a note or checklist, move cards and columns, Share, your boards, keyboard shortcuts. On a phone it stays +, Boards, ⋯.
+- The first step says a Note is a blank card for anything, and the column step says a column is a container that holds your notes and checklists. Nothing about saving or your boards changed.
+
 ## A short welcome tour (2026-10-16)
 
 - The first time you open the board on a device, a 30-second tour lights up one control at a time (add a note or checklist, move cards into columns, the Boards menu, Share, and the ? shortcuts) with Back, Next, Skip tour and a close button. Escape closes it too.

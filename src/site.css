@@ -1,34 +1,52 @@
 /*
- * The website pages beside the app (about/, faq/, terms/, privacy/). Plain pages in the app's look:
- * the same colours as src/styles.css (SPEC "Look and feel"), following the computer's light / dark setting.
+ * The website pages beside the app (about/, faq/, terms/, privacy/, delete-account/): the "Done List" look
+ * (job #79, owner decision 2026-10-16). A big honey block at the top of every page holds the nav and the page
+ * title (warm brown in dark mode); under it, calm reading on a plain page. Two widths line everything up:
+ * --wide (header, board picture, table, footer) and --column (the reading column). Follows the computer's
+ * light / dark setting.
  */
 :root {
-  --canvas: #faf6ec;
-  --toolbar-bg: #fff1c2;
-  --toolbar-edge: #ecd897;
-  --line: #e2ddd4;
-  --ink: #1f1d1a;
-  --ink-soft: #5f5a52;
-  --card-bg: #ffffff;
-  --accent: #8a5a00;
-  --accent-ink: #6b4400;
-  --on-accent: #ffffff;
+  --ground: #fffefa;
+  --ink: #1c1b19;
+  --ink2: #615c54;
+  --hair: #e9e3d6;
+  --frame: #ddd5c4;
+  --soft: #fff3d1;
+  --link: #8f5b00;
+  --honey: #f0b429;
+  --honey-ink: #1c1b19;
+  --good: #1f7a4d;
+  --bad: #b4233c;
+  /* the honey block at the top of every page */
+  --slab: #ffcf3f;
+  --slab-ink: #1c1b19;
+  --slab-btn: #1c1b19;
+  --slab-btn-ink: #ffcf3f;
   --font: 'IBM Plex Sans', system-ui, sans-serif;
+  --display: 'Familjen Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+  --wide: 1080px;
+  --column: 720px;
+  --gutter: clamp(16px, 4vw, 32px);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --canvas: #1d1b17;
-    --toolbar-bg: #2a2416;
-    --toolbar-edge: #3d3422;
-    --line: #3a3733;
-    --ink: #ece8e1;
-    --ink-soft: #c2bcb2;
-    --card-bg: #2b2926;
-    --accent: #f2c14e;
-    --accent-ink: #ffd97a;
-    --on-accent: #241a08;
+    --ground: #161513;
+    --ink: #eeeae3;
+    --ink2: #a9a296;
+    --hair: #2f2c27;
+    --frame: #5a5246;
+    --soft: #3b3120;
+    --link: #f5c451;
+    --honey: #f5c451;
+    --honey-ink: #161513;
+    --good: #7fc9a5;
+    --bad: #f08a9c;
+    --slab: #5a3c14;
+    --slab-ink: #ffcf3f;
+    --slab-btn: #ffcf3f;
+    --slab-btn-ink: #161513;
   }
 }
 
@@ -37,360 +55,287 @@
 body {
   margin: 0;
   font-family: var(--font);
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.6;
   color: var(--ink);
-  background: var(--canvas);
+  background: var(--ground);
   overflow-wrap: anywhere;
 }
+::selection { background: var(--honey); color: var(--honey-ink); }
 
-a { color: var(--accent-ink); }
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+a { color: var(--link); text-underline-offset: 3px; }
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 4px; }
 
-.site-header {
-  background: var(--toolbar-bg);
-  border-bottom: 1px solid var(--toolbar-edge);
-}
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; letter-spacing: -0.015em; text-wrap: balance; }
+h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---- Header, on the honey block ---- */
+.site-header { background: var(--slab); color: var(--slab-ink); }
 .site-header nav,
 .site-footer nav {
-  max-width: 880px;
+  max-width: calc(var(--wide) + 2 * var(--gutter));
   margin: 0 auto;
-  padding: 10px 16px;
+  padding: 14px var(--gutter);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 18px;
+  gap: 4px 24px;
 }
-.site-brand {
+.site-header a {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-right: auto;
-  font-weight: 600;
-  font-size: 17px;
-  color: var(--ink);
+  min-height: 44px;
+  color: var(--slab-ink);
+  font-weight: 500;
   text-decoration: none;
 }
-.site-brand img { width: 32px; height: 32px; border-radius: 8px; }
-.site-header nav a:not(.site-brand) { color: var(--ink); font-weight: 500; text-decoration: none; }
-.site-header nav a:not(.site-brand):hover,
-.site-header nav a[aria-current='page'] { text-decoration: underline; text-underline-offset: 4px; }
-
-main {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
+.site-header a:hover,
+.site-header a[aria-current='page'] { text-decoration: underline 2px; text-underline-offset: 8px; }
+.site-brand { gap: 10px; margin-right: 12px; font-family: var(--display); font-size: 19px; }
+.site-header .site-brand { font-weight: 700; }
+.site-brand img { width: 32px; height: 32px; }
+.site-header a:last-child {
+  margin-left: auto;
+  padding: 0 18px;
+  border: 1.5px solid var(--slab-ink);
+  border-radius: 999px;
+  font-weight: 600;
 }
-main.text { max-width: 720px; }
+.site-header a:last-child::after { content: '→' / ''; margin-left: 8px; }
+.site-header a:last-child:hover { background: var(--slab-ink); color: var(--slab); text-decoration: none; }
 
-h1 { font-size: 32px; line-height: 1.25; font-weight: 600; margin: 16px 0 8px; }
-h2 { font-size: 21px; line-height: 1.3; font-weight: 600; margin: 32px 0 6px; }
-h3 { font-size: 17px; font-weight: 600; margin: 20px 0 4px; }
-p, li { color: var(--ink); }
-.lead { font-size: 20px; color: var(--ink-soft); margin: 0 0 24px; }
-.updated { color: var(--ink-soft); font-size: 14px; }
+/* On a phone the four page links get a row of their own, with 44px tap targets */
+@media (max-width: 640px) {
+  .site-header nav { gap: 0 8px; padding-top: 8px; padding-bottom: 4px; }
+  .site-header nav::after { content: ''; flex-basis: 100%; order: 2; }
+  .site-header a { order: 3; flex: 1 1 0; justify-content: center; }
+  .site-header .site-brand,
+  .site-header a:last-child { order: 1; flex: none; }
+}
+/* Small phones (320px): a tighter Open button, so it still fits beside the name */
+@media (max-width: 380px) {
+  .site-brand { margin-right: 0; }
+  .site-header a:last-child { padding: 0 12px; }
+  .site-header a:last-child::after { content: none; }
+}
 
+/* ---- The honey block's title area ---- */
+.hero,
+.page-head {
+  background: var(--slab);
+  color: var(--slab-ink);
+}
+.hero h1,
+.page-head h1 { margin: 0; font-weight: 700; letter-spacing: -0.035em; line-height: 0.98; }
+
+/* About: centred title, lead and start button, then the board picture, half on the honey block */
+.hero {
+  --overlap: clamp(56px, 12vw, 160px);
+  padding: clamp(40px, 8vw, 88px) var(--gutter) 0;
+  text-align: center;
+  background: linear-gradient(var(--slab) calc(100% - var(--overlap)), transparent 0);
+}
+.hero h1 { font-size: clamp(58px, 11vw, 96px); }
+.lead {
+  max-width: 30ch;
+  margin: 18px auto 0;
+  font-size: clamp(19px, 2.4vw, 22px);
+  line-height: 1.45;
+  text-wrap: balance;
+}
 .start {
-  display: inline-block;
-  padding: 14px 28px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--honey);
+  color: var(--honey-ink);
+  font-size: 17px;
   font-weight: 600;
   text-decoration: none;
 }
-.start:hover { filter: brightness(1.08); }
-
+.start:hover { filter: brightness(1.06); }
+.hero .start { margin-top: 32px; background: var(--slab-btn); color: var(--slab-btn-ink); }
+.hero-board { display: block; max-width: var(--wide); margin: clamp(40px, 6vw, 64px) auto 0; }
 .shot {
   display: block;
   width: 100%;
   height: auto;
-  margin: 32px 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(31, 29, 26, 0.08);
+  border: 1px solid var(--frame);
+  border-radius: clamp(8px, 1.4vw, 14px);
+  background: var(--ground);
+  box-shadow: 0 24px 48px -24px rgba(28, 27, 25, 0.45);
 }
 
-.features {
-  list-style: none;
-  padding: 0;
-  margin: 24px 0;
+/* The reading column and the wider table section share the page's centre line */
+.column,
+.compare-section,
+.close { margin: 0 auto; padding: 0 var(--gutter); }
+.column { max-width: calc(var(--column) + 2 * var(--gutter)); padding-top: clamp(56px, 8vw, 96px); }
+.compare-section { max-width: calc(var(--wide) + 2 * var(--gutter)); padding-top: clamp(64px, 9vw, 112px); }
+
+/* Try it: the three highlights as a to-do list. Ticked rows move under "Completed" (CSS only: flex order). */
+.highlights { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--hair); }
+.highlights li {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 18px 0;
+  border-top: 1px solid var(--hair);
 }
-.features li {
-  background: var(--card-bg);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
+.highlights input {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin: 1px 0 0;
+  border: 2px solid var(--ink2);
+  border-radius: 7px;
+  background: var(--ground) center / 16px no-repeat;
+  cursor: pointer;
 }
-.why { max-width: 65ch; }
-.why p { margin: 0 0 12px; }
-.highlights { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.features h3 { margin: 0 0 4px; }
-.features p { margin: 0; color: var(--ink-soft); }
+.highlights input:checked {
+  border-color: var(--honey);
+  background-color: var(--honey);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3L13 4.8' fill='none' stroke='%231c1b19' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.highlights h3 { grid-column: 2; margin: 0; font-size: 20px; font-weight: 600; }
+.highlights label { cursor: pointer; }
+.highlights p { grid-column: 2; margin: 0; color: var(--ink2); font-size: 16px; }
+.highlights li:has(input:checked) { order: 2; }
+.highlights li:has(input:checked) h3 { text-decoration: line-through 2px; color: var(--ink2); }
+.highlights:has(input:checked)::before {
+  content: 'Completed' / ''; /* on screen only: each checkbox already says ticked or not */
+  order: 1;
+  padding: 28px 0 6px;
+  border-top: 1px solid var(--hair);
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.why p { margin: 0 0 18px; font-size: 19px; line-height: 1.65; }
 
-.site-footer { border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 14px; }
-.site-footer nav a { color: var(--ink-soft); }
+/* Comparison table: a real table on a computer, one block per feature on a phone */
+.compare { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 1.3; }
+.compare caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.compare th,
+.compare td { padding: 16px 12px; border-bottom: 1px solid var(--hair); text-align: center; vertical-align: top; }
+.compare thead th { font-weight: 600; border-bottom-color: var(--ink2); }
+.compare tbody th { text-align: left; font-weight: 600; padding-left: 0; }
+.compare th:nth-child(2),
+.compare td:nth-child(2) { background: var(--soft); }
+.compare td > span:first-child { display: block; font-weight: 600; }
+.compare .yes > span:first-child { color: var(--good); font-size: 20px; line-height: 1; }
+.compare .no > span:first-child { color: var(--bad); }
+.compare .unk { color: var(--ink2); }
+.compare small { display: block; margin-top: 4px; font-size: 13px; color: var(--ink2); }
+.compare-note { max-width: var(--column); margin: 20px 0 0; font-size: 15px; color: var(--ink2); }
 
-/*
- * The bolder look (job #59), on all four pages. body.bold is the shared system: the honey slab (warm brown in
- * dark mode) holding the nav and the title, heavy display type, ruled rows, a brown footer. body.landing is the
- * About page's showcase on top of it (sample board in the hero, comparison table); the FAQ, Terms and Privacy pages keep to
- * a calm reading column under their slab. Display voice: Bricolage Grotesque. Colors come from the app icon:
- * honey #ffcf3f and ant brown #3a2614.
- */
-body.bold {
-  --display: 'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif;
-  --wide: 1200px;
-  --gutter: clamp(16px, 5vw, 48px);
-  --hero-bg: #ffcf3f;
-  --hero-ink: #3a2614;
-  --btn-bg: #3a2614;
-  --btn-ink: #ffcf3f;
-  --band: #3a2614;
-  --band-ink: #f3e7cc;
-  --rule: #3a2614;
-  --box-fill: #ffcf3f;
-  --box-line: #3a2614;
-  --box-tick: #3a2614;
-}
-@media (prefers-color-scheme: dark) {
-  body.bold {
-    --hero-bg: #5a3c14;
-    --hero-ink: #ffcf3f;
-    --btn-bg: #ffcf3f;
-    --btn-ink: #3a2614;
-    --band: #2a2416;
-    --band-ink: #ece8e1;
-    --rule: #6b5a34;
-    --box-fill: #ffcf3f;
-    --box-line: #ffcf3f;
-    --box-tick: #2a2416;
+@media (max-width: 720px) {
+  .compare thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .compare,
+  .compare tbody,
+  .compare tr,
+  .compare tbody th { display: block; }
+  .compare tr { padding: 8px 0 16px; border-top: 1px solid var(--ink2); }
+  .compare tbody th { padding: 12px 0 8px; border: 0; font-size: 18px; }
+  .compare td {
+    display: grid;
+    grid-template-columns: 6.5em minmax(0, 1fr);
+    gap: 0 12px;
+    align-items: baseline;
+    padding: 10px 12px;
+    text-align: left;
   }
-}
-:root:has(body.bold) { scrollbar-color: #8a6a34 var(--canvas); }
-body.bold ::selection { background: var(--btn-bg); color: var(--btn-ink); }
-
-/* Header on the honey field */
-body.bold .site-header { background: var(--hero-bg); border-bottom: 0; }
-body.bold .site-header nav { max-width: var(--wide); padding: 14px var(--gutter); }
-body.bold .site-header a,
-body.bold .site-brand { color: var(--hero-ink); }
-body.bold .site-header a:focus-visible,
-body.bold .hero a:focus-visible { outline: 3px solid var(--hero-ink); outline-offset: 3px; }
-body.bold .site-header nav a:last-child {
-  border: 2px solid var(--hero-ink);
-  border-radius: 999px;
-  padding: 3px 14px;
-  font-weight: 600;
-}
-body.bold .site-header nav a:last-child:hover { background: var(--hero-ink); color: var(--hero-bg); text-decoration: none; }
-
-/* One line of nav on a phone: smaller type and gaps, every link kept */
-@media (max-width: 760px) {
-  body.bold .site-header nav { flex-wrap: nowrap; gap: 0 9px; padding: 12px var(--gutter); font-size: 13px; }
-  body.bold .site-header nav a { white-space: nowrap; }
-  body.bold .site-brand { position: relative; }
-  body.bold .site-brand img { width: 28px; height: 28px; }
-  /* the ant stands for the brand name here; the name stays for screen readers */
-  body.bold .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  body.bold .site-header nav a:last-child { padding: 2px 9px; }
+  .compare td::before { content: attr(data-app) / ''; /* screen readers hear the column header instead */ grid-row: 1 / span 2; color: var(--ink); font-weight: 500; }
+  .compare td > *,
+  .compare small { grid-column: 2; }
 }
 
-body.landing main { max-width: none; padding: 0; }
-body.landing .page { max-width: var(--wide); margin: 0 auto; padding: 0 var(--gutter); }
+/* The second start button, closing the About page */
+.close { padding-top: clamp(48px, 7vw, 80px); text-align: center; }
 
-/* The poster slab: text on the left, a mini sample board on the right (under the text on a phone) */
-body.landing .hero {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 32px clamp(32px, 5vw, 64px);
-  padding: 48px max(var(--gutter), calc((100% - var(--wide)) / 2 + var(--gutter))) 96px;
-  background: var(--hero-bg);
-  color: var(--hero-ink);
-}
-body.landing .hero-inner { position: relative; z-index: 1; min-width: 0; }
-body.landing .hero-board { position: relative; z-index: 1; display: block; min-width: 0; }
-body.landing h1 {
-  margin: 0 0 20px;
-  font-family: var(--display);
-  font-size: clamp(3.5rem, 10.5vw, 6rem);
-  font-weight: 800;
-  line-height: 0.92;
-  letter-spacing: -0.03em;
-  color: var(--hero-ink);
-}
-body.landing .lead {
-  max-width: 21em;
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(1.4rem, 3.2vw, 2rem);
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  color: var(--hero-ink);
-  text-wrap: balance;
-}
-body.landing .start {
-  margin-top: 32px;
-  padding: 16px 30px;
-  border-radius: 14px;
-  background: var(--btn-bg);
-  color: var(--btn-ink);
-  font-size: 18px;
-  font-weight: 600;
-  box-shadow: 0 8px 18px -6px rgba(58, 38, 20, 0.45);
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-body.landing .start:hover { filter: none; transform: translateY(-2px); box-shadow: 0 12px 22px -6px rgba(58, 38, 20, 0.5); }
-body.landing .start:active { transform: translateY(0); box-shadow: 0 4px 10px -4px rgba(58, 38, 20, 0.5); }
-
-body.landing .trail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 32px;
-  height: 8px;
-  color: var(--hero-ink);
-  background: radial-gradient(circle at 4px 4px, currentColor 3.5px, transparent 4px) 0 0 / 24px 8px repeat-x;
-}
-/* Why I made BusyAnts: heading beside the story, then ruled rows */
-body.landing h2 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(2.25rem, 4.6vw, 3.5rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-body.landing .why-section {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  gap: 24px clamp(32px, 6vw, 80px);
-  padding-top: clamp(48px, 7vw, 80px);
-}
-body.landing .why-section h2 { grid-column: 1; grid-row: 1; }
-body.landing .why { grid-column: 1; grid-row: 2; max-width: 65ch; }
-body.landing .why p { margin: 0 0 18px; font-size: 18px; line-height: 1.6; }
-body.landing .why p:first-child {
-  font-family: var(--display);
-  font-size: clamp(1.4rem, 2.4vw, 1.75rem);
-  font-weight: 700;
-  line-height: 1.18;
-  letter-spacing: -0.015em;
-  margin-bottom: 28px;
-  text-wrap: balance;
-}
-body.landing .highlights {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  display: block;
-  margin: 0;
-  border-bottom: 2px solid var(--rule);
-}
-body.landing .highlights li {
-  padding: 20px 0 24px;
-  border: 0;
-  border-top: 2px solid var(--rule);
-  border-radius: 0;
-  background: none;
-}
-body.landing .highlights h3 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(1.4rem, 2.4vw, 1.85rem);
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-body.landing .highlights p { max-width: 52ch; margin-top: 8px; font-size: 17px; color: var(--ink-soft); }
-
-/* The mini sample board in the hero */
-body.landing .shot {
-  width: 100%;
-  height: auto;
-  margin: 0;
-  border: 0;
-  border-radius: 14px;
-  box-shadow: 0 18px 32px -12px rgba(58, 38, 20, 0.55), 0 3px 10px rgba(58, 38, 20, 0.25);
-}
-
-/* Comparison table: scrolls sideways inside its own box on a phone, first column stays put */
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-body.landing .compare-section { padding: clamp(48px, 7vw, 80px) 0 clamp(56px, 8vw, 96px); }
-body.landing .compare-scroll { position: relative; margin-top: 28px; overflow-x: auto; border-top: 2px solid var(--rule); }
-body.landing .compare-scroll:focus-visible { outline: 3px solid var(--rule); outline-offset: 2px; }
-body.landing .compare { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0; font-size: 16px; }
-body.landing .compare caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-body.landing .compare th,
-body.landing .compare td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; line-height: 1.3; background: var(--canvas); }
-body.landing .compare thead th { font-family: var(--display); font-size: 1.1rem; font-weight: 800; border-bottom: 2px solid var(--rule); }
-body.landing .compare tbody th { text-align: left; font-weight: 600; min-width: 180px; }
-body.landing .compare thead th:first-child,
-body.landing .compare tbody th { position: sticky; left: 0; z-index: 1; }
-body.landing .compare th:nth-child(2),
-body.landing .compare td:nth-child(2) { background: color-mix(in srgb, var(--box-fill) 24%, var(--canvas)); }
-body.landing .compare td > span:first-child { display: block; font-weight: 600; }
-body.landing .compare .yes > span:first-child { font-size: 1.35rem; line-height: 1; }
-body.landing .compare .part .word,
-body.landing .compare .paid .word { font-size: 15px; }
-body.landing .compare .no { color: var(--ink-soft); }
-body.landing .compare small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-soft); }
-body.landing .compare-note { max-width: 65ch; margin: 20px 0 0; font-size: 15px; color: var(--ink-soft); }
-
-/* FAQ, Terms, Privacy: the title on the slab (it runs the full width), then a calm reading column of ruled sections */
-body.bold main.text { padding-top: 0; padding-bottom: clamp(48px, 8vw, 96px); }
-body.bold .page-head {
-  margin: 0 0 clamp(8px, 2vw, 24px);
-  padding: clamp(24px, 6vw, 56px) 0 clamp(32px, 7vw, 64px);
-  background: var(--hero-bg);
-  color: var(--hero-ink);
-  box-shadow: 0 0 0 100vmax var(--hero-bg);
+/* ---- Reading pages: FAQ, Terms, Privacy, Delete your account ---- */
+main.text { max-width: calc(var(--column) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
+.page-head {
+  padding: clamp(32px, 7vw, 64px) 0 clamp(40px, 7vw, 64px);
+  margin-bottom: clamp(24px, 4vw, 40px);
+  /* the honey runs the full width of the screen */
+  box-shadow: 0 0 0 100vmax var(--slab);
   clip-path: inset(0 -100vmax);
 }
-body.bold .page-head h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(2.5rem, 8vw, 4.25rem);
-  font-weight: 800;
-  line-height: 0.98;
-  letter-spacing: -0.03em;
-  color: var(--hero-ink);
-  text-wrap: balance;
-}
-body.bold .page-head .updated { margin: 16px 0 0; font-size: 16px; font-weight: 500; color: var(--hero-ink); }
-body.bold main.text h2 {
-  margin: clamp(32px, 5vw, 48px) 0 8px;
-  padding-top: 20px;
-  border-top: 2px solid var(--rule);
-  font-family: var(--display);
-  font-size: clamp(1.5rem, 3.4vw, 2rem);
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-body.bold main.text h3 { margin: 24px 0 4px; font-size: 18px; }
-body.bold main.text .page-head + h2 { border-top: 0; margin-top: 0; padding-top: 0; }
+.page-head h1 { font-size: clamp(40px, 8vw, 58px); }
+.page-head .updated { margin: 14px 0 0; font-weight: 500; }
+main.text p,
+main.text li { color: var(--ink); }
+main.text > h2 { margin-top: 40px; font-size: clamp(24px, 3.4vw, 30px); }
+main.text h3 { margin: 22px 0 4px; font-size: 19px; font-weight: 600; }
 
-/* Footer */
-body.bold .site-footer { border-top: 0; background: var(--band); color: var(--band-ink); }
-body.bold .site-footer nav { max-width: var(--wide); padding: 28px var(--gutter); gap: 8px 28px; }
-body.bold .site-footer a { color: var(--band-ink); font-weight: 500; }
-body.bold .site-footer a:focus-visible { outline: 3px solid var(--box-fill); outline-offset: 3px; }
-
-@media (max-width: 760px) {
-  body.landing .hero { grid-template-columns: minmax(0, 1fr); padding-top: 36px; padding-bottom: 72px; }
-  body.landing .why-section { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-  body.landing .why { grid-row: auto; }
-  body.landing .highlights { grid-column: 1; grid-row: auto; }
+/* Fold-open sections (native <details>) */
+main.text details { border-bottom: 1px solid var(--hair); }
+main.text details:first-of-type { border-top: 1px solid var(--hair); }
+main.text summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 16px 0;
+  list-style: none;
+  cursor: pointer;
 }
+main.text summary::-webkit-details-marker { display: none; }
+main.text summary h2 { margin: 0; font-size: clamp(19px, 2.6vw, 22px); font-weight: 600; letter-spacing: -0.01em; }
+main.text summary::after {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin: 0 6px 5px;
+  border-right: 2px solid var(--ink2);
+  border-bottom: 2px solid var(--ink2);
+  transform: rotate(45deg);
+}
+main.text details[open] > summary::after { margin-bottom: -4px; transform: rotate(-135deg); }
+main.text details > :not(summary) { margin-top: 0; }
+main.text details[open] { padding-bottom: 8px; }
+/* Printing (or saving as PDF) shows every section, open or not */
+@media print {
+  details::details-content { content-visibility: visible; }
+  main.text summary::after { content: none; }
+}
+
+/* Delete your account: the steps as big numbered steps */
+.steps { counter-reset: step; margin: 0 0 20px; padding: 0; list-style: none; }
+.steps li {
+  counter-increment: step;
+  position: relative;
+  min-height: 34px;
+  margin: 0 0 14px;
+  padding: 4px 0 0 50px;
+}
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--honey);
+  color: var(--honey-ink);
+  font-family: var(--display);
+  font-weight: 700;
+  line-height: 34px;
+  text-align: center;
+}
+
+/* ---- Footer ---- */
+main { padding-bottom: clamp(56px, 8vw, 96px); }
+.site-footer { border-top: 1px solid var(--hair); font-size: 14px; }
+.site-footer nav { padding-top: 24px; padding-bottom: 28px; gap: 4px 20px; }
+.site-footer a { color: var(--ink2); }

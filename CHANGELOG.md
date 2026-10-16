@@ -1,5 +1,9 @@
 # Changelog
 
+## Crew coordinator uses fewer tokens (2026-10-16)
+
+- The crew instructions now ask the coordinator to suggest a fresh chat after each publish (when no worker is still running), send heavy reading to a scout worker, keep worker reports to about 15 lines, and keep a short hand-off note on the Crew Board (parked items, owner choices not yet recorded, reminders) so a fresh chat picks up where the last one stopped. Nothing in the app changed.
+
 ## Arrows between cards removed (2026-10-16)
 
 - The arrows you could draw between cards and containers are gone, as asked: hovering or selecting a card or container no longer shows the little connection dots.

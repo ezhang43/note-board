@@ -31,11 +31,6 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     ...blockActions(ctx),
     ...boards,
-    /** The Due panel takes the side panel's place (one at a time), as Version history does. */
-    toggleDuePanel: () => {
-      ctx.updateUi({ sidePanel: null });
-      boards.toggleDuePanel();
-    },
     ...gestureActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),

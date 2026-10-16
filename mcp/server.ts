@@ -19,7 +19,6 @@ export const MAX_CHANGES = 50;
 /** At most this many characters in one item's or note's text. */
 export const MAX_TEXT = 5000;
 
-const day = z.string().describe('A day, written YYYY-MM-DD');
 const itemId = z.string().min(1).describe('An item’s id, as read_board shows it');
 const text = z.string().max(MAX_TEXT);
 
@@ -67,7 +66,7 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
     {
       title: 'Read a BusyAnts board',
       description:
-        'Reads one board as an outline: columns left to right with their cards top to bottom, then loose cards. Checklists show items with ticks, nesting, due dates and ids, and their Completed section; also notes, links, board cards and the Completed card.',
+        'Reads one board as an outline: columns left to right with their cards top to bottom, then loose cards. Checklists show items with ticks, nesting and ids, and their Completed section; also notes, links, board cards and the Completed card.',
       inputSchema: { board: boardArg },
       annotations: readOnly,
     },
@@ -91,7 +90,6 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
           .array(
             z.object({
               text: text.min(1).describe('The item’s text (one line)'),
-              due: day.optional(),
               after: itemId.optional().describe('Put it right after this item'),
               under: itemId.optional().describe('Put it as the last sub-item of this item'),
             }),
@@ -108,11 +106,11 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
     'edit_items',
     {
       title: 'Edit checklist items',
-      description: `Changes items’ text and / or due dates (due: null removes it), by item id, on one of your own boards. At most ${MAX_CHANGES} changes per call.`,
+      description: `Changes items’ text, by item id, on one of your own boards. At most ${MAX_CHANGES} changes per call.`,
       inputSchema: {
         board: boardArg,
         changes: z
-          .array(z.object({ item: itemId, text: text.min(1).optional(), due: day.nullable().optional().describe('A day written YYYY-MM-DD, or null to remove the due date') }))
+          .array(z.object({ item: itemId, text: text.min(1) }))
           .min(1)
           .max(MAX_CHANGES),
       },

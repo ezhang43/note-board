@@ -4,20 +4,20 @@ import { CloseIcon } from './icons';
 import { isTextField, panelCovers } from './textField';
 
 /**
- * A panel beside the board, in the right-hand spot Version history and Due also use (one at a
+ * A panel beside the board, in the right-hand spot Version history also uses (one at a
  * time); on a phone it fills the screen. It only frames what it holds: a title, ×, and Escape to close.
  */
 export function SidePanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    // Escape meant for something else (leaving a text box, closing a date picker, the shortcuts list
-    // or a "Delete …?" question) leaves it open.
+    // Escape meant for something else (leaving a text box, the shortcuts list or a "Delete …?"
+    // question) leaves it open.
     const key = (e: KeyboardEvent) => {
-      const { dueFor, shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
+      const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
       // A "Delete …?" question inside the panel (Google Calendar) answers its own Escape.
       const asking = e.target instanceof Element && e.target.closest('[role="alertdialog"]');
-      if (e.key === 'Escape' && !isTextField(e.target) && !panelCovers() && !dueFor && !shortcutsOpen && !confirm && !deleteCompleted && !asking) onClose();
+      if (e.key === 'Escape' && !isTextField(e.target) && !panelCovers() && !shortcutsOpen && !confirm && !deleteCompleted && !asking) onClose();
     };
-    // Capture: seen before the page's own shortcuts close the list or picker that Escape was for.
+    // Capture: seen before the page's own shortcuts close the list that Escape was for.
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [onClose]);

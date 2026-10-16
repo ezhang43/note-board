@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
 
 // Completed panel (Job #51, owner OK 2026-10-15): the board's Completed card is no longer drawn on
-// the board. Its contents show in a Completed panel, opened by a round button next to Due (a line in
+// the board. Its contents show in a Completed panel, opened by a round button next to Version history (a line in
 // the ⋯ sheet on a phone), in the right-hand side panel spot.
 
 freshBoardEachTest();
@@ -40,9 +40,9 @@ test('Clean up fills the Completed panel, not the board; unticking there sends a
   await expect(page.locator('.completed-card-body')).toHaveCount(0);
   await expect(panel(page)).toHaveCount(0);
 
-  // The round button next to Due opens it; it shares the side panel spot.
-  const due = page.locator('.corner-controls .due-button');
-  await expect(due.locator('xpath=following-sibling::button[1]')).toHaveAccessibleName('Completed');
+  // The round button left of Version history opens it; it shares the side panel spot.
+  const history = page.locator('.corner-controls').getByRole('button', { name: 'Version history' });
+  await expect(history.locator('xpath=preceding-sibling::button[1]')).toHaveAccessibleName('Completed');
   await completedButton(page).click();
   await expect(completedButton(page)).toHaveAttribute('aria-pressed', 'true');
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });

@@ -27,7 +27,7 @@ WHAT YOU CAN DO
 
 - Add notes and checklists, and move them around the board.
 - Group cards in containers that hold your notes and checklists together.
-- Nest checklist items, tick them off, and set due dates.
+- Nest checklist items and tick them off.
 - Put boards inside boards, for example one board per trip, project or class.
 - Connect cards with arrows.
 - Change card and container colors, and make text bigger or smaller.
@@ -50,7 +50,7 @@ STAY FOCUSED
 
 - A built-in focus timer (25 minutes of focus, short breaks, a longer break after four rounds) with a soft chime.
 - Google Calendar beside your board, if you choose to connect it. See your week or month, and add or change simple events without leaving BusyAnts.
-- A list of everything due today, and a Completed panel for the checklist items you have cleaned up.
+- A Completed panel for the checklist items you have cleaned up.
 
 MADE FOR PHONES AND TABLETS TOO
 
@@ -106,4 +106,4 @@ This will change when the site moves to busyants.work: update it in Play Console
 - App icon 512 x 512: `public/busyants-512.png` (already in the repo; upload that file).
 - Feature graphic 1024 x 500: `docs/play-store/screenshots/feature-graphic-1024x500.png`
 - Screenshots: `docs/play-store/screenshots/` (see README.md in this folder).
-- Suggested captions, if you add any: "One board for notes and checklists", "Tick things off, nest them, set due dates", "Plan together in real time", "Light and dark".
+- Suggested captions, if you add any: "One board for notes and checklists", "Tick things off and nest them", "Plan together in real time", "Light and dark".

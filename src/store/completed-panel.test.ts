@@ -33,9 +33,6 @@ describe('Completed panel', () => {
     expect(s.getState().ui.sidePanel).toBe('completed');
     s.toggleSidePanel('completed');
     expect(s.getState().ui.sidePanel).toBeNull();
-    s.toggleDuePanel();
-    s.toggleSidePanel('completed');
-    expect(s.getState().ui.dueOpen).toBe(false);
   });
 
   it('toolbar Clean up records the items but selects nothing and opens nothing', () => {

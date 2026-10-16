@@ -113,7 +113,7 @@ export function findBoard(entries: BoardEntry[], query: string): { entry: BoardE
 
 function itemLines(items: TodoItem[], depth = 0): string[] {
   return items.flatMap((it) => [
-    `${'  '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text} (id: ${it.id})${it.due ? ` (due ${it.due})` : ''}`,
+    `${'  '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text} (id: ${it.id})`,
     ...itemLines(it.children, depth + 1),
   ]);
 }
@@ -170,7 +170,13 @@ export function safeToEdit(raw: string | null): { ok: true } | { ok: false; reas
   const got = readWorkspace(raw);
   if (!got) return { ok: false, reason: 'the saved boards can’t be read (damaged, or from a newer version of the app)' };
   if (got.legacy) return { ok: false, reason: 'the boards were saved by an older version of the app; open BusyAnts once to update them' };
-  if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), JSON.parse(raw))) {
+  // Due dates were removed (owner, 2026-10-16): an item's old `due` is erased by the edit, not a
+  // reason to refuse it. Only checklist items (text and children) lose it in the comparison.
+  const saved = JSON.parse(raw, (_k, v) => {
+    if (v && typeof v.text === 'string' && Array.isArray(v.children)) delete v.due;
+    return v;
+  });
+  if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), saved)) {
     return { ok: false, reason: 'the boards hold data this connector doesn’t know (saved by a newer version of the app?)' };
   }
   return { ok: true };

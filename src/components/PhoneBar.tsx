@@ -14,7 +14,6 @@ import {
 } from './Toolbar';
 import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
-import { DuePanelButton } from './Due';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
@@ -76,7 +75,6 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <SameWidthButton labelled />
           <CleanUpButton />
           <FileMenu />
-          <DuePanelButton labelled />
           <CompletedButton labelled onOpen={() => setOpen(null)} />
           <PomodoroButton labelled onOpen={() => setOpen(null)} />
           <CalendarButton labelled onOpen={() => setOpen(null)} />

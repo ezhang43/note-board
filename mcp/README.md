@@ -11,7 +11,7 @@ It signs in as you, so Google's rules for your boards (`firestore.rules`) apply 
 | `list_boards` | Lists your boards (read only) |
 | `read_board` | Reads one board as an outline, with ids (read only) |
 | `add_items` | Adds items to a checklist: at the end, after an item, or under an item |
-| `edit_items` | Changes items' text or due dates (or removes a due date) |
+| `edit_items` | Changes items' text |
 | `set_items_done` | Ticks or unticks items |
 | `move_items` | Moves items (with their sub-items) to a place in a checklist on the same board |
 | `add_note` | Adds a note: at the end of a column, near a card, or loose on the board |

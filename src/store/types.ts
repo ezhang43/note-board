@@ -143,13 +143,9 @@ export interface Ui {
   preview: { meta: VersionMeta; board: Board } | null;
   /** Search (owner request): what is being looked for, and the match being shown (null: none). */
   find: { query: string; current: Match | null } | null;
-  /** The checklist item whose due date is being picked (owner request: due dates). */
-  dueFor: { cardId: string; itemId: string } | null;
-  /** The Due panel (what is due today or overdue, on every board) is open. */
-  dueOpen: boolean;
   /**
    * The side panel beside the board (owner request: focus timer), in the right-hand spot that
-   * Version history and Due also use: one of them at a time. 'completed' is the board's Completed panel.
+   * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.
    */
   sidePanel: SidePanelKind | null;
   /** The arrow that was clicked (owner request: arrows); shown selected only while no block is. */
@@ -221,8 +217,6 @@ export const emptyUi: Ui = {
   historyOpen: false,
   preview: null,
   find: null,
-  dueFor: null,
-  dueOpen: false,
   sidePanel: null,
   arrowSel: null,
   shares: [],

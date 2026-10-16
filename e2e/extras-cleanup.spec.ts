@@ -1,9 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, cards, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, cards, clickEmpty, freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
-const cleanUpButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Clean up', exact: true });
+// The toolbar's Clean up, in the Arrange menu (opened first).
+const cleanUpButton = async (page: Page) => (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true });
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
 
 async function makeList(page: Page, title: string, items: string[]) {
@@ -24,12 +25,12 @@ const completedPanel = (page: Page) => page.getByRole('complementary', { name: '
 const openCompleted = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
 
 test('Clean up moves ticked items into the Completed panel under today, and unticking sends one back', async ({ page }) => {
-  await expect(cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(await cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
   const groceries = await makeList(page, 'Groceries', ['bread', 'milk', 'eggs']);
   await groceries.locator('[data-item-id]').filter({ has: page.locator('textarea:text-is("milk")') }).getByLabel('Done').click();
-  await expect(cleanUpButton(page)).not.toHaveAttribute('aria-disabled');
+  await expect(await cleanUpButton(page)).not.toHaveAttribute('aria-disabled');
 
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   expect(await texts(groceries)).toEqual(['bread', 'eggs']);
   await expect(cards(page)).toHaveCount(1); // nothing new on the board
   await openCompleted(page);
@@ -39,7 +40,7 @@ test('Clean up moves ticked items into the Completed panel under today, and unti
   await expect(done.locator('.completed-entry')).toHaveCount(1);
   await expect(done.locator('.completed-text')).toHaveText(['milk']);
   await expect(done.locator('.completed-from')).toHaveText(['Groceries']);
-  await expect(cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
+  await expect(await cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
 
   // Untick: back to Groceries, unticked.
   await done.getByLabel('Send "milk" back to Groceries').click();
@@ -51,7 +52,7 @@ test('Clean up moves ticked items into the Completed panel under today, and unti
 test('Clean up is one undo step', async ({ page }) => {
   const list = await makeList(page, 'L', ['a', 'b']);
   await list.getByLabel('Done').first().click();
-  await cleanUpButton(page).click();
+  await (await cleanUpButton(page)).click();
   await openCompleted(page);
   await expect(completedPanel(page).locator('.completed-text')).toHaveText(['a']);
   await clickEmpty(page);

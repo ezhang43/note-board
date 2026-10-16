@@ -26,7 +26,7 @@ interface CardBase {
   w: number | null;
   h: number | null;
   /**
-   * Colour picked for the card's title band (Colour button); missing / null = the usual band.
+   * Colour picked to tint the card's header (Color menu); missing / null = no tint.
    * Cards themselves are always white.
    */
   titleColor?: ColorKey | null;

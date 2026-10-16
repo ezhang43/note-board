@@ -1,28 +1,34 @@
 :root {
-  /* Warm, honey tones taken from the app icon (owner request), so the app and its icon feel like one thing. */
-  --canvas: #faf6ec;
-  --grid-dot: #d6cbb0;
+  /*
+   * "Honey Workshop" (owner decision 2026-10-16): calm cream surfaces with honey accents, from the
+   * app icon's tones (owner request), so the app and its icon feel like one thing.
+   */
+  --canvas: #f8f5ee;
+  --grid-dot: #ddd3bd;
   --grid-dot-faint: #ebe4d2;
-  --toolbar-bg: #fff1c2;
-  --toolbar-edge: #ecd897;
-  --line: #e2ddd4;
+  --toolbar-bg: #fffdf8;
+  --toolbar-edge: #e7dfcd;
+  --line: #e7dfcd;
   --control-edge: #d9d4ca;
   --ink: #1f1d1a;
-  --ink-soft: #5f5a52;
+  --ink-soft: #625c53;
   --ink-faint: #6b655c;
   --card-bg: #ffffff;
-  --card-edge: #e2ddd4;
+  --card-edge: #e6e0d4;
   --accent: #8a5a00;
-  --accent-soft: #fff1c2;
+  --accent-soft: #fdf1cf;
   --accent-ink: #6b4400;
   --danger: #a3263f;
-  --surface: #ffffff;
+  --surface: #fffdf8;
   --hover: rgba(31, 29, 26, 0.07);
   --placeholder: #736c62;
   --on-accent: #ffffff;
   --drop-bg: #fbf0cf;
   --link-url-bg: rgba(255, 255, 255, 0.75);
   --checkbox: #2f7d5b;
+  /* Honey (direction A, owner decision 2026-10-16): the pressed tool and the Share button. */
+  --honey: #f2b62b;
+  --honey-ink: #1f1d1a;
   --nest-mark: #b07a0e;
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
   --colour-dot: #efece6;
@@ -41,28 +47,31 @@
  */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #1d1b17;
-  --grid-dot: #45413b;
+  --canvas: #1b1a17;
+  --grid-dot: #38342e;
   --grid-dot-faint: #2c2a27;
-  --toolbar-bg: #2a2416;
-  --toolbar-edge: #3d3422;
-  --line: #3a3733;
+  --toolbar-bg: #24221e;
+  --toolbar-edge: #3a362f;
+  --line: #3a362f;
   --control-edge: #4a463f;
   --ink: #ece8e1;
-  --ink-soft: #c2bcb2;
+  --ink-soft: #aaa397;
   --ink-faint: #a8a298;
-  --card-bg: #2b2926;
-  --card-edge: #3d3a35;
+  --card-bg: #2a2824;
+  --card-edge: #3c3832;
   --accent: #f2c14e;
   --accent-soft: #3a3020;
   --accent-ink: #ffd97a;
   --danger: #f08a9c;
-  --surface: #2b2926;
+  --surface: #24221e;
   --hover: rgba(236, 232, 225, 0.09);
   --placeholder: #a39d93;
   --on-accent: #241a08;
   --drop-bg: #3a3020;
   --link-url-bg: rgba(0, 0, 0, 0.22);
+  --checkbox: #5fb38a;
+  --honey: #f2c14e;
+  --honey-ink: #1b1a17;
 }
 
 * { box-sizing: border-box; }
@@ -287,7 +296,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   align-items: center;
   justify-content: center;
 }
-.tool-button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+.tool-button[aria-pressed='true'] { background: var(--honey); color: var(--honey-ink); }
 
 .tb-button {
   height: 40px;
@@ -323,7 +332,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .tb-button.quiet:hover:not([aria-disabled='true']) { border-color: var(--control-edge); background: var(--surface); filter: none; }
 
 .tb-button.add-column { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-
+/* In the toolbar the three Add buttons look alike, outlined with an icon; Share is the one solid honey button. */
+/* (Only the toolbar's own button: the Share panel's "Share this board" also uses .add-column.) */
+.toolbar > .tb-button.add-column { background: var(--surface); border-color: var(--control-edge); color: var(--ink); }
+.toolbar .share-wrap:not(.phone) > .tb-button { background: var(--honey); border-color: var(--honey); color: var(--honey-ink); }
 /* ---------- canvas ---------- */
 
 .canvas {
@@ -387,6 +399,30 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
 }
 .help-button:hover { color: var(--ink); }
+
+/* Search, Completed, History, Timer and Calendar: labelled, in one pill. */
+.dock-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+.corner-controls .dock-tools .help-button.dock-tool {
+  width: auto;
+  height: 32px;
+  gap: 6px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 7px;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+.corner-controls .dock-tools .help-button.dock-tool:hover { background: var(--hover); }
 
 .zoom-control {
   display: flex;
@@ -479,6 +515,16 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .icon-button:hover { background: var(--hover); }
 /* A card's or column's delete button: the same faint trash can as a checklist item's, red on hover. */
 .block-trash { color: var(--ink-faint); }
+/*
+ * A card's and a container's header buttons show only while pointing at it, while it is selected, or
+ * while it has keyboard focus (owner decision 2026-10-16). Touch screens have no pointing, so there
+ * they always show.
+ */
+@media (hover: hover) {
+  .card-header > .icon-button, .column-actions > .icon-button { opacity: 0; transition: opacity 120ms; }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .icon-button,
+  :is(.column:hover, .column.selected, .column-header:focus-within) .column-actions > .icon-button { opacity: 1; }
+}
 
 .card, .column { cursor: default; }
 .card input:not([type='checkbox']), .card textarea, .column input { cursor: text; }
@@ -524,36 +570,30 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card.loose { position: absolute; }
 
 /*
- * Titled cards (to-do lists, links, Completed) get a tinted band across the top, behind the header
- * and title: soft teal when loose; inside a column, a deeper shade of the column's colour (mixed
- * from its background and border tones) so the band stands out from the column without clashing.
+ * No title band (owner decision 2026-10-16): cards are white with a bold title. A colour picked in
+ * the Color menu tints the header (and a list's or link's title under it) lightly; the ink stays usual.
  */
-.card { --band: var(--accent-soft); }
-.card.in-column { --band: color-mix(in srgb, var(--col-edge) 70%, var(--bg)); }
-/* In an uncoloured column the mixed shade comes out a dull khaki, so cards keep the usual band. */
-.column.uncoloured .card.in-column { --band: var(--accent-soft); }
-/* A bold band is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
-.column.bold .card.in-column { --band-text: var(--col-text); }
-:is(.card.titled.bold-band, .column.bold .card.titled.in-column:not(.own-band))
-  :is(.card-header, .todo-body > .card-title:first-child, .link-body > .card-title:first-child) {
-  --ink-soft: var(--band-text);
-  --ink-faint: var(--band-text);
-  --placeholder: var(--band-text);
-}
-.card.titled .card-header {
+.card.tinted .card-header {
   margin: 0 -12px;
   padding: 0 6px 0 12px;
-  background: var(--band);
+  background: var(--tint);
   border-radius: 9px 9px 0 0;
 }
-.card.titled.collapsed .card-header { border-radius: 9px; }
-.card.titled .todo-body > .card-title:first-child,
-.card.titled .link-body > .card-title:first-child {
+.card.tinted.collapsed .card-header { border-radius: 9px; }
+/* The title spans the card, so the tint can reach both edges. */
+.todo-body > .card-title:first-child,
+.link-body > .card-title:first-child {
   align-self: stretch;
   max-width: none;
   margin: 0 -12px 4px;
   padding: 0 12px 8px;
-  background: var(--band);
+}
+.card.tinted :is(.todo-body, .link-body) > .card-title:first-child { background: var(--tint); }
+/* A bold tint is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
+.card.bold-tint :is(.card-header, .todo-body > .card-title:first-child, .link-body > .card-title:first-child) {
+  --ink-soft: var(--tint-text);
+  --ink-faint: var(--tint-text);
+  --placeholder: var(--tint-text);
 }
 .card.in-column { width: auto; margin: 0 16px 10px; }
 .card.collapsed { padding-bottom: 0; }
@@ -561,7 +601,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card.loose.collapsed { justify-content: center; min-height: 60px; }
 
 .card.selected, .column.selected { outline: 2px solid var(--accent); }
-.card.selected { outline-offset: 2px; }
+.card.selected { outline-offset: 2px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--honey) 28%, transparent); }
 .column.selected { outline-offset: 3px; }
 
 .card.dragging, .column.dragging {
@@ -628,11 +668,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 4px;
   border-radius: 6px;
-  border: 1px solid var(--edge);
-  background: var(--surface);
-  color: inherit;
+  color: var(--accent);
   font-weight: 600;
   font-size: calc(13px * var(--fs, 1));
   text-decoration: none;
@@ -708,11 +746,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   height: 52px;
   padding: 8px 8px 6px;
   display: grid;
-  /* Equal sides keep the title truly centred; each side has room for the two buttons. */
-  grid-template-columns: minmax(60px, 1fr) minmax(0, auto) minmax(60px, 1fr);
+  /* Title and count on the left, the two buttons on the right. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
   align-items: center;
 }
-.column-heading { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
+.column-heading { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .column-actions { display: flex; justify-content: flex-end; gap: 2px; }
 .column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
 .column-count {

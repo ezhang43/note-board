@@ -54,6 +54,9 @@ describe('column colours in dark mode', () => {
   });
 });
 
+/** Dark mode's card background (--card-bg). */
+const DARK_CARD = '#2A2824';
+
 /** CSS color-mix(in srgb, a p, b): the share p of a, the rest b. */
 function mix(a: string, b: string, p: number) {
   const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
@@ -72,7 +75,7 @@ describe('bold colours (owner request, 2026-10-15)', () => {
     expect(PALETTE.stone).toEqual({ label: 'Stone', bg: '#F7F5F1', edge: '#E2DDD4', text: '#3F3B35' });
   });
 
-  it('are vivid and all different, yet readable: column text, its own text, card title bands and placeholders', () => {
+  it('are vivid and all different, yet readable: column text, its own text, card header tints and placeholders', () => {
     const bgs = COLOR_KEYS.map((k) => PALETTE[k].bg.toLowerCase());
     expect(new Set(bgs).size).toBe(COLOR_KEYS.length);
     for (const key of BOLD_KEYS) {
@@ -81,8 +84,8 @@ describe('bold colours (owner request, 2026-10-15)', () => {
       expect(contrast('#1F1D1A', s.bg)).toBeGreaterThanOrEqual(7); // column title
       expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(7); // count, hints and icons on the column
       expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5); // "Container title" placeholder
-      expect(contrast('#1F1D1A', mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // card title band
-      expect(contrast(s.text, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5); // icons and placeholder on that band
+      expect(contrast('#1F1D1A', mix(s.bg, '#FFFFFF', 0.6))).toBeGreaterThanOrEqual(7); // a card's header tint, with the usual ink
+      expect(contrast(s.text, mix(s.bg, '#FFFFFF', 0.6))).toBeGreaterThanOrEqual(4.5); // its icons and title placeholder on the tint
     }
   });
 
@@ -93,8 +96,15 @@ describe('bold colours (owner request, 2026-10-15)', () => {
       expect(contrast(DARK_INK, s.bg)).toBeGreaterThanOrEqual(7);
       expect(contrast(s.text, s.bg)).toBeGreaterThanOrEqual(7);
       expect(contrast(mix(s.text, s.bg, 0.8), s.bg)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(DARK_INK, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(s.text, mix(s.edge, s.bg, 0.7))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(DARK_INK, mix(s.bg, DARK_CARD, 0.6))).toBeGreaterThanOrEqual(7); // a card's header tint
+      expect(contrast(s.text, mix(s.bg, DARK_CARD, 0.6))).toBeGreaterThanOrEqual(4.5); // its icons and title placeholder
+    }
+  });
+
+  it("a card's header tint (Color, owner decision 2026-10-16) keeps the usual ink readable on every colour", () => {
+    for (const key of COLOR_KEYS) {
+      expect(contrast('#1F1D1A', mix(PALETTE[key].bg, '#FFFFFF', 0.6))).toBeGreaterThanOrEqual(7);
+      expect(contrast(DARK_INK, mix(DARK_PALETTE[key].bg, DARK_CARD, 0.6))).toBeGreaterThanOrEqual(7);
     }
   });
 

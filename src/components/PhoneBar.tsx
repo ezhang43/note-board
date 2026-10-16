@@ -7,6 +7,7 @@ import {
   CollapseAllButton,
   ColourControl,
   DarkModeButton,
+  FeedbackButton,
   FileMenu,
   SameWidthButton,
   SnapButton,
@@ -105,6 +106,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <CoffeeIcon />
             Buy me a coffee
           </a>
+          <FeedbackButton onOpen={() => setOpen(null)} />
           <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
             About BusyAnts
           </a>

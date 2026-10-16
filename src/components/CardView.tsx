@@ -53,10 +53,10 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   // Inside a column a card follows the column's width and fits its content.
   const w = resize?.liveW ?? card.w ?? CARD_W;
   const h = resize?.liveH ?? card.h;
-  // A colour picked for the title band: a deeper shade of it, like the bands inside columns.
-  const band = card.titleColor ? swatchFor(card.titleColor, theme) : null;
+  // A colour picked in the Color menu lightly tints the card's header; the text keeps its usual ink (owner decision 2026-10-16).
+  const tint = card.titleColor ? swatchFor(card.titleColor, theme) : null;
   const style = {
-    ...(band ? { '--band': `color-mix(in srgb, ${band.edge} 70%, ${band.bg})`, '--band-text': band.text } : {}),
+    ...(tint ? { '--tint': `color-mix(in srgb, ${tint.bg} 60%, var(--card-bg))`, '--tint-text': tint.text } : {}),
     ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
   const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
@@ -70,10 +70,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     sizeMatch && 'size-match',
     takes && 'append-target',
     card.collapsed && 'collapsed',
-    // Notes have no title: a coloured note gets the band across its header instead.
-    ((card.kind !== 'note' && card.kind !== 'board') || band) && 'titled',
-    // Its own band colour: bold, or pastel (which then wins over a bold column's band).
-    band && (isBold(card.titleColor) ? 'bold-band' : 'own-band'),
+    tint && 'tinted',
+    isBold(card.titleColor) && 'bold-tint',
     // Search: the current match is out of sight inside this card, so the card is marked.
     findTarget && 'find-target',
   ];

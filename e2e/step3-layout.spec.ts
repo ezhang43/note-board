@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   add,
+  arrange,
   boardPos,
   box,
   clickEmpty,
@@ -211,7 +212,7 @@ test('adding cards to a column pushes a loose card below it out of the way', asy
 test('with snap off moves are free; turning snap back on lines everything up on the grid', async ({ page }) => {
   await add(page, 'Note');
   const note = looseCards(page).first();
-  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  await (await arrange(page)).getByRole('button', { name: 'Snap to grid' }).click();
   await dragBy(page, note, 37, 23);
   const off = await boardPos(note);
   expect(off.x % 20 !== 0 || off.y % 20 !== 0).toBe(true);
@@ -220,7 +221,7 @@ test('with snap off moves are free; turning snap back on lines everything up on 
   await dragPointer(page, { x: h.x + 9, y: h.y + 9 }, { x: h.x + 9 + 47, y: h.y + 9 + 33 });
   expect((await note.evaluate((el) => (el as HTMLElement).offsetWidth)) % 20).not.toBe(0);
 
-  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  await (await arrange(page)).getByRole('button', { name: 'Snap to grid' }).click();
   const on = await boardPos(note);
   expect(Math.abs(on.x % 20)).toBe(0);
   expect(Math.abs(on.y % 20)).toBe(0);
@@ -265,6 +266,7 @@ test('Collapse all collapses every card and column; the same button then expands
   await add(page, 'Checklist');
   await clickEmpty(page);
   const button = () => page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await arrange(page);
   await expect(button()).toHaveAccessibleName('Collapse all');
   await button().click();
   await expect(page.locator('.card:not(.collapsed), .column:not(.collapsed)')).toHaveCount(0);

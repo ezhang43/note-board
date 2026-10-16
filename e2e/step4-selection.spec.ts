@@ -22,7 +22,7 @@ async function threeNotes(page: Page) {
 
 const header = { position: { x: 30, y: 18 } };
 
-test('Ctrl + click and Shift + click add and remove blocks; Color recolors all selected columns and card title bands', async ({ page }) => {
+test('Ctrl + click and Shift + click add and remove blocks; Color recolors all selected columns and tints card headers', async ({ page }) => {
   const [a, b, c] = await threeNotes(page);
   await a.click(header);
   await b.click({ ...header, modifiers: ['Control'] });
@@ -31,7 +31,7 @@ test('Ctrl + click and Shift + click add and remove blocks; Color recolors all s
   await b.click({ ...header, modifiers: ['Control'] });
   await expect(b).not.toHaveClass(/selected/);
 
-  // Cards selected: Color is available (it colors their title bands).
+  // Cards selected: Color is available (it tints their headers).
   await expect(page.getByRole('button', { name: 'Color of selected cards and containers' })).not.toHaveAttribute('aria-disabled');
 
   // With columns in the selection, Color recolors every selected column.
@@ -48,7 +48,7 @@ test('Ctrl + click and Shift + click add and remove blocks; Color recolors all s
   await expect(c1).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(c2).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(a).toHaveCSS('background-color', 'rgb(255, 255, 255)'); // the card stays white
-  await expect(a.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // its band is colored
+  await expect(a.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // its header is tinted
 });
 
 test('Select tool: dragging a box selects everything it touches, live; Ctrl adds to the selection', async ({ page }) => {

@@ -6,6 +6,10 @@
 - The "Why I made BusyAnts" story and the three highlights now sit side by side on a computer, so there is less scrolling.
 - The "Also in BusyAnts" list is now a table comparing BusyAnts with Milanote, Notion, Miro and Trello on their free plans, checked against their own help and pricing pages and dated October 2026. Anything we could not confirm shows a dash. On a phone the table scrolls sideways inside its own box.
 - The board pictures are smaller files, so the page loads faster. Nothing in the app or in anyone's saved boards changed.
+## Tour wording and order (2026-10-16)
+
+- The welcome tour now goes: add a note or checklist, move cards and columns, Share, your boards, keyboard shortcuts. On a phone it stays +, Boards, ⋯.
+- The first step says a Note is a blank card for anything, and the column step says a column is a container that holds your notes and checklists. Nothing about saving or your boards changed.
 
 ## A short welcome tour (2026-10-16)
 

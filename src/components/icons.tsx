@@ -303,3 +303,58 @@ export function ShareIcon({ size = 17 }: { size?: number }) {
     </svg>
   );
 }
+
+/** The toolbar's Add buttons and menus (Honey Workshop look, 2026-10-16). */
+export function NoteIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M15 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v11z" />
+      <path d="M15 21v-5a1 1 0 0 1 1-1h4" />
+    </svg>
+  );
+}
+
+export function ChecklistIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M3 6.5l1.5 1.5L7.5 5M3 15.5L4.5 17l3-3M11 7h10M11 16h10" />
+    </svg>
+  );
+}
+
+export function ContainerIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+    </svg>
+  );
+}
+
+export function ArrangeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+export function FileIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
+export function FeedbackIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z" />
+    </svg>
+  );
+}

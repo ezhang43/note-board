@@ -64,7 +64,6 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
     sizeMatch && 'size-match',
     dropTarget && 'drop-target',
     col.collapsed && 'collapsed',
-    col.color === null && 'uncoloured',
     isBold(col.color) && 'bold',
     findTarget && 'find-target',
   ];
@@ -75,13 +74,12 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={col.title ? `Container: ${col.title}` : 'Untitled container'}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-edge': colors.edge, '--col-text': colors.text } as CSSProperties}
+      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-text': colors.text } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
-      {/* Title and count centred; collapse arrow and trash can on the right. */}
+      {/* Title and count on the left; collapse arrow and trash can on the right. */}
       <div className="column-header">
-        <div aria-hidden="true" />
         <div className="column-heading">
           <AutoSizeInput
             ref={title}

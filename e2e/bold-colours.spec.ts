@@ -43,7 +43,7 @@ test('Auto-color starts with the bold colors', async ({ page }) => {
   expect(bgs.sort()).toEqual([rgb('#6BB8F5'), rgb('#FF8C78')].sort()); // Ocean and Tomato (the order is unit-tested)
 });
 
-test('on a bold title band the icons and the title placeholder use the color’s own dark text', async ({ page }) => {
+test('on a bold header tint the icons and the title placeholder use the color’s own dark text', async ({ page }) => {
   const placeholder = (l: import('@playwright/test').Locator) => l.evaluate((el) => getComputedStyle(el, '::placeholder').color);
   const color = page.getByRole('button', { name: 'Color of selected cards and containers' });
   const menu = page.getByRole('group', { name: 'Colors' });
@@ -55,12 +55,12 @@ test('on a bold title band the icons and the title placeholder use the color’s
   await menu.getByRole('button', { name: 'Tomato' }).click();
   await expect(list.locator('.block-trash')).toHaveCSS('color', rgb('#400A03'));
   expect(await placeholder(list.getByLabel('List title'))).toBe(rgb('#400A03'));
-  // A pastel band keeps the usual soft grey.
+  // A pastel tint keeps the usual soft grey.
   await menu.getByRole('button', { name: 'Sky' }).click();
   await expect(list.locator('.block-trash')).toHaveCSS('color', rgb('#6B655C'));
   await clickEmpty(page);
 
-  // A list inside an Ocean column gets the deep band, with dark blue icons.
+  // Cards no longer take a band from their container (Honey Workshop, 2026-10-16): with Default, a list in an Ocean container is plain white with the usual grey icons.
   await add(page, 'New container');
   const col = columns(page).first();
   await color.click();
@@ -69,12 +69,11 @@ test('on a bold title band the icons and the title placeholder use the color’s
   const colBox = await box(col);
   await dragTo(page, page.locator('.card.loose').first(), { x: colBox.x + 100, y: colBox.y + 20 });
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
-  // It still has its own Sky band, so it keeps the soft grey; with Default it takes the column's band.
-  await expect(col.locator('[data-card-id] .block-trash')).toHaveCSS('color', rgb('#6B655C'));
   await col.locator('[data-card-id]').click({ position: { x: 60, y: 60 } });
   await color.click();
   await menu.getByRole('button', { name: 'Default' }).click();
-  await expect(col.locator('[data-card-id] .block-trash')).toHaveCSS('color', rgb('#042446'));
+  await expect(col.locator('[data-card-id] .block-trash')).toHaveCSS('color', rgb('#6B655C'));
+  await expect(col.locator('[data-card-id] .card-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 });
 
 test.describe('on a phone-sized screen', () => {

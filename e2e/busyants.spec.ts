@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
+import { add, arrange, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
 
 // BusyAnts: the agreed features from the 2026-10-03 owner interview.
 
@@ -68,6 +68,7 @@ test('the Hand tool shows a glove over empty board, and the normal arrow over ca
 
 test('Same width makes the selected blocks as wide as the first one selected', async ({ page }) => {
   const sameWidth = page.locator('header.toolbar').getByRole('button', { name: 'Same width' });
+  await arrange(page);
   await expect(sameWidth).toHaveAttribute('aria-disabled', 'true');
   await clickEmpty(page);
   await add(page, 'New container');
@@ -79,6 +80,7 @@ test('Same width makes the selected blocks as wide as the first one selected', a
   const col = columns(page).first();
   await note.click({ position: { x: 30, y: 10 } });
   await col.click({ position: { x: 20, y: 20 }, modifiers: ['Control'] });
+  await arrange(page);
   await expect(sameWidth).not.toHaveAttribute('aria-disabled', 'true');
   await sameWidth.click();
   await expect.poll(async () => (await col.boundingBox())!.width).toBeCloseTo((await note.boundingBox())!.width, 0);
@@ -331,6 +333,7 @@ test('Expand all opens everything, including cards and columns that were closed 
   await page.keyboard.press('Escape');
   const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
   await clickEmpty(page); // nothing selected: everything
+  await arrange(page);
   await expect(toggle).toHaveAccessibleName('Collapse all');
   await toggle.click();
   await expect(page.locator('.card.loose:not(.collapsed), .column:not(.collapsed)')).toHaveCount(0);
@@ -348,6 +351,7 @@ test('with cards selected, Collapse all / Expand all act on just those', async (
   await page.keyboard.press('Escape');
   await a.click({ position: { x: 30, y: 10 } });
   const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
+  await arrange(page);
   await expect(toggle).toHaveAttribute('title', 'Collapse the selected cards and containers');
   await toggle.click();
   await expect(a).toHaveClass(/collapsed/);
@@ -382,7 +386,7 @@ test('Collapse all closes the gaps: a card under a column moves up to sit right 
   const gapBefore = await gap();
   expect((await col.boundingBox())!.height).toBeGreaterThan(300); // open, with its cards
   await clickEmpty(page); // nothing selected: everything
-  await page.locator('header.toolbar').getByRole('button', { name: 'Collapse all' }).click();
+  await (await arrange(page)).getByRole('button', { name: 'Collapse all' }).click();
   await expect.poll(async () => (await col.boundingBox())!.height).toBeLessThan(100);
   await expect.poll(gap).toBeCloseTo(gapBefore, 0);
 });

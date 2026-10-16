@@ -33,7 +33,7 @@ export function PomodoroButton({ labelled = false, onOpen }: { labelled?: boolea
   return (
     <button
       type="button"
-      className={labelled ? 'tb-button' : `help-button pomodoro-button${time ? ' with-time' : ''}`}
+      className={labelled ? 'tb-button' : `help-button dock-tool pomodoro-button${time ? ' with-time' : ''}`}
       aria-label={time ? `Focus timer, ${time} left` : 'Focus timer'}
       title="Focus timer (Pomodoro)"
       aria-pressed={open}
@@ -43,7 +43,7 @@ export function PomodoroButton({ labelled = false, onOpen }: { labelled?: boolea
       }}
     >
       <TimerIcon />
-      {labelled && 'Focus timer'}
+      {labelled ? 'Focus timer' : !time && 'Timer'}
       {time && <span className="pomodoro-left">{time}</span>}
     </button>
   );

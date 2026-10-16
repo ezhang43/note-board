@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard } from './helpers';
+import { add, arrange, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard } from './helpers';
 
 // Design fixes from the 2026-10-02 Impeccable review.
 
@@ -30,11 +30,13 @@ const style = (l: import('@playwright/test').Locator, prop: string, pseudo?: str
 
 test('the dark-mode button looks pressed while dark mode is on, like Snap to grid', async ({ page }) => {
   const moon = toolbarButton(page, 'Dark mode');
+  await arrange(page); // Snap to grid is in the Arrange menu
   const snap = toolbarButton(page, 'Snap to grid');
   await expect(snap).toHaveAttribute('aria-pressed', 'true');
   const off = await style(moon, 'background-color');
   await moon.click();
   await page.mouse.move(0, 400); // not hovering
+  await arrange(page);
   const on = await style(moon, 'background-color');
   expect(on).not.toBe(off);
   expect(on).toBe(await style(snap, 'background-color'));
@@ -50,32 +52,34 @@ test('placeholder text is dark enough to read (light and dark mode)', async ({ p
 });
 
 test('faded toolbar buttons are a little stronger in dark mode', async ({ page }) => {
+  await arrange(page);
   const faded = page.getByRole('button', { name: 'Same width' }); // faded while fewer than two blocks are selected
   expect(await style(faded, 'opacity')).toBe('0.45');
   await toolbarButton(page, 'Dark mode').click();
+  await arrange(page); // the click outside closed it
   expect(await style(faded, 'opacity')).toBe('0.55');
 });
 
-test('cards in an uncolored column use the usual teal title band', async ({ page }) => {
+test('cards have no title band, loose or in an uncolored column (Honey Workshop, 2026-10-16)', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Checklist');
   const loose = page.locator('.card.loose').first();
-  const looseBand = await style(loose, '--band');
+  await expect(loose.locator('.card-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await clickEmpty(page);
   await add(page, 'New container');
   await add(page, 'Checklist');
   const inColumn = columns(page).first().locator('.card').first();
-  expect(await style(inColumn, '--band')).toBe(looseBand);
+  await expect(inColumn.locator('.card-header')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 });
 
-test('Add Note / Checklist are plain buttons (cards are always white); New column stays teal', async ({ page }) => {
-  const plain = await style(toolbarButton(page, 'Undo (Ctrl+Z)'), 'background-color');
-  for (const name of ['Note', 'Checklist']) {
+test('Add Note, Checklist and Container look alike: outlined, each with its icon (Honey Workshop, 2026-10-16)', async ({ page }) => {
+  const look = await style(toolbarButton(page, 'Note'), 'background-color');
+  for (const name of ['Note', 'Checklist', 'New container']) {
     const b = toolbarButton(page, name);
-    expect(await style(b, 'background-color')).toBe(plain);
+    expect(await style(b, 'background-color')).toBe(look);
+    await expect(b.locator('svg')).toHaveCount(1);
     await expect(b.locator('.add-dot')).toHaveCount(0);
   }
-  expect(await style(toolbarButton(page, 'New container'), 'background-color')).not.toBe(plain);
 });
 
 test('the toolbar is grouped by dividers, and rarely used buttons are quiet until hovered', async ({ page }) => {

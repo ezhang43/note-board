@@ -112,7 +112,7 @@ test.describe('on a phone-sized screen', () => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'More', exact: true }).tap();
     const menu = page.getByRole('dialog', { name: 'More' });
-    for (const name of ['Snap to grid', 'Auto-colour', 'Collapse all', 'Same width', 'Clean up', 'File', 'Larger text', 'Smaller text', 'Hand (H)', 'Select (V)'])
+    for (const name of ['Snap to grid', 'Collapse all', 'Same width', 'Clean up', 'File', 'Larger text', 'Smaller text', 'Hand (H)', 'Select (V)'])
       await expect(menu.getByRole('button', { name, exact: true })).toBeVisible();
     const m = (await menu.boundingBox())!;
     expect(m.x).toBeGreaterThanOrEqual(0);
@@ -122,6 +122,20 @@ test.describe('on a phone-sized screen', () => {
     // Tapping the board closes it.
     await page.mouse.click(200, 70); // just under the top bar, above the menu
     await expect(menu).toBeHidden();
+  });
+
+  test('⋯ has a Color button whose menu holds Auto-color, and it fits the screen', async ({ page }) => {
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    const menu = page.getByRole('dialog', { name: 'More' });
+    await expect(menu.getByRole('button', { name: 'Auto-color', exact: true })).toHaveCount(0); // not a button of its own
+    await menu.getByRole('button', { name: 'Color of selected cards and columns' }).tap();
+    const auto = menu.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Auto-color' });
+    await expect(auto).toBeVisible();
+    await expect(auto).toBeInViewport();
+    const a = (await auto.boundingBox())!;
+    const m = (await menu.boundingBox())!;
+    expect(a.x).toBeGreaterThanOrEqual(m.x);
+    expect(a.x + a.width).toBeLessThanOrEqual(m.x + m.width);
   });
 
   test('while typing in a checklist item, a bar of item actions shows: indent, outdent, move, tick, delete', async ({ page }) => {

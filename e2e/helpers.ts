@@ -19,7 +19,7 @@ export function freshBoardEachTest() {
 /**
  * Wait for the web fonts (IBM Plex Sans from Google Fonts) to finish loading. The page first draws
  * with a fallback font (display=swap) and measuring before the swap made toolbar-width and
- * zoom-centre tests fail now and then on GitHub. Resolves at once when the fonts can't be reached.
+ * zoom-center tests fail now and then on GitHub. Resolves at once when the fonts can't be reached.
  */
 export async function fontsLoaded(page: Page) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined));

@@ -3,7 +3,6 @@ import { ShareButton } from './SharePanel';
 import { appStore, useAppState } from '../store/appStore';
 import { CoffeeIcon, HistoryIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, UndoIcon } from './icons';
 import {
-  AutoColourButton,
   CleanUpButton,
   CollapseAllButton,
   ColourControl,
@@ -72,7 +71,6 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           </div>
           <SnapButton />
           <ColourControl />
-          <AutoColourButton />
           <CollapseAllButton labelled />
           <SameWidthButton labelled />
           <CleanUpButton />

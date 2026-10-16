@@ -50,13 +50,13 @@ test('placeholder text is dark enough to read (light and dark mode)', async ({ p
 });
 
 test('faded toolbar buttons are a little stronger in dark mode', async ({ page }) => {
-  const colour = page.getByRole('button', { name: 'Colour of selected cards and columns' });
-  expect(await style(colour, 'opacity')).toBe('0.45');
+  const faded = page.getByRole('button', { name: 'Same width' }); // faded while fewer than two blocks are selected
+  expect(await style(faded, 'opacity')).toBe('0.45');
   await toolbarButton(page, 'Dark mode').click();
-  expect(await style(colour, 'opacity')).toBe('0.55');
+  expect(await style(faded, 'opacity')).toBe('0.55');
 });
 
-test('cards in an uncoloured column use the usual teal title band', async ({ page }) => {
+test('cards in an uncolored column use the usual teal title band', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Checklist');
   const loose = page.locator('.card.loose').first();
@@ -104,10 +104,10 @@ test('collapse and delete buttons on cards and columns say what they do when hov
   await expect(page.getByRole('button', { name: 'Delete column and its cards' })).toHaveAttribute('title', 'Delete column and its cards');
 });
 
-test('the Colour menu names the swatch under the pointer, and rings each swatch in its own edge colour', async ({ page }) => {
+test('the Color menu names the swatch under the pointer, and rings each swatch in its own edge color', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'New column');
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
   const menu = page.locator('.colour-menu');
   const sky = menu.getByRole('button', { name: 'Sky' });
   await sky.hover();
@@ -204,15 +204,15 @@ test('"Open link" is faded until the link has an address', async ({ page }) => {
   expect(await style(open, 'opacity')).toBe('1');
 });
 
-test('the Colour menu has bigger swatches and never covers the block being coloured', async ({ page }) => {
+test('the Color menu has bigger swatches and never covers the block being colored', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'New column');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
-  const button = (await page.getByRole('button', { name: 'Colour of selected cards and columns' }).boundingBox())!;
-  // Put the column right under the Colour button, where the menu opens.
+  const button = (await page.getByRole('button', { name: 'Color of selected cards and columns' }).boundingBox())!;
+  // Put the column right under the Color button, where the menu opens.
   await dragTo(page, col, { x: button.x + 200, y: button.y + button.height + 40 });
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
   const menu = page.locator('.colour-menu');
   expect((await menu.getByRole('button', { name: 'Sky' }).boundingBox())!.width).toBeGreaterThanOrEqual(32);
   await expect.poll(async () => (await col.boundingBox())!.y).toBeGreaterThan((await menu.boundingBox())!.y + (await menu.boundingBox())!.height);

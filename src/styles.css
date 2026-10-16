@@ -194,7 +194,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .phone-more .zoom-control button { min-width: 44px; height: 38px; font-size: 15px; }
 .phone-more .tool-button { width: 44px; height: 38px; }
 .phone-more .colour-control > .tb-button { width: 100%; }
-/* The colour swatches sit in the sheet, below the Colour button, and fit its width. */
+/* The color swatches sit in the sheet, below the Color button, and fit its width. */
 .phone-more .colour-menu { position: static; margin-top: 6px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; box-shadow: none; }
 .phone-more .swatch { width: 100%; height: auto; aspect-ratio: 1; }
 .item-bar {
@@ -457,6 +457,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .swatch-default[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
 .swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor; }
+/* With nothing selected the swatches and Default are faded and do nothing; Auto-color still works. */
+.swatch[aria-disabled='true'], .swatch-default[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+:root[data-theme='dark'] .swatch[aria-disabled='true'], :root[data-theme='dark'] .swatch-default[aria-disabled='true'] { opacity: 0.55; }
 
 /* ---------- blocks shared ---------- */
 

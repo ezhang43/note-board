@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { add, clickEmpty, freshBoardEachTest } from './helpers';
 
-// Opening the board brings what's on it into view, centred (owner request, 2026-10-04).
+// Opening the board brings what's on it into view, centered (owner request, 2026-10-04).
 
 freshBoardEachTest();
 
@@ -23,7 +23,7 @@ async function scrollAway(page: Page) {
   for (let i = 0; i < 6; i++) await page.mouse.wheel(900, 700);
 }
 
-test('reopening the board shows its cards and columns, centred, even after scrolling far away', async ({ page }) => {
+test('reopening the board shows its cards and columns, centered, even after scrolling far away', async ({ page }) => {
   for (const kind of ['Note', 'Checklist', 'New column'] as const) {
     await clickEmpty(page);
     await add(page, kind);

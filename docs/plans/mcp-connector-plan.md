@@ -30,7 +30,7 @@ Boards and lists can be named by id, or by name when it's unique; ambiguous name
 ## Code and tests
 - `mcp/server.ts` (McpServer + StdioServerTransport), `mcp/boards.ts` (pure), `mcp/firestore.ts` (fetch), `mcp/auth.ts`, `mcp/login/`. Imports `src/model/` directly. Built with Vite to `mcp/dist/server.js` (`npm run mcp:build`); `mcp/dist/` gitignored.
 - New deps: `@modelcontextprotocol/sdk` (stable 1.x, pinned) and `zod` (check which version the SDK wants).
-- Tests (rule 3, failing first): `mcp/*.test.ts` added to Vitest include and tsconfig. Covers each tool on sample boards, a fake in-memory Firestore with the precondition behaviour, round-trip, caps, refusing shared/legacy, and tool-level tests via the SDK's in-memory client. No Firestore emulator. `npm run mcp:check`: read-only real check, prints board count and "safe to edit: yes/no".
+- Tests (rule 3, failing first): `mcp/*.test.ts` added to Vitest include and tsconfig. Covers each tool on sample boards, a fake in-memory Firestore with the precondition behavior, round-trip, caps, refusing shared/legacy, and tool-level tests via the SDK's in-memory client. No Firestore emulator. `npm run mcp:check`: read-only real check, prints board count and "safe to edit: yes/no".
 - Job A: medium review + security check. Job B: high-risk label, high review, waits for the owner. Add `mcp/` to the risky list in `scripts/publish-rules.mjs` (job B).
 
 ## Owner setup (to go in mcp/README.md)

@@ -6,7 +6,7 @@ import { add, box, cards, clickEmpty, freshBoardEachTest } from './helpers';
 
 freshBoardEachTest();
 
-test('cards and items whose saved ids hold odd characters still work with search, Shift+click, Alt+arrows and Colour', async ({ page }) => {
+test('cards and items whose saved ids hold odd characters still work with search, Shift+click, Alt+arrows and Color', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('Buy eggs');
   await clickEmpty(page);
@@ -61,11 +61,11 @@ test('cards and items whose saved ids hold odd characters still work with search
   await page.keyboard.press(`Alt+${key}`);
   await expect(note).not.toHaveClass(/selected/);
 
-  // The Colour menu looks up the selected card to keep it in view.
+  // The Color menu looks up the selected card to keep it in view.
   await clickEmpty(page);
   await note.getByLabel('Note text').click();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Colour of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
   await expect(page.getByRole('button', { name: 'Default' })).toBeVisible();
   // freshBoardEachTest fails the test if the page threw along the way.
 });

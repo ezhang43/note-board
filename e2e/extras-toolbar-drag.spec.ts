@@ -30,7 +30,7 @@ test('dragging Note from the toolbar places a new note where it is let go', asyn
   const note = looseCards(page).first();
   await expect(note).toHaveAttribute('data-kind', 'note');
   await expect(note).toHaveClass(/selected/);
-  // The note's top edge is just above the pointer and it is centred on it.
+  // The note's top edge is just above the pointer and it is centered on it.
   const r = await box(note);
   expect(Math.abs(r.x + r.width / 2 - to.x)).toBeLessThan(25);
   expect(to.y - r.y).toBeGreaterThan(0);

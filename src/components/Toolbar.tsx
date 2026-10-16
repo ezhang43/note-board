@@ -159,12 +159,14 @@ export function FileMenu() {
 }
 
 /**
- * Colour button: recolours the selected columns, and the title band of the selected cards (cards
- * themselves are always white). Faded while nothing is selected.
+ * Color button: recolors the selected columns, and the title band of the selected cards (cards
+ * themselves are always white). Its menu opens even with nothing selected: the swatches and Default
+ * are then faded and do nothing, and Auto-color (every column a different color) still works.
  */
 export function ColourControl() {
   const count = useAppState((s) => s.ui.selection.length);
-  const open = useAppState((s) => s.ui.colourMenuOpen && count > 0);
+  const open = useAppState((s) => s.ui.colourMenuOpen);
+  const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
   // The colour of the last selected block, shown on the button and ringed in the menu.
   const current = useAppState((s): ColorKey | null | undefined => {
     const id = s.ui.selection[s.ui.selection.length - 1];
@@ -193,19 +195,18 @@ export function ColourControl() {
     <div className="colour-control">
       <button
         type="button"
-        className="tb-button faded-colour"
-        aria-label="Colour of selected cards and columns"
-        title={count ? "Colour the selected columns, or the selected cards' title bands" : 'Select a card or column first'}
-        aria-disabled={count ? undefined : true}
+        className="tb-button"
+        aria-label="Color of selected cards and columns"
+        title={count ? "Color the selected columns, or the selected cards' title bands" : 'Color menu: select a card or column to color it, or use Auto-color'}
         aria-expanded={open}
         onClick={appStore.toggleColourMenu}
       >
         <span className="colour-dot" aria-hidden="true" style={{ background: shown.bg, borderColor: current ? shown.text : undefined }} />
-        Colour
+        Color
         <CaretIcon />
       </button>
       {open && (
-        <div ref={menu} className="colour-menu" role="group" aria-label="Colours">
+        <div ref={menu} className="colour-menu" role="group" aria-label="Colors">
           {COLOR_KEYS.map((key) => {
             const sw = swatchFor(key, theme);
             return (
@@ -216,8 +217,9 @@ export function ColourControl() {
               aria-label={sw.label}
               title={sw.label}
               aria-pressed={key === current}
+              aria-disabled={count ? undefined : true}
               style={{ background: sw.bg, borderColor: key === current ? sw.text : sw.edge, color: sw.text }}
-              onClick={() => appStore.recolourSelection(key)}
+              onClick={() => count && appStore.recolourSelection(key)}
               onPointerEnter={() => setHovered(sw.label)}
               onPointerLeave={() => setHovered(null)}
               onFocus={() => setHovered(sw.label)}
@@ -228,8 +230,23 @@ export function ColourControl() {
           <div className="swatch-name" aria-live="polite">
             {named}
           </div>
-          <button type="button" className="swatch-default" aria-pressed={current === null} onClick={() => appStore.recolourSelection(null)}>
+          <button
+            type="button"
+            className="swatch-default"
+            aria-pressed={current === null}
+            aria-disabled={count ? undefined : true}
+            onClick={() => count && appStore.recolourSelection(null)}
+          >
             Default
+          </button>
+          <button
+            type="button"
+            className="swatch-default"
+            title={hasColumns ? 'Give every column a different color' : 'Add a column first'}
+            aria-disabled={hasColumns ? undefined : true}
+            onClick={() => hasColumns && appStore.autoColour()}
+          >
+            Auto-color
           </button>
         </div>
       )}
@@ -311,22 +328,6 @@ export function CleanUpButton() {
       onClick={() => any && appStore.cleanUp()}
     >
       Clean up
-    </button>
-  );
-}
-
-/** Auto-colour: gives every column a different colour. Faded when there are no columns. */
-export function AutoColourButton() {
-  const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
-  return (
-    <button
-      type="button"
-      className="tb-button faded-colour quiet"
-      title={hasColumns ? 'Give every column a different colour' : 'Add a column first'}
-      aria-disabled={hasColumns ? undefined : true}
-      onClick={() => hasColumns && appStore.autoColour()}
-    >
-      Auto-colour
     </button>
   );
 }
@@ -447,7 +448,6 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <SnapButton />
 
       <ColourControl />
-      <AutoColourButton />
       <CollapseAllButton />
       <SameWidthButton />
 

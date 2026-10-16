@@ -1,5 +1,11 @@
 # Changelog
 
+## Auto-color moves into the Color menu, and American spelling everywhere (2026-10-16)
+
+- Auto-color is now a button at the bottom of the Color menu, instead of its own button on the toolbar (and in the ⋯ panel on a phone).
+- The Color button now opens even when nothing is selected. The color swatches and Default are faded and do nothing then, while Auto-color still works on the whole board.
+- Everything you read is now in American English: "color" instead of "colour", plus "neighbor", "center" and the like, in the app, the keyboard shortcuts list, the About and Privacy pages, and the project's notes. Boards you already saved are untouched.
+
 ## The calendar panel can be resized, and is roomier (2026-10-16)
 
 - On a computer, drag the left edge of the Google Calendar panel to make it wider or narrower (or focus the edge and use the left and right arrow keys; double-click puts the usual width back). Week and Month remember their own widths on this device. Some board always stays visible.
@@ -30,12 +36,12 @@
 
 - The automatic offline tests now also run on a phone-sized Chrome (Android) and in WebKit, the engine Safari and iPhones use, both on a computer and on GitHub. In WebKit they check that the offline copy installs and saves the app, and that a new version clears the old copy. The test tool can't switch off the internet for WebKit past the offline copy, so opening with no internet is still only tested in Chrome. Setup on a computer now needs `npx playwright install chromium webkit` once.
 
-## Bold colours (2026-10-15)
+## Bold colors (2026-10-15)
 
-- The Colour menu has a third row of 8 bold, clearly different colours: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colours stay as they were. Dark mode has a deep shade of each.
-- On a bold column or title band, the card count, icons and empty-title hint use a dark shade of the colour instead of grey, so they stay readable.
-- Auto-colour now hands out the bold colours first, then the soft ones, so columns only repeat a colour beyond 24.
-- An older copy of the app (say, a tab left open from before this update) shows a bold colour as its usual colour, and if it saves that board, the column goes back to that colour.
+- The Color menu has a third row of 8 bold, clearly different colors: Tomato, Tangerine, Sunflower, Grass, Emerald, Ocean, Violet and Magenta. The 16 soft colors stay as they were. Dark mode has a deep shade of each.
+- On a bold column or title band, the card count, icons and empty-title hint use a dark shade of the color instead of gray, so they stay readable.
+- Auto-color now hands out the bold colors first, then the soft ones, so columns only repeat a color beyond 24.
+- An older copy of the app (say, a tab left open from before this update) shows a bold color as its usual color, and if it saves that board, the column goes back to that color.
 
 ## Browser tests use at most 4 browsers on a computer (2026-10-15)
 
@@ -189,7 +195,7 @@
 
 - A share link can no longer touch your own boards: whatever someone saves in a board they share with you, it can't take in, overwrite or delete any of your other boards. A link that tries to is refused.
 - Removing someone from a shared board changes its link in the same step, so the old link never lets them back in.
-- Shared boards are recognised the moment the page opens, so a slow connection can't make the app treat them as yours, and a page can never send everyone a version with the shared board missing.
+- Shared boards are recognized the moment the page opens, so a slow connection can't make the app treat them as yours, and a page can never send everyone a version with the shared board missing.
 - When a shared board is deleted, the record of who had it goes too.
 
 ## Editing together, step 2: sharing a board by link (2026-10-05)
@@ -241,7 +247,7 @@
 
 ## Quieter arrow dots (2026-10-05)
 
-- The dots for drawing arrows are smaller and soft grey, and fade in after a moment instead of popping up on every card the pointer passes. The one under the pointer turns amber.
+- The dots for drawing arrows are smaller and soft gray, and fade in after a moment instead of popping up on every card the pointer passes. The one under the pointer turns amber.
 - A dot that would sit on top of another card or a column's title is no longer shown, so dots don't cover text. Cards in a column still have their left and right dots, and any dot draws the same arrow. A card hemmed in on every side keeps one dot, so you can always draw an arrow from it.
 
 ## Ant hill on the Completed card (2026-10-05)
@@ -257,7 +263,7 @@
 
 ## Auto-publish for low-risk changes (2026-10-05)
 
-- Small, low-risk changes now go live by themselves a few minutes after they are merged and pass their tests. Anything touching saving, sync, undo or deleting, or labelled `high-risk`, still waits for you to say "publish".
+- Small, low-risk changes now go live by themselves a few minutes after they are merged and pass their tests. Anything touching saving, sync, undo or deleting, or labeled `high-risk`, still waits for you to say "publish".
 
 ## Owner requests: icon, no Link button, sub-boards, Alt + arrows (2026-10-05)
 
@@ -276,7 +282,7 @@
 
 ## Fix: boards with unusual card ids (2026-10-05)
 
-- A board loaded from an old save or a backup whose cards or items have ids with quotes or brackets in them no longer breaks search, Shift+click on checklist items, Alt + arrows or the Colour menu.
+- A board loaded from an old save or a backup whose cards or items have ids with quotes or brackets in them no longer breaks search, Shift+click on checklist items, Alt + arrows or the Color menu.
 
 ## Arrows between cards (2026-10-05)
 
@@ -328,7 +334,7 @@
 
 ## Honey look, to match the app icon (2026-10-05)
 
-- The toolbar is now soft honey yellow with the BusyAnts ant at its left, the board a warm cream, and the teal highlights (selection outlines, title bands, New column, pressed buttons) are amber instead, so the app and its icon feel like one thing. Dark mode gets matching warm, darker tones. The window's title bar takes the toolbar colour too.
+- The toolbar is now soft honey yellow with the BusyAnts ant at its left, the board a warm cream, and the teal highlights (selection outlines, title bands, New column, pressed buttons) are amber instead, so the app and its icon feel like one thing. Dark mode gets matching warm, darker tones. The window's title bar takes the toolbar color too.
 
 ## Fix: selection box away from the pointer (2026-10-05)
 
@@ -347,7 +353,7 @@
 - BusyAnts now keeps earlier versions of your board. Open it from the clock button by ? (bottom right), or from ⋯ on a phone. Pick a version to see it, then Restore it or go Back to current. Restoring keeps your current board as a version too, and Undo takes a restore back.
 - A version is saved by itself whenever you start editing after 10 minutes away; the newest 100 are kept. On the website they are saved with your board online, so your phone and computer share the same history.
 
-## The board opens centred on your cards; on a phone, swiping moves around (2026-10-04)
+## The board opens centered on your cards; on a phone, swiping moves around (2026-10-04)
 
 - Opening BusyAnts (computer or phone) now shows all your cards and columns in the middle of the screen, zooming out a little if they don't fit (never below 50%).
 - On a phone or tablet, a quick finger swipe over a card, a column or a resize corner now moves around the board. To move a card or column, or to resize one, rest your finger on it for about half a second first.
@@ -371,7 +377,7 @@
 
 ## Phone and tablet, part 2: a phone layout (2026-10-04)
 
-- On a phone, the top bar shows just the board name, and a new bar along the bottom holds Undo, Redo, a big + (Note, To-do list, Link, Column) and ⋯ for everything else (Hand / Select, text size, Snap, Colour, Collapse all, Dark mode, Import, Sign out…).
+- On a phone, the top bar shows just the board name, and a new bar along the bottom holds Undo, Redo, a big + (Note, To-do list, Link, Column) and ⋯ for everything else (Hand / Select, text size, Snap, Color, Collapse all, Dark mode, Import, Sign out…).
 - The zoom buttons and ? are hidden on a phone: pinch with two fingers to zoom.
 
 ## Phone and tablet, part 1: touch controls for checklist items (2026-10-04)
@@ -456,11 +462,11 @@
 
 - The app is now called BusyAnts, with a friendly ant on yellow as its icon (browser tab, installed app and sign-in screen). The website address is unchanged.
 - An empty board shows a short hint on how to start.
-- New to-do lists and columns start untitled (with a grey "List title" / "Column title" placeholder) instead of rows of "New list" and "New column". A new list puts your cursor in its title; press Enter to move on to its first item.
+- New to-do lists and columns start untitled (with a gray "List title" / "Column title" placeholder) instead of rows of "New list" and "New column". A new list puts your cursor in its title; press Enter to move on to its first item.
 
-## Bigger colour chips and a shortcuts list (2026-10-03)
+## Bigger color chips and a shortcuts list (2026-10-03)
 
-- The Colour menu has bigger chips, and if it opens over the card or column you are colouring, the board moves down so you can still see it.
+- The Color menu has bigger chips, and if it opens over the card or column you are coloring, the board moves down so you can still see it.
 - New ? button at the bottom right (or press ?) opens a list of every keyboard shortcut. Escape closes it.
 
 ## Design fixes 6: from the second Impeccable review (2026-10-03)
@@ -484,16 +490,16 @@
 
 - Checklist items no longer wrap early: the text uses the full width of the card. The grip and trash still appear when you hover an item, now over the end of its first line with a soft fade behind them.
 
-## Design fixes 4: clearer buttons and colours (2026-10-02)
+## Design fixes 4: clearer buttons and colors (2026-10-02)
 
 - Hovering a card's or column's collapse arrow or × now says what it does. The card's × reminds you that Ctrl+Z brings the card back.
-- In the Colour menu, each swatch has a clearer ring in its own colour, and the name of the colour under the pointer shows below the swatches, since some of them look alike.
+- In the Color menu, each swatch has a clearer ring in its own color, and the name of the color under the pointer shows below the swatches, since some of them look alike.
 
 ## Design fixes 3: a calmer toolbar (2026-10-02)
 
-- Thin dividers now group the toolbar: tools and undo · editing (Snap, Colour, Auto-colour, Collapse all) · adding · board (Import, Clean up, dark mode).
-- Add Note, To-do list and Link are plain buttons now. Their yellow, green and blue matched old card colours that no longer exist.
-- Auto-colour, Collapse all, Import and Clean up are quieter (no border until you hover), so the everyday buttons stand out.
+- Thin dividers now group the toolbar: tools and undo · editing (Snap, Color, Auto-color, Collapse all) · adding · board (Import, Clean up, dark mode).
+- Add Note, To-do list and Link are plain buttons now. Their yellow, green and blue matched old card colors that no longer exist.
+- Auto-color, Collapse all, Import and Clean up are quieter (no border until you hover), so the everyday buttons stand out.
 - The board name never shrinks below 140px in narrower windows.
 
 ## Design fixes 2: easier to read (2026-10-02)
@@ -501,7 +507,7 @@
 - The dark-mode button now looks pressed while dark mode is on, like Snap to grid.
 - Placeholder text ("Title", "Write something…", "Paste a URL") is darker, so it is easier to read.
 - Faded toolbar buttons are a little easier to see in dark mode.
-- Cards in an uncoloured column now have the usual soft teal title band instead of a dull khaki one.
+- Cards in an uncolored column now have the usual soft teal title band instead of a dull khaki one.
 
 ## Design fixes 1: typing goes into the block you just added (2026-10-02)
 
@@ -534,7 +540,7 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - The board is saved a moment (0.15s) after you stop changing it, instead of on every key press. It is also saved straight away when the window is hidden or closed.
 - Dragging a block works out where everything goes only when it reaches a new grid spot, not on every mouse movement.
 - Panning and zooming no longer redraw every card and checklist item.
-- All colours in the stylesheet are now named colour settings, defined once.
+- All colors in the stylesheet are now named color settings, defined once.
 - Removed unused code and merged repeated helpers (copying items, snapping, refilling an emptied list).
 
 ## Paste, import and keyboard fixes from the code review (2026-10-02)
@@ -560,19 +566,19 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Devices no longer send each other's changes back and forth (this could undo newer typing and clear Ctrl+Z history).
 - If the online board can't be read (damaged, or saved by a newer version of the app), it is left untouched and the page says the board couldn't be loaded, instead of showing an empty board and saving that over everything.
 - If saving online fails (for example the board is too big), a small red note at the bottom says "Couldn't save online. Changes are on this device only." Your next change tries again, and the note disappears once it works.
-- Changes are sent online the moment you minimise or switch away from the window, so closing the app right after typing no longer loses that text.
+- Changes are sent online the moment you minimize or switch away from the window, so closing the app right after typing no longer loses that text.
 
 ## Dark mode (2026-10-02)
 
 - New moon button at the right end of the toolbar switches between light and dark mode.
 - The first time you open the app on a device, it matches your computer's light / dark setting. After you press the button, that device remembers your choice. Each device keeps its own, and Ctrl+Z doesn't change it.
-- In dark mode the board, toolbar and cards turn dark grey with light text, and each column colour becomes a deep shade of itself, so columns still look clearly different.
+- In dark mode the board, toolbar and cards turn dark gray with light text, and each column color becomes a deep shade of itself, so columns still look clearly different.
 
 ## Tests first (2026-10-02)
 
 - New working rule: for every change, the tests are written first and seen to fail, then the change is built until they pass.
 
-## Arrow keys move blocks; centred titles on collapsed cards (2026-10-02)
+## Arrow keys move blocks; centered titles on collapsed cards (2026-10-02)
 
 - With a card or column selected (or several), the arrow keys move them one grid square at a time; hold Shift to move five. A card inside a column moves up or down its column instead. Ctrl+Z undoes a quick run of presses in one go.
 - While typing in a card, the arrows still move through the text. Press Escape to leave the text (the card stays selected), then use the arrows to move it.
@@ -580,16 +586,16 @@ Nothing should look or work differently; this makes big boards smoother and the 
 
 ## Collapse all, and resizing collapsed blocks (2026-10-02)
 
-- New **Collapse all** button (next to Auto-colour): collapses every card and column at once. When everything is collapsed it becomes **Expand all**. Ctrl+Z undoes it.
+- New **Collapse all** button (next to Auto-color): collapses every card and column at once. When everything is collapsed it becomes **Expand all**. Ctrl+Z undoes it.
 - Collapsed columns can now be resized too: drag the right edge. On collapsed cards and columns the right edge lights up when you hover, so the handle is easy to find.
 
-## Colour for cards' title bands (2026-10-02)
+## Color for cards' title bands (2026-10-02)
 
-- With a card selected, **Colour** now colours the card's title band (the card itself stays white). A note gets the colour across the strip at its top. **Default** at the bottom of the colour menu puts the usual band back (or a column back to grey).
+- With a card selected, **Color** now colors the card's title band (the card itself stays white). A note gets the color across the strip at its top. **Default** at the bottom of the color menu puts the usual band back (or a column back to gray).
 
 ## Easier-to-see title bands (2026-10-02)
 
-- Inside a column, a card's title band is now a slightly deeper shade of the column's colour, so it stands out from the column instead of blending into it.
+- Inside a column, a card's title band is now a slightly deeper shade of the column's color, so it stands out from the column instead of blending into it.
 
 ## Fixes: selecting, copying and Tab (2026-10-02)
 
@@ -602,8 +608,8 @@ Nothing should look or work differently; this makes big boards smoother and the 
 
 ## Titles stand out (2026-10-02)
 
-- To-do lists and links now have a soft tinted band behind their title at the top of the card: teal when loose, the column's colour inside a column.
-- Column titles are centred.
+- To-do lists and links now have a soft tinted band behind their title at the top of the card: teal when loose, the column's color inside a column.
+- Column titles are centered.
 
 ## Gentler completing (2026-10-02)
 
@@ -637,15 +643,15 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Pressing Delete at the end of a checklist item pulls the item below up into it (like joining two lines). The cursor stays where the two were joined; the pulled-up item's sub-items move up a level.
 - With several items selected, Tab moves them all in one level together and Shift+Tab moves them all out. They stay selected, so you can press Tab again.
 
-## More colours and Auto-colour (2026-10-02)
+## More colors and Auto-color (2026-10-02)
 
-- The colour menu now has 16 colours (new: Sand, Coral, Orchid, Periwinkle, Aqua, Sage, Lime, Slate), in two rows.
-- New **Auto-colour** button next to Colour: one click gives every column its own, different colour (neighbouring columns get clearly different ones). Ctrl+Z undoes it.
+- The color menu now has 16 colors (new: Sand, Coral, Orchid, Periwinkle, Aqua, Sage, Lime, Slate), in two rows.
+- New **Auto-color** button next to Color: one click gives every column its own, different color (neighboring columns get clearly different ones). Ctrl+Z undoes it.
 
 ## Cleaner cards (2026-10-02)
 
-- Notes, to-do lists and links are now always white, loose or inside a column. Columns keep their colour.
-- The Colour button now recolours columns only, and is faded unless a column is selected.
+- Notes, to-do lists and links are now always white, loose or inside a column. Columns keep their color.
+- The Color button now recolors columns only, and is faded unless a column is selected.
 - To-do lists no longer show "3/6 done" in their header (a collapsed list shows just its title).
 - A column's collapse arrow has moved to the top right, next to its ×.
 
@@ -653,7 +659,7 @@ Nothing should look or work differently; this makes big boards smoother and the 
 
 - New **Import** button at the end of the toolbar: pick a Milanote board exported as Markdown (.md) and its cards are added to your board. Nothing already on the board is changed.
 - Each heading becomes a to-do list with that title (an empty heading gives an empty list); items keep their sub-items and ticks; a blank line between items starts a new untitled list; other text becomes a note, and a lone web address becomes a link card.
-- Milanote's export has no positions or colours, so the cards come in tidy lanes at the top of the screen in default colours, all selected so you can drag them somewhere as a group. One Ctrl+Z removes the whole import.
+- Milanote's export has no positions or colors, so the cards come in tidy lanes at the top of the screen in default colors, all selected so you can drag them somewhere as a group. One Ctrl+Z removes the whole import.
 
 ## Install as an app (2026-10-02)
 
@@ -689,7 +695,7 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Enter adds a new item below at the same level; Tab nests an item under the one above (up to 6 levels); Shift+Tab moves it out a level; Backspace on an empty item deletes it (not the list's last item).
 - Ticking a top-level item moves it, with its sub-items, into "Completed · N" at the bottom; the header collapses and expands the section. Ticking a sub-item only strikes it through.
 - On hover each item shows a drag grip; completed items also show a trash can, which deletes the item and everything under it. An emptied list gets a blank item.
-- Drag an item by its grip (it takes its sub-items): before or after another item (teal line), nested under one (drop slightly to the right; teal tint), into another list, or onto empty list space to add it at the end. Dropping on empty board (or a note, link or column) makes a new "New list" there in the source list's colour.
+- Drag an item by its grip (it takes its sub-items): before or after another item (teal line), nested under one (drop slightly to the right; teal tint), into another list, or onto empty list space to add it at the end. Dropping on empty board (or a note, link or column) makes a new "New list" there in the source list's color.
 - Select several items by holding the mouse on one and dragging over others, or with Shift+click. Selected items are highlighted. Then Delete/Backspace removes them all, ticking one ticks them all, trash deletes them all, dragging one moves them all in order, Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste them after the selection, and Escape clears.
 - Everything here can be undone.
 
@@ -698,7 +704,7 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Ctrl + click (or Shift + click) adds or removes a block from the selection. ⌘ works instead of Ctrl on a Mac.
 - Select tool (V): drag a box on empty board; everything it touches is selected as you drag. Hold Ctrl to add to the current selection.
 - Ctrl + A selects every column and loose card. Escape clears the selection and closes menus.
-- Dragging a selected block moves the whole selection together. Colour recolours every selected block.
+- Dragging a selected block moves the whole selection together. Color recolors every selected block.
 - Delete / Backspace deletes the selection; if it includes a column, the same "Delete '…'?" confirmation appears first.
 - Ctrl + C then Ctrl + V pastes copies 40px further each time (a column copies with its cards, titled "… copy"). Ctrl + D duplicates.
 - Ctrl + Z undoes, up to 100 steps, even while typing; a burst of typing is one step. Ctrl + Y redoes; Ctrl + Shift + Z does nothing. Undo and Redo buttons fade when there is nothing to undo or redo.
@@ -723,7 +729,7 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Click a block to select it (teal outline); click empty board or press Escape to clear.
 - Drag any blank part of a card or column to move it (starts after a 5px nudge). Drop a card on a column to put it there at the pointer; the column opens if collapsed. Drag a card out of a column to make it loose. Moves land on the 20px grid when snapping is on.
 - Collapse arrow on cards (one-line preview) and columns (hides cards).
-- Colour button recolours the selected block from 8 swatches; faded when nothing is selected. Card text stays black whatever the colour.
+- Color button recolors the selected block from 8 swatches; faded when nothing is selected. Card text stays black whatever the color.
 - Card × deletes it. Column × asks "Delete '…'?" first, then deletes the column and its cards.
 - Everything is saved in the browser; boards saved by step 1 are kept.
 - Not yet: blocks you drop yourself can still overlap (step 3), resizing (step 3), multi-select / Delete key / copy-paste / undo (step 4), full checklist editing (step 5).
@@ -737,4 +743,4 @@ Nothing should look or work differently; this makes big boards smoother and the 
 - Pan: drag empty space with Hand, or scroll / swipe with either tool.
 - Zoom 30–250%: Ctrl+scroll or pinch at the cursor, Ctrl+= / Ctrl+− / Ctrl+0, and the − · % · + control. Reset keeps the middle of the screen in place.
 - Board name and snap setting save instantly; pan and zoom save a moment after you stop. Damaged saved data starts a fresh board.
-- Not working yet, by design: Undo, Redo and Colour (shown faded), and the Add buttons (step 2).
+- Not working yet, by design: Undo, Redo and Color (shown faded), and the Add buttons (step 2).

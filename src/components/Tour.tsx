@@ -12,15 +12,20 @@ type Step = { title: string; text: string; target: string; phoneTarget?: string;
 const STEPS: Step[] = [
   {
     title: 'Add a note or a checklist',
-    text: 'Click Note or Checklist to put a new card on the board. You can also drag one from here onto the board.',
+    text: 'Note gives you a blank card to jot down anything. Checklist makes a list you can tick off. You can also drag one from here onto the board.',
     target: '.add-note, .add-todo',
     phoneTarget: '.phone-add-button',
     phoneText: 'Tap + to add a note, a checklist or a column.',
   },
   {
     title: 'Move cards, fill columns',
-    text: 'Drag a card to move it. Drop it into a column to keep it there. New column makes one.',
+    text: 'Drag a card to move it. A column is a container that holds your notes and checklists together.',
     target: '.add-column',
+  },
+  {
+    title: 'Share a board',
+    text: 'Share lets other people see and edit this board with you, using a link.',
+    target: 'header.toolbar button[aria-label="Share"]',
   },
   {
     title: 'Your boards',
@@ -29,9 +34,10 @@ const STEPS: Step[] = [
     phoneTarget: 'header.toolbar button[aria-label="Boards"]',
   },
   {
-    title: 'Share a board',
-    text: 'Share lets other people see and edit this board with you, using a link.',
-    target: 'header.toolbar button[aria-label="Share"]',
+    // Phone only (empty desktop target): ⋯ holds Share there, and stays last so the replay hint comes at the end.
+    title: 'More',
+    text: '',
+    target: '',
     phoneTarget: '.phone-bar [aria-label="More"]',
     phoneText: 'Tap ⋯ for everything else, like Share, Search and Version history. You can show this tour again there.',
   },
@@ -120,7 +126,7 @@ export function Tour() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const phone = isPhone();
-        const rects = STEPS.map((s) => (phone ? (s.phoneTarget ? targetRect(s.phoneTarget) : null) : targetRect(s.target)));
+        const rects = STEPS.map((s) => (phone ? (s.phoneTarget ? targetRect(s.phoneTarget) : null) : s.target ? targetRect(s.target) : null));
         const avail = rects.flatMap((r, i) => (r ? [i] : []));
         setShown((old) => (JSON.stringify(old) === JSON.stringify({ avail, rects }) ? old : { avail, rects }));
       });

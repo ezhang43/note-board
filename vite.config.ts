@@ -13,7 +13,7 @@ export default defineConfig(({ command, isPreview }) => ({
   build: {
     chunkSizeWarningLimit: 700,
     rolldownOptions: {
-      input: ['index.html', 'about/index.html', 'faq/index.html', 'terms/index.html', 'privacy/index.html'],
+      input: ['index.html', 'about/index.html', 'faq/index.html', 'terms/index.html', 'privacy/index.html', 'delete-account/index.html'],
     },
   },
   server: { port: 5173, strictPort: true },

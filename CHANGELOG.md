@@ -1,5 +1,11 @@
 # Changelog
 
+## Delete your account (2026-10-16)
+
+- Signed in, you can now delete your account and everything in it from inside BusyAnts: File, then Delete account… (on a phone: ⋯, then File). A panel says exactly what goes, including how many boards and how many boards you shared (those are deleted for everyone you shared them with; boards others shared with you you just leave). You can download a backup first, then type DELETE and sign in with Google once more to confirm.
+- If anything goes wrong (no connection, say) nothing is deleted on your device and you can simply try again. Afterwards you are signed out, with a note saying your account and data were deleted.
+- A new "Delete your account" page on the website explains how, and who to email if you can't sign in. The Privacy policy, FAQ and Terms now point to it, and every page's footer links to it.
+
 ## A short welcome tour (2026-10-16)
 
 - The first time you open the board on a device, a 30-second tour lights up one control at a time (add a note or checklist, move cards into columns, the Boards menu, Share, and the ? shortcuts) with Back, Next, Skip tour and a close button. Escape closes it too.

@@ -20,5 +20,5 @@ export function SyncedApp() {
         )}
       </>
     );
-  return <SignInScreen status={status} error={error} onSignIn={session.signIn} onSignOut={session.signOut} />;
+  return <SignInScreen status={status} error={error} deleted={session.wasDeleted()} onSignIn={session.signIn} onSignOut={session.signOut} />;
 }

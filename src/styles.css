@@ -1025,6 +1025,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .sign-in-text { margin: 0; font-size: 14px; color: var(--ink-soft); }
 .sign-in-note { margin: 4px 0 0; max-width: 300px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
 .sign-in-error { margin: 0; font-size: 13px; color: var(--danger); }
+.sign-in-deleted { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--hover); font-size: 14px; }
 .tb-button.sign-in-button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* ---------- keyboard shortcuts panel (? button or ? key) ---------- */
@@ -1328,6 +1329,28 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .file-menu button:hover, .file-menu button:focus-visible { background: var(--hover); }
 .phone-more .file-menu { position: static; box-shadow: none; margin-top: 6px; }
+.file-menu button.file-menu-danger { color: var(--danger); }
+
+/* Delete your account (job #63): in the keyboard shortcuts panel's frame. */
+.delete-account { font-size: 14px; line-height: 1.5; }
+.delete-account p, .delete-account ul { margin: 10px 0; }
+.delete-account ul { padding-left: 20px; }
+.delete-account-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink-soft); }
+.delete-account-type { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.delete-account-type input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+}
+.delete-account-note { color: var(--ink-soft); font-size: 13px; }
+.delete-account .confirm-actions { margin-top: 12px; }
+.confirm-actions button:disabled { opacity: 0.5; cursor: default; }
 
 /* Web addresses in a note, as links under its text (owner request). */
 .note-links { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }

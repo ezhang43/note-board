@@ -1,11 +1,14 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { deleteUser, getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
+  clearIndexedDbPersistence,
   collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   initializeFirestore,
   orderBy,
   query,
@@ -15,12 +18,14 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  terminate,
   updateDoc,
   waitForPendingWrites,
   writeBatch,
   type DocumentSnapshot,
   type QuerySnapshot,
 } from 'firebase/firestore';
+import type { AccountBackend } from '../store/account';
 import { personFrom, type CollabBackend } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
@@ -55,6 +60,71 @@ export function signInWithGoogle() {
 
 export function signOutUser() {
   return signOut(auth);
+}
+
+/** The person signed in now, if any. */
+export const currentUser = () => auth.currentUser;
+
+/**
+ * Asks Google to confirm it is still `user` (Firebase only deletes an account signed in to
+ * recently). Call it straight from a click, so the browser allows the Google window.
+ */
+export function confirmSignIn(user: User) {
+  const provider = new GoogleAuthProvider();
+  if (user.email) provider.setCustomParameters({ login_hint: user.email });
+  return reauthenticateWithPopup(user, provider);
+}
+
+/**
+ * Deleting `user`'s account (job #63): everything under boards/{uid} (their boards, version history
+ * and list of shares), the shares they shared and their records on the others (through `shares`),
+ * and the sign-in. The rules in firestore.rules already let a person delete all of it. Reads go to
+ * the server, so without a connection it fails at once rather than working from the offline copy.
+ */
+// simple: a connection lost part-way leaves the deletes already sent waiting until it is back (the
+// panel keeps saying "Deleting…"); they then finish, and running it again is fine.
+export function accountRemote(user: User, shares: CollabBackend): AccountBackend {
+  const own = doc(db, 'boards', user.uid);
+  return {
+    async myShares() {
+      const list = await getDocsFromServer(collection(own, 'shared'));
+      return Promise.all(
+        list.docs.map(async (d) => {
+          try {
+            const snap = await getDocFromServer(doc(db, 'shared', d.id));
+            return { id: d.id, owner: snap.exists() ? String(snap.data().owner) : null };
+          } catch (e) {
+            // No longer one of its people (removed): only their own records of it are left to delete.
+            if ((e as { code?: string }).code === 'permission-denied') return { id: d.id, owner: null };
+            throw e;
+          }
+        }),
+      );
+    },
+    deleteShare: shares.deleteShare,
+    leave: shares.leave,
+    async deleteOwnData() {
+      const subs = await Promise.all(['versions', 'versionData', 'shared'].map((name) => getDocsFromServer(collection(own, name))));
+      const refs = [...subs.flatMap((s) => s.docs.map((d) => d.ref)), own];
+      // A batch takes at most 500 writes.
+      for (let i = 0; i < refs.length; i += 400) {
+        const batch = writeBatch(db);
+        refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+      }
+    },
+    deleteUser: () => deleteUser(user),
+  };
+}
+
+/** Clears this device's offline copy of the online data (after deleting an account; never fails). */
+export async function clearOfflineCopy() {
+  try {
+    await terminate(db);
+    await clearIndexedDbPersistence(db);
+  } catch {
+    // Another tab still has it open: it goes with that tab's next sign-in or the browser's data.
+  }
 }
 
 /** The signed-in person's board, stored as one Firestore document: boards/{uid}. */

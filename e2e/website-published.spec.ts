@@ -8,6 +8,7 @@ test('the website pages are published beside the app, with working links', async
     ['faq/', 'Questions and answers'],
     ['terms/', 'Terms of use'],
     ['privacy/', 'Privacy policy'],
+    ['delete-account/', 'Delete your account'],
   ]) {
     const res = await page.goto(path);
     expect(res?.ok(), path).toBe(true);

@@ -65,21 +65,43 @@ export function demoBackend(person: Person) {
 
 /** Starts editing together for a demo person (local runs only). */
 export async function startDemo(person: Person) {
-  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }, { activeVersionStore }] = await Promise.all([
+  const [{ appStore }, { startSharing }, { collab, joinFromAddress }, { flushWhenHidden }, { activeVersionStore }, { deleteAccountData }, { account, finishDeletion }] = await Promise.all([
     import('../store/appStore'),
     import('../store/sharing'),
     import('./collabSession'),
     import('./pageHide'),
     import('../store/versions'),
+    import('../store/account'),
+    import('./account'),
   ]);
-  const sharing = startSharing(appStore, demoBackend(person), {
-    client: crypto.randomUUID(),
-    storage: demoStorage(localStorage, person),
-    onNotice: collab.setNotice,
-    onReady: () => joinFromAddress(appStore, sharing),
-    versions: activeVersionStore,
+  const backend = demoBackend(person);
+  const start = () => {
+    const next = startSharing(appStore, backend, {
+      client: crypto.randomUUID(),
+      storage: demoStorage(localStorage, person),
+      onNotice: collab.setNotice,
+      onReady: () => joinFromAddress(appStore, next),
+      versions: activeVersionStore,
+    });
+    collab.set(next, person);
+    return next;
+  };
+  let sharing = start();
+  flushWhenHidden(document, window, () => sharing.flush());
+  window.addEventListener('online', () => sharing.retry());
+  // Delete account, as on the published site (job #63): a demo person's own boards are only on
+  // this device, so online there are just their shares.
+  account.setRemover(async () => {
+    const shares = appStore.getState().ui.shares.map((s) => ({ id: s.id, owner: s.ownerUid }));
+    sharing.flush();
+    sharing.stop();
+    let done: { shareIds: string[] };
+    try {
+      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: backend.leave, deleteOwnData: async () => {}, deleteUser: async () => {} });
+    } catch (e) {
+      sharing = start();
+      throw e;
+    }
+    finishDeletion(appStore, localStorage, person.uid, done.shareIds, `${person.uid}:`);
   });
-  collab.set(sharing, person);
-  flushWhenHidden(document, window, sharing.flush);
-  window.addEventListener('online', sharing.retry);
 }

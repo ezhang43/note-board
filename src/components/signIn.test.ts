@@ -48,4 +48,18 @@ describe('who can use BusyAnts', () => {
     // A member's photo is only ever a secure web address (review fix).
     expect(rules).toContain("request.resource.data.photo.matches('https://.*')");
   });
+
+  it('after deleting an account, the sign-in screen says so (job #63)', () => {
+    const html = renderToStaticMarkup(createElement(SignInScreen, { status: 'signed-out', error: '', deleted: true, onSignIn: () => {}, onSignOut: () => {} }));
+    expect(html).toContain('Your account and data were deleted.');
+    expect(screen('signed-out')).not.toContain('were deleted');
+  });
+
+  it('the online rules let a person delete everything of theirs, so deleting an account needs no new rules (job #63)', () => {
+    // Their boards, version history (list and boards) and list of shares.
+    expect(rules.match(/allow read, delete: if isOwner\(uid\);/g)?.length).toBe(4);
+    // The boards they shared, everyone's records on those, and their own record on anyone's.
+    expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
+    expect(rules).toContain('(request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid)');
+  });
 });

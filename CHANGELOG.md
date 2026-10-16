@@ -1,5 +1,12 @@
 # Changelog
 
+## About page: sharper picture, folding "Try it", new ending (2026-10-16)
+
+- The sample-board picture on the About page is sharp now. It was too small (and reduced to 256 colours), so it looked blurry on most screens. Both the light and the dark picture were retaken at twice the size in full colour (WebP, about 290 KB and 260 KB), and they look the same size on the page.
+- "Try it: tick one off" now folds open and shut like the FAQ's questions. It starts open, ticking works as before, and printing shows it open.
+- The page now ends with a full-width honey block: "Ready to clear your head?", "Free, no card, no limits. Works offline." and the Start your board, free button (warm brown with honey text in dark mode).
+- The "Why I made BusyAnts" section was removed.
+
 ## About page: board pictures retaken (2026-10-16)
 
 - The two sample-board pictures on the About page (light and dark) were retaken in the new Honey Workshop look. Same "Weekend in Lisbon" board, same size, still small files (about 30 KB each, down from 72 KB). Nothing else changed.

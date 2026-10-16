@@ -96,7 +96,7 @@ test('the landing page says what BusyAnts is, shows a picture of a board and has
 });
 
 // Job 55 (owner request 2026-10-15): the owner's "Why I made BusyAnts" intro, three highlights and the fuller feature list.
-test('the About page tells why BusyAnts was made, right under the headline and start button, before the screenshot', async ({ page }) => {
+test('the About page tells why BusyAnts was made, right under the hero (headline, start button and mini board)', async ({ page }) => {
   await page.goto('/about/');
   const why = page.getByRole('heading', { level: 2, name: 'Why I made BusyAnts' });
   await expect(why).toBeVisible();
@@ -108,7 +108,7 @@ test('the About page tells why BusyAnts was made, right under the headline and s
   await expect(page.getByRole('heading', { name: 'Why BusyAnts', exact: true })).toHaveCount(0);
   const y = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!.y;
   expect(await y(why)).toBeGreaterThan(await y(page.getByRole('link', { name: 'Start your board, free' })));
-  expect(await y(why)).toBeLessThan(await y(page.getByRole('img', { name: /BusyAnts board/ })));
+  expect(await y(why)).toBeGreaterThan(await y(page.getByRole('img', { name: /BusyAnts board/ })));
 });
 
 test('the About page has three highlights under the intro', async ({ page }) => {
@@ -121,24 +121,82 @@ test('the About page has three highlights under the intro', async ({ page }) => 
   await expect(highlights.nth(2)).toContainText('tick with Ctrl+Enter');
 });
 
-test('the About page lists everything else under "Also in BusyAnts", with no duplicates', async ({ page }) => {
+// Job #62 (owner request 2026-10-16): a shorter, punchier About page: the sample board sits small in the hero,
+// the intro and highlights go side by side, and a comparison table replaces the "Also in BusyAnts" list.
+test('the hero has no big ant drawing; a small sample board sits there instead, and the big picture further down is gone', async ({ page }) => {
   await page.goto('/about/');
-  await expect(page.getByRole('heading', { level: 2, name: 'Also in BusyAnts' })).toBeVisible();
-  const items = page.locator('ul.also > li');
-  await expect(items).toHaveCount(9);
-  const texts = await items.allInnerTexts();
-  expect(new Set(texts).size).toBe(9);
-  await expect(items.nth(0)).toHaveText('Free, with no card or board limits');
-  await expect(items.nth(4)).toContainText('Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs');
-  await expect(items.nth(4).getByRole('link')).toHaveAttribute('href', '../faq/#import');
-  await expect(items.nth(8)).toContainText('24 column colors, including 8 bold ones, with Auto-color');
+  await expect(page.locator('svg.ant')).toHaveCount(0);
+  await expect(page.locator('.showcase')).toHaveCount(0);
+  await expect(page.getByRole('img', { name: /BusyAnts board/ })).toHaveCount(1);
+  const shot = page.locator('.hero').getByRole('img', { name: /BusyAnts board/ });
+  await expect(shot).toBeVisible();
+  expect(await shot.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  // Size set in the HTML so the page does not jump while it loads.
+  await expect(shot).toHaveAttribute('width', /\d+/);
+  await expect(shot).toHaveAttribute('height', /\d+/);
+  // The small ant icon in the top bar stays.
+  await expect(page.locator('.site-brand img')).toBeVisible();
+  // A mini board, not the full-size picture.
+  expect((await shot.boundingBox())!.width).toBeLessThan(700);
 });
 
-test('the new About sections fit a phone with no sideways scrolling', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 800 });
+test('on a computer the hero board sits beside the text; on a phone it sits under it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/about/');
-  await expect(page.getByRole('heading', { name: 'Also in BusyAnts' })).toBeVisible();
+  const box = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!;
+  const shot = page.locator('.hero').getByRole('img', { name: /BusyAnts board/ });
+  const start = page.getByRole('link', { name: 'Start your board, free' });
+  expect((await box(shot)).x).toBeGreaterThan((await box(start)).x + (await box(start)).width);
+  await page.setViewportSize({ width: 390, height: 800 });
+  expect((await box(shot)).y).toBeGreaterThan((await box(start)).y + (await box(start)).height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('the story and the three highlights sit side by side on a computer and stack on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/about/');
+  const why = page.locator('.why');
+  const hl = page.locator('ul.highlights');
+  const w = (await why.boundingBox())!;
+  const h = (await hl.boundingBox())!;
+  expect(h.x).toBeGreaterThan(w.x + w.width - 1);
+  expect(h.y).toBeLessThan(w.y + w.height); // they overlap vertically, so they share the same band
+  await page.setViewportSize({ width: 390, height: 800 });
+  const w2 = (await why.boundingBox())!;
+  const h2 = (await hl.boundingBox())!;
+  expect(h2.y).toBeGreaterThan(w2.y + w2.height - 1);
+});
+
+test('the About page compares BusyAnts with Milanote, Notion, Miro and Trello in a real table, dated and sourced', async ({ page }) => {
+  await page.goto('/about/');
+  await expect(page.getByRole('heading', { level: 2, name: 'Also in BusyAnts' })).toHaveCount(0);
+  await expect(page.locator('ul.also')).toHaveCount(0);
+  const heading = page.getByRole('heading', { level: 2, name: 'How BusyAnts stacks up' });
+  await expect(heading).toBeVisible();
+  const table = page.getByRole('table');
+  await expect(table).toHaveCount(1);
+  await expect(table.locator('caption')).not.toBeEmpty();
+  await expect(table.locator('thead th[scope="col"]')).toHaveText(['Feature', 'BusyAnts', 'Milanote', 'Notion', 'Miro', 'Trello']);
+  const rows = table.locator('tbody tr');
+  expect(await rows.count()).toBeGreaterThanOrEqual(4);
+  await expect(table.locator('tbody th[scope="row"]')).toHaveCount(await rows.count());
+  // BusyAnts says yes to every row; every cell has words for a screen reader, not only a symbol.
+  const cells = table.locator('tbody td');
+  for (const c of await cells.all()) await expect(c.locator('.sr-only, .word')).toHaveCount(1);
+  await expect(table.locator('tbody tr td:nth-of-type(1) .sr-only')).toHaveText(Array(await rows.count()).fill('Yes'));
+  await expect(page.locator('.compare-note')).toContainText('Compared with each app\'s free plan and public feature pages, October 2026.');
+  await expect(page.locator('.compare-note').getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
+  // No competitor logos.
+  await expect(table.locator('img, svg')).toHaveCount(0);
+});
+
+test('the comparison table scrolls sideways inside its own box on a phone, never the whole page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/about/');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const scroller = page.locator('.compare-scroll');
+  expect(await scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  expect(await scroller.evaluate((el) => getComputedStyle(el).overflowX)).toBe('auto');
 });
 
 // Job #59 (owner request 2026-10-16): the bolder look, one system on all four pages: a honey slab (warm
@@ -199,17 +257,6 @@ for (const p of PAGES) {
     heights.forEach((h) => expect(h).toBeLessThan(40));
     await expect(nav.getByRole('link', { name: 'BusyAnts', exact: true })).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  });
-}
-
-for (const width of [1280, 1440, 1920, 390]) {
-  test(`the giant ant on the About page stays fully in frame at ${width}px wide`, async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.setViewportSize({ width, height: 800 });
-    await page.goto('/about/');
-    const box = (await page.locator('svg.ant').boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(width);
   });
 }
 

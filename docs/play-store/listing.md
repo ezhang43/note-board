@@ -29,7 +29,6 @@ WHAT YOU CAN DO
 - Group cards in containers that hold your notes and checklists together.
 - Nest checklist items and tick them off.
 - Put boards inside boards, for example one board per trip, project or class.
-- Connect cards with arrows.
 - Change card and container colors, and make text bigger or smaller.
 - Search across all of your boards.
 - Use light or dark mode.

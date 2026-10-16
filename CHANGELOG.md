@@ -1,5 +1,11 @@
 # Changelog
 
+## Arrows between cards removed (2026-10-16)
+
+- The arrows you could draw between cards and containers are gone, as asked: hovering or selecting a card or container no longer shows the little connection dots.
+- Boards saved with arrows still open normally with every card, container and item as it was; only the arrows are left out. The next time you change anything, your boards are saved without them, so they are erased for good (from all your boards at once, since they are saved together). This also goes for backup files, shared boards and Version history.
+- The arrow keys, the collapse arrows and the normal arrow pointer are something else and work as before.
+
 ## Due dates removed (2026-10-16)
 
 - Checklist items no longer have due dates: the calendar button beside an item's trash, the date under an item, the Due button with its red count, and the Due panel are gone (also from the phone's ⋯ menu). Hovering an item shows just the grip and the trash again, and the text doesn't move.

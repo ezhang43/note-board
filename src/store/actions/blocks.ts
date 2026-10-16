@@ -204,7 +204,7 @@ export function blockActions(ctx: StoreContext) {
     /** Ctrl+A: every column and loose card (not the Completed record, which isn't drawn on the board). */
     selectAll: () => updateUi({ selection: ctx.state.board.order.filter((id) => ctx.state.board.cards[id]?.kind !== 'completed'), itemSel: null }),
     /** Click on empty board or Escape: clear the selection and close menus. */
-    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, deleteCompleted: null, arrowSel: null }),
+    clearSelection: () => updateUi({ selection: [], itemSel: null, colourMenuOpen: false, confirm: null, deleteCompleted: null }),
     toggleColourMenu() {
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });
     },

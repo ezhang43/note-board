@@ -58,7 +58,8 @@ describe('deleteAccountData', () => {
       { id: 's2', owner: 'bob' },
     ]);
     fail.add('leave s2');
-    await expect(deleteAccountData('me', backend)).rejects.toThrow();
+    // Something was already deleted, so the person is told it stopped part-way.
+    await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: true });
     expect(calls).toEqual(['myShares', 'deleteShare s1', 'leave s2']);
     expect(state.user).toBe(true);
     expect(state.ownData).toBe(true);
@@ -69,6 +70,12 @@ describe('deleteAccountData', () => {
     await deleteAccountData('me', backend);
     expect(calls).toEqual(['myShares', 'leave s2', 'deleteOwnData', 'deleteUser']);
     expect(state).toEqual({ shares: [], ownData: false, user: false });
+  });
+
+  it('a failure before anything was deleted is not called part-way', async () => {
+    const { backend, fail } = fakeAccount([{ id: 's1', owner: 'me' }]);
+    fail.add('deleteShare s1');
+    await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: false });
   });
 
   it('a failure deleting the sign-in itself still rejects (Firebase wanting a recent sign-in, say)', async () => {

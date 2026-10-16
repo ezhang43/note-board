@@ -9,6 +9,7 @@ import { downloadBackup } from './Toolbar';
 // (on a phone ⋯ → File): what goes, a backup first, typing DELETE, then Google confirms the sign-in.
 
 const FAILED = 'That didn’t work. Check your connection and try again.';
+const PART_WAY = 'That didn’t finish, and some of your data is already deleted. Check your connection and try again to delete the rest.';
 
 function watchOnline(onChange: () => void) {
   window.addEventListener('online', onChange);
@@ -32,8 +33,8 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
   const online = useOnline();
   const known = useAppState((s) => s.ui.sharesKnown);
   const shares = useAppState((s) => s.ui.shares);
-  const boardIds = useAppState((s) => [s.boards.open, ...Object.keys(s.boards.others)].join(' '));
-  const counts = deletionCounts(boardIds.split(' '), shares);
+  const boards = useAppState((s) => s.boards);
+  const counts = deletionCounts([boards.open, ...Object.keys(boards.others)], shares);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -53,11 +54,11 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
       // On success the page reloads to the sign-in screen.
       await remove();
     } catch (e) {
-      const code = (e as { code?: string }).code;
+      const { code, partial } = e as { code?: string; partial?: boolean };
       // Closing the Google window just goes back to the panel.
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') setError('');
       else if (code === 'auth/user-mismatch') setError('That’s a different Google account. Pick the one you’re signed in with.');
-      else setError(FAILED);
+      else setError(partial ? PART_WAY : FAILED);
       setBusy(false);
     }
   };

@@ -522,3 +522,32 @@ describe('main session check fixes (2026-10-06)', () => {
     expect(fake.writes.every((w) => !w.data.includes('"Home"') || w.data.includes('Home from phone'))).toBe(true);
   });
 });
+
+// Job #63: an account deleted on another device. Its online boards vanish; this device must not
+// put them back (its sign-in may stay valid for up to an hour), so it stops and says so.
+describe('the account deleted on another device', () => {
+  it('once the online boards that were there are gone, it stops syncing, uploads nothing more and reports it', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onGone = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onGone });
+    fake.send({ data: boardJson('Mine'), client: 'laptop' });
+    fake.send(null);
+    expect(onGone).toHaveBeenCalledOnce();
+    store.renameBoard('Typed after');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a first visit with no online boards yet, or an upload that was refused, is not taken for a deleted account', async () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    fake.control.fail = true;
+    const onGone = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onGone });
+    fake.send(null);
+    await settled();
+    fake.send(null);
+    expect(onGone).not.toHaveBeenCalled();
+  });
+});

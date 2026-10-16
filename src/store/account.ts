@@ -25,16 +25,30 @@ export interface AccountBackend {
  * Deletes everything person `uid` has online (owner decision, 2026-10-16): the boards they shared
  * (for everyone), their records on boards shared with them, their own boards and version history,
  * and only then the sign-in, so a failure part-way leaves them able to sign in and try again.
- * Stops at the first failure (rejects). Resolves with the shares it dealt with, for clearing the
- * device.
+ * Stops at the first failure: rejects with Firebase's `code` and `partial`, whether something may
+ * already be deleted (a step that worked, or one made of several saves). Resolves with the shares it
+ * dealt with, for clearing the device.
  */
 export async function deleteAccountData(uid: string, backend: AccountBackend): Promise<{ shareIds: string[] }> {
-  const shares = await backend.myShares();
+  let partial = false;
+  const step = async (run: () => Promise<void>, severalSaves = false) => {
+    try {
+      await run();
+      partial = true;
+    } catch (e) {
+      throw Object.assign(new Error('Deleting the account stopped', { cause: e }), { code: (e as { code?: string })?.code, partial: partial || severalSaves });
+    }
+  };
+  let shares: ShareOwner[] = [];
+  await step(async () => {
+    shares = await backend.myShares();
+  });
+  partial = false;
   const plan = planShares(uid, shares);
-  for (const id of plan.deleteForEveryone) await backend.deleteShare(id);
-  for (const id of plan.leave) await backend.leave(id);
-  await backend.deleteOwnData();
-  await backend.deleteUser();
+  for (const id of plan.deleteForEveryone) await step(() => backend.deleteShare(id));
+  for (const id of plan.leave) await step(() => backend.leave(id));
+  await step(() => backend.deleteOwnData(), true);
+  await step(() => backend.deleteUser());
   return { shareIds: shares.map((s) => s.id) };
 }
 

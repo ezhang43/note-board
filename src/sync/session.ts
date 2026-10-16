@@ -43,7 +43,9 @@ const SHARED_WAIT_MS = 5000;
 /** Identifies this open page, so it can ignore its own uploads when they come back. */
 const client = crypto.randomUUID();
 /** This page opened just after the person deleted their account: the sign-in screen says so. */
-const deleted = takeDeletedNote();
+let deleted = takeDeletedNote();
+/** Deleting the account is under way: signing out part-way shows nothing till the page reloads. */
+let deleting = false;
 
 function update(next: SessionStatus, error = '') {
   status = next;
@@ -65,9 +67,10 @@ watchUser((user) => {
   stopAll();
   collab.set(null, null);
   if (!user) {
-    update('signed-out');
+    if (!deleting) update('signed-out');
     return;
   }
+  deleted = false;
   start(user);
 });
 
@@ -99,6 +102,13 @@ function start(user: User, quiet = false) {
         listeners.forEach((l) => l());
       },
       onError: (e) => update((e as { code?: string }).code === 'permission-denied' ? 'no-access' : 'error'),
+      // The account was deleted on another device (job #63): this one stops, so nothing is put
+      // back online, and signs out with the note. Its copy on this device is left as it is.
+      onGone: () => {
+        stopAll();
+        deleted = true;
+        void signOutUser();
+      },
     });
   };
   const active = startSharing(appStore, backend, {
@@ -138,11 +148,14 @@ async function deleteAccount() {
   sync?.flush();
   sharing?.flush();
   stopAll();
+  deleting = true;
   let done: { shareIds: string[] };
   try {
     done = await deleteAccountData(user.uid, accountRemote(user, backend));
   } catch (e) {
+    deleting = false;
     if (currentUser()?.uid === user.uid) start(user, true);
+    else update('signed-out');
     throw e;
   }
   await clearOfflineCopy();

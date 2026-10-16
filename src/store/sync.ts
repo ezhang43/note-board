@@ -50,6 +50,11 @@ export function startSync(
      * they are neither uploaded here nor replaced by what arrives here.
      */
     isShared?: (boardId: string) => boolean;
+    /**
+     * The online boards, once there, are gone (the account was deleted on another device, job #63):
+     * syncing has stopped, so they are never put back from here.
+     */
+    onGone?: () => void;
   },
 ) {
   const isShared = opts.isShared ?? (() => false);
@@ -192,8 +197,18 @@ export function startSync(
     return null;
   }
 
+  /** An online copy has been seen, so "none" later means it was deleted. */
+  let seen = false;
   const stopWatching = remote.watch((doc) => {
     if (stopped) return;
+    if (doc) seen = true;
+    else if (seen) {
+      stopped = true;
+      waiting = null;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      return opts.onGone?.();
+    }
     if (!ready) {
       if (!doc) {
         ready = true;

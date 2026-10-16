@@ -7,6 +7,10 @@
 - Search still finds cleaned-up items: when the panel is shut it rings the Completed button.
 - Boards you already saved keep every cleaned-up item. An old Completed card is simply no longer drawn, and nothing else on the board moves.
 
+## About page says "list" not "sub-list" (2026-10-16)
+
+- The second highlight card on the About page now reads "Collapse any card, column or list, or everything at once, and bring it back in one click." Wording only; nothing in the app changed.
+
 ## Auto-color moves into the Color menu, and American spelling everywhere (2026-10-16)
 
 - Auto-color is now a button at the bottom of the Color menu, instead of its own button on the toolbar (and in the ⋯ panel on a phone).

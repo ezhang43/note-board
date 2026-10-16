@@ -117,7 +117,7 @@ test('the About page has three highlights under the intro', async ({ page }) => 
   await expect(highlights).toHaveCount(3);
   await expect(highlights.locator('h3')).toHaveText(['Shape it your way', "Fold away what you're not doing", 'Built for checklists']);
   await expect(highlights.nth(0)).toContainText('five typefaces, snap-to-grid or free placement');
-  await expect(highlights.nth(1)).toContainText('bring it back in one click');
+  await expect(highlights.nth(1)).toContainText('Collapse any card, column or list, or everything at once, and bring it back in one click.');
   await expect(highlights.nth(2)).toContainText('tick with Ctrl+Enter');
 });
 

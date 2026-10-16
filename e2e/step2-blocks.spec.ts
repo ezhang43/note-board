@@ -234,7 +234,7 @@ test('collapse: a note shows its first line; a column hides its cards', async ({
   await expect(col.locator('[data-card-id]')).toHaveCount(1);
 });
 
-test("Color opens with nothing selected (swatches faded, doing nothing); it colors a card's title band (card stays white) and a column", async ({ page }) => {
+test("Color opens with nothing selected (swatches faded, doing nothing); it tints a card's header (card stays white) and colors a column", async ({ page }) => {
   const color = page.getByRole('button', { name: 'Color of selected cards and containers' });
   await expect(color).not.toHaveAttribute('aria-disabled');
   await color.click();
@@ -248,7 +248,7 @@ test("Color opens with nothing selected (swatches faded, doing nothing); it colo
   await color.click(); // closes again
   await expect(empty).toHaveCount(0);
 
-  // A selected card: Color tints its title band; the card stays white, text stays black.
+  // A selected card: Color tints its header; the card stays white, text stays black.
   await add(page, 'Checklist');
   const list = cards(page).first();
   const header = list.locator('.card-header');
@@ -261,7 +261,7 @@ test("Color opens with nothing selected (swatches faded, doing nothing); it colo
   await expect(header).not.toHaveCSS('background-color', usual);
   await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(list.getByLabel('Item text')).toHaveCSS('color', 'rgb(31, 29, 26)');
-  // Default puts the usual band back (the menu stays open after picking).
+  // Default takes the tint off (the menu stays open after picking).
   await menu.getByRole('button', { name: 'Default' }).click();
   await expect(header).toHaveCSS('background-color', usual);
 

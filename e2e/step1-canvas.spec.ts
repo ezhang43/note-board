@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded } from './helpers';
+import { arrange, fontsLoaded } from './helpers';
 
 // Step 1: canvas, toolbar, pan and zoom, grid, and saving to the browser.
 
@@ -45,20 +45,18 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Select (V)',
     'Undo (Ctrl+Z)',
     'Redo (Ctrl+Y)',
-    'Snap to grid',
-    'Color of selected cards and containers',
-    'Collapse all',
-    'Same width',
     'Note',
     'Checklist',
     'New container',
+    'Color of selected cards and containers',
+    'Arrange',
     'File',
     'Backup file',
     'File to import',
-    'Clean up',
     'Dark mode',
   ]);
   await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
+  await arrange(page); // Snap to grid, Collapse all, Same width and Clean up are in the Arrange menu
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Undo (Ctrl+Z)' })).toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByRole('button', { name: 'Redo (Ctrl+Y)' })).toHaveAttribute('aria-disabled', 'true');
@@ -188,6 +186,7 @@ test('H and V switch tools, but not while typing the board name', async ({ page 
 });
 
 test('snap toggle fades the grid dots', async ({ page }) => {
+  await arrange(page);
   const snap = page.getByRole('button', { name: 'Snap to grid' });
   const dots = () => page.getByTestId('canvas').evaluate((el) => getComputedStyle(el).backgroundImage);
   const on = await dots();
@@ -200,7 +199,7 @@ test('snap toggle fades the grid dots', async ({ page }) => {
 
 test('board name, snap, pan and zoom are kept after reload', async ({ page }) => {
   await page.getByLabel('Board name').fill('Holiday plans');
-  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  await (await arrange(page)).getByRole('button', { name: 'Snap to grid' }).click();
   await page.getByRole('button', { name: 'Zoom in' }).click();
   const box = await canvasBox(page);
   await page.mouse.move(box.x + 400, box.y + 300);
@@ -211,6 +210,7 @@ test('board name, snap, pan and zoom are kept after reload', async ({ page }) =>
   await page.reload();
 
   await expect(page.getByLabel('Board name')).toHaveValue('Holiday plans');
+  await arrange(page);
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'false');
   await expect(zoomLabel(page)).toHaveText('120%');
   expect(await view(page)).toEqual(before);

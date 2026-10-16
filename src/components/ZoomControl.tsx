@@ -10,7 +10,8 @@ import { CalendarButton } from './CalendarPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * (A− / A+), Search, Completed, Version history, the focus timer, Google Calendar (when signed in), the keyboard shortcuts (?) button, the Buy me a coffee link and the zoom control.
+ * labelled Search, Completed, History, Timer and Calendar (when signed in) in one pill, the keyboard
+ * shortcuts (?) button, the Buy me a coffee link, text size (A− / A+) and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
@@ -26,22 +27,26 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   return (
     <div className="corner-controls">
       {note}
-      <TextSizeButtons />
-      <button type="button" className="help-button" aria-label="Search" title="Search the board (Ctrl+F)" aria-pressed={findOpen} onClick={() => (findOpen ? appStore.closeFind() : appStore.openFind())}>
+      <div className="dock-tools">
+      <button type="button" className="help-button dock-tool" aria-label="Search" title="Search the board (Ctrl+F)" aria-pressed={findOpen} onClick={() => (findOpen ? appStore.closeFind() : appStore.openFind())}>
         <SearchIcon />
+        Search
       </button>
       <CompletedButton />
-      <button type="button" className="help-button" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
+      <button type="button" className="help-button dock-tool" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
         <HistoryIcon />
+        History
       </button>
       <PomodoroButton />
       <CalendarButton />
+      </div>
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?
       </button>
       <a className="help-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" aria-label="Buy me a coffee" title="Buy me a coffee">
         <CoffeeIcon />
       </a>
+      <TextSizeButtons />
       <div className="zoom-control" role="group" aria-label="Zoom">
         <button type="button" aria-label="Fit to screen" title="Fit to screen (Shift+1)" onClick={appStore.fitToScreen}>
           <FitIcon />

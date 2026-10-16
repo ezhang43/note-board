@@ -1,5 +1,16 @@
 # Changelog
 
+## New look: Honey Workshop (2026-10-16)
+
+- The app has a calmer, warmer look in light and dark mode: a cream toolbar, honey-coloured highlights (the pressed Hand or Select tool, the Share button, the selected card's glow) and plain white cards with a bold title. The font stays IBM Plex Sans.
+- Cards no longer have a coloured title band. Picking a colour in the Color menu now tints the card's header lightly; containers are coloured as before.
+- A card's or container's small buttons (trash, collapse) show while you point at it or when it is selected, and always on a phone.
+- Snap to grid, Collapse all, Same width and Clean up are now in a new **Arrange** menu in the toolbar. Escape closes the Arrange and File menus.
+- A checklist's Clean up and Uncheck all now sit inside its Completed row and show only while that row is open.
+- The buttons at the bottom right (Search, Completed, History, Timer, Calendar) are one labelled strip.
+- **Feedback** is now its own button next to File (on a phone, a Feedback row in the ⋯ menu above About BusyAnts) instead of an entry in the File menu. It opens the same feedback form.
+- Nothing about saving, shortcuts or how things work has changed; your boards look the same apart from the new style.
+
 ## Arrows between cards removed (2026-10-16)
 
 - The arrows you could draw between cards and containers are gone, as asked: hovering or selecting a card or container no longer shows the little connection dots.

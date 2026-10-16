@@ -42,6 +42,16 @@ export async function add(page: Page, name: 'Note' | 'Checklist' | 'New containe
 }
 
 /**
+ * Opens the toolbar's Arrange menu (Snap to grid, Collapse all, Same width, Clean up) unless it is
+ * already open, and returns it. A click on the board or a card closes it again.
+ */
+export async function arrange(page: Page) {
+  const toggle = page.locator('header.toolbar').getByRole('button', { name: 'Arrange', exact: true });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  return page.getByRole('group', { name: 'Arrange' });
+}
+
+/**
  * Puts a link card on the board. The toolbar no longer adds links (owner request, 2026-10-05), but
  * boards can still hold them: from before, or from a Milanote import, which is used here.
  */

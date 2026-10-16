@@ -17,8 +17,10 @@ async function expectToolbarFits(page: Page, width: number) {
 }
 
 test('Sign out is never cut off at the right of the toolbar, also inside a sub-board', async ({ page }) => {
-  await page.goto('/?signed-in');
+  // A demo person too, so Feedback and Share show as they do for the owner.
+  await page.goto(`/?signed-in&demo-user=Fit${Math.random().toString(36).slice(2, 8)}`);
   await fontsLoaded(page);
+  await expect(toolbar(page).getByRole('button', { name: 'Feedback', exact: true })).toBeVisible();
   for (const width of [1280, 1366, 1440, 1536, 1920]) await expectToolbarFits(page, width);
 
   // Inside a sub-board the path to it shows too.

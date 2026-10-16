@@ -5,7 +5,7 @@ import { useOnline } from './DeleteAccountPanel';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 
-// Send feedback (owner request, job #69). File → Send feedback… opens it (on a phone ⋯ → File):
+// Send feedback (owner request, job #69). The Feedback button opens it (on a phone ⋯ → Feedback):
 // a short note, sent with the person's email so the owner can reply.
 
 export function FeedbackPanel() {

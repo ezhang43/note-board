@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import {
+  canChangeSeries,
   cellLines,
   cellTime,
   dayKey,
   dayLabel,
+  draftBody,
   draftFor,
+  emailGuests,
   eventsOnDay,
+  isEmail,
   monthGrid,
   moveDraftStart,
   newDraft,
@@ -15,17 +19,18 @@ import {
   rangeLabel,
   timeLabel,
   weekDays,
+  withGuest,
   type CalEvent,
   type DayKey,
   type Draft,
 } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
-import { calendar, useCalendar } from '../store/calendar';
-import { CalendarDaysIcon, ExternalIcon, PlusIcon } from './icons';
+import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type Choice } from '../store/calendar';
+import { CalendarDaysIcon, CloseIcon, ExternalIcon, PlusIcon } from './icons';
 
 // Google Calendar side panel (owner request, 2026-10-06): the signed-in person's primary calendar,
-// a week or a month, beside the board. Simple events can be added, moved, renamed and deleted;
-// the rest open in Google Calendar. Calendar events aren't board data: no undo, not in Version history.
+// a week or a month, beside the board. The person's own events can be added, moved, renamed and
+// deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data: no undo, not in Version history.
 
 /**
  * Opens the panel: a round button by the zoom control (the toolbar is full at 1280px), a line in ⋯
@@ -255,7 +260,7 @@ function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today:
   );
 }
 
-/** Repeating events, events with guests or reminders of their own: shown, and changed in Google Calendar. */
+/** Others' events, events with reminders of their own or of Google's special kinds: shown, and changed in Google Calendar. */
 function ReadOnlyEvent({ event, onBack }: { event: CalEvent; onBack: () => void }) {
   return (
     <div className="cal cal-detail">
@@ -263,7 +268,7 @@ function ReadOnlyEvent({ event, onBack }: { event: CalEvent; onBack: () => void 
       <p className="cal-detail-when">
         {event.allDay ? dayLabel(event.start) : dayLabel(event.start.slice(0, 10))} · {timeLabel(event)}
       </p>
-      <p className="history-note">Repeating events, events with guests or their own reminders, and events from others can only be changed in Google Calendar.</p>
+      <p className="history-note">Events from others, events with their own reminders, and Google’s special kinds (like Out of office) can only be changed in Google Calendar.</p>
       <a className="tb-button cal-open" href={event.link} target="_blank" rel="noopener noreferrer">
         <ExternalIcon />
         Open in Google Calendar
@@ -275,13 +280,21 @@ function ReadOnlyEvent({ event, onBack }: { event: CalEvent; onBack: () => void 
   );
 }
 
-/** Adding (`event` null) or changing a simple event; Delete asks first. */
+/**
+ * The questions asked before saving or deleting (job #85): "which events?" for one of a repeating
+ * series (and "Delete?" for any event), then "Send update emails to guests?" when there are guests.
+ */
+type Ask = { action: 'save' | 'delete'; step: 'which' | 'emails'; all?: boolean };
+
+/** Adding (`event` null) or changing one of the person's own events; Delete asks first. */
 function EventForm({ event, start, onDone }: { event: CalEvent | null; start: Draft; onDone: () => void }) {
   const [draft, setDraft] = useState(start);
+  const [guest, setGuest] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [asking, setAsking] = useState(false);
+  const [ask, setAsk] = useState<Ask | null>(null);
   const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const seriesOk = canChangeSeries(event, draft);
 
   async function run(action: () => Promise<string | null>) {
     setBusy(true);
@@ -291,80 +304,167 @@ function EventForm({ event, start, onDone }: { event: CalEvent | null; start: Dr
     else onDone();
   }
 
+  /** Adds the guest typed in: the draft with it, or null (and a note) when it isn't an email address. */
+  function addGuest(): Draft | null {
+    const email = guest.trim();
+    if (!email) return draft;
+    if (!isEmail(email)) {
+      setNote(BAD_EMAIL);
+      return null;
+    }
+    const next = { ...draft, guests: withGuest(event, draft.guests, email) };
+    setDraft(next);
+    setGuest('');
+    setNote(null);
+    return next;
+  }
+
+  /** Asks the next question, or saves / deletes with the answers given. */
+  function next(action: Ask['action'], d: Draft, choice: Choice, step: 'start' | Ask['step']) {
+    if (step === 'start' && (action === 'delete' || event?.series)) return setAsk({ action, step: 'which' });
+    if (step !== 'emails' && emailGuests(event, action === 'save' ? d : null)) return setAsk({ action, step: 'emails', all: choice.all });
+    setAsk(null);
+    void run(() => (action === 'save' ? calendar.save(event?.id ?? null, d, choice) : calendar.remove(event!.id, choice)));
+  }
+
+  const title = !ask ? '' : ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;
+  const pick = (all: boolean) => () => ask && next(ask.action, draft, { all }, 'which');
+
   return (
     <form
       className="cal cal-form"
       aria-label={event ? 'Change event' : 'New event'}
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        void run(() => calendar.save(event?.id ?? null, draft));
+        const d = addGuest();
+        if (!d) return;
+        // Wrong times are said before any question.
+        if (!draftBody(d, 'UTC')) return setNote(BAD_TIMES);
+        next('save', d, {}, 'start');
       }}
     >
       <h3 className="cal-detail-title">{event ? 'Change event' : 'New event'}</h3>
-      <label className="cal-field">
-        <span>Title</span>
-        <input type="text" aria-label="Title" autoFocus placeholder="(No title)" value={draft.title} onChange={(e) => change({ title: e.currentTarget.value })} />
-      </label>
-      <label className="cal-check">
-        <input type="checkbox" checked={draft.allDay} onChange={(e) => change({ allDay: e.currentTarget.checked })} />
-        All day
-      </label>
-      <div className="cal-field">
-        <span>Starts</span>
-        <div className="cal-when">
-          <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
-          {!draft.allDay && <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => change({ startTime: e.currentTarget.value })} />}
+      {/* Locked while a question is open, so the answer goes with what was asked about. */}
+      <fieldset className="cal-fields" disabled={ask !== null}>
+        <label className="cal-field">
+          <span>Title</span>
+          <input type="text" aria-label="Title" autoFocus placeholder="(No title)" value={draft.title} onChange={(e) => change({ title: e.currentTarget.value })} />
+        </label>
+        <label className="cal-check">
+          <input type="checkbox" checked={draft.allDay} onChange={(e) => change({ allDay: e.currentTarget.checked })} />
+          All day
+        </label>
+        <div className="cal-field">
+          <span>Starts</span>
+          <div className="cal-when">
+            <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
+            {!draft.allDay && <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => change({ startTime: e.currentTarget.value })} />}
+          </div>
         </div>
-      </div>
-      <div className="cal-field">
-        <span>Ends</span>
-        <div className="cal-when">
-          <input type="date" aria-label="End date" value={draft.endDate} onChange={(e) => change({ endDate: e.currentTarget.value })} />
-          {!draft.allDay && <input type="time" aria-label="End time" value={draft.endTime} onChange={(e) => change({ endTime: e.currentTarget.value })} />}
+        <div className="cal-field">
+          <span>Ends</span>
+          <div className="cal-when">
+            <input type="date" aria-label="End date" value={draft.endDate} onChange={(e) => change({ endDate: e.currentTarget.value })} />
+            {!draft.allDay && <input type="time" aria-label="End time" value={draft.endTime} onChange={(e) => change({ endTime: e.currentTarget.value })} />}
+          </div>
         </div>
-      </div>
-      {note && (
-        <p className="cal-error" role="status">
-          {note}
-        </p>
-      )}
-      <div className="cal-actions">
-        <button type="submit" className="tb-button cal-save" disabled={busy}>
-          Save
-        </button>
-        <button type="button" className="tb-button" onClick={onDone}>
-          Cancel
-        </button>
-        {event && (
-          <button type="button" className="tb-button cal-delete" disabled={busy} onClick={() => setAsking(true)}>
-            Delete
-          </button>
+        <div className="cal-field">
+          <span>Guests</span>
+          {draft.guests.length > 0 && (
+            <ul className="cal-guests">
+              {draft.guests.map((g) => (
+                <li key={g}>
+                  <span className="cal-guest">{g}</span>
+                  <button type="button" className="icon-button" aria-label={`Remove guest ${g}`} title="Remove guest" onClick={() => change({ guests: draft.guests.filter((x) => x !== g) })}>
+                    <CloseIcon />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="cal-when">
+            <input
+              type="email"
+              aria-label="Guest email"
+              placeholder="Add a guest by email"
+              value={guest}
+              onChange={(e) => setGuest(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                // Enter adds the guest rather than saving.
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                addGuest();
+              }}
+            />
+            <button type="button" className="tb-button" aria-label="Add guest" onClick={addGuest}>
+              Add
+            </button>
+          </div>
+        </div>
+        {note && (
+          <p className="cal-error" role="status">
+            {note}
+          </p>
         )}
-      </div>
-      {event && asking && (
+        <div className="cal-actions">
+          <button type="submit" className="tb-button cal-save" disabled={busy}>
+            Save
+          </button>
+          <button type="button" className="tb-button" onClick={onDone}>
+            Cancel
+          </button>
+          {event && (
+            <button type="button" className="tb-button cal-delete" disabled={busy} onClick={() => next('delete', draft, {}, 'start')}>
+              Delete
+            </button>
+          )}
+        </div>
+      </fieldset>
+      {ask && (
         <div
           className="confirm cal-confirm"
           role="alertdialog"
-          aria-label={`Delete “${event.title}”?`}
+          aria-label={title}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setAsking(false);
+            if (e.key === 'Escape') setAsk(null);
           }}
         >
-          <div className="confirm-title">{`Delete “${event.title}”?`}</div>
+          <div className="confirm-title">{title}</div>
+          {ask.step === 'which' && ask.action === 'save' && !seriesOk && <p className="history-note">Moving it to another day, or to or from all day, changes only this event.</p>}
           <div className="confirm-actions">
-            <button type="button" className="confirm-cancel" autoFocus onClick={() => setAsking(false)}>
-              Keep
-            </button>
-            <button
-              type="button"
-              className="confirm-delete"
-              onClick={() => {
-                setAsking(false);
-                void run(() => calendar.remove(event.id));
-              }}
-            >
-              Delete
-            </button>
+            {ask.step === 'emails' ? (
+              <>
+                <button type="button" className="confirm-cancel" onClick={() => next(ask.action, draft, { all: ask.all, notify: false }, 'emails')}>
+                  Don’t send
+                </button>
+                <button type="button" className="confirm-send" autoFocus onClick={() => next(ask.action, draft, { all: ask.all, notify: true }, 'emails')}>
+                  Send
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="confirm-cancel" autoFocus={ask.action === 'delete'} onClick={() => setAsk(null)}>
+                  {ask.action === 'delete' ? 'Keep' : 'Cancel'}
+                </button>
+                {!event?.series ? (
+                  <button type="button" className="confirm-delete" onClick={pick(false)}>
+                    Delete
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={ask.action === 'save'} onClick={pick(false)}>
+                      Only this event
+                    </button>
+                    {(ask.action === 'delete' || seriesOk) && (
+                      <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} onClick={pick(true)}>
+                        All events in the series
+                      </button>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

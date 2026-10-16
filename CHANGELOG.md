@@ -1,5 +1,13 @@
 # Changelog
 
+## Google Calendar: repeating events and guests (2026-10-16)
+
+- Repeating events you organise can now be changed and deleted in the calendar panel. It asks whether you mean only this event or all events in the series.
+- You can see, add (by email address) and remove guests on your own events, new ones too. When an event has guests, saving or deleting it asks whether to send update emails to them.
+- Events from other people, events with their own reminders and special kinds like Out of office still open in Google Calendar. So does changing every event of a series that Google keeps in another time zone.
+- The Privacy policy says that guests' email addresses go to Google Calendar and guests are emailed only when you choose Send.
+- Your boards are untouched; calendar events still aren't board data (no undo, not synced).
+
 ## Connector/plugin block for Claude Code undone (2026-10-16)
 
 - Undid the change that turned off unused connectors and plugins for Claude Code in this project; the saving was not worth it. Nothing in the app changed.

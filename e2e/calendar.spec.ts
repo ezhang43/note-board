@@ -4,7 +4,8 @@ import { fontsLoaded } from './helpers';
 // Google Calendar side panel (owner request, 2026-10-06). Tests can't reach Google: with
 // ?demo-user=… `npm run dev` answers like the Calendar API from a pretend calendar (src/calendar/devServer.ts),
 // a fresh one for each demo person, holding: "Dentist" today 10:00–11:00 (simple), "Team stand-up" every
-// day 09:00–09:15 (repeating, so read-only), "Lunch with Sam" tomorrow (has a guest, so read-only).
+// day 09:00–09:15 (repeating), "Lunch with Sam" tomorrow (with a guest), "Holiday" all day in 3 days and
+// "Book club" in 2 days 18:00–19:00 (someone else's, so read-only).
 
 const tag = () => Math.random().toString(36).slice(2, 8).replace(/[^a-z0-9]/g, '');
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -38,7 +39,7 @@ test('without anyone signed in there is no calendar button', async ({ page }) =>
   await expect(button(page)).toHaveCount(0);
 });
 
-test('opens beside the board with this week’s events; repeating and invited events are read-only', async ({ page }) => {
+test('opens beside the board with this week’s events; someone else’s event is read-only', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   await expect(panel(page)).toBeVisible();
@@ -47,8 +48,8 @@ test('opens beside the board with this week’s events; repeating and invited ev
   await expect(today.getByRole('button', { name: '10:00 – 11:00 Dentist' })).toBeVisible();
   await expect(today.getByRole('button', { name: /09:00 – 09:15 Team stand-up/ })).toBeVisible();
 
-  // A repeating event shows its details, read-only, with a link to change it in Google Calendar.
-  await today.getByRole('button', { name: /Team stand-up/ }).click();
+  // Someone else's event shows its details, read-only, with a link to change it in Google Calendar.
+  await day(page, daysFromToday(2)).getByRole('button', { name: '18:00 – 19:00 Book club, read-only' }).click();
   await expect(panel(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
   const link = panel(page).getByRole('link', { name: 'Open in Google Calendar' });
   await expect(link).toHaveAttribute('href', /^https:\/\/(calendar|www)\.google\.com\//);
@@ -151,6 +152,191 @@ test('delete asks first (Keep / Delete); Escape keeps the panel open; Ctrl+Z doe
   expect(errors).toEqual([]);
 });
 
+// Repeating events and guests (owner request, 2026-10-16, job #85).
+const asked = (page: Page, name: string) => panel(page).getByRole('alertdialog', { name });
+const WHICH = 'Save changes to which events?';
+const EMAILS = 'Send update emails to guests?';
+/** The changes sent to the calendar (adds, changes, deletes) as "METHOD url", in order. */
+const ONLY_THIS = 'Moving it to another day, or to or from all day, changes only this event.';
+
+function changesSent(page: Page) {
+  const urls: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/__calendar/') && r.method() !== 'GET') urls.push(`${r.method()} ${r.url()}`);
+  });
+  return urls;
+}
+
+test('a repeating event: “Only this event” changes just that one, “All events in the series” changes them all', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const standUp = (n: number) => day(page, daysFromToday(n)).getByRole('button', { name: /Team stand-up/ });
+
+  // Only this event: today's is renamed, tomorrow's isn't. No guests, so no question about emails.
+  await day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Team stand-up' }).click();
+  await form(page).getByLabel('Title').fill('Planning');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  const which = asked(page, WHICH);
+  await expect(which.getByRole('button', { name: 'Only this event' })).toBeFocused();
+  await which.getByRole('button', { name: 'Only this event' }).click();
+  await expect(form(page)).toHaveCount(0);
+  await expect(asked(page, EMAILS)).toHaveCount(0);
+  await expect(day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Planning' })).toBeVisible();
+  await expect(standUp(1)).toHaveAccessibleName('09:00 – 09:15 Team stand-up');
+
+  // All events: tomorrow's is moved to 09:30, and every other one follows, except today's (changed on its own).
+  await standUp(1).click();
+  await form(page).getByLabel('Start time').fill('09:30');
+  await form(page).getByLabel('End time').fill('09:45');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+  await expect(form(page)).toHaveCount(0);
+  for (const n of [1, 2, 6]) await expect(standUp(n)).toHaveAccessibleName('09:30 – 09:45 Team stand-up');
+  await expect(day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Planning' })).toBeVisible();
+  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  await expect(standUp(7)).toHaveAccessibleName('09:30 – 09:45 Team stand-up');
+  await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
+
+  // Moved to another day: only that one can change; Escape goes back to the form.
+  await standUp(3).click();
+  await form(page).getByLabel('Start date').fill(key(daysFromToday(4)));
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(asked(page, WHICH).getByText(ONLY_THIS)).toBeVisible();
+  await expect(asked(page, WHICH).getByRole('button', { name: 'All events in the series' })).toHaveCount(0);
+  // While asked, the form can't be changed underneath the question.
+  await expect(form(page).getByLabel('Start date')).toBeDisabled();
+  await expect(form(page).getByLabel('Guest email')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(asked(page, WHICH)).toHaveCount(0);
+  await expect(form(page).getByLabel('Start date')).toBeEnabled();
+  // Made all-day: only that one too.
+  await form(page).getByLabel('Start date').fill(key(daysFromToday(3)));
+  await form(page).getByLabel('All day').check();
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(asked(page, WHICH).getByText(ONLY_THIS)).toBeVisible();
+  await expect(asked(page, WHICH).getByRole('button', { name: 'All events in the series' })).toHaveCount(0);
+  await asked(page, WHICH).getByRole('button', { name: 'Cancel' }).click();
+  await expect(form(page)).toBeVisible();
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+
+  // Deleting: only this one, then the whole series.
+  await standUp(5).click();
+  await form(page).getByRole('button', { name: 'Delete' }).click();
+  const del = asked(page, 'Delete “Team stand-up”?');
+  await expect(del.getByRole('button', { name: 'Keep' })).toBeFocused();
+  await del.getByRole('button', { name: 'Only this event' }).click();
+  await expect(standUp(5)).toHaveCount(0);
+  await expect(standUp(4)).toHaveCount(1);
+  await standUp(4).click();
+  await form(page).getByRole('button', { name: 'Delete' }).click();
+  await asked(page, 'Delete “Team stand-up”?').getByRole('button', { name: 'All events in the series' }).click();
+  // Like Google, the whole series includes the ones changed on their own.
+  await expect(panel(page).getByRole('button', { name: /Team stand-up|Planning/ })).toHaveCount(0);
+  await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('guests can be added and removed; “Send update emails to guests?” is asked only when there are guests', async ({ page }) => {
+  const errors = await openAs(page);
+  const sent = changesSent(page);
+  await button(page).click();
+  const today = day(page, new Date());
+
+  // No guests: saved straight away, nothing about emails sent to Google.
+  await today.getByRole('button', { name: /Dentist/ }).click();
+  await form(page).getByLabel('Title').fill('Dentist visit');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(form(page)).toHaveCount(0);
+  await expect(asked(page, EMAILS)).toHaveCount(0);
+  expect(sent.at(-1)).toMatch(/^PATCH /);
+  expect(sent.at(-1)).not.toContain('sendUpdates');
+
+  // A guest is added by email address (Enter adds it, it doesn't save); something that isn't one gets a note.
+  await today.getByRole('button', { name: /Dentist visit/ }).click();
+  await form(page).getByLabel('Guest email').fill('not-an-email');
+  await form(page).getByRole('button', { name: 'Add guest' }).click();
+  await expect(form(page).getByText('That doesn’t look like an email address.')).toBeVisible();
+  await form(page).getByLabel('Guest email').fill('kim@example.com');
+  await page.keyboard.press('Enter');
+  await expect(form(page).getByRole('listitem')).toHaveText(['kim@example.com']);
+  await expect(form(page).getByLabel('Guest email')).toHaveValue('');
+  await expect(form(page)).toBeVisible();
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  const emails = asked(page, EMAILS);
+  await expect(emails.getByRole('button', { name: 'Send', exact: true })).toBeFocused();
+  await emails.getByRole('button', { name: /Don.t send/ }).click();
+  await expect(form(page)).toHaveCount(0);
+  expect(sent.at(-1)).toContain('sendUpdates=none');
+
+  // The guest list doesn't show the person themself; removing the guest, with emails.
+  const lunch = day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ });
+  await lunch.click();
+  await expect(form(page).getByRole('listitem')).toHaveText(['sam@example.com']);
+  await form(page).getByRole('button', { name: 'Remove guest sam@example.com' }).click();
+  await expect(form(page).getByRole('listitem')).toHaveCount(0);
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, EMAILS).getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(form(page)).toHaveCount(0);
+  expect(sent.at(-1)).toContain('sendUpdates=all');
+  await lunch.click();
+  await expect(form(page).getByRole('listitem')).toHaveCount(0);
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+
+  // Escape on the question goes back to the form without saving.
+  await today.getByRole('button', { name: /Dentist visit/ }).click();
+  await expect(form(page).getByRole('listitem')).toHaveText(['kim@example.com']);
+  const before = sent.length;
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(asked(page, EMAILS)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(asked(page, EMAILS)).toHaveCount(0);
+  await expect(form(page)).toBeVisible();
+  expect(sent.length).toBe(before);
+
+  // Deleting an event with guests asks too.
+  await form(page).getByRole('button', { name: 'Delete' }).click();
+  await asked(page, 'Delete “Dentist visit”?').getByRole('button', { name: 'Delete' }).click();
+  await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
+  await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  expect(sent.at(-1)).toMatch(/^DELETE .*sendUpdates=none/);
+  expect(errors).toEqual([]);
+});
+
+test('a guest still typed in when Save is clicked is added, or stops the save if it isn’t an email address', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  await day(page, today).getByRole('button', { name: `Add event on ${label(today)}` }).click();
+  await page.keyboard.type('Coffee');
+  await form(page).getByLabel('Guest email').fill('kim@');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(form(page).getByText('That doesn’t look like an email address.')).toBeVisible();
+  await expect(asked(page, EMAILS)).toHaveCount(0);
+  await form(page).getByLabel('Guest email').fill('kim@example.com');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
+  await day(page, today).getByRole('button', { name: /Coffee/ }).click();
+  await expect(form(page).getByRole('listitem')).toHaveText(['kim@example.com']);
+  expect(errors).toEqual([]);
+});
+
+test('when Google refuses a change, the usual note shows and the form stays open', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await page.route('**/__calendar/**', (route) =>
+    route.request().method() === 'PATCH' ? route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }) : route.continue(),
+  );
+  await day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ }).click();
+  await form(page).getByLabel('Title').fill('Daily sync');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+  await expect(form(page).getByText('That change didn’t reach Google Calendar. Try again later.')).toBeVisible();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Daily sync');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('week and month views, back and forward, and Today', async ({ page }) => {
   await openAs(page);
   await button(page).click();
@@ -199,7 +385,9 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   const todayCell = cell(now);
   await expect(todayCell.locator('.cal-chip')).toHaveText([/Team stand-up/, /Dentist/]);
   await expect(todayCell.getByRole('button', { name: '10:00 – 11:00 Dentist' })).toBeVisible();
-  await expect(todayCell.getByRole('button', { name: /Team stand-up, read-only/ })).toHaveClass(/read-only/);
+  await expect(todayCell.getByRole('button', { name: /Team stand-up/ })).not.toHaveClass(/read-only/);
+  const club = daysFromToday(2);
+  if (club.getMonth() === now.getMonth()) await expect(cell(club).getByRole('button', { name: /Book club, read-only/ })).toHaveClass(/read-only/);
   // An all-day event is a filled chip, first on its day.
   const holiday = daysFromToday(3);
   if (holiday.getMonth() === now.getMonth()) {
@@ -211,10 +399,10 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   await todayCell.getByRole('button', { name: /Dentist/ }).click();
   await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
   await form(page).getByRole('button', { name: 'Cancel' }).click();
-  // A read-only event opens read-only.
+  // A repeating event opens its change form too (job #85).
   await todayCell.getByRole('button', { name: /Team stand-up/ }).click();
-  await expect(panel(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
-  await panel(page).getByRole('button', { name: 'Back' }).click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Team stand-up');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
 
   // The wide Month panel has room for three lines; a fourth event today makes the last say "+2 more".
   for (const [title, start, end] of [['Swim', '07:00', '07:45'], ['Run', '06:00', '06:30']]) {

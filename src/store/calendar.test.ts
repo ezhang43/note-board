@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: nothing here is undone, synced with boards or kept in versions.
@@ -14,31 +14,46 @@ const ev = (id: string, over: Partial<CalEvent> = {}): CalEvent => ({
   end: '2026-10-06T11:00',
   editable: true,
   link: 'https://calendar.google.com/',
+  series: null,
+  guests: [],
+  timeZone: null,
   ...over,
 });
 
+const mail = (notify?: boolean) => (notify === undefined ? '' : notify ? ' (emails sent)' : ' (no emails)');
+
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; fail: boolean; noAccess: 'window' | 'refused' | null } = {
+  const api: CalendarApi & { calls: string[]; bodies: EventBody[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent> } = {
     calls,
     fail: false,
     noAccess: null,
+    series: {},
     async list(from, to) {
       calls.push(`list ${from} ${to}`);
       if (api.noAccess) throw new NoAccess(api.noAccess);
       if (api.fail) throw new Error('403');
       return events;
     },
-    async create(body: EventBody) {
-      calls.push(`create ${body.summary}`);
+    bodies: [] as EventBody[],
+    async get(id) {
+      calls.push(`get ${id}`);
+      if (api.fail) throw new Error('403');
+      // A series' own record: its first event was on 1 Sep, kept in this device's time zone.
+      return ev(id, { start: '2026-09-01T09:00', end: '2026-09-01T09:15', editable: false, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...api.series });
+    },
+    async create(body: EventBody, notify?: boolean) {
+      calls.push(`create ${body.summary}${mail(notify)}`);
+      api.bodies.push(body);
       if (api.fail) throw new Error('403');
     },
-    async update(id, body) {
-      calls.push(`update ${id} ${body.summary}`);
+    async update(id, body, notify) {
+      calls.push(`update ${id} ${body.summary}${mail(notify)}`);
+      api.bodies.push(body);
       if (api.fail) throw new Error('403');
     },
-    async remove(id) {
-      calls.push(`remove ${id}`);
+    async remove(id, notify) {
+      calls.push(`remove ${id}${mail(notify)}`);
       if (api.fail) throw new Error('403');
       events = events.filter((e) => e.id !== id);
     },
@@ -164,7 +179,7 @@ describe('the calendar panel', () => {
 });
 
 describe('changing events', () => {
-  const draft = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00' };
+  const draft = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00', guests: [] as string[] };
 
   it('adds an event, then shows the calendar again', async () => {
     const api = fakeApi();
@@ -218,6 +233,143 @@ describe('changing events', () => {
   });
 });
 
+describe('repeating events and guests (job #85)', () => {
+  const me = { email: 'me@example.com', self: true };
+  const sam = { email: 'sam@example.com', responseStatus: 'accepted' };
+  const standUp = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15' });
+  const lunch = ev('lunch', { title: 'Lunch', guests: [me, sam], start: '2026-10-07T12:30', end: '2026-10-07T13:30' });
+  const change = { title: 'Stand-up', allDay: false, startDate: '2026-10-16', startTime: '09:30', endDate: '2026-10-16', endTime: '09:45', guests: [] as string[] };
+
+  it('“Only this event” changes that one event only', async () => {
+    const api = fakeApi([standUp]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save('su_1016', change, { all: false })).toBeNull();
+    expect(api.calls[1]).toBe('update su_1016 Stand-up');
+    expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-10-16T09:30:00' });
+  });
+
+  it('“All events in the series” changes the series, keeping its own first day', async () => {
+    const api = fakeApi([standUp]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save('su_1016', change, { all: true })).toBeNull();
+    expect(api.calls.slice(1, 3)).toEqual(['get su', 'update su Stand-up']);
+    expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:30:00' });
+    expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
+  });
+
+  it('“All events” is refused when the day was moved, or for an event that doesn’t repeat', async () => {
+    const api = fakeApi([standUp, ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save('su_1016', { ...change, startDate: '2026-10-17', endDate: '2026-10-17' }, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save('a', draftOf('a'), { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save('su_1016', { ...change, allDay: true }, { all: true })).toBe(SAVE_FAILED);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+  });
+
+  it('“All events” of a series kept in another time zone is left to Google Calendar', async () => {
+    const api = fakeApi([standUp]);
+    api.series = { timeZone: 'Pacific/Chatham' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save('su_1016', change, { all: true })).toBe(SERIES_ZONE);
+    expect(api.calls.slice(1)).toEqual(['get su']);
+  });
+
+  it('“All events” sends the series’ own guests back (with their answers), and only when the guests changed', async () => {
+    const seriesSam = { email: 'sam@example.com', responseStatus: 'needsAction' };
+    const one = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15', guests: [me, sam] });
+    const api = fakeApi([one]);
+    api.series = { guests: [me, seriesSam] };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save('su_1016', { ...change, guests: ['sam@example.com'] }, { all: true, notify: false });
+    expect(api.bodies[0].attendees).toBeUndefined();
+    await cal.save('su_1016', { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false });
+    expect(api.bodies[1].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
+  });
+
+  it('deleting one event of a series, or the whole series', async () => {
+    const other = ev('su_1017', { series: 'su', start: '2026-10-17T09:00', end: '2026-10-17T09:15' });
+    const api = fakeApi([standUp, other, ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.remove('su_1016', { all: false })).toBeNull();
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1017', 'a']);
+    expect(await cal.remove('su_1017', { all: true })).toBeNull();
+    expect(api.calls.slice(1)).toEqual(['remove su_1016', 'remove su']);
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('with guests, update emails are sent only when the person said Send', async () => {
+    const api = fakeApi([lunch]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07', guests: ['sam@example.com'] };
+    await cal.save('lunch', d, { notify: true });
+    await cal.save('lunch', d, { notify: false });
+    await cal.save('lunch', d); // not asked: never emails
+    await cal.remove('lunch', { notify: true });
+    expect(api.calls.filter((c) => !c.startsWith('list'))).toEqual(['update lunch Lunch (emails sent)', 'update lunch Lunch (no emails)', 'update lunch Lunch (no emails)', 'remove lunch (emails sent)']);
+  });
+
+  it('without guests nothing about emails is sent to Google', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save('a', draftOf('a'), { notify: true });
+    await cal.remove('a', { notify: true });
+    expect(api.calls.slice(1)).toEqual(['update a a', 'list 2026-10-06 2026-10-13', 'remove a']);
+  });
+
+  it('adds and removes guests; the list is sent only when it changed', async () => {
+    const api = fakeApi([lunch]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07' };
+    await cal.save('lunch', { ...d, guests: ['sam@example.com'] }, { notify: false });
+    expect(api.bodies[0].attendees).toBeUndefined();
+    await cal.save('lunch', { ...d, guests: ['sam@example.com', 'pat@example.com'] }, { notify: false });
+    expect(api.bodies[1].attendees).toEqual([me, sam, { email: 'pat@example.com' }]);
+    await cal.save('lunch', { ...d, guests: [] }, { notify: true });
+    expect(api.bodies[2].attendees).toEqual([me]);
+    expect(api.calls).toContain('update lunch Lunch (emails sent)');
+  });
+
+  it('a guest that isn’t an email address is refused, without asking Google', async () => {
+    const api = fakeApi([lunch]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save(null, { ...change, guests: ['not an email'] })).toBe(BAD_EMAIL);
+    expect(api.calls.length).toBe(1);
+  });
+
+  it('a new event with guests invites them (asking about emails)', async () => {
+    const api = fakeApi([]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(null, { ...change, guests: ['pat@example.com'] }, { notify: true });
+    expect(api.calls[1]).toBe('create Stand-up (emails sent)');
+    expect(api.bodies[0].attendees).toEqual([{ email: 'pat@example.com' }]);
+  });
+
+  it('a change to a series Google refuses says so', async () => {
+    const api = fakeApi([standUp]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    api.fail = true;
+    expect(await cal.save('su_1016', change, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.remove('su_1016', { all: true })).toBe(SAVE_FAILED);
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016']);
+  });
+});
+
+function draftOf(id: string) {
+  return { title: id, allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] as string[] };
+}
+
 describe('talking to the Calendar API', () => {
   function fakeFetch(status = 200, body: unknown = { items: [] }) {
     const calls: { url: string; init: RequestInit }[] = [];
@@ -269,6 +421,25 @@ describe('talking to the Calendar API', () => {
     const del = fakeFetch(204);
     await calendarApi(source(), del.fn).remove('a');
     expect(del.calls[0].init.method).toBe('DELETE');
+  });
+
+  it('asks Google to email guests, or not, only when told to (sendUpdates)', async () => {
+    const f = fakeFetch(200, {});
+    const api = calendarApi(source(), f.fn);
+    const body = { summary: 'S', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } };
+    await api.create(body);
+    await api.create(body, true);
+    await api.update('a', body, false);
+    await api.remove('a', true);
+    expect(f.calls.map((c) => new URL(c.url).searchParams.get('sendUpdates'))).toEqual([null, 'all', 'none', 'all']);
+  });
+
+  it('reads one event (a repeating event’s series) by its id', async () => {
+    const f = fakeFetch(200, { id: 's', summary: 'Stand-up', start: { dateTime: '2026-09-01T09:00:00' }, end: { dateTime: '2026-09-01T09:15:00' }, recurrence: ['RRULE:FREQ=DAILY'] });
+    const got = await calendarApi(source(), f.fn).get('s');
+    expect(f.calls[0].url).toBe('https://api.test/calendar/v3/calendars/primary/events/s');
+    expect(got).toMatchObject({ id: 's', start: '2026-09-01T09:00' });
+    await expect(calendarApi(source(), fakeFetch(404, {}).fn).get('s')).rejects.toThrow();
   });
 
   it('an event already deleted elsewhere counts as deleted', async () => {

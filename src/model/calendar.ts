@@ -15,11 +15,20 @@ export interface CalEvent {
   start: string;
   /** All-day: the day after the last (as Google keeps it). Timed: local 'YYYY-MM-DDTHH:MM'. */
   end: string;
-  /** Simple events only: not repeating, no guests, no reminders of its own, the person's own. */
+  /** The person's own events, without reminders of their own and not one of Google's special kinds. */
   editable: boolean;
   /** Where to open it in Google Calendar. */
   link: string;
+  /** One event of a repeating series: the series' id (job #85). */
+  series: string | null;
+  /** Its guests as Google gave them (checked), the person themself included, marked `self`. */
+  guests: Guest[];
+  /** Timed: the time zone Google keeps it in (a series repeats in it), when Google says. */
+  timeZone: string | null;
 }
+
+/** A guest of an event: the fields of Google's attendee kept, so an unchanged guest is sent back as it was. */
+export type Guest = { email: string; self?: boolean } & Record<string, string | number | boolean>;
 
 /** No calendar access: Google's window was blocked or closed, or access wasn't given. */
 export class NoAccess extends Error {
@@ -36,6 +45,8 @@ export interface Draft {
   startTime: string;
   endDate: string;
   endTime: string;
+  /** The other guests' email addresses (not the person themself). */
+  guests: string[];
 }
 
 /** What is sent to Google to add or change an event. */
@@ -43,6 +54,8 @@ export interface EventBody {
   summary: string;
   start: { date: string } | { dateTime: string; timeZone: string };
   end: { date: string } | { dateTime: string; timeZone: string };
+  /** Only when the guest list changed (or a new event has guests). */
+  attendees?: Guest[];
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -150,7 +163,7 @@ export function safeLink(url: unknown): string {
 
 /**
  * An event as Google's Calendar API sends it, checked (it comes from outside), or null to leave it
- * out. Only simple events can be changed here; the rest open in Google Calendar.
+ * out. Only the person's own events can be changed here; the rest open in Google Calendar.
  */
 export function parseEvent(raw: unknown): CalEvent | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -162,10 +175,11 @@ export function parseEvent(raw: unknown): CalEvent | null {
   const list = (x: unknown) => (Array.isArray(x) ? x.length : 0);
   const reminders = e.reminders as { overrides?: unknown } | undefined;
   const organizer = e.organizer as { self?: unknown } | undefined;
+  // Repeating events and guests can be changed (job #85); a guest list Google cut short can't be
+  // changed safely (the guests left out would be dropped), and a series itself is never listed.
   const editable =
-    !e.recurringEventId &&
     !list(e.recurrence) &&
-    !list(e.attendees) &&
+    e.attendeesOmitted !== true &&
     !list(reminders?.overrides) &&
     (!organizer || organizer.self === true) &&
     (e.eventType === undefined || e.eventType === 'default');
@@ -177,7 +191,24 @@ export function parseEvent(raw: unknown): CalEvent | null {
     end: end.at,
     editable,
     link: safeLink(e.htmlLink),
+    series: typeof e.recurringEventId === 'string' && e.recurringEventId ? e.recurringEventId : null,
+    guests: Array.isArray(e.attendees) ? e.attendees.map(readGuest).filter((g): g is Guest => g !== null) : [],
+    timeZone: start.allDay ? null : zoneOf(e.start),
   };
+}
+
+const zoneOf = (w: unknown) => {
+  const zone = (w as { timeZone?: unknown }).timeZone;
+  return typeof zone === 'string' && zone ? zone : null;
+};
+
+/** A Google attendee with an email address, keeping only its plain fields (it comes from outside). */
+function readGuest(raw: unknown): Guest | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const g = raw as Record<string, unknown>;
+  if (typeof g.email !== 'string' || !g.email) return null;
+  const plain = Object.entries(g).filter(([, v]) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean');
+  return Object.fromEntries(plain) as Guest;
 }
 
 /** The events on a day (also those running over into it): all-day first, then by start time. */
@@ -206,12 +237,66 @@ export function timeLabel(e: CalEvent): string {
 
 /** A new event: an hour from 9:00 on the chosen day. */
 export function newDraft(key: DayKey): Draft {
-  return { title: '', allDay: false, startDate: key, startTime: '09:00', endDate: key, endTime: '10:00' };
+  return { title: '', allDay: false, startDate: key, startTime: '09:00', endDate: key, endTime: '10:00', guests: [] };
 }
 
 export function draftFor(e: CalEvent): Draft {
-  if (e.allDay) return { title: e.title, allDay: true, startDate: e.start, startTime: '09:00', endDate: addDays(e.end, -1), endTime: '10:00' };
-  return { title: e.title, allDay: false, startDate: e.start.slice(0, 10), startTime: e.start.slice(11), endDate: e.end.slice(0, 10), endTime: e.end.slice(11) };
+  const guests = others(e);
+  if (e.allDay) return { title: e.title, allDay: true, startDate: e.start, startTime: '09:00', endDate: addDays(e.end, -1), endTime: '10:00', guests };
+  return { title: e.title, allDay: false, startDate: e.start.slice(0, 10), startTime: e.start.slice(11), endDate: e.end.slice(0, 10), endTime: e.end.slice(11), guests };
+}
+
+// Guests (job #85): the person's own events can have guests added (by email address) and removed.
+
+/** Looks like an email address: something@something.something, no spaces or list characters. */
+export function isEmail(s: string): boolean {
+  return s.length <= 254 && /^[^\s@<>(),;:"[\]]+@[^\s@<>(),;:"[\]]+\.[^\s@<>(),;:"[\]]+$/.test(s);
+}
+
+/** The event's guests other than the person themself. */
+const others = (e: CalEvent | null) => (e?.guests ?? []).filter((g) => !g.self).map((g) => g.email);
+const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x.toLowerCase() === b[i].toLowerCase());
+
+/** Whether to ask "Send update emails to guests?": the event has guests, or will have after the change. */
+export function emailGuests(e: CalEvent | null, d: Draft | null): boolean {
+  return others(e).length > 0 || (d?.guests.length ?? 0) > 0;
+}
+
+/** The form's guests with `email` added, unless it is there already or is the person's own address. */
+export function withGuest(e: CalEvent | null, guests: string[], email: string): string[] {
+  const known = [...guests, ...(e?.guests ?? []).filter((g) => g.self).map((g) => g.email)];
+  return known.some((g) => g.toLowerCase() === email.toLowerCase()) ? guests : [...guests, email];
+}
+
+/**
+ * The guest list to send when it changed, else null (nothing about guests is sent). The person
+ * and the guests already there are sent back as Google gave them, so their answers stay.
+ */
+export function guestChanges(e: CalEvent | null, d: Draft): Guest[] | null {
+  if (same(others(e), d.guests)) return null;
+  const old = e?.guests ?? [];
+  const kept = old.filter((g) => g.self);
+  return [...kept, ...d.guests.map((email) => old.find((g) => !g.self && g.email.toLowerCase() === email.toLowerCase()) ?? { email })];
+}
+
+/**
+ * "All events in the series" (job #85): the draft's title, times, length and guests, on the
+ * series' own first day (moving every event to another day isn't offered).
+ */
+export function seriesDraft(d: Draft, seriesDay: DayKey): Draft {
+  const span = Math.round((toDate(d.endDate).getTime() - toDate(d.startDate).getTime()) / 86_400_000);
+  return { ...d, startDate: seriesDay, endDate: addDays(seriesDay, span) };
+}
+
+/**
+ * Whether "All events in the series" can be offered: a repeating event still on its own day and
+ * still timed (or still all-day), since moving every event, or making them all-day, would change
+ * the repeat rule.
+ */
+export function canChangeSeries(e: CalEvent | null, d: Draft): boolean {
+  if (!e?.series) return false;
+  const was = draftFor(e);
+  return d.startDate === was.startDate && d.allDay === was.allDay;
 }
 
 /** A new start day moves the end day by as much, so the event keeps its length. */

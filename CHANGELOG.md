@@ -1,5 +1,9 @@
 # Changelog
 
+## Google Play kit (2026-10-16)
+
+- Drafts for the Google Play listing are in `docs/play-store/`: the store text, Data safety and content rating answers, a checklist for Play Console, and screenshots of a demo board. Nothing in the app changed; `scripts/play-screenshots.mjs` retakes the screenshots.
+
 ## Tour wording and order (2026-10-16)
 
 - The welcome tour now goes: add a note or checklist, move cards and columns, Share, your boards, keyboard shortcuts. On a phone it stays +, Boards, ⋯.

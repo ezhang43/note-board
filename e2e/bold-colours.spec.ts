@@ -8,8 +8,8 @@ freshBoardEachTest();
 const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 
 test('the Color menu has three rows of 8, the third bold; Tomato colors a column', async ({ page }) => {
-  await add(page, 'New column');
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await add(page, 'New container');
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   const menu = page.getByRole('group', { name: 'Colors' });
   const swatches = menu.locator('.swatch');
   await expect(swatches).toHaveCount(24);
@@ -34,10 +34,10 @@ test('the Color menu has three rows of 8, the third bold; Tomato colors a column
 
 test('Auto-color starts with the bold colors', async ({ page }) => {
   for (let i = 0; i < 2; i++) {
-    await add(page, 'New column');
+    await add(page, 'New container');
     await clickEmpty(page);
   }
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('button', { name: 'Auto-color' }).click();
   const bgs = await columns(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
   expect(bgs.sort()).toEqual([rgb('#6BB8F5'), rgb('#FF8C78')].sort()); // Ocean and Tomato (the order is unit-tested)
@@ -45,7 +45,7 @@ test('Auto-color starts with the bold colors', async ({ page }) => {
 
 test('on a bold title band the icons and the title placeholder use the color’s own dark text', async ({ page }) => {
   const placeholder = (l: import('@playwright/test').Locator) => l.evaluate((el) => getComputedStyle(el, '::placeholder').color);
-  const color = page.getByRole('button', { name: 'Color of selected cards and columns' });
+  const color = page.getByRole('button', { name: 'Color of selected cards and containers' });
   const menu = page.getByRole('group', { name: 'Colors' });
 
   // A list colored Tomato: its trash icon and empty title's placeholder are dark red, not grey.
@@ -61,7 +61,7 @@ test('on a bold title band the icons and the title placeholder use the color’s
   await clickEmpty(page);
 
   // A list inside an Ocean column gets the deep band, with dark blue icons.
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await color.click();
   await menu.getByRole('button', { name: 'Ocean' }).click();
@@ -83,10 +83,10 @@ test.describe('on a phone-sized screen', () => {
   test('all 24 colors fit the ⋯ panel', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
-    await page.getByRole('menuitem', { name: 'Column', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Container', exact: true }).tap();
     await bar.getByRole('button', { name: 'More', exact: true }).tap();
     const panel = page.getByRole('dialog', { name: 'More' });
-    await panel.getByRole('button', { name: 'Color of selected cards and columns' }).tap();
+    await panel.getByRole('button', { name: 'Color of selected cards and containers' }).tap();
     const swatches = panel.locator('.swatch');
     await expect(swatches).toHaveCount(24);
     const p = (await panel.boundingBox())!;

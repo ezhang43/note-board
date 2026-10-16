@@ -48,10 +48,10 @@ test('screen readers hear card and column titles, and "Untitled" when there is n
   await list(page, 'Groceries', ['milk']);
   await expect(page.getByRole('article', { name: 'Checklist: Groceries' })).toHaveCount(1);
   await clickEmpty(page);
-  await add(page, 'New column');
-  await expect(columns(page).first()).toHaveAttribute('aria-label', 'Untitled column');
+  await add(page, 'New container');
+  await expect(columns(page).first()).toHaveAttribute('aria-label', 'Untitled container');
   await page.keyboard.type('Week');
-  await expect(columns(page).first()).toHaveAttribute('aria-label', 'Column: Week');
+  await expect(columns(page).first()).toHaveAttribute('aria-label', 'Container: Week');
   await expect(page.getByRole('main', { name: 'Board' })).toHaveCount(1);
 });
 
@@ -62,7 +62,7 @@ test('tick boxes, resize corners and the item grip are at least 24px to touch', 
   const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('.tick')?.querySelector('input')?.getAttribute('aria-label'), { x: tick.x - 3, y: tick.y + tick.height / 2 });
   expect(hit).toBe('Done');
   await clickEmpty(page);
-  await add(page, 'New column'); // has the width strip
+  await add(page, 'New container'); // has the width strip
   await page.keyboard.press('Escape');
   for (const sel of ['.resize-corner', '.item-grip', '.resize-edge']) {
     const size = await page.locator(sel).first().evaluate((el) => {
@@ -88,9 +88,9 @@ test('Ctrl+Shift+Down / Up move an item past its neighbor, keeping the cursor in
 });
 
 test('wording: placeholders, empty hint, Select tool tip, Color label', async ({ page }) => {
-  await expect(page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('title', 'Select (V): drag a rectangle to select several cards and columns');
-  await expect(page.getByRole('button', { name: 'Color of selected cards and columns' })).toHaveCount(1);
+  await expect(page.getByText('Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('title', 'Select (V): drag a rectangle to select several cards and containers');
+  await expect(page.getByRole('button', { name: 'Color of selected cards and containers' })).toHaveCount(1);
   const l = await list(page, '', []);
   await expect(l.getByLabel('Item text').first()).toHaveAttribute('placeholder', 'Add an item');
   await clickEmpty(page);
@@ -100,7 +100,7 @@ test('wording: placeholders, empty hint, Select tool tip, Color label', async ({
 
 test('deleting a column says how many cards go with it, with a Keep button', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.type('Week');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
@@ -109,9 +109,9 @@ test('deleting a column says how many cards go with it, with a Keep button', asy
     await add(page, 'Note');
     await page.keyboard.press('Escape');
   }
-  await col.getByRole('button', { name: 'Delete column and its cards' }).click();
+  await col.getByRole('button', { name: 'Delete container and its cards' }).click();
   await expect(page.getByText('Delete “Week” and its 2 cards?')).toBeVisible();
-  await page.getByRole('button', { name: 'Keep column' }).click();
+  await page.getByRole('button', { name: 'Keep container' }).click();
   await expect(columns(page)).toHaveCount(1);
 });
 

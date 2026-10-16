@@ -52,12 +52,12 @@ describe('what a version says about itself', () => {
     const two = addColumn(createBoard(), createColumn('c1'));
     expect(summarizeWorkspace({ home: 'a', boards: { a: one, b: two } })).toEqual({ cards: 1, columns: 1, boards: 2 });
     expect(summarizeWorkspace({ home: 'a', boards: { a: one } })).toEqual({ cards: 1, columns: 0 });
-    expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1, boards: 2 })).toBe('2 boards · 1 card · 1 column');
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1, boards: 2 })).toBe('2 boards · 1 card · 1 container');
     expect(describeVersion({ id: 'a', savedAt: 0, cards: 0, columns: 0, boards: 3 })).toBe('3 boards');
   });
   it('reads as a short line', () => {
-    expect(describeVersion({ id: 'a', savedAt: 0, cards: 12, columns: 3 })).toBe('12 cards · 3 columns');
-    expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1 })).toBe('1 card · 1 column');
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 12, columns: 3 })).toBe('12 cards · 3 containers');
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1 })).toBe('1 card · 1 container');
     expect(describeVersion({ id: 'a', savedAt: 0, cards: 0, columns: 0 })).toBe('Empty board');
   });
 });

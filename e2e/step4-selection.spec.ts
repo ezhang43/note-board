@@ -32,18 +32,18 @@ test('Ctrl + click and Shift + click add and remove blocks; Color recolors all s
   await expect(b).not.toHaveClass(/selected/);
 
   // Cards selected: Color is available (it colors their title bands).
-  await expect(page.getByRole('button', { name: 'Color of selected cards and columns' })).not.toHaveAttribute('aria-disabled');
+  await expect(page.getByRole('button', { name: 'Color of selected cards and containers' })).not.toHaveAttribute('aria-disabled');
 
   // With columns in the selection, Color recolors every selected column.
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   const [c1, c2] = [columns(page).nth(0), columns(page).nth(1)];
   await c1.click({ position: { x: 40, y: 80 } });
   await c2.click({ position: { x: 40, y: 80 }, modifiers: ['Control'] });
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Sky' }).click();
   await expect(c1).toHaveCSS('background-color', 'rgb(230, 238, 252)');
   await expect(c2).toHaveCSS('background-color', 'rgb(230, 238, 252)');
@@ -84,7 +84,7 @@ test('Select tool: dragging a box selects everything it touches, live; Ctrl adds
 });
 
 test('Ctrl + A then Delete asks about the column, then deletes everything selected', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   await add(page, 'Note'); // into the column
   await clickEmpty(page);
   await add(page, 'Note');
@@ -95,12 +95,12 @@ test('Ctrl + A then Delete asks about the column, then deletes everything select
   await page.keyboard.press('Delete');
   const dialog = page.getByRole('alertdialog');
   await expect(dialog).toContainText('Delete “Untitled” and its card?');
-  await dialog.getByRole('button', { name: 'Keep column' }).click();
+  await dialog.getByRole('button', { name: 'Keep container' }).click();
   await expect(cards(page)).toHaveCount(2);
 
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Backspace');
-  await dialog.getByRole('button', { name: 'Delete column' }).click();
+  await dialog.getByRole('button', { name: 'Delete container' }).click();
   await expect(columns(page)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(0);
 });
@@ -119,16 +119,16 @@ test('Delete removes selected loose cards straight away, but not while typing', 
 });
 
 test('Ctrl + C, Ctrl + V pastes copies 40px further each time; a column copies with its cards', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  await col.getByLabel('Column title').fill('Ideas');
+  await col.getByLabel('Container title').fill('Ideas');
   await add(page, 'Note');
   await col.click({ position: { x: 240, y: 26 } });
   await page.keyboard.press('Control+c');
   await page.keyboard.press('Control+v');
   await expect(columns(page)).toHaveCount(2);
   const copy = page.locator('[data-col-id].selected');
-  await expect(copy.getByLabel('Column title')).toHaveValue('Ideas copy');
+  await expect(copy.getByLabel('Container title')).toHaveValue('Ideas copy');
   await expect(copy.locator('[data-card-id]')).toHaveCount(1);
   await expectNoOverlaps(page);
 
@@ -191,16 +191,16 @@ test('Ctrl + Z undoes a burst of typing as one step, even from inside the text b
 });
 
 test('undo and redo buttons undo moves, colors and deletes', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   const p0 = await boardPos(col);
   await dragBy(page, col, 200, 100);
   const p1 = await boardPos(col);
   expect(p1).not.toEqual(p0);
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Peach' }).click();
-  await col.getByRole('button', { name: 'Delete column and its cards' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete column' }).click();
+  await col.getByRole('button', { name: 'Delete container and its cards' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete container' }).click();
   await expect(columns(page)).toHaveCount(0);
 
   await undoButton(page).click();
@@ -221,9 +221,9 @@ test('undo and redo buttons undo moves, colors and deletes', async ({ page }) =>
 
 test('Escape clears the selection and closes the color menu; Ctrl + A while typing selects text only', async ({ page }) => {
   const [a, b] = await threeNotes(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await a.click({ ...header, modifiers: ['Control'] });
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await expect(page.getByRole('group', { name: 'Colors' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Colors' })).toHaveCount(0);

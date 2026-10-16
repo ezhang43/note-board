@@ -118,13 +118,13 @@ test('within 8px of another block, the size matches it and both show dashed outl
 });
 
 test('column edge sets width only and the cards inside follow; a column with cards fits them, an empty one gets its height from the corner', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await add(page, 'Note');
   const card = col.locator('[data-card-id]').first();
   await expect(card.getByRole('button', { name: 'Resize card' })).toHaveCount(0); // cards in columns can't be resized
 
-  const edge = await box(col.getByRole('button', { name: 'Resize column width' }));
+  const edge = await box(col.getByRole('button', { name: 'Resize container width' }));
   const h0 = await col.evaluate((el) => (el as HTMLElement).offsetHeight);
   await dragPointer(page, { x: edge.x + 5, y: edge.y + 20 }, { x: edge.x + 5 + 100, y: edge.y + 60 });
   const w = await col.evaluate((el) => (el as HTMLElement).offsetWidth);
@@ -133,7 +133,7 @@ test('column edge sets width only and the cards inside follow; a column with car
   expect(await card.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(w - 32 - 2);
 
   // With cards in it, the column is exactly as tall as its cards: the corner only changes the width.
-  let corner = await box(col.getByRole('button', { name: 'Resize column', exact: true }));
+  let corner = await box(col.getByRole('button', { name: 'Resize container', exact: true }));
   await dragPointer(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9, y: corner.y + 9 + 200 });
   expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBe(h0);
 
@@ -144,7 +144,7 @@ test('column edge sets width only and the cards inside follow; a column with car
   // An empty column keeps a minimum height, set by the corner.
   await card.getByRole('button', { name: 'Delete card' }).click();
   const e0 = await col.evaluate((el) => (el as HTMLElement).offsetHeight);
-  corner = await box(col.getByRole('button', { name: 'Resize column', exact: true }));
+  corner = await box(col.getByRole('button', { name: 'Resize container', exact: true }));
   await dragPointer(page, { x: corner.x + 9, y: corner.y + 9 }, { x: corner.x + 9, y: corner.y + 9 + 200 });
   expect(await col.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThan(e0 + 150);
 });
@@ -183,7 +183,7 @@ test('a note growing as you type pushes the block under it out of the way', asyn
 });
 
 test('adding cards to a column pushes a loose card below it out of the way', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
   await clickEmpty(page);
   await add(page, 'Note');
@@ -248,18 +248,18 @@ test('saved boards with overlapping blocks are tidied on load', async ({ page })
 });
 
 test('a collapsed column can still be resized (width), from its right edge', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = columns(page).first();
-  await col.getByRole('button', { name: 'Collapse column' }).click();
-  const edge = await box(col.getByRole('button', { name: 'Resize column width' }));
+  await col.getByRole('button', { name: 'Collapse container' }).click();
+  const edge = await box(col.getByRole('button', { name: 'Resize container width' }));
   await dragPointer(page, { x: edge.x + 5, y: edge.y + 5 }, { x: edge.x + 5 + 120, y: edge.y + 5 });
   await expect.poll(() => col.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(400);
-  await col.getByRole('button', { name: 'Expand column' }).click();
+  await col.getByRole('button', { name: 'Expand container' }).click();
   expect(await col.evaluate((el) => (el as HTMLElement).offsetWidth)).toBe(400);
 });
 
 test('Collapse all collapses every card and column; the same button then expands them all; one undo step', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   await add(page, 'Note');
   await clickEmpty(page);
   await add(page, 'Checklist');

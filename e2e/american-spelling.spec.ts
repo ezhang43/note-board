@@ -20,9 +20,9 @@ test.describe('the app', () => {
   freshBoardEachTest();
 
   test('says color, Auto-color and the rest in American English, even in the Color menu and the shortcuts list', async ({ page }) => {
-    await add(page, 'New column');
+    await add(page, 'New container');
     await add(page, 'Checklist');
-    await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+    await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
     await page.locator('.swatch').first().hover(); // the swatch name appears under the grid
     expect(await readableWords(page)).not.toMatch(BRITISH);
     await page.keyboard.press('Escape');

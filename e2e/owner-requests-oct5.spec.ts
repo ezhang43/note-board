@@ -11,7 +11,7 @@ const toolbar = (page: Page) => page.locator('header.toolbar');
 test('the toolbar adds notes, to-do lists and columns, but no longer links', async ({ page }) => {
   await expect(toolbar(page).getByRole('button', { name: 'Note', exact: true })).toBeVisible();
   await expect(toolbar(page).getByRole('button', { name: 'Checklist', exact: true })).toBeVisible();
-  await expect(toolbar(page).getByRole('button', { name: 'New column', exact: true })).toBeVisible();
+  await expect(toolbar(page).getByRole('button', { name: 'New container', exact: true })).toBeVisible();
   await expect(toolbar(page).getByRole('button', { name: 'Link', exact: true })).toHaveCount(0);
 });
 
@@ -34,11 +34,11 @@ test('the Boards menu says "Add a sub-board here"', async ({ page }) => {
 /** A column titled `title` holding notes with the given texts, top to bottom. */
 async function column(page: Page, title: string, notes: string[]) {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = page.locator('[data-col-id].selected');
   const id = await col.getAttribute('data-col-id');
   const c = page.locator(`[data-col-id="${id}"]`);
-  await c.getByLabel('Column title').fill(title);
+  await c.getByLabel('Container title').fill(title);
   for (const text of notes) {
     await c.click({ position: { x: 200, y: 26 } });
     await add(page, 'Note');
@@ -70,11 +70,11 @@ test('Alt + arrows step through a column, go to its title, and across to the nex
   expect(await focusedValue(page)).toBe('a1');
 
   await page.keyboard.press('Alt+ArrowUp'); // a1 → the column's title
-  await expect(a.getByLabel('Column title')).toBeFocused();
+  await expect(a.getByLabel('Container title')).toBeFocused();
   await expect(a).toHaveClass(/selected/);
 
   await page.keyboard.press('Alt+ArrowRight'); // title → title
-  await expect(b.getByLabel('Column title')).toBeFocused();
+  await expect(b.getByLabel('Container title')).toBeFocused();
   await expect(b).toHaveClass(/selected/);
 
   await page.keyboard.press('Alt+ArrowDown'); // title → first card
@@ -119,11 +119,11 @@ test('Alt + → goes to the card to the right, not to one that is mostly below',
 test('Alt + arrows reach an empty column and a collapsed one', async ({ page }) => {
   const a = await column(page, 'Full', ['only']);
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   const empty = page.locator('[data-col-id].selected');
   const id = await empty.getAttribute('data-col-id');
   const e = page.locator(`[data-col-id="${id}"]`);
-  await e.getByLabel('Column title').fill('Empty');
+  await e.getByLabel('Container title').fill('Empty');
   const ra = await box(a);
   const g = await grabPoint(e);
   const re = await box(e);
@@ -131,12 +131,12 @@ test('Alt + arrows reach an empty column and a collapsed one', async ({ page }) 
 
   await a.getByLabel('Note text').click();
   await page.keyboard.press('Alt+ArrowRight');
-  await expect(e.getByLabel('Column title')).toBeFocused();
+  await expect(e.getByLabel('Container title')).toBeFocused();
   await page.keyboard.press('Alt+ArrowLeft');
-  await expect(a.getByLabel('Column title')).toBeFocused();
-  await a.getByRole('button', { name: 'Collapse column' }).click();
-  await e.getByLabel('Column title').click();
+  await expect(a.getByLabel('Container title')).toBeFocused();
+  await a.getByRole('button', { name: 'Collapse container' }).click();
+  await e.getByLabel('Container title').click();
   await page.keyboard.press('Alt+ArrowLeft');
-  await expect(a.getByLabel('Column title')).toBeFocused();
+  await expect(a.getByLabel('Container title')).toBeFocused();
   await expect(columns(page)).toHaveCount(2);
 });

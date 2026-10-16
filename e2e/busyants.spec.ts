@@ -10,7 +10,7 @@ test('the app is called BusyAnts', async ({ page }) => {
 });
 
 test('an empty board shows a hint, which goes once anything is on the board', async ({ page }) => {
-  const hint = page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
+  const hint = page.getByText('Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
   await expect(hint).toBeVisible();
   await add(page, 'Note');
   await expect(hint).toHaveCount(0);
@@ -29,10 +29,10 @@ test('new lists and columns start untitled; a new list takes the cursor in its t
   await expect(list.getByLabel('Item text').first()).toHaveValue('milk');
 
   await clickEmpty(page);
-  await add(page, 'New column');
-  const title = columns(page).first().getByLabel('Column title');
+  await add(page, 'New container');
+  const title = columns(page).first().getByLabel('Container title');
   await expect(title).toHaveValue('');
-  await expect(title).toHaveAttribute('placeholder', 'Column title');
+  await expect(title).toHaveAttribute('placeholder', 'Container title');
 });
 
 const css = (l: import('@playwright/test').Locator, prop: string) => l.evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
@@ -70,7 +70,7 @@ test('Same width makes the selected blocks as wide as the first one selected', a
   const sameWidth = page.locator('header.toolbar').getByRole('button', { name: 'Same width' });
   await expect(sameWidth).toHaveAttribute('aria-disabled', 'true');
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
   await clickEmpty(page);
   await add(page, 'Note');
@@ -202,7 +202,7 @@ test('a selection box at the bottom edge keeps moving the board and selecting', 
 /** A column holding two lists (Groceries: milk, eggs / Chores: sweep), and a loose list (Ideas: paint). */
 async function columnWithLists(page: import('@playwright/test').Page) {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
   const listIn = async (title: string, items: string[]) => {
@@ -319,9 +319,9 @@ test.describe('on a touch screen', () => {
 
 test('Expand all opens everything, including cards and columns that were closed before Collapse all (owner bug report)', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
-  await columns(page).first().getByRole('button', { name: 'Collapse column' }).click();
+  await columns(page).first().getByRole('button', { name: 'Collapse container' }).click();
   await clickEmpty(page);
   await add(page, 'Checklist');
   await page.keyboard.press('Escape');
@@ -348,7 +348,7 @@ test('with cards selected, Collapse all / Expand all act on just those', async (
   await page.keyboard.press('Escape');
   await a.click({ position: { x: 30, y: 10 } });
   const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
-  await expect(toggle).toHaveAttribute('title', 'Collapse the selected cards and columns');
+  await expect(toggle).toHaveAttribute('title', 'Collapse the selected cards and containers');
   await toggle.click();
   await expect(a).toHaveClass(/collapsed/);
   await expect(b).not.toHaveClass(/collapsed/);
@@ -358,7 +358,7 @@ test('with cards selected, Collapse all / Expand all act on just those', async (
 
 test('Collapse all closes the gaps: a card under a column moves up to sit right below it', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
   for (let i = 0; i < 3; i++) {
@@ -389,7 +389,7 @@ test('Collapse all closes the gaps: a card under a column moves up to sit right 
 
 test('collapsing one column with its arrow pulls the block below up, leaving no empty space', async ({ page }) => {
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await page.keyboard.press('Escape');
   const col = columns(page).first();
   for (let i = 0; i < 3; i++) {
@@ -412,7 +412,7 @@ test('collapsing one column with its arrow pulls the block below up, leaving no 
   await expect(note).toHaveClass(/loose/);
   const gap = async () => (await note.boundingBox())!.y - ((await col.boundingBox())!.y + (await col.boundingBox())!.height);
   const before = await gap();
-  await col.getByRole('button', { name: 'Collapse column' }).click();
+  await col.getByRole('button', { name: 'Collapse container' }).click();
   await expect.poll(async () => (await col.boundingBox())!.height).toBeLessThan(100);
   await expect.poll(gap).toBeCloseTo(before, 0);
 });

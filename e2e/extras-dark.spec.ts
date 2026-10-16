@@ -49,8 +49,8 @@ test('in dark mode cards are dark with light text, and columns use deep shades o
   expect(brightness(cardStyle.bg)).toBeLessThan(60);
   expect(brightness(cardStyle.ink)).toBeGreaterThan(200);
 
-  await add(page, 'New column');
-  await page.getByRole('button', { name: 'Color of selected cards and columns' }).click();
+  await add(page, 'New container');
+  await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('button', { name: 'Rose' }).click();
   await expect(columns(page).first()).toHaveCSS('background-color', hexToRgb(DARK_PALETTE.rose.bg));
 });

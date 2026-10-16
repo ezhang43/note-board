@@ -109,7 +109,7 @@ test('cards whose saved ids hold odd characters still get their arrow, without e
 });
 
 test('dots never sit on top of another card or a column title (owner request)', async ({ page }) => {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const col = page.locator('[data-col-id]');
   await add(page, 'Note');
   const g = await grabPoint(col);

@@ -30,7 +30,7 @@ test('Sign out is never cut off at the right of the toolbar, also inside a sub-b
 });
 
 test('lists are called Checklist: the toolbar button, the card name and the empty-board hint', async ({ page }) => {
-  await expect(page.getByText('Add a note, a checklist or a column from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
+  await expect(page.getByText('Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
   await expect(toolbar(page).getByRole('button', { name: 'To-do list' })).toHaveCount(0);
   await add(page, 'Checklist', { stayInTitle: true });
   await page.keyboard.type('Groceries');
@@ -154,7 +154,7 @@ test('a selected card shows its four dots too, and they go when the pointer leav
 
 /** A column holding two notes, "upper" above "lower"; nothing selected, pointer on empty board. */
 async function columnOfTwo(page: Page) {
-  await add(page, 'New column');
+  await add(page, 'New container');
   const c = page.locator(`[data-col-id="${await page.locator('[data-col-id].selected').getAttribute('data-col-id')}"]`);
   for (const text of ['upper', 'lower']) {
     await c.click({ position: { x: 200, y: 26 } });

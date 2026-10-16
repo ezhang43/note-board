@@ -296,10 +296,10 @@ test('items dropped on a collapsed list go into it; it stays collapsed', async (
 test('items dropped on a collapsed column make a new list at the end of that column', async ({ page }) => {
   const a = await makeList(page, ['a1', 'a2']);
   await clickEmpty(page);
-  await add(page, 'New column');
+  await add(page, 'New container');
   await clickEmpty(page);
   const col = page.locator('[data-col-id]');
-  await col.getByRole('button', { name: 'Collapse column' }).click();
+  await col.getByRole('button', { name: 'Collapse container' }).click();
   const target = await box(col);
   await dragItem(page, rowWithText(a, 'a2'), { x: target.x + target.width / 2, y: target.y + target.height / 2 });
   const inside = col.locator('[data-card-id]');

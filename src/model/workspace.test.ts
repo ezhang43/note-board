@@ -7,6 +7,7 @@ import {
   HOME_ID,
   boardLinks,
   boardTree,
+  boardNeighbor,
   isLeftoverBoard,
   parseWorkspace,
   pathTo,
@@ -94,6 +95,53 @@ describe('finding boards', () => {
     expect(pathTo(ws, 'paris')).toEqual(['h', 'trips', 'paris']);
     expect(pathTo(ws, 'h')).toEqual(['h']);
     expect(pathTo(ws, 'recipes')).toEqual(['recipes']);
+  });
+});
+
+describe('Ctrl+arrow board switching (owner request, 2026-10-16)', () => {
+  // Menu order: h, trips (inside h), paris (inside trips), oslo (inside h, after trips), recipes.
+  const ws = (): Workspace => {
+    const s = sample();
+    s.boards.h = linkTo(s.boards.h, 'k3', 'oslo');
+    s.boards.oslo = named('Oslo');
+    return s;
+  };
+
+  it('next / previous follow the Boards menu order, sub-boards included', () => {
+    const w = ws();
+    expect(boardTree(w).map((r) => r.id)).toEqual(['h', 'trips', 'paris', 'oslo', 'recipes']);
+    expect(boardNeighbor(w, 'h', 'next')).toBe('trips');
+    expect(boardNeighbor(w, 'trips', 'next')).toBe('paris');
+    expect(boardNeighbor(w, 'paris', 'next')).toBe('oslo');
+    expect(boardNeighbor(w, 'oslo', 'next')).toBe('recipes');
+    expect(boardNeighbor(w, 'recipes', 'previous')).toBe('oslo');
+    expect(boardNeighbor(w, 'oslo', 'previous')).toBe('paris');
+  });
+
+  it('nothing past either end (no wrap)', () => {
+    const w = ws();
+    expect(boardNeighbor(w, 'recipes', 'next')).toBeNull();
+    expect(boardNeighbor(w, 'h', 'previous')).toBeNull();
+  });
+
+  it('up goes to the board above; a top board has none', () => {
+    const w = ws();
+    expect(boardNeighbor(w, 'paris', 'up')).toBe('trips');
+    expect(boardNeighbor(w, 'oslo', 'up')).toBe('h');
+    expect(boardNeighbor(w, 'h', 'up')).toBeNull();
+    expect(boardNeighbor(w, 'recipes', 'up')).toBeNull();
+  });
+
+  it('down goes into the first sub-board; a board with none has no way down', () => {
+    const w = ws();
+    expect(boardNeighbor(w, 'h', 'down')).toBe('trips');
+    expect(boardNeighbor(w, 'trips', 'down')).toBe('paris');
+    expect(boardNeighbor(w, 'paris', 'down')).toBeNull();
+    expect(boardNeighbor(w, 'recipes', 'down')).toBeNull();
+  });
+
+  it('a board that is not there has no neighbor', () => {
+    expect(boardNeighbor(ws(), 'gone', 'next')).toBeNull();
   });
 });
 

@@ -11,6 +11,7 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['H / V', 'Hand tool / Select tool'],
       ['Ctrl+= / Ctrl+− / Ctrl+0', 'Zoom in / out / back to 100%'],
       ['Shift+1', 'Fit to screen: every card and container in view'],
+      ['Ctrl+arrows', 'Switch boards: Left / Right the previous / next board in the Boards menu, Up the board above, Down the first board inside (not while typing)'],
       ['Ctrl+scroll or pinch', 'Zoom at the pointer'],
       ['?', 'Show or hide this list'],
     ],

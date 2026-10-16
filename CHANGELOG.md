@@ -1,5 +1,10 @@
 # Changelog
 
+## Ctrl+arrow keys switch boards (2026-10-16)
+
+- Ctrl+Right and Ctrl+Left open the next and previous board in the Boards menu order (boards inside boards included). Ctrl+Up goes up to the board above, and Ctrl+Down goes into the first board inside the open one. At the ends nothing happens. A short note says which board you switched to, and the keys are in the ? shortcuts list.
+- They don't work while you are typing in a text field. On a Mac the system often keeps Control+arrows for itself, so they may not reach the page there. Your saved boards are untouched.
+
 ## Play Store screenshots say "container" (2026-10-16)
 
 - The Google Play screenshots were retaken so the toolbar shows "New container" instead of "New column", and the Play kit notes were updated. Nothing in the app changed.

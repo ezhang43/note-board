@@ -139,7 +139,7 @@ const DIRECTIONS: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down'
 
 /**
  * Arrow keys for moving between fields and cards. Returns true when it handled the key.
- * Ctrl + arrows are left alone (word by word in text, as usual).
+ * Ctrl + arrows are left alone (word by word in text; elsewhere they switch boards, in useShortcuts).
  */
 export function handleArrowKey(e: KeyboardEvent): boolean {
   const dir = DIRECTIONS[e.key];

@@ -1,5 +1,9 @@
 # Changelog
 
+## About page: board pictures retaken (2026-10-16)
+
+- The two sample-board pictures on the About page (light and dark) were retaken in the new Honey Workshop look. Same "Weekend in Lisbon" board, same size, still small files (about 30 KB each, down from 72 KB). Nothing else changed.
+
 ## Connector/plugin block for Claude Code undone (2026-10-16)
 
 - Undid the change that turned off unused connectors and plugins for Claude Code in this project; the saving was not worth it. Nothing in the app changed.

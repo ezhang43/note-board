@@ -1,5 +1,9 @@
 # Changelog
 
+## Crew rules shared by both coordinators (2026-10-16)
+
+- The crew instructions now include the rules the desktop coordinator was already using: workers say whether their tests failed twice and what happens to saved boards, re-check flaky browser tests, use American English, and stop instead of working around a refused merge. Big visual redesigns now show mockups first. Sonnet workers for low-risk jobs are now standard, not a trial. Nothing in the app changed.
+
 ## Google Play kit (2026-10-16)
 
 - Drafts for the Google Play listing are in `docs/play-store/`: the store text, Data safety and content rating answers, a checklist for Play Console, and screenshots of a demo board. Nothing in the app changed; `scripts/play-screenshots.mjs` retakes the screenshots.

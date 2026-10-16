@@ -345,6 +345,15 @@ Later decisions, with dates and reasons, are listed in `docs/decisions.md`.
 - On touch screens the small card controls (collapse, the card's trash can, the item grip and trash, the resize corner) can be pressed a little outside their drawn edge. The resize corner's extra area lies outside the card, so it never takes a press meant for the last item's grip.
 - On a touch screen, one finger moving straight away over a card, a column or a resize handle moves the board around (nothing is moved or resized by accident). Resting the finger for about half a second first, then moving, drags the card or column (anywhere on it, its text included), or resizes from a resize handle. A quick tap still types. Checklist items still move by their grip, which drags at once; tick boxes and buttons keep their own meaning. No copy / paste menu appears from the hold, and dragging a finger over checklist items no longer selects them.
 
+## Welcome tour (owner request 2026-10-16)
+
+- The first time the board is shown on a device (after sign-in on the published site; not on the sign-in or join screens) a short guided tour starts by itself: the screen is dimmed except one control, which has a soft amber outline, and a small card beside it says "Step 3 of 5" with a title and one or two plain sentences, Back, Next (Done on the last step), Skip tour and a × button. Escape closes it too. Clicking the dimmed area does nothing, and the tour never changes board data.
+- Steps: (1) Note and Checklist, to add a card (or drag one onto the board); (2) New column, "Drag a card to move it. Drop it into a column to keep it there."; (3) the Boards menu; (4) Share (published site or a demo person only); (5) the ? button, press ? for keyboard shortcuts. A step whose control isn't on screen is skipped and the step count adjusts, so locally without sharing it is "of 4".
+- On a phone (under 600px) it points at the phone bar instead: + (add), the Boards button, and ⋯ (which holds Share, Search and Version history); the move step and the ? step have no phone equivalent and are skipped ("of 3").
+- Finishing, skipping, × or Escape ends it for good on that device (`note-board:tour-done` in localStorage, per device like the dark-mode choice: not synced, not board data, not undoable). A blocked store never crashes the page; the tour then simply doesn't start by itself. Existing users see it once on each device, too.
+- Replay: "Show the tour again" at the end of the ? shortcuts panel, and in the phone ⋯ menu. No toolbar button.
+- Built as a labelled dialog (`role="dialog"`, name "Step N of M" + title); focus moves to Next, Tab stays inside the card, buttons keep the focus ring, the card flips or slides to stay on screen, the spotlight follows its control when the window is resized, colors come from the usual CSS variables (also dark mode), and the glide is off under reduced motion.
+
 ## Version history
 
 - Like Google Docs, earlier versions of the board are kept and can be looked at and restored. On a computer it opens from a clock button beside ? (bottom right); on a phone from ⋯ → Version history.

@@ -1,5 +1,11 @@
 # Changelog
 
+## A short welcome tour (2026-10-16)
+
+- The first time you open the board on a device, a 30-second tour lights up one control at a time (add a note or checklist, move cards into columns, the Boards menu, Share, and the ? shortcuts) with Back, Next, Skip tour and a close button. Escape closes it too.
+- It only shows once per device. To see it again, press ? and choose "Show the tour again" (on a phone: ⋯ then "Show the tour again").
+- It works in dark mode and on a phone, and changes nothing on your boards or in how they are saved.
+
 ## A bolder look for the website (2026-10-16)
 
 - The About, FAQ, Terms and Privacy pages now share one bolder look: a solid honey top slab, big chunky headlines in a new font (Bricolage Grotesque), and the same warm colors as the app. About is the showpiece, with a huge ant, a dotted trail and real pictures of the app; the other three pages keep the same style but stay calm and easy to read.

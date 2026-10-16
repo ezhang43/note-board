@@ -1054,7 +1054,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .shortcuts-group dl { margin: 0; }
 .shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
-.shortcuts-site a { color: var(--accent-ink); }
+.shortcuts-site a, .shortcuts-site .link-button { color: var(--accent-ink); }
+.shortcuts-site .link-button { padding: 0; border: none; background: none; font: inherit; text-decoration: underline; cursor: pointer; }
 .shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
 .shortcut dd { margin: 0; color: var(--ink-soft); }
 .shortcut kbd {
@@ -1842,3 +1843,49 @@ a.cal-open { align-self: flex-start; }
 }
 .cal-resize:hover, .cal-resize:active { background: var(--accent-soft); }
 .cal-resize:focus-visible { background: var(--accent); opacity: 0.6; }
+
+/* Welcome tour (owner request, 2026-10-16): the dimmed board with one control lit up, and a small card. */
+.tour-shield { position: fixed; inset: 0; z-index: 60; }
+.tour-spot {
+  position: fixed;
+  z-index: 61;
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 100vmax color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.tour-card {
+  position: fixed;
+  z-index: 62;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(31, 29, 26, 0.3);
+}
+.tour-head { display: flex; align-items: center; justify-content: space-between; }
+.tour-step { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.tour-card h2 { margin: 6px 0 4px; font-size: 16px; font-weight: 600; }
+.tour-card p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
+.tour-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-spacer { flex: 1; }
+.tour-actions button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--control-edge);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tour-actions button:disabled { opacity: 0.4; cursor: default; }
+.tour-actions .tour-skip { border-color: transparent; background: none; color: var(--ink-soft); padding: 0 6px; }
+.tour-actions .tour-next { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .tour-spot { transition: left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease; }
+  .tour-card { transition: left 0.2s ease, top 0.2s ease; }
+}

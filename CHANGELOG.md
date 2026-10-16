@@ -6,6 +6,18 @@
 - If anything goes wrong (no connection, say) nothing is deleted on your device and you can simply try again. Afterwards you are signed out, with a note saying your account and data were deleted.
 - A new "Delete your account" page on the website explains how, and who to email if you can't sign in. The Privacy policy, FAQ and Terms now point to it, and every page's footer links to it.
 
+## A shorter, punchier About page (2026-10-16)
+
+- The About page no longer has the giant ant. A small picture of a sample board now sits beside the headline and Start button (under them on a phone), and the big board picture further down is gone.
+- The "Why I made BusyAnts" story and the three highlights now sit side by side on a computer, so there is less scrolling.
+- The "Also in BusyAnts" list is now a table comparing BusyAnts with Milanote, Notion, Miro and Trello on their free plans, checked against their own help and pricing pages and dated October 2026. Anything we could not confirm shows a dash. On a phone the table scrolls sideways inside its own box.
+- The board pictures are smaller files, so the page loads faster. Nothing in the app or in anyone's saved boards changed.
+
+## Tour wording and order (2026-10-16)
+
+- The welcome tour now goes: add a note or checklist, move cards and columns, Share, your boards, keyboard shortcuts. On a phone it stays +, Boards, ⋯.
+- The first step says a Note is a blank card for anything, and the column step says a column is a container that holds your notes and checklists. Nothing about saving or your boards changed.
+
 ## A short welcome tour (2026-10-16)
 
 - The first time you open the board on a device, a 30-second tour lights up one control at a time (add a note or checklist, move cards into columns, the Boards menu, Share, and the ? shortcuts) with Back, Next, Skip tour and a close button. Escape closes it too.

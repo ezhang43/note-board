@@ -43,6 +43,24 @@ test('Next and Back walk the steps; Done on the last remembers it for good', asy
   await expect(tour(page)).toHaveCount(0);
 });
 
+test('the steps come in the owner order, with the new wording', async ({ page }) => {
+  await open(page, '/?demo-user=Alice');
+  const steps = [
+    ['Add a note or a checklist', 'Note gives you a blank card to jot down anything.'],
+    ['Move cards, fill columns', 'A column is a container that holds your notes and checklists together.'],
+    ['Share a board', 'Share lets other people'],
+    ['Your boards', 'The Boards menu lists all your boards.'],
+    ['Keyboard shortcuts', 'Press ? any time'],
+  ];
+  for (const [i, [title, text]] of steps.entries()) {
+    await expect(tour(page)).toContainText(`Step ${i + 1} of 5`);
+    await expect(tour(page)).toContainText(title);
+    await expect(tour(page)).toContainText(text);
+    if (i < 4) await tour(page).getByRole('button', { name: 'Next' }).click();
+  }
+  await expect(tour(page)).not.toContainText('New column makes one');
+});
+
 test('a step whose control is not there is skipped (no Share without an account)', async ({ page }) => {
   await open(page);
   await expect(tour(page)).toContainText('Step 1 of 4');
@@ -123,8 +141,10 @@ test.describe('on a phone', () => {
     expect(spot.y).toBeLessThanOrEqual(plus.y);
     await tour(page).getByRole('button', { name: 'Next' }).click();
     await expect(tour(page)).toContainText('Step 2 of 3');
+    await expect(tour(page)).toContainText('Your boards');
     await tour(page).getByRole('button', { name: 'Next' }).click();
     await expect(tour(page)).toContainText('Step 3 of 3');
+    await expect(tour(page)).toContainText('Tap ⋯');
     await tour(page).getByRole('button', { name: 'Done' }).click();
     await expect(tour(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'More' }).click();

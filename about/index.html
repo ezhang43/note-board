@@ -32,18 +32,10 @@
           <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
           <a class="start" href="../">Start your board, free</a>
         </div>
-        <svg class="ant" viewBox="90 70 350 345" aria-hidden="true" focusable="false">
-          <g fill="currentColor" stroke="currentColor" stroke-linecap="round">
-            <path d="M160 160 Q150 112 116 96" fill="none" stroke-width="14" />
-            <path d="M214 156 Q228 108 264 94" fill="none" stroke-width="14" />
-            <circle cx="114" cy="94" r="16" stroke="none" />
-            <circle cx="266" cy="92" r="16" stroke="none" />
-            <path d="M250 334 L240 380 M292 338 L298 384 M346 362 L364 400" fill="none" stroke-width="20" />
-            <circle cx="350" cy="306" r="76" stroke="none" />
-            <circle cx="268" cy="300" r="34" stroke="none" />
-            <circle cx="186" cy="244" r="94" stroke="none" />
-          </g>
-        </svg>
+        <picture class="hero-board">
+          <source srcset="./board-dark.png" media="(prefers-color-scheme: dark)" />
+          <img class="shot" src="./board.png" width="960" height="600" alt="A BusyAnts board: containers of checklists and notes on a warm cream background." />
+        </picture>
         <div class="trail" aria-hidden="true"></div>
       </section>
 
@@ -58,11 +50,11 @@
           <ul class="features highlights">
             <li>
               <h3>Shape it your way</h3>
-              <p>Columns, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
+              <p>Containers, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
             </li>
             <li>
               <h3>Fold away what you're not doing</h3>
-              <p>Collapse any card, column or list, or everything at once, and bring it back in one click.</p>
+              <p>Collapse any card, container or list, or everything at once, and bring it back in one click.</p>
             </li>
             <li>
               <h3>Built for checklists</h3>
@@ -72,27 +64,60 @@
         </section>
       </div>
 
-      <section class="showcase">
-        <picture>
-          <source srcset="./board-dark.png" media="(prefers-color-scheme: dark)" />
-          <img class="shot" src="./board.png" width="1280" height="800" alt="A BusyAnts board: columns of checklists and notes on a warm cream background." />
-        </picture>
-      </section>
-
       <div class="page">
-        <section class="also-section">
-          <h2>Also in BusyAnts</h2>
-          <ul class="also">
-            <li>Free, with no card or board limits</li>
-            <li>Share a board by link and edit together in real time</li>
-            <li>Works offline and installs like an app on computer and phone</li>
-            <li>Version history to bring back any earlier version, plus full backups</li>
-            <li>Import from Milanote, Notion, Obsidian, Evernote, Google Keep, Trello, web pages and PDFs (<a href="../faq/#import">how</a>)</li>
-            <li>Find anything on a board, keyboard shortcuts for everything (press ?), and a focus timer</li>
-            <li>Google Calendar beside your board, to see and edit your week</li>
-            <li>Dark mode, and a layout made for phones</li>
-            <li>24 column colors, including 8 bold ones, with Auto-color</li>
-          </ul>
+        <section class="compare-section">
+          <h2>How BusyAnts stacks up</h2>
+          <div class="compare-scroll" role="region" aria-labelledby="compare-cap" tabindex="0">
+            <table class="compare">
+              <caption id="compare-cap">BusyAnts next to Milanote, Notion, Miro and Trello, on their free plans</caption>
+              <thead>
+                <tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">BusyAnts</th><th scope="col">Milanote</th><th scope="col">Notion</th><th scope="col">Miro</th><th scope="col">Trello</th></tr>
+              </thead>
+              <tbody>
+              <tr>
+                <th scope="row">Free, with no card or board limits</th>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+                <td class="part"><span class="word">Partly</span><small>100-card cap</small></td>
+                <td class="part"><span class="word">Partly</span><small>1,000 blocks when shared</small></td>
+                <td class="part"><span class="word">Partly</span><small>3 editable boards</small></td>
+                <td class="part"><span class="word">Partly</span><small>10 boards per Workspace</small></td>
+              </tr>
+              <tr>
+                <th scope="row">Share by link and edit together</th>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+                <td class="part"><span class="word">Partly</span><small>Free links are view-only</small></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Works offline</th>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Installs like an app</small></td>
+                <td class="no"><span aria-hidden="true">&#10007;</span><span class="sr-only">No</span></td>
+                <td class="part"><span class="word">Partly</span><small>Apps only, not the browser</small></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+                <td class="part"><span class="word">Partly</span><small>Phone app only</small></td>
+              </tr>
+              <tr>
+                <th scope="row">Version history</th>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Plus full backups</small></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+                <td class="part"><span class="word">Partly</span><small>7 days</small></td>
+                <td class="paid"><span class="word">Paid</span></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Due dates on checklist items</th>
+                <td class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>With sub-items and Clean up</small></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+                <td class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+                <td class="paid"><span class="word">Paid</span></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="compare-note">Compared with each app's free plan and public feature pages, October 2026. A dash means we couldn't confirm it. Features change; tell us if something's out of date: <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a>. More in BusyAnts: Google Calendar beside your board, a focus timer, and imports from other apps (<a href="../faq/#import">how</a>).</p>
         </section>
       </div>
     </main>
@@ -101,6 +126,7 @@
         <a href="../faq/">FAQ</a>
         <a href="../terms/">Terms of use</a>
         <a href="../privacy/">Privacy policy</a>
+        <a href="../delete-account/">Delete your account</a>
         <a href="https://buymeacoffee.com/ezcookie" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
       </nav>
     </footer>

@@ -19,7 +19,7 @@ node scripts/play-screenshots.mjs
 
 The script starts the app itself, loads a demo board ("Weekend in Lisbon", no personal data, tour dismissed) and writes the PNGs to `docs/play-store/screenshots/`. If the sandbox's Chromium does not match Playwright's, run it with `PW_CHROMIUM=/path/to/chromium node scripts/play-screenshots.mjs`. It is not part of `npm test` or `npm run test:e2e`.
 
-**Regenerate the screenshots after the "column" to "container" rename lands**: the toolbar in the tablet screenshots still says "New column" today. Do it before you upload them. The demo board's container titles ("Friday", "Saturday", "Sunday") need no change.
+The screenshots were retaken on 2026-10-16 after the "column" to "container" rename, so the toolbar shows "New container". Retake them again whenever the app's look or wording changes. The demo board's container titles ("Friday", "Saturday", "Sunday") need no change.
 
 ## Owner checklist for Play Console
 

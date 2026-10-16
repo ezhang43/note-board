@@ -76,7 +76,7 @@ Notes on the claims (for the owner, not for Play):
 - "Free": the About page and SPEC say so; there is a donate link only.
 - "Real time": SPEC "Sharing and editing together".
 - "Press and hold a card to drag it": SPEC "Phone layout".
-- "Containers": the app is being renamed from "column" to "container" (owner decision, 2026-10-16). Re-check this wording once the rename is live.
+- "Containers": the app now says "container" instead of "column" everywhere (owner decision, 2026-10-16, live), and the screenshots show it.
 - OWNER CHECK: "Bring in your notes from other apps: Markdown, text, Trello and Google Keep exports, and PDFs." Third-party names are used only to say what files can be imported. If you would rather have no other product names in the listing, replace the line with "Import notes from files, including Markdown, text, JSON and PDF."
 - OWNER CHECK: "Made by one person" is true as far as the repo shows; delete it if you prefer.
 

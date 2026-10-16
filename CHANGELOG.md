@@ -6,6 +6,15 @@
 - If anything goes wrong (no connection, say) nothing is deleted on your device and you can simply try again. Afterwards you are signed out, with a note saying your account and data were deleted. Other phones or computers you're signed in on are signed out too, but keep the copy saved on them until it's cleared.
 - A new "Delete your account" page on the website explains how, and who to email if you can't sign in. The Privacy policy, FAQ and Terms now point to it, and every page's footer links to it.
 
+## Play Store screenshots say "container" (2026-10-16)
+
+- The Google Play screenshots were retaken so the toolbar shows "New container" instead of "New column", and the Play kit notes were updated. Nothing in the app changed.
+
+## Wider cards and containers (2026-10-16)
+
+- Cards and containers can now be made up to 1280 pixels wide (they stopped at 640 before). Dragging a corner, the arrow keys on a resize handle, and "Same width" all use the new limit.
+- Boards you already saved are not changed: nothing is resized, and saving and loading work as before.
+
 ## "Column" is now "container" (2026-10-16)
 
 - Everywhere you read it, a column is now called a container: the New container button, the container title and its tooltips, the delete question, the shortcuts list, the welcome tour, the + menu on a phone, the Version history line, the text copy of a board, the FAQ and the Privacy page.

@@ -19,6 +19,7 @@ Its data is a small database, read and written with the ArtifactData tool (`url`
 - `jobs`, doc id = the job number: `job`, `kind`, `risk`, `stage`, `branch`, `pr` (`#40` or `none`), `worker`, `files`, `notes`.
 - `needs`, any doc id: `text`, `tag` (`do` or `decision`), `order` (a number). These are the owner's Needs you items.
 - `meta/crew`: `where` ("This computer (Windows)" or "Cloud session"), `session` (id and title), `since` (ISO time), `published` (the publish history line), `rules`.
+- `meta/handoff`: `parked` (items the owner parked for later), `picks` (owner choices still being built that aren't yet in `docs/decisions.md`, such as a chosen design), `reminders` (things to tell the owner at a certain moment). Update it in the same batch as other Board writes when one of these changes. It lives only on the Board, never in the repo, which is public.
 
 Read with `list` or `query`; write with `set`, `update`, `delete` or `batch` (a batch when writing more than a couple), pinning `if_version` as the tool requires. Update it every time a job changes stage, before telling the owner.
 
@@ -57,7 +58,7 @@ Read with `list` or `query`; write with `set`, `update`, `delete` or `batch` (a 
 
 Whichever coordinator chat the owner talks to takes over. On the owner's first message in a chat (or after a gap):
 
-1. Read `meta/crew`. If another session is named, set `meta/crew` to this one (`where`, `session`, `since` = now).
+1. Read `meta/crew` and `meta/handoff`. If another session is named, set `meta/crew` to this one (`where`, `session`, `since` = now).
 2. Read the `jobs` at `working` or `pr-open`. For each, check its branch and pull request on GitHub (`git fetch`, `gh pr view`).
 3. A job whose worker isn't running in this chat and whose pull request isn't open is restarted from its branch (keeping any pushed work) or marked `queued`. Tell the owner which.
 
@@ -67,7 +68,7 @@ Never run two coordinators' workers on the same job: background workers show onl
 
 For each request:
 
-1. **Answer it yourself** if it's a question about the app, the code or the crew. No worker needed.
+1. **Answer it yourself** if it's a question about the app, the code or the crew. No worker needed. Heavy reading (an outside repo or tool docs, design mockups or screenshots, a long investigation) is not a quick question: send it to a `scout` worker and ask for a short summary back.
 2. **Split** it into jobs: one job per change the owner could check on its own. Keep tiny changes to the same screen together in one job; split unrelated ones.
 3. For each job, decide **kind** and **risk**, and guess the **files** it will touch (read the code to check, briefly).
 4. **Check for clashes** with every job in `working` or `pr-open`. If two jobs will change the same files, run them one after the other: the second stays `queued` until the first is `merged`, so it starts from the newer `build/v1`.
@@ -120,11 +121,11 @@ If a question has no recommended answer and would change what the owner sees, st
 report it instead of guessing.
 For a scout job: change nothing, open no pull request; just investigate and report.
 
-End with this report and nothing after it:
+End with this report and nothing after it (at most about 15 lines; no test logs or diffs pasted, details belong in the pull request):
 STAGE: <merged | pr-open | waiting-owner | blocked | done>
 PR: <link or none>
 BUILT: <one or two plain sentences>
-CLICK: <numbered steps the owner can do to see it working>
+CLICK: <at most 5 numbered steps the owner can do to see it working>
 CALLS: <decisions made without asking>
 REVIEW: <level, what it found, what was fixed or left>
 SECURITY: <ran or skipped, and why>
@@ -163,6 +164,7 @@ As soon as a worker reports one ready, run `/check-pr <n>` yourself without wait
 
 ## Rules for the coordinator
 
+- Long chats cost tokens. After each publish, or once this chat has been auto-summarized, suggest the owner start a fresh coordinator chat (it picks up as in "Taking the wheel"), but only when no background worker you started is still running: workers report only to the chat that started them.
 - Never build a job in the project folder, and never push to `build/v1` yourself for crew work: every change arrives as a worker's pull request.
 - Each worktree runs browser tests on its own ports (`scripts/test-ports.mjs`), so parallel workers don't test each other's app. Tell a worker to set `E2E_DEV_PORT` / `E2E_PREVIEW_PORT` only if its tests report a port in use.
 - When a worker's pull request is merged, its worktree can be removed (`git worktree remove`), unless it still holds uncommitted work.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Restoring a version while offline (2026-10-17)
+
+- Pressing "Restore this version" while offline could leave the button waiting until the connection came back, then put the old version over whatever board was open by then. Now it waits at most 3 seconds for the safety copy (the boards as they are now, kept in Version history), then restores, as deleting a board already does. The safety copy is still saved once you're back online.
+- If, while it waits, you press Back to current, pick another version, or another board opens, the restore is dropped and nothing on your boards changes.
+- Boards already saved are untouched.
+
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 
 - Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.

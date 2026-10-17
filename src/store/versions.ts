@@ -167,10 +167,16 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
+  const pressed = store.getState();
   const data = await versions.get(id);
   const got = data ? readWorkspace(data) : null;
   if (!got) throw new Error('That version could not be read.');
-  await saveVersion(versions, serializeWorkspace(store.workspace()), now());
+  // Saving the version may wait (offline): the restore goes ahead after at most 3 seconds, as for a delete.
+  await saveSafetyVersion(store, versions, now);
+  // Unless, meanwhile, the person went back, picked another version, or another board opened (by
+  // them, or by boards arriving from another device): it would replace the wrong board.
+  const { ui, boards } = store.getState();
+  if (ui.preview?.meta.id !== pressed.ui.preview?.meta.id || boards.open !== pressed.boards.open) return [];
   // A version from before there were several boards is of the home board: home opens to take it.
   const { home } = store.getState().boards;
   if (got.legacy) store.openBoard(home);

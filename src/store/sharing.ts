@@ -422,7 +422,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const missing = !s.root || !now[s.root];
     if (doc.rev > s.baseRev || !s.base || missing) {
       const got = readShare(doc.data);
-      if (!got) return;
+      // Saved by a newer app, say: one it had before stays as it was; one never opened here can't
+      // be used (whole-app review H2: waiting on it held back the person's own boards for good).
+      if (!got) {
+        if (!s.base) refuse(s);
+        return;
+      }
       if (busy()) {
         s.waiting = doc;
         return;
@@ -641,13 +646,17 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     /** Joins a share from its link; resolves with its board's id once that has arrived. */
     async join(id: string, key: string): Promise<string> {
       // Opening a link to a board already here just opens it.
-      if (!shares.has(id)) await backend.join(id, key);
+      const had = shares.has(id);
+      if (!had) await backend.join(id, key);
       const s = open(id) ?? need(id);
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root) {
-        // Can't be used here (see refuse): off this person's list again.
-        await backend.leave(id).catch(() => {});
-        gone(s, 'left');
+        // Can't be used here (see refuse): off this person's list again, if this join put it there.
+        // One they already had or shared (saved by a newer app, say) stays theirs (job #91).
+        if (!had && !s.owner) {
+          await backend.leave(id).catch(() => {});
+          gone(s, 'left');
+        }
         throw new Error('This shared board can’t be opened');
       }
       return s.root;

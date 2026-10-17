@@ -6,8 +6,8 @@ import { serializeShare } from '../model/sharing';
 import type { Board, NoteCard } from '../model/types';
 import { readWorkspace, serializeWorkspace } from '../model/workspace';
 import { memoryServer, type Person, type ShareDoc } from './collab';
-import { boardsInKeptShares, sharesKey, startSharing } from './sharing';
-import { SYNC_DELAY as SYNC_DELAY_MS } from './sync';
+import { boardsInKeptShares, ownBoardsGuard, sharesKey, startSharing } from './sharing';
+import { startSync, SYNC_DELAY as SYNC_DELAY_MS, type Remote, type RemoteDoc } from './sync';
 import { createStore, type Store } from './store';
 import { deleteBoardSafely, localVersionStore, type VersionStore } from './versions';
 
@@ -851,5 +851,111 @@ describe('restoring before the shared boards are known (job #33)', () => {
     expect(store.restoreBackup(backup)).toBe('loading');
     await settle();
     expect(store.restoreBackup(backup)).toEqual([]);
+  });
+});
+
+describe('a shared board this app can’t read, never opened on this device (whole-app review H2)', () => {
+  // Saved by a newer version of the app: this one can't read it.
+  const newer = JSON.stringify({ version: 99, home: 'n1', boards: { n1: { name: 'New' } } });
+  const dan = person('dan');
+
+  it('the rest of the boards still start syncing, and the device’s own boards are uploaded', async () => {
+    await server.server.createShare(dan, 'snew', 'n1', 'newkey', newer, 'dan-page');
+    await server.server.join(person('bob'), 'snew', 'newkey');
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const home = store.workspace().home;
+    // Bob's own boards online, wired as src/sync/session.ts does.
+    let send: ((doc: RemoteDoc | null) => void) | null = null;
+    const writes: RemoteDoc[] = [];
+    const online: Remote = {
+      watch: (onChange) => ((send = onChange), () => {}),
+      write: (doc) => (writes.push(doc), Promise.resolve()),
+    };
+    let sharing: ReturnType<typeof startSharing> | null = null;
+    const guard = ownBoardsGuard(store, online, (id) => sharing!.isShared(id), boardsInKeptShares(storage, 'bob'));
+    const sync = startSync(store, guard.remote, { client: 'bob-page', onReady: () => {}, onError: () => {}, isShared: guard.isShared });
+    const onReady = vi.fn(() => {
+      guard.known();
+      sync.sharedChanged();
+    });
+    sharing = startSharing(store, server.backendFor(person('bob')), { client: 'bob-page', storage, onReady });
+    send!({ data: serializeWorkspace({ home, boards: { [home]: store.workspace().boards[home] } }), client: 'phone' });
+    // A board made on this device once its online copy is in: held back while the shares aren't known.
+    const diary = store.newBoard();
+    store.renameBoard('Diary');
+    store.openBoard(home);
+    await settle();
+    expect(onReady).toHaveBeenCalled();
+    expect(store.getState().ui.sharesKnown).toBe(true);
+    expect(store.boardName(diary)).toBe('Diary');
+    expect(Object.keys(readWorkspace(writes.at(-1)?.data ?? null)?.ws.boards ?? {})).toContain(diary);
+    // Nothing of the unreadable share is taken, and it is left as it is online.
+    expect(sharing.isShared(diary)).toBe(false);
+    expect(store.workspace().boards.n1).toBeUndefined();
+    expect(server.shares.get('snew')!.data).toBe(newer);
+  });
+
+  it('opening its link fails rather than waiting for ever', async () => {
+    await server.server.createShare(dan, 'snew', 'n1', 'newkey', newer, 'dan-page');
+    const bob = device('bob');
+    await settle();
+    const joined = bob.sharing.join('snew', 'newkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(bob.store.workspace().boards.n1).toBeUndefined();
+    expect(server.shares.get('snew')!.data).toBe(newer);
+  });
+
+  /** `who`'s page whose leaving is watched. */
+  function watchedDevice(who: Person) {
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const real = server.backendFor(who);
+    const leave = vi.fn((id: string) => real.leave(id));
+    const sharing = startSharing(store, { ...real, leave }, { client: `${who.uid}-page`, storage });
+    return { store, sharing, leave };
+  }
+
+  it('opening its link when it is already theirs (or they shared it) fails without taking it off their list', async () => {
+    await server.server.createShare(dan, 'snew', 'n1', 'newkey', newer, 'dan-page');
+    await server.server.join(person('bob'), 'snew', 'newkey');
+    for (const who of [dan, person('bob')]) {
+      const page = watchedDevice(who);
+      await settle();
+      const joined = page.sharing.join('snew', 'newkey');
+      joined.catch(() => {});
+      await settle();
+      await expect(joined).rejects.toThrow();
+      expect(page.leave).not.toHaveBeenCalled();
+    }
+    expect(server.shares.get('snew')!.people.map((p) => p.uid)).toEqual(['dan', 'bob']);
+  });
+
+  it('a later version this app can read is taken', async () => {
+    await server.server.createShare(dan, 'snew', 'n1', 'newkey', newer, 'dan-page');
+    await server.server.join(person('bob'), 'snew', 'newkey');
+    const bob = device('bob');
+    await settle();
+    expect(bob.store.workspace().boards.n1).toBeUndefined();
+    await server.server.write(dan, 'snew', serializeShare('n1', { n1: { ...B.createBoard(), name: 'Readable' } }), 'dan-page', 1);
+    await settle();
+    expect(bob.store.boardName('n1')).toBe('Readable');
+    expect(bob.sharing.isShared('n1')).toBe(true);
+  });
+
+  it('one already opened here keeps its boards as they were, and isn’t overwritten online', async () => {
+    const { bob, trip, shareId } = await together();
+    const before = bob.store.workspace().boards[trip];
+    const later = JSON.stringify({ version: 99, home: trip, boards: { [trip]: { name: 'Newer' } } });
+    await server.server.write(person('alice'), shareId, later, 'alice-newer-page', server.shares.get(shareId)!.rev);
+    await settle();
+    expect(bob.store.workspace().boards[trip]).toEqual(before);
+    expect(bob.sharing.isShared(trip)).toBe(true);
+    bob.store.openBoard(trip);
+    bob.store.addCard('note');
+    await settle();
+    expect(server.shares.get(shareId)!.data).toBe(later);
   });
 });

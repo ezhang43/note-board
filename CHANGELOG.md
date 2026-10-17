@@ -1,5 +1,10 @@
 # Changelog
 
+## Shared board from a newer app no longer holds back your boards (2026-10-17)
+
+- If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.
+- Shared boards already on your device and your saved boards are untouched.
+
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 
 - Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.

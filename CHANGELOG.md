@@ -6,6 +6,11 @@
 - Reopening straight after a change, online, now also opens a moment sooner, without waiting for that change to arrive. Either way the note says "Saving…" until those changes are online, then "Saved".
 - Your boards are untouched: boards already saved online are not changed, and nothing extra is sent. As before, if the internet refuses those last changes (a board too big to save online, say), the online copy comes back; if there is no online copy yet, the board is kept here and sent again, with the red "Couldn't save online" banner if that is refused too.
 
+## Sharing files now hold back auto-publish (2026-10-17)
+
+- Changes to the sharing, account and board-merging code (`src/store/sharing.ts`, `src/store/account.ts`, `src/model/sharing.ts`, `src/model/merge.ts`) now wait for your "publish" instead of going live on their own, like the other saving and sync files.
+- Nothing in the app changes, and your boards are untouched.
+
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 
 - Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.

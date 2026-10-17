@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShareButton } from './SharePanel';
 import { appStore, useAppState } from '../store/appStore';
-import { CoffeeIcon, HistoryIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, UndoIcon } from './icons';
+import { CoffeeIcon, HistoryIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
 import {
   CleanUpButton,
   CollapseAllButton,
@@ -66,56 +66,77 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
       )}
       {open === 'more' && (
         <div className="phone-sheet phone-more" role="dialog" aria-label="More">
-          <div className="phone-row">
-            <ToolGroup />
-            <TextSizeButtons />
-          </div>
-          <SnapButton />
-          <ColourControl />
-          <CollapseAllButton labelled />
-          <SameWidthButton labelled />
-          <CleanUpButton />
-          <FileMenu />
-          <CompletedButton labelled onOpen={() => setOpen(null)} />
-          <PomodoroButton labelled onOpen={() => setOpen(null)} />
-          <CalendarButton labelled onOpen={() => setOpen(null)} />
-          <DarkModeButton labelled />
-          <button
-            type="button"
-            className="tb-button"
-            onClick={() => {
-              setOpen(null);
-              appStore.openFind();
-            }}
-          >
-            <SearchIcon />
-            Search
-          </button>
-          <button
-            type="button"
-            className="tb-button"
-            onClick={() => {
-              setOpen(null);
-              appStore.toggleHistory();
-            }}
-          >
-            <HistoryIcon />
-            Version history
-          </button>
-          <a className="tb-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
-            <CoffeeIcon />
-            Buy me a coffee
-          </a>
-          <FeedbackButton onOpen={() => setOpen(null)} />
-          <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
-            About BusyAnts
-          </a>
-          <ShareButton phone />
-          {onSignOut && (
-            <button type="button" className="tb-button" onClick={onSignOut}>
-              Sign out
+          <div className="phone-tiles">
+            <button
+              type="button"
+              className="tb-button"
+              onClick={() => {
+                setOpen(null);
+                appStore.openFind();
+              }}
+            >
+              <SearchIcon />
+              Search
             </button>
-          )}
+            <ShareButton phone />
+            <button
+              type="button"
+              className="tb-button"
+              aria-label="Version history"
+              onClick={() => {
+                setOpen(null);
+                appStore.toggleHistory();
+              }}
+            >
+              <HistoryIcon />
+              History
+            </button>
+            <CompletedButton labelled onOpen={() => setOpen(null)} />
+            <PomodoroButton labelled onOpen={() => setOpen(null)} />
+            <CalendarButton labelled onOpen={() => setOpen(null)} />
+          </div>
+          <section className="phone-arrange" aria-labelledby="phone-arrange">
+            <h2 id="phone-arrange" className="phone-label">
+              Arrange
+            </h2>
+            <div className="phone-row">
+              <ToolGroup />
+              <TextSizeButtons />
+            </div>
+            <div className="phone-rows">
+              <SnapButton />
+              <ColourControl />
+            </div>
+            <div className="phone-trio">
+              <CollapseAllButton labelled />
+              <SameWidthButton labelled />
+              <CleanUpButton labelled />
+            </div>
+          </section>
+          <section className="phone-rest" aria-labelledby="phone-rest">
+            <h2 id="phone-rest" className="phone-label">
+              More
+            </h2>
+            <div className="phone-rows">
+              <FileMenu />
+              <DarkModeButton labelled />
+              <FeedbackButton onOpen={() => setOpen(null)} />
+              <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
+                <InfoIcon />
+                About BusyAnts
+              </a>
+              <a className="tb-button" href={DONATE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
+                <CoffeeIcon />
+                Buy me a coffee
+              </a>
+              {onSignOut && (
+                <button type="button" className="tb-button" onClick={onSignOut}>
+                  <SignOutIcon />
+                  Sign out
+                </button>
+              )}
+            </div>
+          </section>
         </div>
       )}
       <nav className="phone-bar" role="toolbar" aria-label="Board actions">

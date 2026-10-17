@@ -7,6 +7,10 @@
 - Every claim was checked against the app and the Privacy policy. For example, it does not say "no account needed", because you sign in with Google. No testimonials or user numbers.
 - Nothing in the app or in saved boards changed.
 
+## Phone menu as tiles (2026-10-16)
+
+- On a phone, the ⋯ menu is tidier and shorter. Search, Share, History, Completed, Focus timer and Calendar are tiles, three across. Below them, Arrange holds the Hand / Select tool, text size, a Snap to grid switch, Color, and one row with Collapse all, Same width and Clean up. Last comes More: File, a Dark mode switch, Feedback, About BusyAnts, Buy me a coffee and Sign out. Everything works as before; items that need sign-in or the published site still only show there. It fits a 320px-wide phone in light and dark mode.
+
 ## About page: sharper picture, folding "Try it", new ending (2026-10-16)
 
 - The sample-board picture on the About page is sharp now. It was too small (and reduced to 256 colours), so it looked blurry on most screens. Both the light and the dark picture were retaken at twice the size in full colour (WebP, about 290 KB and 260 KB), and they look the same size on the page.

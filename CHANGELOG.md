@@ -1,5 +1,10 @@
 # Changelog
 
+## Opening your board offline with unsent changes (2026-10-17)
+
+- Signed in, if you closed the app before your last changes reached the internet and then opened it again without internet, it stayed on "Opening your board…". It now opens on the copy saved on this device, those last changes included, and sends them once you are back online.
+- Your boards are untouched: nothing is sent twice, and a change made on another device is handled as before.
+
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 
 - Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.

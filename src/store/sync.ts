@@ -11,7 +11,8 @@ export interface RemoteDoc {
 export interface Remote {
   /**
    * Calls `onChange` with each new version of the online copy, or null once it is certain
-   * there is none yet. Returns a function that stops watching.
+   * there is none yet. The first version may be this device's copy with saves not yet sent
+   * (opening offline). Returns a function that stops watching.
    */
   watch(onChange: (doc: RemoteDoc | null) => void, onError: (e: unknown) => void): () => void;
   /** Resolves once saved online; rejects if the save was refused (stays pending while offline). */

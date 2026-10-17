@@ -57,6 +57,7 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
       // Like Google, an event of a series has an id made from its series' time, so changing the
       // series' times can give its events new ids (simple: any change with a start does here).
       if (body.start) events = events.map((e) => (e.series === id ? { ...e, id: `${e.id}~` } : e));
+      if (body.summary !== undefined) events = events.map((e) => (e.id === id ? { ...e, title: body.summary! } : e));
     },
     async remove(id, notify) {
       calls.push(`remove ${id}${mail(notify)}`);
@@ -68,6 +69,9 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
 }
 
 const today = () => '2026-10-06';
+
+/** The event as the panel shows it, to open in the form (one not shown is a stand-in). */
+const at = (cal: ReturnType<typeof createCalendar>, id: string) => cal.get().events?.find((e) => e.id === id) ?? ev(id);
 
 describe('the calendar panel', () => {
   it('is only there with a calendar to show (signed in, or a demo person)', () => {
@@ -199,7 +203,7 @@ describe('changing events', () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('a', { ...draft, title: 'Dentist (moved)' })).toBeNull();
+    expect(await cal.save(at(cal, 'a'), { ...draft, title: 'Dentist (moved)' })).toBeNull();
     expect(api.calls).toContain('update a Dentist (moved)');
   });
 
@@ -207,7 +211,7 @@ describe('changing events', () => {
     const api = fakeApi([ev('r', { editable: false })]);
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('r', draft)).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'r'), draft)).toBe(SAVE_FAILED);
     expect(await cal.remove('r')).toBe(SAVE_FAILED);
     expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
   });
@@ -250,7 +254,7 @@ describe('repeating events and guests (job #85)', () => {
     const api = fakeApi([standUp]);
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('su_1016', change, { all: false })).toBeNull();
+    expect(await cal.save(at(cal, 'su_1016'), change, { all: false })).toBeNull();
     expect(api.calls[1]).toBe('update su_1016 Stand-up');
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-10-16T09:30:00' });
   });
@@ -260,7 +264,7 @@ describe('repeating events and guests (job #85)', () => {
     api.series = { title: 'Stand-up' };
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('su_1016', change, { all: true })).toBeNull();
+    expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBeNull();
     expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Stand-up', 'list 2026-10-06 2026-10-13']);
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:30:00' });
     expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
@@ -274,7 +278,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
-    expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
+    expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
     expect(api.calls[3]).toBe('update su Daily sync');
     expect(api.bodies[1].start).toMatchObject({ dateTime: '2026-09-01T09:00:00' });
     expect(api.bodies[1].end).toMatchObject({ dateTime: '2026-09-01T09:15:00' });
@@ -288,7 +292,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
-    expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
+    expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
     // The event first: the series' change can give it a new id (job #88).
     expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
     expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
@@ -301,7 +305,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
-    expect(await cal.save('su_1016', { ...was, title: 'Daily sync', startTime: '10:30', endTime: '10:45' }, { all: true })).toBeNull();
+    expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync', startTime: '10:30', endTime: '10:45' }, { all: true })).toBeNull();
     expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
     // Its own time stays; the series gets the new one.
     expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
@@ -316,11 +320,11 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
-    expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync' }, { all: true })).toBe(SAVE_FAILED);
     expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync']);
   });
 
-  it('when the edited event changed but the series didn’t, it says so, and trying again sends both (job #88)', async () => {
+  it('when the edited event changed but the series didn’t, it says so, shows the calendar as it now is, and trying again sends both (job #88)', async () => {
     const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
     const api = fakeApi([moved]);
     api.series = { title: 'Stand-up' };
@@ -328,12 +332,13 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const draft = { ...change, startTime: '10:00', endTime: '10:15', title: 'Daily sync' };
-    expect(await cal.save('su_1016', draft, { all: true })).toBe(SERIES_FAILED);
-    // Not loaded again: the event still counts as it was, so a second try sends the series the new title.
-    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
+    expect(await cal.save(moved, draft, { all: true })).toBe(SERIES_FAILED);
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
+    expect(cal.get().events?.[0].title).toBe('Daily sync');
+    // The form still holds the event as it opened, so the series still gets the new title.
     api.failId = null;
-    expect(await cal.save('su_1016', draft, { all: true })).toBeNull();
-    expect(api.calls.slice(4, 7)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
+    expect(await cal.save(moved, draft, { all: true })).toBeNull();
+    expect(api.calls.slice(5, 8)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
   });
 
   it('“All events” from an event made all-day (or timed) on its own is left to Google Calendar (review, 2026-10-17)', async () => {
@@ -341,7 +346,7 @@ describe('repeating events and guests (job #85)', () => {
     const api = fakeApi([alone]);
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('su_1016', { ...change, title: 'Daily sync', allDay: true, startTime: '09:00', endTime: '10:00' }, { all: true })).toBe(SERIES_ALL_DAY);
+    expect(await cal.save(at(cal, 'su_1016'), { ...change, title: 'Daily sync', allDay: true, startTime: '09:00', endTime: '10:00' }, { all: true })).toBe(SERIES_ALL_DAY);
     expect(api.calls.slice(1)).toEqual(['get su']);
   });
 
@@ -349,9 +354,9 @@ describe('repeating events and guests (job #85)', () => {
     const api = fakeApi([standUp, ev('a')]);
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('su_1016', { ...change, startDate: '2026-10-17', endDate: '2026-10-17' }, { all: true })).toBe(SAVE_FAILED);
-    expect(await cal.save('a', draftOf('a'), { all: true })).toBe(SAVE_FAILED);
-    expect(await cal.save('su_1016', { ...change, allDay: true }, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'su_1016'), { ...change, startDate: '2026-10-17', endDate: '2026-10-17' }, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'a'), draftOf('a'), { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'su_1016'), { ...change, allDay: true }, { all: true })).toBe(SAVE_FAILED);
     expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
   });
 
@@ -360,7 +365,7 @@ describe('repeating events and guests (job #85)', () => {
     api.series = { timeZone: 'Pacific/Chatham' };
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(await cal.save('su_1016', change, { all: true })).toBe(SERIES_ZONE);
+    expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBe(SERIES_ZONE);
     expect(api.calls.slice(1)).toEqual(['get su']);
   });
 
@@ -368,16 +373,15 @@ describe('repeating events and guests (job #85)', () => {
     const seriesSam = { email: 'sam@example.com', responseStatus: 'needsAction' };
     const one = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15', guests: [me, sam] });
     const api = fakeApi([one]);
-    api.series = { guests: [me, seriesSam] };
+    api.series = { title: 'Stand-up', guests: [me, seriesSam] };
     const cal = createCalendar(api, today);
     await cal.open();
-    await cal.save('su_1016', { ...change, guests: ['sam@example.com'] }, { all: true, notify: false });
+    await cal.save(at(cal, 'su_1016'), { ...change, guests: ['sam@example.com'] }, { all: true, notify: false });
     expect(api.bodies[0].attendees).toBeUndefined();
     // The series' new time gave the event a new id.
-    expect(await cal.save(cal.get().events![0].id, { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false })).toBeNull();
-    // This event's guests differ from the series', so it gets the change on its own first (its own answers stay).
-    expect(api.bodies[1].attendees).toEqual([me, sam, { email: 'pat@example.com' }]);
-    expect(api.bodies[2].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
+    expect(await cal.save(cal.get().events![0], { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false })).toBeNull();
+    expect(api.bodies[1].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
+    expect(api.bodies).toHaveLength(2);
   });
 
   it('deleting one event of a series, or the whole series', async () => {
@@ -397,9 +401,9 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07', guests: ['sam@example.com'] };
-    await cal.save('lunch', d, { notify: true });
-    await cal.save('lunch', d, { notify: false });
-    await cal.save('lunch', d); // not asked: never emails
+    await cal.save(at(cal, 'lunch'), d, { notify: true });
+    await cal.save(at(cal, 'lunch'), d, { notify: false });
+    await cal.save(at(cal, 'lunch'), d); // not asked: never emails
     await cal.remove('lunch', { notify: true });
     expect(api.calls.filter((c) => !c.startsWith('list'))).toEqual(['update lunch Lunch (emails sent)', 'update lunch Lunch (no emails)', 'update lunch Lunch (no emails)', 'remove lunch (emails sent)']);
   });
@@ -408,7 +412,7 @@ describe('repeating events and guests (job #85)', () => {
     const api = fakeApi([ev('a')]);
     const cal = createCalendar(api, today);
     await cal.open();
-    await cal.save('a', draftOf('a'), { notify: true });
+    await cal.save(at(cal, 'a'), draftOf('a'), { notify: true });
     await cal.remove('a', { notify: true });
     expect(api.calls.slice(1)).toEqual(['update a a', 'list 2026-10-06 2026-10-13', 'remove a']);
   });
@@ -418,11 +422,11 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07' };
-    await cal.save('lunch', { ...d, guests: ['sam@example.com'] }, { notify: false });
+    await cal.save(at(cal, 'lunch'), { ...d, guests: ['sam@example.com'] }, { notify: false });
     expect(api.bodies[0].attendees).toBeUndefined();
-    await cal.save('lunch', { ...d, guests: ['sam@example.com', 'pat@example.com'] }, { notify: false });
+    await cal.save(at(cal, 'lunch'), { ...d, guests: ['sam@example.com', 'pat@example.com'] }, { notify: false });
     expect(api.bodies[1].attendees).toEqual([me, sam, { email: 'pat@example.com' }]);
-    await cal.save('lunch', { ...d, guests: [] }, { notify: true });
+    await cal.save(at(cal, 'lunch'), { ...d, guests: [] }, { notify: true });
     expect(api.bodies[2].attendees).toEqual([me]);
     expect(api.calls).toContain('update lunch Lunch (emails sent)');
   });
@@ -449,7 +453,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     api.fail = true;
-    expect(await cal.save('su_1016', change, { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBe(SAVE_FAILED);
     expect(await cal.remove('su_1016', { all: true })).toBe(SAVE_FAILED);
     expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016']);
   });

@@ -173,18 +173,27 @@ export function devCalendarPlugin(): Plugin {
             const end = merge(events[found].end, body.end);
             if ((start.date && start.dateTime) || (end.date && end.dateTime)) return send(400, { error: { code: 400, message: 'Invalid start time.' } });
             const fields = { ...(body.summary !== undefined && { summary: body.summary }), ...(body.attendees !== undefined && { attendees: body.attendees }) };
-            const moved = ms(start) !== ms(events[found].start);
+            const newTime = ms(start) !== ms(events[found].start);
             events[found] = { ...events[found], ...fields, start, end };
             if (events[found].recurringEventId) changedAlone.add(`${who}/${id}`);
             // The whole series: its events not changed on their own follow, each on its own day.
             if (events[found].recurrence) {
               for (const [i, e] of events.entries()) {
                 if (e.recurringEventId !== id) continue;
+                const alone = changedAlone.has(`${who}/${e.id}`);
+                if (!alone) {
+                  const to = shift(e.originalStartTime as When, start, end);
+                  events[i] = { ...e, ...fields, ...to, ...(newTime && { originalStartTime: to.start }) };
+                }
                 // Like Google, an event's id comes from its series' time: a new time gives every event a new id (job #88).
-                const newId = moved ? `${e.id.split('~')[0]}~${next++}` : e.id;
-                if (changedAlone.delete(`${who}/${e.id}`)) changedAlone.add(`${who}/${newId}`);
-                else events[i] = { ...e, ...fields, ...shift(e.originalStartTime as When, start, end) };
-                events[i] = { ...events[i], id: newId };
+                if (newTime) {
+                  const newId = `${e.id.split('~')[0]}~${next++}`;
+                  events[i] = { ...events[i], id: newId };
+                  if (alone) {
+                    changedAlone.delete(`${who}/${e.id}`);
+                    changedAlone.add(`${who}/${newId}`);
+                  }
+                }
               }
             }
             return send(200, events[found]);

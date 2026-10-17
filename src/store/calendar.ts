@@ -198,11 +198,13 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       this.setWidth(view, PANEL_DEFAULT[view]);
     },
     /**
-     * Adds (`id` null) or changes an event, with the person's answers to "Only this event / All
+     * Adds (`opened` null) or changes an event, with the person's answers to "Only this event / All
      * events in the series" and "Send update emails to guests?". Resolves to a note to show, or null.
+     * What was changed is worked out from `opened`, the event as the form opened it, so after only
+     * part of a change reached Google a second try still sends the rest (job #88).
      */
-    async save(id: string | null, draft: Draft, choice: Choice = {}): Promise<string | null> {
-      const event = id === null ? null : editable(id);
+    async save(opened: CalEvent | null, draft: Draft, choice: Choice = {}): Promise<string | null> {
+      const event = opened && (editable(opened.id) ? opened : undefined);
       if (!api || event === undefined) return SAVE_FAILED;
       let body = draftBody(draft, timeZone());
       if (!body) return BAD_TIMES;
@@ -238,8 +240,10 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       try {
         await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
       } catch {
-        // Only this event changed. Not loaded again, so a second try still sends the series what was changed.
-        return own ? SERIES_FAILED : SAVE_FAILED;
+        if (!own) return SAVE_FAILED;
+        // Only this event changed: show the calendar as it now is, and say so.
+        await load();
+        return SERIES_FAILED;
       }
       await load();
       return null;

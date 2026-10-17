@@ -277,6 +277,15 @@ test('“All events” with a new time, from an event moved on its own, reaches 
   await expect(form(page)).toHaveCount(0);
   await expect(day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45 Daily sync' })).toBeVisible();
   await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' })).toBeVisible();
+  // Tomorrow's followed the series, so it isn't one changed on its own: renaming all from it changes only the series.
+  const sent = changesSent(page);
+  await day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45 Daily sync' }).click();
+  await form(page).getByLabel('Title').fill('Team sync');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+  await expect(day(page, daysFromToday(2)).getByRole('button', { name: '10:30 – 10:45 Team sync' })).toBeVisible();
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatch(/\/events\/standup(\?|$)/);
   // It can still be changed with its new id.
   await day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' }).click();
   await form(page).getByLabel('Title').fill('Sync');

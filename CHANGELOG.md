@@ -1,5 +1,14 @@
 # Changelog
 
+## Phone touch fixes (2026-10-17)
+
+- Text boxes are 16px on a phone (notes, list and container titles, checklist items, the Timer's minutes), so iPhone Safari no longer zooms the page in when you tap one. Page zoom is still allowed. On a phone the smaller text size stops at 16px.
+- A pinch on the top bar or the bottom bars no longer zooms the whole page.
+- While you type on a phone, the line you are typing stays above the keyboard as the note grows, not only when you first tap it.
+- Easier to press: checklist tick boxes (wider press area), the Completed buttons (taller, spaced out), the welcome tour's buttons, History and Timer close buttons, Timer Start / Reset / Skip, Search's arrows and close (and a wider Search box), the Boards and File menu rows, the color swatches (44px each, as many to a row as fit) and Default / Auto-color, and the spacing of Hand / Select and A- / A+. On a touch screen the small card controls (collapse, trash can, resize corner, width strip, item grip) have bigger invisible press areas that never overlap each other, and the trash can never covers another control. Nothing looks different on a computer.
+- The empty-board hint on a phone now says "Tap the Add button (+) below to add a note, a checklist or a container."
+- Nothing was changed in saved boards.
+
 ## About page: demo video and new sections (2026-10-17)
 
 - The big board picture on the About page is now a short silent demo video (about 14 seconds, loops). It shows ticking an item so it moves to Completed, folding a container, dragging a card so it snaps into place, and typing a new item. It has a light and a dark version, a Pause / Play button you can reach with the keyboard, and the old board picture as its poster. If your computer is set to "reduce motion", the still picture is shown instead and nothing plays.

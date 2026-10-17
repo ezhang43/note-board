@@ -7,6 +7,7 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
+import { usePhone } from './usePhone';
 
 const NO_GUIDES: never[] = [];
 const NEW_CARD_LABEL = { note: 'New note', todo: 'New checklist', link: 'New link', column: 'New container' } as const;
@@ -17,6 +18,7 @@ export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
 
   const order = useAppState((s) => s.board.order);
+  const phone = usePhone();
   // Nothing drawn (a Completed record is kept but never drawn): show the hint.
   const empty = useAppState((s) => s.board.order.every((id) => s.board.cards[id]?.kind === 'completed'));
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
@@ -230,7 +232,11 @@ export function Canvas() {
       } as CSSProperties}
     >
       {empty && (
-        <p className="empty-hint">Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.</p>
+        <p className="empty-hint">
+          {phone
+            ? 'Tap the Add button (+) below to add a note, a checklist or a container.'
+            : 'Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.'}
+        </p>
       )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         {order.map((id) => {

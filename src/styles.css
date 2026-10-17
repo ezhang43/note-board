@@ -1225,15 +1225,33 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 /*
  * Touch screens: bigger invisible areas to press around the small card controls (owner request,
- * phone step 4). The grip and trash sit side by side, so theirs only grow away from each other.
+ * phone steps 4 and 7; the drawn controls stay as they are). Each area is 44px, except where a
+ * neighbour is in the way, and no area covers another control's drawn box:
+ *  - a header's collapse and delete buttons grow up into the space above the header, never down into
+ *    the card's text; sideways, collapse takes the gap between them and delete grows outwards, so
+ *    delete never grows over another control;
+ *  - the resize corner and the width strip grow outwards, away from the card;
+ *  - the grip grows to the right and up/down, away from the delete can beside it.
  */
 @media (pointer: coarse) {
   .icon-button { position: relative; }
   .icon-button::before { content: ''; position: absolute; inset: -6px; }
+  .card-header > .icon-button::before { top: -12px; bottom: -4px; }
+  .card-header > .icon-button:first-of-type::before { left: -12px; right: -4px; }
+  .card-header > .block-trash::before { left: 0; right: -16px; }
+  .column-actions > .icon-button::before { top: -8px; bottom: -8px; }
+  .column-actions > .icon-button:first-of-type::before { left: -14px; right: -2px; }
+  .column-actions > .block-trash::before { left: 0; right: -16px; }
+  /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
+  .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }
+  .column.collapsed .column-actions > .block-trash::before { right: -3px; }
   .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
-  .item-grip::before { top: -8px; bottom: -8px; left: 0; right: -12px; }
+  .item-grip::before { top: -10px; bottom: -10px; left: -2px; right: -28px; }
+  /* Inside a container the card's right side is close to the container's width strip. */
+  .card.in-column .item-grip::before { right: -22px; }
   /* Outwards, past the card's corner, so it never takes presses meant for the last item's grip. */
-  .resize-corner::before { inset: -4px -12px -12px -4px; }
+  .resize-corner::before { inset: 0 -26px -26px 0; }
+  .resize-edge::before { top: 0; bottom: 0; left: 0; right: -34px; }
 }
 
 /*
@@ -1856,4 +1874,57 @@ a.cal-open { align-self: flex-start; }
 @media (prefers-reduced-motion: no-preference) {
   .tour-spot { transition: left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease; }
   .tour-card { transition: left 0.2s ease, top 0.2s ease; }
+}
+
+/*
+ * Phone touch fixes (owner-approved after a mobile review; windows under 600px, the same width as
+ * the phone layout): 16px text boxes, bars a pinch cannot zoom, and 44px touch targets. Last in the
+ * file so it wins over the plain rules above.
+ */
+@media (max-width: 599px) {
+  /*
+   * Text boxes are at least 16px, or iOS Safari zooms the page in when one is tapped. Page zoom stays
+   * allowed. A bigger text size (A+, or a format size) still makes them bigger; the smaller one stops at 16.
+   */
+  .note-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .card-title { font-size: max(16px, calc(15px * var(--fs, 1) * var(--ts, 1))); }
+  .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); line-height: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); }
+  .column-title { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .pomodoro-length input { font-size: 16px; }
+
+  /* A pinch on the bars would zoom the whole page (it got stuck at 5x): they take no page gestures. */
+  .toolbar.phone, .phone-bar, .item-bar { touch-action: none; }
+
+  /* A tick box is pressed from 44px wide (22px to its left, over the card's padding), as tall as its row. */
+  .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
+  .completed-head, .completed-actions { gap: 8px; }
+  .completed-toggle, .uncheck-all { height: 40px; }
+
+  /* The welcome tour. */
+  .tour-head .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  .tour-actions button { height: 44px; }
+
+  /* Version history and the side panels. */
+  .history-head .icon-button { width: 44px; height: 44px; }
+  .pomodoro-actions .tb-button { height: 44px; }
+
+  /* Search: the box takes what the buttons leave; the count takes no room until there is one. */
+  .app.phone .find-bar { gap: 8px; }
+  .app.phone .find-bar .icon-button { width: 44px; height: 44px; }
+  .app.phone .find-bar input { height: 44px; }
+  .app.phone .find-count { min-width: 0; }
+  .app.phone .find-count:empty { position: absolute; }
+
+  /* The Boards and File menus. */
+  .boards-menu button[role='menuitem'], .file-menu button { height: 44px; }
+  .boards-list { display: flex; flex-direction: column; }
+  .boards-list, .boards-actions, .file-menu { gap: 4px; }
+
+  /* ⋯ More: Hand / Select, A- / A+, the colors. */
+  .phone-more .tool-group, .phone-more .zoom-control { gap: 8px; }
+  .phone-more .zoom-control button.text-size { min-width: 44px; }
+  /* Eight 44px swatches in a row would not fit: as many as fit (six on a 390px phone, five at 320px). */
+  .phone-more .colour-menu { grid-template-columns: repeat(auto-fill, 44px); gap: 8px; }
+  .phone-more .swatch { width: 44px; height: 44px; aspect-ratio: auto; }
+  .phone-more .swatch-default { height: 44px; }
 }

@@ -239,6 +239,10 @@ export function ColourControl() {
     const covered = b.top < m.bottom && b.bottom > m.top && b.left < m.right && b.right > m.left;
     if (covered) appStore.panBy(0, Math.round(m.bottom - b.top + 16));
   }, [open, lastSelected]);
+  // On a phone the menu opens inside the ⋯ panel, which scrolls: bring the whole menu into view.
+  useEffect(() => {
+    if (open && menu.current?.closest('.phone-more')) menu.current.scrollIntoView({ block: 'nearest' });
+  }, [open]);
   const named = hovered ?? (current ? swatchFor(current, theme).label : current === null ? 'Default' : '');
 
   return (

@@ -6,13 +6,18 @@ import {
   parsePanelWidths,
   addDays,
   addMonths,
+  canChangeSeries,
   cellLines,
   cellTime,
   dayKey,
   dayLabel,
   draftBody,
   draftFor,
+  emailGuests,
   eventsOnDay,
+  exceptionChange,
+  guestChanges,
+  isEmail,
   monthGrid,
   moveDraftStart,
   moveView,
@@ -20,9 +25,11 @@ import {
   parseEvent,
   rangeLabel,
   safeLink,
+  seriesDraft,
   timeLabel,
   viewRange,
   weekDays,
+  withGuest,
   type CalEvent,
 } from './calendar';
 
@@ -37,6 +44,10 @@ const timed = (over: Partial<CalEvent> = {}): CalEvent => ({
   end: '2026-10-06T11:00',
   editable: true,
   link: 'https://calendar.google.com/',
+  series: null,
+  guests: [],
+  timeZone: null,
+  moved: false,
   ...over,
 });
 
@@ -114,7 +125,18 @@ describe('reading events from Google', () => {
       end: '2026-10-06T11:30',
       editable: true,
       link: 'https://www.google.com/calendar/event?eid=abc',
+      series: null,
+      guests: [],
+      timeZone: null,
+      moved: false,
     });
+  });
+
+  it('knows an event of a series moved on its own: its start isn’t where the series put it (review, 2026-10-17)', () => {
+    const one = { ...simple, recurringEventId: 's', originalStartTime: { dateTime: '2026-10-06T10:00:00' } };
+    expect(parseEvent(one)?.moved).toBe(false);
+    expect(parseEvent({ ...one, originalStartTime: { dateTime: '2026-10-05T10:00:00' } })?.moved).toBe(true);
+    expect(parseEvent({ ...one, originalStartTime: 'nonsense' })?.moved).toBe(false);
   });
 
   it('reads an all-day event (its end day is not included)', () => {
@@ -122,15 +144,39 @@ describe('reading events from Google', () => {
     expect(ev).toMatchObject({ allDay: true, start: '2026-10-08', end: '2026-10-10', editable: true });
   });
 
-  it('repeating events, events with guests, custom reminders and others’ events are read-only', () => {
-    expect(parseEvent({ ...simple, recurringEventId: 'r1' })?.editable).toBe(false);
-    expect(parseEvent({ ...simple, recurrence: ['RRULE:FREQ=DAILY'] })?.editable).toBe(false);
-    expect(parseEvent({ ...simple, attendees: [{ email: 'sam@example.com' }] })?.editable).toBe(false);
+  it('custom reminders, others’ events and Google’s special kinds are read-only', () => {
     expect(parseEvent({ ...simple, reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] } })?.editable).toBe(false);
     expect(parseEvent({ ...simple, organizer: { email: 'boss@example.com' } })?.editable).toBe(false);
     expect(parseEvent({ ...simple, eventType: 'outOfOffice' })?.editable).toBe(false);
+    // A series itself (never listed: repeating events come as single events) stays read-only.
+    expect(parseEvent({ ...simple, recurrence: ['RRULE:FREQ=DAILY'] })?.editable).toBe(false);
+    // A guest list Google cut short can't be changed safely (its missing guests would be dropped).
+    expect(parseEvent({ ...simple, attendees: [{ email: 'sam@example.com' }], attendeesOmitted: true })?.editable).toBe(false);
     // No guests and only the calendar's default reminders: still simple.
     expect(parseEvent({ ...simple, attendees: [], eventType: 'default', reminders: { useDefault: false, overrides: [] } })?.editable).toBe(true);
+  });
+
+  it('one event of a repeating series can be changed, and knows its series (job #85)', () => {
+    expect(parseEvent({ ...simple, id: 'abc_20261006', recurringEventId: 'abc' })).toMatchObject({ editable: true, series: 'abc' });
+  });
+
+  it('the person’s own events with guests can be changed; the guest list is read and checked (job #85)', () => {
+    const ev = parseEvent({
+      ...simple,
+      attendees: [
+        { email: 'me@example.com', self: true, organizer: true, responseStatus: 'accepted' },
+        { email: 'sam@example.com', responseStatus: 'needsAction', displayName: 'Sam', extra: { nested: 1 } },
+        { displayName: 'no email' },
+        'junk',
+      ],
+    });
+    expect(ev?.editable).toBe(true);
+    expect(ev?.guests).toEqual([
+      { email: 'me@example.com', self: true, organizer: true, responseStatus: 'accepted' },
+      { email: 'sam@example.com', responseStatus: 'needsAction', displayName: 'Sam' },
+    ]);
+    // Someone else's event with guests (an invite) stays read-only.
+    expect(parseEvent({ ...simple, organizer: { email: 'boss@example.com' }, attendees: [{ email: 'me@example.com', self: true }] })?.editable).toBe(false);
   });
 
   it('an untitled event shows "(No title)"', () => {
@@ -204,22 +250,29 @@ describe('a day in the month grid (job #47)', () => {
 
 describe('editing an event', () => {
   it('a new event is an hour from 9:00 on the chosen day', () => {
-    expect(newDraft('2026-10-07')).toEqual({ title: '', allDay: false, startDate: '2026-10-07', startTime: '09:00', endDate: '2026-10-07', endTime: '10:00' });
+    expect(newDraft('2026-10-07')).toEqual({ title: '', allDay: false, startDate: '2026-10-07', startTime: '09:00', endDate: '2026-10-07', endTime: '10:00', guests: [] });
   });
 
   it('fills the form from an event (an all-day event’s last day is shown, not the day after)', () => {
-    expect(draftFor(timed())).toEqual({ title: 'Dentist', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00' });
+    expect(draftFor(timed())).toEqual({ title: 'Dentist', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] });
     expect(draftFor(timed({ allDay: true, start: '2026-10-08', end: '2026-10-10' }))).toMatchObject({ allDay: true, startDate: '2026-10-08', endDate: '2026-10-09' });
   });
 
+  it('an untitled event opens with an empty title, so "(No title)" is never sent as its name (2026-10-17)', () => {
+    const untitled = parseEvent({ id: 'u', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } })!;
+    expect(untitled.title).toBe('(No title)');
+    expect(draftFor(untitled).title).toBe('');
+    expect(draftBody(draftFor(untitled), 'UTC')?.summary).toBe('');
+  });
+
   it('moving the start day moves the end day with it', () => {
-    const d = { title: 'Trip', allDay: true, startDate: '2026-10-08', startTime: '09:00', endDate: '2026-10-09', endTime: '10:00' };
+    const d = { title: 'Trip', allDay: true, startDate: '2026-10-08', startTime: '09:00', endDate: '2026-10-09', endTime: '10:00', guests: [] };
     expect(moveDraftStart(d, '2026-10-20')).toMatchObject({ startDate: '2026-10-20', endDate: '2026-10-21' });
     expect(moveDraftStart(d, '')).toBe(d);
   });
 
   it('turns a timed draft into what Google takes, in the person’s time zone', () => {
-    const body = draftBody({ title: ' Dentist ', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:30' }, 'Europe/London');
+    const body = draftBody({ title: ' Dentist ', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:30', guests: [] }, 'Europe/London');
     expect(body).toEqual({
       summary: 'Dentist',
       start: { dateTime: '2026-10-06T10:00:00', timeZone: 'Europe/London' },
@@ -228,12 +281,12 @@ describe('editing an event', () => {
   });
 
   it('turns an all-day draft into dates, the end day after the last', () => {
-    const body = draftBody({ title: 'Holiday', allDay: true, startDate: '2026-10-08', startTime: '', endDate: '2026-10-09', endTime: '' }, 'Europe/London');
+    const body = draftBody({ title: 'Holiday', allDay: true, startDate: '2026-10-08', startTime: '', endDate: '2026-10-09', endTime: '', guests: [] }, 'Europe/London');
     expect(body).toEqual({ summary: 'Holiday', start: { date: '2026-10-08' }, end: { date: '2026-10-10' } });
   });
 
   it('refuses an end before the start, or a missing date or time', () => {
-    const d = { title: 'X', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '10:00' };
+    const d = { title: 'X', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '10:00', guests: [] };
     expect(draftBody(d, 'UTC')).toBeNull();
     expect(draftBody({ ...d, endTime: '09:00' }, 'UTC')).toBeNull();
     expect(draftBody({ ...d, endDate: '2026-10-07', endTime: '09:00' }, 'UTC')).not.toBeNull(); // overnight is fine
@@ -243,8 +296,141 @@ describe('editing an event', () => {
   });
 
   it('an empty title is saved as "(No title)" in the list, but sent empty', () => {
-    const body = draftBody({ title: '  ', allDay: true, startDate: '2026-10-08', startTime: '', endDate: '2026-10-08', endTime: '' }, 'UTC');
+    const body = draftBody({ title: '  ', allDay: true, startDate: '2026-10-08', startTime: '', endDate: '2026-10-08', endTime: '', guests: [] }, 'UTC');
     expect(body?.summary).toBe('');
+  });
+});
+
+describe('guests (job #85)', () => {
+  const me = { email: 'me@example.com', self: true, responseStatus: 'accepted' };
+  const sam = { email: 'sam@example.com', responseStatus: 'declined' };
+  const withSam = timed({ guests: [me, sam] });
+
+  it('an email address must look like one', () => {
+    expect(isEmail('sam@example.com')).toBe(true);
+    expect(isEmail('a.b+c@sub.example.co.uk')).toBe(true);
+    for (const bad of ['', 'sam', 'sam@', '@example.com', 'sam@example', 'sam @example.com', 'sam@exa mple.com', 'a@b@c.com', '<sam@example.com>', 'sam@example.com,pat@example.com', `${'a'.repeat(250)}@example.com`]) {
+      expect(isEmail(bad), bad).toBe(false);
+    }
+  });
+
+  it('the form shows the other guests, not the person themself', () => {
+    expect(draftFor(withSam).guests).toEqual(['sam@example.com']);
+  });
+
+  it('asks about update emails only when there are guests, before or after the change', () => {
+    expect(emailGuests(timed(), null)).toBe(false);
+    expect(emailGuests(timed({ guests: [me] }), draftFor(timed({ guests: [me] })))).toBe(false);
+    expect(emailGuests(withSam, null)).toBe(true);
+    expect(emailGuests(withSam, { ...draftFor(withSam), guests: [] })).toBe(true); // all removed
+    expect(emailGuests(timed(), { ...draftFor(timed()), guests: ['pat@example.com'] })).toBe(true); // first one added
+    expect(emailGuests(null, { ...newDraft('2026-10-07'), guests: ['pat@example.com'] })).toBe(true);
+    expect(emailGuests(null, newDraft('2026-10-07'))).toBe(false);
+  });
+
+  it('sends the guest list only when it changed, keeping the person and existing guests as Google gave them', () => {
+    expect(guestChanges(withSam, draftFor(withSam))).toBeNull();
+    expect(guestChanges(withSam, { ...draftFor(withSam), guests: ['SAM@example.com'] })).toBeNull(); // case doesn't matter
+    expect(guestChanges(withSam, { ...draftFor(withSam), guests: ['sam@example.com', 'pat@example.com'] })).toEqual([me, sam, { email: 'pat@example.com' }]);
+    expect(guestChanges(withSam, { ...draftFor(withSam), guests: [] })).toEqual([me]);
+    expect(guestChanges(null, newDraft('2026-10-07'))).toBeNull();
+    expect(guestChanges(null, { ...newDraft('2026-10-07'), guests: ['pat@example.com'] })).toEqual([{ email: 'pat@example.com' }]);
+  });
+
+  it('for the whole series, puts only the guests added or removed in the form on the series’ own list (review, 2026-10-17)', () => {
+    const a = { email: 'a@example.com', responseStatus: 'accepted' };
+    const b = { email: 'b@example.com', responseStatus: 'tentative' };
+    const c = { email: 'c@example.com' };
+    const series = timed({ guests: [me, a, b] });
+    // This one event was given C instead of B on its own; the person now removes A, for all events:
+    // the series loses A only (C, given to this one event alone, isn't spread).
+    const one = timed({ guests: [me, a, c] });
+    expect(guestChanges(one, { ...draftFor(one), guests: ['c@example.com'] }, series)).toEqual([me, b]);
+    expect(guestChanges(one, { ...draftFor(one), guests: ['a@example.com', 'c@example.com', 'pat@example.com'] }, series)).toEqual([me, a, b, { email: 'pat@example.com' }]);
+    expect(guestChanges(one, draftFor(one), series)).toBeNull();
+  });
+
+  it('adding a guest already there, or the person themself, changes nothing', () => {
+    expect(withGuest(withSam, ['sam@example.com'], 'pat@example.com')).toEqual(['sam@example.com', 'pat@example.com']);
+    expect(withGuest(withSam, ['sam@example.com'], 'Sam@Example.com')).toEqual(['sam@example.com']);
+    expect(withGuest(withSam, ['sam@example.com'], 'ME@example.com')).toEqual(['sam@example.com']);
+    expect(withGuest(null, [], 'pat@example.com')).toEqual(['pat@example.com']);
+  });
+});
+
+describe('all events in a repeating series (job #85)', () => {
+  it('puts only what was changed in the form on the series, which keeps its own first day', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    const was = { ...series, startDate: '2026-10-16', endDate: '2026-10-16' };
+    // New times and length go on the series' first day.
+    const d = { ...was, startTime: '09:30', endTime: '09:45' };
+    expect(seriesDraft(d, was, series)).toEqual({ ...d, startDate: '2026-09-01', endDate: '2026-09-01' });
+    // An overnight or several-day event keeps its length.
+    expect(seriesDraft({ ...d, endDate: '2026-10-18' }, was, series)).toMatchObject({ startDate: '2026-09-01', endDate: '2026-09-03', startTime: '09:30' });
+    // Finding 1: this one event was moved to 10:00 on its own; a new title alone keeps the series at 09:00.
+    const moved = { ...was, startTime: '10:00', endTime: '10:15' };
+    expect(seriesDraft({ ...moved, title: 'Daily sync' }, moved, series)).toEqual({ ...series, title: 'Daily sync' });
+    // And the other way: renamed on its own, a new time alone keeps the series' title.
+    const renamed = { ...was, title: 'Planning' };
+    expect(seriesDraft({ ...renamed, startTime: '11:00', endTime: '11:15' }, renamed, series)).toEqual({ ...series, startTime: '11:00', endTime: '11:15' });
+  });
+
+  it('a title changed only by spaces is not a new title for the series (2026-10-17)', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    const renamed = { ...series, title: 'Planning', startDate: '2026-10-16', endDate: '2026-10-16' };
+    expect(seriesDraft({ ...renamed, title: 'Planning ', startTime: '09:30', endTime: '09:45' }, renamed, series).title).toBe('Stand-up');
+  });
+
+  it('an event changed on its own also gets the new title and guests, keeping its own time (finding 2, 2026-10-17)', () => {
+    const series = timed({ id: 'su', title: 'Stand-up', start: '2026-09-01T09:00', end: '2026-09-01T09:15', editable: false });
+    const usual = timed({ id: 'su_1016', title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15' });
+    // Just like the rest of the series: the series' change reaches it, so nothing more is sent.
+    expect(exceptionChange(usual, { ...draftFor(usual), title: 'Daily sync' }, series)).toBeNull();
+    // Moved to 10:00 on its own: the new title goes on it too, but no time.
+    const moved = { ...usual, start: '2026-10-16T10:00', end: '2026-10-16T10:15' };
+    expect(exceptionChange(moved, { ...draftFor(moved), title: 'Daily sync', startTime: '11:00', endTime: '11:15' }, series)).toEqual({ summary: 'Daily sync' });
+    // Moved on its own to another day, at the series' time: still changed on its own (review, 2026-10-17).
+    const otherDay = { ...usual, start: '2026-10-17T09:00', end: '2026-10-17T09:15', moved: true };
+    expect(exceptionChange(otherDay, { ...draftFor(otherDay), title: 'Daily sync' }, series)).toEqual({ summary: 'Daily sync' });
+    // Renamed on its own: a new time alone sends it nothing; a stray space isn't a new title.
+    const renamed = { ...usual, title: 'Planning' };
+    expect(exceptionChange(renamed, { ...draftFor(renamed), startTime: '09:30', endTime: '09:45' }, series)).toBeNull();
+    expect(exceptionChange(renamed, { ...draftFor(renamed), title: ' Planning ' }, series)).toBeNull();
+    // Guests changed here go on it as on its own list.
+    const sam = { email: 'sam@example.com', responseStatus: 'accepted' };
+    expect(exceptionChange(renamed, { ...draftFor(renamed), guests: ['sam@example.com'] }, series)).toEqual({ attendees: [{ email: 'sam@example.com' }] });
+    const withSam = { ...usual, guests: [sam] };
+    expect(exceptionChange(withSam, { ...draftFor(withSam), title: 'Daily sync' }, series)).toEqual({ summary: 'Daily sync' });
+  });
+
+  it('a new start or a new end alone goes on the series as such (review, 2026-10-17)', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    // This one event was moved to 10:00–10:15 on its own.
+    const moved = { ...series, startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:00', endTime: '10:15' };
+    // Only the end changed (30 minutes long now): the series keeps its 09:00 start.
+    expect(seriesDraft({ ...moved, endTime: '10:30' }, moved, series)).toMatchObject({ startTime: '09:00', endTime: '09:30', endDate: '2026-09-01' });
+    // Only the start changed: the series starts then and ends as the form says.
+    expect(seriesDraft({ ...moved, startTime: '09:30' }, moved, series)).toMatchObject({ startTime: '09:30', endTime: '10:15', endDate: '2026-09-01' });
+    // A late series made longer runs over midnight into the next day.
+    const late = { ...series, startTime: '23:00', endTime: '23:30' };
+    const lateOne = { ...late, startDate: '2026-10-16', endDate: '2026-10-16' };
+    expect(seriesDraft({ ...lateOne, endDate: '2026-10-17', endTime: '00:30' }, lateOne, late)).toMatchObject({ startTime: '23:00', endTime: '00:30', endDate: '2026-09-02' });
+  });
+
+  it('is offered only for a repeating event still on its own day and still timed (or still all-day)', () => {
+    const one = timed({ series: 'su' });
+    expect(canChangeSeries(one, draftFor(one))).toBe(true);
+    expect(canChangeSeries(one, { ...draftFor(one), startTime: '11:00', endTime: '12:00', title: 'X' })).toBe(true);
+    expect(canChangeSeries(one, moveDraftStart(draftFor(one), '2026-10-07'))).toBe(false);
+    expect(canChangeSeries(one, { ...draftFor(one), allDay: true })).toBe(false);
+    expect(canChangeSeries(timed(), draftFor(timed()))).toBe(false);
+  });
+
+  it('keeps the time zone a timed event is kept in, which the series is repeated in', () => {
+    const raw = { id: 's', start: { dateTime: '2026-09-01T09:00:00-04:00', timeZone: 'America/New_York' }, end: { dateTime: '2026-09-01T09:15:00-04:00', timeZone: 'America/New_York' } };
+    expect(parseEvent(raw)?.timeZone).toBe('America/New_York');
+    expect(parseEvent({ ...raw, start: { dateTime: '2026-09-01T09:00:00Z' } })?.timeZone).toBeNull();
+    expect(parseEvent({ id: 'h', start: { date: '2026-09-01' }, end: { date: '2026-09-02' } })?.timeZone).toBeNull();
   });
 });
 

@@ -1804,6 +1804,14 @@ a.cal-open { align-self: flex-start; }
 .tb-button.cal-save, .tb-button.cal-connect { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .tb-button.cal-delete { margin-left: auto; color: var(--danger); }
 .confirm.cal-confirm { margin: 4px 0 0; }
+.cal-confirm .confirm-actions { flex-wrap: wrap; }
+.cal-confirm .history-note { margin: 0; }
+.cal-fields { display: contents; }
+/* An event's guests (job #85): one line each, with a button to remove them. */
+.cal-guests { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.cal-guests li { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px; }
+.cal-guest { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cal-when input[type='email'] { flex: 1; min-width: 0; }
 
 /* The calendar panel's drag strip (owner request, 2026-10-16): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */

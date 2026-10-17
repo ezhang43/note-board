@@ -1,5 +1,13 @@
 # Changelog
 
+## Google Calendar: "All events" changes only what you edited (2026-10-17)
+
+- When one event of a repeating series had been moved on its own (say to 10:00 in a 09:00 series), changing just its title with "All events in the series" moved the whole series to 10:00. Now only what you changed in the form goes to the series; its time, title and guests otherwise stay as they were.
+- The same goes for guests (only those you added or removed change for the series) and for the end time (a new end alone keeps the series' own start time).
+- If that one event was made all-day (or timed) on its own, "All events" now says to change the series in Google Calendar instead of giving the series wrong times.
+- Deleting with "All events in the series" still deletes every event of it, including ones changed on their own, as Google Calendar does.
+- Your boards are untouched.
+
 ## Phone touch fixes (2026-10-17)
 
 - Text boxes are 16px on a phone (notes, list and container titles, checklist items, the Timer's minutes), so iPhone Safari no longer zooms the page in when you tap one. Page zoom is still allowed. On a phone the smaller text size stops at 16px.
@@ -15,6 +23,15 @@
 - New sections, in this order: Try it, How it works (3 steps), Everything on one board (6 tiles), the comparison, What you can count on (free, private by default, works offline, yours to keep or delete), Quick answers (3 questions, with a link to all the questions), and the closing Start button.
 - Every claim was checked against the app and the Privacy policy. For example, it does not say "no account needed", because you sign in with Google. No testimonials or user numbers.
 - Nothing in the app or in saved boards changed.
+
+## Google Calendar: repeating events and guests (2026-10-16)
+
+- Fixed: renaming one event of a series that was changed on its own, with "All events in the series", now renames that event too (it keeps its own time). Adding a stray space no longer counts as a new title, and an untitled event is no longer saved with "(No title)" as its name.
+- Repeating events you organise can now be changed and deleted in the calendar panel. It asks whether you mean only this event or all events in the series.
+- You can see, add (by email address) and remove guests on your own events, new ones too. When an event has guests, saving or deleting it asks whether to send update emails to them.
+- Events from other people, events with their own reminders and special kinds like Out of office still open in Google Calendar. So does changing every event of a series that Google keeps in another time zone.
+- The Privacy policy says that guests' email addresses go to Google Calendar and guests are emailed only when you choose Send.
+- Your boards are untouched; calendar events still aren't board data (no undo, not synced).
 
 ## Phone menu as tiles (2026-10-16)
 

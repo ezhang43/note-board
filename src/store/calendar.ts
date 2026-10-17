@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { dayKey, draftBody, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -12,6 +12,9 @@ export const NO_WINDOW = 'Google’s window didn’t open or was closed. Click C
 export const NOT_GIVEN = 'Calendar access wasn’t given. Click Connect Google Calendar to allow it.';
 export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try again later.';
 export const BAD_TIMES = 'The end must be after the start.';
+export const BAD_EMAIL = 'That doesn’t look like an email address.';
+export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
+export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 
 /** Where the calendar is and how to get a token for it (kept in memory only, never saved). */
 export interface CalendarSource {
@@ -23,11 +26,23 @@ export interface CalendarSource {
   prepare?(): void;
 }
 
+/** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
 export interface CalendarApi {
   list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
-  create(body: EventBody): Promise<void>;
-  update(id: string, body: EventBody): Promise<void>;
-  remove(id: string): Promise<void>;
+  /** One event: a repeating event's series, to find its first day. */
+  get(id: string): Promise<CalEvent | null>;
+  create(body: EventBody, notify?: boolean): Promise<void>;
+  /** Without a start and end (an event changed on its own getting a new title), its time stays. */
+  update(id: string, body: Partial<EventBody>, notify?: boolean): Promise<void>;
+  remove(id: string, notify?: boolean): Promise<void>;
+}
+
+/** The person's answers to the questions the form asks before saving or deleting (job #85). */
+export interface Choice {
+  /** "All events in the series" rather than "Only this event". */
+  all?: boolean;
+  /** "Send" update emails to guests; not asked (or "Don't send") never emails. */
+  notify?: boolean;
 }
 
 /** Local midnight at the start of a day, as the API wants it. */
@@ -50,10 +65,11 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
   const ok = (res: Response) => {
     if (!res.ok) throw new Error(`Calendar API: ${res.status}`);
   };
-  const one = (id: string) => `${events}/${encodeURIComponent(id)}`;
+  const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
+  const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
   return {
     async list(from, to) {
-      // Repeating events come as single events (each read-only), in time order.
+      // Repeating events come as single events (each with its series' id), in time order.
       // simple: one page of up to 250 events, plenty for a month; more would need nextPageToken.
       const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
       const res = await call(`${events}?${q}`);
@@ -61,18 +77,23 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       const body = (await res.json()) as { items?: unknown };
       return Array.isArray(body.items) ? body.items.map(parseEvent).filter((e): e is CalEvent => e !== null) : [];
     },
-    async create(body) {
-      ok(await call(events, { method: 'POST', body: JSON.stringify(body) }));
+    async get(id) {
+      const res = await call(one(id));
+      ok(res);
+      return parseEvent(await res.json());
     },
-    async update(id, body) {
+    async create(body, notify) {
+      ok(await call(`${events}${updates(notify)}`, { method: 'POST', body: JSON.stringify(body) }));
+    },
+    async update(id, body, notify) {
       // Google merges a changed start / end with the old one: clear the kind not used now, else a
       // timed event made all-day (or back) would have both a date and a time, which Google refuses.
       const clear = { date: null, dateTime: null, timeZone: null };
-      const patch = { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } };
-      ok(await call(one(id), { method: 'PATCH', body: JSON.stringify(patch) }));
+      const patch = body.start && body.end ? { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } } : body;
+      ok(await call(one(id, notify), { method: 'PATCH', body: JSON.stringify(patch) }));
     },
-    async remove(id) {
-      const res = await call(one(id), { method: 'DELETE' });
+    async remove(id, notify) {
+      const res = await call(one(id, notify), { method: 'DELETE' });
       // Already deleted (in Google Calendar, say): that's what was wanted.
       if (res.status !== 404 && res.status !== 410) ok(res);
     },
@@ -111,7 +132,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     state = { ...state, ...patch };
     listeners.forEach((l) => l());
   };
-  const editable = (id: string) => state.events?.some((e) => e.id === id && e.editable) ?? false;
+  const editable = (id: string) => state.events?.find((e) => e.id === id && e.editable);
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   async function load() {
@@ -175,28 +196,60 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     resetWidth(view: CalView) {
       this.setWidth(view, PANEL_DEFAULT[view]);
     },
-    /** Adds (`id` null) or changes a simple event. Resolves to a note to show, or null when it worked. */
-    async save(id: string | null, draft: Draft): Promise<string | null> {
-      if (!api || (id !== null && !editable(id))) return SAVE_FAILED;
-      const body = draftBody(draft, timeZone());
+    /**
+     * Adds (`id` null) or changes an event, with the person's answers to "Only this event / All
+     * events in the series" and "Send update emails to guests?". Resolves to a note to show, or null.
+     */
+    async save(id: string | null, draft: Draft, choice: Choice = {}): Promise<string | null> {
+      const event = id === null ? null : editable(id);
+      if (!api || event === undefined) return SAVE_FAILED;
+      let body = draftBody(draft, timeZone());
       if (!body) return BAD_TIMES;
+      if (!draft.guests.every(isEmail)) return BAD_EMAIL;
+      // The whole series keeps its days: only offered while the event is still on its own day.
+      const all = choice.all === true;
+      if (all && !canChangeSeries(event, draft)) return SAVE_FAILED;
+      // Guests are sent only when the person changed them here (from what this event had).
+      let attendees = guestChanges(event, draft);
+      const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
+      let own: Partial<EventBody> | null = null;
+      let failed = false;
       try {
-        await (id === null ? api.create(body) : api.update(id, body));
+        if (all && event?.series) {
+          const series = await api.get(event.series);
+          if (!series) return SAVE_FAILED;
+          // simple: the series' times are written in this device's time zone, so one kept in
+          // another zone (which its repeat rule follows) is left to Google Calendar.
+          if (!series.allDay && series.timeZone !== timeZone()) return SERIES_ZONE;
+          // This event made all-day (or timed) on its own: its times don't fit the series.
+          if (series.allDay !== event.allDay) return SERIES_ALL_DAY;
+          body = draftBody(seriesDraft(draft, draftFor(event), draftFor(series)), timeZone());
+          if (!body) return SAVE_FAILED;
+          // Only the guests added or removed here change the series' own list (and its guests' answers stay).
+          if (attendees) attendees = guestChanges(event, draft, series);
+          own = exceptionChange(event, draft, series);
+        }
+        if (attendees) body = { ...body, attendees };
+        await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
+        // The series has changed even if this one doesn't: show the calendar as it now is, and say so.
+        if (event && own) failed = await api.update(event.id, own, notify).then(() => false, () => true);
       } catch {
         return SAVE_FAILED;
       }
       await load();
-      return null;
+      return failed ? SAVE_FAILED : null;
     },
-    /** Deletes a simple event (after the panel asked). No undo: it's Google's, not the board's. */
-    async remove(id: string): Promise<string | null> {
-      if (!api || !editable(id)) return SAVE_FAILED;
+    /** Deletes an event, or its whole series (after the panel asked). No undo: it's Google's, not the board's. */
+    async remove(id: string, choice: Choice = {}): Promise<string | null> {
+      const event = editable(id);
+      if (!api || !event) return SAVE_FAILED;
+      const series = choice.all === true ? event.series : null;
       try {
-        await api.remove(id);
+        await api.remove(series ?? id, emailGuests(event, null) ? choice.notify === true : undefined);
       } catch {
         return SAVE_FAILED;
       }
-      set({ events: state.events?.filter((e) => e.id !== id) ?? null });
+      set({ events: state.events?.filter((e) => e.id !== id && (series === null || e.series !== series)) ?? null });
       return null;
     },
   };

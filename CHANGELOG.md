@@ -1,5 +1,11 @@
 # Changelog
 
+## Shared board from a newer app no longer holds back your boards (2026-10-17)
+
+- If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.
+- Opening the link of such a board, or of your own shared board, no longer takes you off it; you stay on it, so the link works once your app is updated.
+- Shared boards already on your device and your saved boards are untouched.
+
 ## Sharing files now hold back auto-publish (2026-10-17)
 
 - Changes to the sharing, account and board-merging code (`src/store/sharing.ts`, `src/store/account.ts`, `src/model/sharing.ts`, `src/model/merge.ts`) now wait for your "publish" instead of going live on their own, like the other saving and sync files.

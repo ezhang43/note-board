@@ -6,6 +6,11 @@
 - Opening the link of such a board, or of your own shared board, no longer takes you off it; you stay on it, so the link works once your app is updated.
 - Shared boards already on your device and your saved boards are untouched.
 
+## Sharing files now hold back auto-publish (2026-10-17)
+
+- Changes to the sharing, account and board-merging code (`src/store/sharing.ts`, `src/store/account.ts`, `src/model/sharing.ts`, `src/model/merge.ts`) now wait for your "publish" instead of going live on their own, like the other saving and sync files.
+- Nothing in the app changes, and your boards are untouched.
+
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 
 - Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Google Calendar: "All events" from an event moved on its own (2026-10-17)
+
+- Changing the time of a whole series with "All events in the series", from an event that had been changed on its own, could say "That change didn’t reach Google Calendar" even though the series had changed, and trying again kept failing until the page was reloaded. The event's own change is now sent first, so this no longer happens.
+- If the event's own change goes through but the series' doesn't, it now says "Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later." Save again to send the rest.
+- Your boards are untouched.
+
 ## Google Calendar: "All events" changes only what you edited (2026-10-17)
 
 - When one event of a repeating series had been moved on its own (say to 10:00 in a 09:00 series), changing just its title with "All events in the series" moved the whole series to 10:00. Now only what you changed in the form goes to the series; its time, title and guests otherwise stay as they were.

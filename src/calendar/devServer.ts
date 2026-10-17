@@ -11,6 +11,7 @@ import { dayKey as dateKey } from '../model/calendar';
 // "Book club" in 2 days 18:00–19:00 (someone else's, the person invited).
 // Only what the panel uses: list (timeMin / timeMax), get, add, change and delete on calendars/primary,
 // for one event of a series or the whole series (its id), with guests and sendUpdates (job #85).
+// Moving a series' time gives its events new ids, as Google can (job #88).
 
 type Event = Record<string, unknown> & { id: string; start: When; end: When };
 type When = { date?: string; dateTime?: string; timeZone?: string };
@@ -172,13 +173,27 @@ export function devCalendarPlugin(): Plugin {
             const end = merge(events[found].end, body.end);
             if ((start.date && start.dateTime) || (end.date && end.dateTime)) return send(400, { error: { code: 400, message: 'Invalid start time.' } });
             const fields = { ...(body.summary !== undefined && { summary: body.summary }), ...(body.attendees !== undefined && { attendees: body.attendees }) };
+            const newTime = ms(start) !== ms(events[found].start);
             events[found] = { ...events[found], ...fields, start, end };
             if (events[found].recurringEventId) changedAlone.add(`${who}/${id}`);
             // The whole series: its events not changed on their own follow, each on its own day.
             if (events[found].recurrence) {
               for (const [i, e] of events.entries()) {
-                if (e.recurringEventId !== id || changedAlone.has(`${who}/${e.id}`)) continue;
-                events[i] = { ...e, ...fields, ...shift(e.originalStartTime as When, start, end) };
+                if (e.recurringEventId !== id) continue;
+                const alone = changedAlone.has(`${who}/${e.id}`);
+                if (!alone) {
+                  const to = shift(e.originalStartTime as When, start, end);
+                  events[i] = { ...e, ...fields, ...to, ...(newTime && { originalStartTime: to.start }) };
+                }
+                // Like Google, an event's id comes from its series' time: a new time gives every event a new id (job #88).
+                if (newTime) {
+                  const newId = `${e.id.split('~')[0]}~${next++}`;
+                  events[i] = { ...events[i], id: newId };
+                  if (alone) {
+                    changedAlone.delete(`${who}/${e.id}`);
+                    changedAlone.add(`${who}/${newId}`);
+                  }
+                }
               }
             }
             return send(200, events[found]);

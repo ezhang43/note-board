@@ -324,7 +324,7 @@ function EventForm({ event, start, onDone }: { event: CalEvent | null; start: Dr
     if (step === 'start' && (action === 'delete' || event?.series)) return setAsk({ action, step: 'which' });
     if (step !== 'emails' && emailGuests(event, action === 'save' ? d : null)) return setAsk({ action, step: 'emails', all: choice.all });
     setAsk(null);
-    void run(() => (action === 'save' ? calendar.save(event?.id ?? null, d, choice) : calendar.remove(event!.id, choice)));
+    void run(() => (action === 'save' ? calendar.save(event, d, choice) : calendar.remove(event!.id, choice)));
   }
 
   const title = !ask ? '' : ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;

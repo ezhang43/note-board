@@ -62,6 +62,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const CALENDAR_HOME = 'https://calendar.google.com/';
+const UNTITLED = '(No title)';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -185,7 +186,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     (e.eventType === undefined || e.eventType === 'default');
   return {
     id: e.id,
-    title: typeof e.summary === 'string' && e.summary.trim() ? e.summary : '(No title)',
+    title: typeof e.summary === 'string' && e.summary.trim() ? e.summary : UNTITLED,
     allDay: start.allDay,
     start: start.at,
     end: end.at,
@@ -242,8 +243,10 @@ export function newDraft(key: DayKey): Draft {
 
 export function draftFor(e: CalEvent): Draft {
   const guests = others(e);
-  if (e.allDay) return { title: e.title, allDay: true, startDate: e.start, startTime: '09:00', endDate: addDays(e.end, -1), endTime: '10:00', guests };
-  return { title: e.title, allDay: false, startDate: e.start.slice(0, 10), startTime: e.start.slice(11), endDate: e.end.slice(0, 10), endTime: e.end.slice(11), guests };
+  // The "(No title)" shown for an untitled event is the form's placeholder, never sent as its name.
+  const title = e.title === UNTITLED ? '' : e.title;
+  if (e.allDay) return { title, allDay: true, startDate: e.start, startTime: '09:00', endDate: addDays(e.end, -1), endTime: '10:00', guests };
+  return { title, allDay: false, startDate: e.start.slice(0, 10), startTime: e.start.slice(11), endDate: e.end.slice(0, 10), endTime: e.end.slice(11), guests };
 }
 
 // Guests (job #85): the person's own events can have guests added (by email address) and removed.
@@ -297,12 +300,27 @@ export function seriesDraft(d: Draft, was: Draft, series: Draft): Draft {
   const pad = (n: number) => String(n).padStart(2, '0');
   return {
     ...series,
-    title: d.title !== was.title ? d.title : series.title,
+    title: d.title.trim() !== was.title.trim() ? d.title : series.title,
     startTime: start,
     endTime: `${pad(Math.floor((end % 1440) / 60))}:${pad(end % 60)}`,
     endDate: addDays(series.startDate, Math.floor(end / 1440)),
     guests: d.guests,
   };
+}
+
+/**
+ * "All events" from an event that was changed on its own (finding 2, 2026-10-17): the series'
+ * change may not reach it (Google can keep its own title), so the title and guests changed in the
+ * form go on it too. Only when it differs from the series on its day; its own time stays. Null: nothing to send.
+ */
+export function exceptionChange(e: CalEvent, d: Draft, series: CalEvent): Partial<EventBody> | null {
+  const was = draftFor(e);
+  const usual = moveDraftStart(draftFor(series), was.startDate);
+  const own = (['title', 'startTime', 'endTime', 'endDate'] as const).some((k) => usual[k] !== was[k]) || !same(usual.guests, was.guests);
+  if (!own) return null;
+  const attendees = guestChanges(e, d);
+  const change = { ...(d.title.trim() !== was.title.trim() && { summary: d.title.trim() }), ...(attendees && { attendees }) };
+  return Object.keys(change).length ? change : null;
 }
 
 /**

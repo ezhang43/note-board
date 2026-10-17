@@ -236,7 +236,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   expect(errors).toEqual([]);
 });
 
-test('“All events” after one event was moved on its own changes only what was edited, not the series’ time (finding 1)', async ({ page }) => {
+test('“All events” after one event was moved on its own changes only what was edited, not the series’ time, and renames that event too (findings 1, 2)', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   // Today's stand-up moves to 10:00 on its own.
@@ -254,6 +254,8 @@ test('“All events” after one event was moved on its own changes only what wa
   await expect(form(page)).toHaveCount(0);
   await expect(day(page, daysFromToday(1)).getByRole('button', { name: '09:00 – 09:15 Daily sync' })).toBeVisible();
   await expect(day(page, daysFromToday(2)).getByRole('button', { name: '09:00 – 09:15 Daily sync' })).toBeVisible();
+  // Finding 2: the edited event itself shows the new title too, at its own time.
+  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

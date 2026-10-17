@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, draftBody, draftFor, emailGuests, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -32,7 +32,8 @@ export interface CalendarApi {
   /** One event: a repeating event's series, to find its first day. */
   get(id: string): Promise<CalEvent | null>;
   create(body: EventBody, notify?: boolean): Promise<void>;
-  update(id: string, body: EventBody, notify?: boolean): Promise<void>;
+  /** Without a start and end (an event changed on its own getting a new title), its time stays. */
+  update(id: string, body: Partial<EventBody>, notify?: boolean): Promise<void>;
   remove(id: string, notify?: boolean): Promise<void>;
 }
 
@@ -88,7 +89,7 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       // Google merges a changed start / end with the old one: clear the kind not used now, else a
       // timed event made all-day (or back) would have both a date and a time, which Google refuses.
       const clear = { date: null, dateTime: null, timeZone: null };
-      const patch = { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } };
+      const patch = body.start && body.end ? { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } } : body;
       ok(await call(one(id, notify), { method: 'PATCH', body: JSON.stringify(patch) }));
     },
     async remove(id, notify) {
@@ -211,6 +212,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       // Guests are sent only when the person changed them here (from what this event had).
       let attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
+      let own: Partial<EventBody> | null = null;
       try {
         if (all && event?.series) {
           const series = await api.get(event.series);
@@ -224,9 +226,11 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           if (!body) return SAVE_FAILED;
           // Only the guests added or removed here change the series' own list (and its guests' answers stay).
           if (attendees) attendees = guestChanges(event, draft, series);
+          own = exceptionChange(event, draft, series);
         }
         if (attendees) body = { ...body, attendees };
         await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
+        if (event && own) await api.update(event.id, own, notify);
       } catch {
         return SAVE_FAILED;
       }

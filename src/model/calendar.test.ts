@@ -15,6 +15,7 @@ import {
   draftFor,
   emailGuests,
   eventsOnDay,
+  exceptionChange,
   guestChanges,
   isEmail,
   monthGrid,
@@ -248,6 +249,13 @@ describe('editing an event', () => {
     expect(draftFor(timed({ allDay: true, start: '2026-10-08', end: '2026-10-10' }))).toMatchObject({ allDay: true, startDate: '2026-10-08', endDate: '2026-10-09' });
   });
 
+  it('an untitled event opens with an empty title, so "(No title)" is never sent as its name (2026-10-17)', () => {
+    const untitled = parseEvent({ id: 'u', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } })!;
+    expect(untitled.title).toBe('(No title)');
+    expect(draftFor(untitled).title).toBe('');
+    expect(draftBody(draftFor(untitled), 'UTC')?.summary).toBe('');
+  });
+
   it('moving the start day moves the end day with it', () => {
     const d = { title: 'Trip', allDay: true, startDate: '2026-10-08', startTime: '09:00', endDate: '2026-10-09', endTime: '10:00', guests: [] };
     expect(moveDraftStart(d, '2026-10-20')).toMatchObject({ startDate: '2026-10-20', endDate: '2026-10-21' });
@@ -356,6 +364,31 @@ describe('all events in a repeating series (job #85)', () => {
     // And the other way: renamed on its own, a new time alone keeps the series' title.
     const renamed = { ...was, title: 'Planning' };
     expect(seriesDraft({ ...renamed, startTime: '11:00', endTime: '11:15' }, renamed, series)).toEqual({ ...series, startTime: '11:00', endTime: '11:15' });
+  });
+
+  it('a title changed only by spaces is not a new title for the series (2026-10-17)', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    const renamed = { ...series, title: 'Planning', startDate: '2026-10-16', endDate: '2026-10-16' };
+    expect(seriesDraft({ ...renamed, title: 'Planning ', startTime: '09:30', endTime: '09:45' }, renamed, series).title).toBe('Stand-up');
+  });
+
+  it('an event changed on its own also gets the new title and guests, keeping its own time (finding 2, 2026-10-17)', () => {
+    const series = timed({ id: 'su', title: 'Stand-up', start: '2026-09-01T09:00', end: '2026-09-01T09:15', editable: false });
+    const usual = timed({ id: 'su_1016', title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15' });
+    // Just like the rest of the series: the series' change reaches it, so nothing more is sent.
+    expect(exceptionChange(usual, { ...draftFor(usual), title: 'Daily sync' }, series)).toBeNull();
+    // Moved to 10:00 on its own: the new title goes on it too, but no time.
+    const moved = { ...usual, start: '2026-10-16T10:00', end: '2026-10-16T10:15' };
+    expect(exceptionChange(moved, { ...draftFor(moved), title: 'Daily sync', startTime: '11:00', endTime: '11:15' }, series)).toEqual({ summary: 'Daily sync' });
+    // Renamed on its own: a new time alone sends it nothing; a stray space isn't a new title.
+    const renamed = { ...usual, title: 'Planning' };
+    expect(exceptionChange(renamed, { ...draftFor(renamed), startTime: '09:30', endTime: '09:45' }, series)).toBeNull();
+    expect(exceptionChange(renamed, { ...draftFor(renamed), title: ' Planning ' }, series)).toBeNull();
+    // Guests changed here go on it as on its own list.
+    const sam = { email: 'sam@example.com', responseStatus: 'accepted' };
+    expect(exceptionChange(renamed, { ...draftFor(renamed), guests: ['sam@example.com'] }, series)).toEqual({ attendees: [{ email: 'sam@example.com' }] });
+    const withSam = { ...usual, guests: [sam] };
+    expect(exceptionChange(withSam, { ...draftFor(withSam), title: 'Daily sync' }, series)).toEqual({ summary: 'Daily sync' });
   });
 
   it('a new start or a new end alone goes on the series as such (review, 2026-10-17)', () => {

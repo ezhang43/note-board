@@ -17,6 +17,7 @@
 
 ## Google Calendar: repeating events and guests (2026-10-16)
 
+- Fixed: renaming one event of a series that was changed on its own, with "All events in the series", now renames that event too (it keeps its own time). Adding a stray space no longer counts as a new title, and an untitled event is no longer saved with "(No title)" as its name.
 - Repeating events you organise can now be changed and deleted in the calendar panel. It asks whether you mean only this event or all events in the series.
 - You can see, add (by email address) and remove guests on your own events, new ones too. When an event has guests, saving or deleting it asks whether to send update emails to them.
 - Events from other people, events with their own reminders and special kinds like Out of office still open in Google Calendar. So does changing every event of a series that Google keeps in another time zone.

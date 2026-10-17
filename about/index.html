@@ -26,17 +26,64 @@
       </nav>
     </header>
     <main>
-      <section class="hero">
+      <section class="hero" id="demo">
         <h1>BusyAnts</h1>
         <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
         <a class="start" href="../">Start your board, free</a>
-        <picture class="hero-board">
-          <source srcset="./board-dark.webp" media="(prefers-color-scheme: dark)" />
-          <img class="shot" src="./board.webp" width="960" height="600" alt="A BusyAnts board: containers of checklists and notes on a warm cream background." />
-        </picture>
+        <div class="hero-board demo">
+          <!-- A short silent clip: tick an item, fold a container, drag a card, type a new item. The still picture is for "reduce motion". -->
+          <video class="shot" autoplay muted loop playsinline preload="metadata" width="960" height="600" poster="./board.webp" aria-label="A short silent demo of a BusyAnts board: ticking an item so it moves to Completed, folding a container, dragging a card, typing a new item.">
+            <source src="./demo-dark.webm" type="video/webm" media="(prefers-color-scheme: dark)" />
+            <source src="./demo-dark.mp4" type="video/mp4" media="(prefers-color-scheme: dark)" />
+            <source src="./demo.webm" type="video/webm" />
+            <source src="./demo.mp4" type="video/mp4" />
+          </video>
+          <picture class="demo-still">
+            <source srcset="./board-dark.webp" media="(prefers-color-scheme: dark)" />
+            <img class="shot" src="./board.webp" width="960" height="600" alt="A BusyAnts board: containers of checklists and notes on a warm cream background." />
+          </picture>
+          <button class="demo-toggle" type="button">Pause demo</button>
+        </div>
+        <script>
+          // "Reduce motion" keeps the still picture and never plays the clip. Browsers differ on whether they honour
+          // media= on a video's sources, so pick the light or dark clip here (and its poster) from the computer's setting.
+          (() => {
+            const video = document.querySelector('.demo video');
+            const toggle = document.querySelector('.demo-toggle');
+            const label = () => (toggle.textContent = video.paused ? 'Play demo' : 'Pause demo');
+            video.addEventListener('play', label);
+            video.addEventListener('pause', label);
+            let held = false; // the visitor pressed Pause: a change of light / dark must not start it again
+            toggle.addEventListener('click', () => {
+              held = !video.paused;
+              if (held) video.pause();
+              else video.play().catch(label);
+            });
+            if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              video.removeAttribute('autoplay');
+              video.preload = 'none';
+              video.pause();
+              label();
+              return;
+            }
+            const dark = matchMedia('(prefers-color-scheme: dark)');
+            const pick = () => {
+              const src = [...video.querySelectorAll('source')].find((s) => video.canPlayType(s.type) && (!s.media || matchMedia(s.media).matches));
+              const still = document.querySelector('.demo-still source');
+              video.poster = dark.matches ? still.getAttribute('srcset') : document.querySelector('.demo-still img').getAttribute('src');
+              if (src && video.getAttribute('src') !== src.getAttribute('src')) {
+                video.autoplay = !held;
+                video.src = src.getAttribute('src');
+                if (!held) video.play().catch(label); // autoplay can be blocked: then the button says Play
+              }
+            };
+            pick();
+            dark.addEventListener('change', pick);
+          })();
+        </script>
       </section>
 
-      <section class="column">
+      <section class="column" id="try">
         <details open>
           <summary><h2>Try it: tick one off</h2></summary>
           <ul class="highlights">
@@ -59,7 +106,55 @@
         </details>
       </section>
 
-      <section class="compare-section">
+      <section class="band" id="how">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li>
+            <h3>Sign in with Google</h3>
+            <p>One click, any Google account. Your boards are saved online, so they open on every device you sign in on.</p>
+          </li>
+          <li>
+            <h3>Fill your board</h3>
+            <p>Add notes, checklists and containers, then drag them where you want them.</p>
+          </li>
+          <li>
+            <h3>Share it, if you like</h3>
+            <p>Press Share and send the link. Anyone who opens it and signs in with Google can plan on the same board, and changes reach everyone within a second or two.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="band" id="features">
+        <h2>Everything on one board</h2>
+        <ul class="tiles">
+          <li>
+            <h3>Share by link</h3>
+            <p>Send a link and plan together on the same board, in real time.</p>
+          </li>
+          <li>
+            <h3>Works offline</h3>
+            <p>Open it once online and it opens without internet. Your changes are saved when you're back.</p>
+          </li>
+          <li>
+            <h3>Installs like an app</h3>
+            <p>Add it to your computer, iPhone, iPad or Android phone, with its own window and icon.</p>
+          </li>
+          <li>
+            <h3>Version history</h3>
+            <p>Earlier versions are saved as you work. Look at one, then restore it.</p>
+          </li>
+          <li>
+            <h3>Google Calendar</h3>
+            <p>See your Google Calendar beside your board, and add or change simple events.</p>
+          </li>
+          <li>
+            <h3>Bring your notes</h3>
+            <p>Import Markdown, text, web pages, Trello or Google Keep exports, and PDFs.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="compare-section" id="compare">
         <h2>How BusyAnts stacks up</h2>
         <table class="compare">
           <caption>BusyAnts next to Milanote, Notion, Miro and Trello, on their free plans</caption>
@@ -104,7 +199,39 @@
         <p class="compare-note">Compared with each app's free plan and public feature pages, October 2026. A dash means we couldn't confirm it. Features change; tell us if something's out of date: <a href="mailto:ezhang43@gmail.com">ezhang43@gmail.com</a>. More in BusyAnts: Google Calendar beside your board, a focus timer, and imports from other apps (<a href="../faq/#import">how</a>).</p>
       </section>
 
-      <section class="closing">
+      <section class="trust" id="trust">
+        <div class="trust-inner">
+          <h2>What you can count on</h2>
+          <ul>
+            <li><strong>Free</strong> Every feature, with no limit on cards, containers or boards, and no ads.</li>
+            <li><strong>Private by default</strong> Only you can see your boards, unless you share one. No analytics or tracking.</li>
+            <li><strong>Works offline</strong> Once you've opened it online, it opens without internet.</li>
+            <li><strong>Yours to keep or delete</strong> Download a backup any time. Delete your account in the app and everything saved online goes at once, except any feedback you sent.</li>
+          </ul>
+          <p>The details are in the <a href="../privacy/">Privacy policy</a>.</p>
+        </div>
+      </section>
+
+      <section class="band" id="faq">
+        <h2>Quick answers</h2>
+        <div class="faq-preview">
+          <div>
+            <h3>Is BusyAnts free?</h3>
+            <p>Yes. Every feature is free, with no limit on how many cards, containers or boards you make, and no ads.</p>
+          </div>
+          <div>
+            <h3>Does it work offline?</h3>
+            <p>Yes. Once you've opened BusyAnts online on a device, it opens there without internet too. Changes you make offline are saved online when you're back.</p>
+          </div>
+          <div>
+            <h3>How does sharing work?</h3>
+            <p>Open a board, press Share, then Share this board, and send the link. Anyone who opens it and signs in with Google gets that board and can change everything on it. Only the person who shared it can turn the link off.</p>
+          </div>
+        </div>
+        <a class="more" href="../faq/">See all questions</a>
+      </section>
+
+      <section class="closing" id="start">
         <h2>Ready to clear your head?</h2>
         <p class="lead">Free, no card, no limits. Works offline.</p>
         <a class="start" href="../">Start your board, free</a>

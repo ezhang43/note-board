@@ -2,7 +2,7 @@
  * The website pages beside the app (about/, faq/, terms/, privacy/, delete-account/): the "Done List" look
  * (job #79, owner decision 2026-10-16). A big honey block at the top of every page holds the nav and the page
  * title (warm brown in dark mode); under it, calm reading on a plain page. Two widths line everything up:
- * --wide (header, board picture, table, footer) and --column (the reading column). Follows the computer's
+ * --wide (header, demo clip, steps, tiles, table, footer) and --column (the reading column). Follows the computer's
  * light / dark setting.
  */
 :root {
@@ -162,6 +162,29 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 .start:hover { filter: brightness(1.06); }
 .hero .start { margin-top: 32px; background: var(--slab-btn); color: var(--slab-btn-ink); }
 .hero-board { display: block; max-width: var(--wide); margin: clamp(40px, 6vw, 64px) auto 0; }
+/* The demo clip, with a Pause / Play button over its corner. "Reduce motion" shows the still picture instead. */
+.demo { position: relative; }
+.demo-still { display: none; }
+.demo-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.6); /* so it shows on the dark clip too */
+  border-radius: 999px;
+  background: rgba(28, 27, 25, 0.9);
+  color: #fff;
+  font: 600 15px/1 var(--font);
+  cursor: pointer;
+}
+.demo-toggle:hover { background: #1c1b19; }
+.demo-toggle:focus-visible { outline: 3px solid var(--honey); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .demo video,
+  .demo-toggle { display: none; }
+  .demo-still { display: block; }
+}
 .shot {
   display: block;
   width: 100%;
@@ -174,9 +197,11 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 
 /* The reading column and the wider table section share the page's centre line */
 .column,
-.compare-section { margin: 0 auto; padding: 0 var(--gutter); }
+.compare-section,
+.band { margin: 0 auto; padding: 0 var(--gutter); }
 .column { max-width: calc(var(--column) + 2 * var(--gutter)); padding-top: clamp(56px, 8vw, 96px); }
-.compare-section { max-width: calc(var(--wide) + 2 * var(--gutter)); padding-top: clamp(64px, 9vw, 112px); }
+.compare-section,
+.band { max-width: calc(var(--wide) + 2 * var(--gutter)); padding-top: clamp(64px, 9vw, 112px); }
 
 /* Try it: the three highlights as a to-do list. Ticked rows move under "Completed" (CSS only: flex order). */
 .highlights { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--hair); }
@@ -216,6 +241,39 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
   font-size: 14px;
   font-weight: 600;
 }
+
+/* How it works: the delete-account step badges again, three across on a computer */
+.band .steps { margin: 0; }
+.band .steps li { margin: 0; padding: 0 0 28px 50px; }
+.band .steps h3,
+.tiles h3,
+.faq-preview h3 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.band .steps p,
+.tiles p,
+.faq-preview p { margin: 0; color: var(--ink2); font-size: 16px; }
+@media (min-width: 760px) {
+  .band .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+  .band .steps li { padding: 52px 0 0; }
+}
+
+/* Feature tiles: three across on a computer, two on a tablet, one on a phone */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.tiles li { padding: 22px 22px 24px; border: 1px solid var(--hair); border-top: 4px solid var(--honey); border-radius: 12px; background: var(--ground); }
+
+/* Trust band: a soft honey strip of plain facts (each one is in the FAQ or the Privacy policy) */
+.trust { margin-top: clamp(64px, 9vw, 112px); padding: clamp(40px, 6vw, 64px) var(--gutter); background: var(--soft); }
+.trust-inner { max-width: var(--wide); margin: 0 auto; }
+.trust h2 { margin-bottom: 28px; }
+.trust ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 24px; margin: 0; padding: 0; list-style: none; }
+.trust li { font-size: 16px; }
+.trust li strong { display: block; margin-bottom: 4px; font-family: var(--display); font-size: 20px; font-weight: 700; }
+.trust p { margin: 28px 0 0; font-size: 15px; }
+
+/* Quick answers: three questions from the FAQ, and a link to the rest */
+.faq-preview { max-width: var(--column); border-bottom: 1px solid var(--hair); }
+.faq-preview > div { padding: 18px 0; border-top: 1px solid var(--hair); }
+.more { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; font-weight: 600; }
+.more::after { content: '→' / ''; margin-left: 8px; }
 
 /* Comparison table: a real table on a computer, one block per feature on a phone */
 .compare { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 1.3; }

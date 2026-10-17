@@ -452,6 +452,28 @@ describe('restoring a version while offline (job #93)', () => {
     }
   });
 
+  it('does nothing if Back to current was pressed and the same version picked again meanwhile', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging, look } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      store.endPreview();
+      look();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a safety version that fails to save (not just waits) still stops the restore', async () => {
+    const { store, hanging } = await offline();
+    const failing = { ...hanging, save: async () => Promise.reject(new Error('denied')) };
+    await expect(restoreVersion(store, failing, 'old')).rejects.toThrow();
+    expect(store.getState().board.name).toBe('Now');
+  });
+
   it('does nothing if another version is being looked at by then', async () => {
     vi.useFakeTimers();
     try {

@@ -514,3 +514,148 @@ test.describe('on a phone-sized screen', () => {
     await expect(ant).toHaveAttribute('target', '_blank');
   });
 });
+
+// Job #87 (owner decisions, 2026-10-17): a silent looping demo video replaces the big board picture, and the About page
+// gains 3 steps, feature tiles, a trust band and a FAQ preview. The tests run with "reduce motion" on (see
+// playwright.config.ts), so the video ones turn it off for themselves.
+const SECTION_IDS = ['demo', 'try', 'how', 'features', 'compare', 'trust', 'faq', 'start'];
+
+test('the About page sections come in this order: demo, Try it, 3 steps, feature tiles, comparison, trust band, FAQ preview, closing', async ({ page }) => {
+  await page.goto('/about/');
+  await expect(page.locator('main > *')).toHaveCount(SECTION_IDS.length);
+  expect(await page.locator('main > *').evaluateAll((els) => els.map((e) => `${e.tagName}#${e.id}`))).toEqual(SECTION_IDS.map((id) => `SECTION#${id}`));
+  await expect(page.locator('#how h2')).toHaveText('How it works');
+  await expect(page.locator('#how ol.steps > li')).toHaveCount(3);
+  await expect(page.locator('#features h2')).toHaveText('Everything on one board');
+  expect(await page.locator('#features ul.tiles > li').count()).toBeGreaterThanOrEqual(6);
+  await expect(page.locator('#trust h2')).toHaveText('What you can count on');
+  await expect(page.locator('#faq h2')).toHaveText('Quick answers');
+  await expect(page.locator('#faq h3')).toHaveCount(3);
+});
+
+test('the demo video is silent, loops, plays by itself and has the board picture as its poster', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/about/');
+  const video = page.locator('.hero video');
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute('autoplay', '');
+  await expect(video).toHaveAttribute('loop', '');
+  await expect(video).toHaveAttribute('playsinline', '');
+  await expect(video).toHaveAttribute('width', '960');
+  await expect(video).toHaveAttribute('height', '600');
+  await expect(video).toHaveAttribute('poster', /board.*\.webp/);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.muted && v.loop)).toBe(true);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.poster)).toMatch(/board.*\.webp$/);
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+  // The picture is only the still for "reduce motion"; it is not shown beside the video.
+  await expect(page.locator('.hero img.shot')).toBeHidden();
+  // Short, and kept small: every clip is under 300 KB (MP4 for Safari and iPhone, WebM for the rest).
+  const sources = await video.locator('source').evaluateAll((els: HTMLSourceElement[]) => els.map((s) => ({ src: s.src, type: s.type })));
+  expect(sources.map((s) => s.type).sort()).toEqual(['video/mp4', 'video/mp4', 'video/webm', 'video/webm']);
+  for (const s of sources) {
+    const res = await page.request.get(s.src);
+    expect(res.ok(), s.src).toBe(true);
+    expect((await res.body()).length, s.src).toBeLessThan(300 * 1024);
+  }
+  const duration = await video.evaluate((v: HTMLVideoElement) => new Promise<number>((r) => (v.duration ? r(v.duration) : v.addEventListener('loadedmetadata', () => r(v.duration), { once: true }))));
+  expect(duration).toBeGreaterThanOrEqual(10);
+  expect(duration).toBeLessThanOrEqual(15);
+});
+
+test("the demo video has a light and a dark version, picked by the computer's setting", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto('/about/');
+    const video = page.locator('.hero video');
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentSrc.split('/').pop()), scheme).toMatch(scheme === 'dark' ? /^demo-dark.*\.webm$/ : /^demo(?!-dark).*\.webm$/);
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.poster.split('/').pop()), scheme).toMatch(scheme === 'dark' ? /^board-dark.*\.webp$/ : /^board(?!-dark).*\.webp$/);
+  }
+});
+
+test('the demo video has a Pause / Play button you can reach and use with the keyboard', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/about/');
+  const video = page.locator('.hero video');
+  const button = page.locator('.hero').getByRole('button', { name: /demo/ });
+  await expect(button).toHaveText('Pause demo');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await button.click();
+  await expect(button).toHaveText('Play demo');
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  // Tab reaches it from the Start button, it shows a focus ring, and Space / Enter work it.
+  await page.getByRole('link', { name: 'Start your board, free' }).first().focus();
+  await page.keyboard.press('Tab');
+  await expect(button).toBeFocused();
+  expect(await button.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+  await page.keyboard.press('Space');
+  await expect(button).toHaveText('Pause demo');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(button).toHaveText('Play demo');
+  expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
+test('with "reduce motion" the still board picture is shown and the video does not play or load', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/about/');
+  const video = page.locator('.hero video');
+  await expect(video).toBeHidden();
+  await expect(page.locator('.hero').getByRole('button', { name: /demo/ })).toBeHidden();
+  const still = page.locator('.hero').getByRole('img', { name: /BusyAnts board/ });
+  await expect(still).toBeVisible();
+  expect(await still.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await page.waitForTimeout(500);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused && v.currentTime === 0 && !v.hasAttribute('autoplay') && v.preload === 'none')).toBe(true);
+});
+
+test('the demo and the new sections fit a phone: no sideways scrolling, a tappable Pause button', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/about/');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const video = (await page.locator('.hero video').boundingBox())!;
+    expect(video.x).toBeGreaterThanOrEqual(16);
+    expect(video.x + video.width).toBeLessThanOrEqual(width - 16 + 1);
+    const button = (await page.locator('.hero').getByRole('button', { name: /demo/ }).boundingBox())!;
+    expect(button.height).toBeGreaterThanOrEqual(44);
+    expect(button.x).toBeGreaterThanOrEqual(video.x);
+    expect(button.x + button.width).toBeLessThanOrEqual(video.x + video.width);
+    for (const id of ['how', 'features', 'trust', 'faq']) {
+      const b = (await page.locator(`#${id}`).boundingBox())!;
+      expect(b.x + b.width, id).toBeLessThanOrEqual(width);
+    }
+  }
+});
+
+test('the steps, tiles and trust band make only claims the app and the Privacy page back', async ({ page }) => {
+  await page.goto('/about/');
+  // Not built, or not true: none of these may appear.
+  for (const text of [/avatar/i, /presence/i, /per-person/i, /no account/i, /no sign-?in/i, /two clicks/i, /testimonial/i, /\d[\d,]*\+? (users|people|teams)/i]) {
+    await expect(page.locator('main'), String(text)).not.toContainText(text);
+  }
+  const trust = page.locator('#trust');
+  await expect(trust.locator('ul > li')).toHaveCount(4);
+  await expect(trust.locator('ul > li strong')).toHaveText(['Free', 'Private by default', 'Works offline', 'Yours to keep or delete']);
+  await expect(trust).toContainText('no limit on cards, containers or boards');
+  await expect(trust).toContainText('no ads');
+  await expect(trust.getByRole('link', { name: 'Privacy policy' })).toHaveAttribute('href', '../privacy/');
+  // Sharing is by Google sign-in, so the steps say so.
+  await expect(page.locator('#how')).toContainText('Sign in with Google');
+});
+
+test('the FAQ preview has three questions that are on the FAQ page, and a link to all of them', async ({ page }) => {
+  await page.goto('/about/');
+  const preview = page.locator('#faq');
+  const questions = await preview.locator('h3').allTextContents();
+  expect(questions).toEqual(['Is BusyAnts free?', 'Does it work offline?', 'How does sharing work?']);
+  const all = preview.getByRole('link', { name: 'See all questions' });
+  await expect(all).toHaveAttribute('href', '../faq/');
+  await all.click();
+  await expect(page).toHaveURL(/\/faq\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Questions and answers');
+  const faqHeadings = await page.locator('main h2').allTextContents();
+  for (const q of ['Is BusyAnts free?', 'Does it work offline?']) expect(faqHeadings).toContain(q);
+  expect(faqHeadings.some((h) => h.startsWith('How does sharing work'))).toBe(true);
+});

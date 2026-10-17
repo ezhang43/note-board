@@ -1,5 +1,12 @@
 # Changelog
 
+## About page: demo video and new sections (2026-10-17)
+
+- The big board picture on the About page is now a short silent demo video (about 14 seconds, loops). It shows ticking an item so it moves to Completed, folding a container, dragging a card so it snaps into place, and typing a new item. It has a light and a dark version, a Pause / Play button you can reach with the keyboard, and the old board picture as its poster. If your computer is set to "reduce motion", the still picture is shown instead and nothing plays.
+- New sections, in this order: Try it, How it works (3 steps), Everything on one board (6 tiles), the comparison, What you can count on (free, private by default, works offline, yours to keep or delete), Quick answers (3 questions, with a link to all the questions), and the closing Start button.
+- Every claim was checked against the app and the Privacy policy. For example, it does not say "no account needed", because you sign in with Google. No testimonials or user numbers.
+- Nothing in the app or in saved boards changed.
+
 ## About page: sharper picture, folding "Try it", new ending (2026-10-16)
 
 - The sample-board picture on the About page is sharp now. It was too small (and reduced to 256 colours), so it looked blurry on most screens. Both the light and the dark picture were retaken at twice the size in full colour (WebP, about 290 KB and 260 KB), and they look the same size on the page.

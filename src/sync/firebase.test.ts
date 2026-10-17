@@ -49,9 +49,6 @@ vi.mock('firebase/firestore', () => ({
 
 const { collabRemote, sendFeedback, boardRemote } = await import('./firebase');
 const firestore = await import('firebase/firestore');
-const { startSync } = await import('../store/sync');
-const { createStore } = await import('../store/store');
-const { serializeWorkspace } = await import('../model/workspace');
 const user = { uid: 'u1', displayName: 'Bob', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
 beforeEach(() => {
@@ -93,7 +90,8 @@ describe('leaving a shared board online', () => {
 
 // Job 92 (whole-app review, H1): signed in and offline, with changes this device hadn't sent yet,
 // reopening the board stayed on "Opening your board…": every snapshot carried those unsent changes
-// ("pending writes") and was skipped, and offline the server never confirms them.
+// ("pending writes") and was skipped, and offline the server never confirms them. What startSync
+// does with such a first version is tested in src/store/sync.test.ts.
 describe('opening your board offline with unsent changes (job 92)', () => {
   type Snap = { exists: () => boolean; data: () => unknown; metadata: { fromCache: boolean; hasPendingWrites: boolean } };
   const snap = (data: unknown, fromCache: boolean, hasPendingWrites: boolean): Snap => ({
@@ -101,61 +99,46 @@ describe('opening your board offline with unsent changes (job 92)', () => {
     data: () => data,
     metadata: { fromCache, hasPendingWrites },
   });
-  /** Starts watching boards/u1 and returns a way to hand it snapshots, as Firestore would. */
-  function watching(onChange: (doc: unknown) => void) {
+  /** Watches boards/u1, noting what it reports, and returns a way to hand it snapshots as Firestore would. */
+  function watching(got: unknown[]) {
     let next: (s: Snap) => void = () => {};
     vi.mocked(firestore.onSnapshot).mockImplementation(((_ref: unknown, _opts: unknown, fn: (s: Snap) => void) => {
       next = fn;
       return () => {};
     }) as never);
-    boardRemote('u1').watch(onChange, () => {});
+    boardRemote('u1').watch((d) => got.push(d), () => {});
     return (s: Snap) => next(s);
   }
 
-  it('opens from this device’s copy, unsent changes included', () => {
+  it('opens from this device’s copy, unsent changes included, saying they are not on the server yet', () => {
     const got: unknown[] = [];
-    const send = watching((d) => got.push(d));
-    send(snap({ data: 'mine', client: 'old-page' }, true, true));
-    expect(got).toEqual([{ data: 'mine', client: 'old-page' }]);
+    watching(got)(snap({ data: 'mine', client: 'old-page' }, true, true));
+    expect(got).toEqual([{ data: 'mine', client: 'old-page', pending: true }]);
   });
 
-  it('once open, its own unconfirmed saves are still skipped', () => {
+  it('once open, unconfirmed saves are still skipped', () => {
     const got: unknown[] = [];
-    const send = watching((d) => got.push(d));
+    const send = watching(got);
     send(snap({ data: 'v1', client: 'x' }, true, false));
     send(snap({ data: 'v2', client: 'me' }, true, true));
-    expect(got).toEqual([{ data: 'v1', client: 'x' }]);
+    send(snap({ data: 'v2', client: 'me' }, false, false));
+    expect(got).toEqual([
+      { data: 'v1', client: 'x' },
+      { data: 'v2', client: 'me' },
+    ]);
   });
 
-  it('a delete not yet sent is never taken for “there is no online board” (that would upload this device’s board again)', () => {
+  it('a delete not yet sent is never taken for “there is no online board” (that would upload this device’s boards again)', () => {
     const got: unknown[] = [];
-    const send = watching((d) => got.push(d));
+    const send = watching(got);
     send(snap(undefined, false, true));
     send(snap(undefined, true, true));
     expect(got).toEqual([]);
   });
 
-  it('the board opens, and when the changes reach the server nothing is sent again or replaced', () => {
-    const store = createStore(null, (fn) => fn());
-    const ws = { ...store.workspace() };
-    const home = ws.boards[ws.home];
-    const mine = serializeWorkspace({ home: ws.home, boards: { [ws.home]: { ...home, name: 'Made offline' } } });
-    let next: (s: Snap) => void = () => {};
-    vi.mocked(firestore.onSnapshot).mockImplementation(((_ref: unknown, _opts: unknown, fn: (s: Snap) => void) => {
-      next = fn;
-      return () => {};
-    }) as never);
-    vi.mocked(firestore.setDoc).mockClear();
-    const onReady = vi.fn();
-    startSync(store, boardRemote('u1'), { client: 'new-page', onReady, onError: () => {} });
-
-    next(snap({ data: mine, client: 'old-page' }, true, true));
-    expect(onReady).toHaveBeenCalledOnce();
-    expect(store.getState().board.name).toBe('Made offline');
-
-    const before = store.workspace();
-    next(snap({ data: mine, client: 'old-page' }, false, false));
-    expect(store.workspace()).toBe(before);
-    expect(firestore.setDoc).not.toHaveBeenCalled();
+  it('an unsent copy that isn’t a board is not opened from, nor taken for “no online board”', () => {
+    const got: unknown[] = [];
+    watching(got)(snap({ data: 42 }, true, true));
+    expect(got).toEqual([]);
   });
 });

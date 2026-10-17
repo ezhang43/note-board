@@ -5,14 +5,16 @@ import type { Store } from './store';
 export interface RemoteDoc {
   data: string;
   client: string;
+  /** Only on this device so far: saves a closed page hadn't sent yet (only ever the first version). */
+  pending?: true;
 }
 
 /** Where the online copy lives (Firestore in the app, a fake in tests). */
 export interface Remote {
   /**
    * Calls `onChange` with each new version of the online copy, or null once it is certain
-   * there is none yet. The first version may be this device's copy with saves not yet sent
-   * (opening offline). Returns a function that stops watching.
+   * there is none yet. The first version may be `pending` (opening offline). Returns a function
+   * that stops watching.
    */
   watch(onChange: (doc: RemoteDoc | null) => void, onError: (e: unknown) => void): () => void;
   /** Resolves once saved online; rejects if the save was refused (stays pending while offline). */
@@ -202,7 +204,8 @@ export function startSync(
   let seen = false;
   const stopWatching = remote.watch((doc) => {
     if (stopped) return;
-    if (doc) seen = true;
+    // Only a version the server has counts: one only on this device may yet be refused.
+    if (doc && !doc.pending) seen = true;
     else if (seen) {
       stopped = true;
       waiting = null;
@@ -219,8 +222,12 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       ready = true;
-      lastSynced = ownKey(ws);
       store.replaceWorkspace(withShared(ws));
+      // Saves a closed page hadn't sent (job 92): this page sends them again as its own, so it hears
+      // if the server refuses them ("Couldn't save online", and they stay here) instead of having
+      // them replaced unannounced. Firestore sends saves in order, so the copy follows the original.
+      if (doc.pending) upload();
+      else lastSynced = ownKey(ws);
       return opts.onReady();
     }
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.

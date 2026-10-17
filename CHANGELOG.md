@@ -3,7 +3,8 @@
 ## Opening your board offline with unsent changes (2026-10-17)
 
 - Signed in, if you closed the app before your last changes reached the internet and then opened it again without internet, it stayed on "Opening your board…". It now opens on the copy saved on this device, those last changes included, and sends them once you are back online.
-- Your boards are untouched: nothing is sent twice, and a change made on another device is handled as before.
+- If the internet then refuses those changes (a board too big to save online, say), the red "Couldn't save online" banner shows and they stay on this device, as when the page had stayed open.
+- Your boards are untouched: nothing changes for boards already saved online, and a change made on another device is handled as before.
 
 ## Google Calendar: "All events" from an event moved on its own (2026-10-17)
 

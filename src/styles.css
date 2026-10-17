@@ -197,14 +197,56 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   cursor: pointer;
 }
 .phone-add > button:active { background: var(--hover); }
-.phone-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.phone-more .tb-button { height: 44px; font-size: 15px; }
-.phone-more .tb-button.quiet { border-color: var(--control-edge); background: var(--surface); }
-.phone-more .zoom-control button { min-width: 44px; height: 38px; font-size: 15px; }
-.phone-more .tool-button { width: 44px; height: 38px; }
-.phone-more .colour-control > .tb-button { width: 100%; }
-/* The color swatches sit in the sheet, below the Color button, and fit its width. */
-.phone-more .colour-menu { position: static; margin-top: 6px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; box-shadow: none; }
+/* The ⋯ menu (job 74, option B): tiles for what opens, an Arrange group, then a More group of rows. */
+.phone-more { gap: 10px; }
+.phone-label { margin: 0 0 6px 2px; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+.phone-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.phone-more .zoom-control button { min-width: 44px; height: 44px; font-size: 15px; }
+.phone-more .tool-button { width: 44px; height: 44px; }
+/* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
+.phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.phone-trio { margin-top: 6px; }
+.phone-more .share-wrap.phone { display: contents; }
+.phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }
+.phone-tiles > .tb-button, .phone-tiles > .share-wrap > .tb-button, .phone-trio .tb-button {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+  height: auto;
+  padding: 6px 4px;
+  font-size: 13px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.phone-trio .tb-button { min-height: 52px; }
+.phone-tiles > .tb-button svg, .phone-tiles > .share-wrap > .tb-button svg, .phone-trio .tb-button svg { width: 20px; height: 20px; color: var(--ink-soft); }
+.phone-tiles > .tb-button[aria-expanded='true'], .phone-tiles > .share-wrap > .tb-button[aria-expanded='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.phone-tiles .pomodoro-left { color: var(--accent-ink); font-size: 12px; }
+.phone-trio .tb-button.quiet { border-color: var(--control-edge); background: var(--surface); }
+/* Rows: one bordered group, a line between rows, icon at the left. */
+.phone-rows { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.phone-more .phone-rows .tb-button { width: 100%; height: 48px; padding: 0 12px; gap: 10px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font-size: 15px; }
+.phone-more .phone-rows > * + * { border-top: 1px solid var(--line); }
+.phone-rows .tb-button > svg:first-child { color: var(--ink-soft); }
+.phone-rows .colour-control > .tb-button svg:last-child { margin-left: auto; }
+/* Snap to grid and Dark mode read as switches: a track and knob after the label, amber while on. */
+.phone-rows > .tb-button[aria-pressed]::after {
+  content: '';
+  margin-left: auto;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 99px;
+  background: radial-gradient(circle 9px at 12px 12px, var(--surface) 97%, transparent) var(--control-edge);
+}
+.phone-rows > .tb-button[aria-pressed='true']::after {
+  background: radial-gradient(circle 9px at 28px 12px, var(--on-accent) 97%, transparent) var(--accent);
+}
+/* The color swatches and the File menu open inside the sheet, below their row. */
+.phone-more .colour-menu { position: static; padding: 10px 12px 12px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .phone-more .swatch { width: 100%; height: auto; aspect-ratio: 1; }
 .item-bar {
   position: fixed;
@@ -1366,7 +1408,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   cursor: pointer;
 }
 .file-menu button:hover, .file-menu button:focus-visible { background: var(--hover); }
-.phone-more .file-menu { position: static; box-shadow: none; margin-top: 6px; }
+.phone-more .file-menu { position: static; box-shadow: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
 .file-menu button.file-menu-danger { color: var(--danger); }
 
 /* Delete your account (job #63): in the keyboard shortcuts panel's frame. */

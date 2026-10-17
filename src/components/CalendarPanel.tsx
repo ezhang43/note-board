@@ -33,8 +33,8 @@ import { CalendarDaysIcon, CloseIcon, ExternalIcon, PlusIcon } from './icons';
 // deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data: no undo, not in Version history.
 
 /**
- * Opens the panel: a round button by the zoom control (the toolbar is full at 1280px), a line in ⋯
- * on a phone. Only there for someone signed in (or a demo person, locally).
+ * Opens the panel: a round button by the zoom control (the toolbar is full at 1280px), a tile in ⋯
+ * on a phone (`labelled`; its name there is still "Google Calendar"). Only there for someone signed in (or a demo person, locally).
  */
 export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolean; onOpen?: () => void }) {
   const open = useAppState((s) => s.ui.sidePanel === 'calendar');
@@ -56,7 +56,7 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
       }}
     >
       <CalendarDaysIcon />
-      {labelled ? 'Google Calendar' : 'Calendar'}
+      Calendar
     </button>
   );
 }

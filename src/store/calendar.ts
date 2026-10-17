@@ -213,6 +213,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       let attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
       let own: Partial<EventBody> | null = null;
+      let failed = false;
       try {
         if (all && event?.series) {
           const series = await api.get(event.series);
@@ -230,12 +231,13 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         }
         if (attendees) body = { ...body, attendees };
         await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
-        if (event && own) await api.update(event.id, own, notify);
+        // The series has changed even if this one doesn't: show the calendar as it now is, and say so.
+        if (event && own) failed = await api.update(event.id, own, notify).then(() => false, () => true);
       } catch {
         return SAVE_FAILED;
       }
       await load();
-      return null;
+      return failed ? SAVE_FAILED : null;
     },
     /** Deletes an event, or its whole series (after the panel asked). No undo: it's Google's, not the board's. */
     async remove(id: string, choice: Choice = {}): Promise<string | null> {

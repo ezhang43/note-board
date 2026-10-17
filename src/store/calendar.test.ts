@@ -17,6 +17,7 @@ const ev = (id: string, over: Partial<CalEvent> = {}): CalEvent => ({
   series: null,
   guests: [],
   timeZone: null,
+  moved: false,
   ...over,
 });
 
@@ -24,11 +25,12 @@ const mail = (notify?: boolean) => (notify === undefined ? '' : notify ? ' (emai
 
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent> } = {
+  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null } = {
     calls,
     fail: false,
     noAccess: null,
     series: {},
+    failId: null,
     async list(from, to) {
       calls.push(`list ${from} ${to}`);
       if (api.noAccess) throw new NoAccess(api.noAccess);
@@ -50,7 +52,7 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
     async update(id, body, notify) {
       calls.push(`update ${id} ${body.summary}${mail(notify)}`);
       api.bodies.push(body);
-      if (api.fail) throw new Error('403');
+      if (api.fail || id === api.failId) throw new Error('403');
     },
     async remove(id, notify) {
       calls.push(`remove ${id}${mail(notify)}`);
@@ -285,6 +287,18 @@ describe('repeating events and guests (job #85)', () => {
     expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
     expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Daily sync', 'update su_1016 Daily sync']);
     expect(api.bodies[1]).toEqual({ summary: 'Daily sync' });
+  });
+
+  it('when the series changed but the edited event didn’t, it says so and shows the calendar as it now is (review, 2026-10-17)', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    api.failId = 'su_1016';
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const was = { ...change, startTime: '10:00', endTime: '10:15' };
+    expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBe(SAVE_FAILED);
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su Daily sync', 'update su_1016 Daily sync', 'list 2026-10-06 2026-10-13']);
   });
 
   it('“All events” from an event made all-day (or timed) on its own is left to Google Calendar (review, 2026-10-17)', async () => {

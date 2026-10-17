@@ -47,6 +47,7 @@ const timed = (over: Partial<CalEvent> = {}): CalEvent => ({
   series: null,
   guests: [],
   timeZone: null,
+  moved: false,
   ...over,
 });
 
@@ -127,7 +128,15 @@ describe('reading events from Google', () => {
       series: null,
       guests: [],
       timeZone: null,
+      moved: false,
     });
+  });
+
+  it('knows an event of a series moved on its own: its start isn’t where the series put it (review, 2026-10-17)', () => {
+    const one = { ...simple, recurringEventId: 's', originalStartTime: { dateTime: '2026-10-06T10:00:00' } };
+    expect(parseEvent(one)?.moved).toBe(false);
+    expect(parseEvent({ ...one, originalStartTime: { dateTime: '2026-10-05T10:00:00' } })?.moved).toBe(true);
+    expect(parseEvent({ ...one, originalStartTime: 'nonsense' })?.moved).toBe(false);
   });
 
   it('reads an all-day event (its end day is not included)', () => {
@@ -380,6 +389,9 @@ describe('all events in a repeating series (job #85)', () => {
     // Moved to 10:00 on its own: the new title goes on it too, but no time.
     const moved = { ...usual, start: '2026-10-16T10:00', end: '2026-10-16T10:15' };
     expect(exceptionChange(moved, { ...draftFor(moved), title: 'Daily sync', startTime: '11:00', endTime: '11:15' }, series)).toEqual({ summary: 'Daily sync' });
+    // Moved on its own to another day, at the series' time: still changed on its own (review, 2026-10-17).
+    const otherDay = { ...usual, start: '2026-10-17T09:00', end: '2026-10-17T09:15', moved: true };
+    expect(exceptionChange(otherDay, { ...draftFor(otherDay), title: 'Daily sync' }, series)).toEqual({ summary: 'Daily sync' });
     // Renamed on its own: a new time alone sends it nothing; a stray space isn't a new title.
     const renamed = { ...usual, title: 'Planning' };
     expect(exceptionChange(renamed, { ...draftFor(renamed), startTime: '09:30', endTime: '09:45' }, series)).toBeNull();

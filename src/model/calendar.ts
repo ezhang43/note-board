@@ -25,6 +25,8 @@ export interface CalEvent {
   guests: Guest[];
   /** Timed: the time zone Google keeps it in (a series repeats in it), when Google says. */
   timeZone: string | null;
+  /** One event of a series whose start was changed on its own (it isn't where the series put it). */
+  moved: boolean;
 }
 
 /** A guest of an event: the fields of Google's attendee kept, so an unchanged guest is sent back as it was. */
@@ -184,6 +186,8 @@ export function parseEvent(raw: unknown): CalEvent | null {
     !list(reminders?.overrides) &&
     (!organizer || organizer.self === true) &&
     (e.eventType === undefined || e.eventType === 'default');
+  // Where the series put it (one event of a series): a different start means it was moved on its own.
+  const first = readWhen(e.originalStartTime);
   return {
     id: e.id,
     title: typeof e.summary === 'string' && e.summary.trim() ? e.summary : UNTITLED,
@@ -195,6 +199,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     series: typeof e.recurringEventId === 'string' && e.recurringEventId ? e.recurringEventId : null,
     guests: Array.isArray(e.attendees) ? e.attendees.map(readGuest).filter((g): g is Guest => g !== null) : [],
     timeZone: start.allDay ? null : zoneOf(e.start),
+    moved: first !== null && first.at !== start.at,
   };
 }
 
@@ -311,12 +316,12 @@ export function seriesDraft(d: Draft, was: Draft, series: Draft): Draft {
 /**
  * "All events" from an event that was changed on its own (finding 2, 2026-10-17): the series'
  * change may not reach it (Google can keep its own title), so the title and guests changed in the
- * form go on it too. Only when it differs from the series on its day; its own time stays. Null: nothing to send.
+ * form go on it too. Only when it was moved or differs from the series on its day; its own time stays. Null: nothing to send.
  */
 export function exceptionChange(e: CalEvent, d: Draft, series: CalEvent): Partial<EventBody> | null {
   const was = draftFor(e);
   const usual = moveDraftStart(draftFor(series), was.startDate);
-  const own = (['title', 'startTime', 'endTime', 'endDate'] as const).some((k) => usual[k] !== was[k]) || !same(usual.guests, was.guests);
+  const own = e.moved || (['title', 'startTime', 'endTime', 'endDate'] as const).some((k) => usual[k] !== was[k]) || !same(usual.guests, was.guests);
   if (!own) return null;
   const attendees = guestChanges(e, d);
   const change = { ...(d.title.trim() !== was.title.trim() && { summary: d.title.trim() }), ...(attendees && { attendees }) };

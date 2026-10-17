@@ -918,19 +918,34 @@ describe('a shared board this app can’t read, never opened on this device (who
     return { store, sharing, leave };
   }
 
-  it('opening its link when it is already theirs (or they shared it) fails without taking it off their list', async () => {
+  it('opening its link fails without taking anyone off it: its owner, a member, or someone new', async () => {
     await server.server.createShare(dan, 'snew', 'n1', 'newkey', newer, 'dan-page');
     await server.server.join(person('bob'), 'snew', 'newkey');
-    for (const who of [dan, person('bob')]) {
+    for (const who of [dan, person('bob'), person('carol')]) {
+      // A new device (or storage cleared): the link is opened before the list of shared boards has
+      // loaded, so this page doesn't yet know the share is theirs.
       const page = watchedDevice(who);
-      await settle();
       const joined = page.sharing.join('snew', 'newkey');
       joined.catch(() => {});
       await settle();
       await expect(joined).rejects.toThrow();
       expect(page.leave).not.toHaveBeenCalled();
     }
-    expect(server.shares.get('snew')!.people.map((p) => p.uid)).toEqual(['dan', 'bob']);
+    // Still on everyone's list, so a version of the app that can read it opens it.
+    expect(server.shares.get('snew')!.people.map((p) => p.uid)).toEqual(['dan', 'bob', 'carol']);
+    expect(server.shares.get('snew')!.data).toBe(newer);
+  });
+
+  it('its owner opening the link of their share whose starting board is missing isn’t taken off it either', async () => {
+    // Saved by someone it is shared with, without its starting board (the rules allow that).
+    await server.server.createShare(dan, 'sroot', 'n1', 'rootkey', serializeShare('x1', { x1: { ...B.createBoard(), name: 'Other' } }), 'dan-page');
+    const page = watchedDevice(dan);
+    const joined = page.sharing.join('sroot', 'rootkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(page.leave).not.toHaveBeenCalled();
+    expect(server.shares.get('sroot')!.people.map((p) => p.uid)).toEqual(['dan']);
   });
 
   it('a later version this app can read is taken', async () => {

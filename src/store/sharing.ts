@@ -108,6 +108,8 @@ interface Share {
   ready: boolean;
   /** A version that arrived mid-drag, applied once the drag is over. */
   waiting: ShareDoc | null;
+  /** Refused because this app can't read it (saved by a newer one): it stays on the person's list. */
+  unreadable: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   uploading: boolean;
   again: boolean;
@@ -282,13 +284,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function agree(s: Share, boards: Record<string, Board>, rev: number) {
     s.base = boards;
     s.baseRev = rev;
+    s.unreadable = false;
     boardCardKeys(boards).forEach((k) => s.cameWith.add(k));
     saveBase(s);
   }
 
   /** The share can't be used here (security review fix): it holds nothing, and a join waiting on it fails. */
-  function refuse(s: Share) {
+  function refuse(s: Share, unreadable: boolean) {
     s.root = null;
+    s.unreadable = unreadable;
     s.ready = true;
     s.arrived.splice(0).forEach((fn) => fn());
     publish();
@@ -422,23 +426,19 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const missing = !s.root || !now[s.root];
     if (doc.rev > s.baseRev || !s.base || missing) {
       const got = readShare(doc.data);
-      // Saved by a newer app, say: one it had before stays as it was; one never opened here can't
-      // be used (whole-app review H2: waiting on it held back the person's own boards for good).
-      if (!got) {
-        if (!s.base) refuse(s);
-        return;
-      }
-      if (busy()) {
+      if (got && busy()) {
         s.waiting = doc;
         return;
       }
       // Only boards in the share's data, never one of this person's own, and its starting board must
       // be one of them (security review fix: whatever is saved online can't take this person's boards).
-      const boards = safeBoards(s, got.boards, doc.root);
-      // A version without its starting board: one it had before stays as it was (anyone it is
-      // shared with can save anything in it); one never opened here can't be used.
+      const boards = got ? safeBoards(s, got.boards, doc.root) : {};
+      // A version this app can't read (saved by a newer one) or without its starting board: one it
+      // had before stays as it was (anyone it is shared with can save anything in it); one never
+      // opened here can't be used (whole-app review H2: waiting on it held back the person's own
+      // boards for good).
       if (!boards[doc.root] || (s.root && doc.root !== s.root)) {
-        if (!s.base) refuse(s);
+        if (!s.base) refuse(s, !got);
         return;
       }
       const next = s.base && !missing ? mergeBoardSets(s.base, now, boards) : boards;
@@ -515,6 +515,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       baseRev: saved?.rev ?? 0,
       ready: Boolean(saved),
       waiting: null,
+      unreadable: false,
       timer: null,
       uploading: false,
       again: false,
@@ -652,8 +653,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root) {
         // Can't be used here (see refuse): off this person's list again, if this join put it there.
-        // One they already had or shared (saved by a newer app, say) stays theirs (job #91).
-        if (!had && !s.owner) {
+        // Never their own share, and never one this app can't read: this page may not know yet that
+        // it is theirs (shared-boards list not loaded), and a newer version of the app opens it (job #91).
+        if (!had && !s.owner && !s.unreadable) {
           await backend.leave(id).catch(() => {});
           gone(s, 'left');
         }

@@ -259,6 +259,33 @@ test('“All events” after one event was moved on its own changes only what wa
   expect(errors).toEqual([]);
 });
 
+test('“All events” with a new time, from an event moved on its own, reaches both though the series’ new time gives its events new ids (job #88)', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Team stand-up' }).click();
+  await form(page).getByLabel('Start time').fill('10:00');
+  await form(page).getByLabel('End time').fill('10:15');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
+  // Now a new title and a new time for all events: the series moves to 10:30, this one keeps 10:00.
+  await day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Team stand-up' }).click();
+  await form(page).getByLabel('Title').fill('Daily sync');
+  await form(page).getByLabel('Start time').fill('10:30');
+  await form(page).getByLabel('End time').fill('10:45');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+  await expect(form(page)).toHaveCount(0);
+  await expect(day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45 Daily sync' })).toBeVisible();
+  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' })).toBeVisible();
+  // It can still be changed with its new id.
+  await day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' }).click();
+  await form(page).getByLabel('Title').fill('Sync');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
+  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Sync' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('guests can be added and removed; “Send update emails to guests?” is asked only when there are guests', async ({ page }) => {
   const errors = await openAs(page);
   const sent = changesSent(page);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: nothing here is undone, synced with boards or kept in versions.
@@ -53,6 +53,10 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
       calls.push(`update ${id} ${body.summary}${mail(notify)}`);
       api.bodies.push(body);
       if (api.fail || id === api.failId) throw new Error('403');
+      if (!events.some((e) => e.id === id || e.series === id)) throw new Error('404');
+      // Like Google, an event of a series has an id made from its series' time, so changing the
+      // series' times can give its events new ids (simple: any change with a start does here).
+      if (body.start) events = events.map((e) => (e.series === id ? { ...e, id: `${e.id}~` } : e));
     },
     async remove(id, notify) {
       calls.push(`remove ${id}${mail(notify)}`);
@@ -271,9 +275,9 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
-    expect(api.calls[2]).toBe('update su Daily sync');
-    expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:00:00' });
-    expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:15:00' });
+    expect(api.calls[3]).toBe('update su Daily sync');
+    expect(api.bodies[1].start).toMatchObject({ dateTime: '2026-09-01T09:00:00' });
+    expect(api.bodies[1].end).toMatchObject({ dateTime: '2026-09-01T09:15:00' });
   });
 
   it('“All events” renames the edited event too when it was changed on its own, keeping its time (finding 2)', async () => {
@@ -285,11 +289,26 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
-    expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Daily sync', 'update su_1016 Daily sync']);
-    expect(api.bodies[1]).toEqual({ summary: 'Daily sync' });
+    // The event first: the series' change can give it a new id (job #88).
+    expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
+    expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
   });
 
-  it('when the series changed but the edited event didn’t, it says so and shows the calendar as it now is (review, 2026-10-17)', async () => {
+  it('“All events” with a new time and title, from an event changed on its own, reaches both though the series’ change gives it a new id (job #88)', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const was = { ...change, startTime: '10:00', endTime: '10:15' };
+    expect(await cal.save('su_1016', { ...was, title: 'Daily sync', startTime: '10:30', endTime: '10:45' }, { all: true })).toBeNull();
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
+    // Its own time stays; the series gets the new one.
+    expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
+    expect(api.bodies[1].start).toMatchObject({ dateTime: '2026-09-01T10:30:00' });
+  });
+
+  it('when the edited event’s own change fails, nothing is changed and the series isn’t sent (job #88)', async () => {
     const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
     const api = fakeApi([moved]);
     api.series = { title: 'Stand-up' };
@@ -298,7 +317,23 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBe(SAVE_FAILED);
-    expect(api.calls.slice(1)).toEqual(['get su', 'update su Daily sync', 'update su_1016 Daily sync', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync']);
+  });
+
+  it('when the edited event changed but the series didn’t, it says so, and trying again sends both (job #88)', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    api.failId = 'su';
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const draft = { ...change, startTime: '10:00', endTime: '10:15', title: 'Daily sync' };
+    expect(await cal.save('su_1016', draft, { all: true })).toBe(SERIES_FAILED);
+    // Not loaded again: the event still counts as it was, so a second try sends the series the new title.
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
+    api.failId = null;
+    expect(await cal.save('su_1016', draft, { all: true })).toBeNull();
+    expect(api.calls.slice(4, 7)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
   });
 
   it('“All events” from an event made all-day (or timed) on its own is left to Google Calendar (review, 2026-10-17)', async () => {
@@ -338,8 +373,11 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     await cal.save('su_1016', { ...change, guests: ['sam@example.com'] }, { all: true, notify: false });
     expect(api.bodies[0].attendees).toBeUndefined();
-    await cal.save('su_1016', { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false });
-    expect(api.bodies[1].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
+    // The series' new time gave the event a new id.
+    expect(await cal.save(cal.get().events![0].id, { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false })).toBeNull();
+    // This event's guests differ from the series', so it gets the change on its own first (its own answers stay).
+    expect(api.bodies[1].attendees).toEqual([me, sam, { email: 'pat@example.com' }]);
+    expect(api.bodies[2].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
   });
 
   it('deleting one event of a series, or the whole series', async () => {

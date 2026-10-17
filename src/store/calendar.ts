@@ -14,6 +14,7 @@ export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try agai
 export const BAD_TIMES = 'The end must be after the start.';
 export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
+export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 
 /** Where the calendar is and how to get a token for it (kept in memory only, never saved). */
@@ -213,7 +214,6 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       let attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
       let own: Partial<EventBody> | null = null;
-      let failed = false;
       try {
         if (all && event?.series) {
           const series = await api.get(event.series);
@@ -230,14 +230,19 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           own = exceptionChange(event, draft, series);
         }
         if (attendees) body = { ...body, attendees };
-        await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
-        // The series has changed even if this one doesn't: show the calendar as it now is, and say so.
-        if (event && own) failed = await api.update(event.id, own, notify).then(() => false, () => true);
+        // The edited event's own change goes first, since the series' change can give it a new id (job #88).
+        if (event && own) await api.update(event.id, own, notify);
       } catch {
         return SAVE_FAILED;
       }
+      try {
+        await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
+      } catch {
+        // Only this event changed. Not loaded again, so a second try still sends the series what was changed.
+        return own ? SERIES_FAILED : SAVE_FAILED;
+      }
       await load();
-      return failed ? SAVE_FAILED : null;
+      return null;
     },
     /** Deletes an event, or its whole series (after the panel asked). No undo: it's Google's, not the board's. */
     async remove(id: string, choice: Choice = {}): Promise<string | null> {

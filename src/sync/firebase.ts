@@ -148,22 +148,20 @@ export function boardRemote(uid: string): Remote {
         { includeMetadataChanges: true },
         (snap) => {
           const pending = snap.metadata.hasPendingWrites;
+          const d = snap.exists() ? snap.data() : undefined;
+          const data = typeof d?.data === 'string' ? d.data : null;
           // Our own write, not yet confirmed by the server: skipped, except to open the board. Saves
           // this device hadn't sent when it was last closed stay unconfirmed while offline, so the
-          // board opens from them (job 92: it stayed on "Opening your board…"), marked `pending` so
-          // startSync sends them as its own. A delete not yet sent (or anything but a board) is never
-          // taken for "no board", which would upload this device's boards again.
-          if (pending && (opened || !snap.exists() || typeof snap.data().data !== 'string')) return;
-          if (!snap.exists()) {
-            // "No board" from the offline copy may just mean it hasn't been downloaded yet.
-            if (snap.metadata.fromCache) return;
-            opened = true;
-            return onChange(null);
-          }
+          // board opens from them (job 92: it stayed on "Opening your board…"); they are its newest
+          // copy, and the server ends up with them once they arrive. They are marked `pending`.
+          // simple: an unsent delete (or anything but a board) is skipped, so it is never taken for
+          // "no board" (which would upload this device's boards again); reopened offline it still
+          // waits on "Opening your board…". Only deleting the account makes one.
+          if (pending && (opened || data === null)) return;
+          // "No board" from the offline copy may just mean it hasn't been downloaded yet.
+          if (!d && snap.metadata.fromCache) return;
           opened = true;
-          const d = snap.data();
-          if (typeof d.data !== 'string') return onChange(null);
-          onChange({ data: d.data, client: String(d.client ?? ''), ...(pending ? { pending: true } : {}) });
+          onChange(data === null ? null : { data, client: String(d?.client ?? ''), ...(pending ? { pending: true } : {}) });
         },
         onError,
       );

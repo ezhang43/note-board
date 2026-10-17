@@ -52,6 +52,7 @@ const firestore = await import('firebase/firestore');
 const user = { uid: 'u1', displayName: 'Bob', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
 beforeEach(() => {
+  vi.mocked(firestore.onSnapshot).mockReset();
   calls.batches = [];
   calls.deleteDoc = [];
   calls.added = [];

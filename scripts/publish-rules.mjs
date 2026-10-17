@@ -14,6 +14,11 @@ const RISKY = [
   /^src\/model\/history\.ts$/,
   /^src\/model\/versions\.ts$/,
   /^src\/model\/workspace\.ts$/,
+  // Sharing: who may see and change a board, and how copies of a shared board merge.
+  /^src\/store\/sharing\.ts$/,
+  /^src\/store\/account\.ts$/,
+  /^src\/model\/merge\.ts$/,
+  /^src\/model\/sharing\.ts$/,
   /^firestore\.rules$/,
   // The Claude connector changes the owner's saved boards.
   /^mcp\//,

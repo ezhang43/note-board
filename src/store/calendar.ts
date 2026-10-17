@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, draftBody, emailGuests, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, draftBody, draftFor, emailGuests, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -14,6 +14,7 @@ export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try agai
 export const BAD_TIMES = 'The end must be after the start.';
 export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
+export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 
 /** Where the calendar is and how to get a token for it (kept in memory only, never saved). */
 export interface CalendarSource {
@@ -217,10 +218,12 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           // simple: the series' times are written in this device's time zone, so one kept in
           // another zone (which its repeat rule follows) is left to Google Calendar.
           if (!series.allDay && series.timeZone !== timeZone()) return SERIES_ZONE;
-          body = draftBody(seriesDraft(draft, series.start.slice(0, 10)), timeZone());
+          // This event made all-day (or timed) on its own: its times don't fit the series.
+          if (series.allDay !== event.allDay) return SERIES_ALL_DAY;
+          body = draftBody(seriesDraft(draft, draftFor(event), draftFor(series)), timeZone());
           if (!body) return SAVE_FAILED;
-          // The series' own guests (and their answers) are what is sent back.
-          if (attendees) attendees = guestChanges(series, draft);
+          // Only the guests added or removed here change the series' own list (and its guests' answers stay).
+          if (attendees) attendees = guestChanges(event, draft, series);
         }
         if (attendees) body = { ...body, attendees };
         await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));

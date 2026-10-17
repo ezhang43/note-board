@@ -270,22 +270,39 @@ export function withGuest(e: CalEvent | null, guests: string[], email: string): 
 
 /**
  * The guest list to send when it changed, else null (nothing about guests is sent). The person
- * and the guests already there are sent back as Google gave them, so their answers stay.
+ * and the guests already there are sent back as Google gave them, so their answers stay. For the
+ * whole series, `onto` is the series: only the guests added or removed here change its own list.
  */
-export function guestChanges(e: CalEvent | null, d: Draft): Guest[] | null {
-  if (same(others(e), d.guests)) return null;
-  const old = e?.guests ?? [];
-  const kept = old.filter((g) => g.self);
-  return [...kept, ...d.guests.map((email) => old.find((g) => !g.self && g.email.toLowerCase() === email.toLowerCase()) ?? { email })];
+export function guestChanges(e: CalEvent | null, d: Draft, onto: CalEvent | null = e): Guest[] | null {
+  const had = others(e);
+  if (same(had, d.guests)) return null;
+  const has = (list: string[], email: string) => list.some((x) => x.toLowerCase() === email.toLowerCase());
+  const kept = (onto?.guests ?? []).filter((g) => g.self || has(d.guests, g.email) || !has(had, g.email));
+  const added = d.guests.filter((email) => !has(had, email) && !has(kept.map((g) => g.email), email));
+  return [...kept, ...added.map((email) => ({ email }))];
 }
 
 /**
- * "All events in the series" (job #85): the draft's title, times, length and guests, on the
- * series' own first day (moving every event to another day isn't offered).
+ * "All events in the series" (job #85): what the person changed in the form (`d` against `was`,
+ * this event as it opened) put on the series, on its own first day; the rest stays as the series
+ * has it, so a time or title this one event was given on its own doesn't spread to the whole series
+ * (finding 1, 2026-10-17). The guests are worked out apart (guestChanges).
  */
-export function seriesDraft(d: Draft, seriesDay: DayKey): Draft {
-  const span = Math.round((toDate(d.endDate).getTime() - toDate(d.startDate).getTime()) / 86_400_000);
-  return { ...d, startDate: seriesDay, endDate: addDays(seriesDay, span) };
+export function seriesDraft(d: Draft, was: Draft, series: Draft): Draft {
+  // Start and length in minutes from the start day (an all-day draft's times are fixed, so unchanged).
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const length = (x: Draft) => Math.round((toDate(x.endDate).getTime() - toDate(x.startDate).getTime()) / 60_000) + mins(x.endTime) - mins(x.startTime);
+  const start = d.startTime !== was.startTime ? d.startTime : series.startTime;
+  const end = mins(start) + (d.startTime !== was.startTime || length(d) !== length(was) ? length(d) : length(series));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    ...series,
+    title: d.title !== was.title ? d.title : series.title,
+    startTime: start,
+    endTime: `${pad(Math.floor((end % 1440) / 60))}:${pad(end % 60)}`,
+    endDate: addDays(series.startDate, Math.floor(end / 1440)),
+    guests: d.guests,
+  };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: nothing here is undone, synced with boards or kept in versions.
@@ -251,12 +251,36 @@ describe('repeating events and guests (job #85)', () => {
 
   it('“All events in the series” changes the series, keeping its own first day', async () => {
     const api = fakeApi([standUp]);
+    api.series = { title: 'Stand-up' };
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save('su_1016', change, { all: true })).toBeNull();
     expect(api.calls.slice(1, 3)).toEqual(['get su', 'update su Stand-up']);
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:30:00' });
     expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
+  });
+
+  it('“All events” sends the series only what was changed: one event moved on its own doesn’t move the series (finding 1)', async () => {
+    // Today's stand-up was moved to 10:00 on its own; the series (first on 1 Sep) is at 09:00.
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const was = { ...change, startTime: '10:00', endTime: '10:15' };
+    expect(await cal.save('su_1016', { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
+    expect(api.calls[2]).toBe('update su Daily sync');
+    expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:00:00' });
+    expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:15:00' });
+  });
+
+  it('“All events” from an event made all-day (or timed) on its own is left to Google Calendar (review, 2026-10-17)', async () => {
+    const alone = ev('su_1016', { title: 'Stand-up', series: 'su', allDay: true, start: '2026-10-16', end: '2026-10-17' });
+    const api = fakeApi([alone]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save('su_1016', { ...change, title: 'Daily sync', allDay: true, startTime: '09:00', endTime: '10:00' }, { all: true })).toBe(SERIES_ALL_DAY);
+    expect(api.calls.slice(1)).toEqual(['get su']);
   });
 
   it('“All events” is refused when the day was moved, or for an event that doesn’t repeat', async () => {

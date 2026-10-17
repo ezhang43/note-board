@@ -1,5 +1,13 @@
 # Changelog
 
+## Google Calendar: "All events" changes only what you edited (2026-10-17)
+
+- When one event of a repeating series had been moved on its own (say to 10:00 in a 09:00 series), changing just its title with "All events in the series" moved the whole series to 10:00. Now only what you changed in the form goes to the series; its time, title and guests otherwise stay as they were.
+- The same goes for guests (only those you added or removed change for the series) and for the end time (a new end alone keeps the series' own start time).
+- If that one event was made all-day (or timed) on its own, "All events" now says to change the series in Google Calendar instead of giving the series wrong times.
+- Deleting with "All events in the series" still deletes every event of it, including ones changed on their own, as Google Calendar does.
+- Your boards are untouched.
+
 ## About page: demo video and new sections (2026-10-17)
 
 - The big board picture on the About page is now a short silent demo video (about 14 seconds, loops). It shows ticking an item so it moves to Completed, folding a container, dragging a card so it snaps into place, and typing a new item. It has a light and a dark version, a Pause / Play button you can reach with the keyboard, and the old board picture as its poster. If your computer is set to "reduce motion", the still picture is shown instead and nothing plays.

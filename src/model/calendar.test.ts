@@ -320,6 +320,19 @@ describe('guests (job #85)', () => {
     expect(guestChanges(null, { ...newDraft('2026-10-07'), guests: ['pat@example.com'] })).toEqual([{ email: 'pat@example.com' }]);
   });
 
+  it('for the whole series, puts only the guests added or removed in the form on the series’ own list (review, 2026-10-17)', () => {
+    const a = { email: 'a@example.com', responseStatus: 'accepted' };
+    const b = { email: 'b@example.com', responseStatus: 'tentative' };
+    const c = { email: 'c@example.com' };
+    const series = timed({ guests: [me, a, b] });
+    // This one event was given C instead of B on its own; the person now removes A, for all events:
+    // the series loses A only (C, given to this one event alone, isn't spread).
+    const one = timed({ guests: [me, a, c] });
+    expect(guestChanges(one, { ...draftFor(one), guests: ['c@example.com'] }, series)).toEqual([me, b]);
+    expect(guestChanges(one, { ...draftFor(one), guests: ['a@example.com', 'c@example.com', 'pat@example.com'] }, series)).toEqual([me, a, b, { email: 'pat@example.com' }]);
+    expect(guestChanges(one, draftFor(one), series)).toBeNull();
+  });
+
   it('adding a guest already there, or the person themself, changes nothing', () => {
     expect(withGuest(withSam, ['sam@example.com'], 'pat@example.com')).toEqual(['sam@example.com', 'pat@example.com']);
     expect(withGuest(withSam, ['sam@example.com'], 'Sam@Example.com')).toEqual(['sam@example.com']);
@@ -329,11 +342,34 @@ describe('guests (job #85)', () => {
 });
 
 describe('all events in a repeating series (job #85)', () => {
-  it('puts the draft’s title, times and length on the series, which keeps its own first day', () => {
-    const d = { title: 'Stand-up', allDay: false, startDate: '2026-10-16', startTime: '09:30', endDate: '2026-10-16', endTime: '09:45', guests: [] };
-    expect(seriesDraft(d, '2026-09-01')).toEqual({ ...d, startDate: '2026-09-01', endDate: '2026-09-01' });
+  it('puts only what was changed in the form on the series, which keeps its own first day', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    const was = { ...series, startDate: '2026-10-16', endDate: '2026-10-16' };
+    // New times and length go on the series' first day.
+    const d = { ...was, startTime: '09:30', endTime: '09:45' };
+    expect(seriesDraft(d, was, series)).toEqual({ ...d, startDate: '2026-09-01', endDate: '2026-09-01' });
     // An overnight or several-day event keeps its length.
-    expect(seriesDraft({ ...d, endDate: '2026-10-18' }, '2026-09-01')).toMatchObject({ startDate: '2026-09-01', endDate: '2026-09-03' });
+    expect(seriesDraft({ ...d, endDate: '2026-10-18' }, was, series)).toMatchObject({ startDate: '2026-09-01', endDate: '2026-09-03', startTime: '09:30' });
+    // Finding 1: this one event was moved to 10:00 on its own; a new title alone keeps the series at 09:00.
+    const moved = { ...was, startTime: '10:00', endTime: '10:15' };
+    expect(seriesDraft({ ...moved, title: 'Daily sync' }, moved, series)).toEqual({ ...series, title: 'Daily sync' });
+    // And the other way: renamed on its own, a new time alone keeps the series' title.
+    const renamed = { ...was, title: 'Planning' };
+    expect(seriesDraft({ ...renamed, startTime: '11:00', endTime: '11:15' }, renamed, series)).toEqual({ ...series, startTime: '11:00', endTime: '11:15' });
+  });
+
+  it('a new start or a new end alone goes on the series as such (review, 2026-10-17)', () => {
+    const series = { title: 'Stand-up', allDay: false, startDate: '2026-09-01', startTime: '09:00', endDate: '2026-09-01', endTime: '09:15', guests: [] };
+    // This one event was moved to 10:00–10:15 on its own.
+    const moved = { ...series, startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:00', endTime: '10:15' };
+    // Only the end changed (30 minutes long now): the series keeps its 09:00 start.
+    expect(seriesDraft({ ...moved, endTime: '10:30' }, moved, series)).toMatchObject({ startTime: '09:00', endTime: '09:30', endDate: '2026-09-01' });
+    // Only the start changed: the series starts then and ends as the form says.
+    expect(seriesDraft({ ...moved, startTime: '09:30' }, moved, series)).toMatchObject({ startTime: '09:30', endTime: '10:15', endDate: '2026-09-01' });
+    // A late series made longer runs over midnight into the next day.
+    const late = { ...series, startTime: '23:00', endTime: '23:30' };
+    const lateOne = { ...late, startDate: '2026-10-16', endDate: '2026-10-16' };
+    expect(seriesDraft({ ...lateOne, endDate: '2026-10-17', endTime: '00:30' }, lateOne, late)).toMatchObject({ startTime: '23:00', endTime: '00:30', endDate: '2026-09-02' });
   });
 
   it('is offered only for a repeating event still on its own day and still timed (or still all-day)', () => {

@@ -551,3 +551,85 @@ describe('the account deleted on another device', () => {
     expect(onGone).not.toHaveBeenCalled();
   });
 });
+
+// Job 92 (whole-app review, H1): signed in, the page was closed before its last saves reached the
+// server, and it is opened again (offline, say). The online copy then exists only as those unsent
+// saves ("pending"): the board opens from them; the server gets them once they arrive.
+describe('opening from saves a closed page never sent (job 92)', () => {
+  function opened() {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onReady = vi.fn();
+    const onGone = vi.fn();
+    const onSaveState = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady, onError: vi.fn(), onGone, onSaveState });
+    const data = boardJson('Made offline');
+    fake.send({ data, client: 'old-page', pending: true });
+    return { store, fake, onReady, onGone, onSaveState, sync, data };
+  }
+
+  it('opens the board from them, sending nothing (they are on their way already)', () => {
+    const { store, fake, onReady, sync } = opened();
+    expect(onReady).toHaveBeenCalledOnce();
+    expect(store.getState().board.name).toBe('Made offline');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+    sync.stop();
+  });
+
+  it('says “Saving…” until the server has them, then “Saved”; nothing is replaced and nothing is sent', () => {
+    const { store, fake, onSaveState, sync, data } = opened();
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(onSaveState).toHaveBeenLastCalledWith('saving');
+    const before = store.workspace();
+    fake.send({ data, client: 'old-page' });
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+    expect(store.workspace()).toBe(before);
+    expect(fake.writes).toEqual([]);
+    sync.stop();
+  });
+
+  it('edits made after opening are sent as usual', () => {
+    const { store, fake, sync } = opened();
+    store.renameBoard('Edited offline');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Edited offline');
+    sync.stop();
+  });
+
+  it('if the server refuses them and has no board, that is not taken for a deleted account: this page uploads its boards, and says so if that is refused too', async () => {
+    const { store, fake, onGone, onSaveState, sync } = opened();
+    fake.control.fail = true;
+    fake.send(null);
+    expect(onGone).not.toHaveBeenCalled();
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Made offline');
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    // Firestore puts "no board" back again after the refusal: not sent again in a loop.
+    fake.send(null);
+    expect(fake.writes).toHaveLength(1);
+    expect(store.getState().board.name).toBe('Made offline');
+    sync.stop();
+  });
+
+  it('if the server refuses them and has an older board, that board comes back, as before this fix', () => {
+    const { store, fake, sync } = opened();
+    fake.send({ data: boardJson('Older online'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Older online');
+    sync.stop();
+  });
+
+  it('a pending version after one the server has is never taken for a deleted account', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onGone = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onGone });
+    fake.send({ data: boardJson('Online'), client: 'laptop' });
+    fake.send({ data: boardJson('Online'), client: 'laptop', pending: true });
+    expect(onGone).not.toHaveBeenCalled();
+    sync.stop();
+  });
+});

@@ -5,13 +5,19 @@ import type { Store } from './store';
 export interface RemoteDoc {
   data: string;
   client: string;
+  /**
+   * Not on the server yet: saves made on this device (by a page since closed, or another open tab)
+   * still on their way. Only ever the first version.
+   */
+  pending?: true;
 }
 
 /** Where the online copy lives (Firestore in the app, a fake in tests). */
 export interface Remote {
   /**
    * Calls `onChange` with each new version of the online copy, or null once it is certain
-   * there is none yet. Returns a function that stops watching.
+   * there is none yet. The first version may be `pending` (opening offline, or just after a
+   * reload). Returns a function that stops watching.
    */
   watch(onChange: (doc: RemoteDoc | null) => void, onError: (e: unknown) => void): () => void;
   /** Resolves once saved online; rejects if the save was refused (stays pending while offline). */
@@ -135,7 +141,7 @@ export function startSync(
     const ws = store.workspace();
     const key = ownKey(ws);
     if (key === lastSynced) {
-      if (!failed) opts.onSaveState?.('saved');
+      if (!failed && !unconfirmed) opts.onSaveState?.('saved');
       return;
     }
     lastSynced = key;
@@ -199,10 +205,14 @@ export function startSync(
 
   /** An online copy has been seen, so "none" later means it was deleted. */
   let seen = false;
+  /** Opened from saves not yet on the server (`pending`), and no version has come since. */
+  let unconfirmed = false;
   const stopWatching = remote.watch((doc) => {
     if (stopped) return;
-    if (doc) seen = true;
-    else if (seen) {
+    // Only a version the server has counts: one only on this device may yet be refused.
+    if (doc) {
+      if (!doc.pending) seen = true;
+    } else if (seen) {
       stopped = true;
       waiting = null;
       if (timer) clearTimeout(timer);
@@ -220,14 +230,28 @@ export function startSync(
       ready = true;
       lastSynced = ownKey(ws);
       store.replaceWorkspace(withShared(ws));
+      // Opened from saves not on the server yet (job 92): "Saving…" until they are.
+      unconfirmed = Boolean(doc.pending);
+      if (unconfirmed) opts.onSaveState?.('saving');
       return opts.onReady();
+    }
+    const wasUnconfirmed = unconfirmed;
+    unconfirmed = false;
+    // Those saves were refused and there is no online board: upload this page's boards (once), so a
+    // refusal shows as with any upload.
+    if (!doc && wasUnconfirmed) {
+      lastSynced = null;
+      return upload();
     }
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.
     if (!doc || doc.client === opts.client || failed) return;
     const ws = read(doc.data);
     if (!ws) return;
     const data = ownKey(ws);
-    if (data === lastSynced) return;
+    if (data === lastSynced) {
+      if (wasUnconfirmed && !timer) opts.onSaveState?.('saved');
+      return;
+    }
     // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
     if (timer && ownKey(store.workspace()) !== lastSynced) return upload();
     lastSynced = data;

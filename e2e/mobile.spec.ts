@@ -192,8 +192,9 @@ test.describe('on a phone-sized screen', () => {
         const r = el.getBoundingClientRect();
         return el.contains(document.elementFromPoint(r.x + r.width / 2, r.bottom + g));
       }, gap);
-    expect(await hitBelow('Delete card', 5)).toBe(true);
-    expect(await hitBelow('Collapse card', 5)).toBe(true);
+    // (The card header's buttons reach up and sideways instead, so they never cover the card's text: see phone-touch.spec.ts.)
+    expect(await hitBelow('Delete card', 3)).toBe(true);
+    expect(await hitBelow('Collapse card', 3)).toBe(true);
     expect(await hitBelow('Delete item', 6)).toBe(true);
     expect(await hitBelow('Drag item', 6)).toBe(true);
     const corner = await card.getByRole('button', { name: 'Resize card' }).evaluate((el) => {

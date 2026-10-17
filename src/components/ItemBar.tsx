@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { appStore } from '../store/appStore';
+import { caretBottom } from './caret';
 import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon } from './icons';
 
 type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
@@ -29,29 +30,47 @@ export function ItemBar() {
   const [cover, setCover] = useState(0);
   const bar = useRef<HTMLDivElement>(null);
 
+  // Keep the line being typed in clear of the keyboard and of this bar: move the board up under it.
+  const keepCaretClear = () => {
+    const field = typingIn()?.field;
+    if (!field) return;
+    const limit = (bar.current?.getBoundingClientRect().top ?? window.innerHeight - keyboardCover()) - 12;
+    // The cursor is never lower than its box, so a box that ends above the limit needs no measuring.
+    if (field.getBoundingClientRect().bottom <= limit) return;
+    const bottom = caretBottom(field);
+    if (bottom > limit) appStore.panBy(0, Math.round(limit - bottom));
+  };
+
   useEffect(() => {
     // After a change the item's text box can be redrawn, so look again once focus has settled.
     const update = () => setTimeout(() => setTyping(typingIn()));
+    // A note or item grows as it is typed in, and the cursor can move within it: check again after each.
+    let frame = 0;
+    const follow = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(keepCaretClear);
+    };
     const v = window.visualViewport;
     const onViewport = () => setCover(keyboardCover());
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
+    document.addEventListener('input', follow);
+    document.addEventListener('selectionchange', follow);
     v?.addEventListener('resize', onViewport);
     v?.addEventListener('scroll', onViewport);
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
+      document.removeEventListener('input', follow);
+      document.removeEventListener('selectionchange', follow);
       v?.removeEventListener('resize', onViewport);
       v?.removeEventListener('scroll', onViewport);
     };
   }, []);
 
-  // Keep the box being typed in clear of the keyboard and of this bar: move the board up under it.
   useLayoutEffect(() => {
-    if (!typing) return;
-    const limit = (bar.current?.getBoundingClientRect().top ?? window.innerHeight - cover) - 12;
-    const bottom = typing.field.getBoundingClientRect().bottom;
-    if (bottom > limit) appStore.panBy(0, Math.round(limit - bottom));
+    if (typing) keepCaretClear();
   }, [typing, cover]);
 
   if (!typing?.item) return null;

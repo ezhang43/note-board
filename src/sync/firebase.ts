@@ -189,9 +189,12 @@ export function versionsRemote(uid: string): VersionStore {
       return typeof data === 'string' ? data : null;
     },
     async save(meta, data) {
-      // The board first, so a version in the list always has its board.
-      await setDoc(doc(datas, meta.id), { data });
-      await setDoc(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns, ...(meta.boards ? { boards: meta.boards } : {}), ...(meta.hash ? { hash: meta.hash } : {}) });
+      // Both in one go, so a version in the list always has its board, and offline (when a restore
+      // or delete goes ahead without waiting) both are kept on this device until back online.
+      const batch = writeBatch(db);
+      batch.set(doc(datas, meta.id), { data });
+      batch.set(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns, ...(meta.boards ? { boards: meta.boards } : {}), ...(meta.hash ? { hash: meta.hash } : {}) });
+      await batch.commit();
     },
     async remove(id) {
       await deleteDoc(doc(metas, id));

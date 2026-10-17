@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Leaving a shared board online (main session check, 2026-10-06): all or nothing. Firebase itself
 // is replaced by a stand-in that records what would be written.
 
-const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; committed: boolean }[], deleteDoc: [] as string[], added: [] as { ref: string; data: unknown }[], fail: false }));
+const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; sets: string[]; committed: boolean }[], deleteDoc: [] as string[], added: [] as { ref: string; data: unknown }[], fail: false }));
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/auth', () => ({
@@ -17,15 +17,15 @@ vi.mock('firebase/firestore', () => ({
   initializeFirestore: () => ({}),
   persistentLocalCache: () => ({}),
   persistentMultipleTabManager: () => ({}),
-  doc: (_db: unknown, ...path: string[]) => path.join('/'),
+  doc: (base: unknown, ...path: string[]) => (typeof base === 'string' ? [base, ...path] : path).join('/'),
   collection: (_db: unknown, ...path: string[]) => path.join('/'),
   deleteDoc: async (ref: string) => void calls.deleteDoc.push(ref),
   writeBatch: () => {
-    const batch = { deletes: [] as string[], committed: false };
+    const batch = { deletes: [] as string[], sets: [] as string[], committed: false };
     calls.batches.push(batch);
     return {
       delete: (ref: string) => void batch.deletes.push(ref),
-      set: vi.fn(),
+      set: (ref: string) => void batch.sets.push(ref),
       commit: async () => {
         if (calls.fail) throw new Error('offline');
         batch.committed = true;
@@ -47,7 +47,7 @@ vi.mock('firebase/firestore', () => ({
   },
 }));
 
-const { collabRemote, sendFeedback } = await import('./firebase');
+const { collabRemote, sendFeedback, versionsRemote } = await import('./firebase');
 const user = { uid: 'u1', displayName: 'Bob', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
 beforeEach(() => {
@@ -84,5 +84,14 @@ describe('leaving a shared board online', () => {
     calls.fail = true;
     await expect(collabRemote(user).leave('s1')).rejects.toThrow();
     expect(calls.deleteDoc).toEqual([]);
+  });
+});
+
+describe('saving a version online (job #93)', () => {
+  it('saves its board and its list entry in one go, so offline both wait together (a reload keeps both)', async () => {
+    await versionsRemote('u1').save({ id: 'v1', savedAt: 1, cards: 0, columns: 0 }, '{}');
+    expect(calls.batches).toHaveLength(1);
+    expect(calls.batches[0].sets).toEqual(['boards/u1/versionData/v1', 'boards/u1/versions/v1']);
+    expect(calls.batches[0].committed).toBe(true);
   });
 });

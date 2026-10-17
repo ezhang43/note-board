@@ -400,3 +400,108 @@ describe('review fixes: several boards (2026-10-05)', () => {
     expect(store.boardName(other)).toBe('Other');
   });
 });
+
+describe('restoring a version while offline (job #93)', () => {
+  /**
+   * The home board named 'Then' saved as version 'old', a board 'Other', the home board now 'Now'
+   * and open, looking at 'old'; the version store's saves never answer (offline).
+   */
+  async function offline() {
+    const store = createStore(null, (fn) => fn());
+    const local = localVersionStore(memory());
+    const home = store.getState().boards.open;
+    store.renameBoard('Then');
+    await local.save({ id: 'old', savedAt: 1, cards: 0, columns: 0 }, serializeWorkspace(store.workspace()));
+    const other = store.addBoardCard();
+    store.openBoard(other);
+    store.renameBoard('Other');
+    store.openBoard(home);
+    store.renameBoard('Now');
+    const hanging = { ...local, save: () => new Promise<void>(() => {}) };
+    const meta = (await local.list())[0];
+    const look = () => store.previewVersion(meta, readWorkspace(serializeWorkspace(store.workspace()))!.ws.boards[store.getState().boards.open]);
+    look();
+    return { store, hanging, meta, home, other, look };
+  }
+
+  it('goes ahead after at most 3 seconds when the safety version can’t be saved yet', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      expect(await done).toEqual([]);
+      expect(store.getState().board.name).toBe('Then');
+      expect(store.getState().ui.preview).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does nothing if Back to current was pressed meanwhile', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      store.endPreview();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      expect(await done).toEqual([]);
+      expect(store.getState().board.name).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does nothing if Back to current was pressed and the same version picked again meanwhile', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging, look } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      store.endPreview();
+      look();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a safety version that fails to save (not just waits) still stops the restore', async () => {
+    const { store, hanging } = await offline();
+    const failing = { ...hanging, save: async () => Promise.reject(new Error('denied')) };
+    await expect(restoreVersion(store, failing, 'old')).rejects.toThrow();
+    expect(store.getState().board.name).toBe('Now');
+  });
+
+  it('does nothing if another version is being looked at by then', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging, meta } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      store.previewVersion({ ...meta, id: 'other' }, store.getState().board);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Now');
+      expect(store.getState().ui.preview?.meta.id).toBe('other');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does nothing if another board is open by then, even looking at the same version there', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging, home, other, look } = await offline();
+      const done = restoreVersion(store, hanging, 'old');
+      store.openBoard(other);
+      look();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Other');
+      expect(store.boardName(home)).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

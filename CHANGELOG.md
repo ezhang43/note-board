@@ -1,5 +1,13 @@
 # Changelog
 
+## Restoring a version while offline (2026-10-17)
+
+- Pressing "Restore this version" while offline could leave the button waiting until the connection came back, then put the old version over whatever board was open by then. Now it waits at most 3 seconds for the safety copy (the boards as they are now, kept in Version history), then restores, as deleting a board already does. The safety copy is still saved once you're back online.
+- If, while it waits, you press Back to current, pick another version, or another board opens, the restore is dropped and nothing on your boards changes.
+- If the safety copy can't be saved at all (not just waiting), the restore still stops and says "Couldn't restore it", as before.
+- Offline, a safety copy (also the one made before deleting a board) is now kept on this device as a whole until you're back online, even if you close or reload the page meanwhile.
+- Boards already saved are untouched.
+
 ## Sharing files now hold back auto-publish (2026-10-17)
 
 - Changes to the sharing, account and board-merging code (`src/store/sharing.ts`, `src/store/account.ts`, `src/model/sharing.ts`, `src/model/merge.ts`) now wait for your "publish" instead of going live on their own, like the other saving and sync files.

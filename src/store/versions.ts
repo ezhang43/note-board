@@ -23,7 +23,7 @@ export interface VersionStore {
 
 export const LIST_KEY = 'note-board:versions:v1';
 /**
- * How long a delete or a backup restore waits for its safety version to be saved. Offline, an
+ * How long a delete or a restore waits for its safety version to be saved. Offline, an
  * online save only answers once back online: the version is still saved then, but the action
  * goes ahead now.
  */
@@ -162,15 +162,24 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
  * Put version `id` back: the open board as it was then, and any board deleted since. Every board
  * as it is now is saved as a version first, so restoring never loses anything (and Ctrl+Z undoes
  * the restore of the open board). Boards shared with this person by someone else stay as they are:
- * returns those shares' starting boards (see restorable).
+ * returns those shares' starting boards (see restorable), or [] for a restore dropped because the
+ * person moved on while the version was saving.
  */
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
+  const pressed = store.getState();
   const data = await versions.get(id);
   const got = data ? readWorkspace(data) : null;
   if (!got) throw new Error('That version could not be read.');
-  await saveVersion(versions, serializeWorkspace(store.workspace()), now());
+  // Saving the version may wait (offline): the restore goes ahead after at most VERSION_SAVE_WAIT_MS
+  // (the version is saved once back online). A save that fails stops it, as before.
+  const saving = saveVersion(versions, serializeWorkspace(store.workspace()), now());
+  await Promise.race([saving, new Promise((done) => setTimeout(done, VERSION_SAVE_WAIT_MS))]);
+  // Unless, meanwhile, the person went back (or looked again), picked another version, or another
+  // board opened (by them, or by boards arriving from another device): it would replace the wrong board.
+  const { ui, boards } = store.getState();
+  if (ui.preview !== pressed.ui.preview || boards.open !== pressed.boards.open) return [];
   // A version from before there were several boards is of the home board: home opens to take it.
   const { home } = store.getState().boards;
   if (got.legacy) store.openBoard(home);

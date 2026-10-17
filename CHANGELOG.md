@@ -1,5 +1,9 @@
 # Changelog
 
+## Phone menu as tiles (2026-10-16)
+
+- On a phone, the ⋯ menu is tidier and shorter. Search, Share, History, Completed, Focus timer and Calendar are tiles, three across. Below them, Arrange holds the Hand / Select tool, text size, a Snap to grid switch, Color, and one row with Collapse all, Same width and Clean up. Last comes More: File, a Dark mode switch, Feedback, About BusyAnts, Buy me a coffee and Sign out. Everything works as before; items that need sign-in or the published site still only show there. It fits a 320px-wide phone in light and dark mode.
+
 ## About page: board pictures retaken (2026-10-16)
 
 - The two sample-board pictures on the About page (light and dark) were retaken in the new Honey Workshop look. Same "Weekend in Lisbon" board, same size, still small files (about 30 KB each, down from 72 KB). Nothing else changed.

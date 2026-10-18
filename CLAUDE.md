@@ -53,7 +53,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 - `/finish-step` — the end-of-step routine (rules 3, 5, 8, 9, 10, a security check for sign-in, sync, sharing, imports and links, and the report), in order. Use it to finish every step.
 - `/check-pr <number>` — rule 9's check of another session's pull request. The crew coordinator runs it by itself when a high-risk pull request is ready; the owner can also type it. Reports; never merges.
-- `/crew [request | status]` — the coordinator: the crew coordinator session takes the owner's requests, splits them into jobs, starts a background worker in its own worktree for each (at most 3 at a time), tracks every job's stage on the Crew Board (a private claude.ai page, not in git) and reports one status. Each worktree runs browser tests on its own ports (`scripts/test-ports.mjs`).
+- `/crew [request | status]` — the coordinator: the crew coordinator session takes the owner's requests, splits them into jobs, starts a background worker in its own worktree for each (at most 4 at a time), tracks every job's stage on the Crew Board (a private claude.ai page, not in git) and reports one status. Each worktree runs browser tests on its own ports (`scripts/test-ports.mjs`).
 - `spec-checker` subagent — compares a change with `SPEC.md` and `docs/decisions.md`; `/finish-step` calls it.
 - Hooks in `.claude/settings.json` (code in `scripts/claude-hooks.mjs`): a reminder before editing a risky file, and a type check after editing a `.ts`/`.tsx` file.
 

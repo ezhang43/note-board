@@ -13,6 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="/src/site.css" />
+    <link rel="preload" as="image" href="./board-dark.webp" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <header class="site-header">
@@ -46,9 +47,11 @@
           (() => {
             const video = document.querySelector('.demo video');
             const dark = matchMedia('(prefers-color-scheme: dark)');
+            const lightPoster = video.getAttribute('poster'); // the build gives these two files hashed names, so read the addresses from the page, not the script
+            const darkPoster = document.querySelector('link[rel=preload][as=image]').getAttribute('href');
             const pick = () => {
               const src = [...video.querySelectorAll('source')].find((s) => video.canPlayType(s.type) && (!s.media || matchMedia(s.media).matches));
-              video.poster = dark.matches ? './board-dark.webp' : './board.webp';
+              video.poster = dark.matches ? darkPoster : lightPoster;
               if (src && video.getAttribute('src') !== src.getAttribute('src')) {
                 video.src = src.getAttribute('src');
                 video.play().catch(() => {});

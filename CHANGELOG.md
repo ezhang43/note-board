@@ -1,5 +1,11 @@
 # Changelog
 
+## About page demo always plays (2026-10-18)
+
+- The demo clip on the About page now starts by itself and loops over and over on every device, with no Pause button. Before, a computer or phone with "Reduce motion" on showed only a still picture and no button.
+- People who turned on "Reduce motion" will now see this one moving clip, and cannot pause it. If a browser blocks autoplay (low-power mode, say), the still picture stays.
+- Nothing in the app changes, and your boards are untouched.
+
 ## Opening your board offline with unsent changes (2026-10-17)
 
 - Signed in, if you closed the app before your last changes reached the internet and then opened it again without internet, it stayed on "Opening your board…". It now opens on the copy saved on this device, those last changes included, and they are sent once you are back online.

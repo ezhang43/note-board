@@ -6,6 +6,12 @@
 - People who turned on "Reduce motion" will now see this one moving clip, and cannot pause it. If a browser blocks autoplay (low-power mode, say), the still picture stays.
 - Nothing in the app changes, and your boards are untouched.
 
+## Phone: double tap to zoom in, long tap to zoom out; selected blocks move together (2026-10-18)
+
+- On a phone or tablet, on the empty board: double tap zooms in one step and a long tap (resting a finger about half a second, then lifting) zooms out one step, each around your finger, the same step as the computer's zoom buttons. Cards and containers are unchanged, and swiping still pans the board or draws the selection box.
+- Fixed: with several cards and containers selected, pressing and holding one and then moving it moved only that one. All the selected blocks now move together, as with a mouse.
+- Your boards are untouched; nothing new is saved.
+
 ## Shared board from a newer app no longer holds back your boards (2026-10-17)
 
 - If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.

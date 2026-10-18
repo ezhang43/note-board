@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { DRAG_THRESHOLD, ZOOM_STEP } from '../model/constants';
 import { FONT_SCALE } from '../model/font';
+import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
 import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point, View } from '../model/types';
@@ -7,6 +9,7 @@ import { clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
+import { HOLD_MS } from './touchHold';
 import { usePhone } from './usePhone';
 
 const NO_GUIDES: never[] = [];
@@ -95,6 +98,9 @@ export function Canvas() {
 
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
+  // A finger on the empty board, for the zoom taps: double tap zooms in, a long tap zooms out.
+  const press = useRef<{ id: number; down: Touch; moved: boolean } | null>(null);
+  const lastTap = useRef<Touch | null>(null);
   // Shows the closed glove while the Hand tool drags the board.
   const [panning, setPanning] = useState(false);
   // The selection box keeps moving the board at the screen edge (owner request).
@@ -132,6 +138,8 @@ export function Canvas() {
       edges.current?.stop();
       edges.current = null;
       drag.current = null;
+      press.current = null;
+      lastTap.current = null;
       setPanning(false);
       for (const id of fingers.keys()) if (id !== e.pointerId) window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: id, pointerType: 'touch' }));
     };
@@ -171,6 +179,7 @@ export function Canvas() {
     const at = clientToCanvas(e.clientX, e.clientY);
     const mode = appStore.getState().view.tool === 'hand' ? 'pan' : 'marquee';
     drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
+    press.current = e.pointerType === 'touch' ? { id: e.pointerId, down: { x: e.clientX, y: e.clientY, t: Date.now() }, moved: false } : null;
     if (mode === 'pan') setPanning(true);
     // Select tool: drag a box; everything it touches is selected (Ctrl adds to the selection).
     if (mode === 'marquee') {
@@ -186,6 +195,8 @@ export function Canvas() {
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const p = press.current;
+    if (p?.id === e.pointerId && Math.hypot(e.clientX - p.down.x, e.clientY - p.down.y) >= DRAG_THRESHOLD) p.moved = true;
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     if (d.mode === 'marquee') {
@@ -195,6 +206,22 @@ export function Canvas() {
     appStore.panBy(e.clientX - d.x, e.clientY - d.y);
     d.x = e.clientX;
     d.y = e.clientY;
+  }
+
+  // Touch screens, empty board only (owner request): two quick taps close together zoom in one step,
+  // a finger resting without moving zooms out one step when it lifts (so a rest then a swipe still
+  // pans or draws the box), each around the finger and by the zoom buttons' step.
+  function zoomTap(e: React.PointerEvent<HTMLDivElement>) {
+    const p = press.current;
+    if (p?.id !== e.pointerId) return;
+    press.current = null;
+    const up = { x: e.clientX, y: e.clientY, t: Date.now() };
+    const kind = pressKind(p.down, up, p.moved, HOLD_MS);
+    const at = clientToCanvas(e.clientX, e.clientY);
+    const double = kind === 'tap' && isDoubleTap(lastTap.current, p.down);
+    if (kind === 'long') appStore.zoomAt(at, 1 / ZOOM_STEP);
+    else if (double) appStore.zoomAt(at, ZOOM_STEP);
+    lastTap.current = kind === 'tap' && !double ? up : null;
   }
 
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
@@ -221,8 +248,15 @@ export function Canvas() {
       data-zoom={view.zoom}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      onPointerUp={(e) => {
+        zoomTap(e);
+        endDrag(e);
+      }}
+      onPointerCancel={(e) => {
+        press.current = null;
+        endDrag(e);
+      }}
+      onContextMenu={(e) => press.current && e.preventDefault()} // a long tap zooms; no copy / paste menu
       style={{
         // Text size on cards and containers (A− / A+).
         '--fs': FONT_SCALE[view.fontSize],

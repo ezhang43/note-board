@@ -77,7 +77,7 @@ For each request:
 
 ## 2. Start a worker
 
-At most **3 workers at a time** (each runs browser tests and a build; more slows everything and costs more tokens). Queue the rest.
+At most **4 workers at a time** (each runs browser tests and a build; more slows everything and costs more tokens). Queue the rest.
 
 Start each with the Agent tool: `subagent_type: general-purpose`, `isolation: worktree`, `run_in_background: true`, a short `description`, and a `name` matching the job (`job-3-dots`). In a cloud session use `isolation: worktree` as usual (the cloud machine is its own computer). Use `isolation: remote` (a cloud worker) only when the owner asks for it.
 

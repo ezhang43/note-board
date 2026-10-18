@@ -8,6 +8,12 @@
 - Deleting a board, restoring a backup and losing a shared board also start their safety copy at once now, instead of first reading the version list (which, just after the connection drops, can itself take a while). A safety copy the same as the version before it is removed again once its save answers (if the page is still open then), so the history doesn't fill up with repeats.
 - Boards already saved are untouched.
 
+## Shared board from a newer app no longer holds back your boards (2026-10-17)
+
+- If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.
+- Opening the link of such a board, or of your own shared board, no longer takes you off it; you stay on it, so the link works once your app is updated.
+- Shared boards already on your device and your saved boards are untouched.
+
 ## Opening your board offline with unsent changes (2026-10-17)
 
 - Signed in, if you closed the app before your last changes reached the internet and then opened it again without internet, it stayed on "Opening your board…". It now opens on the copy saved on this device, those last changes included, and they are sent once you are back online.

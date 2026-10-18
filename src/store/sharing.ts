@@ -108,7 +108,7 @@ interface Share {
   ready: boolean;
   /** A version that arrived mid-drag, applied once the drag is over. */
   waiting: ShareDoc | null;
-  /** Refused because it was saved by a newer version of the app: it stays on the person's list. */
+  /** Refused because it was saved by a newer version of the app: it stays on the person's list. Only read while the share has no starting board. */
   unreadable: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   uploading: boolean;
@@ -370,7 +370,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         s.id,
         (latest) => {
           const got = readShare(latest);
-          // Online boards this page can't read (saved by a newer app) are never overwritten.
+          // Online boards this page can't read (damaged, another format, or saved by a newer app) are never overwritten.
           if (!got) return null;
           const merged = mergeBoardSets(base, sent, got.boards);
           return deepEqual(merged, got.boards) ? null : serializeShare(root, merged);
@@ -438,7 +438,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // held back the person's own boards for good). Only one saved by a newer version of the app is
       // kept on the person's list for an updated app (job 98).
       if (!boards[doc.root] || (s.root && doc.root !== s.root)) {
-        if (!s.base) refuse(s, !got && savedByNewer(doc.data));
+        if (!s.base) refuse(s, savedByNewer(doc.data));
         return;
       }
       const next = s.base && !missing ? mergeBoardSets(s.base, now, boards) : boards;

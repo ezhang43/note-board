@@ -270,6 +270,22 @@ test('a share link whose board is one of your own doesn’t open, and leaves it 
   await expect(noteTexts(bob)).toHaveValue('secret');
 });
 
+test('a link to a shared board with damaged data doesn’t work, and doesn’t leave the newcomer on it (job 98)', async ({ browser }) => {
+  const t = tag();
+  const bob = await person(browser, `Bob${t}`);
+  const mallory = { uid: `demo-mallory${t}`, name: `Mallory${t}`, photo: null };
+  const who = { uid: `demo-bob${t}`, name: `Bob${t}`, photo: null };
+  const shareId = `sdamaged${t}`;
+  await bob.request.post('/__collab/call', { data: { who: mallory, method: 'createShare', args: [shareId, 'm1', 'badkey', 'not json {', 'mallory'] } });
+
+  await bob.goto(`/?join=${shareId}.badkey&demo-user=Bob${t}`);
+  await expect(bob.getByRole('status').filter({ hasText: 'This share link doesn’t work' })).toBeVisible({ timeout: 8000 });
+  // Bob was taken off it again: he can no longer read it.
+  await expect
+    .poll(async () => Object.keys(await (await bob.request.post('/__collab/call', { data: { who, method: 'read', args: [shareId] } })).json()))
+    .toEqual(['error']);
+});
+
 // Main session check fixes (2026-10-06).
 const boardsMenu = (page: Page) => page.getByRole('menu', { name: 'Boards' });
 const historyPanel = (page: Page) => page.getByRole('complementary', { name: 'Version history' });

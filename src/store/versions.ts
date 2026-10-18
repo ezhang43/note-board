@@ -23,20 +23,60 @@ export interface VersionStore {
 
 export const LIST_KEY = 'note-board:versions:v1';
 /**
- * How long a delete or a backup restore waits for its safety version to be saved. Offline, an
+ * How long a delete or a restore waits for its safety version to be saved. Offline, an
  * online save only answers once back online: the version is still saved then, but the action
  * goes ahead now.
  */
 export const VERSION_SAVE_WAIT_MS = 3000;
 
 /**
- * Saves every board as a version, waiting at most VERSION_SAVE_WAIT_MS; never fails. The boards are
- * read straight away, so what is saved is how they are at the call, even if they change meanwhile.
+ * Saves every board as a version, waiting at most VERSION_SAVE_WAIT_MS. The boards are read and the
+ * save started straight away (offline, it is then queued on this device and kept over a reload), so
+ * what is saved is how they are at the call; the version list is only read after, to drop the copy
+ * again if the newest version already has these boards, and the oldest past the limit. Resolves
+ * false if the save failed within the wait, true otherwise; `onLateFailure` runs if it fails later.
  */
-export function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number) {
-  const saving = saveVersion(versions, serializeWorkspace(store.workspace()), now()).catch(() => null);
-  return Promise.race([saving, new Promise((done) => setTimeout(done, VERSION_SAVE_WAIT_MS))]);
+export async function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number, onLateFailure?: () => void) {
+  const data = serializeWorkspace(store.workspace());
+  const got = readWorkspace(data);
+  if (!got) return true;
+  const meta: VersionMeta = { id: newId(), savedAt: now(), ...summarizeWorkspace(got.ws), hash: contentHash(data) };
+  const saving = (async () => versions.save(meta, data))(); // called now; a throw becomes a failed save
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waited = new Promise<null>((done) => (timer = setTimeout(() => done(null), VERSION_SAVE_WAIT_MS)));
+  const saved = await Promise.race([
+    saving.then(
+      () => tidyAfter(versions, meta, data).then(() => true, () => true),
+      () => false,
+    ),
+    waited,
+  ]);
+  clearTimeout(timer);
+  if (saved !== null) return saved;
+  saving.catch(() => onLateFailure?.());
+  return true;
 }
+
+/**
+ * After `meta` is saved: if the newest version saved no later than it has the same boards, the later
+ * of the two is removed again (so two same copies answering together keep exactly one, never none);
+ * otherwise the oldest past the limit are dropped.
+ */
+async function tidyAfter(versions: VersionStore, meta: VersionMeta, data: string) {
+  const others = (await versions.list()).filter((v) => v.id !== meta.id);
+  const before = others.find((v) => v.savedAt <= meta.savedAt);
+  if (before && (await sameBoards(versions, before, data))) {
+    const later = before.savedAt < meta.savedAt || before.id < meta.id ? meta : before;
+    return versions.remove(later.id);
+  }
+  for (const id of versionsToDrop([meta, ...others], versions.keep ?? KEEP_VERSIONS)) await versions.remove(id);
+}
+
+/** Whether version `v` holds exactly `data`. Versions saved before fingerprints existed are downloaded to compare. */
+async function sameBoards(versions: VersionStore, v: VersionMeta, data: string) {
+  return v.hash ? v.hash === contentHash(data) : (await versions.get(v.id)) === data;
+}
+
 export const dataKey = (id: string) => `note-board:version:${id}`;
 
 /** Versions kept in this device's storage (local-only use and tests). */
@@ -77,12 +117,10 @@ const newId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.
 async function saveVersion(versions: VersionStore, data: string, savedAt: number, list?: VersionMeta[]) {
   const known = list ?? (await versions.list());
   const [newest] = known;
-  const hash = contentHash(data);
-  // Versions saved before fingerprints existed are compared the slow way, by downloading them.
-  if (newest && (newest.hash ? newest.hash === hash : (await versions.get(newest.id)) === data)) return null;
+  if (newest && (await sameBoards(versions, newest, data))) return null;
   const got = readWorkspace(data);
   if (!got) return null;
-  const meta: VersionMeta = { id: newId(), savedAt, ...summarizeWorkspace(got.ws), hash };
+  const meta: VersionMeta = { id: newId(), savedAt, ...summarizeWorkspace(got.ws), hash: contentHash(data) };
   await versions.save(meta, data);
   for (const id of versionsToDrop([meta, ...known], versions.keep ?? KEEP_VERSIONS)) await versions.remove(id);
   return meta;
@@ -162,19 +200,38 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
  * Put version `id` back: the open board as it was then, and any board deleted since. Every board
  * as it is now is saved as a version first, so restoring never loses anything (and Ctrl+Z undoes
  * the restore of the open board). Boards shared with this person by someone else stay as they are:
- * returns those shares' starting boards (see restorable).
+ * returns those shares' starting boards (see restorable), or [] for a restore dropped because the
+ * person moved on while the version was saving. `onLateFailure`: see saveSafetyVersion.
  */
-export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now) {
+export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now, onLateFailure?: () => void) {
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
-  const data = await versions.get(id);
+  const pressed = store.getState();
+  // The safety version's save starts first, at the press, so it is queued on this device even while
+  // reading the chosen version waits (just offline). Saving may wait too: the restore goes ahead after
+  // at most VERSION_SAVE_WAIT_MS. A save refused before the restore stops it; one refused after it is
+  // reported through `onLateFailure`.
+  let restored = false;
+  let refused = false;
+  const saving = saveSafetyVersion(store, versions, now, () => {
+    refused = true;
+    if (restored) onLateFailure?.();
+  });
+  const data = await versions.get(id).catch(() => null); // unreadable: see below, once it is known the person is still here
+  const saved = await saving;
+  // Unless, meanwhile, the person went back (or looked again), picked another version, or another
+  // board opened (by them, or by boards arriving from another device): it would replace the wrong board.
+  const { ui, boards } = store.getState();
+  if (ui.preview !== pressed.ui.preview || boards.open !== pressed.boards.open) return [];
   const got = data ? readWorkspace(data) : null;
   if (!got) throw new Error('That version could not be read.');
-  await saveVersion(versions, serializeWorkspace(store.workspace()), now());
+  if (!saved || refused) throw new Error('The boards as they are now could not be saved as a version.');
   // A version from before there were several boards is of the home board: home opens to take it.
   const { home } = store.getState().boards;
   if (got.legacy) store.openBoard(home);
-  return store.restoreVersion(got.legacy ? { home, boards: { [home]: Object.values(got.ws.boards)[0] } } : got.ws);
+  const kept = store.restoreVersion(got.legacy ? { home, boards: { [home]: Object.values(got.ws.boards)[0] } } : got.ws);
+  restored = kept !== 'loading';
+  return kept;
 }
 
 /**

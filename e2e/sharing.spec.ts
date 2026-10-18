@@ -277,9 +277,20 @@ test('a link to a shared board with damaged data doesn’t work, and doesn’t l
   const who = { uid: `demo-bob${t}`, name: `Bob${t}`, photo: null };
   const shareId = `sdamaged${t}`;
   await bob.request.post('/__collab/call', { data: { who: mallory, method: 'createShare', args: [shareId, 'm1', 'badkey', 'not json {', 'mallory'] } });
+  // What the page asks the server, so the test sees Bob was really added before being taken off.
+  const calls: { method: string; body: unknown }[] = [];
+  bob.on('response', async (res) => {
+    if (!res.url().includes('/__collab/call')) return;
+    const { method } = res.request().postDataJSON() as { method: string };
+    if (method === 'join' || method === 'leave') calls.push({ method, body: await res.json() });
+  });
 
   await bob.goto(`/?join=${shareId}.badkey&demo-user=Bob${t}`);
   await expect(bob.getByRole('status').filter({ hasText: 'This share link doesn’t work' })).toBeVisible({ timeout: 8000 });
+  await expect.poll(() => calls).toEqual([
+    { method: 'join', body: { ok: true } },
+    { method: 'leave', body: { ok: null } },
+  ]);
   // Bob was taken off it again: he can no longer read it.
   await expect
     .poll(async () => Object.keys(await (await bob.request.post('/__collab/call', { data: { who, method: 'read', args: [shareId] } })).json()))

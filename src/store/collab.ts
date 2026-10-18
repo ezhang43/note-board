@@ -55,8 +55,11 @@ export interface CollabBackend {
    */
   updateShare(id: string, change: (latest: string) => string | null, client: string): Promise<{ data: string; rev: number }>;
   createShare(id: string, root: string, link: string, data: string, client: string): Promise<void>;
-  /** Joins with a share link's key (refused if the link is wrong or turned off). */
-  join(id: string, key: string): Promise<void>;
+  /**
+   * Joins with a share link's key (refused if the link is wrong or turned off). Resolves true only
+   * if this join added the person (they weren't on it already); when unsure, false.
+   */
+  join(id: string, key: string): Promise<boolean>;
   leave(id: string): Promise<void>;
   /**
    * Owner only: removes someone and, if the link is on, changes it to `newKey`, in one go, so the
@@ -82,7 +85,7 @@ export interface CollabServer {
   /** Writes only if the share is still at `rev`; false if someone wrote first. */
   write(who: Person, id: string, data: string, client: string, rev: number): Promise<boolean>;
   createShare(who: Person, id: string, root: string, link: string, data: string, client: string): Promise<void>;
-  join(who: Person, id: string, key: string): Promise<void>;
+  join(who: Person, id: string, key: string): Promise<boolean>;
   leave(who: Person, id: string): Promise<void>;
   removePerson(who: Person, id: string, uid: string, newKey: string): Promise<void>;
   setLink(who: Person, id: string, key: string | null): Promise<void>;
@@ -218,9 +221,11 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     async join(who, id, key) {
       const s = shares.get(id);
       check(Boolean(s && (member(who, s) || (s.link !== null && s.link === key))));
-      if (!member(who, s)) s!.people = [...s!.people, who];
+      const added = !member(who, s);
+      if (added) s!.people = [...s!.people, who];
       addMine(who.uid, id);
       notify();
+      return added;
     },
     async leave(who, id) {
       check(true);

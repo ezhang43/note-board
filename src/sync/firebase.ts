@@ -323,10 +323,18 @@ export function collabRemote(user: User): CollabBackend {
       await batch.commit();
     },
     async join(id, key) {
+      // Whether this join adds them (owner decision, 2026-10-18), asked of the server before joining:
+      // only members may read a member record, so "not allowed" means they weren't on it. Any other
+      // answer (offline, say) counts as already on it, so a refused share never takes them off.
+      const added = await getDocFromServer(memberRef(id, me.uid)).then(
+        (snap) => !snap.exists(),
+        (e: unknown) => (e as { code?: string }).code === 'permission-denied',
+      );
       const batch = writeBatch(db);
       batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
       batch.set(mineRef(id), { joinedAt: serverTimestamp() });
       await batch.commit();
+      return added;
     },
     async leave(id) {
       // One batch (main session check, 2026-10-06): off the board and off their list together, or

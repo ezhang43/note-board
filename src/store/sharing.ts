@@ -647,17 +647,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     /** Joins a share from its link; resolves with its board's id once that has arrived. */
     async join(id: string, key: string): Promise<string> {
       // Opening a link to a board already here just opens it.
-      const had = shares.has(id);
-      if (!had) await backend.join(id, key);
+      const added = !shares.has(id) && (await backend.join(id, key));
       const s = open(id) ?? need(id);
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root) {
-        // Can't be used here (see refuse): off this person's list again, if this join put it there.
-        // Never their own share, and never one saved by a newer version of the app: this page may not
-        // know yet that it is theirs (shared-boards list not loaded), and an updated app opens it (job #91).
-        // simple: `had` only knows this page's list, so a member on a new device whose shared-boards list
-        // hasn't loaded yet is taken off too; upgrade to leaving only when this join itself added them.
-        if (!had && !s.owner && !s.unreadable) {
+        // Can't be used here (see refuse): off this person's list again, only if this join added them
+        // (owner decision, 2026-10-18: someone already on it, on a new device whose shared-boards list
+        // hasn't loaded, keeps it). Never their own share, and never one saved by a newer version of
+        // the app, which an updated app opens (job #91).
+        if (added && !s.owner && !s.unreadable) {
           await backend.leave(id).catch(() => {});
           gone(s, 'left');
         }

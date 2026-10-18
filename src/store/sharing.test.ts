@@ -908,13 +908,14 @@ describe('a shared board this app can’t read, never opened on this device (who
     expect(server.shares.get('snew')!.data).toBe(newer);
   });
 
-  /** `who`'s page whose leaving is watched. */
-  function watchedDevice(who: Person) {
+  /** `who`'s page whose leaving is watched; `fresh`: a new device whose shared-boards list never loads. */
+  function watchedDevice(who: Person, fresh = false) {
     const storage = memoryStorage();
     const store = createStore(storage, (fn) => fn());
     const real = server.backendFor(who);
     const leave = vi.fn((id: string) => real.leave(id));
-    const sharing = startSharing(store, { ...real, leave }, { client: `${who.uid}-page`, storage });
+    const watchMyShares = fresh ? () => () => {} : real.watchMyShares;
+    const sharing = startSharing(store, { ...real, leave, watchMyShares }, { client: `${who.uid}-page`, storage });
     return { store, sharing, leave };
   }
 
@@ -983,13 +984,14 @@ describe('a shared board this app can’t read for another reason: damaged, old 
     ['an older version', JSON.stringify({ version: 2, home: 'n1', boards: { n1: { ...B.createBoard(), name: 'Older' } } })],
   ];
 
-  /** `who`'s page whose leaving is watched. */
-  function watchedDevice(who: Person) {
+  /** `who`'s page whose leaving is watched; `fresh`: a new device whose shared-boards list never loads. */
+  function watchedDevice(who: Person, fresh = false) {
     const storage = memoryStorage();
     const store = createStore(storage, (fn) => fn());
     const real = server.backendFor(who);
     const leave = vi.fn((id: string) => real.leave(id));
-    const sharing = startSharing(store, { ...real, leave }, { client: `${who.uid}-page`, storage });
+    const watchMyShares = fresh ? () => () => {} : real.watchMyShares;
+    const sharing = startSharing(store, { ...real, leave, watchMyShares }, { client: `${who.uid}-page`, storage });
     return { store, sharing, leave };
   }
 
@@ -1039,5 +1041,29 @@ describe('a shared board this app can’t read for another reason: damaged, old 
     await expect(joined).rejects.toThrow();
     expect(page.leave).not.toHaveBeenCalled();
     expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan', 'carol']);
+  });
+
+  // Owner decision, 2026-10-18: only someone this link-open added is taken off again.
+  it('someone already on it, opening its link on a new device before its shared-boards list loads, stays on it', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    await server.server.join(person('carol'), 'sbad', 'badkey');
+    const page = watchedDevice(person('carol'), true);
+    const joined = page.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(page.leave).not.toHaveBeenCalled();
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan', 'carol']);
+  });
+
+  it('someone new, opening its link on a new device before its shared-boards list loads, is still taken off it', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    const page = watchedDevice(person('carol'), true);
+    const joined = page.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
   });
 });

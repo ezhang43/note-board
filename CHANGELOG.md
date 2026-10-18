@@ -3,7 +3,7 @@
 ## Unsent changes too big to save online now say so (2026-10-18)
 
 - Signed in, if the app opened on changes this device hadn't sent yet and they made your boards too big to save online (over 900,000 characters), the internet refused them, the older online copy came back and the note said "Saved". Now the red "Couldn't save online. Changes are on this device only." banner shows as soon as the board opens, and your changes stay on screen.
-- Your next change tries to save again, those changes included; the banner goes once a save succeeds. Until then, changes from your other devices wait, as with any refused save.
+- Your next change tries to save again, those changes included; the banner goes once a save succeeds. While the banner shows, changes from your other devices are ignored, and your next successful save from this device replaces them, as with any refused save.
 - Boards already saved are untouched, and boards under the limit work as before. If unsent changes are refused for another reason, the older online copy still comes back, as before.
 
 ## Shared board from a newer app no longer holds back your boards (2026-10-17)

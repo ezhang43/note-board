@@ -1,5 +1,11 @@
 # Changelog
 
+## About page demo always plays (2026-10-18)
+
+- The demo clip on the About page now starts by itself and loops over and over on every device, with no Pause button. Before, a computer or phone with "Reduce motion" on showed only a still picture and no button.
+- People who turned on "Reduce motion" will now see this one moving clip, and cannot pause it. If a browser blocks autoplay (low-power mode, say), the still picture stays.
+- Nothing in the app changes, and your boards are untouched.
+
 ## Phone: double tap to zoom in, long tap to zoom out; selected blocks move together (2026-10-18)
 
 - On a phone or tablet, on the empty board: double tap zooms in one step and a long tap (resting a finger about half a second, then lifting) zooms out one step, each around your finger, the same step as the computer's zoom buttons. Cards and containers are unchanged, and swiping still pans the board or draws the selection box.

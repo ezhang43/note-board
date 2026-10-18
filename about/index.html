@@ -13,6 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="/src/site.css" />
+    <link rel="preload" as="image" href="./board-dark.webp" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <header class="site-header">
@@ -31,50 +32,29 @@
         <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
         <a class="start" href="../">Start your board, free</a>
         <div class="hero-board demo">
-          <!-- A short silent clip: tick an item, fold a container, drag a card, type a new item. The still picture is for "reduce motion". -->
+          <!-- A short silent clip: tick an item, fold a container, drag a card, type a new item. It always plays, whatever the "Reduce motion" setting, and has no Pause button (owner decision 2026-10-18). -->
           <video class="shot" autoplay muted loop playsinline preload="metadata" width="960" height="600" poster="./board.webp" aria-label="A short silent demo of a BusyAnts board: ticking an item so it moves to Completed, folding a container, dragging a card, typing a new item.">
             <source src="./demo-dark.webm" type="video/webm" media="(prefers-color-scheme: dark)" />
             <source src="./demo-dark.mp4" type="video/mp4" media="(prefers-color-scheme: dark)" />
             <source src="./demo.webm" type="video/webm" />
             <source src="./demo.mp4" type="video/mp4" />
           </video>
-          <picture class="demo-still">
-            <source srcset="./board-dark.webp" media="(prefers-color-scheme: dark)" />
-            <img class="shot" src="./board.webp" width="960" height="600" alt="A BusyAnts board: containers of checklists and notes on a warm cream background." />
-          </picture>
-          <button class="demo-toggle" type="button">Pause demo</button>
         </div>
         <script>
-          // "Reduce motion" keeps the still picture and never plays the clip. Browsers differ on whether they honour
-          // media= on a video's sources, so pick the light or dark clip here (and its poster) from the computer's setting.
+          // Browsers differ on whether they honour media= on a video's sources, so pick the light or dark clip here (and its poster)
+          // from the computer's setting.
+          // simple: if the browser blocks autoplay (low-power mode, say), the poster just stays; there is deliberately no Play button.
           (() => {
             const video = document.querySelector('.demo video');
-            const toggle = document.querySelector('.demo-toggle');
-            const label = () => (toggle.textContent = video.paused ? 'Play demo' : 'Pause demo');
-            video.addEventListener('play', label);
-            video.addEventListener('pause', label);
-            let held = false; // the visitor pressed Pause: a change of light / dark must not start it again
-            toggle.addEventListener('click', () => {
-              held = !video.paused;
-              if (held) video.pause();
-              else video.play().catch(label);
-            });
-            if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-              video.removeAttribute('autoplay');
-              video.preload = 'none';
-              video.pause();
-              label();
-              return;
-            }
             const dark = matchMedia('(prefers-color-scheme: dark)');
+            const lightPoster = video.getAttribute('poster'); // the build gives these two files hashed names, so read the addresses from the page, not the script
+            const darkPoster = document.querySelector('link[rel=preload][as=image]').getAttribute('href');
             const pick = () => {
               const src = [...video.querySelectorAll('source')].find((s) => video.canPlayType(s.type) && (!s.media || matchMedia(s.media).matches));
-              const still = document.querySelector('.demo-still source');
-              video.poster = dark.matches ? still.getAttribute('srcset') : document.querySelector('.demo-still img').getAttribute('src');
+              video.poster = dark.matches ? darkPoster : lightPoster;
               if (src && video.getAttribute('src') !== src.getAttribute('src')) {
-                video.autoplay = !held;
                 video.src = src.getAttribute('src');
-                if (!held) video.play().catch(label); // autoplay can be blocked: then the button says Play
+                video.play().catch(() => {});
               }
             };
             pick();

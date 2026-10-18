@@ -1,6 +1,6 @@
 import { shownName } from './board';
 import type { Board } from './types';
-import { boardLinks, readWorkspace, serializeWorkspace, type Workspace } from './workspace';
+import { boardLinks, readWorkspace, serializeWorkspace, WORKSPACE_VERSION, type Workspace } from './workspace';
 
 // Sharing a board (owner request, 2026-10-05): a shared board takes every board inside it along, and
 // is saved online apart from its owner's other boards, so everyone it is shared with can edit it.
@@ -126,6 +126,16 @@ export function readShare(raw: string | null): { root: string; boards: Record<st
   const got = readWorkspace(raw);
   if (!got || got.legacy) return null;
   return { root: got.ws.home, boards: got.ws.boards };
+}
+
+/** Whether a share's saved data has a version number newer than this app's (job 98): it waits for an updated app. */
+export function savedByNewer(raw: string | null): boolean {
+  try {
+    const data: unknown = raw == null ? null : JSON.parse(raw);
+    return typeof data === 'object' && data !== null && 'version' in data && typeof data.version === 'number' && data.version > WORKSPACE_VERSION;
+  } catch {
+    return false;
+  }
 }
 
 /** Share ids and link keys are made of these only, so a link can't point anywhere else. */

@@ -32,7 +32,9 @@ const fs = vi.hoisted(() => {
     local,
     watches,
     uid: 'u1',
+    unreachable: false,
     reset() {
+      this.unreachable = false;
       server.clear();
       local.clear();
       pending = [];
@@ -93,6 +95,12 @@ vi.mock('firebase/firestore', () => {
     collection: (_db: unknown, ...path: string[]) => path.join('/'),
     serverTimestamp: () => 0,
     waitForPendingWrites: () => fs.waitForPendingWrites(),
+    // The server's answer, checking the rules (only a board's people read its records).
+    getDocFromServer: async (ref: string) => {
+      if (fs.unreachable) throw Object.assign(new Error('offline'), { code: 'unavailable' });
+      if (!fs.allowed(ref, fs.uid)) throw Object.assign(new Error('refused'), { code: 'permission-denied' });
+      return { exists: () => fs.server.has(ref), data: () => fs.server.get(ref) };
+    },
     writeBatch: () => {
       const writes: [string, Data | null][] = [];
       return {
@@ -342,5 +350,32 @@ describe('sharing a new board on the published site (job 22)', () => {
     await ticks();
     expect(fs.watches.size).toBe(0);
     expect(errors).toEqual([]);
+  });
+});
+
+describe('joining by link says whether it added the person (owner decision, 2026-10-18)', () => {
+  const join = async () => {
+    fs.server.set('shared/s1', { owner: 'u2', root: 'b1', link: 'k', data: '{}', client: '', rev: 1 });
+    fs.server.set('shared/s1/members/u2', { name: 'Ann', photo: null, key: 'k', joinedAt: 0 });
+    const joining = collabRemote(user).join('s1', 'k');
+    await ticks();
+    fs.arrive();
+    return joining;
+  };
+
+  it('someone new: yes', async () => {
+    expect(await join()).toBe(true);
+    expect(fs.server.has('shared/s1/members/u1')).toBe(true);
+  });
+
+  it('someone already on it (on a new device, say): no', async () => {
+    fs.server.set('shared/s1/members/u1', { name: 'Eric', photo: null, key: 'k', joinedAt: 0 });
+    expect(await join()).toBe(false);
+    expect(fs.server.has('shared/s1/members/u1')).toBe(true);
+  });
+
+  it('when the server can’t say: no, so a refused share never takes them off', async () => {
+    fs.unreachable = true;
+    expect(await join()).toBe(false);
   });
 });

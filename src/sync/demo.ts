@@ -54,7 +54,7 @@ export function demoBackend(person: Person) {
     read: (_who, id) => call('read', id) as Promise<{ data: string; rev: number }>,
     write: (_who, id, data, client, rev) => call('write', id, data, client, rev) as Promise<boolean>,
     createShare: async (_who, ...args) => void (await call('createShare', ...args)),
-    join: async (_who, ...args) => void (await call('join', ...args)),
+    join: async (_who, ...args) => (await call('join', ...args)) === true,
     leave: async (_who, ...args) => void (await call('leave', ...args)),
     removePerson: async (_who, ...args) => void (await call('removePerson', ...args)),
     setLink: async (_who, ...args) => void (await call('setLink', ...args)),

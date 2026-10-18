@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard } from './cards';
-import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, keptNotice, parseJoin, readShare, restorable, serializeShare } from './sharing';
+import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, keptNotice, parseJoin, readShare, restorable, savedByNewer, serializeShare } from './sharing';
 import type { Board } from './types';
 import type { Workspace } from './workspace';
 
@@ -103,6 +103,18 @@ describe('the shared boards as saved online', () => {
   it('anything unreadable gives null', () => {
     expect(readShare('nonsense')).toBeNull();
     expect(readShare(JSON.stringify({ version: 99, home: 'x', boards: {} }))).toBeNull();
+  });
+
+  it('only a version number above this app’s counts as saved by a newer app (job 98)', () => {
+    expect(savedByNewer(JSON.stringify({ version: 4, home: 'x', boards: {} }))).toBe(true);
+    expect(savedByNewer(JSON.stringify({ version: 99 }))).toBe(true);
+    expect(savedByNewer(serializeShare('trip', { trip: sample().boards.trip }))).toBe(false);
+    expect(savedByNewer(JSON.stringify({ version: 2, home: 'x', boards: {} }))).toBe(false);
+    expect(savedByNewer(JSON.stringify({ version: '9', boards: {} }))).toBe(false);
+    expect(savedByNewer(JSON.stringify({ version: 2, board: {} }))).toBe(false);
+    expect(savedByNewer(JSON.stringify([99]))).toBe(false);
+    expect(savedByNewer('nonsense')).toBe(false);
+    expect(savedByNewer(null)).toBe(false);
   });
 });
 

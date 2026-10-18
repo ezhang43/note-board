@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { cards, freshBoardEachTest } from './helpers';
+import { add, cards, expectNoOverlaps, freshBoardEachTest } from './helpers';
 
 // Daily journal (owner request, 2026-10-18): the Journal button opens the Journal board and puts
 // today's dated note at the top, or goes back to it.
@@ -57,6 +57,34 @@ test('Ctrl+Z takes today’s note away in one step, and Journal puts it back', a
   await expect(cards(page)).toHaveCount(0);
   await expect(boardName(page)).toHaveValue('Journal');
   await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('the Journal card lands in Home’s usual spot whatever board was showing; Ctrl+Z on Home takes it away, the board stays', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape');
+  const boardsMenu = page.getByRole('menu', { name: 'Boards' });
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu.getByRole('menuitem', { name: 'New board' }).click();
+  await expect(boardName(page)).toHaveValue('');
+  // Pan far away on the other board.
+  await page.mouse.move(640, 400);
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(3000, 3000);
+  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
+  await expect(boardName(page)).toHaveValue('Journal');
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu.getByRole('menuitem', { name: 'My first board' }).click();
+  const journalCard = cards(page).filter({ has: page.getByRole('button', { name: 'Open board' }) });
+  await expect(journalCard).toBeInViewport();
+  await expect(cards(page).filter({ hasText: 'on home' })).toBeInViewport();
+  await expectNoOverlaps(page);
+  // Ctrl+Z on Home takes the card away, as after Add a sub-board; the Journal board is kept.
+  await page.keyboard.press('Control+z');
+  await expect(journalCard).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(1);
+  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
+  await expect(boardName(page)).toHaveValue('Journal');
   await expect(cards(page)).toHaveCount(1);
 });
 

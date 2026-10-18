@@ -70,6 +70,65 @@ describe('Journal button', () => {
     expect(notes(s)).toHaveLength(1);
   });
 
+  it("today's note in a collapsed container: the container is selected, not the hidden note", () => {
+    const s = setup();
+    s.journal();
+    s.undo(); // the board is empty again
+    s.addColumn();
+    const col = s.getState().ui.selection[0];
+    s.addCard('note'); // goes into the selected container
+    const [note] = notes(s);
+    s.setNoteText(note.id, `${today}\n\nmorning`);
+    s.toggleCollapsed(col);
+    s.clearSelection();
+    s.journal();
+    expect(notes(s)).toHaveLength(1);
+    expect(s.getState().ui.selection).toEqual([col]);
+    expect(s.getState().ui.focusBlock).toBeNull();
+  });
+
+  it("the first press puts the Journal card in Home's usual spot, not where another board was panned to", () => {
+    const s = setup();
+    const home = s.getState().boards.home;
+    s.addCard('note'); // something on Home, in the middle of Home's view
+    const homeNote = notes(s)[0];
+    s.newBoard();
+    s.panBy(-20000, -15000); // far away on the other board
+    s.journal();
+    const card = Object.values(s.workspace().boards[home].cards).find((c) => c.kind === 'board')!;
+    // Within one screen of what Home shows on arrival (its note).
+    expect(Math.abs(card.x - homeNote.x)).toBeLessThan(1000);
+    expect(Math.abs(card.y - homeNote.y)).toBeLessThan(800);
+  });
+
+  it('placing the card on a wide Home leaves the zoom alone', () => {
+    const s = setup();
+    s.addCard('note');
+    s.panBy(-3000, 0);
+    s.addCard('note'); // Home is wider than a screen
+    s.newBoard();
+    const zoom = s.getState().view.zoom;
+    s.journal();
+    expect(s.getState().view.zoom).toBe(zoom);
+  });
+
+  it('Ctrl+Z on Home after the first press removes the Journal card, like Add a sub-board; the Journal board stays', () => {
+    const s = setup();
+    const home = s.getState().boards.home;
+    s.journal();
+    const journal = s.getState().boards.open;
+    s.openBoard(home);
+    s.undo();
+    expect(Object.values(s.getState().board.cards).filter((c) => c.kind === 'board')).toHaveLength(0);
+    expect(journals(s)).toHaveLength(1);
+    expect(s.workspace().boards[journal].name).toBe('Journal');
+    // Pressing Journal again opens the same board, with today's note, and makes no second one.
+    s.journal();
+    expect(s.getState().boards.open).toBe(journal);
+    expect(journals(s)).toHaveLength(1);
+    expect(notes(s)).toHaveLength(1);
+  });
+
   it('pressed from another board, it goes to the one Journal board', () => {
     const s = setup();
     s.journal();

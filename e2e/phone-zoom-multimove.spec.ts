@@ -90,9 +90,9 @@ test.describe('zoom taps on the empty board', () => {
     expect(local.x - p1.x).toBeCloseTo(boardPoint.x * (await zoom(page)), 1);
   });
 
-  test('a long tap starts no selection box with the Select tool, and a rest then a swipe still pans with the Hand tool', async ({ page }) => {
+  test('a long tap starts no selection box with the Select tool, and a rest then a move still draws it', async ({ page }) => {
     await chooseTool(page, 'Select (V)');
-    await page.mouse.click(200, 70); // closes the menu
+    await page.mouse.click(200, 70); // the menu stays open and covers the board; this closes it
     const z0 = await zoom(page);
     await touch(page, [{ type: 'touchStart', p: EMPTY }, { type: 'touchEnd', wait: 700 }]);
     await expect.poll(() => zoom(page)).toBeCloseTo(z0 / STEP, 3);
@@ -101,12 +101,14 @@ test.describe('zoom taps on the empty board', () => {
     const z1 = await zoom(page);
     await holdAndDrag(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
     expect(await zoom(page)).toBe(z1);
-    await chooseTool(page, 'Hand (H)');
-    await page.mouse.click(200, 70);
-    const p1 = await pan(page);
+  });
+
+  test('with the Hand tool (the default), a rest then a swipe still pans and does not zoom', async ({ page }) => {
+    const z0 = await zoom(page);
+    const p0 = await pan(page);
     await holdAndDrag(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
-    expect(await zoom(page)).toBe(z1);
-    expect((await pan(page)).x).toBeGreaterThan(p1.x + 40);
+    expect(await zoom(page)).toBe(z0);
+    expect((await pan(page)).x).toBeGreaterThan(p0.x + 40);
   });
 
   test('two quick swipes in the same place pan and never zoom', async ({ page }) => {

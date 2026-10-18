@@ -541,6 +541,86 @@ describe('restoring a version while offline (job #93)', () => {
     }
   });
 
+  it('starts saving the safety version straight away, before the chosen version is read (owner, second check of PR #87)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const saved: string[] = [];
+      // Just after the connection drops, reading the version can take about 10 seconds.
+      let answer: (data: string | null) => void = () => {};
+      const slow = {
+        ...hanging,
+        get: (id: string) => new Promise<string | null>((done) => (answer = () => hanging.get(id).then(done))),
+        save: (_: VersionMeta, data: string) => (saved.push(data), new Promise<void>(() => {})),
+      };
+      const done = restoreVersion(store, slow, 'old');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(saved.map((d) => homeIn(d)?.name)).toEqual(['Now']);
+      await vi.advanceTimersByTimeAsync(10_000);
+      answer(null);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Then');
+      expect(saved).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('restores nothing if the safety version is refused right at the 3-second mark', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const late = { ...hanging, save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), VERSION_SAVE_WAIT_MS)) };
+      const note = vi.fn();
+      const done = restoreVersion(store, late, 'old', Date.now, note);
+      await vi.advanceTimersByTimeAsync(0);
+      vi.advanceTimersByTime(VERSION_SAVE_WAIT_MS); // the refusal and the end of the wait in the same moment
+      // Known refused before anything was replaced: nothing is restored, and the bar says so.
+      await expect(done).rejects.toThrow();
+      expect(store.getState().board.name).toBe('Now');
+      expect(note).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('restores nothing if the safety version is refused after the 3 seconds but before the chosen version is read', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const slow = {
+        ...hanging,
+        get: (id: string) => new Promise<string | null>((done) => setTimeout(() => hanging.get(id).then(done), 10_000)),
+        save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), 5000)),
+      };
+      const note = vi.fn();
+      const done = restoreVersion(store, slow, 'old', Date.now, note);
+      const failed = expect(done).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(10_000);
+      await failed;
+      expect(store.getState().board.name).toBe('Now');
+      expect(note).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stays quiet if the chosen version can’t be read after the person moved on', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const slow = { ...hanging, get: () => new Promise<string | null>((_, no) => setTimeout(() => no(new Error('offline')), 10_000)) };
+      const done = restoreVersion(store, slow, 'old');
+      store.endPreview();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await done).toEqual([]);
+      expect(store.getState().board.name).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('no note for a late failure when nothing was restored', async () => {
     vi.useFakeTimers();
     try {

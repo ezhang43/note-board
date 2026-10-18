@@ -207,19 +207,25 @@ export async function restoreVersion(store: Store, versions: VersionStore, id: s
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
   const pressed = store.getState();
-  const data = await versions.get(id);
-  const got = data ? readWorkspace(data) : null;
-  if (!got) throw new Error('That version could not be read.');
-  // Saving the version may wait (offline): the restore goes ahead after at most VERSION_SAVE_WAIT_MS
-  // (the save is already queued on this device). A save that fails within the wait stops it; one that
-  // fails later is reported through `onLateFailure`, if something was restored.
+  // The safety version's save starts first, at the press, so it is queued on this device even while
+  // reading the chosen version waits (just offline). Saving may wait too: the restore goes ahead after
+  // at most VERSION_SAVE_WAIT_MS. A save refused before the restore stops it; one refused after it is
+  // reported through `onLateFailure`.
   let restored = false;
-  const saved = await saveSafetyVersion(store, versions, now, () => restored && onLateFailure?.());
+  let refused = false;
+  const saving = saveSafetyVersion(store, versions, now, () => {
+    refused = true;
+    if (restored) onLateFailure?.();
+  });
+  const data = await versions.get(id).catch(() => null); // unreadable: see below, once it is known the person is still here
+  const saved = await saving;
   // Unless, meanwhile, the person went back (or looked again), picked another version, or another
   // board opened (by them, or by boards arriving from another device): it would replace the wrong board.
   const { ui, boards } = store.getState();
   if (ui.preview !== pressed.ui.preview || boards.open !== pressed.boards.open) return [];
-  if (!saved) throw new Error('The boards as they are now could not be saved as a version.');
+  const got = data ? readWorkspace(data) : null;
+  if (!got) throw new Error('That version could not be read.');
+  if (!saved || refused) throw new Error('The boards as they are now could not be saved as a version.');
   // A version from before there were several boards is of the home board: home opens to take it.
   const { home } = store.getState().boards;
   if (got.legacy) store.openBoard(home);

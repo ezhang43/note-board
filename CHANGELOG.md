@@ -1,5 +1,11 @@
 # Changelog
 
+## Unsent changes refused online now say so (2026-10-18)
+
+- Signed in, if the app opened on changes this device hadn't sent yet and the internet then refused them (a board too big to save online, say), the older online copy came back and the note said "Saved". Now the red "Couldn't save online. Changes are on this device only." banner shows instead, and your changes stay on screen and on this device.
+- Your next change tries to save again, those changes included; the banner goes once a save succeeds. Until then, changes from your other devices wait, as with any refused save.
+- Boards already saved are untouched: nothing extra is sent, and this only happens when such a save is refused.
+
 ## Opening your board offline with unsent changes (2026-10-17)
 
 - Signed in, if you closed the app before your last changes reached the internet and then opened it again without internet, it stayed on "Opening your board…". It now opens on the copy saved on this device, those last changes included, and they are sent once you are back online.

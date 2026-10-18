@@ -252,6 +252,14 @@ export function startSync(
       if (wasUnconfirmed && !timer) opts.onSaveState?.('saved');
       return;
     }
+    // Opened from unsent saves, and the server's older copy came back instead: they were refused
+    // (job 94). Shown as a refused upload: the red banner, and they stay here; the next change tries again.
+    // lastSynced stays theirs, so they are not sent again by themselves (the job 92 review dropped that).
+    // simple: another device's save arriving in the same moment theirs did would be taken for this too.
+    if (wasUnconfirmed) {
+      failed = true;
+      return opts.onSaveState?.('failed');
+    }
     // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
     if (timer && ownKey(store.workspace()) !== lastSynced) return upload();
     lastSynced = data;

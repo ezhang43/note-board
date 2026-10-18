@@ -615,10 +615,40 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     sync.stop();
   });
 
-  it('if the server refuses them and has an older board, that board comes back, as before this fix', () => {
-    const { store, fake, sync } = opened();
+  // Job 94 (owner decision 2026-10-18): Firestore puts the older online copy back after refusing
+  // them. That shows as a refused upload: the red banner, never "Saved", and the unsent copy stays.
+  it('if the server refuses them and has an older board, says “Couldn’t save online” and keeps them on screen', async () => {
+    const { store, fake, onSaveState, sync } = opened();
     fake.send({ data: boardJson('Older online'), client: 'laptop' });
-    expect(store.getState().board.name).toBe('Older online');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    await settled();
+    expect(store.getState().board.name).toBe('Made offline');
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    expect(onSaveState).not.toHaveBeenCalledWith('saved');
+    expect(fake.writes).toEqual([]);
+    // Like any refused upload: other versions wait until a save goes through.
+    fake.send({ data: boardJson('Another device'), client: 'phone' });
+    expect(store.getState().board.name).toBe('Made offline');
+    // The next change tries again, with those changes in it.
+    store.renameBoard('Edited after');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Edited after');
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+    sync.stop();
+  });
+
+  it('an edit still waiting when the refusal shows is sent, and “Saved” follows once it is online', async () => {
+    const { store, fake, onSaveState, sync } = opened();
+    store.renameBoard('Edited after');
+    fake.send({ data: boardJson('Older online'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Edited after');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Edited after');
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
     sync.stop();
   });
 

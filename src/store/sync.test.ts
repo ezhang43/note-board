@@ -615,40 +615,81 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     sync.stop();
   });
 
-  // Job 94 (owner decision 2026-10-18): Firestore puts the older online copy back after refusing
-  // them. That shows as a refused upload: the red banner, never "Saved", and the unsent copy stays.
-  it('if the server refuses them and has an older board, says “Couldn’t save online” and keeps them on screen', async () => {
-    const { store, fake, onSaveState, sync } = opened();
+  it('if the server refuses them and has an older board, that board comes back, as before this fix', () => {
+    const { store, fake, sync } = opened();
+    fake.send({ data: boardJson('Older online'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Older online');
+    sync.stop();
+  });
+
+  // Job 94 (owner decision 2026-10-18): saves over the online limit (firestore.rules, 900,000
+  // characters) will be refused, so the red banner shows as soon as the board opens from them.
+  function openedWith(data: string) {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onSaveState = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onSaveState });
+    fake.send({ data, client: 'old-page', pending: true });
+    return { store, fake, onSaveState, sync };
+  }
+  /** A board whose saved text is exactly `size` characters (as the rules count them), using `fill` for the padding. */
+  function boardOfSize(size: number, fill = 'x') {
+    const base = boardJson('Too big ').length;
+    return boardJson('Too big ' + fill.repeat(size - base));
+  }
+
+  it('over the online limit: says “Couldn’t save online” straight away, keeps them, sends nothing by itself', async () => {
+    const { store, fake, onSaveState, sync } = openedWith(boardOfSize(900_001));
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    expect(fake.writes).toEqual([]);
+    // Firestore then puts the older online copy back: not applied, and never "Saved".
     fake.send({ data: boardJson('Older online'), client: 'laptop' });
     vi.advanceTimersByTime(SYNC_DELAY * 2);
     await settled();
-    expect(store.getState().board.name).toBe('Made offline');
-    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    expect(store.getState().board.name.startsWith('Too big')).toBe(true);
     expect(onSaveState).not.toHaveBeenCalledWith('saved');
-    expect(fake.writes).toEqual([]);
-    // Like any refused upload: other versions wait until a save goes through.
-    fake.send({ data: boardJson('Another device'), client: 'phone' });
-    expect(store.getState().board.name).toBe('Made offline');
-    // The next change tries again, with those changes in it.
-    store.renameBoard('Edited after');
+    sync.stop();
+  });
+
+  it('over the limit: the next change tries again, even one undone back to the same boards', async () => {
+    const { store, fake, onSaveState, sync } = openedWith(boardOfSize(900_001));
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    const name = store.getState().board.name;
+    store.renameBoard('Smaller');
+    store.renameBoard(name);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0].data).toContain('Edited after');
+    fake.control.fail = true;
+    store.renameBoard('Smaller');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    fake.control.fail = false;
+    store.renameBoard('Smaller still');
+    vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
     expect(onSaveState).toHaveBeenLastCalledWith('saved');
     sync.stop();
   });
 
-  it('an edit still waiting when the refusal shows is sent, and “Saved” follows once it is online', async () => {
-    const { store, fake, onSaveState, sync } = opened();
-    store.renameBoard('Edited after');
-    fake.send({ data: boardJson('Older online'), client: 'laptop' });
-    expect(store.getState().board.name).toBe('Edited after');
-    vi.advanceTimersByTime(SYNC_DELAY);
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0].data).toContain('Edited after');
-    await settled();
-    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+  it('exactly at the limit, counted in characters as the rules do (an emoji is one), is not taken for a refusal', () => {
+    for (const data of [boardOfSize(900_000), boardOfSize(900_000, '😀')]) {
+      const { onSaveState, sync } = openedWith(data);
+      expect(onSaveState).toHaveBeenLastCalledWith('saving');
+      sync.stop();
+    }
+  });
+
+  it('a version the server has, however big, is not checked here (the rules decide)', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onSaveState = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onSaveState });
+    fake.send({ data: boardOfSize(900_001), client: 'laptop' });
+    expect(onSaveState).not.toHaveBeenCalledWith('failed');
     sync.stop();
   });
 

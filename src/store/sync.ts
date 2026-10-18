@@ -31,6 +31,12 @@ export type SaveState = 'saving' | 'saved' | 'failed';
 export const SYNC_DELAY = 800;
 
 /**
+ * The most characters the online rules accept for the saved boards.
+ * simple: copied from `boardText` in firestore.rules (900000), and must match it; change both together.
+ */
+const ONLINE_LIMIT = 900_000;
+
+/**
  * Keeps the store's board and the online copy the same. The first online version wins over
  * this device's board; if there is no online copy yet, this device's board is uploaded.
  * After that, the most recent change wins on every device: a change made here that hasn't been
@@ -232,7 +238,15 @@ export function startSync(
       store.replaceWorkspace(withShared(ws));
       // Opened from saves not on the server yet (job 92): "Saving…" until they are.
       unconfirmed = Boolean(doc.pending);
-      if (unconfirmed) opts.onSaveState?.('saving');
+      // Over the online limit they will be refused (job 94): shown as a refused upload straight away,
+      // kept here, and the next change tries again. Counted in characters as the rules count them.
+      if (unconfirmed && [...doc.data].length > ONLINE_LIMIT) {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        lastSynced = null;
+        failed = true;
+        opts.onSaveState?.('failed');
+      } else if (unconfirmed) opts.onSaveState?.('saving');
       return opts.onReady();
     }
     const wasUnconfirmed = unconfirmed;
@@ -251,14 +265,6 @@ export function startSync(
     if (data === lastSynced) {
       if (wasUnconfirmed && !timer) opts.onSaveState?.('saved');
       return;
-    }
-    // Opened from unsent saves, and the server's older copy came back instead: they were refused
-    // (job 94). Shown as a refused upload: the red banner, and they stay here; the next change tries again.
-    // lastSynced stays theirs, so they are not sent again by themselves (the job 92 review dropped that).
-    // simple: another device's save arriving in the same moment theirs did would be taken for this too.
-    if (wasUnconfirmed) {
-      failed = true;
-      return opts.onSaveState?.('failed');
     }
     // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
     if (timer && ownKey(store.workspace()) !== lastSynced) return upload();

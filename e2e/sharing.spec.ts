@@ -282,7 +282,7 @@ test('a link to a shared board with damaged data doesn’t work, and doesn’t l
   bob.on('response', async (res) => {
     if (!res.url().includes('/__collab/call')) return;
     const { method } = res.request().postDataJSON() as { method: string };
-    if (method === 'join' || method === 'leave') calls.push({ method, body: await res.json() });
+    if (method === 'join' || method === 'leave') calls.push({ method, body: await res.json().catch(() => 'no body') });
   });
 
   await bob.goto(`/?join=${shareId}.badkey&demo-user=Bob${t}`);

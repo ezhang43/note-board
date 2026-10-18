@@ -129,7 +129,10 @@ export function PreviewBar() {
     setBusy(true);
     setError('');
     try {
-      const kept = await restoreVersion(appStore, store, meta.id);
+      // Offline, the boards from before are saved once back online; if that fails, say so.
+      const kept = await restoreVersion(appStore, store, meta.id, Date.now, () =>
+        collab.setNotice('The boards from before your restore couldn’t be saved in Version history.'),
+      );
       const notice = keptNotice(kept, appStore.boardName);
       if (notice) collab.setNotice(notice);
     } catch {

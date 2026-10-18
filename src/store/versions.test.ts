@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { serializeBoard } from '../model/persist';
 import { readWorkspace, serializeWorkspace } from '../model/workspace';
-import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, VERSION_GAP_MS, type VersionMeta } from '../model/versions';
+import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, VERSION_GAP_MS, contentHash, type VersionMeta } from '../model/versions';
 import { createStore } from './store';
-import { VERSION_SAVE_WAIT_MS, deleteBoardSafely, localVersionStore, restoreFromBackup, restoreVersion, startVersions } from './versions';
+import { VERSION_SAVE_WAIT_MS, deleteBoardSafely, localVersionStore, restoreFromBackup, restoreVersion, saveSafetyVersion, startVersions } from './versions';
 
 // Version history (owner request): the board as it was is saved when editing starts after a quiet spell.
 
@@ -503,5 +503,154 @@ describe('restoring a version while offline (job #93)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('starts saving the safety version straight away, before the version list is read (owner, check of PR #87)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const saved: string[] = [];
+      // Just offline: reading the list doesn't answer yet either.
+      const slow = { ...hanging, list: () => new Promise<VersionMeta[]>(() => {}), save: (_: VersionMeta, data: string) => (saved.push(data), new Promise<void>(() => {})) };
+      const done = restoreVersion(store, slow, 'old');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(saved.map((d) => homeIn(d)?.name)).toEqual(['Now']);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Then');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells the person if the safety version fails after the restore went ahead', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const late = { ...hanging, save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), 5000)) };
+      const note = vi.fn();
+      const done = restoreVersion(store, late, 'old', Date.now, note);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.getState().board.name).toBe('Then');
+      expect(note).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(note).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no note for a late failure when nothing was restored', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const late = { ...hanging, save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), 5000)) };
+      const note = vi.fn();
+      const done = restoreVersion(store, late, 'old', Date.now, note);
+      store.endPreview();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS + 5000);
+      await done;
+      expect(note).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves no 3-second timer behind once the safety version is saved', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = createStore(null, (fn) => fn());
+      const versions = localVersionStore(memory());
+      store.renameBoard('Before');
+      await versions.save({ id: 'old', savedAt: 1, cards: 0, columns: 0 }, serializeWorkspace(store.workspace()));
+      store.renameBoard('After');
+      const timers = vi.getTimerCount();
+      await restoreVersion(store, versions, 'old');
+      expect(vi.getTimerCount()).toBe(timers);
+      expect(await versions.list()).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a delete also starts its safety version before reading the list', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging, other } = await offline();
+      let saves = 0;
+      const slow = { ...hanging, list: () => new Promise<VersionMeta[]>(() => {}), save: () => (saves++, new Promise<void>(() => {})) };
+      const done = deleteBoardSafely(store, slow, other);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(saves).toBe(1);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      await done;
+      expect(store.workspace().boards[other]).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('two identical safety versions that answer together keep one of them, not none', async () => {
+    const store = createStore(null, (fn) => fn());
+    const local = localVersionStore(memory());
+    const answers: (() => void)[] = [];
+    // Offline, both saves wait, then answer together once back online.
+    const queued = { ...local, save: (meta: VersionMeta, data: string) => new Promise<void>((done) => answers.push(() => void local.save(meta, data).then(done))) };
+    let at = 1;
+    const first = saveSafetyVersion(store, queued, () => at++);
+    const second = saveSafetyVersion(store, queued, () => at++);
+    answers.forEach((answer) => answer());
+    await Promise.all([first, second]);
+    await settled();
+    expect(await local.list()).toHaveLength(1);
+  });
+
+  it('no note for a late failure when the restore waited for shared boards instead', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const late = { ...hanging, save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), 5000)) };
+      const note = vi.fn();
+      const done = restoreVersion(store, late, 'old', Date.now, note);
+      store.setShares([], false);
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      expect(await done).toBe('loading');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(note).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a safety version refused after the person moved on changes nothing and says nothing', async () => {
+    vi.useFakeTimers();
+    try {
+      const { store, hanging } = await offline();
+      const refused = { ...hanging, save: () => new Promise<void>((_, no) => setTimeout(() => no(new Error('denied')), 1000)) };
+      const done = restoreVersion(store, refused, 'old');
+      store.endPreview();
+      await vi.advanceTimersByTimeAsync(VERSION_SAVE_WAIT_MS);
+      expect(await done).toEqual([]);
+      expect(store.getState().board.name).toBe('Now');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a safety version answering after a newer, different version is still dropped if it repeats the one before it', async () => {
+    const store = createStore(null, (fn) => fn());
+    const local = localVersionStore(memory());
+    store.renameBoard('Same');
+    const same = serializeWorkspace(store.workspace());
+    await local.save({ id: 'before', savedAt: 1, cards: 0, columns: 0, hash: contentHash(same) }, same);
+    let answer = () => {};
+    const queued = { ...local, save: (meta: VersionMeta, data: string) => new Promise<void>((done) => (answer = () => void local.save(meta, data).then(done))) };
+    const saving = saveSafetyVersion(store, queued, () => 2);
+    store.renameBoard('Different');
+    await local.save({ id: 'newer', savedAt: 3, cards: 0, columns: 0 }, serializeWorkspace(store.workspace()));
+    answer();
+    await saving;
+    expect((await local.list()).map((v) => v.id)).toEqual(['newer', 'before']);
   });
 });

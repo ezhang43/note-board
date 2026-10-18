@@ -1,6 +1,6 @@
 import { deepEqual, mergeBoardSets } from '../model/merge';
 import type { StorageLike } from '../model/persist';
-import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, serializeShare } from '../model/sharing';
+import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, savedByNewer, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
 import { readWorkspace, type Workspace } from '../model/workspace';
 import type { CollabBackend, Person, ShareDoc } from './collab';
@@ -108,7 +108,7 @@ interface Share {
   ready: boolean;
   /** A version that arrived mid-drag, applied once the drag is over. */
   waiting: ShareDoc | null;
-  /** Refused because this app can't read it (saved by a newer one): it stays on the person's list. */
+  /** Refused because it was saved by a newer version of the app: it stays on the person's list. */
   unreadable: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   uploading: boolean;
@@ -284,7 +284,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function agree(s: Share, boards: Record<string, Board>, rev: number) {
     s.base = boards;
     s.baseRev = rev;
-    s.unreadable = false;
     boardCardKeys(boards).forEach((k) => s.cameWith.add(k));
     saveBase(s);
   }
@@ -433,12 +432,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Only boards in the share's data, never one of this person's own, and its starting board must
       // be one of them (security review fix: whatever is saved online can't take this person's boards).
       const boards = got ? safeBoards(s, got.boards, doc.root) : {};
-      // A version this app can't read (saved by a newer one) or without its starting board: one it
-      // had before stays as it was (anyone it is shared with can save anything in it); one never
-      // opened here can't be used (whole-app review H2: waiting on it held back the person's own
-      // boards for good).
+      // A version this app can't read (damaged, the old single-board format, another version) or
+      // without its starting board: one it had before stays as it was (anyone it is shared with can
+      // save anything in it); one never opened here can't be used (whole-app review H2: waiting on it
+      // held back the person's own boards for good). Only one saved by a newer version of the app is
+      // kept on the person's list for an updated app (job 98).
       if (!boards[doc.root] || (s.root && doc.root !== s.root)) {
-        if (!s.base) refuse(s, !got);
+        if (!s.base) refuse(s, !got && savedByNewer(doc.data));
         return;
       }
       const next = s.base && !missing ? mergeBoardSets(s.base, now, boards) : boards;
@@ -653,8 +653,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root) {
         // Can't be used here (see refuse): off this person's list again, if this join put it there.
-        // Never their own share, and never one this app can't read: this page may not know yet that
-        // it is theirs (shared-boards list not loaded), and a newer version of the app opens it (job #91).
+        // Never their own share, and never one saved by a newer version of the app: this page may not
+        // know yet that it is theirs (shared-boards list not loaded), and an updated app opens it (job #91).
+        // simple: `had` only knows this page's list, so a member on a new device whose shared-boards list
+        // hasn't loaded yet is taken off too; upgrade to leaving only when this join itself added them.
         if (!had && !s.owner && !s.unreadable) {
           await backend.leave(id).catch(() => {});
           gone(s, 'left');

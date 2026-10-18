@@ -1,5 +1,11 @@
 # Changelog
 
+## Broken shared boards no longer keep newcomers on them (2026-10-18)
+
+- A shared board whose saved data is damaged, in the old format or from an older version of the app is now handled like one missing its main board: it is skipped, its link says it doesn't work, and someone opening the link for the first time is taken off it again (before, they stayed on it without seeing it, and couldn't leave it).
+- Only a shared board saved by a newer version of the app is still kept on everyone's list, so an updated app opens it.
+- Shared boards already on your device and your own boards are untouched.
+
 ## Shared board from a newer app no longer holds back your boards (2026-10-17)
 
 - If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.

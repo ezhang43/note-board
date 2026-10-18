@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StorageLike } from '../model/persist';
+import { serializeBoard, type StorageLike } from '../model/persist';
 import * as B from '../model/board';
 import { createBoardCard } from '../model/cards';
 import { serializeShare } from '../model/sharing';
@@ -972,5 +972,72 @@ describe('a shared board this app can’t read, never opened on this device (who
     bob.store.addCard('note');
     await settle();
     expect(server.shares.get(shareId)!.data).toBe(later);
+  });
+});
+
+describe('a shared board this app can’t read for another reason: damaged, old format, older version (job 98)', () => {
+  const dan = person('dan');
+  const kinds: [string, string][] = [
+    ['damaged', 'not json {'],
+    ['the old single-board format', serializeBoard({ ...B.createBoard(), name: 'Old' })],
+    ['an older version', JSON.stringify({ version: 2, home: 'n1', boards: { n1: { ...B.createBoard(), name: 'Older' } } })],
+  ];
+
+  /** `who`'s page whose leaving is watched. */
+  function watchedDevice(who: Person) {
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const real = server.backendFor(who);
+    const leave = vi.fn((id: string) => real.leave(id));
+    const sharing = startSharing(store, { ...real, leave }, { client: `${who.uid}-page`, storage });
+    return { store, sharing, leave };
+  }
+
+  for (const [kind, data] of kinds) {
+    it(`${kind}: the shares still count as known, and nothing of it is taken`, async () => {
+      await server.server.createShare(dan, 'sbad', 'n1', 'badkey', data, 'dan-page');
+      await server.server.join(person('bob'), 'sbad', 'badkey');
+      const bob = device('bob');
+      await settle();
+      expect(bob.store.getState().ui.sharesKnown).toBe(true);
+      expect(bob.store.workspace().boards.n1).toBeUndefined();
+      expect(server.shares.get('sbad')!.data).toBe(data);
+    });
+
+    it(`${kind}: someone new opening its link is taken off it again; its owner isn’t`, async () => {
+      await server.server.createShare(dan, 'sbad', 'n1', 'badkey', data, 'dan-page');
+      for (const who of [person('carol'), dan]) {
+        const page = watchedDevice(who);
+        const joined = page.sharing.join('sbad', 'badkey');
+        joined.catch(() => {});
+        await settle();
+        await expect(joined).rejects.toThrow();
+        expect(page.leave).toHaveBeenCalledTimes(who === dan ? 0 : 1);
+      }
+      expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
+      expect(server.shares.get('sbad')!.data).toBe(data);
+    });
+
+    it(`${kind}: one already opened here keeps its boards as they were`, async () => {
+      const { bob, trip, shareId } = await together();
+      const before = bob.store.workspace().boards[trip];
+      await server.server.write(person('alice'), shareId, data, 'alice-other-page', server.shares.get(shareId)!.rev);
+      await settle();
+      expect(bob.store.workspace().boards[trip]).toEqual(before);
+      expect(bob.sharing.isShared(trip)).toBe(true);
+    });
+  }
+
+  it('someone it is already on this page’s list of isn’t taken off it by opening its link', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    await server.server.join(person('carol'), 'sbad', 'badkey');
+    const page = watchedDevice(person('carol'));
+    await settle();
+    const joined = page.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow();
+    expect(page.leave).not.toHaveBeenCalled();
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan', 'carol']);
   });
 });

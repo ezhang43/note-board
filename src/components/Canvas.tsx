@@ -124,6 +124,8 @@ export function Canvas() {
     };
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
+      // A tap on a card or container in between means the next tap on the board is not a double tap.
+      if (e.target !== el && (e.target as Element).closest('[data-card-id], [data-col-id]')) lastTap.current = null;
       fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pinch) {
         // A finger put back down after one lifted: carry on from the new pair.
@@ -254,6 +256,7 @@ export function Canvas() {
       }}
       onPointerCancel={(e) => {
         press.current = null;
+        lastTap.current = null;
         endDrag(e);
       }}
       onContextMenu={(e) => press.current && e.preventDefault()} // a long tap zooms; no copy / paste menu

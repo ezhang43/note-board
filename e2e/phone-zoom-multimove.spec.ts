@@ -150,6 +150,17 @@ test.describe('on a note, nothing changes', () => {
   });
 });
 
+test('a tap on a note between two taps on the board does not make them a double tap', async ({ page }) => {
+  await addMenu(page, 'Note');
+  await page.mouse.click(200, 70);
+  const b = (await page.locator('[data-card-id]').first().boundingBox())!;
+  const board = { x: b.x - 12, y: b.y + 30 };
+  const z0 = await zoom(page);
+  await touch(page, [...tapSteps(board), ...tapSteps({ x: b.x + 10, y: b.y + 30 }), ...tapSteps(board)]);
+  await page.waitForTimeout(300);
+  expect(await zoom(page)).toBe(z0);
+});
+
 test.describe('on a container, nothing changes', () => {
   test('a double tap and a long press without moving do not zoom; a long press then move drags it', async ({ page }) => {
     await addMenu(page, 'Container');

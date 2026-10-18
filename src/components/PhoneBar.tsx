@@ -18,6 +18,7 @@ import { DONATE_URL } from '../model/constants';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
+import { JournalButton } from './JournalButton';
 
 /**
  * Phone layout (owner request): a bar along the bottom, in reach of a thumb, with Undo, Redo,
@@ -94,6 +95,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <CompletedButton labelled onOpen={() => setOpen(null)} />
             <PomodoroButton labelled onOpen={() => setOpen(null)} />
             <CalendarButton labelled onOpen={() => setOpen(null)} />
+            <JournalButton labelled onOpen={() => setOpen(null)} />
           </div>
           <section className="phone-arrange" aria-labelledby="phone-arrange">
             <h2 id="phone-arrange" className="phone-label">

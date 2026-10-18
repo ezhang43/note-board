@@ -136,6 +136,7 @@ test('the panel buttons at the bottom right are labelled; the ? and zoom stay', 
     ['Completed', 'Completed'],
     ['Version history', 'History'],
     ['Focus timer', 'Timer'],
+    ['Journal', 'Journal'],
   ])
     await expect(dock.getByRole('button', { name, exact: true })).toHaveText(text);
   await expect(dock.getByRole('button', { name: 'Keyboard shortcuts' })).toBeVisible();

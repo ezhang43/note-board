@@ -83,12 +83,10 @@ for (const p of PAGES) {
 }
 
 // Job #79 (owner decision 2026-10-16, "Done List" look): a second start button closes the page, after the comparison.
-test('the landing page says what BusyAnts is, shows a picture of a board and has a start button at the top and at the end', async ({ page }) => {
+test('the landing page says what BusyAnts is, shows a demo video of a board and has a start button at the top and at the end', async ({ page }) => {
   await page.goto('/about/');
   await expect(page.getByText('A calm, free visual board for notes and checklists. Plan together in real time.')).toBeVisible();
-  const shot = page.getByRole('img', { name: /BusyAnts board/ });
-  await expect(shot).toBeVisible();
-  expect(await shot.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.hero video')).toBeVisible();
   const starts = page.getByRole('link', { name: 'Start your board, free' });
   await expect(starts).toHaveCount(2);
   for (const s of await starts.all()) await expect(s).toHaveAttribute('href', '../');
@@ -129,15 +127,18 @@ test('the About page ends with a honey block: a headline, one line and the start
   expect(link.x + link.width).toBeLessThanOrEqual(320 - 16);
 });
 
-test('the About page board picture is sharp: twice the pixels it is shown at, light and dark', async ({ page }) => {
+test("the About page demo's poster picture is sharp: twice the pixels it is shown at, light and dark", async ({ page }) => {
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto('/about/');
-    const img = page.locator('img.shot');
-    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.currentSrc.split('/').pop()), scheme).toBe(scheme === 'dark' ? 'board-dark.webp' : 'board.webp');
-    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth), scheme).toBe(1920);
-    await expect(img).toHaveAttribute('width', '960');
-    await expect(img).toHaveAttribute('height', '600');
+    const video = page.locator('.hero video');
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.poster.split('/').pop()), scheme).toBe(scheme === 'dark' ? 'board-dark.webp' : 'board.webp');
+    const width = await video.evaluate(
+      (v: HTMLVideoElement) => new Promise<number>((r) => { const img = new Image(); img.onload = () => r(img.naturalWidth); img.onerror = () => r(0); img.src = v.poster; }),
+    );
+    expect(width, scheme).toBe(1920);
+    await expect(video).toHaveAttribute('width', '960');
+    await expect(video).toHaveAttribute('height', '600');
   }
 });
 
@@ -180,14 +181,12 @@ test('the About page has three highlights under the intro', async ({ page }) => 
 
 // Job #79 (owner decision 2026-10-16): the "Done List" look. The board picture is shown big under the hero text
 // (it was a small thumbnail beside it, and a dark blob on a phone in dark mode).
-test('the board picture is big, under the start button, framed so it stands out in light and dark', async ({ page }) => {
+test('the demo video is big, under the start button, framed so it stands out in light and dark', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/about/');
   await expect(page.locator('svg.ant')).toHaveCount(0);
-  await expect(page.getByRole('img', { name: /BusyAnts board/ })).toHaveCount(1);
-  const shot = page.locator('.hero').getByRole('img', { name: /BusyAnts board/ });
+  const shot = page.locator('.hero video');
   await expect(shot).toBeVisible();
-  expect(await shot.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   // Size set in the HTML so the page does not jump while it loads.
   await expect(shot).toHaveAttribute('width', /\d+/);
   await expect(shot).toHaveAttribute('height', /\d+/);
@@ -547,8 +546,8 @@ test('the demo video is silent, loops, plays by itself and has the board picture
   expect(await video.evaluate((v: HTMLVideoElement) => v.muted && v.loop)).toBe(true);
   expect(await video.evaluate((v: HTMLVideoElement) => v.poster)).toMatch(/board.*\.webp$/);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
-  // The picture is only the still for "reduce motion"; it is not shown beside the video.
-  await expect(page.locator('.hero img.shot')).toBeHidden();
+  // The video stands alone: no separate still picture beside it.
+  await expect(page.locator('.hero img.shot')).toHaveCount(0);
   // Short, and kept small: every clip is under 300 KB (MP4 for Safari and iPhone, WebM for the rest).
   const sources = await video.locator('source').evaluateAll((els: HTMLSourceElement[]) => els.map((s) => ({ src: s.src, type: s.type })));
   expect(sources.map((s) => s.type).sort()).toEqual(['video/mp4', 'video/mp4', 'video/webm', 'video/webm']);
@@ -573,43 +572,26 @@ test("the demo video has a light and a dark version, picked by the computer's se
   }
 });
 
-test('the demo video has a Pause / Play button you can reach and use with the keyboard', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('/about/');
-  const video = page.locator('.hero video');
-  const button = page.locator('.hero').getByRole('button', { name: /demo/ });
-  await expect(button).toHaveText('Pause demo');
-  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
-  await button.click();
-  await expect(button).toHaveText('Play demo');
-  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
-  // Tab reaches it from the Start button, it shows a focus ring, and Space / Enter work it.
-  await page.getByRole('link', { name: 'Start your board, free' }).first().focus();
-  await page.keyboard.press('Tab');
-  await expect(button).toBeFocused();
-  expect(await button.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
-  await page.keyboard.press('Space');
-  await expect(button).toHaveText('Pause demo');
-  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
-  await page.keyboard.press('Enter');
-  await expect(button).toHaveText('Play demo');
-  expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-});
+for (const motion of ['no-preference', 'reduce'] as const) {
+  test(`the demo video plays and loops by itself, muted, with no button, also with reduce motion = ${motion}`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: motion });
+    await page.goto('/about/');
+    const video = page.locator('.hero video');
+    await expect(video).toBeVisible();
+    await expect(video).toHaveAttribute('autoplay', '');
+    expect(await video.evaluate((v: HTMLVideoElement) => v.muted && v.loop)).toBe(true);
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+    const t = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(t);
+    expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+    // No Pause / Play button and no still picture, whatever the setting.
+    await expect(page.locator('.demo-toggle, .demo-still')).toHaveCount(0);
+    await expect(page.locator('.hero').getByRole('button')).toHaveCount(0);
+    await expect(page.locator('.hero img.shot')).toHaveCount(0);
+  });
+}
 
-test('with "reduce motion" the still board picture is shown and the video does not play or load', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/about/');
-  const video = page.locator('.hero video');
-  await expect(video).toBeHidden();
-  await expect(page.locator('.hero').getByRole('button', { name: /demo/ })).toBeHidden();
-  const still = page.locator('.hero').getByRole('img', { name: /BusyAnts board/ });
-  await expect(still).toBeVisible();
-  expect(await still.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-  await page.waitForTimeout(500);
-  expect(await video.evaluate((v: HTMLVideoElement) => v.paused && v.currentTime === 0 && !v.hasAttribute('autoplay') && v.preload === 'none')).toBe(true);
-});
-
-test('the demo and the new sections fit a phone: no sideways scrolling, a tappable Pause button', async ({ page }) => {
+test('the demo and the new sections fit a phone: no sideways scrolling', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 800 });
@@ -618,10 +600,6 @@ test('the demo and the new sections fit a phone: no sideways scrolling, a tappab
     const video = (await page.locator('.hero video').boundingBox())!;
     expect(video.x).toBeGreaterThanOrEqual(16);
     expect(video.x + video.width).toBeLessThanOrEqual(width - 16 + 1);
-    const button = (await page.locator('.hero').getByRole('button', { name: /demo/ }).boundingBox())!;
-    expect(button.height).toBeGreaterThanOrEqual(44);
-    expect(button.x).toBeGreaterThanOrEqual(video.x);
-    expect(button.x + button.width).toBeLessThanOrEqual(video.x + video.width);
     for (const id of ['how', 'features', 'trust', 'faq']) {
       const b = (await page.locator(`#${id}`).boundingBox())!;
       expect(b.x + b.width, id).toBeLessThanOrEqual(width);

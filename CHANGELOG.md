@@ -6,6 +6,12 @@
 - Only a shared board saved by a newer version of the app is still kept on everyone's list, so an updated app opens it.
 - Shared boards already on your device and your own boards are untouched.
 
+## About page demo always plays (2026-10-18)
+
+- The demo clip on the About page now starts by itself and loops over and over on every device, with no Pause button. Before, a computer or phone with "Reduce motion" on showed only a still picture and no button.
+- People who turned on "Reduce motion" will now see this one moving clip, and cannot pause it. If a browser blocks autoplay (low-power mode, say), the still picture stays.
+- Nothing in the app changes, and your boards are untouched.
+
 ## Shared board from a newer app no longer holds back your boards (2026-10-17)
 
 - If someone shared a board with you that was saved by a newer version of the app, and this device had never opened it, boards you made on this device could stay unsent and be lost on the next reload. Now that shared board is simply skipped (its link says it doesn't work), and your own boards save online as usual.

@@ -32,9 +32,10 @@ export const SYNC_DELAY = 800;
 
 /**
  * The most characters the online rules accept for the saved boards.
- * simple: copied from `boardText` in firestore.rules (900000), and must match it; change both together.
+ * simple: copied from `boardText` in firestore.rules (900000), and must match it; change both together
+ * (a unit test checks). Firestore's own 1 MiB per document (counted in bytes) isn't checked here.
  */
-const ONLINE_LIMIT = 900_000;
+export const ONLINE_LIMIT = 900_000;
 
 /**
  * Keeps the store's board and the online copy the same. The first online version wins over
@@ -240,7 +241,8 @@ export function startSync(
       unconfirmed = Boolean(doc.pending);
       // Over the online limit they will be refused (job 94): shown as a refused upload straight away,
       // kept here, and the next change tries again. Counted in characters as the rules count them.
-      if (unconfirmed && [...doc.data].length > ONLINE_LIMIT) {
+      // (`.length` is never below that count, so most boards skip the count.)
+      if (unconfirmed && doc.data.length > ONLINE_LIMIT && [...doc.data].length > ONLINE_LIMIT) {
         if (timer) clearTimeout(timer);
         timer = null;
         lastSynced = null;

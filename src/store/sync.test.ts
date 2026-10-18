@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { addCard, createBoard } from '../model/board';
 import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
 import { ownBoardsGuard } from './sharing';
-import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
+import { ONLINE_LIMIT, startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
 function fakeRemote() {
@@ -632,10 +633,10 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     fake.send({ data, client: 'old-page', pending: true });
     return { store, fake, onSaveState, sync };
   }
-  /** A board whose saved text is exactly `size` characters (as the rules count them), using `fill` for the padding. */
-  function boardOfSize(size: number, fill = 'x') {
+  /** A board whose saved text is exactly `size` characters (as the rules count them), `emoji` of them emoji. */
+  function boardOfSize(size: number, emoji = 0) {
     const base = boardJson('Too big ').length;
-    return boardJson('Too big ' + fill.repeat(size - base));
+    return boardJson('Too big ' + '😀'.repeat(emoji) + 'x'.repeat(size - base - emoji));
   }
 
   it('over the online limit: says “Couldn’t save online” straight away, keeps them, sends nothing by itself', async () => {
@@ -666,6 +667,7 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     store.renameBoard('Smaller');
     vi.advanceTimersByTime(SYNC_DELAY);
     await settled();
+    expect(fake.writes).toHaveLength(2);
     expect(onSaveState).toHaveBeenLastCalledWith('failed');
     fake.control.fail = false;
     store.renameBoard('Smaller still');
@@ -676,11 +678,18 @@ describe('opening from saves a closed page never sent (job 92)', () => {
   });
 
   it('exactly at the limit, counted in characters as the rules do (an emoji is one), is not taken for a refusal', () => {
-    for (const data of [boardOfSize(900_000), boardOfSize(900_000, '😀')]) {
+    const withEmoji = boardOfSize(900_000, 10);
+    expect(withEmoji.length).toBeGreaterThan(900_000);
+    for (const data of [boardOfSize(900_000), withEmoji]) {
       const { onSaveState, sync } = openedWith(data);
       expect(onSaveState).toHaveBeenLastCalledWith('saving');
       sync.stop();
     }
+  });
+
+  it('the limit is the one in firestore.rules', () => {
+    const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
+    expect(rules).toContain(`text.size() <= ${ONLINE_LIMIT}`);
   });
 
   it('a version the server has, however big, is not checked here (the rules decide)', () => {

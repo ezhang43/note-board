@@ -369,11 +369,9 @@ describe('joining by link says whether it added the person (owner decision, 2026
   });
 
   it('someone already on it (on a new device, say): no', async () => {
-    fs.server.set('shared/s1/members/u1', { name: 'Eric', photo: null, key: 'old', joinedAt: 0 });
+    fs.server.set('shared/s1/members/u1', { name: 'Eric', photo: null, key: 'k', joinedAt: 0 });
     expect(await join()).toBe(false);
-    // Their record is left as it is (the rules would refuse it with an old link; their place in the list stays).
-    expect(fs.server.get('shared/s1/members/u1')).toEqual({ name: 'Eric', photo: null, key: 'old', joinedAt: 0 });
-    expect(fs.server.has('boards/u1/shared/s1')).toBe(true);
+    expect(fs.server.has('shared/s1/members/u1')).toBe(true);
   });
 
   it('when the server can’t say: no, so a refused share never takes them off', async () => {

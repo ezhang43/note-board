@@ -328,16 +328,15 @@ export function collabRemote(user: User): CollabBackend {
       // simple: any other answer (offline, say) counts as "maybe on it": nobody is taken off then, so
       // a newcomer could stay on a refused share, invisible (rare); and the read and the write are two
       // steps, so a join from another tab in between isn't seen. Upgrade if either shows up.
-      const on = await getDocFromServer(memberRef(id, me.uid)).then(
-        (snap) => (snap.exists() ? 'yes' : 'no'),
-        (e: unknown) => ((e as { code?: string }).code === 'permission-denied' ? 'no' : 'maybe'),
+      const added = await getDocFromServer(memberRef(id, me.uid)).then(
+        (snap) => !snap.exists(),
+        (e: unknown) => (e as { code?: string }).code === 'permission-denied',
       );
       const batch = writeBatch(db);
-      // Already on it: their record stays (an old link's key would be refused, and their place in the list is kept).
-      if (on !== 'yes') batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
       batch.set(mineRef(id), { joinedAt: serverTimestamp() });
       await batch.commit();
-      return on === 'no';
+      return added;
     },
     async leave(id) {
       // One batch (main session check, 2026-10-06): off the board and off their list together, or

@@ -17,7 +17,19 @@ test('the website pages are published beside the app, with working links', async
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   }
   await page.goto('about/');
-  expect(await page.getByRole('img', { name: /BusyAnts board/ }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  // The demo video is there, autoplays and loops, and its clip loads under /note-board/.
+  const video = page.locator('.hero video');
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute('autoplay', '');
+  expect(await video.evaluate((v: HTMLVideoElement) => v.loop && v.muted)).toBe(true);
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => /\/note-board\/assets\/demo-.*\.(webm|mp4)$/.test(v.currentSrc) && v.readyState >= 2)).toBe(true);
+  // Its poster (light and dark) is a real file in the build, not a broken address.
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto('about/');
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => new Promise<number>((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); i.src = v.poster; })), scheme).toBeGreaterThan(0);
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.poster), scheme).toMatch(scheme === 'dark' ? /board-dark-.*\.webp$/ : /board-(?!dark).*\.webp$/);
+  }
   await page.getByRole('link', { name: 'Start your board, free' }).first().click();
   await expect(page).toHaveURL(/\/note-board\/$/);
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();

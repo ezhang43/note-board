@@ -162,29 +162,6 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 .start:hover { filter: brightness(1.06); }
 .hero .start { margin-top: 32px; background: var(--slab-btn); color: var(--slab-btn-ink); }
 .hero-board { display: block; max-width: var(--wide); margin: clamp(40px, 6vw, 64px) auto 0; }
-/* The demo clip, with a Pause / Play button over its corner. "Reduce motion" shows the still picture instead. */
-.demo { position: relative; }
-.demo-still { display: none; }
-.demo-toggle {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1.5px solid rgba(255, 255, 255, 0.6); /* so it shows on the dark clip too */
-  border-radius: 999px;
-  background: rgba(28, 27, 25, 0.9);
-  color: #fff;
-  font: 600 15px/1 var(--font);
-  cursor: pointer;
-}
-.demo-toggle:hover { background: #1c1b19; }
-.demo-toggle:focus-visible { outline: 3px solid var(--honey); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) {
-  .demo video,
-  .demo-toggle { display: none; }
-  .demo-still { display: block; }
-}
 .shot {
   display: block;
   width: 100%;

@@ -1,5 +1,12 @@
 # Changelog
 
+## Broken shared boards no longer keep newcomers on them (2026-10-18)
+
+- A shared board whose saved data is damaged, in the old format or from an older version of the app is now handled like one missing its main board: it is skipped, its link says it doesn't work, and someone opening the link for the first time is taken off it again (before, they stayed on it without seeing it, and couldn't leave it).
+- Only a shared board saved by a newer version of the app is still kept on everyone's list, so an updated app opens it.
+- Someone who was already on such a shared board and opens its link on a new device stays on it (before, they could be taken off it, and lost it on their other devices too).
+- Shared boards already on your device and your own boards are untouched.
+
 ## Unsent changes too big to save online now say so (2026-10-18)
 
 - Signed in, if the app opened on changes this device hadn't sent yet and they made your boards too big to save online (over 900,000 characters), the internet refused them, the older online copy came back and the note said "Saved". Now the red "Couldn't save online. Changes are on this device only." banner shows as soon as the board opens, and your changes stay on screen.

@@ -1,5 +1,12 @@
 # Changelog
 
+## Daily journal (2026-10-18)
+
+- New **Journal** button, last in the row of buttons by the zoom control (on a phone: ⋯, then the Journal tile). It opens a board called Journal, with a note headed with today's date (like "Sun 18 Oct 2026") at the top and the cursor in it, ready to type. Press it again the same day and it takes you back to that note instead of adding another. Each new day adds a new note above the older ones.
+- The first time, the Journal board is made for you inside your home board (a card on home opens it, placed where a new sub-board would go on home). Ctrl+Z on the Journal board takes today's note away; pressing Journal puts it back. Ctrl+Z on home takes the card away, as after Add a sub-board; the Journal board stays and Journal still opens it.
+- If today's note is inside a collapsed container, Journal selects the container.
+- Your boards are untouched: nothing changes until you press Journal, and a board you already named Journal is used as it is.
+
 ## Broken shared boards no longer keep newcomers on them (2026-10-18)
 
 - A shared board whose saved data is damaged, in the old format or from an older version of the app is now handled like one missing its main board: it is skipped, its link says it doesn't work, and someone opening the link for the first time is taken off it again (before, they stayed on it without seeing it, and couldn't leave it).

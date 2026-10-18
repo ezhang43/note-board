@@ -360,6 +360,16 @@ export function FileIcon() {
   );
 }
 
+/** Journal: a closed book with a title line and a page edge. */
+export function JournalIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M6 3.5h11.5a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z" />
+      <path d="M4 17.5a2 2 0 0 1 2-2h12.5M9 8h6" />
+    </svg>
+  );
+}
+
 export function FeedbackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>

@@ -7,10 +7,11 @@ import { usePhone } from './usePhone';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
+import { JournalButton } from './JournalButton';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * labelled Search, Completed, History, Timer and Calendar (when signed in) in one pill, the keyboard
+ * labelled Search, Completed, History, Timer, Calendar (when signed in) and Journal in one pill, the keyboard
  * shortcuts (?) button, the Buy me a coffee link, text size (A− / A+) and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
@@ -39,6 +40,7 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       </button>
       <PomodoroButton />
       <CalendarButton />
+      <JournalButton />
       </div>
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?

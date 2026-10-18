@@ -19,8 +19,14 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     e.stopPropagation(); // the board underneath must not pan or clear the selection
     const additive = e.ctrlKey || e.metaKey || e.shiftKey;
     const interactive = !!(e.target as Element).closest(INTERACTIVE);
-    // Clicking into a text field selects just that block; a modifier-click toggles it.
-    if (interactive && !additive) return appStore.select(id);
+    // Clicking into a text field selects just that block; a modifier-click toggles it. By finger the
+    // selection is kept for now: a long press on the text must move the whole selection, and a quick
+    // tap narrows it to this block when the finger lifts (blockHoldPointerDown).
+    if (interactive && !additive) {
+      const sel = appStore.getState().ui.selection;
+      if (e.pointerType === 'touch' && sel.length > 1 && sel.includes(id)) return;
+      return appStore.select(id);
+    }
     appStore.pressBlock(id, additive);
     if (interactive) return;
 
@@ -48,10 +54,16 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     if (target.closest('button, .tick, input[type="checkbox"], a')) return;
     if (kind === 'column' && target.closest('[data-card-id]')) return;
     const el = e.currentTarget;
-    holdOrPan(e.nativeEvent, (start, at, done) => {
-      appStore.select(id);
-      trackDrag(kind, id, el, start, { at, done });
-    });
+    const onText = !!target.closest('input, textarea, select, label');
+    holdOrPan(
+      e.nativeEvent,
+      (start, at, done) => {
+        // A block that is part of a bigger selection keeps it, so the whole selection moves.
+        appStore.pressBlock(id, false);
+        trackDrag(kind, id, el, start, { at, done });
+      },
+      () => onText && appStore.select(id),
+    );
   };
 }
 

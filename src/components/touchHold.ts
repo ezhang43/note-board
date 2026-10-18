@@ -10,9 +10,13 @@ type Point = { x: number; y: number };
  * Touch screens (owner request): one finger moving straight away moves the board around, so
  * looking around never moves or resizes anything by accident. Resting the finger for a moment
  * first calls `onHold` (with where the finger started and where it is now), which takes over.
- * A quick tap does neither. The long-press copy / paste menu is kept away meanwhile.
+ * A quick tap does neither (it calls `onTap`). The long-press copy / paste menu is kept away meanwhile.
  */
-export function holdOrPan(e: PointerEvent | { clientX: number; clientY: number; pointerId: number }, onHold: (start: Point, at: Point, done: () => void) => void) {
+export function holdOrPan(
+  e: PointerEvent | { clientX: number; clientY: number; pointerId: number },
+  onHold: (start: Point, at: Point, done: () => void) => void,
+  onTap?: () => void,
+) {
   const start = { x: e.clientX, y: e.clientY };
   let at = start;
   let panning = false;
@@ -48,6 +52,7 @@ export function holdOrPan(e: PointerEvent | { clientX: number; clientY: number; 
     clearTimeout(timer);
     listen(false);
     allowMenu();
+    if (ev.type === 'pointerup' && !panning) onTap?.();
   }
   listen(true);
 }

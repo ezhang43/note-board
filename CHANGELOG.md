@@ -6,11 +6,31 @@
 - Only a shared board saved by a newer version of the app is still kept on everyone's list, so an updated app opens it.
 - Shared boards already on your device and your own boards are untouched.
 
+## Unsent changes too big to save online now say so (2026-10-18)
+
+- Signed in, if the app opened on changes this device hadn't sent yet and they made your boards too big to save online (over 900,000 characters), the internet refused them, the older online copy came back and the note said "Saved". Now the red "Couldn't save online. Changes are on this device only." banner shows as soon as the board opens, and your changes stay on screen.
+- Your next change tries to save again, those changes included; the banner goes once a save succeeds. While the banner shows, changes from your other devices are ignored, and your next successful save from this device replaces them, as with any refused save.
+- Boards already saved are untouched, and boards under the limit work as before. If unsent changes are refused for another reason, the older online copy still comes back, as before.
+
 ## About page demo always plays (2026-10-18)
 
 - The demo clip on the About page now starts by itself and loops over and over on every device, with no Pause button. Before, a computer or phone with "Reduce motion" on showed only a still picture and no button.
 - People who turned on "Reduce motion" will now see this one moving clip, and cannot pause it. If a browser blocks autoplay (low-power mode, say), the still picture stays.
 - Nothing in the app changes, and your boards are untouched.
+
+## Phone: double tap to zoom in, long tap to zoom out; selected blocks move together (2026-10-18)
+
+- On a phone or tablet, on the empty board: double tap zooms in one step and a long tap (resting a finger about half a second, then lifting) zooms out one step, each around your finger, the same step as the computer's zoom buttons. Cards and containers are unchanged, and swiping still pans the board or draws the selection box.
+- Fixed: with several cards and containers selected, pressing and holding one and then moving it moved only that one. All the selected blocks now move together, as with a mouse.
+- Your boards are untouched; nothing new is saved.
+
+## Restoring a version while offline (2026-10-17)
+
+- Pressing "Restore this version" while offline could leave the button waiting until the connection came back, then put the old version over whatever board was open by then. Now the safety copy (every board as it is now, kept in Version history) is started the moment you press Restore, before the old version is even read, so offline it is already waiting on this device, kept even if you close or reload the page, and saved once you're back online. The restore waits for the old version to be read and at most 3 seconds for that save, then goes ahead.
+- If, while it waits, you press Back to current, pick another version, or another board opens, the restore is dropped and nothing on your boards changes.
+- If the safety copy is refused before the restore happens (within those 3 seconds, or while the old version is still being read), the restore stops and says "Couldn't restore it", as before. If it is refused later, after the restore went ahead, a note says "The boards from before your restore couldn't be saved in Version history."
+- Deleting a board, restoring a backup and losing a shared board also start their safety copy at once now, instead of first reading the version list (which, just after the connection drops, can itself take a while). A safety copy the same as the version before it is removed again once its save answers (if the page is still open then), so the history doesn't fill up with repeats.
+- Boards already saved are untouched.
 
 ## Shared board from a newer app no longer holds back your boards (2026-10-17)
 

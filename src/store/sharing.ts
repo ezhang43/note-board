@@ -464,7 +464,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     // Like deleting any board (main session check, 2026-10-06): every board as it is now is saved as
     // a version first, so Version history can bring these back. Not waited for (the boards are read
     // at once). After the owner's delete on this page (deleteBoardSafely saved one first), this one
-    // matches the newest version, so none is added.
+    // matches the newest version, so it is removed again once saved (if this page is still open then).
     const versions = opts.versions?.();
     if (versions && ids.length) void saveSafetyVersion(store, versions, Date.now);
     close(s);

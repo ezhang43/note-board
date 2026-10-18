@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { addCard, createBoard } from '../model/board';
 import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
 import { ownBoardsGuard } from './sharing';
-import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
+import { ONLINE_LIMIT, startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
 function fakeRemote() {
@@ -619,6 +620,85 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     const { store, fake, sync } = opened();
     fake.send({ data: boardJson('Older online'), client: 'laptop' });
     expect(store.getState().board.name).toBe('Older online');
+    sync.stop();
+  });
+
+  // Job 94 (owner decision 2026-10-18): saves over the online limit (firestore.rules, 900,000
+  // characters) will be refused, so the red banner shows as soon as the board opens from them.
+  function openedWith(data: string) {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onSaveState = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onSaveState });
+    fake.send({ data, client: 'old-page', pending: true });
+    return { store, fake, onSaveState, sync };
+  }
+  /** A board whose saved text is exactly `size` characters (as the rules count them), `emoji` of them emoji. */
+  function boardOfSize(size: number, emoji = 0) {
+    const base = boardJson('Too big ').length;
+    return boardJson('Too big ' + '😀'.repeat(emoji) + 'x'.repeat(size - base - emoji));
+  }
+
+  it('over the online limit: says “Couldn’t save online” straight away, keeps them, sends nothing by itself', async () => {
+    const { store, fake, onSaveState, sync } = openedWith(boardOfSize(900_001));
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    expect(fake.writes).toEqual([]);
+    // Firestore then puts the older online copy back: not applied, and never "Saved".
+    fake.send({ data: boardJson('Older online'), client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    await settled();
+    expect(store.getState().board.name.startsWith('Too big')).toBe(true);
+    expect(onSaveState).not.toHaveBeenCalledWith('saved');
+    sync.stop();
+  });
+
+  it('over the limit: the next change tries again, even one undone back to the same boards', async () => {
+    const { store, fake, onSaveState, sync } = openedWith(boardOfSize(900_001));
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    const name = store.getState().board.name;
+    store.renameBoard('Smaller');
+    store.renameBoard(name);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    fake.control.fail = true;
+    store.renameBoard('Smaller');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(fake.writes).toHaveLength(2);
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    fake.control.fail = false;
+    store.renameBoard('Smaller still');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('saved');
+    sync.stop();
+  });
+
+  it('exactly at the limit, counted in characters as the rules do (an emoji is one), is not taken for a refusal', () => {
+    const withEmoji = boardOfSize(900_000, 10);
+    expect(withEmoji.length).toBeGreaterThan(900_000);
+    for (const data of [boardOfSize(900_000), withEmoji]) {
+      const { onSaveState, sync } = openedWith(data);
+      expect(onSaveState).toHaveBeenLastCalledWith('saving');
+      sync.stop();
+    }
+  });
+
+  it('the limit is the one in firestore.rules', () => {
+    const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
+    expect(rules).toContain(`text.size() <= ${ONLINE_LIMIT}`);
+  });
+
+  it('a version the server has, however big, is not checked here (the rules decide)', () => {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onSaveState = vi.fn();
+    const sync = startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onSaveState });
+    fake.send({ data: boardOfSize(900_001), client: 'laptop' });
+    expect(onSaveState).not.toHaveBeenCalledWith('failed');
     sync.stop();
   });
 

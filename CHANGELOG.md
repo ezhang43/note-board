@@ -10,11 +10,28 @@
 - The card follows the panel's edge when you drag the panel wider or narrower (it stays open) or resize the window. In a narrow window with a wide panel, where there is no room beside the panel, it sits inside the panel instead of being partly hidden. While a delete is on its way to Google, clicking another event or week waits, so a "didn't reach Google Calendar" note is still shown.
 - Your boards and their saving are not touched.
 
+## Habits (2026-10-19)
+
+- A new **Habits** button sits next to Journal in the panel pill by the zoom control (on a phone: ⋯ → Habits). It opens a Habits panel at the side; the board you are on stays open.
+- Type a habit in "New habit" and press Enter or Add. Each habit shows this week's seven days, Monday to Sunday, today outlined. Tap a day to tick it, tap again to untick it; a day is ticked at most once.
+- Under each habit is its streak: the days in a row you ticked, up to today. Not having ticked today yet doesn't break a streak that ran through yesterday.
+- Rename a habit by typing over its name. The bin deletes it after asking first; Ctrl+Z in the panel, or Version history, brings it back with its ticks.
+- Habits are kept on a hidden board called "Habits", like the Journal, so they save, sync to your Google account when signed in, and stay on the device when not.
+- Your boards and journal already saved load exactly as before. Nothing new is saved until you add your first habit.
+- Restoring a version in Version history also puts your habits back as they were then, like the Journal.
+- On a phone the keyboard doesn't pop up by itself when the panel opens, so it doesn't cover the day boxes. Screen readers say each day box with its habit ("Read, Mon 19 Oct").
+
 ## Phone: press and hold to move a list item (2026-10-19)
 
 - On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.
 - A quick tap still lets you type, a swipe still moves the board, and resting on the list's title or the card's empty space still picks up the whole card. The grip still drags at once.
 - With your phone set to reduce motion, the items jump instead of sliding. Computers and tablets are unchanged. Your boards are not touched: dropping is the same undoable move as before.
+
+## Privacy-friendly visit counts (2026-10-19)
+
+- The published site now counts page visits (the app and the About, FAQ, Terms, Privacy and Delete your account pages) with GoatCounter, a counter with no cookies. It is the owner's account, busyants.goatcounter.com.
+- Nothing from your boards is sent. It only runs on the published site: not in `npm run dev`, not in the browser tests, not on localhost.
+- The Privacy page has a new "Counting visits" section saying so, and the About page's "no analytics" line now says "only a privacy-friendly count of page visits".
 
 ## Phone: the line you are typing in always stays in view (2026-10-19)
 

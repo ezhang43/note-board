@@ -362,6 +362,50 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
   return { summary, start: { dateTime: start, timeZone }, end: { dateTime: end, timeZone } };
 }
 
+// The calendar access (Google's token, about an hour) is kept for this tab only, in sessionStorage,
+// so a reload within the hour doesn't ask Google again (owner choice, 2026-10-19). The storage is
+// passed as a getter, since even reaching it can throw where the browser blocks it.
+export const ACCESS_KEY = 'note-board:calendar-access';
+export interface Access {
+  token: string;
+  /** When it runs out, in ms since 1970. */
+  expiresAt: number;
+  /** Who it belongs to: the signed-in person's account id. */
+  user: string;
+}
+type TabStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+export function keepAccess(storage: () => TabStorage | null, access: Access) {
+  try {
+    storage()?.setItem(ACCESS_KEY, JSON.stringify(access));
+  } catch {
+    // Blocked or full: the access is still kept in memory until the page is closed.
+  }
+}
+
+export function dropAccess(storage: () => TabStorage | null) {
+  try {
+    storage()?.removeItem(ACCESS_KEY);
+  } catch {
+    // Blocked: nothing was kept.
+  }
+}
+
+/** The kept access if it is this person's with over a minute left; anything else is dropped. */
+export function readAccess(storage: () => TabStorage | null, user: string | null, now = Date.now()): Access | null {
+  type Raw = { token?: unknown; expiresAt?: unknown; user?: unknown };
+  let a: Raw | null = null;
+  try {
+    a = JSON.parse(storage()?.getItem(ACCESS_KEY) ?? 'null') as Raw | null;
+  } catch {
+    // Blocked or damaged: Google is asked as usual.
+  }
+  const { token, expiresAt, user: owner }: Raw = a && typeof a === 'object' ? a : {};
+  if (typeof token === 'string' && token !== '' && typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > now + 60_000 && user !== null && owner === user) return { token, expiresAt, user };
+  dropAccess(storage);
+  return null;
+}
+
 // The panel's width (owner request, 2026-10-16): kept on this device for each view, so Week and Month
 // can differ. Not board data. The window width is passed in, so this stays free of the DOM.
 export const PANEL_MIN = 300;

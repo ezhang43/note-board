@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { deleteUser, getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { readAccess } from '../model/calendar';
 import {
   addDoc,
   clearIndexedDbPersistence,
@@ -52,7 +53,12 @@ const db = initializeFirestore(app, {
 export type { User };
 
 export function watchUser(onChange: (user: User | null) => void) {
-  return onAuthStateChanged(auth, onChange);
+  return onAuthStateChanged(auth, (user) => {
+    // Every sign-out or change of person drops the calendar access kept for this tab (job 103), here
+    // because this is loaded at start, before the calendar ever shows (on a phone, in the ⋯ sheet).
+    readAccess(() => sessionStorage, user?.uid ?? null);
+    onChange(user);
+  });
 }
 
 export function signInWithGoogle() {

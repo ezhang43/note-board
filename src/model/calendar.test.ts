@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCESS_KEY,
+  dropAccess,
+  keepAccess,
+  readAccess,
   PANEL_DEFAULT,
   PANEL_STEP,
   clampPanelWidth,
@@ -460,5 +464,82 @@ describe('the calendar panel’s width', () => {
     expect(parsePanelWidths('[1,2]')).toEqual({ week: 420, month: 720 });
     expect(parsePanelWidths('{"week":"wide","month":-5}')).toEqual({ week: 420, month: 720 });
     expect(parsePanelWidths('{"week":10,"month":1e9}')).toEqual({ week: 420, month: 720 });
+  });
+});
+
+describe('calendar access kept for this tab (owner choice, 2026-10-19)', () => {
+  const now = 1_000_000_000_000;
+  const tab = () => {
+    const data = new Map<string, string>();
+    return { data, getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) };
+  };
+  const access = { token: 'tok', expiresAt: now + 3_600_000, user: 'u1' };
+
+  it('gives back the kept access for the same person while over a minute is left', () => {
+    const s = tab();
+    keepAccess(() => s, access);
+    expect(JSON.parse(s.data.get(ACCESS_KEY)!)).toEqual(access);
+    expect(readAccess(() => s, 'u1', now)).toEqual(access);
+    expect(readAccess(() => s, 'u1', now + 3_600_000 - 61_000)).toEqual(access);
+  });
+
+  it('drops it when it belongs to someone else, or no one is signed in', () => {
+    for (const who of ['u2', null]) {
+      const s = tab();
+      keepAccess(() => s, access);
+      expect(readAccess(() => s, who, now)).toBeNull();
+      expect(s.data.has(ACCESS_KEY)).toBe(false);
+    }
+  });
+
+  it('drops it with a minute or less left, or expired', () => {
+    for (const at of [now + 3_600_000 - 60_000, now + 3_600_000, now + 9_999_999]) {
+      const s = tab();
+      keepAccess(() => s, access);
+      expect(readAccess(() => s, 'u1', at)).toBeNull();
+      expect(s.data.has(ACCESS_KEY)).toBe(false);
+    }
+  });
+
+  it('drops anything damaged or of the wrong shape', () => {
+    const bad = [
+      '{',
+      'null',
+      '[]',
+      '"tok"',
+      '{"token":"","expiresAt":9e15,"user":"u1"}',
+      '{"token":5,"expiresAt":9e15,"user":"u1"}',
+      '{"token":"t","expiresAt":"9e15","user":"u1"}',
+      '{"token":"t","user":"u1"}',
+      '{"token":"t","expiresAt":9e15,"user":5}',
+      '{"token":"t","expiresAt":9e15}',
+      '{"token":"t","expiresAt":1e999,"user":"u1"}', // reads as Infinity: never "never runs out"
+    ];
+    for (const raw of bad) {
+      const s = tab();
+      s.setItem(ACCESS_KEY, raw);
+      expect(readAccess(() => s, 'u1', now)).toBeNull();
+      expect(s.data.has(ACCESS_KEY)).toBe(false);
+    }
+    expect(readAccess(() => tab(), 'u1', now)).toBeNull();
+  });
+
+  it('dropAccess removes it', () => {
+    const s = tab();
+    keepAccess(() => s, access);
+    dropAccess(() => s);
+    expect(s.data.has(ACCESS_KEY)).toBe(false);
+  });
+
+  it('never throws when the storage is blocked, full or missing', () => {
+    const blocked = () => {
+      throw new Error('SecurityError');
+    };
+    const broken = { getItem: blocked, setItem: blocked, removeItem: blocked };
+    for (const s of [blocked, () => broken, () => null]) {
+      expect(() => keepAccess(s, access)).not.toThrow();
+      expect(readAccess(s, 'u1', now)).toBeNull();
+      expect(() => dropAccess(s)).not.toThrow();
+    }
   });
 });

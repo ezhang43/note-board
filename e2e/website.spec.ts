@@ -433,7 +433,7 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
 
   await page.goto('/privacy/');
   const privacy = page.locator('main');
-  await expect(privacy).toContainText('Effective from October 16, 2026');
+  await expect(privacy).toContainText('Effective from October 19, 2026');
   await expect(privacy).toContainText('australia-southeast1 (Sydney, Australia)');
   await expect(privacy).toContainText('may be processed outside your own country');
   await expect(privacy).not.toContainText('us-central');

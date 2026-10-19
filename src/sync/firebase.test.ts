@@ -47,7 +47,9 @@ vi.mock('firebase/firestore', () => ({
   },
 }));
 
-const { collabRemote, sendFeedback, boardRemote, versionsRemote } = await import('./firebase');
+const { collabRemote, sendFeedback, boardRemote, versionsRemote, watchUser } = await import('./firebase');
+const auth = await import('firebase/auth');
+const { ACCESS_KEY: KEY } = await import('../model/calendar');
 const firestore = await import('firebase/firestore');
 const user = { uid: 'u1', displayName: 'Bob', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
@@ -150,5 +152,42 @@ describe('opening your board offline with unsent changes (job 92)', () => {
     const got: unknown[] = [];
     watching(got)(snap({ data: 42 }, true, true));
     expect(got).toEqual([]);
+  });
+});
+
+describe('the calendar access kept for this tab (job 103, owner check of PR #98)', () => {
+  // The sign-in watcher is loaded at start, so every sign-out or change of person drops it, even
+  // before the calendar (on a phone, in the ⋯ sheet) has ever been shown.
+  const data = new Map<string, string>();
+  beforeEach(() => {
+    data.clear();
+    vi.stubGlobal('sessionStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) });
+    data.set(KEY, JSON.stringify({ token: 't', expiresAt: Date.now() + 3_000_000, user: 'u1' }));
+  });
+  const fire = (u: { uid: string } | null) => {
+    const seen: unknown[] = [];
+    watchUser((x) => void seen.push(x));
+    (vi.mocked(auth.onAuthStateChanged).mock.calls.at(-1)![1] as (u: unknown) => void)(u);
+    return seen;
+  };
+
+  it('is kept when the same person is still signed in after a reload', () => {
+    expect(fire({ uid: 'u1' })).toEqual([{ uid: 'u1' }]);
+    expect(data.has(KEY)).toBe(true);
+  });
+
+  it('is dropped on sign-out, however it happened', () => {
+    expect(fire(null)).toEqual([null]);
+    expect(data.has(KEY)).toBe(false);
+  });
+
+  it('is dropped when another person signs in', () => {
+    fire({ uid: 'u2' });
+    expect(data.has(KEY)).toBe(false);
+  });
+
+  it('blocked storage never stops the sign-in watcher', () => {
+    vi.stubGlobal('sessionStorage', { getItem: () => { throw new Error('blocked'); }, setItem() {}, removeItem: () => { throw new Error('blocked'); } });
+    expect(fire(null)).toEqual([null]);
   });
 });

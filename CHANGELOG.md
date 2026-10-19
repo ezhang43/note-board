@@ -1,5 +1,13 @@
 # Changelog
 
+## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
+
+- On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.
+- The bar has two new buttons: Undo (at the left) and Done (at the right, which puts the keyboard away). Undo goes back one step at a time and keeps you typing.
+- The Indent and Outdent icons are clearer: like the ones in a text editor, with an arrow showing which way the item moves.
+- Checklist items on a phone no longer have a small trash can on each row; Delete is in the bar above the keyboard. Computers and tablets are unchanged.
+- Your boards are not touched: only what the buttons do while you are typing changed.
+
 ## Custom hotkeys (2026-10-19)
 
 - You can now change the keys for the Hand tool, the Select tool, Select all, Copy, Paste, Duplicate and Delete. Open the Keyboard shortcuts list (the ? button or the ? key), click a key, and press the new one. Escape cancels, and a "Reset to defaults" button puts every key back.

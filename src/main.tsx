@@ -9,6 +9,13 @@ import { takeDeletedNote } from './sync/account';
 import { SignInScreen } from './components/SignInScreen';
 import './styles.css';
 
+// Motion is for what the pointer does. Anything the keyboard starts (a shortcut, Enter on a button) happens
+// at once: the styles read this switch (html[data-input='keys']). Any press of the pointer turns it off again.
+addEventListener('keydown', (e) => {
+  if (!/^(Shift|Control|Alt|Meta)$/.test(e.key)) document.documentElement.dataset.input = 'keys'; // a held Shift while dragging is still the pointer
+}, true);
+addEventListener('pointerdown', () => delete document.documentElement.dataset.input, true);
+
 // Save any board change or pan/zoom still waiting when the tab is closed or hidden.
 flushWhenHidden(document, window, appStore.flush);
 

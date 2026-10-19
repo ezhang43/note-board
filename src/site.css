@@ -6,6 +6,7 @@
  * light / dark setting.
  */
 :root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* strong ease-out for motion (Emil Kowalski's skills) */
   --ground: #fffefa;
   --ink: #1c1b19;
   --ink2: #615c54;
@@ -93,8 +94,10 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
   font-weight: 500;
   text-decoration: none;
 }
-.site-header a:hover,
 .site-header a[aria-current='page'] { text-decoration: underline 2px; text-underline-offset: 8px; }
+@media (hover: hover) {
+  .site-header a:hover { text-decoration: underline 2px; text-underline-offset: 8px; }
+}
 .site-brand { gap: 10px; margin-right: 12px; font-family: var(--display); font-size: 19px; }
 .site-header .site-brand { font-weight: 700; }
 .site-brand img { width: 32px; height: 32px; }
@@ -106,7 +109,9 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
   font-weight: 600;
 }
 .site-header a:last-child::after { content: '→' / ''; margin-left: 8px; }
-.site-header a:last-child:hover { background: var(--slab-ink); color: var(--slab); text-decoration: none; }
+@media (hover: hover) {
+  .site-header a:last-child:hover { background: var(--slab-ink); color: var(--slab); text-decoration: none; }
+}
 
 /* On a phone the four page links get a row of their own, with 44px tap targets */
 @media (max-width: 640px) {
@@ -159,7 +164,9 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
   font-weight: 600;
   text-decoration: none;
 }
-.start:hover { filter: brightness(1.06); }
+@media (hover: hover) {
+  .start:hover { filter: brightness(1.06); }
+}
 .hero .start { margin-top: 32px; background: var(--slab-btn); color: var(--slab-btn-ink); }
 .hero-board { display: block; max-width: var(--wide); margin: clamp(40px, 6vw, 64px) auto 0; }
 .shot {
@@ -342,7 +349,8 @@ summary::after {
   border-bottom: 2px solid var(--ink2);
   transform: rotate(45deg);
 }
-details[open] > summary::after { margin-bottom: -4px; transform: rotate(-135deg); }
+/* Opening turns the arrow over; the 4.5px it sinks is a translate (not a margin) so it can move smoothly. */
+details[open] > summary::after { transform: translateY(4.5px) rotate(-135deg); }
 details > :not(summary) { margin-top: 0; }
 details[open] { padding-bottom: 8px; }
 /* Printing (or saving as PDF) shows every section, open or not */
@@ -382,3 +390,17 @@ main:has(.closing) { padding-bottom: 0; } /* About: the closing honey block sits
 .site-footer { border-top: 1px solid var(--hair); font-size: 14px; }
 .site-footer nav { padding-top: 24px; padding-bottom: 28px; gap: 4px 20px; }
 .site-footer a { color: var(--ink2); }
+
+/* Phone-native feel (mobile-native skill): no grey flash on a tap, and no wait for a double-tap on buttons, links and folds. */
+html { -webkit-tap-highlight-color: transparent; }
+a, summary { touch-action: manipulation; }
+
+/*
+ * Motion (owner request 2026-10-19, Emil Kowalski's skills; docs/design-polish-review.md): the big
+ * buttons shrink a little when pressed, and a fold's arrow turns instead of jumping. Not with reduced motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .start, .site-header a:last-child { transition: transform 120ms var(--ease-out); }
+  .start:active, .site-header a:last-child:active { transform: scale(0.97); }
+  summary::after { transition: transform 200ms var(--ease-out); }
+}

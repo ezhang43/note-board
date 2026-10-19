@@ -102,8 +102,9 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
 /**
  * Blocks in the same row as `id` (they overlap it by at least half the shorter one's height) that it
  * now covers slide sideways out of its way, keeping their left-to-right order, and push the blocks
- * beside them along too (owner decision 2026-10-19). After a resize (no `drag`) they all go right,
- * as a block only grows to the right. For a drag, blocks whose middle is left of its middle go left,
+ * beside them along too (owner decision 2026-10-19). After a resize (no `drag`) the blocks that start
+ * at or right of it go right, and those starting left of it stay (a block only grows to the right).
+ * For a drag, blocks whose middle is left of its middle go left,
  * the others right; on a tie they go the way it came from (`movedX` > 0: it moved right, so they go
  * left). Blocks in `fixed` never move; when one of them is in the way the dragged block itself will
  * move instead, so nothing shifts. Returns the same board when nothing moves.
@@ -117,7 +118,9 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
     return r ? [{ id: o, r }] : [];
   });
   if (rects.some((m) => fixed.has(m.id) && overlaps(a, m.r, BLOCK_GAP - 1))) return board;
-  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
+  // After a resize the block keeps its own x and only grows right, so blocks starting left of it are
+  // never touched (they would otherwise be moved to its right, as "in the way").
+  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && (drag || r.x >= a.x) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
   const mid = (r: Rect) => r.x + r.w / 2;
   const goesLeft = (r: Rect) => !!drag && (mid(r) < mid(a) || (mid(r) === mid(a) && drag.movedX > 0));
   // Each block only has to clear the blocks already placed beside it (level with it, give or take the gap).

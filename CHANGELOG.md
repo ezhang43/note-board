@@ -1,5 +1,10 @@
 # Changelog
 
+## Widening a card no longer throws its row neighbours around (2026-10-19)
+
+- Fix: when you dragged a card's resize corner wider so it covered the next card, the blocks to its left in the row (such as the card at its far left) jumped to the right of it, so the row came out in the wrong order. Now the card you resize keeps its place, blocks to its left stay exactly where they were, and only the blocks it now covers slide right, in their old order.
+- This is the same for the corner, the width strip, the keyboard arrows and a finger. Dragging blocks is unchanged. Your boards and their saving are not touched.
+
 ## Rich text in the Journal (2026-10-19)
 
 - Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).

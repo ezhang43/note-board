@@ -24,12 +24,12 @@ It signs in as you, so Google's rules for your boards (`firestore.rules`) apply 
 Each change is one save of at most 50 changes, and Claude's answer lists exactly what changed. There is no tool for link cards (BusyAnts has no Add Link).
 
 **Deleting** is off until you switch it on, on your computer: `npm run mcp:delete-on` (and `npm run mcp:delete-off` to stop it again; `npm run mcp:check` shows which). No tool can switch it. When it is on:
-- Claude first shows you what would be deleted (`preview_delete`), and deletes only after you say yes (`confirm_delete`, once per preview). If the board changed in between, nothing is deleted.
+- Claude first shows you what would be deleted (`preview_delete`), and deletes only after you say yes (`confirm_delete`, once per preview). If anything it would delete changed in between, nothing is deleted.
 - Just before deleting, a copy of your boards is saved in version history (the History button), so you can always put it back.
 - At most 20 things at a time (a column or a board counts as one, with what is inside it).
 - Never deleted: your home board, a top-level board (one no card opens), the Completed card, or anything on a shared board.
 - A preview works once, for 10 minutes, and is forgotten when Claude Desktop or the connector restarts: ask for a new one.
-- The setting is a file on your computer (`settings.json` in the connector's folder, next to its sign-in file). Claude Desktop's connector can't change it, but Claude Code on the same computer could, like any file. To stop that, add to `permissions.deny` in your own Claude Code user settings: `Bash(npm run mcp:delete-on*)`, and `Edit` / `Write` rules for that folder (`%APPDATA%/busyants-mcp/**` on Windows, `~/.config/busyants-mcp/**` elsewhere).
+- The setting is a file on your computer (`settings.json` in the connector's folder, next to its sign-in file). Claude Desktop's connector can't change it, but Claude Code on the same computer could, like any file. To stop that, add to `permissions.deny` in your own Claude Code user settings: `Bash(npm run mcp:delete-on*)`, and `Edit` / `Write` rules for that folder, written as its full path followed by `/**` (it is the folder `npm run mcp:login` said it saved your sign-in to).
 
 **Safety:**
 - Before Claude's first change (and again after 10 quiet minutes), your boards as they were are saved in version history: open BusyAnts → Version history (the clock button, bottom right) to go back.

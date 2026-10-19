@@ -280,7 +280,7 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
         previews.set(key, { boardId: got.id, ids: things, print: plan.print, at: Date.now() });
         const list = plan.lines.map((l) => `- ${l}`).join('\n');
         return {
-          text: `This would delete (nothing is deleted yet):\n${list}\n\nPreview id: ${key}. To delete exactly this, call confirm_delete with it (once), only after the person has said yes to this list. If the boards change before then, nothing is deleted and a new preview is needed.`,
+          text: `This would delete (nothing is deleted yet):\n${list}\n\nPreview id: ${key}. To delete exactly this, call confirm_delete with it (once, within 10 minutes), only after the person has said yes to this list. If anything in this list changes before then, nothing is deleted and a new preview is needed.`,
         };
       }),
   );

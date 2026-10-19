@@ -377,4 +377,21 @@ describe('saving a delete (job 110)', () => {
     expect(fs.own()).toContain('"noteCall"');
     expect(log.at(-1)).toMatch(/not deleted again/);
   });
+
+  it('the app saving only part of a delete back: says some of it may be back, never deleted again', async () => {
+    const { fs, deps } = setup();
+    const ws = readWorkspace(ownRaw())!.ws;
+    const both = planDelete(ws, 'home', ['noteCall', 'noteIdea'], new Set(), (x) => x);
+    if ('error' in both) throw new Error(both.error);
+    const ideaOnly = planDelete(ws, 'home', ['noteIdea'], new Set(), (x) => x);
+    if ('error' in ideaOnly) throw new Error(ideaOnly.error);
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn(serializeWorkspace(ideaOnly.ws)); // the call note is back, the idea still gone
+    };
+    const r = await saveChange(deps, deleteThings('home', ['noteCall', 'noteIdea'], new Set(), both.print, 'z'), { deleting: true });
+    expect(r.isError).toBe(true);
+    expect(r.text).toMatch(/some of it may be back on the board[\s\S]*not deleted again/);
+    expect(boardCommits(fs)).toHaveLength(1);
+    expect(fs.own()).toContain('"noteCall"');
+  });
 });

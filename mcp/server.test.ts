@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TodoCard } from '../src/model/types';
 import { readWorkspace } from '../src/model/workspace';
 import type { Snapshot } from './boards';
@@ -15,10 +15,10 @@ const noSaving: Write = async () => {
   throw new Error('not saving in this test');
 };
 
-async function connect(load: () => Promise<Snapshot> = async () => sampleSnapshot(), write = noSaving) {
+async function connect(load: () => Promise<Snapshot> = async () => sampleSnapshot(), write = noSaving, deleteAllowed?: () => Promise<boolean>) {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test', version: '1' });
-  await Promise.all([createServer(load, write).connect(a), client.connect(b)]);
+  await Promise.all([createServer(load, write, { deleteAllowed }).connect(a), client.connect(b)]);
   return client;
 }
 
@@ -27,7 +27,7 @@ const text = (r: unknown) => ((r as { content: { type: string; text: string }[] 
 describe('the connector’s tools', () => {
   it('the read tools are read-only', async () => {
     const { tools } = await (await connect()).listTools();
-    expect(tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort()).toEqual(['list_boards', 'read_board']);
+    expect(tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort()).toEqual(['list_boards', 'preview_delete', 'read_board']);
   });
 
   it('list_boards lists every board', async () => {
@@ -66,26 +66,28 @@ describe('the connector’s tools', () => {
 
 // ---------- changing boards (job B) ----------
 
-function connectWithWrites() {
+function connectWithWrites(deleteAllowed?: () => Promise<boolean>) {
   const fs = fakeFirestore('me');
   fs.setOwn(ownRaw());
   const deps = { db: ownDb(async () => 'ID', 'me', fs.fetch), client: 'mcp-test', now: () => Date.UTC(2026, 9, 6, 12), wait: async () => {}, log: () => {}, memory: { lastEditAt: null } };
   const load = async () => ({ ...sampleSnapshot(), own: fs.own() });
-  return { fs, client: connect(load, (edit) => saveChange(deps, edit)) };
+  return { fs, client: connect(load, (edit, opts) => saveChange(deps, edit, opts), deleteAllowed) };
 }
 
 const items = (fs: ReturnType<typeof fakeFirestore>) => (readWorkspace(fs.own())!.ws.boards.home.cards.listGroceries as TodoCard).items;
 const saves = (fs: ReturnType<typeof fakeFirestore>) => fs.calls.filter((c) => c.path === ':commit' && JSON.stringify(c.body).includes('documents/boards/me"')).length;
 
 describe('the connector’s write tools', () => {
-  it('offers the five write tools, none marked destructive or read-only', async () => {
+  it('offers the write tools, none marked destructive or read-only, and confirm_delete marked destructive', async () => {
     const { tools } = await (await connectWithWrites().client).listTools();
-    const writes = ['add_items', 'add_note', 'edit_items', 'move_items', 'set_items_done'];
-    expect(tools.map((t) => t.name).sort()).toEqual(['add_items', 'add_note', 'edit_items', 'list_boards', 'move_items', 'read_board', 'set_items_done']);
+    const writes = ['add_checklist', 'add_column', 'add_items', 'add_note', 'create_board', 'edit_items', 'move_items', 'set_items_done'];
+    expect(tools.map((t) => t.name).sort()).toEqual([...writes, 'confirm_delete', 'list_boards', 'preview_delete', 'read_board'].sort());
     for (const t of tools.filter((t) => writes.includes(t.name))) {
       expect(t.annotations?.destructiveHint, t.name).toBe(false);
       expect(t.annotations?.readOnlyHint, t.name).toBe(false);
     }
+    const confirm = tools.find((t) => t.name === 'confirm_delete')!;
+    expect([confirm.annotations?.destructiveHint, confirm.annotations?.readOnlyHint]).toEqual([true, false]);
   });
 
   it('add_items adds to a list and replies with a plain list of what changed', async () => {
@@ -156,5 +158,147 @@ describe('the connector’s write tools', () => {
     const r = await (await client).callTool({ name: 'add_note', arguments: { board: 'Nope', text: 'x' } });
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/No board called "Nope"/);
+  });
+});
+
+// ---------- making and deleting (job 110) ----------
+
+const home = (fs: ReturnType<typeof fakeFirestore>) => readWorkspace(fs.own())!.ws.boards.home;
+const allowed = async () => true;
+const previewId = (r: unknown) => /Preview id: (\S+)\./.exec(text(r))![1];
+
+describe('the connector’s making tools', () => {
+  it('add_checklist and add_column add to the board', async () => {
+    const { fs, client } = connectWithWrites();
+    const c = await client;
+    expect(text(await c.callTool({ name: 'add_checklist', arguments: { board: 'home', title: 'Packing', items: ['Socks'], column: 'Ideas' } }))).toMatch(/Added the checklist "Packing" \(id: \S+\) with 1 item to the column Ideas/);
+    expect(text(await c.callTool({ name: 'add_column', arguments: { board: 'home', title: 'Later' } }))).toMatch(/Added the column "Later"/);
+    const b = home(fs);
+    expect(Object.values(b.columns).map((col) => col.title)).toContain('Later');
+    expect(Object.values(b.cards).filter((k) => k.kind === "todo" && k.title === "Packing")).toHaveLength(1);
+  });
+
+  it('create_board makes a board inside another, or on its own; never inside a shared board', async () => {
+    const { fs, client } = connectWithWrites();
+    const c = await client;
+    expect(text(await c.callTool({ name: 'create_board', arguments: { name: 'Garden', inside: 'Home' } }))).toMatch(/Made the board "Garden" \(id: \S+\) inside Home/);
+    expect(text(await c.callTool({ name: 'create_board', arguments: { name: 'Side' } }))).toMatch(/Made the board "Side" \(id: \S+\), on its own/);
+    const names = Object.values(readWorkspace(fs.own())!.ws.boards).map((b) => b.name);
+    expect(names).toEqual(expect.arrayContaining(['Garden', 'Side']));
+    const r = await c.callTool({ name: 'create_board', arguments: { name: 'X', inside: 'Trip' } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/shared.*read-only/);
+  });
+});
+
+describe('the connector’s safe delete', () => {
+  it('off by default: preview and confirm are refused, telling Claude to ask the owner', async () => {
+    const { fs, client } = connectWithWrites();
+    const r = await (await client).callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/Deleting is switched off.*ask the owner/s);
+    expect(text(r)).not.toMatch(/delete-on/);
+    expect(fs.calls.some((x) => x.path === ':commit')).toBe(false);
+  });
+
+  it('preview lists exactly what would go and changes nothing; confirm deletes it, after a backup version', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'Home', things: ['noteCall', 'iBread'] } });
+    expect(p.isError).toBeFalsy();
+    expect(text(p)).toMatch(/^This would delete \(nothing is deleted yet\):\n- the note "Call the bank" \(id: noteCall\) on Home\n- the item "Bread" \(id: iBread\) from Groceries on Home\n/);
+    expect(fs.calls.some((x) => x.path === ':commit')).toBe(false);
+    const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(r.isError).toBeFalsy();
+    expect(text(r)).toMatch(/^Saved:\n- Deleted the note "Call the bank" \(id: noteCall\) on Home\n- Deleted the item "Bread"/);
+    expect(text(r)).toMatch(/Version history/);
+    expect(home(fs).cards.noteCall).toBeUndefined();
+    expect(fs.versions()).toHaveLength(1);
+    expect(fs.field(`boards/me/versionData/${fs.versions()[0]}`, 'data')).toBe(ownRaw());
+  });
+
+  it('a preview is used once; an unknown one is refused', async () => {
+    const { client } = connectWithWrites(allowed);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    expect((await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } })).isError).toBeFalsy();
+    const again = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(again.isError).toBe(true);
+    expect(text(again)).toMatch(/No preview with id/);
+    expect((await c.callTool({ name: 'confirm_delete', arguments: { preview: 'made-up' } })).isError).toBe(true);
+  });
+
+  it('the board changed between preview and confirm: refused, nothing deleted', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['listGroceries'] } });
+    await c.callTool({ name: 'add_items', arguments: { board: 'home', list: 'Groceries', items: [{ text: 'Apples' }] } });
+    const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/changed since the preview/);
+    expect(home(fs).cards.listGroceries).toBeDefined();
+  });
+
+  it('switched off between preview and confirm: refused, nothing deleted', async () => {
+    let on = true;
+    const { fs, client } = connectWithWrites(async () => on);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    on = false;
+    const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/switched off/);
+    expect(home(fs).cards.noteCall).toBeDefined();
+    // Switched on again, the same preview still works: a refusal doesn't use it up.
+    on = true;
+    expect((await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } })).isError).toBeFalsy();
+    expect(home(fs).cards.noteCall).toBeUndefined();
+  });
+
+  it('a preview works for 10 minutes only', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const { fs, client } = connectWithWrites(allowed);
+      const c = await client;
+      const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+      vi.setSystemTime(Date.now() + 10 * 60_000 + 1);
+      const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+      expect(r.isError).toBe(true);
+      expect(text(r)).toMatch(/older than 10 minutes/);
+      expect(home(fs).cards.noteCall).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the app saving the deleted things back: said so, and still points to the backup in Version history', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn(ownRaw());
+    };
+    const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/not deleted again[\s\S]*Version history/);
+  });
+
+  it('never on a shared board, and at most 20 things per call', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const c = await client;
+    const shared = await c.callTool({ name: 'preview_delete', arguments: { board: 'Trip', things: ['listTrip'] } });
+    expect(shared.isError).toBe(true);
+    expect(text(shared)).toMatch(/shared.*read-only/);
+    expect((await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: Array.from({ length: 21 }, (_, i) => `x${i}`) } })).isError).toBe(true);
+    expect((await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: [] } })).isError).toBe(true);
+    expect(fs.calls.some((x) => x.path === ':commit')).toBe(false);
+  });
+
+  it('never a top-level board (Work is opened from Home, so it is inside it; Home itself never)', async () => {
+    const { client } = connectWithWrites(allowed);
+    const c = await client;
+    const r = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['home'] } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/home board/);
   });
 });

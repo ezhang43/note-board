@@ -44,6 +44,13 @@
 - Nothing from your boards is sent. It only runs on the published site: not in `npm run dev`, not in the browser tests, not on localhost.
 - The Privacy page has a new "Counting visits" section saying so, and the About page's "no analytics" line now says "only a privacy-friendly count of page visits".
 
+## Claude can make boards, checklists and containers, and delete safely (2026-10-19)
+
+- The Claude connector can now add a checklist, add an empty container (column), and make a new board, either inside one of your boards (with a card that opens it) or on its own.
+- Claude can also delete items, cards, containers and boards inside a board, but only if you switch it on, on your computer: `npm run mcp:delete-on` (`npm run mcp:delete-off` switches it off again). It is off to begin with.
+- Deleting always takes two steps: Claude shows you exactly what would go, and deletes only after you say yes. A copy of your boards is saved in Version history just before, so it can be put back.
+- Claude never deletes your home board, a top-level board, the Completed card or anything on a shared board, and at most 20 things at a time.
+
 ## Phone: the line you are typing in always stays in view (2026-10-19)
 
 - On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.

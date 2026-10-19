@@ -52,22 +52,25 @@ async function readAndEdit(db: OwnDb, edit: Edit) {
   return { raw: raw!, updateTime, data, changed: r.changed };
 }
 
-/** Saves the boards before the change as a version, when the app's version rule (or a first change) asks for one. */
-async function safetyVersion(deps: SaveDeps, raw: string) {
+/**
+ * Saves the boards before the change as a version, when the app's version rule (or a first change)
+ * asks for one, and always before a delete (`force`), unless the newest version is these very boards.
+ */
+async function safetyVersion(deps: SaveDeps, raw: string, force: boolean) {
   const now = deps.now();
   const newest = await deps.db.newestVersion();
   const hash = contentHash(raw);
-  const due = deps.memory.lastEditAt === null || needsVersion(newest?.savedAt ?? null, deps.memory.lastEditAt, now);
+  const due = force || deps.memory.lastEditAt === null || needsVersion(newest?.savedAt ?? null, deps.memory.lastEditAt, now);
   if (!due || newest?.hash === hash) return;
   await deps.db.addVersion({ id: crypto.randomUUID(), savedAt: now, ...summarizeWorkspace(readWorkspace(raw)!.ws), hash }, raw);
 }
 
 /** Makes `edit` and saves it, trying again (up to RETRIES times) when the boards changed in between. */
-async function commit(deps: SaveDeps, edit: Edit, before?: (raw: string) => Promise<void>): Promise<string[]> {
+async function commit(deps: SaveDeps, edit: Edit, before?: (raw: string) => Promise<void>, everyAttempt = false): Promise<string[]> {
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     const got = await readAndEdit(deps.db, edit);
     if (!got.changed.length) return [];
-    if (attempt === 0 && before) await before(got.raw);
+    if ((attempt === 0 || everyAttempt) && before) await before(got.raw);
     if (await deps.db.write(got.data, deps.client, got.updateTime)) return got.changed;
   }
   throw new Stop('Nothing was changed: the boards kept changing while saving (BusyAnts is probably open and busy). Try again in a moment.');
@@ -87,16 +90,18 @@ async function stillThere(db: OwnDb, edit: Edit): Promise<boolean | string> {
 
 const list = (changed: string[]) => changed.map((c) => `- ${c}`).join('\n');
 
-export async function saveChange(deps: SaveDeps, edit: Edit): Promise<SaveResult> {
+/** `deleting`: a confirmed delete: always a backup version first, and never made again if saved over. */
+export async function saveChange(deps: SaveDeps, edit: Edit, opts: { deleting?: boolean } = {}): Promise<SaveResult> {
   let changed: string[];
   try {
     changed = await commit(deps, edit, async (raw) => {
       try {
-        await safetyVersion(deps, raw);
+        await safetyVersion(deps, raw, Boolean(opts.deleting));
       } catch (e) {
         throw new Stop(`Nothing was changed: the safety version (a copy of the boards as they were) couldn’t be saved. ${e instanceof Error ? e.message : ''}`.trim());
       }
-    });
+      // A delete backs up the boards it is about to save over, even when a retry read them anew.
+    }, Boolean(opts.deleting));
   } catch (e) {
     if (e instanceof Stop) return { text: e.message, isError: true };
     throw e;
@@ -110,6 +115,7 @@ export async function saveChange(deps: SaveDeps, edit: Edit): Promise<SaveResult
   // same item in the app within these few seconds, the connector's version is put back over it.
   // Job C (merging edits with merge.ts) would remove the need for this check.
   try {
+    if (opts.deleting) return await checkDelete(deps, edit, changed, saved);
     return await checkAfter(deps, edit, changed, saved);
   } catch (e) {
     // Saved, but reading it back failed (offline, say): say so rather than "not saved".
@@ -141,6 +147,26 @@ async function checkAfter(deps: SaveDeps, edit: Edit, changed: string[], saved: 
   await deps.log(`Saved over by the app twice; not put back again: ${changed.join('; ')}`);
   return {
     text: `${saved}\n\nBut BusyAnts saved over it a moment later, twice, so the change isn’t on the board now. Is BusyAnts open with changes being made? Read the board and try again.`,
+    isError: true,
+  };
+}
+
+/**
+ * After a delete: if the app saved the deleted things back (it saves "most recent wins"), say so
+ * and leave it. A delete is never made again without a new preview, so nothing goes twice.
+ */
+async function checkDelete(deps: SaveDeps, edit: Edit, changed: string[], saved: string): Promise<SaveResult> {
+  await deps.wait(PUT_BACK_MS);
+  const { raw } = await deps.db.read();
+  const safe = safeToEdit(raw);
+  if (!safe.ok) return { text: `${saved}\n\n(It couldn’t be checked a moment later: ${safe.reason}. Read the board to see it now.)` };
+  const r = edit(readWorkspace(raw)!.ws);
+  if (!('error' in r) && !r.changed.length) return { text: saved };
+  await deps.log(`Saved over by the app; not deleted again: ${changed.join('; ')}`);
+  // Making it again would delete all of it: it is all back. Refused: the boards changed, so some may be.
+  const back = 'error' in r ? 'some of it may be back on the board' : 'it is back on the board';
+  return {
+    text: `${saved}\n\nBut BusyAnts saved over it a moment later, so ${back}; it was not deleted again. Read the board to see it now.`,
     isError: true,
   };
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## Habits (2026-10-19)
+
+- A new **Habits** button sits next to Journal in the panel pill by the zoom control (on a phone: ⋯ → Habits). It opens a Habits panel at the side; the board you are on stays open.
+- Type a habit in "New habit" and press Enter or Add. Each habit shows this week's seven days, Monday to Sunday, today outlined. Tap a day to tick it, tap again to untick it; a day is ticked at most once.
+- Under each habit is its streak: the days in a row you ticked, up to today. Not having ticked today yet doesn't break a streak that ran through yesterday.
+- Rename a habit by typing over its name. The bin deletes it after asking first; Ctrl+Z in the panel, or Version history, brings it back with its ticks.
+- Habits are kept on a hidden board called "Habits", like the Journal, so they save, sync to your Google account when signed in, and stay on the device when not.
+- Your boards and journal already saved load exactly as before. Nothing new is saved until you add your first habit.
+- Restoring a version in Version history also puts your habits back as they were then, like the Journal.
+- On a phone the keyboard doesn't pop up by itself when the panel opens, so it doesn't cover the day boxes. Screen readers say each day box with its habit ("Read, Mon 19 Oct").
+
 ## Phone: press and hold to move a list item (2026-10-19)
 
 - On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.

@@ -83,3 +83,15 @@ What that look turned up (none applied: all are about layout or look, which Impe
 | Phone Add sheet | Four text-only rows (Note, Checklist, Container, Sub-board), while the desktop buttons have an icon each | Would change what the owner sees; SPEC (Phone layout) describes the rows as they are |
 | Phone ⋯ sheet | Five tiles leave an empty slot in the second row | The tile grid is an owner decision (job 74, option B) |
 | About page | Hierarchy, contrast and the honey block read clearly; nothing to change | n/a |
+
+## Code review (medium, run by the `code-review` skill without sub-agents)
+
+Fixed after the review: adjacent `@media (hover: hover)` wrappers merged; a unit test for the keyboard-tick switch
+(`src/store/store-tick-keyboard.test.ts`); the fold arrow's position is now asserted, not only its transition.
+Left alone, with reasons: the glide also stays off while someone types and a neighbour is pushed (typing is the keyboard; a
+remote change arriving at that moment just jumps, as before the glide existed); `e.key` odd values from soft keyboards set the
+switch, but a tap always clears it first, so a phone sheet or tick by finger still animates; the two press-shrink selector
+lists differ on purpose (the item trash and arrows already have their own transition for their hover fade); menus keep a fixed
+top-left origin because every one of them is anchored at its button's left edge (Share, anchored right, has its own); a menu
+mounted while a key is held keeps no transition for its life, but menus change nothing afterwards; the website tests were
+written right after the CSS rather than before.

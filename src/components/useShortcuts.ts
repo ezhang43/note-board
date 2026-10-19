@@ -146,11 +146,16 @@ export function useShortcuts() {
 /** Put on the computer's clipboard when blocks are copied in the app: Ctrl+V pastes them only while it is still there, so a newer copy elsewhere wins. */
 export const BLOCKS_MARKER = 'application/x-note-board-blocks';
 
+/** False when the browser refused to write the marker: then the copied blocks are all there is to paste (as before the marker). */
+export let markerWritten = true;
+
 /** Writes the marker with the browser's own copy (which replaces whatever was copied before). */
 function markBlocksCopied() {
+  markerWritten = false;
   const put = (e: ClipboardEvent) => {
     e.clipboardData?.setData(BLOCKS_MARKER, '1');
     e.preventDefault();
+    markerWritten = true;
   };
   document.addEventListener('copy', put, { once: true });
   try {

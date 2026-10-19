@@ -8,6 +8,10 @@
 - The newest copy wins: copy a card and then a web address somewhere else, and Ctrl+V makes the link card; copy a card after an address and Ctrl+V pastes the card (it used to keep pasting the old card until you reloaded).
 - A click on a video on a card that isn't selected selects the card first, so cards still drag and select as usual. Only http and https addresses are ever used. Nothing about saving, sync or undo changed. A link card already on a board (or shared with you, or imported) whose address is a picture or video now shows it too.
 
+## Find zooms in less (2026-10-19)
+
+- When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.
+
 ## The Privacy page explains the Claude connector (2026-10-19)
 
 - The Privacy policy has a new short section, "The Claude connector (optional)". It says the connector runs only on your own computer, signs in with your own Google account, keeps that sign-in in a file on that computer, touches your boards only when you ask Claude to, has deleting switched off, and sends what Claude reads to Claude under Anthropic's privacy policy. BusyAnts stores nothing new because of it.

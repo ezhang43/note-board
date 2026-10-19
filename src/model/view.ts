@@ -1,5 +1,5 @@
 import { DEFAULT_HOTKEYS } from './hotkeys';
-import { CARD_MAX_W, CARD_MIN_W, GRID, MAX_ZOOM, MIN_ZOOM, PHONE_MARGIN, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
+import { FIND_MIN_ZOOM, CARD_MAX_W, CARD_MIN_W, GRID, MAX_ZOOM, MIN_ZOOM, PHONE_MARGIN, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
@@ -103,6 +103,11 @@ export function wheelPan(e: WheelDelta, pageHeight: number) {
 /** Zoom factor for one wheel / pinch event. Scrolling up (negative deltaY) zooms in. */
 export function wheelZoomFactor(deltaY: number): number {
   return Math.exp(-deltaY * WHEEL_ZOOM_SPEED);
+}
+
+/** The zoom Find leaves the board at: zoomed out below 60% goes in to 60%, 60% and above stays. */
+export function zoomForFind(zoom: number): number {
+  return Math.max(zoom, FIND_MIN_ZOOM);
 }
 
 export function zoomLabel(zoom: number): string {

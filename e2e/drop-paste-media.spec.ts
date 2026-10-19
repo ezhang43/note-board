@@ -141,6 +141,16 @@ test('a web address copied after copying a card is what Ctrl+V pastes', async ({
   await expect(cards(page)).toHaveCount(2); // the original note and the link card, no copy of the note
 });
 
+test('if the browser refuses to write to the clipboard, Ctrl+V still pastes the copied cards', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => (document.execCommand = () => false));
+  await selectOnlyCard(page);
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await expect(cards(page)).toHaveCount(2);
+  await expect(link(page)).toHaveCount(0);
+});
+
 test('cards copied after an address are what Ctrl+V pastes', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.evaluate(() => navigator.clipboard.writeText('https://example.com/copied-first'));

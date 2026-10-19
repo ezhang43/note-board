@@ -1257,13 +1257,17 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
   .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }
   .column.collapsed .column-actions > .block-trash::before { right: -3px; }
-  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: 0; right: 0; } /* stops at the Move down arrow */
+  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
   .item-grip::before { top: -10px; bottom: -10px; left: -2px; right: -28px; }
   /* Inside a container the card's right side is close to the container's width strip. */
   .card.in-column .item-grip::before { right: -22px; }
   /* Outwards, past the card's corner, so it never takes presses meant for the last item's grip. */
   .resize-corner::before { inset: 0 -26px -26px 0; }
   .resize-edge::before { top: 0; bottom: 0; left: 0; right: -34px; }
+}
+@media (pointer: coarse) and (hover: hover) {
+  /* The Move down arrow sits right beside the trash can, so its press area stops at the trash's own edge. */
+  .item-trash::before { left: 0; }
 }
 
 /*

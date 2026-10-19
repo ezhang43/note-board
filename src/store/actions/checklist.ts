@@ -6,7 +6,7 @@ import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDon
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
-import { copyText, reducedMotion } from '../env';
+import { copyText, keyboardInitiated, reducedMotion } from '../env';
 import type { ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
@@ -186,9 +186,9 @@ export function checklistActions(ctx: StoreContext) {
       const next = C.setItemsDone(card.items, ids, !item.done);
       // Applied to the list as it is then (another device's change may have arrived meanwhile).
       const apply = () => commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
-      // Top-level items this tick sends to the Completed section get a short leaving animation first.
+      // Top-level items this tick sends to the Completed section get a short leaving animation first (not when a key did it).
       const leaving = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done).flatMap(C.subtreeIds);
-      if (!leaving.length || reducedMotion()) return void apply();
+      if (!leaving.length || reducedMotion() || keyboardInitiated()) return void apply();
       updateUi({ completing: leaving });
       const finish = () => {
         ctx.pending.tick = null;

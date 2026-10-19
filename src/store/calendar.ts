@@ -295,9 +295,9 @@ function defaultSource(): CalendarSource | null {
     base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
     async token() {
       const kept = readAccess(tab, demo.uid);
-      if (kept) return kept.token;
       const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
-      noAccess = null;
+      noAccess = null; // only the first ask: in a tab already connected, the setting has no effect
+      if (kept) return kept.token;
       if (reason) throw new NoAccess(reason);
       keepAccess(tab, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
       return demo.uid;

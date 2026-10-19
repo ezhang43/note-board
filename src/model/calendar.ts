@@ -401,7 +401,7 @@ export function readAccess(storage: () => TabStorage | null, user: string | null
     // Blocked or damaged: Google is asked as usual.
   }
   const { token, expiresAt, user: owner }: Raw = a && typeof a === 'object' ? a : {};
-  if (typeof token === 'string' && token !== '' && typeof expiresAt === 'number' && expiresAt > now + 60_000 && user !== null && owner === user) return { token, expiresAt, user };
+  if (typeof token === 'string' && token !== '' && typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > now + 60_000 && user !== null && owner === user) return { token, expiresAt, user };
   dropAccess(storage);
   return null;
 }

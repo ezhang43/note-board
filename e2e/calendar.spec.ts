@@ -684,6 +684,13 @@ test.describe('calendar access kept for this tab', () => {
     await button(page).click();
     await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
+    // In a tab that already connected, ?demo-calendar=blocked has no effect: not later either,
+    // when the kept access is gone and the demo asks again.
+    await page.evaluate((k) => sessionStorage.removeItem(k), ACCESS_KEY);
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    await panel(page).getByRole('button', { name: 'Previous week' }).click();
+    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 

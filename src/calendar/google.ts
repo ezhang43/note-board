@@ -45,10 +45,10 @@ let loaded: Gis | null = null;
 // day or another device still gets Google's quick window. Reaching sessionStorage can throw (blocked).
 const tab = () => sessionStorage;
 
-// Signing out (or another person signing in) drops the token, from memory and from the tab.
+// Signing out (or another person signing in) drops the token from memory; the tab's copy is dropped
+// by the sign-in watcher that is always loaded (src/sync/firebase.ts watchUser).
 onAuthStateChanged(getAuth(), (user) => {
   if (cached?.user !== user?.uid) cached = null;
-  readAccess(tab, user?.uid ?? null);
 });
 
 function loadGis(): Promise<Gis> {
@@ -90,8 +90,12 @@ function request(gis: Gis): Promise<string> {
         if (r.error === 'access_denied') return fail(new NoAccess('refused'));
         if (r.error) return fail(new Error(r.error));
         if (!r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new NoAccess('refused'));
-        if (user && user === getAuth().currentUser?.uid) {
-          cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000, user };
+        // Another person signed in while Google's window was open: this token isn't theirs, so it is neither kept nor used.
+        if (user !== (getAuth().currentUser?.uid ?? null)) return fail(new NoAccess('window'));
+        const expiresAt = Date.now() + Number(r.expires_in ?? 3599) * 1000;
+        // An odd expiry (not a number, or Infinity) isn't kept, so it is never taken as never running out.
+        if (user && Number.isFinite(expiresAt)) {
+          cached = { token: r.access_token, expiresAt, user };
           keepAccess(tab, cached);
         }
         done(r.access_token);
@@ -107,8 +111,7 @@ function request(gis: Gis): Promise<string> {
 /** A token for the person's calendar: the one kept (in memory or this tab) while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
   const user = getAuth().currentUser?.uid ?? null;
-  // Written as "not good" so a bad expiry (NaN) counts as run out.
-  if (!(cached && cached.user === user && cached.expiresAt > Date.now() + 60_000)) cached = readAccess(tab, user);
+  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(tab, user);
   if (cached) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the

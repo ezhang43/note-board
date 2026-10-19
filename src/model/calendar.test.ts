@@ -513,6 +513,7 @@ describe('calendar access kept for this tab (owner choice, 2026-10-19)', () => {
       '{"token":"t","user":"u1"}',
       '{"token":"t","expiresAt":9e15,"user":5}',
       '{"token":"t","expiresAt":9e15}',
+      '{"token":"t","expiresAt":1e999,"user":"u1"}', // reads as Infinity: never "never runs out"
     ];
     for (const raw of bad) {
       const s = tab();

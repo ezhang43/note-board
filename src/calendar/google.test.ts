@@ -53,8 +53,8 @@ describe('calendar access on the published site', () => {
     await expect(google.token()).resolves.toBe('kept');
     auth.currentUser = null;
     auth.listener!(null);
-    expect(data.has(ACCESS_KEY)).toBe(false);
     await expect(google.token()).rejects.toThrow();
+    expect(data.has(ACCESS_KEY)).toBe(false);
   });
 
   it('another person signing in drops it, from the tab and from memory', async () => {
@@ -64,8 +64,8 @@ describe('calendar access on the published site', () => {
     await expect(google.token()).resolves.toBe('kept');
     auth.currentUser = { uid: 'u2', email: 'b@example.com' };
     auth.listener!({ uid: 'u2' });
-    expect(data.has(ACCESS_KEY)).toBe(false);
     await expect(google.token()).rejects.toThrow();
+    expect(data.has(ACCESS_KEY)).toBe(false);
   });
 
   describe('with Google asked (a pretend Google script)', () => {
@@ -96,7 +96,7 @@ describe('calendar access on the published site', () => {
       expect(clients).toHaveLength(1);
     });
 
-    it('a token arriving after another person signed in is not kept, and the new person is asked afresh', async () => {
+    it('a token arriving after another person signed in is neither kept nor used, and the new person is asked afresh', async () => {
       const google = await load();
       const forA = google.token();
       await asked(1);
@@ -105,18 +105,21 @@ describe('calendar access on the published site', () => {
       void google.token();
       await asked(2);
       clients[0].callback({ access_token: 'for-a', expires_in: 3599 });
-      await expect(forA).resolves.toBe('for-a');
+      await expect(forA).rejects.toMatchObject({ reason: 'window' });
       expect(data.has(ACCESS_KEY)).toBe(false);
     });
 
     it('a bad expiry from Google is not taken as never running out', async () => {
-      const google = await load();
-      const t = google.token();
-      await asked(1);
-      clients[0].callback({ access_token: 'odd', expires_in: 'soon' });
-      await expect(t).resolves.toBe('odd');
-      void google.token();
-      await asked(2);
+      for (const [n, expires_in] of ['soon', 'Infinity'].entries()) {
+        const google = await load();
+        const t = google.token();
+        await asked(2 * n + 1);
+        clients[2 * n].callback({ access_token: 'odd', expires_in });
+        await expect(t).resolves.toBe('odd');
+        void google.token();
+        await asked(2 * n + 2);
+        vi.resetModules();
+      }
     });
   });
 

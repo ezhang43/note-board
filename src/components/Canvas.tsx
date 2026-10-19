@@ -5,7 +5,8 @@ import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
 import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point, View } from '../model/types';
-import { clientToCanvas, setCanvasElement } from './canvasDom';
+import type { ItemDrag } from '../store/store';
+import { canvasRect, clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
@@ -344,7 +345,7 @@ export function Canvas() {
         </div>
       )}
       {itemDrag && (
-        <div className="item-ghost" data-testid="item-ghost" style={{ left: itemDrag.at.x + 14, top: itemDrag.at.y + 10 }}>
+        <div className={itemDrag.lift ? 'item-ghost moving lifted' : 'item-ghost moving'} data-testid="item-ghost" style={itemGhostStyle(itemDrag)}>
           <span className="item-ghost-label">{itemDrag.label}</span>
           {itemDrag.hint && 'newList' in itemDrag.hint ? (
             <span className="item-ghost-extra">Drop to make a new list</span>
@@ -368,4 +369,15 @@ export function Canvas() {
       )}
     </div>
   );
+}
+
+/**
+ * Where the dragged items' label is, moved by `translate` (not left / top, so nothing is laid out again
+ * as the finger moves). By mouse it trails the pointer. Lifted by a finger it is the row's width, kept on
+ * the screen, sitting on the finger's line, a little above it, so the gap opening under the finger stays in view.
+ */
+function itemGhostStyle({ at, lift }: ItemDrag): CSSProperties {
+  if (!lift) return { translate: `${at.x + 14}px ${at.y + 10}px` };
+  const x = Math.max(8, Math.min(at.x - lift.width / 2, (canvasRect()?.width ?? Infinity) - lift.width - 8));
+  return { width: lift.width, translate: `${x}px max(8px, calc(${at.y + 12}px - 100%))` };
 }

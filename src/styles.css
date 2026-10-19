@@ -1015,6 +1015,23 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 }
 /*
+ * On a computer the controls are bigger (owner request, 2026-10-19): arrows 22px wide, trash 28px, grip 18px,
+ * in the same order and flush with each other, so the strip kept free for them grows from 72px to 92px.
+ * Touch screens (no hover) keep the sizes above.
+ */
+@media (hover: hover) {
+  .todo-item { padding-right: 92px; }
+  .item-grip, .item-trash, .item-arrow { top: 0; height: 28px; }
+  .item-grip { width: 18px; }
+  .item-grip svg { width: 10px; height: 15px; }
+  .item-trash { right: 20px; width: 28px; }
+  .item-trash svg { width: 16px; height: 16px; }
+  .item-arrow { width: 22px; }
+  .item-arrow svg { width: 18px; height: 18px; }
+  .item-up { right: 70px; }
+  .item-down { right: 48px; }
+}
+/*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
  * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
  */

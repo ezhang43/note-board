@@ -140,7 +140,7 @@ test('a board and a journal saved before Habits existed load unchanged', async (
   expect(await page.evaluate(() => localStorage.getItem('note-board:v1'))).toBe(saved);
   await expect(cards(page)).toContainText('old note');
   await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox').first()).toHaveValue('old journal');
+  await expect(page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox').first()).toHaveText('old journal');
 });
 
 test.describe('on a phone', () => {

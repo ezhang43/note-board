@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { habitList, tickedDays } from '../model/habits';
 import type { StorageLike } from '../model/persist';
+import { fromPlain } from '../model/richText';
 import { createStore } from './store';
 
 // Habits (owner request, 2026-10-19): a Habits side panel, like the Journal one, that keeps daily
@@ -204,7 +205,7 @@ describe('Habits panel', () => {
     first.addCard('todo');
     first.openJournal();
     const note = Object.values(first.workspace().boards[first.getState().ui.journalBoard!].cards)[0];
-    first.setJournalText(note.id, 'kept');
+    first.setJournal(note.id, fromPlain('kept'));
     first.flush();
     const saved = storage.getItem('note-board:v1');
     const again = setup(storage);

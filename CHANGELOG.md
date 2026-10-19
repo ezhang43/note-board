@@ -7,6 +7,25 @@
 - The connector's instructions (`mcp/README.md`) are now written for anyone, with Mac and Windows steps.
 - Your boards, how they save and the website are not changed. An existing sign-in keeps working, and deleting stays off unless you switch it on as before.
 
+## Rich text in the Journal (2026-10-19)
+
+- Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).
+- Select some words and press a button, or press it first and then type. Keys: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Shift+X (strikethrough), Ctrl+Shift+8 (bullets), Ctrl+Shift+7 (numbers).
+- In a list, Enter adds the next item, Enter on an empty item ends the list, and Tab / Shift+Tab indent and outdent.
+- Only the Journal has this. Everywhere else (other notes, search, export, copying, the note's card on the Journal board) the words show as plain text, with lists as "•" and "1.".
+- The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
+- When two edits of the same note are combined, its formatting always comes with the words that are kept. (On your own devices the latest save wins, words and formatting together, as with every board.)
+
+## Calendar events open in a small card (2026-10-19)
+
+- Clicking an event in the calendar panel now opens a small card next to it, like Google Calendar's, instead of replacing the whole panel. The list stays in view. On a phone the card slides up from the bottom.
+- The card shows the title, the date and time, and the guests. Its top has a pencil (opens the full edit form), a trash can (deletes the event) and × (closes).
+- Pressing Delete or Backspace while the card is open deletes the event too. It asks first, exactly like the trash can and the form's Delete button ("Delete “Dentist”?" · Keep · Delete). Calendar events can't be undone, so that question is the safeguard. It doesn't fire while you're typing in a text box.
+- Events you can only change in Google Calendar show the same card without pencil and trash, with the Open in Google Calendar link.
+- Escape, × or a click anywhere else closes the card; the next Escape closes the panel.
+- The card follows the panel's edge when you drag the panel wider or narrower (it stays open) or resize the window. In a narrow window with a wide panel, where there is no room beside the panel, it sits inside the panel instead of being partly hidden. While a delete is on its way to Google, clicking another event or week waits, so a "didn't reach Google Calendar" note is still shown.
+- Your boards and their saving are not touched.
+
 ## A flaky phone test made reliable (2026-10-19)
 
 - One browser test (an item far off to the side is brought back on a phone) sometimes failed on GitHub for no real reason: the app was doing its job, bringing the item back on screen, a moment before the test looked. The test now waits for that first move to finish before sliding the board.

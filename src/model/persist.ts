@@ -1,6 +1,7 @@
 import { createBoard } from './board';
 import { COLUMN_W } from './constants';
 import { isColorKey } from './palette';
+import { parseRich } from './richText';
 import { parseStyle } from './textStyle';
 import { clampZoom, createView } from './view';
 import type { Board, Card, Column, CompletedGroup, TodoItem, View } from './types';
@@ -89,7 +90,11 @@ function parseCard(id: string, c: unknown): Card | null {
     ...(size(c.collapsedH) ? { collapsedH: size(c.collapsedH) } : {}),
     ...styleField(c.style),
   };
-  if (kind === 'note') return { ...base, kind, text: str(c.text, '') };
+  if (kind === 'note') {
+    // A Journal note's formatting is untrusted when loaded or imported: parseRich keeps only known values.
+    const rich = parseRich(c.rich);
+    return { ...base, kind, text: str(c.text, ''), ...(rich ? { rich } : {}) };
+  }
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
   if (kind === 'completed') return { ...base, kind, groups: parseGroups(c.groups) };
   if (kind === 'board') return { ...base, kind, boardId: c.boardId as string };

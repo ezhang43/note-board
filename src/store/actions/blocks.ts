@@ -334,8 +334,9 @@ export function blockActions(ctx: StoreContext) {
     },
 
     // ---------- editing ----------
+    // Typing in a note on the board is plain text, so a Journal note edited there drops its formatting (undoable).
     setNoteText: (id: string, text: string) =>
-      commit((b) => B.updateCard(b, id, (c) => (c.kind === 'note' && c.text !== text ? { ...c, text } : c)), { merge: `text:${id}` }),
+      commit((b) => B.updateCard(b, id, (c) => (c.kind === 'note' && c.text !== text ? (({ rich: _r, ...rest }) => ({ ...rest, text }))(c) : c)), { merge: `text:${id}` }),
     setCardTitle: (id: string, title: string) =>
       commit((b) => B.updateCard(b, id, (c) => ((c.kind === 'todo' || c.kind === 'link') && c.title !== title ? { ...c, title } : c)), { merge: `title:${id}` }),
     setLinkUrl: (id: string, url: string) =>

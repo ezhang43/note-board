@@ -661,13 +661,14 @@ for (const [kind, note] of [
   });
 }
 
-// The access is kept for this tab for up to an hour (owner choice, 2026-10-19), so a reload doesn't
+// The access is kept on this device for up to an hour (owner choices, 2026-10-19: job 103 for the
+// tab, job 107 "Remember for the hour"), so a reload, a new tab or reopening the browser doesn't
 // ask Google again. Locally the "ask" is the demo's: &demo-calendar=blocked makes it fail, so the
 // events showing after such a reload prove nothing was asked.
-test.describe('calendar access kept for this tab', () => {
+test.describe('calendar access kept on this device for the hour', () => {
   const ACCESS_KEY = 'note-board:calendar-access';
   const blockedNote = 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.';
-  const kept = (page: Page) => page.evaluate((k) => sessionStorage.getItem(k), ACCESS_KEY);
+  const kept = (page: Page) => page.evaluate((k) => localStorage.getItem(k), ACCESS_KEY);
   async function connect(page: Page, name: string) {
     const errors = await openAs(page, name);
     await button(page).click();
@@ -686,12 +687,44 @@ test.describe('calendar access kept for this tab', () => {
     await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
     // In a tab that already connected, ?demo-calendar=blocked has no effect: not later either,
     // when the kept access is gone and the demo asks again.
-    await page.evaluate((k) => sessionStorage.removeItem(k), ACCESS_KEY);
+    await page.evaluate((k) => localStorage.removeItem(k), ACCESS_KEY);
     await panel(page).getByRole('button', { name: 'Next week' }).click();
     await panel(page).getByRole('button', { name: 'Previous week' }).click();
     await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
     expect(errors).toEqual([]);
+  });
+
+  test('a new tab, or the browser closed and opened again, shows the events without asking again', async ({ page, browser }) => {
+    test.slow(); // three pages, one after another
+    const name = `Cal${tag()}`;
+    const errors = await connect(page, name);
+    const again = async (other: Page) => {
+      other.on('pageerror', (e) => errors.push(e.message));
+      await other.goto(`/?demo-user=${name}&demo-calendar=blocked`);
+      await fontsLoaded(other);
+      await button(other).click();
+      await expect(day(other, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+      await expect(panel(other).getByText(blockedNote)).toHaveCount(0);
+    };
+    // Another tab in the same browser.
+    await again(await page.context().newPage());
+    // The browser closed and opened again: what it keeps on the device (not a tab's own storage).
+    const reopened = await browser.newContext({ storageState: await page.context().storageState() });
+    await page.context().close();
+    await again(await reopened.newPage());
+    await reopened.close();
+    expect(errors).toEqual([]);
+  });
+
+  test('another person in another tab doesn’t get it: they are asked, and the kept access is dropped', async ({ page }) => {
+    await connect(page, `Cal${tag()}`);
+    const other = await page.context().newPage();
+    await other.goto(`/?demo-user=Other${tag()}&demo-calendar=blocked`);
+    await fontsLoaded(other);
+    await button(other).click();
+    await expect(panel(other).getByText(blockedNote)).toBeVisible();
+    expect(await kept(other)).toBeNull();
   });
 
   test('another person in the same tab doesn’t get it: they are asked, and the kept access is dropped', async ({ page }) => {
@@ -707,8 +740,8 @@ test.describe('calendar access kept for this tab', () => {
     const name = `Cal${tag()}`;
     await connect(page, name);
     await page.evaluate((k) => {
-      const a = JSON.parse(sessionStorage.getItem(k)!);
-      sessionStorage.setItem(k, JSON.stringify({ ...a, expiresAt: Date.now() + 30_000 }));
+      const a = JSON.parse(localStorage.getItem(k)!);
+      localStorage.setItem(k, JSON.stringify({ ...a, expiresAt: Date.now() + 30_000 }));
     }, ACCESS_KEY);
     await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
     await fontsLoaded(page);
@@ -719,7 +752,7 @@ test.describe('calendar access kept for this tab', () => {
   test('damaged kept access is ignored: the usual ask happens and nothing breaks', async ({ page }) => {
     const name = `Cal${tag()}`;
     const errors = await openAs(page, name);
-    await page.evaluate((k) => sessionStorage.setItem(k, '{not json'), ACCESS_KEY);
+    await page.evaluate((k) => localStorage.setItem(k, '{not json'), ACCESS_KEY);
     await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
     await fontsLoaded(page);
     await button(page).click();

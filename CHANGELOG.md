@@ -8,6 +8,14 @@
 - On a phone it is the Appearance row in the ⋯ menu (it replaces the Dark mode row and opens inside the menu).
 - Every theme was checked for readable contrast (WCAG AA) by an automatic test. Your boards are not touched: the pick is one small setting kept on this device, and a missing or broken one just means Honey.
 
+## Google Calendar remembered for the hour (2026-10-19)
+
+- Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.
+- Google's quick window still shows about once an hour, when the access runs out, and on another device.
+- The access is dropped when you sign out (in any tab), when someone else signs in, when Google refuses it, after about an hour, and when you delete your account. It is never in a backup.
+- If you're already connected, you aren't asked again because of this change.
+- The Privacy policy says so.
+
 ## Text size can go even bigger (2026-10-19)
 
 - A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.

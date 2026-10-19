@@ -957,9 +957,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
  * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
  */
-.todo-item { padding-right: 40px; }
+.todo-item { padding-right: 72px; }
 .item-grip,
-.item-trash {
+.item-trash,
+.item-arrow {
   position: absolute;
   z-index: 1;
   flex-shrink: 0;
@@ -974,19 +975,30 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .todo-item:hover .item-grip,
 .todo-item:hover .item-trash,
+.todo-item:hover .item-arrow,
 .item-grip:focus-visible,
-.item-trash:focus-visible { opacity: 1; }
+.item-trash:focus-visible,
+.item-arrow:focus-visible { opacity: 1; }
 .item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
 .item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-arrow { top: 2px; width: 16px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-arrow svg { width: 14px; height: 14px; }
+.item-up { right: 56px; }
+.item-down { right: 40px; }
+.item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
+/* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
+.todo-item:hover .item-arrow[aria-disabled='true'], .item-arrow[aria-disabled='true']:focus-visible { opacity: 0.3; cursor: default; }
 .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 /*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
  * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
  */
 @media (hover: none) {
-  .item-grip, .item-trash { visibility: hidden; }
+  .item-grip, .item-trash, .item-arrow { visibility: hidden; }
   .todo-item:hover .item-grip, .todo-item:hover .item-trash { opacity: 0; }
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
+  /* The phone already has Move up / Move down in the row above the keyboard, so the arrows never show and keep no room. */
+  .todo-item { padding-right: 40px; }
 }
 
 .completed {
@@ -1245,7 +1257,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
   .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }
   .column.collapsed .column-actions > .block-trash::before { right: -3px; }
-  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
+  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: 0; right: 0; } /* stops at the Move down arrow */
   .item-grip::before { top: -10px; bottom: -10px; left: -2px; right: -28px; }
   /* Inside a container the card's right side is close to the container's width strip. */
   .card.in-column .item-grip::before { right: -22px; }

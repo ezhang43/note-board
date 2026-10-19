@@ -127,8 +127,8 @@ test('checklist text stops before the grip and trash, so hovering never covers i
   const row = card.locator('[data-item-id]').first();
   const field = row.getByLabel('Item text');
   const before = (await field.boundingBox())!;
-  // The strip kept free holds only grip and trash (40px).
-  expect(before.width).toBeGreaterThan((await card.boundingBox())!.width - 111);
+  // The strip kept free holds the arrows, trash and grip (72px); the rest (71px) is the card's own padding.
+  expect(before.width).toBeGreaterThan((await card.boundingBox())!.width - 143);
   await row.hover();
   const trash = row.getByRole('button', { name: 'Delete item' });
   await expect(trash).toBeVisible();

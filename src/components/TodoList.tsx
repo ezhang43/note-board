@@ -1,7 +1,7 @@
 import { boxProps } from './textBox';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { ITEM_INDENT, sections } from '../model/checklist';
+import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -9,7 +9,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { clientToCanvas } from './canvasDom';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
-import { ChevronIcon, GripIcon, TrashIcon } from './icons';
+import { ArrowIcon, ChevronIcon, GripIcon, TrashIcon } from './icons';
 import { itemHintAt, rowAt, rowUnder } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
@@ -96,6 +96,13 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   // Just ticked and about to move to Completed, or just arrived there (a short animation).
   const leaving = useAppState((s) => s.ui.completing.includes(item.id));
   const arrived = useAppState((s) => s.ui.arrived.includes(item.id));
+  // Whether the hover arrows have anywhere to go: 1 = up, 2 = down (a number, so the selector stays cheap to compare).
+  // simple: this walks the card's items for every row on each change; fine for lists of a few hundred items, cache per card if lists grow far larger.
+  const moves = useAppState((s) => {
+    const card = s.board.cards[cardId];
+    if (card?.kind !== 'todo') return 0;
+    return (canMoveItem(card.items, item.id, -1) ? 1 : 0) + (canMoveItem(card.items, item.id, 1) ? 2 : 0);
+  });
 
   // Put the cursor in this item's text when asked: at the end (new item, Tab, Backspace) or at a
   // given spot (where two items were joined by Delete).
@@ -166,6 +173,27 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
       />
+      {/* Move up / down on hover, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18). */}
+      {/* Faded (aria-disabled) at the end of its level. The cursor goes into the item, as with the keyboard. */}
+      {([-1, 1] as const).map((dir) => {
+        const label = dir < 0 ? 'Move up' : 'Move down';
+        const can = (moves & (dir < 0 ? 1 : 2)) !== 0;
+        return (
+          <button
+            key={dir}
+            type="button"
+            className={dir < 0 ? 'item-arrow item-up' : 'item-arrow item-down'}
+            aria-label={label}
+            title={label}
+            aria-disabled={!can || undefined}
+            tabIndex={can ? undefined : -1}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => can && appStore.moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
+          >
+            <ArrowIcon down={dir > 0} />
+          </button>
+        );
+      })}
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
       {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}
       <button

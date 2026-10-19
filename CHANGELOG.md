@@ -1,5 +1,10 @@
 # Changelog
 
+## Emil Kowalski's design skills (2026-10-19)
+
+- Added four design and motion skills by Emil Kowalski (MIT licence, credit and licence kept in `.claude/skills/EMIL-KOWALSKI-LICENSE.md`): design engineering, review animations, improve animations and animation performance. From now on, any UI or motion work follows them, but `SPEC.md` and your recorded decisions win where they disagree. The cursor and focus-ring rules are unchanged, and the end-of-step routine now runs a light design check on UI changes.
+- Nothing in the app changes in this step; the polish fixes to the current app come in a separate pull request. Your boards are untouched.
+
 ## Up and down arrows on checklist items (2026-10-18)
 
 - Hover a checklist item on a computer and two small arrows show by its trash can and grip: Move up and Move down. They do the same as Ctrl+Shift+Up / Down and the phone's Move up / Move down: the item moves past the one above or below it at the same level, with its sub-items, in one undo step, and the cursor stays in it.

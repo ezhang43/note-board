@@ -1,5 +1,9 @@
 # Changelog
 
+## Find zooms in less (2026-10-19)
+
+- When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.
+
 ## The Claude connector in one file, with sign-in from Claude (2026-10-19)
 
 - The BusyAnts connector for Claude can now be made into one file, `busyants.mcpb` (`npm run mcp:pack`). Anyone with Claude Desktop on a Mac or Windows computer opens that file to install it: no Node, no project folder, no settings to edit.

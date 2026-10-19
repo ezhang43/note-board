@@ -6,6 +6,9 @@ export const MIN_ZOOM = 0.3;
 export const MAX_ZOOM = 2.5;
 export const ZOOM_STEP = 1.2;
 
+/** Find zooms a board that is smaller than this in to exactly this, so the text can be read (owner request 2026-10-19). */
+export const FIND_MIN_ZOOM = 0.6;
+
 /** How strongly Ctrl+scroll and trackpad pinch zoom. */
 export const WHEEL_ZOOM_SPEED = 0.0025;
 

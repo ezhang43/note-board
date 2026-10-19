@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED } from './constants';
-import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelPan, wheelPixels, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo, panToShow } from './view';
+import { FIND_MIN_ZOOM, MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED } from './constants';
+import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelPan, wheelPixels, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo, panToShow, zoomForFind } from './view';
 
 describe('wheel scrolling', () => {
   it('pans at half the scroll distance, the opposite way (owner request: scrolling was too fast)', () => {
@@ -176,5 +176,19 @@ describe('panToShow (keep the line being typed in on screen)', () => {
   it('shows the top of a box taller than the area, not its bottom', () => {
     expect(panToShow({ left: 30, top: 100, right: 40, bottom: 900 }, area, 12)).toEqual({ x: 0, y: -36 });
     expect(panToShow({ left: 30, top: 20, right: 40, bottom: 900 }, area, 12)).toEqual({ x: 0, y: 44 });
+  });
+});
+
+describe('zoom for Find (owner request 2026-10-19: zoom in only to 60%)', () => {
+  it('zooms in to 60% when the board is zoomed out below 60%', () => {
+    expect(FIND_MIN_ZOOM).toBe(0.6);
+    expect(zoomForFind(0.3)).toBe(0.6);
+    expect(zoomForFind(0.59)).toBe(0.6);
+  });
+
+  it('leaves 60% and above alone, never zooming to 100%', () => {
+    expect(zoomForFind(0.6)).toBe(0.6);
+    expect(zoomForFind(0.8)).toBe(0.8);
+    expect(zoomForFind(2)).toBe(2);
   });
 });

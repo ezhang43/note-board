@@ -1,6 +1,6 @@
 import { COLUMN_DROP_REACH } from '../model/constants';
 import { columnAt, insertIndex } from '../model/geometry';
-import { screenToBoard } from '../model/view';
+import { screenToBoard, zoomForFind } from '../model/view';
 import { appStore } from '../store/appStore';
 
 // Reading positions from what is drawn on screen. Kept here so components stay simple.
@@ -98,12 +98,9 @@ export function dropIndex(columnId: string, clientY: number): number {
   return before ?? rest.length;
 }
 
-/** Below this zoom, revealOnBoard zooms in to 100% so the text can be read. */
-const READABLE_ZOOM = 0.6;
-
 /**
  * Move the board so `el` sits in the middle of what can be seen (above a phone's keyboard),
- * zooming in to 100% first when the board is too small to read (search).
+ * zooming in to 60% first when the board is zoomed out below that to read (search).
  */
 export function revealOnBoard(el: Element) {
   const canvas = canvasEl ?? document.querySelector<HTMLElement>('[data-testid="canvas"]');
@@ -112,9 +109,10 @@ export function revealOnBoard(el: Element) {
   const v = window.visualViewport;
   const bottom = Math.min(c.bottom, v ? v.offsetTop + v.height : c.bottom);
   const centre = { x: c.left + c.width / 2, y: (c.top + bottom) / 2 };
-  if (appStore.getState().view.zoom < READABLE_ZOOM) {
+  const zoom = appStore.getState().view.zoom;
+  if (zoomForFind(zoom) !== zoom) {
     const r = el.getBoundingClientRect();
-    appStore.zoomAt({ x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }, 1 / appStore.getState().view.zoom);
+    appStore.zoomAt({ x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top }, zoomForFind(zoom) / zoom);
   }
   const r = el.getBoundingClientRect();
   appStore.panBy(Math.round(centre.x - (r.left + r.width / 2)), Math.round(centre.y - (r.top + r.height / 2)));

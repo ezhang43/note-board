@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "deny": ["Read(~/AppData/Roaming/busyants-mcp/**)"]
+    "deny": ["Read(~/AppData/Roaming/busyants-mcp/**)", "Read(~/.config/busyants-mcp/**)"]
   },
   "hooks": {
     "PreToolUse": [

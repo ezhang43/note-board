@@ -5,6 +5,24 @@
 - Fix: when you dragged a card's resize corner wider so it covered the next card, the blocks to its left in the row (such as the card at its far left) jumped to the right of it, so the row came out in the wrong order. Now the card you resize keeps its place, blocks to its left stay exactly where they were, and only the blocks it now covers slide right, in their old order.
 - This is the same for the corner, the width strip, the keyboard arrows and a finger. Dragging blocks is unchanged. Your boards and their saving are not touched.
 
+## Find zooms in less (2026-10-19)
+
+- When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.
+
+## The Privacy page explains the Claude connector (2026-10-19)
+
+- The Privacy policy has a new short section, "The Claude connector (optional)". It says the connector runs only on your own computer, signs in with your own Google account, keeps that sign-in in a file on that computer, touches your boards only when you ask Claude to, has deleting switched off, and sends what Claude reads to Claude under Anthropic's privacy policy. BusyAnts stores nothing new because of it.
+- Anthropic is now listed with the other services the page names.
+- Claude Code is also kept from reading the connector's sign-in folder on a Mac or Linux computer, as it already was on Windows.
+- The app, your boards and their saving are not touched.
+
+## The Claude connector in one file, with sign-in from Claude (2026-10-19)
+
+- The BusyAnts connector for Claude can now be made into one file, `busyants.mcpb` (`npm run mcp:pack`). Anyone with Claude Desktop on a Mac or Windows computer opens that file to install it: no Node, no project folder, no settings to edit.
+- Claude can sign you in: ask it to "sign in to BusyAnts" and a sign-in page opens in your web browser, where you pick your own Google account. "Sign out of BusyAnts" deletes the saved sign-in. Neither changes anything on your boards.
+- The connector's instructions (`mcp/README.md`) are now written for anyone, with Mac and Windows steps.
+- Your boards, how they save and the website are not changed. An existing sign-in keeps working, and deleting stays off unless you switch it on as before.
+
 ## Rich text in the Journal (2026-10-19)
 
 - Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).

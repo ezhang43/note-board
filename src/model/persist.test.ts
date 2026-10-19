@@ -3,6 +3,7 @@ import { addCard, addColumn, createBoard, problems } from './board';
 import { createCard, createColumn } from './cards';
 import type { LinkCard, NoteCard } from './types';
 import { parseBoard, parseView, readBoard, serializeBoard, serializeView } from './persist';
+import { DEFAULT_HOTKEYS } from './hotkeys';
 import { createView } from './view';
 
 function sampleBoard() {
@@ -84,7 +85,7 @@ describe('saving the board', () => {
 
 describe('saving the view', () => {
   it('remembers pan and zoom but always starts with the Hand tool', () => {
-    const v = { panX: -120, panY: 45.5, zoom: 1.44, tool: 'select' as const, theme: 'light' as const, colorTheme: 'honey' as const, fontSize: 'normal' as const };
+    const v = { panX: -120, panY: 45.5, zoom: 1.44, tool: 'select' as const, theme: 'light' as const, colorTheme: 'honey' as const, fontSize: 'normal' as const, hotkeys: DEFAULT_HOTKEYS };
     expect(parseView(serializeView(v))).toEqual({ ...v, tool: 'hand' });
   });
 

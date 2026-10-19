@@ -10,6 +10,7 @@ import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { boardRights, restorable } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
+import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
 import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
@@ -106,6 +107,20 @@ export function blockActions(ctx: StoreContext) {
     setColorTheme(colorTheme: ColorTheme) {
       updateView((v) => (v.colorTheme === colorTheme ? v : { ...v, colorTheme }));
       ctx.write(COLOR_THEME_KEY, colorTheme);
+    },
+    /** Panel: gives an action a new key and remembers it on this device. Returns why not (a short message) when the key can't be used. */
+    setHotkey(action: HotkeyAction, binding: Binding) {
+      const problem = problemWith(ctx.state.view.hotkeys, action, binding);
+      if (problem) return problem;
+      const hotkeys = { ...ctx.state.view.hotkeys, [action]: binding };
+      updateView((v) => ({ ...v, hotkeys }));
+      ctx.write(HOTKEYS_KEY, JSON.stringify(hotkeys));
+      return null;
+    },
+    /** Panel: every key back to its default. */
+    resetHotkeys() {
+      updateView((v) => ({ ...v, hotkeys: DEFAULT_HOTKEYS }));
+      ctx.write(HOTKEYS_KEY, JSON.stringify(DEFAULT_HOTKEYS));
     },
     /** A+ / A−: text on cards and columns one size bigger or smaller, remembered on this device. */
     changeFontSize(step: 1 | -1) {

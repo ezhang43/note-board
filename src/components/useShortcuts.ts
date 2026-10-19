@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
 import { shownName } from '../model/board';
+import { matches } from '../model/hotkeys';
 import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
 import { collab } from '../sync/collabSession';
@@ -115,18 +116,17 @@ export function useShortcuts() {
         return;
       }
 
-      if (mod) {
-        if (key === 'a') return run(e, appStore.selectAll);
-        if (key === 'c' && appStore.copySelection()) return e.preventDefault();
-        if (key === 'v' && appStore.paste()) return e.preventDefault();
-        if (key === 'd') return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
-        return;
-      }
-      if (key === 'delete' || key === 'backspace') {
+      // The tools and block shortcuts use the keys this device chose (hotkeys.ts); the defaults are the usual ones.
+      const hk = state.view.hotkeys;
+      if (matches(hk.selectAll, e)) return run(e, appStore.selectAll);
+      if (matches(hk.copy, e) && appStore.copySelection()) return e.preventDefault();
+      if (matches(hk.paste, e) && appStore.paste()) return e.preventDefault();
+      if (matches(hk.duplicate, e)) return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
+      if (matches(hk.hand, e)) return run(e, () => appStore.setTool('hand'));
+      if (matches(hk.select, e)) return run(e, () => appStore.setTool('select'));
+      if (matches(hk.delete, e) || (!mod && key === 'backspace')) {
         if (appStore.deleteSelection()) e.preventDefault();
-      } else if (key === 'escape') appStore.clearSelection();
-      else if (key === 'h') appStore.setTool('hand');
-      else if (key === 'v') appStore.setTool('select');
+      } else if (!mod && key === 'escape') appStore.clearSelection();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

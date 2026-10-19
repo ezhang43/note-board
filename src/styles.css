@@ -1257,14 +1257,19 @@ html[data-input='keys'] .column {
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(31, 29, 26, 0.2);
 }
-.shortcuts-header { display: flex; align-items: center; justify-content: space-between; }
-.shortcuts-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.shortcuts-header { display: flex; align-items: center; gap: 8px; }
+.shortcuts-hint { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+.shortcuts-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+.shortcuts-header h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
 .shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .shortcuts-group dl { margin: 0; }
 .shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
 .shortcuts-site a { color: var(--accent-ink); }
 .shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
 .shortcut dd { margin: 0; color: var(--ink-soft); }
+.key-button { padding: 0; border: none; background: none; font: inherit; color: inherit; cursor: pointer; border-radius: 5px; }
+.key-button[aria-pressed='true'] kbd { border-color: var(--accent); background: var(--accent-soft); }
+@media (hover: hover) { .key-button:hover kbd { border-color: var(--ink-soft); } }
 .shortcut kbd {
   font: inherit;
   font-size: 13px;

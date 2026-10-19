@@ -298,11 +298,11 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
       alive.current = false;
     };
   }, []);
-  // Deleted: the keyboard goes to the panel, as the event's button is gone.
+  // Deleted: the keyboard goes to the panel, as the event's button is gone. The card may already be
+  // gone too (its button left the page first), so only a keyboard left with nowhere to be moves.
   const { note, busy, ask, setAsk, next } = useChange(event, () => {
-    if (!alive.current) return;
-    onClose();
-    document.querySelector<HTMLElement>('.side-panel')?.focus();
+    if (alive.current) onClose();
+    if (document.activeElement === document.body) document.querySelector<HTMLElement>('.side-panel')?.focus();
   });
   const remove = () => next('delete', draft, {}, 'start');
   const close = () => {

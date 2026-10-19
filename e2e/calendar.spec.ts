@@ -437,6 +437,8 @@ test('the card’s trash asks first, the same as the form’s Delete, with the g
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
   await expect(card(page)).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
+  // The event's button is gone, so the keyboard goes to the panel rather than being lost.
+  await expect(panel(page)).toBeFocused();
   expect(sent.at(-1)).toMatch(/^DELETE /);
 
   await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();

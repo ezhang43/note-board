@@ -31,7 +31,9 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
     return () => window.removeEventListener('pointerdown', away, true);
   }, [open]);
 
-  const rows = open ? boardTree(appStore.workspace()) : [];
+  // The Journal panel's own board stays out of the list (owner, 2026-10-18).
+  const hidden = open ? appStore.hiddenJournal() : null;
+  const rows = open ? boardTree(appStore.workspace()).filter(({ id }) => id !== hidden) : [];
   const nameOf = (id: string) => shownName(id === openId ? openName : (others[id]?.name ?? ''));
   const pick = (action: () => void) => () => {
     setOpen(false);

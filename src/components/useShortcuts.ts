@@ -20,6 +20,10 @@ export function useShortcuts() {
       // except while a panel covers the board, where they'd change the board unseen: in the panel's own
       // box the browser undoes its typing (the board is inert then, so that can't reach it); elsewhere nothing.
       if (panelCovers() && mod && (key === 'z' || key === 'y')) return isTextField(e.target) ? undefined : run(e, () => {});
+      // In the Journal panel they step the Journal board's own history, leaving the open board as it is.
+      const inJournal = appStore.getState().ui.sidePanel === 'journal' && e.target instanceof Element && e.target.closest('.side-panel') !== null;
+      if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoJournal);
+      if (inJournal && mod && key === 'y') return run(e, appStore.redoJournal);
       if (mod && key === 'z' && !e.shiftKey) return run(e, appStore.undo);
       if (mod && key === 'y') return run(e, appStore.redo);
       if (mod && key === 'z' && e.shiftKey) return run(e, () => {}); // does nothing, on purpose
@@ -28,6 +32,8 @@ export function useShortcuts() {
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
+      // Keys pressed in the Journal panel never act on the board behind it.
+      if (inJournal) return;
       // Nothing below acts on the board while a panel covers it (Send feedback, Delete account),
       // wherever focus is: it can be on the page itself after a click on the panel's text.
       if (panelCovers()) return;

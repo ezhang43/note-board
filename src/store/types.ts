@@ -105,7 +105,7 @@ export interface ItemDrag {
 }
 
 /** What the side panel beside the board can show. */
-export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed';
+export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed' | 'journal';
 
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {
@@ -148,6 +148,8 @@ export interface Ui {
    * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.
    */
   sidePanel: SidePanelKind | null;
+  /** The board the Journal panel writes into (set when it opens). */
+  journalBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
   shares: ShareInfo[];
   /**
@@ -216,6 +218,7 @@ export const emptyUi: Ui = {
   preview: null,
   find: null,
   sidePanel: null,
+  journalBoard: null,
   shares: [],
   sharesKnown: true,
 };

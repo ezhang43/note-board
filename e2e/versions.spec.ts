@@ -56,6 +56,31 @@ test('the history lists earlier versions by day; one can be looked at, then rest
   await expect(page.getByLabel('Note text').first()).toHaveValue('Second draft');
 });
 
+test('restoring a version brings back the Journal panel’s writing too (check of PR #94)', async ({ page }) => {
+  const journal = page.getByRole('complementary', { name: 'Journal' });
+  const journalButton = page.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true });
+  await journalButton.click();
+  await page.keyboard.type('First words');
+  await journal.getByRole('button', { name: 'Close journal' }).click();
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.type('Home note');
+  await clickEmpty(page);
+  await page.clock.fastForward('11:00');
+  await journalButton.click();
+  await journal.getByRole('textbox').first().fill('Second words');
+  await journal.getByRole('button', { name: 'Close journal' }).click();
+  await page.getByLabel('Note text').first().fill('Home later');
+  await clickEmpty(page);
+
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await page.getByRole('complementary', { name: 'Version history' }).getByRole('button', { name: /card/ }).first().click();
+  await page.getByRole('region', { name: 'Looking at an earlier version' }).getByRole('button', { name: 'Restore this version' }).click();
+  await expect(page.getByLabel('Note text').first()).toHaveValue('Home note');
+  await journalButton.click();
+  await expect(journal.getByRole('textbox').first()).toHaveValue('First words');
+});
+
 test('versions are kept after the page is reloaded', async ({ page }) => {
   await twoDrafts(page, 'Keep me', 'Changed');
   await page.reload();

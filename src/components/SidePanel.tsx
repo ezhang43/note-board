@@ -23,7 +23,9 @@ export function SidePanel({ title, onClose, children }: { title: string; onClose
   }, [onClose]);
 
   return (
-    <aside className="history-panel side-panel" aria-label={title}>
+    // tabIndex -1: a click on its heading or blank space keeps the keyboard in the panel instead
+    // of on the page, so keys meant for it (Journal) never reach the board behind it.
+    <aside className="history-panel side-panel" aria-label={title} tabIndex={-1}>
       <header className="history-head">
         <h2>{title}</h2>
         <button type="button" className="icon-button" aria-label={`Close ${title.toLowerCase()}`} title="Close (Esc)" onClick={onClose}>

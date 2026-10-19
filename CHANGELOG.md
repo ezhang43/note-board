@@ -6,6 +6,14 @@
 - The calendar access is kept only for this browser tab and is dropped when you sign out, when someone else signs in, when Google refuses it, or after about an hour. A new tab, the next day or another device still shows Google's quick window once (a duplicated or reopened tab may carry it over).
 - The Privacy policy says so (effective October 19, 2026).
 
+## Search all boards (2026-10-19)
+
+- The search bar has a new switch under the box: **This board** / **All boards**. It always opens on This board, exactly as before, and goes back to it whenever you close the bar (Escape or ×).
+- **All boards** looks in every board you have, sub-boards included. Matches on the board you are on come first, then the other boards in the Boards menu order. When the current match is on a board that isn't open, the count says so, like "3 of 12 · Garage".
+- Enter (or the arrows) takes you to the next match; if it is on another board, that board opens, then the board moves to the match and marks it, as for a match on the same board.
+- Searching only looks: it never changes or saves a board. Your saved boards are untouched.
+- On a phone the two options are 44px tall, under the search box.
+
 ## Design polish: motion and phone feel (2026-10-19)
 
 - Buttons now give a little feedback when pressed: they shrink a touch and spring back (the faded ones stay still). The big Start and Open buttons on the website do the same.

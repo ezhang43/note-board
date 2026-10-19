@@ -77,6 +77,74 @@
   --honey-ink: #1b1a17;
 }
 
+/*
+ * Color themes (Appearance menu; <html data-color-theme>, job 112). Honey is the plain look above. Each
+ * other theme changes only the accent colors and the board's tint (canvas, grid dots, toolbar and panel
+ * surfaces and their lines); cards, text and tick boxes stay as they are. Every theme has a light and a dark
+ * block, and the dark block sets the same variables (it is more specific, so it wins in dark mode). A unit test
+ * checks that, and that text and buttons keep WCAG AA contrast (4.5:1).
+ */
+:root[data-color-theme='ocean'] {
+  --canvas: #f1f6f9; --grid-dot: #c9d9e4; --grid-dot-faint: #dce8ef;
+  --toolbar-bg: #fafdff; --surface: #fafdff; --toolbar-edge: #d7e3ea; --line: #d7e3ea;
+  --accent: #0b5f8f; --accent-soft: #dcecf7; --accent-ink: #084a70; --on-accent: #ffffff; --drop-bg: #d7eaf7;
+  --honey: #62b6e8; --honey-ink: #10222e;
+}
+:root[data-color-theme='ocean'][data-theme='dark'] {
+  --canvas: #15191c; --grid-dot: #2d383f; --grid-dot-faint: #242c31;
+  --toolbar-bg: #1c2226; --surface: #1c2226; --toolbar-edge: #2e3a41; --line: #2e3a41;
+  --accent: #6cc0f0; --accent-soft: #1e3341; --accent-ink: #a8dcfa; --on-accent: #08202f; --drop-bg: #1e3341;
+  --honey: #6cc0f0; --honey-ink: #10181d;
+}
+:root[data-color-theme='forest'] {
+  --canvas: #f2f6ef; --grid-dot: #cbd9c3; --grid-dot-faint: #dde8d6;
+  --toolbar-bg: #fbfdf9; --surface: #fbfdf9; --toolbar-edge: #d9e4d2; --line: #d9e4d2;
+  --accent: #2c6a3a; --accent-soft: #e0efdb; --accent-ink: #1f4f2a; --on-accent: #ffffff; --drop-bg: #dcebd5;
+  --honey: #8ccb7b; --honey-ink: #16231a;
+}
+:root[data-color-theme='forest'][data-theme='dark'] {
+  --canvas: #161a15; --grid-dot: #2f3a2d; --grid-dot-faint: #262e25;
+  --toolbar-bg: #1d221c; --surface: #1d221c; --toolbar-edge: #2f3a2d; --line: #2f3a2d;
+  --accent: #8fd18c; --accent-soft: #243424; --accent-ink: #b6e6b3; --on-accent: #10260f; --drop-bg: #243424;
+  --honey: #8fd18c; --honey-ink: #131912;
+}
+:root[data-color-theme='lavender'] {
+  --canvas: #f6f3fa; --grid-dot: #d8cfe8; --grid-dot-faint: #e7e0f2;
+  --toolbar-bg: #fdfbff; --surface: #fdfbff; --toolbar-edge: #e2daee; --line: #e2daee;
+  --accent: #6546a5; --accent-soft: #ebe3f7; --accent-ink: #4d3386; --on-accent: #ffffff; --drop-bg: #e6dcf5;
+  --honey: #b99cea; --honey-ink: #1d1630;
+}
+:root[data-color-theme='lavender'][data-theme='dark'] {
+  --canvas: #18161c; --grid-dot: #38314a; --grid-dot-faint: #2a2634;
+  --toolbar-bg: #201d26; --surface: #201d26; --toolbar-edge: #352f44; --line: #352f44;
+  --accent: #c0a6f2; --accent-soft: #2f2845; --accent-ink: #dccdfa; --on-accent: #1d1233; --drop-bg: #2f2845;
+  --honey: #c0a6f2; --honey-ink: #16131b;
+}
+:root[data-color-theme='rose'] {
+  --canvas: #faf3f4; --grid-dot: #e8d0d6; --grid-dot-faint: #f1e1e5;
+  --toolbar-bg: #fffbfc; --surface: #fffbfc; --toolbar-edge: #efdde1; --line: #efdde1;
+  --accent: #a3305a; --accent-soft: #fbe3ea; --accent-ink: #862045; --on-accent: #ffffff; --drop-bg: #f8dbe4;
+  --honey: #f09ab3; --honey-ink: #2a1119;
+}
+:root[data-color-theme='rose'][data-theme='dark'] {
+  --canvas: #1c1618; --grid-dot: #46333a; --grid-dot-faint: #342a2e;
+  --toolbar-bg: #262022; --surface: #262022; --toolbar-edge: #413238; --line: #413238;
+  --accent: #f4a1b9; --accent-soft: #42242f; --accent-ink: #fbc7d6; --on-accent: #2e0f1b; --drop-bg: #42242f;
+  --honey: #f4a1b9; --honey-ink: #1a1315;
+}
+:root[data-color-theme='slate'] {
+  --canvas: #f1f3f5; --grid-dot: #cfd6dd; --grid-dot-faint: #e0e5ea;
+  --toolbar-bg: #fafbfc; --surface: #fafbfc; --toolbar-edge: #dce1e6; --line: #dce1e6;
+  --accent: #3d5266; --accent-soft: #e0e7ee; --accent-ink: #2d3f51; --on-accent: #ffffff; --drop-bg: #dae3ec;
+  --honey: #a3b6c9; --honey-ink: #141b22;
+}
+:root[data-color-theme='slate'][data-theme='dark'] {
+  --canvas: #16181a; --grid-dot: #2f363c; --grid-dot-faint: #25292d;
+  --toolbar-bg: #1e2124; --surface: #1e2124; --toolbar-edge: #30363c; --line: #30363c;
+  --accent: #a9bdd2; --accent-soft: #2a343e; --accent-ink: #cfdcea; --on-accent: #121a22; --drop-bg: #2a343e;
+  --honey: #a9bdd2; --honey-ink: #131517;
+}
+
 * { box-sizing: border-box; }
 
 html, body, #root { height: 100%; margin: 0; }
@@ -244,9 +312,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .phone-more .phone-rows .tb-button { width: 100%; height: 48px; padding: 0 12px; gap: 10px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font-size: 15px; }
 .phone-more .phone-rows > * + * { border-top: 1px solid var(--line); }
 .phone-rows .tb-button > svg:first-child { color: var(--ink-soft); }
-.phone-rows .colour-control > .tb-button svg:last-child { margin-left: auto; }
-/* Snap to grid and Dark mode read as switches: a track and knob after the label, amber while on. */
-.phone-rows > .tb-button[aria-pressed]::after {
+.phone-rows .colour-control > .tb-button svg:last-child, .phone-rows .appearance-wrap > .tb-button svg:last-child { margin-left: auto; }
+/* Snap to grid and Dark mode (in the Appearance menu) read as switches: a track and knob after the label, amber while on. */
+.phone-rows > .tb-button[aria-pressed]::after, .appearance-menu > .tb-button[aria-pressed]::after {
   content: '';
   margin-left: auto;
   flex: none;
@@ -255,7 +323,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border-radius: 99px;
   background: radial-gradient(circle 9px at 12px 12px, var(--surface) 97%, transparent) var(--control-edge);
 }
-.phone-rows > .tb-button[aria-pressed='true']::after {
+.phone-rows > .tb-button[aria-pressed='true']::after, .appearance-menu > .tb-button[aria-pressed='true']::after {
   background: radial-gradient(circle 9px at 28px 12px, var(--on-accent) 97%, transparent) var(--accent);
 }
 /* The color swatches and the File menu open inside the sheet, below their row. */
@@ -1513,6 +1581,24 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .phone-more .file-menu { position: static; box-shadow: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
 .file-menu button.file-menu-danger { color: var(--danger); }
 
+/*
+ * Appearance menu (job 112): the Dark mode switch, then the color themes as two columns of dot + name.
+ * It hangs from the button's right edge (the button sits near the toolbar's right end), and stays open
+ * while it is used. The switch is drawn like the ones in the phone ⋯ panel.
+ */
+.appearance-wrap .file-menu { left: auto; right: 0; min-width: 232px; gap: 4px; padding: 6px; transform-origin: top right; }
+.file-menu.appearance-menu > .tb-button { width: 100%; height: 40px; padding: 0 10px; gap: 10px; justify-content: flex-start; border: 0; background: none; font-size: 14px; }
+.appearance-menu > .tb-button svg { color: var(--ink-soft); }
+.theme-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.file-menu .theme-chip { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--control-edge); background: var(--surface); font-size: 13px; font-weight: 500; }
+.file-menu .theme-chip[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.theme-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(31, 29, 26, 0.22); }
+/* On a phone the menu opens inside the ⋯ panel: full width rows and the chips as big as the other rows. */
+.phone-more .appearance-wrap .file-menu { min-width: 0; padding: 0; gap: 0; }
+.phone-more .appearance-menu > .tb-button { height: 48px; padding: 0 12px; font-size: 15px; }
+.phone-more .theme-chips { padding: 10px 12px 12px; }
+.phone-more .file-menu .theme-chip { height: 44px; font-size: 15px; }
+
 /* Delete your account (job #63): in the keyboard shortcuts panel's frame. */
 .delete-account { font-size: 14px; line-height: 1.5; }
 .delete-account p, .delete-account ul { margin: 10px 0; }
@@ -2059,10 +2145,10 @@ a.cal-open { align-self: flex-start; }
 .phone-sheet { transform-origin: bottom center; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all, .habit-day) {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day) {
   transition: transform 100ms var(--ease-out);
 }
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day):not([aria-disabled='true'], :disabled):active {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day):not([aria-disabled='true'], :disabled):active {
   transform: scale(0.97);
 }
 

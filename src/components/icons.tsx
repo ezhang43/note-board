@@ -70,6 +70,16 @@ export function PlusIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** Appearance menu: a circle, half filled (light and dark, and a color to pick). */
+export function AppearanceIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" />
+    </svg>
+  );
+}
+
 /** Dark mode toggle: a moon. */
 export function MoonIcon() {
   return (

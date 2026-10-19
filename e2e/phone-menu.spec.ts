@@ -4,7 +4,7 @@ import { fontsLoaded } from './helpers';
 // The phone ⋯ menu as tiles (owner approved job 74, option B, 2026-10-16): the things that open
 // (Search, Share, History, Completed, Focus timer, Calendar, Journal) are tiles three across; then an Arrange
 // group (tool, text size, Snap to grid, Color, Collapse all · Same width · Clean up); then a More
-// group (File, Dark mode, Feedback, About, Buy me a coffee, Sign out).
+// group (File, Appearance, Feedback, About, Buy me a coffee, Sign out).
 
 test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
@@ -89,9 +89,9 @@ test('the Arrange group: tool, text size, Snap to grid, Color, then Collapse all
   expect(colour.y).toBeLessThan(three[0].y);
 });
 
-test('the More group, in order: File, Dark mode, Feedback, About, Buy me a coffee, Sign out', async ({ page }) => {
+test('the More group, in order: File, Appearance, Feedback, About, Buy me a coffee, Sign out', async ({ page }) => {
   await openSignedIn(page);
-  expect(await names(rest(page).locator('button, a'))).toEqual(['File', 'Dark mode', 'Feedback', 'About BusyAnts', 'Buy me a coffee', 'Sign out']);
+  expect(await names(rest(page).locator('button, a'))).toEqual(['File', 'Appearance', 'Feedback', 'About BusyAnts', 'Buy me a coffee', 'Sign out']);
   // Feedback is a row of its own, right before About (owner decision, 2026-10-16).
   const fb = await box(rest(page).getByRole('button', { name: 'Feedback', exact: true }));
   const about = await box(rest(page).getByRole('link', { name: 'About BusyAnts' }));
@@ -101,7 +101,7 @@ test('the More group, in order: File, Dark mode, Feedback, About, Buy me a coffe
   await expect(rest(page).getByRole('link', { name: 'Buy me a coffee' })).toHaveAttribute('href', /.+/);
 });
 
-test('Snap to grid and Dark mode are switches that show on / off', async ({ page }) => {
+test('Snap to grid and Appearance’s Dark mode are switches that show on / off', async ({ page }) => {
   await openLocal(page);
   const snap = arrange(page).getByRole('button', { name: 'Snap to grid' });
   await expect(snap).toHaveAttribute('aria-pressed', 'true');
@@ -110,6 +110,7 @@ test('Snap to grid and Dark mode are switches that show on / off', async ({ page
   await expect(snap).toHaveAttribute('aria-pressed', 'false');
   await snap.tap();
   await expect(snap).toHaveAttribute('aria-pressed', 'true');
+  await rest(page).getByRole('button', { name: 'Appearance', exact: true }).tap();
   const dark = rest(page).getByRole('button', { name: 'Dark mode' });
   await dark.tap();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

@@ -8,6 +8,23 @@
 - Rename a habit by typing over its name. The bin deletes it after asking first; Ctrl+Z in the panel, or Version history, brings it back with its ticks.
 - Habits are kept on a hidden board called "Habits", like the Journal, so they save, sync to your Google account when signed in, and stay on the device when not.
 - Your boards and journal already saved load exactly as before. Nothing new is saved until you add your first habit.
+
+## Color themes (2026-10-19)
+
+- The moon button in the toolbar is now an Appearance button (a half-filled circle). It opens a small menu with the Dark mode switch and six color themes: Honey (the look you have today, still the default), Ocean, Forest, Lavender, Rose and Slate.
+- A theme changes the accent color (the pressed tool, the Share button, switches, the New container button) and the tint of the board and the toolbar. Cards stay white, and dark mode still has its own dark version of every theme.
+- Your pick is remembered on this device only, like dark mode. It is not part of your board, is not synced and is not undone by Undo.
+- On a phone it is the Appearance row in the ⋯ menu (it replaces the Dark mode row and opens inside the menu).
+- Every theme was checked for readable contrast (WCAG AA) by an automatic test. Your boards are not touched: the pick is one small setting kept on this device, and a missing or broken one just means Honey.
+
+## Google Calendar remembered for the hour (2026-10-19)
+
+- Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.
+- Google's quick window still shows about once an hour, when the access runs out, and on another device.
+- The access is dropped when you sign out (in any tab), when someone else signs in, when Google refuses it, after about an hour, and when you delete your account. It is never in a backup.
+- If you're already connected, you aren't asked again because of this change.
+- The Privacy policy says so.
+
 ## Text size can go even bigger (2026-10-19)
 
 - A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.

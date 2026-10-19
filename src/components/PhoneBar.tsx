@@ -6,7 +6,7 @@ import {
   CleanUpButton,
   CollapseAllButton,
   ColourControl,
-  DarkModeButton,
+  AppearanceMenu,
   FeedbackButton,
   FileMenu,
   SameWidthButton,
@@ -123,7 +123,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             </h2>
             <div className="phone-rows">
               <FileMenu />
-              <DarkModeButton labelled />
+              <AppearanceMenu labelled />
               <FeedbackButton onOpen={() => setOpen(null)} />
               <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
                 <InfoIcon />

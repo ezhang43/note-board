@@ -3,7 +3,7 @@ import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { boardRights, keptNotice } from '../model/sharing';
-import { swatchFor } from '../model/theme';
+import { COLOR_THEMES, swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { CANT_READ, IMPORT_ACCEPT, IMPORT_MAX_BYTES, isPdf, TOO_BIG } from '../model/importFile';
 import { readPdf } from './readPdf';
@@ -19,7 +19,7 @@ import { account, useAccountRemover } from '../sync/account';
 import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
 import { usePhone } from './usePhone';
-import { ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
+import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -351,21 +351,46 @@ export function SameWidthButton({ labelled = false }: { labelled?: boolean }) {
   );
 }
 
-/** Light / dark toggle (pressed = dark). The choice is remembered on this device only. */
-export function DarkModeButton({ labelled = false }: { labelled?: boolean }) {
+/**
+ * Appearance menu (job 112): the Dark mode switch (pressed = dark) and the color themes. Both
+ * choices are remembered on this device only. On a computer an icon button opens it under the
+ * toolbar; on a phone (`labelled`) it is a row in ⋯ More that opens inside the panel.
+ */
+export function AppearanceMenu({ labelled = false }: { labelled?: boolean }) {
+  const { open, setOpen, wrap, onKeyDown } = usePopover();
   const dark = useAppState((s) => s.view.theme === 'dark');
+  const picked = useAppState((s) => s.view.colorTheme);
   return (
-    <button
-      type="button"
-      className={`tb-button${labelled ? '' : ' icon-only'}`}
-      aria-label="Dark mode"
-      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      aria-pressed={dark}
-      onClick={appStore.toggleTheme}
-    >
-      <MoonIcon />
-      {labelled && 'Dark mode'}
-    </button>
+    <div className="file-menu-wrap appearance-wrap" ref={wrap} onKeyDown={onKeyDown}>
+      <button
+        type="button"
+        className={`tb-button${labelled ? '' : ' icon-only'}`}
+        aria-label="Appearance"
+        title="Dark mode and color theme"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <AppearanceIcon />
+        {labelled && 'Appearance'}
+        {labelled && <CaretIcon />}
+      </button>
+      {open && (
+        <div className="file-menu appearance-menu" role="group" aria-label="Appearance">
+          <button type="button" className="tb-button" aria-pressed={dark} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={appStore.toggleTheme}>
+            <MoonIcon />
+            Dark mode
+          </button>
+          <div className="theme-chips" role="group" aria-label="Color theme">
+            {COLOR_THEMES.map((t) => (
+              <button key={t.key} type="button" className="theme-chip" aria-label={t.label} aria-pressed={t.key === picked} onClick={() => appStore.setColorTheme(t.key)}>
+                <span className="theme-dot" aria-hidden="true" style={{ background: t.dot }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -537,7 +562,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <FeedbackButton />
 
       <div className="toolbar-divider" aria-hidden="true" />
-      <DarkModeButton />
+      <AppearanceMenu />
       <ShareButton />
 
       {onSignOut && (

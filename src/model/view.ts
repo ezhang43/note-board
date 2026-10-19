@@ -1,5 +1,5 @@
 import { DEFAULT_HOTKEYS } from './hotkeys';
-import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
+import { CARD_MAX_W, CARD_MIN_W, GRID, MAX_ZOOM, MIN_ZOOM, PHONE_MARGIN, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
@@ -129,4 +129,22 @@ export function gridStyle(view: View): { size: number; offsetX: number; offsetY:
  */
 export function viewFitting(rects: Rect[], size: Size, view: View): View {
   return viewShowing(rects, size, { ...view, zoom: 1 }, MIN_ZOOM);
+}
+
+/** Phone (owner request): the width, in board pixels, that fills a screen `screenW` wide at `zoom` less a margin each side, within the card size limits. */
+export function phoneCardWidth(screenW: number, zoom: number): number {
+  return Math.min(CARD_MAX_W, Math.max(CARD_MIN_W, Math.round((screenW - 2 * PHONE_MARGIN) / zoom)));
+}
+
+/**
+ * Phone (owner request): the view that fills the screen's width with the block `rect` (within the
+ * zoom limits), its left edge at the margin (centred when it is narrower even at 250%). The board
+ * point at screen point `at` (the line being tapped) stays at the same height, or is brought back
+ * on screen when it was off it.
+ */
+export function viewFillingWidth(view: View, size: Size, rect: Rect, at: Point): View {
+  const zoomed = zoomTo(view, at, (size.width - 2 * PHONE_MARGIN) / rect.w);
+  const left = Math.max(PHONE_MARGIN, (size.width - rect.w * zoomed.zoom) / 2);
+  const top = Math.min(size.height - PHONE_MARGIN, Math.max(PHONE_MARGIN, at.y));
+  return panBy(zoomed, Math.round(left - rect.x * zoomed.zoom) - zoomed.panX, Math.round(top - at.y));
 }

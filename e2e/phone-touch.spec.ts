@@ -18,6 +18,16 @@ const more = async (page: Page) => {
 };
 const rect = async (l: Locator) => (await l.boundingBox())!;
 const fontSize = (l: Locator) => l.first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+/**
+ * A card or container made on a phone fills the screen's width (job 113), so the part of a resize
+ * handle's touch area that lies outside the block would be off the screen. Move the board 40px left
+ * (a scroll, which keeps the selection) to leave room, as a finger would by panning.
+ */
+const makeRoomAtRight = async (page: Page) => {
+  await page.mouse.move(200, 400);
+  await page.mouse.wheel(80, 0);
+  await page.waitForTimeout(100);
+};
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -358,6 +368,7 @@ test.describe('7. 44px touch areas around the small card controls', () => {
   test('a note: collapse, delete and the resize corner', async ({ page }) => {
     await addMenu(page, 'Note');
     await page.keyboard.type('Hello');
+    await makeRoomAtRight(page);
     const card = page.locator('[data-card-id]').first();
     const collapse = card.getByRole('button', { name: 'Collapse card' });
     const del = card.getByRole('button', { name: 'Delete card' });
@@ -380,6 +391,7 @@ test.describe('7. 44px touch areas around the small card controls', () => {
 
   test('a container: collapse, delete, resize corner and the width strip', async ({ page }) => {
     await addMenu(page, 'Container');
+    await makeRoomAtRight(page);
     const col = page.locator('[data-col-id]').first();
     const collapse = col.getByRole('button', { name: 'Collapse container' });
     const del = col.getByRole('button', { name: 'Delete container and its cards' });
@@ -401,6 +413,7 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     await page.keyboard.type('Hello');
     const card = page.locator('[data-card-id]').first();
     await card.getByRole('button', { name: 'Collapse card' }).tap();
+    await makeRoomAtRight(page);
     const strip = card.getByRole('button', { name: 'Resize card width' });
     const del = card.getByRole('button', { name: 'Delete card' });
     const collapse = card.getByRole('button', { name: 'Expand card' });

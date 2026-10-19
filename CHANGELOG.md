@@ -6,6 +6,12 @@
 - A quick tap still lets you type, a swipe still moves the board, and resting on the list's title or the card's empty space still picks up the whole card. The grip still drags at once.
 - With your phone set to reduce motion, the items jump instead of sliding. Computers and tablets are unchanged. Your boards are not touched: dropping is the same undoable move as before.
 
+## Phone: the line you are typing in always stays in view (2026-10-19)
+
+- On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.
+- It also stays clear of the top bar and the sides of the screen, not only the bottom. When the phone scrolls the page so part of it is out of sight, the line is kept out of that part too.
+- Nothing else changed: computers and tablets are the same, and your boards are not touched.
+
 ## Lists fill the screen on a phone (2026-10-19)
 
 - On a phone, a new note, checklist or link is made almost as wide as the screen (a small margin each side) instead of the small desktop size.

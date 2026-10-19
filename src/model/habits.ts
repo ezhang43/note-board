@@ -37,13 +37,16 @@ export function habitList(board: Board): TodoCard[] {
     .filter((c): c is TodoCard => !!c && isHabit(c));
 }
 
-/** The days ticked, each once (two devices ticking the same day leave two items once combined). */
+/** The days ticked, each once (on a board in a share, two devices ticking the same day leave two items once merged). */
 export const tickedDays = (habit: TodoCard): Set<DayKey> => new Set(habit.items.filter(isTick).map((i) => i.text));
 
 /** The habit with `day` ticked (`on`) or not; unchanged if it already is. */
 export function withDay(habit: TodoCard, day: DayKey, on: boolean): TodoCard {
   if (tickedDays(habit).has(day) === on) return habit;
-  const items = on ? [...habit.items, { id: newId('i'), text: day, done: true, children: [] }] : habit.items.filter((i) => i.text !== day);
+  if (!on) return { ...habit, items: habit.items.filter((i) => i.text !== day) };
+  // A day unticked on the board itself is ticked again, rather than adding a second item for it.
+  const left = habit.items.findIndex((i) => i.text === day);
+  const items = left < 0 ? [...habit.items, { id: newId('i'), text: day, done: true, children: [] }] : habit.items.map((i, n) => (n === left ? { ...i, done: true } : i));
   return { ...habit, items };
 }
 

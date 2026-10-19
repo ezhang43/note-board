@@ -8,6 +8,8 @@
 - Rename a habit by typing over its name. The bin deletes it after asking first; Ctrl+Z in the panel, or Version history, brings it back with its ticks.
 - Habits are kept on a hidden board called "Habits", like the Journal, so they save, sync to your Google account when signed in, and stay on the device when not.
 - Your boards and journal already saved load exactly as before. Nothing new is saved until you add your first habit.
+- Restoring a version in Version history also puts your habits back as they were then, like the Journal.
+- On a phone the keyboard doesn't pop up by itself when the panel opens, so it doesn't cover the day boxes. Screen readers say each day box with its habit ("Read, Mon 19 Oct").
 
 ## Color themes (2026-10-19)
 

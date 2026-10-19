@@ -30,6 +30,8 @@ describe('habits', () => {
     expect(isHabit(unticked)).toBe(true);
     expect([...tickedDays(unticked)]).toEqual(['2026-10-19']);
     expect([...tickedDays(withDay(unticked, '2026-10-18', true))].sort()).toEqual(['2026-10-18', '2026-10-19']);
+    // Ticking it again ticks that same item rather than adding a second one.
+    expect(withDay(unticked, '2026-10-18', true).items.filter((i) => i.text === '2026-10-18')).toEqual([{ id: 'u', text: '2026-10-18', done: true, children: [] }]);
     expect(withDay(unticked, '2026-10-18', false)).toBe(unticked); // not ticked: unchanged
     const other = createCard('todo') as TodoCard;
     expect(isHabit({ ...other, items: [{ ...other.items[0], text: 'buy milk' }] })).toBe(false);

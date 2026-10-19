@@ -12,7 +12,7 @@ const panel = (page: Page) => page.getByRole('complementary', { name: 'Habits' }
 const newHabit = (page: Page) => panel(page).getByRole('textbox', { name: 'New habit' });
 const habitRows = (page: Page) => panel(page).locator('.habit');
 const row = (page: Page, i: number) => habitRows(page).nth(i);
-const days = (page: Page, i: number) => row(page, i).getByRole('button', { name: /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) / });
+const days = (page: Page, i: number) => row(page, i).getByRole('button', { name: /, (Mon|Tue|Wed|Thu|Fri|Sat|Sun) / });
 const todayBox = (page: Page, i: number) => row(page, i).locator('.habit-day[aria-current="date"]');
 
 async function addHabit(page: Page, name: string) {
@@ -33,7 +33,7 @@ test('Habits opens a side panel; add a habit, tick today and see the streak; the
   await expect(habitRows(page)).toHaveCount(1);
   await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toHaveValue('Walk');
   await expect(days(page, 0)).toHaveCount(7);
-  await expect(days(page, 0).first()).toHaveAccessibleName(/^Mon /);
+  await expect(days(page, 0).first()).toHaveAccessibleName(/^Walk, Mon \d+ [A-Z][a-z]{2}$/);
   await expect(row(page, 0)).toContainText('No streak');
   await todayBox(page, 0).click();
   await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
@@ -151,6 +151,8 @@ test.describe('on a phone', () => {
     await page.getByRole('dialog', { name: 'More' }).locator('.phone-tiles').getByRole('button', { name: 'Habits', exact: true }).tap();
     await expect(panel(page)).toBeVisible();
     expect((await panel(page).boundingBox())!.width).toBeGreaterThanOrEqual(389);
+    // The keyboard doesn't pop up by itself and cover the day boxes.
+    await expect(newHabit(page)).not.toBeFocused();
     await addHabit(page, 'Walk');
     const box = (await todayBox(page, 0).boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(40);

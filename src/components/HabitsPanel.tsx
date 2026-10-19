@@ -4,6 +4,7 @@ import { habitList, streak, thisWeek, tickedDays } from '../model/habits';
 import { appStore, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { HabitsIcon, TrashIcon } from './icons';
+import { usePhone } from './usePhone';
 
 /**
  * The Habits button (owner request, 2026-10-19): opens the Habits side panel, or closes it. By the
@@ -45,6 +46,8 @@ export function HabitsPanel() {
   const today = dayKey(new Date());
   const week = thisWeek(today);
   const [name, setName] = useState('');
+  // On a phone or touch screen the keyboard would pop up and cover the day boxes, so it waits for a tap.
+  const touch = usePhone() || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const root = useRef<HTMLDivElement>(null);
   /** What in the panel had the keyboard last, so it stays in the panel when undo or delete takes that away. */
   const focused = useRef<Element | null>(null);
@@ -84,7 +87,7 @@ export function HabitsPanel() {
           add();
         }}
       >
-        <input type="text" aria-label="New habit" placeholder="New habit" autoFocus enterKeyHint="done" value={name} onChange={(e) => setName(e.currentTarget.value)} onKeyDown={leave} />
+        <input type="text" aria-label="New habit" placeholder="New habit" autoFocus={!touch} enterKeyHint="done" value={name} onChange={(e) => setName(e.currentTarget.value)} onKeyDown={leave} />
         <button type="submit" className="tb-button">
           Add
         </button>
@@ -115,7 +118,7 @@ export function HabitsPanel() {
                   key={d}
                   type="button"
                   className="habit-day"
-                  aria-label={dayLabel(d)}
+                  aria-label={`${h.title || 'Habit'}, ${dayLabel(d)}`}
                   aria-pressed={done.has(d)}
                   aria-current={d === today ? 'date' : undefined}
                   onClick={() => appStore.toggleHabitDay(h.id, d)}

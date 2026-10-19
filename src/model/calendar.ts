@@ -93,7 +93,7 @@ export function addMonths(key: DayKey, n: number): DayKey {
   return fromDate(first);
 }
 
-const weekStart = (key: DayKey) => addDays(key, -((toDate(key).getUTCDay() + 6) % 7));
+export const weekStart = (key: DayKey) => addDays(key, -((toDate(key).getUTCDay() + 6) % 7));
 
 /** Seven days from `key`: the week view (today and the next six when it opens), or a row of the month grid. */
 export function weekDays(key: DayKey): DayKey[] {

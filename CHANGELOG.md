@@ -1,5 +1,14 @@
 # Changelog
 
+## Habits (2026-10-19)
+
+- A new **Habits** button sits next to Journal in the panel pill by the zoom control (on a phone: ⋯ → Habits). It opens a Habits panel at the side; the board you are on stays open.
+- Type a habit in "New habit" and press Enter or Add. Each habit shows this week's seven days, Monday to Sunday, today outlined. Tap a day to tick it, tap again to untick it; a day is ticked at most once.
+- Under each habit is its streak: the days in a row you ticked, up to today. Not having ticked today yet doesn't break a streak that ran through yesterday.
+- Rename a habit by typing over its name. The bin deletes it after asking first; Ctrl+Z in the panel, or Version history, brings it back with its ticks.
+- Habits are kept on a hidden board called "Habits", like the Journal, so they save, sync to your Google account when signed in, and stay on the device when not.
+- Your boards and journal already saved load exactly as before. Nothing new is saved until you add your first habit.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

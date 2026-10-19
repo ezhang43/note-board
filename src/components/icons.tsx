@@ -371,6 +371,18 @@ export function JournalIcon() {
   );
 }
 
+/** Habits: a row of three day boxes, the first two ticked. */
+export function HabitsIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <rect x="2.5" y="8" width="5.5" height="8" rx="1.5" />
+      <rect x="9.25" y="8" width="5.5" height="8" rx="1.5" />
+      <rect x="16" y="8" width="5.5" height="8" rx="1.5" />
+      <path d="M4 12l1 1.2 1.6-2.4M10.75 12l1 1.2 1.6-2.4" />
+    </svg>
+  );
+}
+
 export function FeedbackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>

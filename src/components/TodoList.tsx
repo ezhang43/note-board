@@ -2,15 +2,13 @@ import { boxProps } from './textBox';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
-import { DRAG_THRESHOLD } from '../model/constants';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
-import { clientToCanvas } from './canvasDom';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ArrowIcon, ChevronIcon, GripIcon, TrashIcon } from './icons';
-import { itemHintAt, rowAt, rowUnder } from './itemDom';
+import { rowAt, rowUnder, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 
@@ -93,6 +91,9 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     return h && 'markId' in h && h.markId === item.id ? h.markMode : null;
   });
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
+  // Lifted by press-and-hold (phone): the rows slide aside by this many px (0: back in place).
+  const lifting = useAppState((s) => !!s.ui.itemDrag?.lift);
+  const slide = useAppState((s) => s.ui.itemDrag?.slide?.[item.id] ?? 0);
   // Just ticked and about to move to Completed, or just arrived there (a short animation).
   const leaving = useAppState((s) => s.ui.completing.includes(item.id));
   const arrived = useAppState((s) => s.ui.arrived.includes(item.id));
@@ -147,6 +148,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     picked && 'picked',
     mark && `mark-${mark}`,
     dimmed && 'dimmed',
+    lifting && 'lifting',
     leaving && 'leaving',
     arrived && 'arrived',
   ];
@@ -154,7 +156,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     <div
       className={classes.filter(Boolean).join(' ')}
       data-item-id={item.id}
-      style={{ paddingLeft: depth * ITEM_INDENT }}
+      style={{ paddingLeft: depth * ITEM_INDENT, transform: lifting ? `translateY(${slide}px)` : undefined }}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
@@ -286,34 +288,6 @@ function gripPointerDown(cardId: string, itemId: string) {
     e.stopPropagation();
     appStore.select(cardId);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    const start = { x: e.clientX, y: e.clientY };
-    let started = false;
-
-    const onMove = (ev: { clientX: number; clientY: number }) => {
-      if (!started) {
-        if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
-        started = true;
-        appStore.startItemDrag(cardId, itemId, clientToCanvas(ev.clientX, ev.clientY));
-      }
-      const d = appStore.getState().ui.itemDrag;
-      if (d) appStore.moveItemDrag(clientToCanvas(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d));
-    };
-    const edges = followEdges((p) => started && onMove(p));
-    const onPointerMove = (ev: PointerEvent) => {
-      edges.track(ev);
-      onMove(ev);
-    };
-    const finish = (ev: PointerEvent) => {
-      edges.stop();
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      if (!started) return;
-      if (ev.type === 'pointercancel') appStore.cancelItemDrag();
-      else appStore.dropItems();
-    };
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', finish);
-    window.addEventListener('pointercancel', finish);
+    trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY });
   };
 }

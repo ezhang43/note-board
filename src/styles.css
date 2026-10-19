@@ -345,13 +345,16 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   z-index: 4;
   display: flex;
   justify-content: space-around;
-  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
   background: var(--toolbar-bg);
   border-top: 1px solid var(--line);
   box-shadow: 0 -4px 12px rgba(31, 29, 26, 0.06);
 }
 .item-bar > button {
-  width: 48px;
+  /* Eight buttons share the width, so they fit a 320px phone (about 39px each at the narrowest). */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 52px;
   height: 48px;
   padding: 0;
   border: none;
@@ -364,6 +367,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   cursor: pointer;
 }
 .item-bar > button:active { background: var(--hover); }
+.item-bar > button[aria-disabled='true'] { opacity: 0.35; }
+/* Done is a word, not a picture: it puts the keyboard away. */
+.item-bar > button[aria-label='Done typing'] { font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-ink); }
 .item-bar > button[aria-label='Delete item'] { color: var(--danger); }
 .app.phone ~ .save-banner, .app.phone .save-banner { bottom: calc(76px + env(safe-area-inset-bottom)); }
 .app.phone .corner-controls { bottom: calc(76px + env(safe-area-inset-bottom)); right: 12px; }
@@ -1118,6 +1124,15 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
   /* The phone already has Move up / Move down in the row above the keyboard, so the arrows never show and keep no room. */
   .todo-item { padding-right: 40px; }
+}
+/*
+ * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the
+ * item bar above the keyboard, which keeps the cursor in a text box, and the strip kept free at the
+ * right end of a row shrinks to the grip alone. Tablets (600px and wider) and mouse users keep the trash can.
+ */
+@media (hover: none) {
+  .app.phone .item-trash { display: none; }
+  .app.phone .todo-item { padding-right: 24px; }
 }
 
 .completed {
@@ -2225,6 +2240,14 @@ a.cal-open { align-self: flex-start; }
   .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
   .completed-head, .completed-actions { gap: 8px; }
   .completed-toggle, .uncheck-all { height: 40px; }
+
+  /*
+   * A card's or container's collapse arrow and trash can show only on the selected one (owner request,
+   * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
+   * around them take no taps: a tap on another card selects it, never deletes it.
+   */
+  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
 
   /* The welcome tour. */
   .tour-head .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }

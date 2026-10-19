@@ -52,3 +52,6 @@ export const NEW_BLOCK_H = { note: 160, todo: 120, link: 160, completed: 160, bo
 
 /** The owner's Buy Me a Coffee page (owner request 2026-10-05), opened by the coffee button. */
 export const DONATE_URL = 'https://buymeacoffee.com/ezcookie';
+
+/** Phone: space kept at each side of the screen by a list that fills its width, in screen pixels. */
+export const PHONE_MARGIN = 16;

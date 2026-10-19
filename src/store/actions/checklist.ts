@@ -202,7 +202,8 @@ export function checklistActions(ctx: StoreContext) {
       ctx.pending.tick = { timer: setTimeout(finish, COMPLETE_LEAVE_MS), apply: finish };
     },
     /**
-     * Ctrl+Enter while typing in an item (owner request, 2026-10-15): the same as its Done box. After a
+     * Ctrl+Enter while typing in an item (owner request, 2026-10-15; also the phone item bar's Tick,
+     * 2026-10-19): the same as its Done box. After a
      * tick the cursor moves to the next open item (below, else above); after an untick it stays at
      * `caret`. Returns false when no open item is left: the field should let go, the list stays selected.
      */
@@ -218,12 +219,34 @@ export function checklistActions(ctx: StoreContext) {
       updateUi({ focusItem: focus, focusOffset: ticking ? null : caret, ...(focus ? {} : { selection: [cardId] }) });
       return !!focus;
     },
-    /** Trash can: deletes the item and everything under it (or every selected item, if it is one of them). */
-    trashItem(cardId: string, itemId: string) {
+    /**
+     * Trash can: deletes the item and everything under it (or every selected item, if it is one of them).
+     * `keepTyping` (the phone's item bar): the cursor moves to the item above (else below), so the keyboard stays up.
+     */
+    trashItem(cardId: string, itemId: string, keepTyping = false) {
       const lists = listsIncluding(cardId, itemId);
       if (lists) return void commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } });
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      commit((b) => C.editItems(b, cardId, (items) => C.deleteItems(items, ids)), { ui: { itemSel: null } });
+      commit((b) => {
+        const card = b.cards[cardId];
+        if (card?.kind !== 'todo') return null;
+        const items = C.deleteItems(card.items, ids);
+        const focus = keepTyping ? C.focusAfterRemoving(visibleItems(card), items, ids) : null;
+        return { board: C.editItems(b, cardId, () => items), ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
+      });
+    },
+    /**
+     * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so
+     * the cursor goes back into it at `caret` (else the item next to it) and the keyboard stays up.
+     */
+    undoInItem(cardId: string, itemId: string, caret: number) {
+      const before = ctx.state.board.cards[cardId];
+      const shown = before?.kind === 'todo' ? visibleItems(before) : [];
+      ctx.undoOn(ctx.state.boards.open, 'undo');
+      const after = ctx.state.board.cards[cardId];
+      if (after?.kind !== 'todo') return;
+      const focus = C.findItem(after.items, itemId) ? itemId : C.focusAfterRemoving(shown, after.items, [itemId]);
+      if (focus) updateUi({ focusItem: focus, focusOffset: focus === itemId ? caret : null });
     },
     toggleCompletedSection: (cardId: string) => commit((b) => C.toggleCompletedSection(b, cardId)),
     /** Uncheck all (owner request): every item in the list unticked, to use it again. One undo step. */

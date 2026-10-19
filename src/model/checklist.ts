@@ -240,12 +240,25 @@ export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoIte
   const next = cloned(items);
   removeItemInPlace(next, id);
   if (!next.length) return null;
-  const order = displayOrder(items);
-  const at = order.indexOf(id);
-  const left = new Set(flatIds(next));
-  // The nearest item above that is still there; failing that, the nearest one below.
-  const focus = order.slice(0, at).reverse().find((x) => left.has(x)) ?? order.slice(at + 1).find((x) => left.has(x)) ?? null;
-  return { items: next, focus };
+  return { items: next, focus: focusAfterRemoving(displayOrder(items), next, [id]) };
+}
+
+/**
+ * Where the cursor goes after `gone` were removed: the nearest item above the first of them that is
+ * still there, else the nearest one below. Only items in `shown` (the ids on screen, top to bottom,
+ * before the change) count, so the cursor never lands in a closed Completed section. A list emptied
+ * by the delete has a new blank item, which takes the cursor.
+ */
+export function focusAfterRemoving(shown: string[], after: TodoItem[], gone: string[]): string | null {
+  const left = new Set(flatIds(after));
+  const at = shown.findIndex((x) => gone.includes(x));
+  if (at < 0) return null; // nothing that was on screen went
+  return (
+    shown.slice(0, at).reverse().find((x) => left.has(x)) ??
+    shown.slice(at + 1).find((x) => left.has(x)) ??
+    flatIds(after).find((x) => !shown.includes(x) && findItem(after, x)!.item.text === '' && !findItem(after, x)!.item.done) ??
+    null
+  );
 }
 
 /**

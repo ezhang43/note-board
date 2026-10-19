@@ -4,6 +4,13 @@
 
 - When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.
 
+## The Privacy page explains the Claude connector (2026-10-19)
+
+- The Privacy policy has a new short section, "The Claude connector (optional)". It says the connector runs only on your own computer, signs in with your own Google account, keeps that sign-in in a file on that computer, touches your boards only when you ask Claude to, has deleting switched off, and sends what Claude reads to Claude under Anthropic's privacy policy. BusyAnts stores nothing new because of it.
+- Anthropic is now listed with the other services the page names.
+- Claude Code is also kept from reading the connector's sign-in folder on a Mac or Linux computer, as it already was on Windows.
+- The app, your boards and their saving are not touched.
+
 ## The Claude connector in one file, with sign-in from Claude (2026-10-19)
 
 - The BusyAnts connector for Claude can now be made into one file, `busyants.mcpb` (`npm run mcp:pack`). Anyone with Claude Desktop on a Mac or Windows computer opens that file to install it: no Node, no project folder, no settings to edit.

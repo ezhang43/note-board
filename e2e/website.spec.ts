@@ -459,6 +459,27 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
   await expect(page.locator('details:has(#delete) p').getByRole('link', { name: 'ezhang43@gmail.com' })).toHaveAttribute('href', 'mailto:ezhang43@gmail.com');
 });
 
+// Job 123 (owner decision 2026-10-19): the optional Claude connector has its own short section, and is listed with the services.
+test('the Privacy policy has a short, true section about the optional Claude connector', async ({ page }) => {
+  await page.goto('/privacy/');
+  const privacy = page.locator('main');
+  await expect(privacy.getByRole('heading', { name: 'The Claude connector (optional)' })).toBeVisible();
+  const section = privacy.locator('details:has(h2:text("The Claude connector"))');
+  await section.locator('summary').click();
+  await expect(section).toContainText('runs on your own computer');
+  await expect(section).toContainText('your own Google account');
+  await expect(section).toContainText('kept in a file on that computer');
+  await expect(section).toContainText('only when you ask Claude to');
+  await expect(section).toContainText('deleting is switched off');
+  await expect(section).toContainText('Anthropic');
+  await expect(section.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://www.anthropic.com/legal/privacy');
+  await expect(section).toContainText('BusyAnts stores nothing new');
+  // Listed with the other services.
+  const services = privacy.locator('details:has(h2:text("who helps run it"))');
+  await expect(services).toContainText('Anthropic');
+  await expect(services).toContainText('Claude connector');
+});
+
 test('the app still opens at its own address, and a share link in the existing format still opens the app', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');

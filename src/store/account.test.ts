@@ -128,6 +128,7 @@ describe('accountKeys', () => {
       'note-board:own-boards:someone-else',
       // Settings of this device, not the account's data.
       'note-board:theme',
+      'note-board:color-theme',
       'note-board:font',
       'note-board:tour-done',
       'note-board:pomodoro',

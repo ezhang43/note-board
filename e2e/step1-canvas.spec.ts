@@ -53,7 +53,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'File',
     'Backup file',
     'File to import',
-    'Dark mode',
+    'Appearance',
   ]);
   await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
   await arrange(page); // Snap to grid, Collapse all, Same width and Clean up are in the Arrange menu

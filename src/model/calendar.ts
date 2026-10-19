@@ -362,9 +362,10 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
   return { summary, start: { dateTime: start, timeZone }, end: { dateTime: end, timeZone } };
 }
 
-// The calendar access (Google's token, about an hour) is kept for this tab only, in sessionStorage,
-// so a reload within the hour doesn't ask Google again (owner choice, 2026-10-19). The storage is
-// passed as a getter, since even reaching it can throw where the browser blocks it.
+// The calendar access (Google's token, about an hour) is kept on this device, in localStorage, so a
+// reload, a new tab or reopening the browser within the hour doesn't ask Google again (owner choice
+// "Remember for the hour", 2026-10-19, job 107). The storage is passed as a getter, since even
+// reaching it can throw where the browser blocks it.
 export const ACCESS_KEY = 'note-board:calendar-access';
 export interface Access {
   token: string;
@@ -373,9 +374,9 @@ export interface Access {
   /** Who it belongs to: the signed-in person's account id. */
   user: string;
 }
-type TabStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+type KeptStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-export function keepAccess(storage: () => TabStorage | null, access: Access) {
+export function keepAccess(storage: () => KeptStorage | null, access: Access) {
   try {
     storage()?.setItem(ACCESS_KEY, JSON.stringify(access));
   } catch {
@@ -383,7 +384,7 @@ export function keepAccess(storage: () => TabStorage | null, access: Access) {
   }
 }
 
-export function dropAccess(storage: () => TabStorage | null) {
+export function dropAccess(storage: () => KeptStorage | null) {
   try {
     storage()?.removeItem(ACCESS_KEY);
   } catch {
@@ -392,7 +393,7 @@ export function dropAccess(storage: () => TabStorage | null) {
 }
 
 /** The kept access if it is this person's with over a minute left; anything else is dropped. */
-export function readAccess(storage: () => TabStorage | null, user: string | null, now = Date.now()): Access | null {
+export function readAccess(storage: () => KeptStorage | null, user: string | null, now = Date.now()): Access | null {
   type Raw = { token?: unknown; expiresAt?: unknown; user?: unknown };
   let a: Raw | null = null;
   try {

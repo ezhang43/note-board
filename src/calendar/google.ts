@@ -4,10 +4,11 @@ import { dropAccess, keepAccess, NoAccess, readAccess, type Access } from '../mo
 // Calendar access on the published site (owner request, 2026-10-06), asked for only when the
 // Google Calendar panel first opens, not at sign-in. Google Identity Services' token client gives a
 // short-lived token (about an hour) for the calendar.events scope; once the person has agreed, a new
-// one comes without asking again. The token is kept in memory and for this tab only (sessionStorage,
-// owner choice 2026-10-19), so a reload within the hour needs no Google window; it is dropped when
-// the person signs out or another signs in, when Google refuses it, and when it runs out. Loaded
-// only on the published site.
+// one comes without asking again. The token is kept in memory and on this device until it runs out
+// (localStorage, owner choice 2026-10-19 "Remember for the hour", job 107), so a reload, a new tab
+// or reopening the browser within the hour needs no Google window; it is dropped when the person
+// signs out or another signs in, when Google refuses it, and when it runs out. Loaded only on the
+// published site.
 
 /** The OAuth client ID (not secret), set in .env.production. Without it the panel says it isn't connected yet. */
 const CLIENT_ID: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -41,11 +42,12 @@ let script: Promise<Gis> | null = null;
 /** Google's script once loaded, so a click can ask for access straight away (browsers block windows opened after a wait). */
 let loaded: Gis | null = null;
 
-// simple: kept for this tab, so it covers reloads in the same tab within the hour; a new tab, a new
-// day or another device still gets Google's quick window. Reaching sessionStorage can throw (blocked).
-const tab = () => sessionStorage;
+// simple: kept until it runs out (about an hour), so Google's quick window still shows about once an
+// hour of use, and on another device; a server-held refresh key would end that. Reaching
+// localStorage can throw (blocked).
+const device = () => localStorage;
 
-// Signing out (or another person signing in) drops the token from memory; the tab's copy is dropped
+// Signing out (or another person signing in) drops the token from memory; the device's copy is dropped
 // by the sign-in watcher that is always loaded (src/sync/firebase.ts watchUser).
 onAuthStateChanged(getAuth(), (user) => {
   if (cached?.user !== user?.uid) cached = null;
@@ -96,7 +98,7 @@ function request(gis: Gis): Promise<string> {
         // An odd expiry (not a number, or Infinity) isn't kept, so it is never taken as never running out.
         if (user && Number.isFinite(expiresAt)) {
           cached = { token: r.access_token, expiresAt, user };
-          keepAccess(tab, cached);
+          keepAccess(device, cached);
         }
         done(r.access_token);
       },
@@ -108,10 +110,10 @@ function request(gis: Gis): Promise<string> {
   });
 }
 
-/** A token for the person's calendar: the one kept (in memory or this tab) while it has over a minute left, else a new one. */
+/** A token for the person's calendar: the one kept (in memory or on this device) while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
   const user = getAuth().currentUser?.uid ?? null;
-  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(tab, user);
+  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(device, user);
   if (cached) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
@@ -129,5 +131,5 @@ export function token(): Promise<string> {
 
 export function forget() {
   cached = null;
-  dropAccess(tab);
+  dropAccess(device);
 }

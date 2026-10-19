@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { deleteUser, getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
-import { readAccess } from '../model/calendar';
+import { dropAccess, keepAccess, readAccess } from '../model/calendar';
 import {
   addDoc,
   clearIndexedDbPersistence,
@@ -54,9 +54,16 @@ export type { User };
 
 export function watchUser(onChange: (user: User | null) => void) {
   return onAuthStateChanged(auth, (user) => {
-    // Every sign-out or change of person drops the calendar access kept for this tab (job 103), here
-    // because this is loaded at start, before the calendar ever shows (on a phone, in the ⋯ sheet).
-    readAccess(() => sessionStorage, user?.uid ?? null);
+    // Every sign-out or change of person drops the calendar access kept on this device (jobs 103,
+    // 107), here because this is loaded at start, before the calendar ever shows (on a phone, in the
+    // ⋯ sheet). Firebase tells every tab of the browser, so a sign-out in one drops it in all.
+    const uid = user?.uid ?? null;
+    readAccess(() => localStorage, uid);
+    // simple: moves a copy kept for the tab before job 107 to the device (same checks: same person,
+    // over a minute left), so nobody connected is asked again; can go after 2026-11-19.
+    const old = readAccess(() => sessionStorage, uid);
+    dropAccess(() => sessionStorage);
+    if (old) keepAccess(() => localStorage, old);
     onChange(user);
   });
 }

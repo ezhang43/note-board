@@ -108,7 +108,7 @@ test.describe('on a phone-sized screen', () => {
     await expect(page.locator('[data-col-id]')).toHaveCount(0);
   });
 
-  test('⋯ holds the rest: dark mode, snap, text size and the other board actions', async ({ page }) => {
+  test('⋯ holds the rest: appearance (dark mode), snap, text size and the other board actions', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'More', exact: true }).tap();
     const menu = page.getByRole('dialog', { name: 'More' });
@@ -117,6 +117,7 @@ test.describe('on a phone-sized screen', () => {
     const m = (await menu.boundingBox())!;
     expect(m.x).toBeGreaterThanOrEqual(0);
     expect(m.x + m.width).toBeLessThanOrEqual(390);
+    await menu.getByRole('button', { name: 'Appearance', exact: true }).tap();
     await menu.getByRole('button', { name: 'Dark mode' }).tap();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     // Tapping the board closes it.

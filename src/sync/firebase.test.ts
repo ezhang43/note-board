@@ -155,13 +155,18 @@ describe('opening your board offline with unsent changes (job 92)', () => {
   });
 });
 
-describe('the calendar access kept for this tab (job 103, owner check of PR #98)', () => {
+describe('the calendar access kept on this device (job 103, owner check of PR #98; job 107)', () => {
   // The sign-in watcher is loaded at start, so every sign-out or change of person drops it, even
-  // before the calendar (on a phone, in the ⋯ sheet) has ever been shown.
+  // before the calendar (on a phone, in the ⋯ sheet) has ever been shown. Firebase tells every tab
+  // of the browser, so a sign-out in another tab drops it too.
   const data = new Map<string, string>();
+  const tab = new Map<string, string>();
+  const fake = (m: Map<string, string>) => ({ getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
   beforeEach(() => {
     data.clear();
-    vi.stubGlobal('sessionStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) });
+    tab.clear();
+    vi.stubGlobal('localStorage', fake(data));
+    vi.stubGlobal('sessionStorage', fake(tab));
     data.set(KEY, JSON.stringify({ token: 't', expiresAt: Date.now() + 3_000_000, user: 'u1' }));
   });
   const fire = (u: { uid: string } | null) => {
@@ -186,8 +191,30 @@ describe('the calendar access kept for this tab (job 103, owner check of PR #98)
     expect(data.has(KEY)).toBe(false);
   });
 
+  it('a copy kept for the tab before job 107 (sessionStorage) moves to the device for the same person', () => {
+    tab.set(KEY, data.get(KEY)!);
+    data.clear();
+    fire({ uid: 'u1' });
+    expect(tab.has(KEY)).toBe(false);
+    expect(JSON.parse(data.get(KEY)!)).toMatchObject({ token: 't', user: 'u1' });
+  });
+
+  it('a copy kept for the tab before job 107 is only removed for another person, or on sign-out', () => {
+    tab.set(KEY, data.get(KEY)!);
+    data.clear();
+    fire({ uid: 'u2' });
+    expect(tab.has(KEY)).toBe(false);
+    expect(data.has(KEY)).toBe(false);
+    tab.set(KEY, JSON.stringify({ token: 't', expiresAt: Date.now() + 3_000_000, user: 'u1' }));
+    fire(null);
+    expect(tab.has(KEY)).toBe(false);
+    expect(data.has(KEY)).toBe(false);
+  });
+
   it('blocked storage never stops the sign-in watcher', () => {
-    vi.stubGlobal('sessionStorage', { getItem: () => { throw new Error('blocked'); }, setItem() {}, removeItem: () => { throw new Error('blocked'); } });
+    const blocked = { getItem: () => { throw new Error('blocked'); }, setItem() {}, removeItem: () => { throw new Error('blocked'); } };
+    vi.stubGlobal('localStorage', blocked);
+    vi.stubGlobal('sessionStorage', blocked);
     expect(fire(null)).toEqual([null]);
   });
 });

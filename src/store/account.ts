@@ -1,6 +1,7 @@
 import { planShares, type ShareOwner } from '../model/account';
 import { BOARD_KEY, VIEW_KEY } from '../model/persist';
 import { OPEN_BOARD_KEY } from '../model/workspace';
+import { ACCESS_KEY } from '../model/calendar';
 import { baseKey, ownBoardsKey, sharesKey } from './sharing';
 import { dataKey, LIST_KEY } from './versions';
 
@@ -57,8 +58,9 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
  * account is deleted: the boards, which board is open and where it was looked at, version history
  * kept on the device, their list of shares (`kept`: its saved text) and each share's last agreed
  * version, and their own-boards list. Never another account's, nor this device's settings (dark
- * mode, text size, the tour, the focus timer, the calendar's width). `prefix`: a demo person's keys
- * start with it.
+ * mode, text size, the tour, the focus timer, the calendar's width). The Google Calendar access kept
+ * on the device (job 107) goes too: it isn't a setting (one per device, so a demo person's has no prefix).
+ * `prefix`: a demo person's keys start with it.
  */
 export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = ''): string[] {
   let keptIds: string[] = [];
@@ -70,6 +72,7 @@ export function accountKeys(keys: string[], uid: string, shareIds: string[], kep
   }
   const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, sharesKey(uid), ownBoardsKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
   return keys.filter((key) => {
+    if (key === ACCESS_KEY) return true;
     if (!key.startsWith(prefix)) return false;
     const k = key.slice(prefix.length);
     return exact.has(k) || k.startsWith(dataKey(''));

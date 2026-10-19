@@ -1,8 +1,9 @@
-import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
+import { DEFAULT_HOTKEYS } from './hotkeys';
+import { CARD_MAX_W, CARD_MIN_W, GRID, MAX_ZOOM, MIN_ZOOM, PHONE_MARGIN, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
-  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', colorTheme: 'honey', fontSize: 'normal' };
+  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', colorTheme: 'honey', fontSize: 'normal', hotkeys: DEFAULT_HOTKEYS };
 }
 
 export function clampZoom(zoom: number): number {
@@ -17,6 +18,22 @@ export function screenToBoard(view: View, p: Point): Point {
 export function panBy(view: View, dx: number, dy: number): View {
   if (dx === 0 && dy === 0) return view;
   return { ...view, panX: view.panX + dx, panY: view.panY + dy };
+}
+
+/**
+ * How far to move the board (screen pixels) so `box` sits inside `area` with `margin` to spare:
+ * just enough, and none if it already does. A box too big to fit shows its top and left edge.
+ */
+export function panToShow(
+  box: { left: number; top: number; right: number; bottom: number },
+  area: { left: number; top: number; right: number; bottom: number },
+  margin: number,
+): Point {
+  const fit = (lo: number, hi: number, from: number, to: number) => {
+    const move = Math.max(Math.min(0, hi - margin - to), lo + margin - from);
+    return move || 0; // never -0
+  };
+  return { x: fit(area.left, area.right, box.left, box.right), y: fit(area.top, area.bottom, box.top, box.bottom) };
 }
 
 /** Zoom to `zoom` (clamped) while keeping the board point under screen point `at` in place. */
@@ -112,4 +129,22 @@ export function gridStyle(view: View): { size: number; offsetX: number; offsetY:
  */
 export function viewFitting(rects: Rect[], size: Size, view: View): View {
   return viewShowing(rects, size, { ...view, zoom: 1 }, MIN_ZOOM);
+}
+
+/** Phone (owner request): the width, in board pixels, that fills a screen `screenW` wide at `zoom` less a margin each side, within the card size limits. */
+export function phoneCardWidth(screenW: number, zoom: number): number {
+  return Math.min(CARD_MAX_W, Math.max(CARD_MIN_W, Math.round((screenW - 2 * PHONE_MARGIN) / zoom)));
+}
+
+/**
+ * Phone (owner request): the view that fills the screen's width with the block `rect` (within the
+ * zoom limits), its left edge at the margin (centred when it is narrower even at 250%). The board
+ * point at screen point `at` (the line being tapped) stays at the same height, or is brought back
+ * on screen when it was off it.
+ */
+export function viewFillingWidth(view: View, size: Size, rect: Rect, at: Point): View {
+  const zoomed = zoomTo(view, at, (size.width - 2 * PHONE_MARGIN) / rect.w);
+  const left = Math.max(PHONE_MARGIN, (size.width - rect.w * zoomed.zoom) / 2);
+  const top = Math.min(size.height - PHONE_MARGIN, Math.max(PHONE_MARGIN, at.y));
+  return panBy(zoomed, Math.round(left - rect.x * zoomed.zoom) - zoomed.panX, Math.round(top - at.y));
 }

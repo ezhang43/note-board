@@ -2,10 +2,10 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { deleteToken, saveToken } from './auth';
+import { WEB_API_KEY, deleteToken, saveToken } from './auth';
 import { addItems } from './edits';
 import { fakeFirestore } from './fakeFirestore';
-import { activityLog, activityPath, boardsLoader, boardsWriter, deleteAllowed, runCheck, setDeleteAllowed, settingsPath } from './main';
+import { activityLog, activityPath, boardsLoader, boardsWriter, deleteAllowed, runCheck, setDeleteAllowed, settingsPath, signInHelper } from './main';
 import { ownRaw } from './sample';
 
 describe('the connector’s sign-in', () => {
@@ -183,5 +183,107 @@ describe('the "Let Claude delete" setting', () => {
       await writeFile(at, bad);
       expect(await deleteAllowed(at), bad).toBe(false);
     }
+  });
+});
+
+describe('signing in from inside Claude (the sign_in and sign_out tools)', () => {
+  it('sign_in opens the sign-in page in the browser and answers at once, with its address', async () => {
+    const opened: string[] = [];
+    const { signIn, close } = signInHelper(await tempFile(), (url) => opened.push(url), () => {});
+    try {
+      const answer = await signIn();
+      expect(opened).toHaveLength(1);
+      expect(answer).toContain(opened[0]);
+      expect(new URL(opened[0]).hostname).toBe('localhost');
+      expect((await fetch(opened[0])).status).toBe(200);
+    } finally {
+      close();
+    }
+  });
+
+  it('a second sign_in stops the first page, so only the newest one works', async () => {
+    const opened: string[] = [];
+    const { signIn, close } = signInHelper(await tempFile(), (url) => opened.push(url), () => {});
+    try {
+      await signIn();
+      await signIn();
+      await expect(fetch(opened[0])).rejects.toThrow();
+      expect((await fetch(opened[1])).status).toBe(200);
+    } finally {
+      close();
+    }
+  });
+
+  it('two sign_in calls at the same moment still leave only one page working', async () => {
+    const opened: string[] = [];
+    const { signIn, close } = signInHelper(await tempFile(), (url) => opened.push(url), () => {});
+    try {
+      await Promise.all([signIn(), signIn()]);
+      const works = await Promise.all(opened.map((url) => fetch(url).then((r) => r.status === 200, () => false)));
+      expect(works.filter(Boolean)).toHaveLength(1);
+    } finally {
+      close();
+    }
+  });
+
+  it('a damaged API key in the saved sign-in falls back to the app’s web key', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me', apiKey: 'not a key' });
+    const opened: string[] = [];
+    const { signIn, close } = signInHelper(file, (url) => opened.push(url), () => {});
+    try {
+      await signIn();
+      expect(await (await fetch(opened[0])).text()).toContain(WEB_API_KEY);
+    } finally {
+      close();
+    }
+  });
+
+  it('the sign-in handed in by the page is saved, and then used without a restart', async () => {
+    const file = await tempFile();
+    const opened: string[] = [];
+    const lines: string[] = [];
+    const { signIn, close } = signInHelper(file, (url) => opened.push(url), (l) => lines.push(l));
+    try {
+      await signIn();
+      const u = new URL(opened[0]);
+      const res = await fetch(`${u.origin}/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: u.origin },
+        body: JSON.stringify({ nonce: u.searchParams.get('n'), refreshToken: 'R', uid: 'me', email: 'me@example.com' }),
+      });
+      expect(res.status).toBe(200);
+      await vi.waitFor(() => expect(lines.join('\n')).toContain('Signed in as me@example.com'));
+      expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ refreshToken: 'R', uid: 'me', email: 'me@example.com' });
+      expect((await boardsLoader(file, fakeGoogle(ownRaw()))()).email).toBe('me@example.com');
+    } finally {
+      close();
+    }
+  });
+
+  it('sign_in keeps the API key the saved sign-in was made with', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me', apiKey: 'AIzaSecondKey-0123456789abcdefgh' });
+    const opened: string[] = [];
+    const { signIn, close } = signInHelper(file, (url) => opened.push(url), () => {});
+    try {
+      await signIn();
+      expect(await (await fetch(opened[0])).text()).toContain('AIzaSecondKey-0123456789abcdefgh');
+    } finally {
+      close();
+    }
+  });
+
+  it('sign_out deletes the saved sign-in, and says so when there was none', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me' });
+    const { signOut } = signInHelper(file, () => {}, () => {});
+    expect(await signOut()).toMatch(/Signed out/);
+    await expect(boardsLoader(file, fakeGoogle(ownRaw()))()).rejects.toThrow(/Not signed in/);
+    expect(await signOut()).toMatch(/Not signed in/);
+  });
+
+  it('"not signed in" tells the person to sign in from Claude', async () => {
+    await expect(boardsLoader(await tempFile(), fakeGoogle(ownRaw()))()).rejects.toThrow(/sign in to BusyAnts.*sign_in/);
   });
 });

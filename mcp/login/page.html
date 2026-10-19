@@ -40,9 +40,9 @@
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ nonce: NONCE, refreshToken: user.refreshToken, uid: user.uid, email: user.email ?? undefined }),
           });
-          status.textContent = res.ok ? 'Done, you can close this tab.' : 'The helper refused this sign-in. Run npm run mcp:login again.';
+          status.textContent = res.ok ? 'Done. You can close this tab and go back to Claude.' : 'The connector refused this sign-in. Start the sign-in again.';
         } catch (e) {
-          status.textContent = `That didn’t work: ${e && e.code ? e.code : e}. Run npm run mcp:login again to retry.`;
+          status.textContent = `That didn’t work: ${e && e.code ? e.code : e}. Start the sign-in again to retry.`;
           button.disabled = false;
         }
       });

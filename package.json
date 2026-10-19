@@ -18,7 +18,8 @@
     "mcp:logout": "npm run mcp:build --silent && node mcp/dist/server.js logout",
     "mcp:check": "npm run mcp:build --silent && node mcp/dist/server.js check",
     "mcp:delete-on": "npm run mcp:build --silent && node mcp/dist/server.js delete-on",
-    "mcp:delete-off": "npm run mcp:build --silent && node mcp/dist/server.js delete-off"
+    "mcp:delete-off": "npm run mcp:build --silent && node mcp/dist/server.js delete-off",
+    "mcp:pack": "npm run mcp:build --silent && node mcp/pack.mjs && mcpb pack mcp/dist/bundle mcp/dist/busyants.mcpb"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -29,6 +30,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",

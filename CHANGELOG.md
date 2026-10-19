@@ -1,5 +1,11 @@
 # Changelog
 
+## Dragging and resizing keep rows together (2026-10-19)
+
+- Drag a block along a row and the blocks in that row now slide sideways out of its way and keep their left-to-right order, instead of jumping above or below the row. Drop a block onto its neighbour and they swap places.
+- Blocks only make room for where the dragged block is now: once it has moved past them, they spring back to their own spots.
+- Widening a card or container does the same when you let go: its neighbours in the row slide sideways, not down. Blocks still never overlap. Your saved boards are not changed until you move something.
+
 ## Phone: press and hold to move a list item (2026-10-19)
 
 - On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createCard, createColumn } from './cards';
-import type { MeasuredHeight } from './layout';
+import { BLOCK_GAP } from './constants';
+import { overlaps } from './geometry';
+import { blockRect, settle, shiftRow, type MeasuredHeight } from './layout';
 import { dropBoard, movedBlocks, recordPushes, returnPushes } from './placement';
 import type { Board } from './types';
 
@@ -87,5 +89,113 @@ describe('where a dragged block lands', () => {
     const r = dropBoard(b, drag('a', 'card', 0, 400, ['b']), measured);
     expect(r.ids).toEqual(['a', 'b']);
     expect(r.board.cards.b).toMatchObject({ x: 300, y: 400 });
+  });
+});
+
+describe('blocks in the same row slide sideways and spring back (owner decision 2026-10-19)', () => {
+  const drag = (id: string, kind: 'card' | 'column', x: number, y: number, startX = 0, startY = 0) => ({ id, kind, x, y, startX, startY, group: [] });
+  /** Four containers in a row, 280 wide and 220 tall, 20 apart: a, b, c, d. */
+  function row() {
+    let b = B.createBoard();
+    for (const [i, id] of ['a', 'b', 'c', 'd'].entries()) {
+      b = B.addColumn(b, { ...createColumn(id), x: i * 300, y: 0 });
+      heights[id] = 220;
+    }
+    return b;
+  }
+  const xs = (b: Board, ids: string[]) => ids.map((id) => B.blockOf(b, id)!.x);
+  const ys = (b: Board, ids: string[]) => ids.map((id) => B.blockOf(b, id)!.y);
+  function expectNoOverlap(b: Board) {
+    const rects = b.order.map((id) => blockRect(b, id, measured)!);
+    for (let i = 0; i < rects.length; i++)
+      for (let j = i + 1; j < rects.length; j++) expect(overlaps(rects[i], rects[j], BLOCK_GAP - 1), `${b.order[i]} and ${b.order[j]}`).toBe(false);
+  }
+
+  it('a block dragged onto its neighbour swaps places with it, and the row stays a row', () => {
+    const r = dropBoard(row(), drag('a', 'column', 300, 0), measured);
+    expect(xs(r.board, ['b', 'a', 'c', 'd'])).toEqual([0, 300, 600, 900]);
+    expect(ys(r.board, ['a', 'b', 'c', 'd'])).toEqual([0, 0, 0, 0]);
+  });
+
+  it('dragged across the row step by step, the others keep their left-to-right order and stay in the row', () => {
+    const start = row();
+    for (let x = 20; x <= 900; x += 20) {
+      const { board } = dropBoard(start, drag('a', 'column', x, 0), measured);
+      expect(ys(board, ['a', 'b', 'c', 'd']), `at ${x}`).toEqual([0, 0, 0, 0]);
+      const others = xs(board, ['b', 'c', 'd']);
+      expect(others, `at ${x}`).toEqual([...others].sort((p, q) => p - q));
+      expectNoOverlap(board);
+    }
+    const end = dropBoard(start, drag('a', 'column', 900, 0), measured).board;
+    expect(xs(end, ['b', 'c', 'd', 'a'])).toEqual([0, 300, 600, 900]);
+  });
+
+  it('blocks spring back to their own spot once the dragged block has moved past them', () => {
+    const start = row();
+    const over = dropBoard(start, drag('d', 'column', 600, 0, 900, 0), measured);
+    expect(over.bumped.c).toEqual({ x: 900, y: 0 });
+    const away = dropBoard(start, drag('d', 'column', 900, 600, 900, 0), measured);
+    expect(away.bumped).toEqual({});
+    expect(xs(away.board, ['a', 'b', 'c'])).toEqual([0, 300, 600]);
+  });
+
+  it('a block below the dragged one (not in its row) still just moves out of the way', () => {
+    let b = row();
+    b = loose(b, 'n', 0, 540, 300);
+    // a now covers only the top 40px of n: not the same row.
+    const r = dropBoard(b, drag('a', 'column', 0, 360), measured);
+    expect(r.board.cards.n.x).toBe(0);
+    expect(r.board.cards.n.y).toBeGreaterThan(540);
+    expectNoOverlap(r.board);
+  });
+
+  it('widening a card pushes its row neighbours sideways, keeping their order, not down', () => {
+    let b = loose(B.createBoard(), 'tuesday', 0, 0, 160);
+    b = loose(b, 'notes', 260, 0, 160);
+    b = loose(b, 'later', 520, 20, 160);
+    const wide = shiftRow(B.resizeCard(b, 'tuesday', 400), 'tuesday', measured);
+    expect(xs(wide, ['tuesday', 'notes', 'later'])).toEqual([0, 420, 680]);
+    expect(ys(wide, ['tuesday', 'notes', 'later'])).toEqual([0, 0, 20]);
+    expectNoOverlap(settle(wide, measured, ['tuesday']));
+    // Shrinking it back before letting go: nothing was moved yet, so they stay where they were.
+    const same = B.resizeCard(b, 'tuesday', 240);
+    expect(shiftRow(same, 'tuesday', measured)).toBe(same);
+  });
+
+  it('widening a card past its neighbour’s middle still pushes the neighbour right, never to its left', () => {
+    let b = loose(B.createBoard(), 'tuesday', 0, 0, 160);
+    b = loose(b, 'notes', 260, 0, 160);
+    const wide = shiftRow(B.resizeCard(b, 'tuesday', 800), 'tuesday', measured);
+    expect(wide.cards.notes).toMatchObject({ x: 820, y: 0 });
+  });
+
+  it('blocks stacked beside the dragged block move over together, not spread out', () => {
+    let b = B.addColumn(B.createBoard(), { ...createColumn('a'), x: 0, y: 0 });
+    heights.a = 600;
+    b = loose(b, 'n1', 300, 0, 160);
+    b = loose(b, 'n2', 300, 200, 160);
+    const r = dropBoard(b, drag('a', 'column', 100, 0), measured);
+    expect(xs(r.board, ['n1', 'n2'])).toEqual([400, 400]);
+    expect(ys(r.board, ['n1', 'n2'])).toEqual([0, 200]);
+  });
+
+  it('a dragged card that will be moved off a container does not shift its row first', () => {
+    let b = B.addColumn(B.createBoard(), { ...createColumn('col'), x: 0, y: 0 });
+    heights.col = 220;
+    b = loose(b, 'n', 300, 0, 160);
+    b = loose(b, 'm', 0, 600, 160);
+    // m dropped over the container's right edge and touching n: m is moved off the container, so n
+    // is not slid sideways for a spot m never takes (where m then lands is the old nearest-free-spot rule).
+    const r = dropBoard(b, drag('m', 'card', 240, 0, 0, 600), measured);
+    expect(r.board.cards.n.x).toBe(300);
+    expectNoOverlap(r.board);
+  });
+
+  it('a single dragged card still never pushes a container sideways', () => {
+    let b = row();
+    b = loose(b, 'n', 0, 300, 100);
+    const r = dropBoard(b, drag('n', 'card', 300, 0, 0, 300), measured);
+    expect(xs(r.board, ['a', 'b', 'c', 'd'])).toEqual([0, 300, 600, 900]);
+    expectNoOverlap(r.board);
   });
 });

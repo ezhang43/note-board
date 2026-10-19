@@ -17,7 +17,7 @@ export const SERIES_ZONE = 'This series is in another time zone: change all of i
 export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 
-/** Where the calendar is and how to get a token for it (kept in memory and for this tab only, never in localStorage). */
+/** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
 export interface CalendarSource {
   base: string;
   token(): Promise<string>;
@@ -289,14 +289,14 @@ function defaultSource(): CalendarSource | null {
   // Locally, ?demo-calendar=blocked (or =refused) makes the first ask for access fail as Google's
   // window does when it is blocked or closed (or access isn't given), to try Connect Google Calendar.
   let noAccess = new URLSearchParams(location.search).get('demo-calendar');
-  // Kept for this tab for an hour, as on the published site, so a reload doesn't ask again.
-  const tab = () => sessionStorage;
+  // Kept on this device for an hour, as on the published site, so a reload or new tab doesn't ask again.
+  const tab = deviceStorage;
   return {
     base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
     async token() {
       const kept = readAccess(tab, demo.uid);
       const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
-      noAccess = null; // only the first ask: in a tab already connected, the setting has no effect
+      noAccess = null; // only the first ask: once connected (kept for every tab, job 107), the setting has no effect
       if (kept) return kept.token;
       if (reason) throw new NoAccess(reason);
       keepAccess(tab, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
@@ -307,7 +307,7 @@ function defaultSource(): CalendarSource | null {
 }
 
 const source = defaultSource();
-function deviceStorage(): WidthStorage | null {
+function deviceStorage(): Storage | null {
   try {
     return window.localStorage;
   } catch {

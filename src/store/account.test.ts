@@ -132,6 +132,8 @@ describe('accountKeys', () => {
       'note-board:tour-done',
       'note-board:pomodoro',
       'note-board:calendar-width',
+      // The calendar access (job 107): not a setting, so it goes.
+      'note-board:calendar-access',
       'unrelated',
     ];
   });
@@ -149,6 +151,7 @@ describe('accountKeys', () => {
         'note-board:own-boards:me',
         'note-board:share-base:s1',
         'note-board:share-base:s2',
+        'note-board:calendar-access',
       ].sort(),
     );
   });
@@ -158,7 +161,8 @@ describe('accountKeys', () => {
   });
 
   it('for a demo person, only their own prefixed keys', () => {
-    const demo = ['demo-alice:note-board:v1', 'demo-alice:note-board:shares:demo-alice', 'demo-bob:note-board:v1', 'note-board:v1', 'note-board:tour-done'];
-    expect(accountKeys(demo, 'demo-alice', [], null, 'demo-alice:').sort()).toEqual(['demo-alice:note-board:shares:demo-alice', 'demo-alice:note-board:v1']);
+    const demo = ['demo-alice:note-board:v1', 'demo-alice:note-board:shares:demo-alice', 'demo-bob:note-board:v1', 'note-board:v1', 'note-board:tour-done', 'note-board:calendar-access'];
+    // The calendar access is kept once for the device, not per demo person: it goes too.
+    expect(accountKeys(demo, 'demo-alice', [], null, 'demo-alice:').sort()).toEqual(['demo-alice:note-board:shares:demo-alice', 'demo-alice:note-board:v1', 'note-board:calendar-access']);
   });
 });

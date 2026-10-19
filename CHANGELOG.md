@@ -1,5 +1,12 @@
 # Changelog
 
+## Google Calendar remembered for the hour (2026-10-19)
+
+- Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.
+- Google's quick window still shows about once an hour, when the access runs out, and on another device.
+- The access is dropped when you sign out (in any tab), when someone else signs in, when Google refuses it, after about an hour, and when you delete your account. It is never in a backup.
+- The Privacy policy says so.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

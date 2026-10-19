@@ -149,6 +149,22 @@ test('deleting signs the person out with a note, deletes the board they shared f
   expect([...alice.errors, ...bob.errors]).toEqual([]);
 });
 
+test('deleting also removes the Google Calendar access kept on this device (job 107)', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  const KEY = 'note-board:calendar-access';
+  // Connected: the calendar keeps its access on the device for the hour.
+  await alice.locator('.corner-controls').getByRole('button', { name: 'Google Calendar' }).click();
+  await expect.poll(() => alice.evaluate((k) => localStorage.getItem(k), KEY)).not.toBeNull();
+  await alice.keyboard.press('Escape');
+
+  await openPanel(alice);
+  await panel(alice).getByLabel('Type DELETE to confirm').fill('DELETE');
+  await panel(alice).getByRole('button', { name: 'Delete my account' }).click();
+  await expect(alice.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 8000 });
+  expect(await alice.evaluate((k) => localStorage.getItem(k), KEY)).toBeNull();
+  expect(alice.errors).toEqual([]);
+});
+
 test('if deleting fails, nothing is deleted on the device and the panel says to try again', async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`);

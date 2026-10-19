@@ -2,7 +2,7 @@
 
 ## Emil Kowalski's design skills (2026-10-19)
 
-- Added four design and motion skills by Emil Kowalski (MIT licence, credit and licence kept in `.claude/skills/EMIL-KOWALSKI-LICENSE.md`): design engineering, review animations, improve animations and animation performance. From now on, any UI or motion work follows them, but `SPEC.md` and your recorded decisions win where they disagree. The cursor and focus-ring rules are unchanged, and the end-of-step routine now runs a light design check on UI changes.
+- Added five design, motion and phone-feel skills by Emil Kowalski (MIT licence, credit and licence kept in `.claude/skills/EMIL-KOWALSKI-LICENSE.md`): design engineering, review animations, improve animations, animation performance and mobile native. From now on, any UI or motion work, on the computer and on the phone layout, follows them alongside Impeccable. `SPEC.md` and your recorded decisions come first, then Impeccable for the look, then these for motion and feel. The cursor and focus-ring rules are unchanged, and the end-of-step routine now runs a light design check on UI changes.
 - Nothing in the app changes in this step; the polish fixes to the current app come in a separate pull request. Your boards are untouched.
 
 ## Up and down arrows on checklist items (2026-10-18)

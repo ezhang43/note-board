@@ -1,6 +1,6 @@
 # Emil Kowalski's skills: credit and licence
 
-The skills `emil-design-eng`, `review-animations`, `improve-animations` and `animation-performance` in this folder are copied unchanged from https://github.com/emilkowalski/skills by Emil Kowalski, used under the MIT licence below.
+The skills `emil-design-eng`, `review-animations`, `improve-animations`, `animation-performance` and `mobile-native` in this folder are copied unchanged from https://github.com/emilkowalski/skills by Emil Kowalski, used under the MIT licence below.
 
 MIT License
 

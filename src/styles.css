@@ -2141,6 +2141,14 @@ a.cal-open { align-self: flex-start; }
   .completed-head, .completed-actions { gap: 8px; }
   .completed-toggle, .uncheck-all { height: 40px; }
 
+  /*
+   * A card's or container's collapse arrow and trash can show only on the selected one (owner request,
+   * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
+   * around them take no taps: a tap on another card selects it, never deletes it.
+   */
+  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
+
   /* The welcome tour. */
   .tour-head .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
   .tour-actions button { height: 44px; }

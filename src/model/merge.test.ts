@@ -377,6 +377,15 @@ describe('Journal formatting edited on two devices at once (job 119)', () => {
     expect(shown(merged)).toEqual(under('hello'));
   });
 
+  it('one clears the formatting, the other types: the typing is kept with its formatting, the same either way round', () => {
+    const base = set(sample(), 'hello', bold('hello'));
+    const cleared = set(base, 'hello');
+    const typed = set(base, 'hello there', bold('hello there'));
+    const one = mergeBoards(base, cleared, typed);
+    expect(shown(one)).toEqual(bold('hello there'));
+    expect(one.cards.n1).toEqual(mergeBoards(base, typed, cleared).cards.n1);
+  });
+
   it('a note neither side changed keeps its saved formatting, even one that no longer fits its text', () => {
     const stale = B.updateCard(set(sample(), 'hello'), 'n1', (c) => ({ ...c, rich: bold('old words') }) as Card);
     const merged = mergeBoards(stale, B.renameBoard(stale, 'Trip'), B.updateCard(stale, 'n2', (c) => ({ ...c, x: 400 })));

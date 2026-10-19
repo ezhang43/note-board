@@ -7,7 +7,7 @@
 - In a list, Enter adds the next item, Enter on an empty item ends the list, and Tab / Shift+Tab indent and outdent.
 - Only the Journal has this. Everywhere else (other notes, search, export, copying, the note's card on the Journal board) the words show as plain text, with lists as "•" and "1.".
 - The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
-- A note's formatting always stays with its words when edits from two devices meet: on your own devices the latest save wins, words and formatting together, and on a shared board the formatting kept is always one that matches the words kept.
+- When two edits of the same note meet, its formatting now always comes with the words that are kept, so a note can no longer end up shown (and then saved) as plain text that way. On your own devices this was already so: the latest save wins, words and formatting together, as with every board, so an edit made on the other device at the same moment is still lost.
 
 ## Phone: press and hold to move a list item (2026-10-19)
 

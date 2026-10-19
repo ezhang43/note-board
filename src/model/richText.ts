@@ -186,12 +186,8 @@ export function hasFormatting(rich: Rich): boolean {
 
 /** A Journal note's body to show: its saved formatting while that still matches its text, else the text, plain. */
 export function journalRich(text: string, rich: Rich | undefined): Rich {
-  return rich && richFits(text, rich) ? rich : fromPlain(journalBody(text));
-}
-
-/** True when this formatting belongs to this note text (its plain text is the text's body). */
-export function richFits(text: string, rich: Rich): boolean {
-  return rich.length > 0 && plainOf(rich) === journalBody(text);
+  const body = journalBody(text);
+  return rich && rich.length && plainOf(rich) === body ? rich : fromPlain(body);
 }
 
 /** The plain text of a selection, without list markers (for copy and cut). */

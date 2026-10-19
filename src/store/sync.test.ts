@@ -724,8 +724,8 @@ describe('Journal formatting edited on two devices at once (job 119)', () => {
     const device = (client: string) => {
       const store = createStore(null, (fn) => fn());
       const fake = fakeRemote();
-      startSync(store, fake.remote, { client, onReady: () => {}, onError: () => {} });
-      return { store, fake };
+      const sync = startSync(store, fake.remote, { client, onReady: () => {}, onError: () => {} });
+      return { store, fake, sync };
     };
     const note = (s: ReturnType<typeof createStore>) => {
       const board = s.workspace().boards[s.getState().ui.journalBoard!];
@@ -754,5 +754,7 @@ describe('Journal formatting edited on two devices at once (job 119)', () => {
       expect(journalRich(n.text, n.rich)).toBe(n.rich);
     }
     expect(note(a.store)).toEqual(note(b.store));
+    a.sync.stop();
+    b.sync.stop();
   });
 });

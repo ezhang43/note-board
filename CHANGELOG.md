@@ -1,5 +1,12 @@
 # Changelog
 
+## The Claude connector in one file, with sign-in from Claude (2026-10-19)
+
+- The BusyAnts connector for Claude can now be made into one file, `busyants.mcpb` (`npm run mcp:pack`). Anyone with Claude Desktop on a Mac or Windows computer opens that file to install it: no Node, no project folder, no settings to edit.
+- Claude can sign you in: ask it to "sign in to BusyAnts" and a sign-in page opens in your web browser, where you pick your own Google account. "Sign out of BusyAnts" deletes the saved sign-in. Neither changes anything on your boards.
+- The connector's instructions (`mcp/README.md`) are now written for anyone, with Mac and Windows steps.
+- Your boards, how they save and the website are not changed. An existing sign-in keeps working, and deleting stays off unless you switch it on as before.
+
 ## Rich text in the Journal (2026-10-19)
 
 - Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).

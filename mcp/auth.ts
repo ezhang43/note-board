@@ -17,7 +17,7 @@ export interface TokenFile {
   apiKey?: string;
 }
 
-export const LOGIN_AGAIN = 'Run npm run mcp:login to sign in again.';
+export const LOGIN_AGAIN = 'To sign in again, ask Claude to sign in to BusyAnts (its sign_in tool), or run npm run mcp:login.';
 
 /**
  * %APPDATA%\busyants-mcp\token.json: outside the project, in the Windows account's own folder.
@@ -75,7 +75,7 @@ function refusal(status: number, body: string): string {
     ].join('\n');
   }
   if (/TOKEN_EXPIRED|INVALID_REFRESH_TOKEN|USER_DISABLED|USER_NOT_FOUND|INVALID_GRANT/i.test(body)) return `The sign-in has expired or was revoked. ${LOGIN_AGAIN}`;
-  return `Google’s sign-in service didn’t answer properly (status ${status}). Try again in a moment; if it keeps failing, ${LOGIN_AGAIN.toLowerCase()}`;
+  return `Google’s sign-in service didn’t answer properly (status ${status}). Try again in a moment; if it keeps failing, ask Claude to sign in to BusyAnts again (its sign_in tool), or run npm run mcp:login.`;
 }
 
 /**

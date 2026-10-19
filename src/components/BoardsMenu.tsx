@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { shownName } from '../model/board';
+import { hiddenJournal } from '../model/journal';
 import { boardRights } from '../model/sharing';
 import { boardTree } from '../model/workspace';
 import { appStore, useAppState } from '../store/appStore';
@@ -31,7 +32,10 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
     return () => window.removeEventListener('pointerdown', away, true);
   }, [open]);
 
-  const rows = open ? boardTree(appStore.workspace()) : [];
+  const sharesKnown = useAppState((s) => s.ui.sharesKnown);
+  // The Journal panel's own board stays out of the list (owner, 2026-10-18), unless it is the one open.
+  const hidden = open && sharesKnown ? hiddenJournal(appStore.workspace(), shares.flatMap((s) => s.boards)) : null;
+  const rows = open ? boardTree(appStore.workspace()).filter(({ id }) => id !== hidden || id === openId) : [];
   const nameOf = (id: string) => shownName(id === openId ? openName : (others[id]?.name ?? ''));
   const pick = (action: () => void) => () => {
     setOpen(false);

@@ -1,5 +1,12 @@
 # Changelog
 
+## Journal opens in a side panel (2026-10-18)
+
+- The **Journal** button now opens a Journal panel at the right, in the same spot as the Focus timer, History, Completed and Calendar (full screen on a phone). The board you are on stays open behind it. Escape, × or the button again closes it.
+- Today's note is at the top, with the cursor ready to type; earlier days are listed below it, newest first, and can be edited too. What you write is saved as before, on the board called Journal.
+- Ctrl+Z / Ctrl+Y in the panel undo and redo your journal writing only, never the board behind it.
+- A new Journal board no longer gets a card on home and is not listed in the Boards menu. A Journal board you already have, with its card on home, is left exactly as it is and still opens as a normal board.
+
 ## Daily journal (2026-10-18)
 
 - New **Journal** button, last in the row of buttons by the zoom control (on a phone: ⋯, then the Journal tile). It opens a board called Journal, with a note headed with today's date (like "Sun 18 Oct 2026") at the top and the cursor in it, ready to type. Press it again the same day and it takes you back to that note instead of adding another. Each new day adds a new note above the older ones.

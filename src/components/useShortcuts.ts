@@ -20,6 +20,10 @@ export function useShortcuts() {
       // except while a panel covers the board, where they'd change the board unseen: in the panel's own
       // box the browser undoes its typing (the board is inert then, so that can't reach it); elsewhere nothing.
       if (panelCovers() && mod && (key === 'z' || key === 'y')) return isTextField(e.target) ? undefined : run(e, () => {});
+      // In the Journal panel they step the Journal board's own history, leaving the open board as it is.
+      const inJournal = appStore.getState().ui.sidePanel === 'journal' && e.target instanceof Element && e.target.closest('.side-panel') !== null;
+      if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoJournal);
+      if (inJournal && mod && key === 'y') return run(e, appStore.redoJournal);
       if (mod && key === 'z' && !e.shiftKey) return run(e, appStore.undo);
       if (mod && key === 'y') return run(e, appStore.redo);
       if (mod && key === 'z' && e.shiftKey) return run(e, () => {}); // does nothing, on purpose

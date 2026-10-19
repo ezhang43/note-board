@@ -1,10 +1,9 @@
 import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
-import { JOURNAL_NAME, findJournalBoard, journalDateLine, journalSpot, todaysNote } from '../../model/journal';
-import { blockRect, spotForNewBlock, topLevelRects } from '../../model/layout';
-import { centreOf, screenToBoard, viewShowing } from '../../model/view';
-import type { Board, Rect } from '../../model/types';
+import { JOURNAL_NAME, findJournalBoard, hiddenJournal, journalDateLine, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
+import { spotForNewBlock } from '../../model/layout';
+import type { Board } from '../../model/types';
 import { boardNeighbor, pathTo, withoutBoard, type Workspace } from '../../model/workspace';
 import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
@@ -17,25 +16,7 @@ const blankBoard = (): Board => ({ ...B.createBoard(), name: '' });
 
 export function boardActions(ctx: StoreContext) {
   const { commit, setOthers, openBoard } = ctx;
-
-  /**
-   * Add a board here: a new board inside this one, with a card on this board that opens it.
-   * The card is placed like a new card (into the selected column, else the middle of the screen,
-   * or `centre` when given).
-   */
-  function addBoardCard(name = '', centre = ctx.screenCentre()): string {
-    const id = newId('b');
-    setOthers((o) => ({ ...o, [id]: { ...blankBoard(), name } }));
-    const card = createBoardCard(id);
-    const { board, ui } = ctx.state;
-    const selected = ui.selection.length === 1 ? ui.selection[0] : null;
-    const place =
-      B.placementForNewCard(board, selected) ??
-      ({ type: 'loose', ...spotForNewBlock(board, CARD_W, NEW_BLOCK_H.board, centre, ctx.measured) } as const);
-    commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null } });
-    ctx.requestSettle([place.type === 'column' ? place.columnId : card.id]);
-    return id;
-  }
+  const sharedIds = () => ctx.state.ui.shares.flatMap((s) => s.boards);
 
   return {
     openBoard,
@@ -48,7 +29,11 @@ export function boardActions(ctx: StoreContext) {
     pathToOpen: () => pathTo(ctx.workspace(), ctx.state.boards.open),
     /** Ctrl+arrow keys: opens the next / previous / parent / first inner board and returns its id; null (nothing opens) at an end. */
     moveBoard(move: Parameters<typeof boardNeighbor>[2]): string | null {
-      const id = boardNeighbor(ctx.workspace(), ctx.state.boards.open, move);
+      // The hidden Journal board is passed over, as in the Boards menu.
+      const ws = ctx.workspace();
+      const hidden = hiddenJournal(ws, sharedIds());
+      let id = boardNeighbor(ws, ctx.state.boards.open, move);
+      if (id && id === hidden) id = boardNeighbor(ws, id, move);
       if (id) openBoard(id);
       return id && ctx.state.boards.open === id ? id : null;
     },
@@ -59,59 +44,71 @@ export function boardActions(ctx: StoreContext) {
       openBoard(id);
       return id;
     },
-    addBoardCard: () => addBoardCard(),
     /**
-     * The Journal button (owner request, 2026-10-18): opens the person's own board called "Journal"
-     * (made inside home the first time) and puts today's dated note at the top of it with the
-     * cursor in it, or, if today's note is there, goes to it. Adding the note is one change on the
-     * Journal board (Ctrl+Z); its card on home is one change on home, as Add a sub-board (the board itself stays). Returns 'loading'
-     * (changing nothing) while it isn't yet known which boards are shared: never uses one of those.
+     * Add a board here: a new board inside this one, with a card on this board that opens it.
+     * The card is placed like a new card (into the selected column, else the middle of the screen).
      */
-    journal(): 'loading' | null {
-      if (!ctx.state.ui.sharesKnown) return 'loading';
-      ctx.updateUi({ preview: null, historyOpen: false, selection: [], itemSel: null }); // an old version being looked at is put away first
-      let id = findJournalBoard(ctx.workspace(), ctx.state.ui.shares.flatMap((s) => s.boards));
+    addBoardCard(): string {
+      const id = newId('b');
+      setOthers((o) => ({ ...o, [id]: blankBoard() }));
+      const card = createBoardCard(id);
+      const { board, ui } = ctx.state;
+      const selected = ui.selection.length === 1 ? ui.selection[0] : null;
+      const place =
+        B.placementForNewCard(board, selected) ??
+        ({ type: 'loose', ...spotForNewBlock(board, CARD_W, NEW_BLOCK_H.board, ctx.screenCentre(), ctx.measured) } as const);
+      commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null } });
+      ctx.requestSettle([place.type === 'column' ? place.columnId : card.id]);
+      return id;
+    },
+    /**
+     * The Journal button (owner request, 2026-10-18): opens the Journal side panel, or closes it,
+     * leaving the open board as it is. The panel writes into the person's own board called "Journal"
+     * (made on its own, with no card opening it, the first time); opening it adds today's dated note
+     * at the top of that board if it isn't there, as one change on that board's undo. Returns
+     * 'loading' (changing nothing) while it isn't yet known which boards are shared: never uses one of those.
+     */
+    openJournal(): 'loading' | null {
+      const { ui } = ctx.state;
+      if (ui.sidePanel === 'journal') {
+        ctx.updateUi({ sidePanel: null });
+        return null;
+      }
+      if (!ui.sharesKnown) return 'loading';
+      ctx.updateUi({ preview: null }); // an old version being looked at is put away first
+      let id = findJournalBoard(ctx.workspace(), sharedIds());
       if (!id) {
-        const onHome = ctx.state.boards.open === ctx.state.boards.home;
-        openBoard(ctx.state.boards.home); // the home board is never shared
-        // The card goes where Add a sub-board puts one on home: the middle of the screen if home was
-        // showing, else the middle of the view home opens with (not the other board's view).
-        const size = ctx.viewportSize();
-        const centre = onHome
-          ? ctx.screenCentre()
-          : screenToBoard(viewShowing(topLevelRects(ctx.state.board, ctx.measured), size, ctx.state.view), centreOf(size));
-        // simple: home's drawn heights are forgotten on opening, so its blocks' heights are guessed and the
-        // card can overlap a tall note until home is drawn and tidied; measure first if that matters.
-        id = addBoardCard(JOURNAL_NAME, centre);
+        const made = newId('b');
+        setOthers((o) => ({ ...o, [made]: { ...blankBoard(), name: JOURNAL_NAME } }));
+        id = made;
       }
-      const wasOpen = ctx.state.boards.open === id;
-      openBoard(id);
       const line = journalDateLine(new Date());
-      let noteId = todaysNote(ctx.state.board, line);
-      if (noteId) {
-        // In a collapsed container the note is hidden: the container is selected. A collapsed note is
-        // selected; the cursor goes in only when the note's text is showing.
-        const { board } = ctx.state;
-        const col = B.columnOf(board, noteId);
-        if (col?.collapsed) ctx.updateUi({ selection: [col.id], itemSel: null, focusBlock: null });
-        else ctx.updateUi({ selection: [noteId], itemSel: null, focusBlock: board.cards[noteId].collapsed ? null : noteId });
-      } else {
-        const note = { ...createCard('note'), text: `${line}\n\n` };
-        noteId = note.id;
-        commit((b) => B.addCard(b, note, { type: 'loose', ...journalSpot(b, ctx.measured, ctx.screenCentre()) }), {
-          ui: { selection: [note.id], itemSel: null, focusBlock: note.id },
-        });
-        ctx.requestSettle([note.id]);
-      }
-      // Opening another board shows the whole of it; if it was already open, bring the note into view
-      // (the container's place, if it is in one) unless it is all on screen already.
-      const { board, view } = ctx.state;
-      const rect = wasOpen && blockRect(board, B.columnOf(board, noteId)?.id ?? noteId, ctx.measured);
-      const { width, height } = ctx.viewportSize();
-      const seen = (r: Rect) =>
-        r.x * view.zoom + view.panX >= 0 && r.y * view.zoom + view.panY >= 0 && (r.x + r.w) * view.zoom + view.panX <= width && (r.y + r.h) * view.zoom + view.panY <= height;
-      if (rect && !seen(rect)) ctx.updateView((v) => viewShowing([rect], ctx.viewportSize(), v));
+      const note = { ...createCard('note'), text: `${line}\n\n` };
+      // On the open board it is placed by what is drawn; elsewhere heights are guessed, and it is
+      // tidied once that board is drawn.
+      const open = id === ctx.state.boards.open;
+      ctx.commitTo(id, (b) =>
+        todaysNote(b, line) ? b : B.addCard(b, note, { type: 'loose', ...journalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) }),
+      );
+      if (open && ctx.state.board.cards[note.id]) ctx.requestSettle([note.id]);
+      ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false });
       return null;
+    },
+    /** Typing in the Journal panel: what is written under a note's date line (the date line stays). */
+    setJournalText(noteId: string, body: string) {
+      const id = ctx.state.ui.journalBoard;
+      if (!id) return;
+      const write = (text: string) => withJournalBody(text, body);
+      ctx.commitTo(id, (b) => B.updateCard(b, noteId, (c) => (c.kind === 'note' && write(c.text) !== c.text ? { ...c, text: write(c.text) } : c)), `text:${noteId}`);
+    },
+    /** Ctrl+Z / Ctrl+Y in the Journal panel: on the Journal board's own history, whichever board is open. */
+    undoJournal() {
+      const id = ctx.state.ui.journalBoard;
+      if (id) ctx.undoOn(id, 'undo');
+    },
+    redoJournal() {
+      const id = ctx.state.ui.journalBoard;
+      if (id) ctx.undoOn(id, 'redo');
     },
     /**
      * Delete a board and every card that opens it (the home board never). If it is open, the board

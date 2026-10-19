@@ -8,6 +8,11 @@
 - The newest copy wins: copy a card and then a web address somewhere else, and Ctrl+V makes the link card; copy a card after an address and Ctrl+V pastes the card (it used to keep pasting the old card until you reloaded).
 - A click on a video on a card that isn't selected selects the card first, so cards still drag and select as usual. Only http and https addresses are ever used. Nothing about saving, sync or undo changed. A link card already on a board (or shared with you, or imported) whose address is a picture or video now shows it too.
 
+## Widening a card no longer throws its row neighbours around (2026-10-19)
+
+- Fix: when you dragged a card's resize corner wider so it covered the next card, the blocks to its left in the row (such as the card at its far left) jumped to the right of it, so the row came out in the wrong order. Now the card you resize keeps its place, blocks to its left stay exactly where they were, and only the blocks it now covers slide right, in their old order.
+- This is the same for the corner, the width strip, the keyboard arrows and a finger. Dragging blocks is unchanged. Your boards and their saving are not touched.
+
 ## Find zooms in less (2026-10-19)
 
 - When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.

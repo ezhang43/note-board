@@ -53,6 +53,10 @@ Otherwise skip it and say so in the report. Fix what it confirms the same way as
 
 Use the `spec-checker` subagent on the change. Fix anything it lists, or say in the report why it is fine as it is.
 
+## 5b. Design check (UI changes only)
+
+If the change touches `src/components/`, `src/styles.css` or any page's look, do a light `emil-design-eng` check (rule 12) of the changed UI using its Review Checklist: exact `transition` properties (never `all`), `ease-out` not `ease-in`, under 300ms, no animation on keyboard actions, hover effects inside `@media (hover: hover)`, `prefers-reduced-motion` respected, popovers growing from their trigger. If it touches the phone layout or touch handling, also check it against `mobile-native` (hover gated by `@media (hover: hover)`, 16px text boxes, `dvh` and safe areas, no `user-scalable=no`, tap feedback on `:active`). `SPEC.md` and `docs/decisions.md` win over the skills, and Impeccable leads on the look (rule 12). Fix what it finds (tests first where checkable), or say in the report why it is fine. Skip for changes with no UI and say so.
+
 ## 6. Documents
 
 - `CHANGELOG.md`: a short plain-English entry at the top, in the style of the ones below it (rule 5).

@@ -6,6 +6,11 @@
 - The calendar access is kept only for this browser tab and is dropped when you sign out, when someone else signs in, when Google refuses it, or after about an hour. A new tab, the next day or another device still shows Google's quick window once (a duplicated or reopened tab may carry it over).
 - The Privacy policy says so (effective October 19, 2026).
 
+## Emil Kowalski's design skills (2026-10-19)
+
+- Added five design, motion and phone-feel skills by Emil Kowalski (MIT licence, credit and licence kept in `.claude/skills/EMIL-KOWALSKI-LICENSE.md`): design engineering, review animations, improve animations, animation performance and mobile native. From now on, any UI or motion work, on the computer and on the phone layout, follows them alongside Impeccable. `SPEC.md` and your recorded decisions come first, then Impeccable for the look, then these for motion and feel. The cursor and focus-ring rules are unchanged, and the end-of-step routine now runs a light design check on UI changes.
+- Nothing in the app changes in this step; the polish fixes to the current app come in a separate pull request. Your boards are untouched.
+
 ## Journal opens in a side panel (2026-10-18)
 
 - The **Journal** button now opens a Journal panel at the right, in the same spot as the Focus timer, History, Completed and Calendar (full screen on a phone). The board you are on stays open behind it. Escape, × or the button again closes it.

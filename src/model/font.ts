@@ -1,12 +1,12 @@
 // Text size on cards and columns (A− / A+ by the zoom control). A per-device view setting, like the
 // light / dark choice: not board data, not undoable, not synced.
 
-export type FontSize = 'small' | 'normal' | 'large' | 'larger';
+export type FontSize = 'small' | 'normal' | 'large' | 'larger' | 'huge' | 'largest';
 
-export const FONT_SIZES: FontSize[] = ['small', 'normal', 'large', 'larger'];
+export const FONT_SIZES: FontSize[] = ['small', 'normal', 'large', 'larger', 'huge', 'largest'];
 
 /** How much bigger than Normal each size makes card and column text. */
-export const FONT_SCALE: Record<FontSize, number> = { small: 0.9, normal: 1, large: 1.15, larger: 1.3 };
+export const FONT_SCALE: Record<FontSize, number> = { small: 0.9, normal: 1, large: 1.15, larger: 1.3, huge: 1.5, largest: 1.75 };
 
 /** Where this device remembers the text size. */
 export const FONT_KEY = 'note-board:font';

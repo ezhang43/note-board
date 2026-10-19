@@ -1,8 +1,9 @@
+import { DEFAULT_HOTKEYS } from './hotkeys';
 import { GRID, MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED, WHEEL_ZOOM_SPEED } from './constants';
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
-  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', colorTheme: 'honey', fontSize: 'normal' };
+  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', colorTheme: 'honey', fontSize: 'normal', hotkeys: DEFAULT_HOTKEYS };
 }
 
 export function clampZoom(zoom: number): number {

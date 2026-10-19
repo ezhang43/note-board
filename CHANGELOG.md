@@ -8,6 +8,13 @@
 - Checklist items on a phone no longer have a small trash can on each row; Delete is in the bar above the keyboard. Computers and tablets are unchanged.
 - Your boards are not touched: only what the buttons do while you are typing changed.
 
+## Custom hotkeys (2026-10-19)
+
+- You can now change the keys for the Hand tool, the Select tool, Select all, Copy, Paste, Duplicate and Delete. Open the Keyboard shortcuts list (the ? button or the ? key), click a key, and press the new one. Escape cancels, and a "Reset to defaults" button puts every key back.
+- If the key is taken, the list says what uses it (for example "V is already used by Select tool.") and nothing changes. Undo, redo, zoom, the arrows and the keys inside checklists stay as they are.
+- The Hand and Select buttons, and the list, show your keys. They are remembered on this device only, like dark mode: not part of your board, not synced, not undone. Your boards are not touched, and a missing or broken setting just means the usual keys.
+- Small change: the match is exact now, so Shift+H no longer picks the Hand tool and Ctrl+Shift+D no longer duplicates.
+
 ## Color themes (2026-10-19)
 
 - The moon button in the toolbar is now an Appearance button (a half-filled circle). It opens a small menu with the Dark mode switch and six color themes: Honey (the look you have today, still the default), Ocean, Forest, Lavender, Rose and Slate.

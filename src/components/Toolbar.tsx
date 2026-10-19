@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
+import { labelOf } from '../model/hotkeys';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { boardRights, keptNotice } from '../model/sharing';
 import { COLOR_THEMES, swatchFor } from '../model/theme';
@@ -415,13 +416,14 @@ export function CleanUpButton({ labelled = false }: { labelled?: boolean }) {
 /** Hand / Select: what dragging empty board does. */
 export function ToolGroup() {
   const tool = useAppState((s) => s.view.tool);
+  const keys = useAppState((s) => s.view.hotkeys);
   return (
     <div className="tool-group" role="group" aria-label="Board tool">
       <button
         type="button"
         className="tool-button"
-        aria-label="Hand (H)"
-        title="Hand (H): drag empty space to move the board"
+        aria-label={`Hand (${labelOf(keys.hand)})`}
+        title={`Hand (${labelOf(keys.hand)}): drag empty space to move the board`}
         aria-pressed={tool === 'hand'}
         onClick={() => appStore.setTool('hand')}
       >
@@ -430,8 +432,8 @@ export function ToolGroup() {
       <button
         type="button"
         className="tool-button"
-        aria-label="Select (V)"
-        title="Select (V): drag a rectangle to select several cards and containers"
+        aria-label={`Select (${labelOf(keys.select)})`}
+        title={`Select (${labelOf(keys.select)}): drag a rectangle to select several cards and containers`}
         aria-pressed={tool === 'select'}
         onClick={() => appStore.setTool('select')}
       >

@@ -3,7 +3,7 @@ import { pourList } from '../../model/checklist';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
 import { overlaps, snapIf } from '../../model/geometry';
 import { alignTo } from '../../model/align';
-import { blockRect, landingSpot, topLevelRects } from '../../model/layout';
+import { blockRect, landingSpot, shiftRow, topLevelRects } from '../../model/layout';
 import { dropBoard } from '../../model/placement';
 import type { Board, Point, Rect } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -167,7 +167,8 @@ export function gestureActions(ctx: StoreContext) {
       const r = ctx.state.ui.resize;
       if (!r) return;
       commit(
-        (b) => (r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? undefined) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined)),
+        // Its row neighbours slide sideways out of the way (owner decision 2026-10-19).
+        (b) => shiftRow(r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? undefined) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined), r.id, measured),
         { ui: { resize: null } },
       );
       requestSettle([r.id]);

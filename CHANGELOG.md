@@ -1,5 +1,11 @@
 # Changelog
 
+## Bigger item buttons on a computer (2026-10-19)
+
+- On a computer, the Move up, Move down, trash and drag buttons that show when you point at a checklist item are bigger: arrows 16px to 22px wide, trash 24px to 28px, grip 14px to 18px, with their icons scaled to match.
+- They still sit at the right end of the item's first line and never cover the text, and the text doesn't move when you point at it. This holds at every A- / A+ size, inside containers and on sub-items.
+- Phones and touch screens are unchanged. Nothing about saving or your boards is touched.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

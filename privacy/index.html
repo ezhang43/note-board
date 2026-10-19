@@ -3,6 +3,7 @@
   Draft for the owner to review; not legal advice.
   Written from what the code does (src/sync/firebase.ts, src/store/collab.ts, firestore.rules, public/sw.js) on 2026-10-06.
   Feedback (job #69) added on 2026-10-16.
+  Claude connector section and Anthropic in the services list added on 2026-10-19 (job 123), written from mcp/.
   The owner's details were filled in on 2026-10-07. Update this page whenever what is stored changes.
 -->
 <html lang="en">
@@ -77,6 +78,17 @@
       </details>
 
       <details>
+        <summary><h2>The Claude connector (optional)</h2></summary>
+        <p>BusyAnts has an optional connector that lets Claude read your boards and add to them. It is a small program that runs on your own computer, and only if you install it. The BusyAnts site and app work the same without it.</p>
+        <ul>
+          <li>It signs in with your own Google account, in your web browser, and works as you: it can reach your own boards and the boards shared with you (those only to read). The sign-in is kept in a file on that computer. Asking Claude to sign you out of BusyAnts deletes that file.</li>
+          <li>It reads or changes your boards only when you ask Claude to. In the connector you install, deleting is switched off.</li>
+          <li>What Claude reads from your boards goes to Claude, which is run by Anthropic, and is handled under Anthropic's <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>, not this one.</li>
+          <li>BusyAnts stores nothing new because of it. A change Claude makes is saved on your board like one you make, with a safety copy saved to your version history before its first change. The connector's list of its changes stays on your computer.</li>
+        </ul>
+      </details>
+
+      <details>
         <summary><h2>Counting visits</h2></summary>
         <p>The published site counts page visits (the app and the About, FAQ, Terms, Privacy and Delete your account pages) with <a href="https://www.goatcounter.com" target="_blank" rel="noopener noreferrer">GoatCounter</a>, a privacy-friendly counter that uses no cookies and does no personal tracking. When a page opens, your browser asks GoatCounter to add one to that page's count. BusyAnts gives it only the page's address without anything after a “?” (so a share link's key is never sent). Like any website you load something from, GoatCounter also receives your IP address and browser details, and the page you came from. What is on your boards, and your account details, are never sent to it. It runs only on the published site, not on a copy run on a developer's computer.</p>
       </details>
@@ -94,6 +106,7 @@
           <li><strong>Google Calendar</strong> (run by Google) holds your calendar events, if you use the calendar panel; BusyAnts reads and changes them there and keeps no copy.</li>
           <li><strong>Google Fonts</strong> supplies the typefaces, so Google also receives your IP address when the fonts load.</li>
           <li><strong>GoatCounter</strong> counts page visits (see “Counting visits” above).</li>
+          <li><strong>Anthropic</strong> (Claude), only if you use the optional Claude connector, receives what Claude reads from your boards when you ask it to (see “The Claude connector” above).</li>
         </ul>
         <p>Each of these follows its own privacy policy. BusyAnts uses no other services and no advertising.</p>
       </details>

@@ -91,6 +91,11 @@ describe('refresh token → id token', () => {
     const err = await idTokens(token, { fetch: fn })().catch((e: Error) => e);
     expect(String(err)).not.toContain('REFRESH-1');
   });
+
+  it('when Google’s service fails, the error says to try again, then to sign in from Claude', async () => {
+    const { fn } = fakeFetch([{ status: 503, body: 'busy' }]);
+    await expect(idTokens(token, { fetch: fn })()).rejects.toThrow(/status 503\). Try again in a moment; if it keeps failing, ask Claude to sign in to BusyAnts/);
+  });
 });
 
 it('the saved file is plain JSON', async () => {

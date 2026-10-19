@@ -94,7 +94,7 @@ const int = (n: number) => ({ integerValue: String(n) });
 
 export function ownDb(idToken: () => Promise<string>, uid: string, fetchFn: typeof fetch = fetch): OwnDb {
   // A uid goes into document names (not escaped there): Firebase uids are letters and digits.
-  if (!/^[\w-]+$/.test(uid)) throw new Error('The saved sign-in has an unexpected account id. Run npm run mcp:login again.');
+  if (!/^[\w-]+$/.test(uid)) throw new Error('The saved sign-in has an unexpected account id. Ask Claude to sign in to BusyAnts again.');
   const reader = firestoreReader(idToken, fetchFn);
   const own = `boards/${uid}`;
 

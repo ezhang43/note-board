@@ -26,7 +26,7 @@ function setup(storage = memoryStorage()) {
 }
 const habitsIds = (s: Store) => Object.entries(s.workspace().boards).filter(([, b]) => b.name === 'Habits').map(([id]) => id);
 const habits = (s: Store) => {
-  const id = s.getState().ui.habitsBoard;
+  const id = s.habitsBoard();
   return id ? habitList(s.workspace().boards[id]) : [];
 };
 
@@ -52,6 +52,30 @@ describe('Habits panel', () => {
     expect(habits(s).map((h) => h.title)).toEqual(['Walk', 'Read']);
     expect(s.getState().board).toBe(homeBoard);
     expect(s.hiddenBoards()).toEqual([habitsIds(s)[0]]);
+  });
+
+  it('a new habit is a checklist like any other (one blank item), the same before and after a reload', () => {
+    const storage = memoryStorage();
+    const s = setup(storage);
+    s.openHabits();
+    const id = s.addHabit('Walk')!;
+    expect(habits(s)[0].items.map((i) => [i.text, i.done])).toEqual([['', false]]);
+    s.toggleHabitDay(id, '2026-10-19');
+    s.flush();
+    expect(setup(storage).workspace()).toEqual(s.workspace());
+  });
+
+  it('a Habits board that arrives from another device while the panel is open is the one shown and used', () => {
+    const s = setup();
+    s.openHabits();
+    const theirs = setup();
+    theirs.openHabits();
+    theirs.addHabit('Walk');
+    s.replaceWorkspace({ ...s.workspace(), boards: { ...s.workspace().boards, ...theirs.workspace().boards, [s.workspace().home]: s.workspace().boards[s.workspace().home] } });
+    expect(habits(s).map((h) => h.title)).toEqual(['Walk']);
+    s.addHabit('Read');
+    expect(habitsIds(s)).toHaveLength(1);
+    expect(habits(s).map((h) => h.title)).toEqual(['Walk', 'Read']);
   });
 
   it('ticks and unticks a day, renames and deletes, all saved and kept after a reload', () => {
@@ -90,7 +114,7 @@ describe('Habits panel', () => {
     s.deleteHabit(id);
     expect(habits(s)).toEqual([]);
     s.undoHabits();
-    expect(habits(s).map((h) => [h.title, h.items.length])).toEqual([['Walk', 1]]);
+    expect(habits(s).map((h) => [h.title, [...tickedDays(h)]])).toEqual([['Walk', ['2026-10-19']]]);
     s.redoHabits();
     expect(habits(s)).toEqual([]);
     expect(s.getState().board).toBe(homeBoard);
@@ -119,7 +143,7 @@ describe('Habits panel', () => {
     s.setShares([{ id: 's1', root: shared, boards: [shared], owner: false, ownerUid: 'alice', people: [], link: null }], true);
     s.openHabits();
     s.addHabit('Walk');
-    expect(s.getState().ui.habitsBoard).not.toBe(shared);
+    expect(s.habitsBoard()).not.toBe(shared);
     expect(s.workspace().boards[shared].cards).toEqual({});
   });
 
@@ -127,7 +151,7 @@ describe('Habits panel', () => {
     const s = setup();
     s.openHabits();
     const id = s.addHabit('Walk')!;
-    const board = s.getState().ui.habitsBoard!;
+    const board = s.habitsBoard()!;
     s.setShares([{ id: 's1', root: board, boards: [board], owner: true, ownerUid: 'me', people: [], link: null }], true);
     const before = s.workspace().boards[board];
     s.toggleHabitDay(id, '2026-10-19');

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, cards, freshBoardEachTest } from './helpers';
+import { add, cards, expectNoOverlaps, freshBoardEachTest } from './helpers';
 
 // Habits (owner request, 2026-10-19): the Habits button opens a side panel of daily habits, each
 // with this week's seven days to tick and its streak. The board you are on stays open.
@@ -87,6 +87,28 @@ test('delete asks first, and Ctrl+Z in the panel brings the habit back with its 
   for (let i = 0; i < 5; i++) await page.keyboard.press('Control+z');
   await expect(cards(page)).toHaveCount(1);
   await expect(cards(page)).toContainText('on home');
+});
+
+test('Ctrl+Z while typing a new habit undoes the typing, not a tick', async ({ page }) => {
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await todayBox(page, 0).click();
+  await newHabit(page).click();
+  await page.keyboard.type('Meditat');
+  await page.keyboard.press('Control+z');
+  await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(habitRows(page)).toHaveCount(1);
+  await expect(newHabit(page)).not.toHaveValue('Meditat');
+});
+
+test('on a board named Habits that is open, new habits are placed clear of what is drawn', async ({ page }) => {
+  await page.getByLabel('Board name').fill('Habits');
+  await page.keyboard.press('Enter');
+  await habitsButton(page).click();
+  for (const name of ['Walk', 'Read', 'Stretch', 'Water']) await addHabit(page, name);
+  await todayBox(page, 0).click();
+  await expect(cards(page)).toHaveCount(4);
+  await expectNoOverlaps(page);
 });
 
 test('keys pressed in the panel never act on the board behind it; Escape closes it', async ({ page }) => {

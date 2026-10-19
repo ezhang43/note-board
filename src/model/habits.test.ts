@@ -25,6 +25,12 @@ describe('habits', () => {
     expect(isHabit(loaded)).toBe(true);
     expect([...tickedDays(loaded)]).toEqual(['2026-10-19']);
     expect(withDay(withDay(loaded, '2026-10-19', false), '2026-10-18', true).items.map((i) => i.text)).toEqual(['', '2026-10-18']);
+    // A day unticked on the board itself (open the Habits board, untick an item) is not a tick, but still a habit.
+    const unticked = { ...habit('Walk', ['2026-10-19']), items: [{ id: 'u', text: '2026-10-18', done: false, children: [] }, ...habit('', ['2026-10-19']).items] };
+    expect(isHabit(unticked)).toBe(true);
+    expect([...tickedDays(unticked)]).toEqual(['2026-10-19']);
+    expect([...tickedDays(withDay(unticked, '2026-10-18', true))].sort()).toEqual(['2026-10-18', '2026-10-19']);
+    expect(withDay(unticked, '2026-10-18', false)).toBe(unticked); // not ticked: unchanged
     const other = createCard('todo') as TodoCard;
     expect(isHabit({ ...other, items: [{ ...other.items[0], text: 'buy milk' }] })).toBe(false);
     expect(isHabit(createCard('note'))).toBe(false);

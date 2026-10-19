@@ -1803,7 +1803,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   font: inherit;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out);
 }
 .habit-wd { font-size: 10px; font-weight: 600; color: var(--ink-soft); }
 .habit-day[aria-current='date'] { border: 2px solid var(--accent); }

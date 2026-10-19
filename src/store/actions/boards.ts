@@ -1,7 +1,7 @@
 import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
-import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, withDay } from '../../model/habits';
+import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
 import { JOURNAL_NAME, findJournalBoard, hiddenJournal, journalDateLine, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { spotForNewBlock } from '../../model/layout';
 import type { Board, TodoCard } from '../../model/types';
@@ -23,11 +23,8 @@ export function boardActions(ctx: StoreContext) {
     const id = ctx.state.ui.journalBoard;
     return id && !sharedIds().includes(id) ? id : null;
   };
-  /** The Habits panel's board, under the same rule as the Journal's. */
-  const habitsId = () => {
-    const id = ctx.state.ui.habitsBoard;
-    return id && !sharedIds().includes(id) ? id : null;
-  };
+  /** The Habits panel's board, found afresh each time, so one that arrives from another device is used and a shared one never is. */
+  const habitsId = () => findHabitsBoard(ctx.workspace(), sharedIds());
   /** The Journal and Habits boards left out of the Boards menu and Ctrl+arrows: never the open one, none until shares are known. */
   const hidden = (): string[] => {
     if (!ctx.state.ui.sharesKnown) return [];
@@ -147,37 +144,35 @@ export function boardActions(ctx: StoreContext) {
       }
       if (!ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null }); // an old version being looked at is put away first
-      const id = findHabitsBoard(ctx.workspace(), sharedIds());
       // Nothing stays selected behind the panel, so a key meant for it can't delete it.
-      ctx.updateUi({ sidePanel: 'habits', habitsBoard: id, historyOpen: false, selection: [], itemSel: null });
+      ctx.updateUi({ sidePanel: 'habits', historyOpen: false, selection: [], itemSel: null });
       return null;
     },
     /** A new habit at the end of the list, named `name` (trimmed; nothing for a blank name). Returns its id. */
     addHabit(name: string): string | null {
       const title = name.trim();
       if (!title || ctx.state.ui.sidePanel !== 'habits') return null;
-      // The board found when the panel opened, or one that came since (from another device), or a new one.
       let id = habitsId();
-      if (!id || !ctx.workspace().boards[id]) id = findHabitsBoard(ctx.workspace(), sharedIds());
       if (!id) {
         const made = newId('b');
         setOthers((o) => ({ ...o, [made]: { ...blankBoard(), name: HABITS_NAME } }));
         id = made;
       }
-      ctx.updateUi({ habitsBoard: id });
-      const card: TodoCard = { ...(createCard('todo') as TodoCard), title, items: [] };
+      const card: TodoCard = { ...(createCard('todo') as TodoCard), title };
       // Placed with guessed heights (the board isn't drawn), and tidied if that board is ever opened.
       ctx.commitTo(id, (b) => B.addCard(b, card, { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, { x: 0, y: 0 }, () => undefined) }));
       return card.id;
     },
     renameHabit: (cardId: string, name: string) => changeHabit(cardId, (c) => (c.title === name ? c : { ...c, title: name }), `title:${cardId}`),
     /** Tick or untick one day (a "YYYY-MM-DD" key) of a habit. */
-    toggleHabitDay: (cardId: string, day: string) => changeHabit(cardId, (c) => withDay(c, day, !c.items.some((i) => i.text === day))),
+    toggleHabitDay: (cardId: string, day: string) => changeHabit(cardId, (c) => withDay(c, day, !tickedDays(c).has(day))),
     /** Delete a habit with its ticks, as one change on the Habits board's undo (Ctrl+Z in the panel, or Version history, brings it back). */
     deleteHabit(cardId: string) {
       const id = habitsId();
       if (id) ctx.commitTo(id, (b) => (b.cards[cardId] && isHabit(b.cards[cardId]) ? B.deleteBlocks(b, [cardId]) : b));
     },
+    /** The board the Habits panel shows and changes, or null before the first habit. */
+    habitsBoard: habitsId,
     /** Ctrl+Z / Ctrl+Y in the Habits panel: on the Habits board's own history, whichever board is open. */
     undoHabits() {
       const id = habitsId();

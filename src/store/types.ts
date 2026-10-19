@@ -155,8 +155,6 @@ export interface Ui {
   sidePanel: SidePanelKind | null;
   /** The board the Journal panel writes into (set when it opens). */
   journalBoard: string | null;
-  /** The board the Habits panel keeps habits on (null until it is found or the first habit makes it). */
-  habitsBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
   shares: ShareInfo[];
   /**
@@ -226,7 +224,6 @@ export const emptyUi: Ui = {
   find: null,
   sidePanel: null,
   journalBoard: null,
-  habitsBoard: null,
   shares: [],
   sharesKnown: true,
 };

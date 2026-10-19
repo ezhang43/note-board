@@ -24,6 +24,8 @@ export function useShortcuts() {
       const panel = appStore.getState().ui.sidePanel;
       const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
       const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
+      // The New habit box isn't saved anywhere yet, so there the browser undoes the typing.
+      if (inPanel && mod && (key === 'z' || key === 'y') && e.target instanceof Element && e.target.closest('.habit-new')) return;
       const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
       if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
       if (inJournal && mod && key === 'y') return run(e, redo);

@@ -13,14 +13,15 @@ export const HABITS_NAME = 'Habits';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** A ticked day (an item whose text is that day). */
-const isTick = (i: TodoItem) => DAY.test(i.text);
+/** A day item; it is a tick while done (it can be unticked on the Habits board itself). */
+const isDay = (i: TodoItem) => DAY.test(i.text);
+const isTick = (i: TodoItem) => i.done && isDay(i);
 
 /**
- * A habit: a checklist whose items are all ticked days. A blank item is allowed too, since a
- * checklist saved with no items loads with one blank item (a habit never ticked); it is not a tick.
+ * A habit: a checklist whose items are all days. A blank item is allowed too, since a new
+ * checklist has one blank item (as one saved with none loads); it is not a tick.
  */
-export const isHabit = (c: Card): c is TodoCard => c.kind === 'todo' && c.items.every((i) => !i.children.length && (isTick(i) || (!i.text && !i.done)));
+export const isHabit = (c: Card): c is TodoCard => c.kind === 'todo' && c.items.every((i) => !i.children.length && (isDay(i) || (!i.text && !i.done)));
 
 /** The first board named exactly "Habits" among the person's own boards (not one a share holds), or null. */
 export function findHabitsBoard(ws: Workspace, shared: string[]): string | null {

@@ -36,7 +36,7 @@ export function HabitsButton({ labelled = false, onOpen }: { labelled?: boolean;
  */
 export function HabitsPanel() {
   const board = useAppState((s) => {
-    const id = s.ui.habitsBoard;
+    const id = appStore.habitsBoard();
     if (!id) return undefined;
     return id === s.boards.open ? s.board : s.boards.others[id];
   });
@@ -103,7 +103,7 @@ export function HabitsPanel() {
                 aria-label={`Delete habit ${h.title}`}
                 title="Delete habit"
                 onClick={() => {
-                  if (window.confirm(`Delete the habit “${h.title}” and its ticks? You can bring it back with Ctrl+Z here, or from Version history.`)) appStore.deleteHabit(h.id);
+                  if (window.confirm(`Delete the habit “${h.title}” and its ticks? You can bring it back from Version history, or with Ctrl+Z in this panel.`)) appStore.deleteHabit(h.id);
                 }}
               >
                 <TrashIcon />

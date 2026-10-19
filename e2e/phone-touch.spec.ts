@@ -438,7 +438,7 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     expect(r.w).toBeGreaterThanOrEqual(44);
     expect(r.h).toBeGreaterThanOrEqual(44);
     expect(await keepsItsOwnBox(grip)).toBe(true);
-    const trash = page.locator('[data-card-id]').first().getByRole('button', { name: 'Delete item' });
-    expect(await keepsItsOwnBox(trash)).toBe(true);
+    // (No trash can on each row on a phone, 2026-10-19: Delete is in the item bar. See phone-item-bar.spec.ts.)
+    await expect(page.locator('[data-card-id]').first().getByRole('button', { name: 'Delete item' })).toBeHidden();
   });
 });

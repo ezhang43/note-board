@@ -19,14 +19,18 @@ function browserStorage() {
 export const appStore = createStore(browserStorage());
 
 /**
- * Puts the light / dark choice on the page (<html data-theme>), so the stylesheet can switch
+ * Puts the light / dark choice and the color theme on the page (<html data-theme data-color-theme>), so the stylesheet can switch
  * colours everywhere, the sign-in screen included; also tints the browser / app title bar.
  */
 function showTheme() {
-  const theme = appStore.getState().view.theme;
-  if (document.documentElement.dataset.theme === theme) return;
-  document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#24221E' : '#FFFDF8');
+  const { theme, colorTheme } = appStore.getState().view;
+  const root = document.documentElement;
+  if (root.dataset.theme === theme && root.dataset.colorTheme === colorTheme) return;
+  root.dataset.theme = theme;
+  root.dataset.colorTheme = colorTheme;
+  // The title bar takes the toolbar's color, read from the stylesheet so it is defined once.
+  const bar = getComputedStyle(root).getPropertyValue('--toolbar-bg').trim().toUpperCase() || (theme === 'dark' ? '#24221E' : '#FFFDF8'); // the old colors if the stylesheet isn't in yet
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bar);
 }
 if (typeof document !== 'undefined') {
   showTheme();

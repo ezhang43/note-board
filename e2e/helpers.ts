@@ -52,6 +52,24 @@ export async function arrange(page: Page) {
 }
 
 /**
+ * Opens the toolbar's Appearance menu (the Dark mode switch and the color themes) unless it is already
+ * open, and returns it. A click on the board or a card closes it again.
+ */
+export async function appearance(page: Page) {
+  const toggle = page.locator('header.toolbar').getByRole('button', { name: 'Appearance', exact: true });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  return page.getByRole('group', { name: 'Appearance', exact: true });
+}
+
+/** Switches Dark mode on the desktop toolbar (through the Appearance menu), then closes the menu. */
+export async function toggleDark(page: Page) {
+  const menu = await appearance(page);
+  await menu.getByRole('button', { name: 'Dark mode' }).click();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+}
+
+/**
  * Puts a link card on the board. The toolbar no longer adds links (owner request, 2026-10-05), but
  * boards can still hold them: from before, or from a Milanote import, which is used here.
  */

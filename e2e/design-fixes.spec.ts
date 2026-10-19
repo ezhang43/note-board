@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { add, arrange, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard } from './helpers';
+import { add, appearance, arrange, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard, toggleDark } from './helpers';
 
 // Design fixes from the 2026-10-02 Impeccable review.
 
@@ -28,18 +28,15 @@ const toolbarButton = (page: import('@playwright/test').Page, name: string) => p
 const style = (l: import('@playwright/test').Locator, prop: string, pseudo?: string) =>
   l.evaluate((el, [p, ps]) => getComputedStyle(el, ps ?? null).getPropertyValue(p as string), [prop, pseudo] as const);
 
-test('the dark-mode button looks pressed while dark mode is on, like Snap to grid', async ({ page }) => {
-  const moon = toolbarButton(page, 'Dark mode');
-  await arrange(page); // Snap to grid is in the Arrange menu
-  const snap = toolbarButton(page, 'Snap to grid');
-  await expect(snap).toHaveAttribute('aria-pressed', 'true');
-  const off = await style(moon, 'background-color');
-  await moon.click();
+test('the Dark mode switch in the Appearance menu reads as on while dark mode is on (a switch, like the phone menu)', async ({ page }) => {
+  const menu = await appearance(page);
+  const dark = menu.getByRole('button', { name: 'Dark mode' });
+  expect(await style(dark, 'width', '::after')).toBe('40px');
+  const off = await style(dark, 'background-color', '::after');
+  await dark.click();
   await page.mouse.move(0, 400); // not hovering
-  await arrange(page);
-  const on = await style(moon, 'background-color');
-  expect(on).not.toBe(off);
-  expect(on).toBe(await style(snap, 'background-color'));
+  await expect(dark).toHaveAttribute('aria-pressed', 'true');
+  expect(await style(dark, 'background-color', '::after')).not.toBe(off);
 });
 
 test('placeholder text is dark enough to read (light and dark mode)', async ({ page }) => {
@@ -47,7 +44,7 @@ test('placeholder text is dark enough to read (light and dark mode)', async ({ p
   await add(page, 'Note');
   const note = page.getByLabel('Note text');
   expect(await style(note, 'color', '::placeholder')).toBe('rgb(115, 108, 98)');
-  await toolbarButton(page, 'Dark mode').click();
+  await toggleDark(page);
   expect(await style(note, 'color', '::placeholder')).toBe('rgb(163, 157, 147)');
 });
 
@@ -55,8 +52,8 @@ test('faded toolbar buttons are a little stronger in dark mode', async ({ page }
   await arrange(page);
   const faded = page.getByRole('button', { name: 'Same width' }); // faded while fewer than two blocks are selected
   expect(await style(faded, 'opacity')).toBe('0.45');
-  await toolbarButton(page, 'Dark mode').click();
-  await arrange(page); // the click outside closed it
+  await toggleDark(page);
+  await arrange(page); // the click on Appearance closed it
   expect(await style(faded, 'opacity')).toBe('0.55');
 });
 
@@ -191,7 +188,7 @@ test('a long board name shrinks (with …) instead of pushing buttons off a 1280
   await clickEmpty(page);
   const toolbar = page.locator('header.toolbar');
   expect(await toolbar.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  const moon = (await toolbarButton(page, 'Dark mode').boundingBox())!;
+  const moon = (await toolbarButton(page, 'Appearance').boundingBox())!;
   expect(moon.x + moon.width).toBeLessThanOrEqual(1280);
   expect((await page.locator('header.toolbar .board-name').boundingBox())!.width).toBeGreaterThanOrEqual(140);
   expect(await style(page.getByLabel('Board name'), 'text-overflow')).toBe('ellipsis');

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { freshBoardEachTest } from './helpers';
+import { freshBoardEachTest, toggleDark } from './helpers';
 
 // Owner request: the app and toolbar take on the app icon's warm yellow, so it all feels like one thing.
 
@@ -13,7 +13,7 @@ test('the toolbar shows the BusyAnts ant and is warm cream (Honey Workshop, 2026
 });
 
 test('dark mode keeps a warm, dark toolbar', async ({ page }) => {
-  await page.getByRole('button', { name: /dark mode/i }).click();
+  await toggleDark(page);
   await expect(page.locator('.toolbar')).toHaveCSS('background-color', 'rgb(36, 34, 30)');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#24221E');
 });

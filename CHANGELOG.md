@@ -1,5 +1,11 @@
 # Changelog
 
+## Google Calendar stays connected across a reload (2026-10-19)
+
+- Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.
+- The calendar access is kept only in this browser tab and is dropped when you sign out, when someone else signs in, when Google refuses it, or after about an hour. A new tab, the next day or another device still shows Google's quick window once.
+- The Privacy policy says so (effective October 19, 2026).
+
 ## Journal opens in a side panel (2026-10-18)
 
 - The **Journal** button now opens a Journal panel at the right, in the same spot as the Focus timer, History, Completed and Calendar (full screen on a phone). The board you are on stays open behind it. Escape, × or the button again closes it.

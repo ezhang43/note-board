@@ -1,11 +1,13 @@
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { NoAccess } from '../model/calendar';
+import { dropAccess, keepAccess, NoAccess, readAccess, type Access } from '../model/calendar';
 
 // Calendar access on the published site (owner request, 2026-10-06), asked for only when the
 // Google Calendar panel first opens, not at sign-in. Google Identity Services' token client gives a
 // short-lived token (about an hour) for the calendar.events scope; once the person has agreed, a new
-// one comes without asking again. The token is kept in memory only, never saved, and dropped when
-// the person signs out or another signs in. Loaded only on the published site.
+// one comes without asking again. The token is kept in memory and for this tab only (sessionStorage,
+// owner choice 2026-10-19), so a reload within the hour needs no Google window; it is dropped when
+// the person signs out or another signs in, when Google refuses it, and when it runs out. Loaded
+// only on the published site.
 
 /** The OAuth client ID (not secret), set in .env.production. Without it the panel says it isn't connected yet. */
 const CLIENT_ID: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -31,17 +33,20 @@ interface Gis {
   };
 }
 
-let cached: { token: string; expiresAt: number } | null = null;
+let cached: Access | null = null;
 let pending: Promise<string> | null = null;
 let script: Promise<Gis> | null = null;
 /** Google's script once loaded, so a click can ask for access straight away (browsers block windows opened after a wait). */
 let loaded: Gis | null = null;
 
-// Signing out (or another person signing in) drops the token.
-let uid: string | null | undefined;
+// simple: kept for this tab, so it covers reloads in the same tab within the hour; a new tab, a new
+// day or another device still gets Google's quick window. Reaching sessionStorage can throw (blocked).
+const tab = () => sessionStorage;
+
+// Signing out (or another person signing in) drops the token, from memory and from the tab.
 onAuthStateChanged(getAuth(), (user) => {
-  if (user?.uid !== uid) cached = null;
-  uid = user?.uid ?? null;
+  if (cached?.user !== user?.uid) cached = null;
+  readAccess(tab, user?.uid ?? null);
 });
 
 function loadGis(): Promise<Gis> {
@@ -71,6 +76,8 @@ export function prepare() {
 
 /** Asks Google for a token, opening its window at once (in the same click when called from one). */
 function request(gis: Gis): Promise<string> {
+  // Kept only for the person who asked, and only if they are still the one signed in when it comes.
+  const user = getAuth().currentUser?.uid;
   return new Promise<string>((done, fail) => {
     const client = gis.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
@@ -81,7 +88,10 @@ function request(gis: Gis): Promise<string> {
         if (r.error === 'access_denied') return fail(new NoAccess('refused'));
         if (r.error) return fail(new Error(r.error));
         if (!r.access_token || !gis.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fail(new NoAccess('refused'));
-        cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000 };
+        if (user && user === getAuth().currentUser?.uid) {
+          cached = { token: r.access_token, expiresAt: Date.now() + Number(r.expires_in ?? 3599) * 1000, user };
+          keepAccess(tab, cached);
+        }
         done(r.access_token);
       },
       // The window was blocked or closed (Google's types popup_failed_to_open, popup_closed).
@@ -92,9 +102,11 @@ function request(gis: Gis): Promise<string> {
   });
 }
 
-/** A token for the person's calendar: the one in memory while it has over a minute left, else a new one. */
+/** A token for the person's calendar: the one kept (in memory or this tab) while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
-  if (cached && cached.expiresAt > Date.now() + 60_000) return Promise.resolve(cached.token);
+  const user = getAuth().currentUser?.uid ?? null;
+  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(tab, user);
+  if (cached) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
   // wait and may be blocked; the panel then says so and Connect Google Calendar works.
@@ -104,4 +116,5 @@ export function token(): Promise<string> {
 
 export function forget() {
   cached = null;
+  dropAccess(tab);
 }

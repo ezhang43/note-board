@@ -661,6 +661,77 @@ for (const [kind, note] of [
   });
 }
 
+// The access is kept for this tab for up to an hour (owner choice, 2026-10-19), so a reload doesn't
+// ask Google again. Locally the "ask" is the demo's: &demo-calendar=blocked makes it fail, so the
+// events showing after such a reload prove nothing was asked.
+test.describe('calendar access kept for this tab', () => {
+  const ACCESS_KEY = 'note-board:calendar-access';
+  const blockedNote = 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.';
+  const kept = (page: Page) => page.evaluate((k) => sessionStorage.getItem(k), ACCESS_KEY);
+  async function connect(page: Page, name: string) {
+    const errors = await openAs(page, name);
+    await button(page).click();
+    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    expect(JSON.parse((await kept(page)) ?? 'null')).toMatchObject({ user: `demo-${name.toLowerCase()}` });
+    return errors;
+  }
+
+  test('a reload within the hour shows the events without asking again', async ({ page }) => {
+    const name = `Cal${tag()}`;
+    const errors = await connect(page, name);
+    await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
+    await fontsLoaded(page);
+    await button(page).click();
+    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('another person in the same tab doesn’t get it: they are asked, and the kept access is dropped', async ({ page }) => {
+    await connect(page, `Cal${tag()}`);
+    await page.goto(`/?demo-user=Other${tag()}&demo-calendar=blocked`);
+    await fontsLoaded(page);
+    await button(page).click();
+    await expect(panel(page).getByText(blockedNote)).toBeVisible();
+    expect(await kept(page)).toBeNull();
+  });
+
+  test('with a minute or less left it is dropped and Google is asked again', async ({ page }) => {
+    const name = `Cal${tag()}`;
+    await connect(page, name);
+    await page.evaluate((k) => {
+      const a = JSON.parse(sessionStorage.getItem(k)!);
+      sessionStorage.setItem(k, JSON.stringify({ ...a, expiresAt: Date.now() + 30_000 }));
+    }, ACCESS_KEY);
+    await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
+    await fontsLoaded(page);
+    await button(page).click();
+    await expect(panel(page).getByText(blockedNote)).toBeVisible();
+  });
+
+  test('damaged kept access is ignored: the usual ask happens and nothing breaks', async ({ page }) => {
+    const name = `Cal${tag()}`;
+    const errors = await openAs(page, name);
+    await page.evaluate((k) => sessionStorage.setItem(k, '{not json'), ACCESS_KEY);
+    await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
+    await fontsLoaded(page);
+    await button(page).click();
+    await expect(panel(page).getByText(blockedNote)).toBeVisible();
+    await panel(page).getByRole('button', { name: 'Connect Google Calendar' }).click();
+    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('when Google refuses it (401) it is dropped', async ({ page }) => {
+    const name = `Cal${tag()}`;
+    await connect(page, name);
+    await page.route('**/__calendar/**', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":{"code":401}}' }));
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    await expect(panel(page).getByText('Google Calendar isn’t connected yet. Try again later.')).toBeVisible();
+    expect(await kept(page)).toBeNull();
+  });
+});
+
 test.describe('on a wide phone-layout screen (month cells 70px or wider)', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 590, height: 1000 } });
 

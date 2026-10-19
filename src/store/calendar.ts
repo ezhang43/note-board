@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
@@ -17,7 +17,7 @@ export const SERIES_ZONE = 'This series is in another time zone: change all of i
 export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 
-/** Where the calendar is and how to get a token for it (kept in memory only, never saved). */
+/** Where the calendar is and how to get a token for it (kept in memory and for this tab only, never in localStorage). */
 export interface CalendarSource {
   base: string;
   token(): Promise<string>;
@@ -289,15 +289,20 @@ function defaultSource(): CalendarSource | null {
   // Locally, ?demo-calendar=blocked (or =refused) makes the first ask for access fail as Google's
   // window does when it is blocked or closed (or access isn't given), to try Connect Google Calendar.
   let noAccess = new URLSearchParams(location.search).get('demo-calendar');
+  // Kept for this tab for an hour, as on the published site, so a reload doesn't ask again.
+  const tab = () => sessionStorage;
   return {
     base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
     async token() {
+      const kept = readAccess(tab, demo.uid);
+      if (kept) return kept.token;
       const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
       noAccess = null;
       if (reason) throw new NoAccess(reason);
+      keepAccess(tab, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
       return demo.uid;
     },
-    forget() {},
+    forget: () => dropAccess(tab),
   };
 }
 

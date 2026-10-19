@@ -1,5 +1,11 @@
 # Changelog
 
+## Phone: the line you are typing in always stays in view (2026-10-19)
+
+- On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.
+- It also stays clear of the top bar and the sides of the screen, not only the bottom. When the phone scrolls the page so part of it is out of sight, the line is kept out of that part too.
+- Nothing else changed: computers and tablets are the same, and your boards are not touched.
+
 ## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
 
 - On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.

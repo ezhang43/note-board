@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { appStore, useAppState } from '../store/appStore';
-import { caretBottom } from './caret';
+import { panToShow } from '../model/view';
+import { canvasRect } from './canvasDom';
+import { caretLine } from './caret';
 import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon, UndoIcon } from './icons';
 
 type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
@@ -32,28 +34,41 @@ export function ItemBar() {
   const bar = useRef<HTMLDivElement>(null);
   const canUndo = useAppState((s) => s.ui.canUndo);
 
-  // Keep the line being typed in clear of the keyboard and of this bar: move the board up under it.
+  // Keep the line being typed in on screen (owner request, "audit job B"): below the top bar (or the
+  // part of the page the phone has scrolled away), above the keyboard and this bar, and between the
+  // sides. The board moves just enough. The browser's own scrolling can't do it: the board is moved, not scrolled.
   const keepCaretClear = () => {
     const field = typingIn()?.field;
-    if (!field) return;
-    const limit = (bar.current?.getBoundingClientRect().top ?? window.innerHeight - keyboardCover()) - 12;
-    // The cursor is never lower than its box, so a box that ends above the limit needs no measuring.
-    if (field.getBoundingClientRect().bottom <= limit) return;
-    const bottom = caretBottom(field);
-    if (bottom > limit) appStore.panBy(0, Math.round(limit - bottom));
+    const canvas = canvasRect();
+    if (!field || !canvas) return;
+    const v = window.visualViewport;
+    const area = {
+      left: canvas.left,
+      right: canvas.right,
+      top: Math.max(canvas.top, v?.offsetTop ?? 0),
+      bottom: Math.min(canvas.bottom, bar.current?.getBoundingClientRect().top ?? Infinity, v ? v.offsetTop + v.height : Infinity),
+    };
+    // The cursor is never outside its box, so a box that is in view needs no measuring.
+    const boxMove = panToShow(field.getBoundingClientRect(), area, 12);
+    if (!boxMove.x && !boxMove.y) return;
+    const move = panToShow(caretLine(field), area, 12);
+    if (move.x || move.y) appStore.panBy(Math.round(move.x), Math.round(move.y));
+  };
+  // A note or item grows as it is typed in, and the cursor can move within it or on to another item: check again after each.
+  const frame = useRef(0);
+  const follow = () => {
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(keepCaretClear);
   };
 
   useEffect(() => {
     // After a change the item's text box can be redrawn, so look again once focus has settled.
     const update = () => setTimeout(() => setTyping(typingIn()));
-    // A note or item grows as it is typed in, and the cursor can move within it: check again after each.
-    let frame = 0;
-    const follow = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(keepCaretClear);
-    };
     const v = window.visualViewport;
-    const onViewport = () => setCover(keyboardCover());
+    const onViewport = () => {
+      setCover(keyboardCover());
+      follow();
+    };
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
     document.addEventListener('input', follow);
@@ -61,7 +76,7 @@ export function ItemBar() {
     v?.addEventListener('resize', onViewport);
     v?.addEventListener('scroll', onViewport);
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(frame.current);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
       document.removeEventListener('input', follow);
@@ -87,7 +102,12 @@ export function ItemBar() {
       // Pressing a button keeps the cursor (and the phone keyboard) in the item.
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
-      onClick={() => !disabled && act()}
+      // The cursor can land in another item, or the one it is in can move: look again once it is drawn.
+      onClick={() => {
+        if (disabled) return;
+        act();
+        follow();
+      }}
     >
       {icon}
     </button>

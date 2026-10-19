@@ -139,11 +139,24 @@ test('dropping an address onto a container puts the card into it', async ({ page
   await expect(col.locator('[data-kind="link"]')).toHaveCount(1);
 });
 
+test('a video on a selected card keeps its own controls (the press is not taken over by a card drag)', async ({ page }) => {
+  await page.route('https://videos.example.test/**', () => {});
+  await paste(page, 'body', 'https://videos.example.test/clip.mp4');
+  const taken = await link(page).locator('video').evaluate((v) => {
+    const e = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse' });
+    v.dispatchEvent(e);
+    return e.defaultPrevented;
+  });
+  expect(taken).toBe(false);
+  await expect(link(page)).toHaveClass(/selected/);
+});
+
 test('a paste or drop while the Journal panel is open adds nothing to the board behind it', async ({ page }) => {
   await page.getByRole('button', { name: 'Journal', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'Journal' })).toBeVisible();
   await page.locator('body').evaluate((b) => (document.activeElement as HTMLElement | null)?.blur?.() ?? b);
   await paste(page, 'body', 'https://example.com/behind-panel');
+  await drop(page, { x: 400, y: 400 }, { 'text/uri-list': 'https://example.com/behind-panel' });
   await expect(link(page)).toHaveCount(0);
 });
 

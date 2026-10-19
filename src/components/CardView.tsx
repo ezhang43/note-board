@@ -205,6 +205,7 @@ function NoteBody({ card }: { card: NoteCard }) {
  */
 function LinkMedia({ card }: { card: LinkCard }) {
   const media = mediaOf(card.url);
+  // simple: a failed picture or video stays hidden until the card is drawn afresh (no retry); add a retry if offline starts to matter.
   const [failed, setFailed] = useState<string | null>(null);
   const selected = useAppState((s) => s.ui.selection.includes(card.id));
   if (!media || failed === media.src) return null;

@@ -1,5 +1,11 @@
 # Changelog
 
+## Privacy-friendly visit counts (2026-10-19)
+
+- The published site now counts page visits (the app and the About, FAQ, Terms, Privacy and Delete your account pages) with GoatCounter, a counter with no cookies. It is the owner's account, busyants.goatcounter.com.
+- Nothing from your boards is sent. It only runs on the published site: not in `npm run dev`, not in the browser tests, not on localhost.
+- The Privacy page has a new "Counting visits" section saying so, and the About page's "no analytics" line now says "only a privacy-friendly count of page visits".
+
 ## Google Calendar remembered for the hour (2026-10-19)
 
 - Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.

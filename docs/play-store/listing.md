@@ -62,7 +62,7 @@ YOURS TO KEEP
 
 PRIVATE BY DEFAULT
 
-Your boards are private to you unless you share one. There are no ads and no tracking, and your data is never sold. Read the full privacy policy on our website.
+Your boards are private to you unless you share one. There are no ads and no tracking cookies, and your data is never sold. Read the full privacy policy on our website.
 
 BusyAnts is made by one person, and is free to use. If you like it, there is a Buy me a coffee link in the app.
 

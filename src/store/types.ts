@@ -141,8 +141,13 @@ export interface Ui {
    * is (and keeps syncing). Nothing can be changed meanwhile.
    */
   preview: { meta: VersionMeta; board: Board } | null;
-  /** Search (owner request): what is being looked for, and the match being shown (null: none). */
-  find: { query: string; current: Match | null } | null;
+  /**
+   * Search (owner request): what is being looked for, and the match being shown (null: none).
+   * `all`: looking on every board, not just the open one (not saved; every search starts on This
+   * board). `from`: the board the matches' order started from, kept while stepping so it does not
+   * reshuffle when a match opens another board.
+   */
+  find: { query: string; current: Match | null; all: boolean; from: string } | null;
   /**
    * The side panel beside the board (owner request: focus timer), in the right-hand spot that
    * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.

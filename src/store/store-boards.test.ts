@@ -220,7 +220,25 @@ describe('review fixes (2026-10-05)', () => {
     s.setFindQuery('milk');
     s.showMatch({ key: 'note:x', start: 0, end: 4, showInstead: null } as never);
     s.openBoard(s.getState().boards.home);
-    expect(s.getState().ui.find).toEqual({ query: 'milk', current: null });
+    expect(s.getState().ui.find).toMatchObject({ query: 'milk', current: null });
+  });
+
+  it('search starts on This board, can look on all boards, and closing the bar puts it back (never saved)', () => {
+    const { s } = setup();
+    const home = s.getState().boards.home;
+    s.openFind();
+    expect(s.getState().ui.find).toMatchObject({ all: false, from: home });
+    s.setFindAll(true);
+    s.setFindQuery('milk');
+    expect(s.getState().ui.find).toMatchObject({ all: true, query: 'milk' });
+    s.openFind(); // Ctrl+F with the bar already open keeps what is chosen
+    expect(s.getState().ui.find).toMatchObject({ all: true, query: 'milk' });
+    s.newBoard();
+    s.openBoard(home); // opening a board by hand keeps the scope
+    expect(s.getState().ui.find).toMatchObject({ all: true, current: null });
+    s.closeFind();
+    s.openFind();
+    expect(s.getState().ui.find).toMatchObject({ all: false, query: '' });
   });
 });
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Search all boards (2026-10-19)
+
+- The search bar has a new switch under the box: **This board** / **All boards**. It always opens on This board, exactly as before, and goes back to it whenever you close the bar (Escape or ×).
+- **All boards** looks in every board you have, sub-boards included. Matches on the board you are on come first, then the other boards in the Boards menu order. When the current match is on a board that isn't open, the count says so, like "3 of 12 · Garage".
+- Enter (or the arrows) takes you to the next match; if it is on another board, that board opens, then the board moves to the match and marks it, as for a match on the same board.
+- Searching only looks: it never changes or saves a board. Your saved boards are untouched.
+- On a phone the two options are 44px tall, under the search box.
+
 ## Journal opens in a side panel (2026-10-18)
 
 - The **Journal** button now opens a Journal panel at the right, in the same spot as the Focus timer, History, Completed and Calendar (full screen on a phone). The board you are on stays open behind it. Escape, × or the button again closes it.

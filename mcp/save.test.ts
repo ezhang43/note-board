@@ -6,7 +6,7 @@ import { serializeBoard } from '../src/model/persist';
 import type { NoteCard, TodoCard } from '../src/model/types';
 import { contentHash, VERSION_GAP_MS } from '../src/model/versions';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
-import { addItems, type Edit } from './edits';
+import { addItems, deleteThings, planDelete, type Edit } from './edits';
 import { fakeFirestore } from './fakeFirestore';
 import { ownDb } from './firestore';
 import { homeBoard, ownRaw } from './sample';
@@ -300,5 +300,55 @@ describe('the put-back check', () => {
     expect(r.text).toMatch(/isn’t on the board now/);
     expect(boardCommits(fs)).toHaveLength(2);
     expect(findItem(groceries(fs.own()), 'n1')).toBeNull();
+  });
+});
+
+describe('saving a delete (job 110)', () => {
+  const deleteNote = () => {
+    const ws = readWorkspace(ownRaw())!.ws;
+    const p = planDelete(ws, 'home', ['noteCall'], new Set(), (x) => x);
+    if ('error' in p) throw new Error(p.error);
+    return deleteThings('home', ['noteCall'], new Set(), p.lines, 'z');
+  };
+
+  it('always saves a backup version first, even right after another change (no 10 quiet minutes needed)', async () => {
+    const { fs, deps, advance } = setup();
+    await saveChange(deps, addApples('n1'));
+    expect(fs.versions()).toHaveLength(1);
+    advance(60_000);
+    const r = await saveChange(deps, deleteNote(), { deleting: true });
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toBe('Saved:\n- Deleted the note "Call the bank" (id: noteCall) on Home');
+    expect(fs.versions()).toHaveLength(2);
+    // The backup holds the boards just before the delete: the note, and the change before it.
+    const backup = fs.versions().at(-1)!;
+    expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('"noteCall"');
+    expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('"n1"');
+    expect(fs.own()).not.toContain('"noteCall"');
+  });
+
+  it('if the backup can’t be saved, nothing is deleted', async () => {
+    const { fs, deps } = setup();
+    const real = fs.fetch;
+    fs.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
+      String(init?.body ?? '').includes('versionData') ? new Response('{"error":{"code":403,"status":"PERMISSION_DENIED"}}', { status: 403 }) : real(input, init)) as typeof fetch;
+    deps.db = ownDb(async () => 'ID', 'me', fs.fetch);
+    const r = await saveChange(deps, deleteNote(), { deleting: true });
+    expect(r.isError).toBe(true);
+    expect(r.text).toMatch(/safety version/);
+    expect(fs.own()).toContain('"noteCall"');
+  });
+
+  it('the app saving over a delete: reported, never deleted again', async () => {
+    const { fs, deps, log } = setup();
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn(ownRaw());
+    };
+    const r = await saveChange(deps, deleteNote(), { deleting: true });
+    expect(r.isError).toBe(true);
+    expect(r.text).toMatch(/back on the board[\s\S]*not deleted again/);
+    expect(boardCommits(fs)).toHaveLength(1);
+    expect(fs.own()).toContain('"noteCall"');
+    expect(log.at(-1)).toMatch(/not deleted again/);
   });
 });

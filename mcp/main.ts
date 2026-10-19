@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -78,7 +78,29 @@ export function boardsWriter(loader: ReturnType<typeof boardsLoader>, logFile: s
   const log = activityLog(logFile);
   const client = `mcp-${crypto.randomUUID().slice(0, 8)}`;
   const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
-  return (edit) => loader.withOwn((db, memory) => saveChange({ db, client, now: Date.now, wait, log, memory }, edit));
+  return (edit, opts) => loader.withOwn((db, memory) => saveChange({ db, client, now: Date.now, wait, log, memory }, edit, opts));
+}
+
+/**
+ * The "Let Claude delete" setting: settings.json beside the saved sign-in, on this computer only
+ * (not synced, not in the boards). Only the owner switches it, with npm run mcp:delete-on / -off;
+ * no tool can. Read afresh on every delete call.
+ */
+export const settingsPath = (tokenFile: string) => join(dirname(tokenFile), 'settings.json');
+
+/** On only when the file says exactly {"allowDelete": true}; missing or damaged means off. */
+export async function deleteAllowed(file: string): Promise<boolean> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(file, 'utf8'));
+    return typeof parsed === 'object' && parsed !== null && (parsed as { allowDelete?: unknown }).allowDelete === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setDeleteAllowed(file: string, on: boolean): Promise<void> {
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify({ allowDelete: on }));
 }
 
 /** npm run mcp:check: read only. Exit code 0 when the boards could be read. */
@@ -96,6 +118,7 @@ export async function runCheck(opts: { tokenFile: string; fetch: typeof fetch; l
     opts.log(`${entries.length} board${entries.length === 1 ? '' : 's'} (${shared} shared, read-only)`);
     if (ownUnreadable) opts.log('Your own boards couldn’t be read.');
     opts.log(safe.ok ? 'Safe to edit: yes' : `Safe to edit: no (${safe.reason})`);
+    opts.log((await deleteAllowed(settingsPath(opts.tokenFile))) ? 'Claude may delete: yes (npm run mcp:delete-off to stop it)' : 'Claude may delete: no (npm run mcp:delete-on to allow it)');
     return 0;
   } catch (e) {
     opts.log(e instanceof Error ? e.message : String(e));
@@ -143,15 +166,27 @@ export async function main(args: string[]): Promise<number | null> {
       return 0;
     case 'check':
       return runCheck({ tokenFile: file, fetch, log: (line) => console.log(line) });
+    case 'delete-on':
+    case 'delete-off': {
+      const on = args[0] === 'delete-on';
+      await setDeleteAllowed(settingsPath(file), on);
+      console.log(
+        on
+          ? 'Claude may now delete from your own boards: always a preview first, then a confirm, with a copy saved in Version history. Never shared boards or whole top-level boards. To stop: npm run mcp:delete-off'
+          : 'Claude may no longer delete anything. To allow it again: npm run mcp:delete-on',
+      );
+      return 0;
+    }
     case undefined: {
       // Claude talks to the server over stdin / stdout, so nothing else may be printed there.
       const load = boardsLoader(file, fetch);
-      await createServer(async () => (await load()).snapshot, boardsWriter(load, activityPath())).connect(new StdioServerTransport());
+      const options = { deleteAllowed: () => deleteAllowed(settingsPath(file)) };
+      await createServer(async () => (await load()).snapshot, boardsWriter(load, activityPath()), options).connect(new StdioServerTransport());
       console.error('BusyAnts connector running.');
       return null;
     }
     default:
-      console.log('Use: node mcp/dist/server.js [login [--key <api key>] | logout | check]');
+      console.log('Use: node mcp/dist/server.js [login [--key <api key>] | logout | check | delete-on | delete-off]');
       return 1;
   }
 }

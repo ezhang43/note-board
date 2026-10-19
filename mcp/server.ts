@@ -2,28 +2,53 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { newId } from '../src/model/cards';
 import { readShare } from '../src/model/sharing';
-import { boardOutline, collectBoards, findBoard, listBoardsText, type Snapshot } from './boards';
-import { addItems, addNote, editItems, moveItems, setItemsDone, type Edit } from './edits';
+import { readWorkspace } from '../src/model/workspace';
+import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit, type Snapshot } from './boards';
+import { addChecklist, addItems, addLink, addNote, deleteThings, editItems, moveItems, newBoard, newColumn, planDelete, setItemsDone, type Edit } from './edits';
 
-// The BusyAnts connector's tools: listing boards and reading one, and changing checklist items and
-// adding notes on the owner's own boards (shared boards are read-only). Every call reads the boards
+// The BusyAnts connector's tools: listing boards and reading one; changing checklist items and
+// adding notes, checklists, links, columns and boards on the owner's own boards (shared boards are
+// read-only); and, only when the owner has switched it on, deleting in two steps (a preview, then a
+// confirm carrying the preview's id), with a backup version first. Every call reads the boards
 // afresh, so Claude always sees what is saved online now; each change is one save.
 
 const reply = (text: string, isError = false) => ({ content: [{ type: 'text' as const, text }], ...(isError ? { isError: true } : {}) });
 
 /** Saves an edit to the owner's own boards (save.ts), giving the plain-English answer. */
-export type Write = (edit: Edit) => Promise<{ text: string; isError?: boolean }>;
+export type Write = (edit: Edit, opts?: { deleting?: boolean }) => Promise<{ text: string; isError?: boolean }>;
 
 /** At most this many changes in one call (each call is one save). */
 export const MAX_CHANGES = 50;
 /** At most this many characters in one item's or note's text. */
 export const MAX_TEXT = 5000;
+/** At most this many things deleted in one call. */
+export const MAX_DELETE = 20;
+
+const DELETE_OFF = 'Deleting is switched off for this connector, so nothing was deleted. Only the owner can switch it on, on their computer: ask the owner.';
+
+/** Every board in any share (the person's own shared boards too): read-only for the connector. */
+const sharedIds = (snap: Snapshot) => new Set(snap.shares.flatMap((s) => Object.keys(readShare(s.raw)?.boards ?? {})));
+
+interface Preview {
+  boardId: string;
+  ids: string[];
+  lines: string[];
+  seed: string;
+}
 
 const itemId = z.string().min(1).describe('An item’s id, as read_board shows it');
 const text = z.string().max(MAX_TEXT);
 
-export function createServer(load: () => Promise<Snapshot>, write: Write): McpServer {
-  const server = new McpServer({ name: 'busyants', version: '1.1.0' });
+export interface ServerOptions {
+  /** Whether the owner lets Claude delete (the "Let Claude delete" setting); off when not given. */
+  deleteAllowed?: () => Promise<boolean>;
+}
+
+export function createServer(load: () => Promise<Snapshot>, write: Write, opts: ServerOptions = {}): McpServer {
+  const server = new McpServer({ name: 'busyants', version: '1.2.0' });
+  const deleteAllowed = opts.deleteAllowed ?? (async () => false);
+  // Previews waiting for a confirm, by preview id; each is used once (kept only while running).
+  const previews = new Map<string, Preview>();
   const readOnly = { readOnlyHint: true, openWorldHint: false };
   const changes = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
   const boardArg = z.string().min(1).describe('The board’s id, or its name when only one board has that name');
@@ -38,17 +63,24 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
     }
   };
 
+  /** The owner's own board `board` (by id or name), with the boards now and the shared boards' ids. */
+  const ownBoard = async (board: string): Promise<{ error: string } | { snap: Snapshot; id: string; shared: Set<string> }> => {
+    const snap = await load();
+    const found = findBoard(collectBoards(snap).entries, board);
+    if ('error' in found) return { error: found.error };
+    // A board in any share counts as shared, even while an old copy is still in the own boards
+    // (just shared): the app shows the share's copy, so a change to the old one would be lost.
+    const shared = sharedIds(snap);
+    if (found.entry.sharedBy || shared.has(found.entry.id)) return { error: `${found.entry.name} is a shared board: shared boards are read-only for this connector. Nothing was changed.` };
+    return { snap, id: found.entry.id, shared };
+  };
+
   /** Finds the board, refuses shared ones, and saves `make(boardId)` to the owner's boards. */
   const change = (board: string, make: (boardId: string) => Edit) =>
     safely(async () => {
-      const snap = await load();
-      const found = findBoard(collectBoards(snap).entries, board);
-      if ('error' in found) return { text: found.error, isError: true };
-      // A board in any share counts as shared, even while an old copy is still in the own boards
-      // (just shared): the app shows the share's copy, so a change to the old one would be lost.
-      const inShare = snap.shares.some((s) => readShare(s.raw)?.boards[found.entry.id]);
-      if (found.entry.sharedBy || inShare) return { text: `${found.entry.name} is a shared board: shared boards are read-only for this connector. Nothing was changed.`, isError: true };
-      return write(make(found.entry.id));
+      const got = await ownBoard(board);
+      if ('error' in got) return { text: got.error, isError: true };
+      return write(make(got.id));
     });
 
   server.registerTool(
@@ -165,6 +197,130 @@ export function createServer(load: () => Promise<Snapshot>, write: Write): McpSe
       annotations: changes,
     },
     ({ board, text: note, column, near }) => change(board, (id) => addNote(id, note, { column, near }, newId('k'))),
+  );
+
+  const column = z.string().min(1).optional().describe('Put it at the end of this column (its id or title)');
+  const near = z.string().min(1).optional().describe('Put it just below this card in a column, or beside this loose card or column (its id)');
+
+  server.registerTool(
+    'add_checklist',
+    {
+      title: 'Add a checklist',
+      description: `Adds a checklist card (a title and items) to one of your own boards, placed as add_note places a note. With no items it gets one blank item, as a new checklist in the app. At most ${MAX_CHANGES} items; add_items adds more, nested.`,
+      inputSchema: {
+        board: boardArg,
+        title: text.min(1).describe('The checklist’s title (one line)'),
+        items: z.array(text.min(1)).max(MAX_CHANGES).optional().describe('The items’ text, in order (one line each)'),
+        column,
+        near,
+      },
+      annotations: changes,
+    },
+    ({ board, title, items = [], column: col, near: by }) =>
+      change(board, (id) => addChecklist(id, title, items, { column: col, near: by }, newId('k'), (items.length ? items : ['']).map(() => newId('i')))),
+  );
+
+  server.registerTool(
+    'add_link',
+    {
+      title: 'Add a link',
+      description: 'Adds a link card (a web address, http or https, and an optional title) to one of your own boards, placed as add_note places a note.',
+      inputSchema: {
+        board: boardArg,
+        url: z.string().min(1).max(2000).describe('The web address, for example example.com/page'),
+        title: text.optional(),
+        column,
+        near,
+      },
+      annotations: changes,
+    },
+    ({ board, url, title = '', column: col, near: by }) => change(board, (id) => addLink(id, url, title, { column: col, near: by }, newId('k'))),
+  );
+
+  server.registerTool(
+    'add_column',
+    {
+      title: 'Add a column',
+      description: 'Adds an empty column (a container for cards) to one of your own boards: beside a card or column (near: its id), or else near the board’s top left; never over another block.',
+      inputSchema: { board: boardArg, title: text.min(1).describe('The column’s title (one line)'), near: z.string().min(1).optional().describe('A card’s or column’s id') },
+      annotations: changes,
+    },
+    ({ board, title, near: by }) => change(board, (id) => newColumn(id, title, by, newId('c'))),
+  );
+
+  server.registerTool(
+    'create_board',
+    {
+      title: 'Make a board',
+      description:
+        'Makes a new, empty, named board in your own boards: inside one of your boards (inside: its id or name), with a board card opening it there (placed as add_note places a note), or else on its own, as New board in the app does.',
+      inputSchema: {
+        name: z.string().min(1).max(200).describe('The new board’s name'),
+        inside: z.string().min(1).optional().describe('The board to put it inside (its id, or its name when only one board has it)'),
+        column,
+        near,
+      },
+      annotations: changes,
+    },
+    ({ name, inside, column: col, near: by }) => {
+      const id = newId('b');
+      const cardId = newId('k');
+      if (inside === undefined) {
+        if (col !== undefined || by !== undefined) return reply('column and near need inside (the board to put it in).', true);
+        return safely(() => write(newBoard(name, undefined, id, cardId)));
+      }
+      return change(inside, (parent) => newBoard(name, { boardId: parent, where: { column: col, near: by } }, id, cardId));
+    },
+  );
+
+  server.registerTool(
+    'preview_delete',
+    {
+      title: 'Preview a delete',
+      description: `Step 1 of 2 for deleting: lists exactly what would be deleted from one of your own boards, and deletes nothing. Things are items (with their sub-items), cards, columns (with their cards) and boards inside this board (with their cards), by the ids read_board shows; at most ${MAX_DELETE} per call. Never the home board, a top-level board, the Completed card, or anything on a shared board. Show the list to the person and ask them; only if they say yes, call confirm_delete with the preview id. Works only when the owner has switched deleting on.`,
+      inputSchema: { board: boardArg, things: z.array(z.string().min(1)).min(1).max(MAX_DELETE).describe('The ids to delete') },
+      annotations: readOnly,
+    },
+    ({ board, things }) =>
+      safely(async () => {
+        if (!(await deleteAllowed())) return { text: DELETE_OFF, isError: true };
+        const got = await ownBoard(board);
+        if ('error' in got) return { text: got.error, isError: true };
+        const safe = safeToEdit(got.snap.own);
+        if (!safe.ok) return { text: `Nothing can be deleted: ${safe.reason}.`, isError: true };
+        const seed = newId('d').slice(2);
+        const plan = planDelete(readWorkspace(got.snap.own)!.ws, got.id, things, got.shared, (p) => `${p}_${seed}`);
+        if ('error' in plan) return { text: plan.error, isError: true };
+        const key = newId('p');
+        previews.set(key, { boardId: got.id, ids: things, lines: plan.lines, seed });
+        const list = plan.lines.map((l) => `- ${l}`).join('\n');
+        return {
+          text: `This would delete (nothing is deleted yet):\n${list}\n\nPreview id: ${key}. To delete exactly this, call confirm_delete with it (once), only after the person has said yes to this list. If the boards change before then, nothing is deleted and a new preview is needed.`,
+        };
+      }),
+  );
+
+  server.registerTool(
+    'confirm_delete',
+    {
+      title: 'Confirm a delete',
+      description:
+        'Step 2 of 2 for deleting: deletes exactly what preview_delete listed, by its preview id (each preview is used once), after the person has agreed to that list. A copy of the boards as they were is saved first (Version history in the app), so it can be put back. Nothing is deleted if the boards changed since the preview.',
+      inputSchema: { preview: z.string().min(1).describe('The preview id preview_delete gave') },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+    },
+    ({ preview }) =>
+      safely(async () => {
+        const p = previews.get(preview);
+        if (!p) return { text: `No preview with id "${preview}" (each preview is used once). Call preview_delete again.`, isError: true };
+        previews.delete(preview);
+        if (!(await deleteAllowed())) return { text: DELETE_OFF, isError: true };
+        const got = await ownBoard(p.boardId);
+        if ('error' in got) return { text: got.error, isError: true };
+        const r = await write(deleteThings(got.id, p.ids, got.shared, p.lines, p.seed), { deleting: true });
+        if (r.isError || !r.text.startsWith('Saved:')) return r;
+        return { text: `${r.text}\n\nA copy of the boards as they were just before is in Version history (the History button in BusyAnts), so it can be put back.` };
+      }),
   );
 
   return server;

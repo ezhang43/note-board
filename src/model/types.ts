@@ -1,4 +1,5 @@
 import type { ColorKey } from './palette';
+import type { Rich } from './richText';
 import type { FontSize } from './font';
 import type { Hotkeys } from './hotkeys';
 import type { ColorTheme, Theme } from './theme';
@@ -40,6 +41,8 @@ interface CardBase {
 export interface NoteCard extends CardBase {
   kind: 'note';
   text: string;
+  /** Journal notes only: the body's formatting, used while its plain text matches `text` (see richText.ts). */
+  rich?: Rich;
 }
 
 export interface TodoItem {

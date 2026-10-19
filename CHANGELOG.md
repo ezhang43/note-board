@@ -1,5 +1,13 @@
 # Changelog
 
+## Rich text in the Journal (2026-10-19)
+
+- Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).
+- Select some words and press a button, or press it first and then type. Keys: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Shift+X (strikethrough), Ctrl+Shift+8 (bullets), Ctrl+Shift+7 (numbers).
+- In a list, Enter adds the next item, Enter on an empty item ends the list, and Tab / Shift+Tab indent and outdent.
+- Only the Journal has this. Everywhere else (other notes, search, export, copying, the note's card on the Journal board) the words show as plain text, with lists as "•" and "1.".
+- The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
+
 ## Custom hotkeys (2026-10-19)
 
 - You can now change the keys for the Hand tool, the Select tool, Select all, Copy, Paste, Duplicate and Delete. Open the Keyboard shortcuts list (the ? button or the ? key), click a key, and press the new one. Escape cancels, and a "Reset to defaults" button puts every key back.

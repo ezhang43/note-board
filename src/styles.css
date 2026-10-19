@@ -42,6 +42,11 @@
   --font-rounded: 'Nunito', system-ui, sans-serif;
   --font-hand: 'Caveat', 'Segoe Print', cursive;
   --font-mono: 'IBM Plex Mono', Consolas, monospace;
+  /* Highlight colours for words in the Journal (its only colours; owner request, 2026-10-19). */
+  --hl-yellow: #fdeb8a;
+  --hl-green: #c8ecc0;
+  --hl-blue: #cfe3fb;
+  --hl-pink: #f9d2e3;
 }
 
 /*
@@ -75,6 +80,10 @@
   --checkbox: #5fb38a;
   --honey: #f2c14e;
   --honey-ink: #1b1a17;
+  --hl-yellow: #6b5a14;
+  --hl-green: #2e5a2c;
+  --hl-blue: #23466e;
+  --hl-pink: #6a2e48;
 }
 
 /*
@@ -1840,7 +1849,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .journal-panel { display: flex; flex-direction: column; gap: 4px; }
 .journal-panel:focus, .side-panel:focus { outline: none; }
 .journal-entry h3 { margin: 12px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.journal-entry .grow {
+.journal-entry .rich {
+  min-height: 3.1em;
   padding: 6px 8px;
   background: var(--card-bg);
   border: 1px solid var(--card-edge);
@@ -1848,9 +1858,84 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   color: var(--ink);
   font-size: 14px;
   line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
 }
-.journal-entry .grow > textarea { min-height: 3.1em; }
-.app.phone .journal-entry .grow { font-size: 16px; }
+.app.phone .journal-entry .rich { font-size: 16px; }
+
+/* Rich text in the Journal (owner request, 2026-10-19): lines, list items and the looks of words. */
+.rich > div { position: relative; }
+.rich > [data-type='h1'] { font-size: 1.45em; font-weight: 600; line-height: 1.3; margin: 0.2em 0; }
+.rich > [data-type='h2'] { font-size: 1.2em; font-weight: 600; line-height: 1.35; margin: 0.15em 0; }
+.rich > :is([data-type='bullet'], [data-type='number']) { --indent: 0; padding-left: calc(1.6em + var(--indent) * 1.4em); }
+.rich > [data-indent='1'] { --indent: 1; }
+.rich > [data-indent='2'] { --indent: 2; }
+.rich > [data-indent='3'] { --indent: 3; }
+.rich > [data-indent='4'] { --indent: 4; }
+.rich > [data-marker]::before {
+  content: attr(data-marker);
+  position: absolute;
+  left: calc(var(--indent) * 1.4em);
+  width: 1.3em;
+  text-align: right;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.rich [data-b] { font-weight: 600; }
+.rich [data-i] { font-style: italic; }
+.rich [data-u] { text-decoration-line: underline; }
+.rich [data-s] { text-decoration-line: line-through; }
+.rich [data-u][data-s] { text-decoration-line: underline line-through; }
+.rich [data-size='small'] { font-size: 0.85em; }
+.rich [data-size='large'] { font-size: 1.3em; }
+.rich [data-font='serif'] { font-family: var(--font-serif); }
+.rich [data-font='rounded'] { font-family: var(--font-rounded); }
+.rich [data-font='hand'] { font-family: var(--font-hand); }
+.rich [data-font='mono'] { font-family: var(--font-mono); }
+.rich [data-hl] { border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.rich [data-hl='yellow'] { background: var(--hl-yellow); }
+.rich [data-hl='green'] { background: var(--hl-green); }
+.rich [data-hl='blue'] { background: var(--hl-blue); }
+.rich [data-hl='pink'] { background: var(--hl-pink); }
+
+/* Its Formatting bar stays at the top of the panel while the notes scroll under it. */
+.journal-tools {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: -8px -10px 0;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.journal-tools button,
+.journal-tools select {
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.journal-tools button { min-width: 32px; padding: 0 6px; line-height: 1; }
+.journal-tools select { padding: 0 4px; border-color: var(--control-edge); max-width: 9.5em; }
+@media (hover: hover) {
+  .journal-tools button:hover { background: var(--hover); }
+}
+.journal-tools button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.journal-tools .jt-b { font-weight: 700; }
+.journal-tools .jt-i { font-style: italic; font-family: Georgia, serif; }
+.journal-tools .jt-u { text-decoration: underline; }
+.journal-tools .jt-s { text-decoration: line-through; }
+.app.phone .journal-tools button { min-width: 44px; height: 44px; font-size: 16px; }
+.app.phone .journal-tools select { height: 44px; font-size: 16px; }
 
 /* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
 .confirm.delete-completed {

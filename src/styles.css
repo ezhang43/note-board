@@ -1671,7 +1671,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 
 /* The Journal panel: each day's note as a white card, newest first, its date above it. */
 .journal-panel { display: flex; flex-direction: column; gap: 4px; }
-.journal-panel:focus { outline: none; }
+.journal-panel:focus, .side-panel:focus { outline: none; }
 .journal-entry h3 { margin: 12px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .journal-entry .grow {
   padding: 6px 8px;

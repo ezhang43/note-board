@@ -136,6 +136,25 @@ test('keys pressed in the panel never act on the board behind it (review of job 
   await expect(cards(page)).toContainText('on home');
 });
 
+test('a click on the panel’s heading or blank space keeps board keys away from the board (check of PR #94)', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape'); // the note stays selected
+  await journalButton(page).click();
+  const box = (await panel(page).boundingBox())!;
+  for (const spot of [panel(page).getByRole('heading', { name: 'Journal', level: 2 }), null]) {
+    if (spot) await spot.click();
+    else await page.mouse.click(box.x + 20, box.y + box.height - 20); // blank space at the bottom
+    for (const key of ['Delete', 'Backspace', 'Control+z', 'Control+x', 'Control+d', 'ArrowDown']) await page.keyboard.press(key);
+    await expect(cards(page)).toHaveCount(1);
+    await expect(cards(page)).toContainText('on home');
+  }
+  // Opening the panel cleared the selection, so Delete after closing it removes nothing either.
+  await panel(page).getByRole('button', { name: 'Close journal' }).click();
+  await page.keyboard.press('Delete');
+  await expect(cards(page)).toHaveCount(1);
+});
+
 test('an existing Journal board and its Home card are left as they are, and the panel writes into that board', async ({ page }) => {
   await boardName(page).fill('Home');
   await page.getByRole('button', { name: 'Boards', exact: true }).click();

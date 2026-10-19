@@ -5,7 +5,8 @@
 - The **Journal** button now opens a Journal panel at the right, in the same spot as the Focus timer, History, Completed and Calendar (full screen on a phone). The board you are on stays open behind it. Escape, × or the button again closes it.
 - Today's note is at the top, with the cursor ready to type; earlier days are listed below it, newest first, and can be edited too. What you write is saved as before, on the board called Journal.
 - Ctrl+Z / Ctrl+Y in the panel undo and redo your journal writing only, never the board behind it.
-- Other keys pressed while writing in the panel (Delete, arrows and so on) never touch the board behind it.
+- Other keys pressed in the panel (Delete, arrows and so on), even after clicking its heading or blank space, never touch the board behind it. Opening the panel unselects whatever was selected on the board.
+- Restoring a version from Version history also brings back your journal writing as it was then.
 - A new Journal board no longer gets a card on home and is not listed in the Boards menu. A Journal board you already have, with its card on home, is left exactly as it is and still opens as a normal board.
 
 ## Up and down arrows on checklist items (2026-10-18)

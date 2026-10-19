@@ -223,6 +223,39 @@ describe('Journal panel', () => {
     expect(s.hiddenJournal()).toBe(id);
   });
 
+  it('restoring a version brings back the hidden Journal board’s writing too, and undo in the panel takes it back (check of PR #94)', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournalText(note.id, 'old words');
+    const then = s.workspace();
+    vi.advanceTimersByTime(5000);
+    s.setJournalText(note.id, 'new words');
+    expect(s.restoreVersion(then)).toEqual([]);
+    expect(journalNotes(s)[0].text).toBe(`${today}\n\nold words`);
+    s.undoJournal();
+    expect(journalNotes(s)[0].text).toBe(`${today}\n\nnew words`);
+  });
+
+  it('a version from before the Journal board existed leaves it as it is', () => {
+    const s = setup();
+    const then = s.workspace();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournalText(note.id, 'kept');
+    s.restoreVersion(then);
+    expect(journalNotes(s)[0].text).toBe(`${today}\n\nkept`);
+  });
+
+  it('opening the panel clears the selection on the board behind it, so Delete can’t remove it (check of PR #94)', () => {
+    const s = setup();
+    s.addCard('note');
+    expect(s.getState().ui.selection).toHaveLength(1);
+    s.openJournal();
+    expect(s.getState().ui.selection).toEqual([]);
+    expect(s.getState().ui.itemSel).toBeNull();
+  });
+
   it('makes the hidden Journal board standalone, not inside the board that is open', () => {
     const s = setup();
     const sub = s.addBoardCard();

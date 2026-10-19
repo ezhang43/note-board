@@ -103,7 +103,8 @@ export function boardActions(ctx: StoreContext) {
         todaysNote(b, line) ? b : B.addCard(b, note, { type: 'loose', ...journalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) }),
       );
       if (open && ctx.state.board.cards[note.id]) ctx.requestSettle([note.id]);
-      ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false });
+      // Nothing stays selected behind the panel, so a key meant for the journal can't delete it.
+      ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false, selection: [], itemSel: null });
       return null;
     },
     /** Typing in the Journal panel: what is written under a note's date line (the date line stays). */
@@ -155,6 +156,10 @@ export function boardActions(ctx: StoreContext) {
     restoreVersion(ws: Workspace): string[] | 'loading' {
       if (!ctx.state.ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null });
+      // The hidden Journal board can't be opened to restore it on its own, so it comes back too
+      // (check of PR #94), as one change on its own undo; a version without it leaves it as it is.
+      const journal = hidden();
+      if (journal && ws.boards[journal]) ctx.commitTo(journal, () => ws.boards[journal]);
       const open = ctx.state.boards.open;
       const missing = Object.keys(ws.boards).filter((id) => id !== open && !ctx.workspace().boards[id]);
       const { ids, kept } = restorable(ctx.state.ui.shares, ws.boards[open] ? [open, ...missing] : missing);

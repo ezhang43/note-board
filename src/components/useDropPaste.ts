@@ -3,7 +3,7 @@ import { addressFromTransfer } from '../model/media';
 import { appStore } from '../store/appStore';
 import { clientToBoard } from './canvasDom';
 import { isTextField, panelCovers } from './textField';
-import { toast } from './useShortcuts';
+import { BLOCKS_MARKER, toast } from './useShortcuts';
 
 const NO_FILES = 'Images from your computer can’t be added yet. Paste a web address instead.';
 
@@ -29,6 +29,8 @@ export function useDropPaste() {
     const onPaste = (e: ClipboardEvent) => {
       const dt = e.clipboardData;
       if (!dt || !free(e.target)) return;
+      // Blocks copied in the app are pasted only while they are the newest copy: the marker is still on the clipboard.
+      if (dt.types.includes(BLOCKS_MARKER) && appStore.paste()) return e.preventDefault();
       const address = addressFromTransfer(get(dt));
       if (address) appStore.addLinkCard(address);
       else if (hasFile(dt)) toast(NO_FILES);

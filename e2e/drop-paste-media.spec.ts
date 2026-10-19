@@ -111,10 +111,40 @@ test('pasting a web address while typing in a text field stays plain text', asyn
   await expect(cards(page)).toHaveCount(1);
 });
 
-test('copying and pasting the board\'s own cards still wins over an address', async ({ page }) => {
+/** Select the only card on the board, ready to copy. */
+async function selectOnlyCard(page: Page) {
   await add(page, 'Note');
   await page.keyboard.press('Escape');
   await page.locator('[data-card-id]').first().click({ position: { x: 20, y: 10 } });
+}
+
+// The newest copy wins: cards copied in the app, or an address copied after them (real keys and the real clipboard).
+test('copying a card and pasting still duplicates it, and one undo removes the copy', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await selectOnlyCard(page);
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await expect(cards(page)).toHaveCount(2);
+  await expect(link(page)).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('a web address copied after copying a card is what Ctrl+V pastes', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await selectOnlyCard(page);
+  await page.keyboard.press('Control+c');
+  await page.evaluate(() => navigator.clipboard.writeText('https://example.com/copied-later')); // copied in another tab or app
+  await page.keyboard.press('Control+v');
+  await expect(link(page)).toHaveCount(1);
+  await expect(link(page).getByLabel('Link address')).toHaveValue('https://example.com/copied-later');
+  await expect(cards(page)).toHaveCount(2); // the original note and the link card, no copy of the note
+});
+
+test('cards copied after an address are what Ctrl+V pastes', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => navigator.clipboard.writeText('https://example.com/copied-first'));
+  await selectOnlyCard(page);
   await page.keyboard.press('Control+c');
   await page.keyboard.press('Control+v');
   await expect(cards(page)).toHaveCount(2);

@@ -1,5 +1,10 @@
 # Changelog
 
+## Text size can go even bigger (2026-10-19)
+
+- A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.
+- Your saved text size still loads as before. The sizes you set on a single note or title (Ctrl+Shift+>) are unchanged.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

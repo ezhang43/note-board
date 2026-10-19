@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, createBoard, problems } from '../src/model/board';
 import { createBoardCard, createCard } from '../src/model/cards';
-import type { Board, BoardCard, LinkCard, NoteCard, TodoCard, TodoItem } from '../src/model/types';
+import type { Board, BoardCard, NoteCard, TodoCard, TodoItem } from '../src/model/types';
 import { readWorkspace, serializeWorkspace, type Workspace } from '../src/model/workspace';
-import { addChecklist, addItems, addLink, deleteThings, newBoard, newColumn, planDelete, type Edit } from './edits';
+import { addChecklist, addItems, deleteThings, newBoard, newColumn, planDelete, type Edit } from './edits';
 import { homeBoard, ownRaw, workBoard } from './sample';
 
 // The connector's making and deleting (job 110), pure, on the sample boards.
@@ -49,21 +49,6 @@ describe('add_checklist', () => {
     expect(ok(edit, once.ws).changed).toEqual([]);
     expect(fails(addChecklist('home', ' ', [], {}, 'k', ['a']))).toMatch(/blank/);
     expect(fails(addChecklist('home', 'T', ['ok', ' '], {}, 'k', ['a', 'b']))).toMatch(/blank/);
-  });
-});
-
-describe('add_link', () => {
-  it('a link card near a card in a column', () => {
-    const r = ok(addLink('home', 'example.com/a', 'Example', { near: 'noteCall' }, 'kLink'));
-    const card = r.ws.boards.home.cards.kLink as LinkCard;
-    expect([card.kind, card.url, card.title]).toEqual(['link', 'example.com/a', 'Example']);
-    expect(r.ws.boards.home.columns.colTodo.cardIds).toEqual(['listGroceries', 'noteCall', 'kLink']);
-    expect(r.changed).toEqual(['Added the link "Example" (id: kLink) to a column, below the card: example.com/a']);
-  });
-
-  it('refuses an address the app wouldn’t open (only http and https)', () => {
-    expect(fails(addLink('home', 'javascript:alert(1)', '', {}, 'k'))).toMatch(/web address/);
-    expect(fails(addLink('home', '  ', '', {}, 'k'))).toMatch(/web address/);
   });
 });
 

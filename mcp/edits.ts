@@ -1,10 +1,10 @@
 import { addCard, addColumn, createBoard, deleteBlocks, placementForNewCard, setItemText, shownName } from '../src/model/board';
-import { createBoardCard, createCard, createColumn, createItem, hrefOf, isPermanent, type MakeId } from '../src/model/cards';
+import { createBoardCard, createCard, createColumn, createItem, isPermanent, type MakeId } from '../src/model/cards';
 import { editItems as changeItems, deleteItems, extractItems, findItem, flatIds, insertItems, refill, rootsOf, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
 import { blockRect, spotForNewBlock, type MeasuredHeight } from '../src/model/layout';
 import { estimateHeight } from '../src/model/milanote';
-import type { Board, Card, LinkCard, NoteCard, TodoCard, TodoItem } from '../src/model/types';
+import type { Board, Card, NoteCard, TodoCard, TodoItem } from '../src/model/types';
 import { boardLinks, pathTo, withoutBoard, type Workspace } from '../src/model/workspace';
 
 // The connector's changes to a board (pure: no network). Each tool's request becomes an Edit: a
@@ -148,8 +148,8 @@ export interface MoveTo {
 
 /**
  * move_items: items (with their sub-items) to a place in a list on the same board, in the order
- * they are shown, as when dragging them. A list left empty keeps one blank item: the connector
- * never deletes anything (in the app, dragging the last item out removes the list).
+ * they are shown, as when dragging them. A list left empty keeps one blank item: moving
+ * never deletes a list (in the app, dragging the last item out removes the list).
  */
 export function moveItems(boardId: string, ids: string[], to: MoveTo): Edit {
   return onBoard(boardId, (b, changed) => {
@@ -288,19 +288,6 @@ export function addChecklist(boardId: string, title: string, items: string[], wh
   });
 }
 
-/** add_link: a link card; only addresses the app would open (http or https). */
-export function addLink(boardId: string, url: string, title: string, where: Where, id: string): Edit {
-  return onBoard(boardId, (b, changed) => {
-    if (b.cards[id]) return b;
-    const u = url.trim();
-    if (!hrefOf(u)) refuse(`"${short(u)}" isn’t a web address (http or https) the app would open.`);
-    const link: LinkCard = { ...(createCard('link', id) as LinkCard), url: u, title: title.trim() };
-    const { board, place } = placeCard(b, link, where);
-    changed.push(`Added the link "${short(link.title || u)}" (id: ${id}) ${place}: ${u}`);
-    return board;
-  });
-}
-
 /** add_column: an empty column, loose, beside block `near` or near the top left. */
 export function newColumn(boardId: string, title: string, near: string | undefined, id: string): Edit {
   return onBoard(boardId, (b, changed) => {
@@ -371,7 +358,7 @@ function whatWent(before: Workspace, after: Workspace, boardId: string): string[
       else if (card.kind === 'note') lines.push(`the note "${firstLine(card.text)}" (id: ${card.id}) ${on}`);
       else if (card.kind === 'link') lines.push(`the link "${short(card.title.trim() || card.url)}" (id: ${card.id}) ${on}`);
       else if (card.kind === 'board') {
-        const opens = before.boards[card.boardId] ? nameOf(card.boardId) : 'a board that isn’t there';
+        const opens = before.boards[card.boardId] ? nameOf(card.boardId) : 'a board not among your own (shared with you, or gone)';
         const kept = after.boards[card.boardId] ? ` (the board ${opens} itself is kept)` : '';
         lines.push(`the board card (id: ${card.id}) ${on}, which opens ${opens}${kept}`);
       } else lines.push(`the card (id: ${card.id}) ${on}`);

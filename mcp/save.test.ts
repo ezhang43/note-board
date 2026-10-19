@@ -327,6 +327,20 @@ describe('saving a delete (job 110)', () => {
     expect(fs.own()).not.toContain('"noteCall"');
   });
 
+  it('the app saving in between: the backup is saved again, so it holds the boards just before the delete', async () => {
+    const { fs, deps } = setup();
+    fs.hooks.beforeCommit = (n) => {
+      if (n === 2) fs.setOwn(ownRaw().replace('"Work"', '"Work (renamed in the app)"'));
+    };
+    const r = await saveChange(deps, deleteNote(), { deleting: true });
+    expect(r.isError).toBeFalsy();
+    expect(fs.versions()).toHaveLength(2);
+    const backup = fs.versions().at(-1)!;
+    expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('Work (renamed in the app)');
+    expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('"noteCall"');
+    expect(fs.own()).not.toContain('"noteCall"');
+  });
+
   it('if the backup can’t be saved, nothing is deleted', async () => {
     const { fs, deps } = setup();
     const real = fs.fetch;

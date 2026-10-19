@@ -80,7 +80,7 @@ const saves = (fs: ReturnType<typeof fakeFirestore>) => fs.calls.filter((c) => c
 describe('the connector’s write tools', () => {
   it('offers the write tools, none marked destructive or read-only, and confirm_delete marked destructive', async () => {
     const { tools } = await (await connectWithWrites().client).listTools();
-    const writes = ['add_checklist', 'add_column', 'add_items', 'add_link', 'add_note', 'create_board', 'edit_items', 'move_items', 'set_items_done'];
+    const writes = ['add_checklist', 'add_column', 'add_items', 'add_note', 'create_board', 'edit_items', 'move_items', 'set_items_done'];
     expect(tools.map((t) => t.name).sort()).toEqual([...writes, 'confirm_delete', 'list_boards', 'preview_delete', 'read_board'].sort());
     for (const t of tools.filter((t) => writes.includes(t.name))) {
       expect(t.annotations?.destructiveHint, t.name).toBe(false);
@@ -168,15 +168,14 @@ const allowed = async () => true;
 const previewId = (r: unknown) => /Preview id: (\S+)\./.exec(text(r))![1];
 
 describe('the connector’s making tools', () => {
-  it('add_checklist, add_link and add_column add to the board', async () => {
+  it('add_checklist and add_column add to the board', async () => {
     const { fs, client } = connectWithWrites();
     const c = await client;
     expect(text(await c.callTool({ name: 'add_checklist', arguments: { board: 'home', title: 'Packing', items: ['Socks'], column: 'Ideas' } }))).toMatch(/Added the checklist "Packing" \(id: \S+\) with 1 item to the column Ideas/);
-    expect(text(await c.callTool({ name: 'add_link', arguments: { board: 'home', url: 'example.com', title: 'Example' } }))).toMatch(/Added the link "Example"/);
     expect(text(await c.callTool({ name: 'add_column', arguments: { board: 'home', title: 'Later' } }))).toMatch(/Added the column "Later"/);
     const b = home(fs);
     expect(Object.values(b.columns).map((col) => col.title)).toContain('Later');
-    expect(Object.values(b.cards).filter((k) => k.kind === 'link')).toHaveLength(2);
+    expect(Object.values(b.cards).filter((k) => k.kind === "todo" && k.title === "Packing")).toHaveLength(1);
   });
 
   it('create_board makes a board inside another, or on its own; never inside a shared board', async () => {

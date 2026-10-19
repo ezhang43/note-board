@@ -66,11 +66,11 @@ async function safetyVersion(deps: SaveDeps, raw: string, force: boolean) {
 }
 
 /** Makes `edit` and saves it, trying again (up to RETRIES times) when the boards changed in between. */
-async function commit(deps: SaveDeps, edit: Edit, before?: (raw: string) => Promise<void>): Promise<string[]> {
+async function commit(deps: SaveDeps, edit: Edit, before?: (raw: string) => Promise<void>, everyAttempt = false): Promise<string[]> {
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     const got = await readAndEdit(deps.db, edit);
     if (!got.changed.length) return [];
-    if (attempt === 0 && before) await before(got.raw);
+    if ((attempt === 0 || everyAttempt) && before) await before(got.raw);
     if (await deps.db.write(got.data, deps.client, got.updateTime)) return got.changed;
   }
   throw new Stop('Nothing was changed: the boards kept changing while saving (BusyAnts is probably open and busy). Try again in a moment.');
@@ -100,7 +100,8 @@ export async function saveChange(deps: SaveDeps, edit: Edit, opts: { deleting?: 
       } catch (e) {
         throw new Stop(`Nothing was changed: the safety version (a copy of the boards as they were) couldn’t be saved. ${e instanceof Error ? e.message : ''}`.trim());
       }
-    });
+      // A delete backs up the boards it is about to save over, even when a retry read them anew.
+    }, Boolean(opts.deleting));
   } catch (e) {
     if (e instanceof Stop) return { text: e.message, isError: true };
     throw e;

@@ -4,7 +4,7 @@ import { newId } from '../src/model/cards';
 import { readShare } from '../src/model/sharing';
 import { readWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit, type Snapshot } from './boards';
-import { addChecklist, addItems, addLink, addNote, deleteThings, editItems, moveItems, newBoard, newColumn, planDelete, setItemsDone, type Edit } from './edits';
+import { addChecklist, addItems, addNote, deleteThings, editItems, moveItems, newBoard, newColumn, planDelete, setItemsDone, type Edit } from './edits';
 
 // The BusyAnts connector's tools: listing boards and reading one; changing checklist items and
 // adding notes, checklists, links, columns and boards on the owner's own boards (shared boards are
@@ -221,23 +221,6 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
   );
 
   server.registerTool(
-    'add_link',
-    {
-      title: 'Add a link',
-      description: 'Adds a link card (a web address, http or https, and an optional title) to one of your own boards, placed as add_note places a note.',
-      inputSchema: {
-        board: boardArg,
-        url: z.string().min(1).max(2000).describe('The web address, for example example.com/page'),
-        title: text.optional(),
-        column,
-        near,
-      },
-      annotations: changes,
-    },
-    ({ board, url, title = '', column: col, near: by }) => change(board, (id) => addLink(id, url, title, { column: col, near: by }, newId('k'))),
-  );
-
-  server.registerTool(
     'add_column',
     {
       title: 'Add a column',
@@ -289,7 +272,8 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
         const safe = safeToEdit(got.snap.own);
         if (!safe.ok) return { text: `Nothing can be deleted: ${safe.reason}.`, isError: true };
         const seed = newId('d').slice(2);
-        const plan = planDelete(readWorkspace(got.snap.own)!.ws, got.id, things, got.shared, (p) => `${p}_${seed}`);
+        let n = 0; // the same new ids confirm_delete makes (only a blank item refilling an emptied list gets one)
+        const plan = planDelete(readWorkspace(got.snap.own)!.ws, got.id, things, got.shared, (p) => `${p}_${seed}${n++ || ''}`);
         if ('error' in plan) return { text: plan.error, isError: true };
         const key = newId('p');
         previews.set(key, { boardId: got.id, ids: things, lines: plan.lines, seed });

@@ -1,11 +1,11 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { deleteToken, saveToken } from './auth';
 import { addItems } from './edits';
 import { fakeFirestore } from './fakeFirestore';
-import { activityLog, activityPath, boardsLoader, boardsWriter, runCheck } from './main';
+import { activityLog, activityPath, boardsLoader, boardsWriter, deleteAllowed, runCheck, setDeleteAllowed, settingsPath } from './main';
 import { ownRaw } from './sample';
 
 describe('the connector’s sign-in', () => {
@@ -126,6 +126,16 @@ describe('npm run mcp:check', () => {
     expect(out).toContain('Signed in as me@example.com');
     expect(out).toContain('2 boards (0 shared, read-only)');
     expect(out).toContain('Safe to edit: yes');
+    expect(out).toContain('Claude may delete: no (npm run mcp:delete-on to allow it)');
+  });
+
+  it('shows Claude may delete: yes once switched on', async () => {
+    const file = await tempFile();
+    await saveToken(file, { refreshToken: 'R', uid: 'me' });
+    await setDeleteAllowed(settingsPath(file), true);
+    const lines: string[] = [];
+    await runCheck({ tokenFile: file, fetch: fakeGoogle(ownRaw()), log: (s) => lines.push(s) });
+    expect(lines).toContain('Claude may delete: yes (npm run mcp:delete-off to stop it)');
   });
 
   it('data it can’t round-trip: safe to edit: no, with the reason', async () => {
@@ -148,5 +158,30 @@ describe('npm run mcp:check', () => {
     const code = await runCheck({ tokenFile: file, fetch: (async () => new Response('{"error":{"message":"TOKEN_EXPIRED"}}', { status: 400 })) as typeof fetch, log: (s) => lines.push(s) });
     expect(code).toBe(1);
     expect(lines.join('\n')).toMatch(/expired/);
+  });
+});
+
+describe('the "Let Claude delete" setting', () => {
+  it('is settings.json beside the sign-in, and off when there is no file', async () => {
+    const file = await tempFile();
+    expect(settingsPath(file)).toBe(join(dirname(file), 'settings.json'));
+    expect(await deleteAllowed(settingsPath(file))).toBe(false);
+  });
+
+  it('npm run mcp:delete-on / mcp:delete-off switch it, read afresh every time', async () => {
+    const at = settingsPath(await tempFile());
+    await setDeleteAllowed(at, true);
+    expect(await deleteAllowed(at)).toBe(true);
+    expect(JSON.parse(await readFile(at, 'utf8'))).toEqual({ allowDelete: true });
+    await setDeleteAllowed(at, false);
+    expect(await deleteAllowed(at)).toBe(false);
+  });
+
+  it('anything but exactly true counts as off (a damaged file, a string, a number)', async () => {
+    const at = settingsPath(await tempFile());
+    for (const bad of ['{', '{"allowDelete":"true"}', '{"allowDelete":1}', 'null', '[]']) {
+      await writeFile(at, bad);
+      expect(await deleteAllowed(at), bad).toBe(false);
+    }
   });
 });

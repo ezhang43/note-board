@@ -19,9 +19,19 @@ export function whenLabel(e: CalEvent): string {
 const GAP = 8;
 
 /**
- * The card's top: level with the event, kept on screen and never above the panel's top, so it
- * doesn't cover the toolbar. (Its side follows the panel's edge in CSS: `.cal-card` in styles.css.)
+ * Where the card sits: just left of the panel (clear of its resize strip), its top level with the
+ * event, kept on screen and never above the panel's top so it doesn't cover the toolbar. With no
+ * room left of the panel it sits inside the panel, 8px from the window's right edge.
  */
-export function cardTop(event: { top: number }, panel: { top: number }, card: { height: number }, screen: { height: number }): number {
-  return Math.max(panel.top, Math.min(event.top, screen.height - card.height - GAP));
+export function cardPosition(
+  event: { top: number },
+  panel: { left: number; top: number },
+  card: { width: number; height: number },
+  screen: { width: number; height: number },
+): { left: number; top: number } {
+  const beside = panel.left - GAP - card.width;
+  return {
+    left: Math.max(GAP, beside >= GAP ? beside : screen.width - GAP - card.width),
+    top: Math.max(panel.top, Math.min(event.top, screen.height - card.height - GAP)),
+  };
 }

@@ -2050,9 +2050,7 @@ a.cal-open { align-self: flex-start; }
 /* An event's card (job #108): beside the event, over the board, with the list still in view; on a phone, a sheet from the bottom. */
 .cal-card {
   position: fixed;
-  z-index: 7; /* above the panel's resize strip, where a narrow window pushes it over the panel */
-  /* 8px left of the panel's edge, so it follows the panel as it is resized; kept 8px from the window's left. */
-  right: min(calc(var(--side-width) + 8px), calc(100vw - 308px));
+  z-index: 7; /* above the panel's own lists; inside the panel's layer, so it keeps clear of the resize strip (eventCard.ts) */
   width: 300px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);

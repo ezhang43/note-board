@@ -549,38 +549,41 @@ test('while a delete is on its way, clicking another event waits, so Google’s 
   expect(errors).toEqual([]);
 });
 
-test('with little board left beside a wide panel the card sits on top of the panel’s edge, not under it', async ({ page }) => {
+test('with no room beside a wide panel the card sits inside the panel, fully seen and clear of its resize strip', async ({ page }) => {
   const errors = await openAs(page);
   await page.setViewportSize({ width: 760, height: 800 });
   await button(page).click();
   await dragTo(page, 300);
   await expect.poll(async () => (await panel(page).boundingBox())!.x).toBe(300);
   await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await expect(card(page)).toBeInViewport({ ratio: 1 });
   const box = (await card(page).boundingBox())!;
-  // The card runs over the resize strip (296–304): the strip must not cover it.
-  expect(box.x + box.width).toBeGreaterThan(304);
-  const onTop = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.cal-card') != null, [300, box.y + 20]);
+  // 8px from the window's right edge, so nothing of it is under the strip (296–304).
+  expect(Math.round(box.x + box.width)).toBe(752);
+  expect(box.x).toBeGreaterThan(304);
+  const onTop = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.cal-card') != null, [box.x + 4, box.y + 20]);
   expect(onTop).toBe(true);
   expect(errors).toEqual([]);
 });
 
-test('the card moves with the panel’s edge when the panel is resized', async ({ page }) => {
+test('the card moves with the panel’s edge when the panel or the window is resized', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).focus();
-  await page.keyboard.press('Enter');
+  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
   await expect(card(page)).toBeVisible();
-  // Resized by keyboard, so the card stays open.
-  await handle(page).focus();
-  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
-  await expect.poll(() => width(page)).toBeGreaterThan(420);
-  const panelBox = (await panel(page).boundingBox())!;
-  await expect
-    .poll(async () => {
-      const box = (await card(page).boundingBox())!;
-      return Math.round(panelBox.x - 8 - (box.x + box.width));
-    })
-    .toBe(0);
+  const gap = async () => {
+    const [p, c] = [(await panel(page).boundingBox())!, (await card(page).boundingBox())!];
+    return Math.round(p.x - 8 - (c.x + c.width));
+  };
+  // Dragging the panel's edge keeps the card open, and it follows.
+  const before = (await panel(page).boundingBox())!.x;
+  await dragTo(page, before - 120);
+  await expect.poll(async () => (await panel(page).boundingBox())!.x).toBeLessThan(before - 100);
+  await expect(card(page)).toBeVisible();
+  await expect.poll(gap).toBe(0);
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await expect(card(page)).toBeVisible();
+  await expect.poll(gap).toBe(0);
   expect(errors).toEqual([]);
 });
 

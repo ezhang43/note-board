@@ -1,5 +1,14 @@
 # Changelog
 
+## Design polish: motion and phone feel (2026-10-19)
+
+- Buttons now give a little feedback when pressed: they shrink a touch and spring back (the faded ones stay still). The big Start and Open buttons on the website do the same.
+- Menus and panels (File, Arrange, Boards, Share, the shortcuts and the phone's + and ⋯ sheets, the side panels, Search) now fade in and grow from the button you pressed, over about a tenth of a second, instead of popping in. Closing them is still instant. The Color menu only fades.
+- Nothing moves when the keyboard did it: arrow-key moves, undo, Enter on a button, Ctrl+F, `?`, and Ctrl+Enter on a checklist item (which now ticks at once instead of fading out first). Ticking with the mouse or a finger still eases out as before. With the computer set to reduce motion, none of the new motion plays.
+- A fold's arrow on the website turns over instead of jumping; the ease curves of the existing slides and glides are a little punchier (same lengths).
+- On a phone: no grey flash or tint left on a button after a tap (hover looks now apply only where a mouse can hover), buttons respond to a tap without waiting for a possible double-tap, a long press no longer selects a button's label, the pressed bottom-bar button shows at once, and tall panels fit the visible screen (not the height with the address bar hidden).
+- The full list of what was changed, held back and left alone, with the reasons, is in `docs/design-polish-review.md`. Nothing about saving, undo or deleting changed, and your boards are untouched.
+
 ## Emil Kowalski's design skills (2026-10-19)
 
 - Added five design, motion and phone-feel skills by Emil Kowalski (MIT licence, credit and licence kept in `.claude/skills/EMIL-KOWALSKI-LICENSE.md`): design engineering, review animations, improve animations, animation performance and mobile native. From now on, any UI or motion work, on the computer and on the phone layout, follows them alongside Impeccable. `SPEC.md` and your recorded decisions come first, then Impeccable for the look, then these for motion and feel. The cursor and focus-ring rules are unchanged, and the end-of-step routine now runs a light design check on UI changes.

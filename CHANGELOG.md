@@ -8,6 +8,12 @@
 - Other keys pressed while writing in the panel (Delete, arrows and so on) never touch the board behind it.
 - A new Journal board no longer gets a card on home and is not listed in the Boards menu. A Journal board you already have, with its card on home, is left exactly as it is and still opens as a normal board.
 
+## Up and down arrows on checklist items (2026-10-18)
+
+- Hover a checklist item on a computer and two small arrows show by its trash can and grip: Move up and Move down. They do the same as Ctrl+Shift+Up / Down and the phone's Move up / Move down: the item moves past the one above or below it at the same level, with its sub-items, in one undo step, and the cursor stays in it.
+- At the top or bottom of its level an arrow is faded and does nothing. On a phone or tablet the arrows don't show (the phone already has its row of buttons above the keyboard).
+- On a computer the space kept free at the right end of each item is a little wider (it holds four buttons now), so checklist text wraps slightly earlier than before. On a phone it is unchanged. Your boards are untouched.
+
 ## Daily journal (2026-10-18)
 
 - New **Journal** button, last in the row of buttons by the zoom control (on a phone: ⋯, then the Journal tile). It opens a board called Journal, with a note headed with today's date (like "Sun 18 Oct 2026") at the top and the cursor in it, ready to type. Press it again the same day and it takes you back to that note instead of adding another. Each new day adds a new note above the older ones.

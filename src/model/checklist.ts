@@ -386,16 +386,27 @@ export function dropOnRow(
 export function moveItemBy(items: TodoItem[], id: string, dir: -1 | 1): TodoItem[] | null {
   const next = cloned(items);
   const loc = findItem(next, id);
-  if (!loc) return null;
+  const j = loc && passTarget(loc, dir);
+  if (!loc || j === null) return null;
   const { list, index, item } = loc;
-  let j = index + dir;
-  while (j >= 0 && j < list.length && !loc.parent && list[j].done !== item.done) j += dir;
-  if (j < 0 || j >= list.length) return null;
   const passed = list[j];
   list.splice(index, 1);
   const k = list.indexOf(passed);
   list.splice(dir < 0 ? k : k + 1, 0, item);
   return next;
+}
+
+/** Whether `moveItemBy` would move the item: the hover arrows fade when it would not. */
+export function canMoveItem(items: TodoItem[], id: string, dir: -1 | 1): boolean {
+  const loc = findItem(items, id);
+  return !!loc && passTarget(loc, dir) !== null;
+}
+
+/** The index of the neighbour an item would pass (top-level items skip the other section), or null. */
+function passTarget({ list, index, parent, item }: ItemLocation, dir: -1 | 1): number | null {
+  let j = index + dir;
+  while (j >= 0 && j < list.length && !parent && list[j].done !== item.done) j += dir;
+  return j < 0 || j >= list.length ? null : j;
 }
 
 /** Take items (with their sub-items) out of a list. */

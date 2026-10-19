@@ -547,6 +547,19 @@ describe('Ctrl+Shift+Up / Down: moving an item past its neighbour', () => {
   });
 });
 
+describe('canMoveItem: whether the hover arrows can move an item (owner request, 2026-10-18)', () => {
+  it('is true exactly when moveItemBy would move it', () => {
+    const mixed = [item('x'), item('d', [], true), item('y')];
+    for (const items of [sample(), mixed]) {
+      const all = [...items, ...items.flatMap((i) => i.children)];
+      for (const { id } of all) for (const dir of [-1, 1] as const) expect(C.canMoveItem(items, id, dir)).toBe(C.moveItemBy(items, id, dir) !== null);
+    }
+  });
+  it('is false for an id that is not there', () => {
+    expect(C.canMoveItem(sample(), 'nope', 1)).toBe(false);
+  });
+});
+
 describe('Uncheck all (owner request, to reuse a list)', () => {
   it('unticks every item and sub-item, keeping their order and nesting', () => {
     const items = [

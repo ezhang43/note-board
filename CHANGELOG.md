@@ -1,5 +1,10 @@
 # Changelog
 
+## A flaky phone test made reliable (2026-10-19)
+
+- One browser test (an item far off to the side is brought back on a phone) sometimes failed on GitHub for no real reason: the app was doing its job, bringing the item back on screen, a moment before the test looked. The test now waits for that first move to finish before sliding the board.
+- The app itself and your boards are not changed.
+
 ## Phone: press and hold to move a list item (2026-10-19)
 
 - On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.

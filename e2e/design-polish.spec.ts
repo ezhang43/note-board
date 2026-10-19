@@ -12,18 +12,28 @@ const style = (loc: ReturnType<Page['locator']>, prop: string) => loc.evaluate((
 test.describe('reduced motion', () => {
   freshBoardEachTest();
 
-  test('turns the new motion off: menus, press scale and the collapse arrow', async ({ page }) => {
+  test('turns the new motion off (menus, collapse arrow) but a pressed button still shrinks (owner, 2026-10-19)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await fileButton(page).click();
     const menu = page.getByRole('menu', { name: 'File' });
     await expect(menu).toBeVisible();
     expect(await style(menu, 'transition-duration')).toBe('0s');
     await page.keyboard.press('Escape');
-    // Pressing a button changes nothing about its size.
+    // The press shrink is the one thing that plays with reduced motion too: it is a tiny scale in place.
     const noteButton = toolbar(page).getByRole('button', { name: 'Note', exact: true });
     const b = (await noteButton.boundingBox())!;
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
-    expect(await style(noteButton, 'transform')).toBe('none');
+    await expect.poll(() => style(noteButton, 'transform')).toBe('matrix(0.97, 0, 0, 0.97, 0, 0)');
+    expect(await style(noteButton, 'transition-duration')).toBe('0.1s');
+    await page.mouse.up();
+    await expect.poll(() => style(noteButton, 'transform')).toBe('none');
+    // A faded button stays still.
+    const redo = toolbar(page).getByRole('button', { name: 'Redo' });
+    const u = (await redo.boundingBox())!;
+    await page.mouse.move(u.x + u.width / 2, u.y + u.height / 2);
+    await page.mouse.down();
+    expect(await style(redo, 'transform')).toBe('none');
     await page.mouse.up();
   });
 
@@ -225,13 +235,14 @@ test.describe('the website pages', () => {
     });
   });
 
-  test('with reduced motion nothing shrinks, and no hover rule sticks after a tap', async ({ page }) => {
+  test('with reduced motion the big button still shrinks, the fold arrow does not turn, and no hover rule sticks after a tap', async ({ page }) => {
     await page.goto('/faq/');
     const start = page.locator('.site-header a').last();
     const b = (await start.boundingBox())!;
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
-    expect(await style(start, 'transform')).toBe('none');
+    await expect.poll(() => style(start, 'transform')).toBe('matrix(0.97, 0, 0, 0.97, 0, 0)');
+    expect(await page.locator('summary').first().evaluate((el) => getComputedStyle(el, '::after').transitionDuration)).toBe('0s');
     await page.mouse.move(0, 0);
     await page.mouse.up();
     expect(await allHoverRules(page)).toEqual([]);

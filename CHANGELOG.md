@@ -6,6 +6,12 @@
 - The calendar access is kept only for this browser tab and is dropped when you sign out, when someone else signs in, when Google refuses it, or after about an hour. A new tab, the next day or another device still shows Google's quick window once (a duplicated or reopened tab may carry it over).
 - The Privacy policy says so (effective October 19, 2026).
 
+## Press shrink works with reduced motion too (2026-10-19)
+
+- A button you press now shrinks a little (3%, for a tenth of a second) for everyone, even when Windows has "Animation effects" turned off or the computer is set to reduce motion. The website's Start and Open buttons do the same.
+- Only that one thing changed. Menus and panels opening, the fold arrows turning, the tick fade and the block glide still stay off when reduce motion is on.
+- Nothing about saving or your boards is touched.
+
 ## Search all boards (2026-10-19)
 
 - The search bar has a new switch under the box: **This board** / **All boards**. It always opens on This board, exactly as before, and goes back to it whenever you close the bar (Escape or ×).

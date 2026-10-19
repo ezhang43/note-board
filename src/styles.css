@@ -336,13 +336,16 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   z-index: 4;
   display: flex;
   justify-content: space-around;
-  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
   background: var(--toolbar-bg);
   border-top: 1px solid var(--line);
   box-shadow: 0 -4px 12px rgba(31, 29, 26, 0.06);
 }
 .item-bar > button {
-  width: 48px;
+  /* Eight buttons share the width, so they fit a 320px phone (about 39px each at the narrowest). */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 52px;
   height: 48px;
   padding: 0;
   border: none;
@@ -355,6 +358,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   cursor: pointer;
 }
 .item-bar > button:active { background: var(--hover); }
+.item-bar > button[aria-disabled='true'] { opacity: 0.35; }
+/* Done is a word, not a picture: it puts the keyboard away. */
+.item-bar > button[aria-label='Done typing'] { font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-ink); }
 .item-bar > button[aria-label='Delete item'] { color: var(--danger); }
 .app.phone ~ .save-banner, .app.phone .save-banner { bottom: calc(76px + env(safe-area-inset-bottom)); }
 .app.phone .corner-controls { bottom: calc(76px + env(safe-area-inset-bottom)); right: 12px; }
@@ -1110,6 +1116,15 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   /* The phone already has Move up / Move down in the row above the keyboard, so the arrows never show and keep no room. */
   .todo-item { padding-right: 40px; }
 }
+/*
+ * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the
+ * item bar above the keyboard, which keeps the cursor in a text box, and the strip kept free at the
+ * right end of a row shrinks to the grip alone. Tablets (600px and wider) and mouse users keep the trash can.
+ */
+@media (hover: none) {
+  .app.phone .item-trash { display: none; }
+  .app.phone .todo-item { padding-right: 24px; }
+}
 
 .completed {
   display: flex;
@@ -1257,14 +1272,19 @@ html[data-input='keys'] .column {
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(31, 29, 26, 0.2);
 }
-.shortcuts-header { display: flex; align-items: center; justify-content: space-between; }
-.shortcuts-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.shortcuts-header { display: flex; align-items: center; gap: 8px; }
+.shortcuts-hint { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+.shortcuts-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+.shortcuts-header h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
 .shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .shortcuts-group dl { margin: 0; }
 .shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
 .shortcuts-site a { color: var(--accent-ink); }
 .shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
 .shortcut dd { margin: 0; color: var(--ink-soft); }
+.key-button { padding: 0; border: none; background: none; font: inherit; color: inherit; cursor: pointer; border-radius: 5px; }
+.key-button[aria-pressed='true'] kbd { border-color: var(--accent); background: var(--accent-soft); }
+@media (hover: hover) { .key-button:hover kbd { border-color: var(--ink-soft); } }
 .shortcut kbd {
   font: inherit;
   font-size: 13px;
@@ -2135,6 +2155,14 @@ a.cal-open { align-self: flex-start; }
   .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
   .completed-head, .completed-actions { gap: 8px; }
   .completed-toggle, .uncheck-all { height: 40px; }
+
+  /*
+   * A card's or container's collapse arrow and trash can show only on the selected one (owner request,
+   * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
+   * around them take no taps: a tap on another card selects it, never deletes it.
+   */
+  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
 
   /* The welcome tour. */
   .tour-head .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }

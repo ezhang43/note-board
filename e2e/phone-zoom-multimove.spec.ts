@@ -189,6 +189,9 @@ test.describe('several selected blocks move together by finger', () => {
     }
     await chooseTool(page, 'Select (V)');
     await page.mouse.click(200, 70); // closes the menu
+    // New cards are screen-wide (job 113), so the three no longer fit one screen: zoom out to see them all.
+    await page.keyboard.press('Control+Minus');
+    await page.keyboard.press('Control+Minus');
     const rects = await page.locator('.card.loose, [data-col-id]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom })));
     expect(rects.length).toBe(3);
     const from = { x: Math.max(2, Math.min(...rects.map((r) => r.l)) - 6), y: Math.max(60, Math.min(...rects.map((r) => r.t)) - 6) };

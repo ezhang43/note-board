@@ -96,6 +96,42 @@ export function Canvas() {
     return () => window.removeEventListener('wheel', onWheel);
   }, []);
 
+  // Phone (owner request): starting to edit in a card or container (the cursor coming in from outside
+  // it, not moving between its own boxes) fills the screen's width with it, the tapped line staying put.
+  useEffect(() => {
+    if (!phone) return;
+    const el = ref.current!;
+    const onFocus = (e: FocusEvent) => {
+      const field = e.target;
+      if (!(field instanceof HTMLTextAreaElement || (field instanceof HTMLInputElement && field.type !== 'checkbox'))) return;
+      const block = field.closest<HTMLElement>('[data-card-id], [data-col-id]');
+      if (!block) return;
+      const top = block.closest<HTMLElement>('[data-col-id]') ?? block;
+      if (e.relatedTarget instanceof Node && top.contains(e.relatedTarget)) return;
+      const r = field.getBoundingClientRect();
+      appStore.fitBlockWidth((block.dataset.cardId ?? block.dataset.colId)!, clientToCanvas(r.left + r.width / 2, r.top + r.height / 2));
+    };
+    // A tap near another card's (hidden) buttons selects that card, and the buttons then appear under
+    // the finger: the browser aims the click at them. After a finger press, a click on a header button
+    // counts only when the press began on that button (keyboard clicks, with no press, still do).
+    let down: PointerEvent | null = null;
+    const onDown = (e: PointerEvent) => (down = e);
+    const onClick = (e: MouseEvent) => {
+      const press = down;
+      down = null;
+      const button = e.target instanceof Element ? e.target.closest('.card-header > .icon-button, .column-actions > .icon-button') : null;
+      if (button && e.detail > 0 && press?.pointerType === 'touch' && !(press.target instanceof Node && button.contains(press.target))) e.stopPropagation();
+    };
+    el.addEventListener('focusin', onFocus);
+    el.addEventListener('pointerdown', onDown, true);
+    el.addEventListener('click', onClick, true);
+    return () => {
+      el.removeEventListener('focusin', onFocus);
+      el.removeEventListener('pointerdown', onDown, true);
+      el.removeEventListener('click', onClick, true);
+    };
+  }, [phone]);
+
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
   // A finger on the empty board, for the zoom taps: double tap zooms in, a long tap zooms out.

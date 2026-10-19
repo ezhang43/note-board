@@ -7,6 +7,34 @@
 - Deleting always takes two steps: Claude shows you exactly what would go, and deletes only after you say yes. A copy of your boards is saved in Version history just before, so it can be put back.
 - Claude never deletes your home board, a top-level board, the Completed card or anything on a shared board, and at most 20 things at a time.
 
+## Phone: the line you are typing in always stays in view (2026-10-19)
+
+- On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.
+- It also stays clear of the top bar and the sides of the screen, not only the bottom. When the phone scrolls the page so part of it is out of sight, the line is kept out of that part too.
+- Nothing else changed: computers and tablets are the same, and your boards are not touched.
+
+## Lists fill the screen on a phone (2026-10-19)
+
+- On a phone, a new note, checklist or link is made almost as wide as the screen (a small margin each side) instead of the small desktop size.
+- When you start typing in a card or container on a phone, the board zooms and moves so that card fills the screen's width. The line you tapped stays where it was. Moving between the boxes of the same list doesn't move the board again, and you can still pinch and pan as you like while typing.
+- On a phone, the collapse arrow and the trash can now show only on the card (or container) you have selected, not on every card. Tap a card to select it, then use its buttons. A tap that only selects a card can no longer press a button that appears under your finger.
+- Computers and tablets are unchanged. Nothing about your saved boards changes; the zoom is not saved or undone.
+
+## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
+
+- On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.
+- The bar has two new buttons: Undo (at the left) and Done (at the right, which puts the keyboard away). Undo goes back one step at a time and keeps you typing.
+- The Indent and Outdent icons are clearer: like the ones in a text editor, with an arrow showing which way the item moves.
+- Checklist items on a phone no longer have a small trash can on each row; Delete is in the bar above the keyboard. Computers and tablets are unchanged.
+- Your boards are not touched: only what the buttons do while you are typing changed.
+
+## Custom hotkeys (2026-10-19)
+
+- You can now change the keys for the Hand tool, the Select tool, Select all, Copy, Paste, Duplicate and Delete. Open the Keyboard shortcuts list (the ? button or the ? key), click a key, and press the new one. Escape cancels, and a "Reset to defaults" button puts every key back.
+- If the key is taken, the list says what uses it (for example "V is already used by Select tool.") and nothing changes. Undo, redo, zoom, the arrows and the keys inside checklists stay as they are.
+- The Hand and Select buttons, and the list, show your keys. They are remembered on this device only, like dark mode: not part of your board, not synced, not undone. Your boards are not touched, and a missing or broken setting just means the usual keys.
+- Small change: the match is exact now, so Shift+H no longer picks the Hand tool and Ctrl+Shift+D no longer duplicates.
+
 ## Color themes (2026-10-19)
 
 - The moon button in the toolbar is now an Appearance button (a half-filled circle). It opens a small menu with the Dark mode switch and six color themes: Honey (the look you have today, still the default), Ocean, Forest, Lavender, Rose and Slate.

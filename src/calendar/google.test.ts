@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_KEY } from '../model/calendar';
 
 // The published site's calendar access (src/calendar/google.ts), with Firebase sign-in pretended:
-// the access kept for this tab is reused for the same person and dropped on sign-out, on another
+// the access kept on this device (job 107) is reused for the same person and dropped on sign-out, on another
 // person signing in, and when Google refuses it. No OAuth client ID is set in tests, so a token()
 // that resolves came from what was kept, without asking Google.
 
@@ -15,7 +15,7 @@ vi.mock('firebase/auth', () => ({
 }));
 
 const data = new Map<string, string>();
-vi.stubGlobal('sessionStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) });
+vi.stubGlobal('localStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) });
 
 const keep = (user: string, token = 'kept', ms = 3_000_000) => data.set(ACCESS_KEY, JSON.stringify({ token, expiresAt: Date.now() + ms, user }));
 const load = () => import('./google');
@@ -46,7 +46,7 @@ describe('calendar access on the published site', () => {
     }
   });
 
-  it('signing out drops it, from the tab and from memory', async () => {
+  it('signing out drops it, from the device and from memory', async () => {
     keep('u1');
     const google = await load();
     auth.listener!({ uid: 'u1' });
@@ -57,7 +57,7 @@ describe('calendar access on the published site', () => {
     expect(data.has(ACCESS_KEY)).toBe(false);
   });
 
-  it('another person signing in drops it, from the tab and from memory', async () => {
+  it('another person signing in drops it, from the device and from memory', async () => {
     keep('u1');
     const google = await load();
     auth.listener!({ uid: 'u1' });

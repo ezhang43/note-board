@@ -5,6 +5,7 @@
 - Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.
 - Google's quick window still shows about once an hour, when the access runs out, and on another device.
 - The access is dropped when you sign out (in any tab), when someone else signs in, when Google refuses it, after about an hour, and when you delete your account. It is never in a backup.
+- If you're already connected, you aren't asked again because of this change.
 - The Privacy policy says so.
 
 ## Google Calendar stays connected across a reload (2026-10-19)

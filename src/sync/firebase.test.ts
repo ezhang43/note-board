@@ -191,11 +191,24 @@ describe('the calendar access kept on this device (job 103, owner check of PR #9
     expect(data.has(KEY)).toBe(false);
   });
 
-  it('a copy kept for the tab before job 107 (sessionStorage) is removed, even for the same person', () => {
+  it('a copy kept for the tab before job 107 (sessionStorage) moves to the device for the same person', () => {
     tab.set(KEY, data.get(KEY)!);
+    data.clear();
     fire({ uid: 'u1' });
     expect(tab.has(KEY)).toBe(false);
-    expect(data.has(KEY)).toBe(true);
+    expect(JSON.parse(data.get(KEY)!)).toMatchObject({ token: 't', user: 'u1' });
+  });
+
+  it('a copy kept for the tab before job 107 is only removed for another person, or on sign-out', () => {
+    tab.set(KEY, data.get(KEY)!);
+    data.clear();
+    fire({ uid: 'u2' });
+    expect(tab.has(KEY)).toBe(false);
+    expect(data.has(KEY)).toBe(false);
+    tab.set(KEY, JSON.stringify({ token: 't', expiresAt: Date.now() + 3_000_000, user: 'u1' }));
+    fire(null);
+    expect(tab.has(KEY)).toBe(false);
+    expect(data.has(KEY)).toBe(false);
   });
 
   it('blocked storage never stops the sign-in watcher', () => {

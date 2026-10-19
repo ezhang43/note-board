@@ -290,19 +290,19 @@ function defaultSource(): CalendarSource | null {
   // window does when it is blocked or closed (or access isn't given), to try Connect Google Calendar.
   let noAccess = new URLSearchParams(location.search).get('demo-calendar');
   // Kept on this device for an hour, as on the published site, so a reload or new tab doesn't ask again.
-  const tab = deviceStorage;
+  const device = deviceStorage;
   return {
     base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
     async token() {
-      const kept = readAccess(tab, demo.uid);
+      const kept = readAccess(device, demo.uid);
       const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
       noAccess = null; // only the first ask: once connected (kept for every tab, job 107), the setting has no effect
       if (kept) return kept.token;
       if (reason) throw new NoAccess(reason);
-      keepAccess(tab, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
+      keepAccess(device, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
       return demo.uid;
     },
-    forget: () => dropAccess(tab),
+    forget: () => dropAccess(device),
   };
 }
 

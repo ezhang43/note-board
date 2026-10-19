@@ -45,7 +45,7 @@ let loaded: Gis | null = null;
 // simple: kept until it runs out (about an hour), so Google's quick window still shows about once an
 // hour of use, and on another device; a server-held refresh key would end that. Reaching
 // localStorage can throw (blocked).
-const tab = () => localStorage;
+const device = () => localStorage;
 
 // Signing out (or another person signing in) drops the token from memory; the device's copy is dropped
 // by the sign-in watcher that is always loaded (src/sync/firebase.ts watchUser).
@@ -98,7 +98,7 @@ function request(gis: Gis): Promise<string> {
         // An odd expiry (not a number, or Infinity) isn't kept, so it is never taken as never running out.
         if (user && Number.isFinite(expiresAt)) {
           cached = { token: r.access_token, expiresAt, user };
-          keepAccess(tab, cached);
+          keepAccess(device, cached);
         }
         done(r.access_token);
       },
@@ -113,7 +113,7 @@ function request(gis: Gis): Promise<string> {
 /** A token for the person's calendar: the one kept (in memory or on this device) while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
   const user = getAuth().currentUser?.uid ?? null;
-  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(tab, user);
+  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(device, user);
   if (cached) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
@@ -131,5 +131,5 @@ export function token(): Promise<string> {
 
 export function forget() {
   cached = null;
-  dropAccess(tab);
+  dropAccess(device);
 }

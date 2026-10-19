@@ -177,6 +177,17 @@ test('Arrange controls work: text size, Collapse all, Color menu with Auto-color
   await expect(menu(page).getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Import file…' })).toBeVisible();
 });
 
+test('text size in the menu goes up to 175% and A+ fades there', async ({ page }) => {
+  await openLocal(page);
+  const a = arrange(page);
+  for (let i = 0; i < 4; i++) await a.getByRole('button', { name: 'Larger text' }).tap(); // Normal → Largest
+  await expect(a.getByRole('button', { name: 'Larger text' })).toHaveAttribute('aria-disabled', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('largest');
+  await a.getByRole('button', { name: 'Smaller text' }).tap();
+  await expect(a.getByRole('button', { name: 'Larger text' })).not.toHaveAttribute('aria-disabled', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('huge');
+});
+
 test('tapping outside closes it', async ({ page }) => {
   await openLocal(page);
   await page.mouse.click(200, 70);

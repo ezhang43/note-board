@@ -1,5 +1,16 @@
 # Changelog
 
+## A flaky phone test made reliable (2026-10-19)
+
+- One browser test (an item far off to the side is brought back on a phone) sometimes failed on GitHub for no real reason: the app was doing its job, bringing the item back on screen, a moment before the test looked. The test now waits for that first move to finish before sliding the board.
+- The app itself and your boards are not changed.
+
+## Dragging and resizing keep rows together (2026-10-19)
+
+- Drag a block along a row and the blocks in that row now slide sideways out of its way and keep their left-to-right order, instead of jumping above or below the row. Drop a block onto its neighbour and they swap places.
+- Blocks only make room for where the dragged block is now: once it has moved past them, they spring back to their own spots.
+- Widening a card or container does the same when you let go: its neighbours in the row slide sideways, not down. Blocks still never overlap. Your saved boards are not changed until you move something.
+
 ## Habits (2026-10-19)
 
 - A new **Habits** button sits next to Journal in the panel pill by the zoom control (on a phone: ⋯ → Habits). It opens a Habits panel at the side; the board you are on stays open.

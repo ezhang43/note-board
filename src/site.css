@@ -391,6 +391,10 @@ main:has(.closing) { padding-bottom: 0; } /* About: the closing honey block sits
 .site-footer nav { padding-top: 24px; padding-bottom: 28px; gap: 4px 20px; }
 .site-footer a { color: var(--ink2); }
 
+/* Phone-native feel (mobile-native skill): no grey flash on a tap, and no wait for a double-tap on buttons, links and folds. */
+html { -webkit-tap-highlight-color: transparent; }
+a, summary { touch-action: manipulation; }
+
 /*
  * Motion (owner request 2026-10-19, Emil Kowalski's skills; docs/design-polish-review.md): the big
  * buttons shrink a little when pressed, and a fold's arrow turns instead of jumping. Not with reduced motion.

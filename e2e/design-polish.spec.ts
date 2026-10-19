@@ -235,5 +235,8 @@ test.describe('the website pages', () => {
     await page.mouse.move(0, 0);
     await page.mouse.up();
     expect(await allHoverRules(page)).toEqual([]);
+    // Phone feel on the website too: no grey flash on a tap, no wait for a double-tap.
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('-webkit-tap-highlight-color'))).toBe('rgba(0, 0, 0, 0)');
+    expect(await style(page.locator('summary').first(), 'touch-action')).toBe('manipulation');
   });
 });

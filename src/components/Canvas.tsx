@@ -5,7 +5,8 @@ import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
 import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point, View } from '../model/types';
-import { clientToCanvas, setCanvasElement } from './canvasDom';
+import type { ItemDrag } from '../store/store';
+import { canvasRect, clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
@@ -95,6 +96,42 @@ export function Canvas() {
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
   }, []);
+
+  // Phone (owner request): starting to edit in a card or container (the cursor coming in from outside
+  // it, not moving between its own boxes) fills the screen's width with it, the tapped line staying put.
+  useEffect(() => {
+    if (!phone) return;
+    const el = ref.current!;
+    const onFocus = (e: FocusEvent) => {
+      const field = e.target;
+      if (!(field instanceof HTMLTextAreaElement || (field instanceof HTMLInputElement && field.type !== 'checkbox'))) return;
+      const block = field.closest<HTMLElement>('[data-card-id], [data-col-id]');
+      if (!block) return;
+      const top = block.closest<HTMLElement>('[data-col-id]') ?? block;
+      if (e.relatedTarget instanceof Node && top.contains(e.relatedTarget)) return;
+      const r = field.getBoundingClientRect();
+      appStore.fitBlockWidth((block.dataset.cardId ?? block.dataset.colId)!, clientToCanvas(r.left + r.width / 2, r.top + r.height / 2));
+    };
+    // A tap near another card's (hidden) buttons selects that card, and the buttons then appear under
+    // the finger: the browser aims the click at them. After a finger press, a click on a header button
+    // counts only when the press began on that button (keyboard clicks, with no press, still do).
+    let down: PointerEvent | null = null;
+    const onDown = (e: PointerEvent) => (down = e);
+    const onClick = (e: MouseEvent) => {
+      const press = down;
+      down = null;
+      const button = e.target instanceof Element ? e.target.closest('.card-header > .icon-button, .column-actions > .icon-button') : null;
+      if (button && e.detail > 0 && press?.pointerType === 'touch' && !(press.target instanceof Node && button.contains(press.target))) e.stopPropagation();
+    };
+    el.addEventListener('focusin', onFocus);
+    el.addEventListener('pointerdown', onDown, true);
+    el.addEventListener('click', onClick, true);
+    return () => {
+      el.removeEventListener('focusin', onFocus);
+      el.removeEventListener('pointerdown', onDown, true);
+      el.removeEventListener('click', onClick, true);
+    };
+  }, [phone]);
 
   // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
@@ -308,7 +345,7 @@ export function Canvas() {
         </div>
       )}
       {itemDrag && (
-        <div className="item-ghost" data-testid="item-ghost" style={{ left: itemDrag.at.x + 14, top: itemDrag.at.y + 10 }}>
+        <div className={itemDrag.lift ? 'item-ghost moving lifted' : 'item-ghost moving'} data-testid="item-ghost" style={itemGhostStyle(itemDrag)}>
           <span className="item-ghost-label">{itemDrag.label}</span>
           {itemDrag.hint && 'newList' in itemDrag.hint ? (
             <span className="item-ghost-extra">Drop to make a new list</span>
@@ -332,4 +369,15 @@ export function Canvas() {
       )}
     </div>
   );
+}
+
+/**
+ * Where the dragged items' label is, moved by `translate` (not left / top, so nothing is laid out again
+ * as the finger moves). By mouse it trails the pointer. Lifted by a finger it is the row's width, kept on
+ * the screen, sitting on the finger's line, a little above it, so the gap opening under the finger stays in view.
+ */
+function itemGhostStyle({ at, lift }: ItemDrag): CSSProperties {
+  if (!lift) return { translate: `${at.x + 14}px ${at.y + 10}px` };
+  const x = Math.max(8, Math.min(at.x - lift.width / 2, (canvasRect()?.width ?? Infinity) - lift.width - 8));
+  return { width: lift.width, translate: `${x}px max(8px, calc(${at.y + 12}px - 100%))` };
 }

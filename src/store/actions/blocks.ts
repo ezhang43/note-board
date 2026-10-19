@@ -3,19 +3,20 @@ import { createCard, createColumn } from '../../model/cards';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../../model/clipboard';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/completed';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
-import { blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
+import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
 import { readImport } from '../../model/importFile';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { boardRights, restorable } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
-import { THEME_KEY } from '../../model/theme';
+import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
+import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
-import { centreOf, panBy, resetZoom, screenToBoard, viewFitting, viewShowing, zoomBy } from '../../model/view';
+import { centreOf, panBy, phoneCardWidth, resetZoom, screenToBoard, viewFillingWidth, viewFitting, viewShowing, zoomBy } from '../../model/view';
 import { readWorkspace, type Workspace } from '../../model/workspace';
 import type { StoreContext } from '../core';
 import type { SidePanelKind } from '../types';
@@ -28,9 +29,9 @@ export const EXPAND_WATCH_MS = 1500;
 /** Imported cards start this far (screen pixels) below the top of the board area. */
 export const IMPORT_TOP_MARGIN = 40;
 
-/** Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). */
-export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement) {
-  const card = createCard(kind);
+/** Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). A loose card can be given a width. */
+export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement, w: number | null = null) {
+  const card = { ...createCard(kind), w };
   ctx.commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusBlock: card.id } });
   ctx.requestSettle([place.type === 'column' ? place.columnId : card.id]);
 }
@@ -101,6 +102,25 @@ export function blockActions(ctx: StoreContext) {
       const theme = ctx.state.view.theme === 'dark' ? 'light' : 'dark';
       updateView((v) => ({ ...v, theme }));
       ctx.write(THEME_KEY, theme);
+    },
+    /** Appearance menu: picks a color theme (accent and board tint) and remembers it on this device. */
+    setColorTheme(colorTheme: ColorTheme) {
+      updateView((v) => (v.colorTheme === colorTheme ? v : { ...v, colorTheme }));
+      ctx.write(COLOR_THEME_KEY, colorTheme);
+    },
+    /** Panel: gives an action a new key and remembers it on this device. Returns why not (a short message) when the key can't be used. */
+    setHotkey(action: HotkeyAction, binding: Binding) {
+      const problem = problemWith(ctx.state.view.hotkeys, action, binding);
+      if (problem) return problem;
+      const hotkeys = { ...ctx.state.view.hotkeys, [action]: binding };
+      updateView((v) => ({ ...v, hotkeys }));
+      ctx.write(HOTKEYS_KEY, JSON.stringify(hotkeys));
+      return null;
+    },
+    /** Panel: every key back to its default. */
+    resetHotkeys() {
+      updateView((v) => ({ ...v, hotkeys: DEFAULT_HOTKEYS }));
+      ctx.write(HOTKEYS_KEY, JSON.stringify(DEFAULT_HOTKEYS));
     },
     /** A+ / A−: text on cards and columns one size bigger or smaller, remembered on this device. */
     changeFontSize(step: 1 | -1) {
@@ -240,14 +260,19 @@ export function blockActions(ctx: StoreContext) {
     endMarquee: () => updateUi({ marquee: null }),
 
     // ---------- adding ----------
-    /** Clicking Add Note / To-do list / Link. */
-    addCard(kind: CardKind) {
-      const { board, ui } = ctx.state;
+    /** Clicking Add Note / To-do list / Link. On a phone (owner request) a loose card is as wide as the screen; one put into a container follows the container. */
+    addCard(kind: CardKind, phone = false) {
+      const { board, ui, view } = ctx.state;
       const selected = ui.selection.length === 1 ? ui.selection[0] : null;
-      const place =
-        B.placementForNewCard(board, selected) ??
-        ({ type: 'loose', ...spotForNewBlock(board, CARD_W, NEW_BLOCK_H[kind], ctx.screenCentre(), measured) } as const);
-      addNewCard(ctx, kind, place);
+      const into = B.placementForNewCard(board, selected);
+      const w = phone && !into ? phoneCardWidth(ctx.viewportSize().width, view.zoom) : null;
+      const place = into ?? ({ type: 'loose', ...spotForNewBlock(board, w ?? CARD_W, NEW_BLOCK_H[kind], ctx.screenCentre(), measured) } as const);
+      addNewCard(ctx, kind, place, w);
+    },
+    /** Phone (owner request): starting to edit in block `id` (a card in a container: the container) fills the screen's width with it; `at` is the tapped line, in canvas pixels. */
+    fitBlockWidth(id: string, at: Point) {
+      const rect = blockRect(ctx.state.board, B.topLevelOf(ctx.state.board, id), measured);
+      if (rect) updateView((v) => viewFillingWidth(v, ctx.viewportSize(), rect, at));
     },
     /** Clicking New column. */
     addColumn() {

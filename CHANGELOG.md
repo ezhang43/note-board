@@ -9,6 +9,56 @@
 - Escape, × or a click anywhere else closes the card; the next Escape closes the panel.
 - Your boards and their saving are not touched.
 
+## Phone: press and hold to move a list item (2026-10-19)
+
+- On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.
+- A quick tap still lets you type, a swipe still moves the board, and resting on the list's title or the card's empty space still picks up the whole card. The grip still drags at once.
+- With your phone set to reduce motion, the items jump instead of sliding. Computers and tablets are unchanged. Your boards are not touched: dropping is the same undoable move as before.
+
+## Phone: the line you are typing in always stays in view (2026-10-19)
+
+- On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.
+- It also stays clear of the top bar and the sides of the screen, not only the bottom. When the phone scrolls the page so part of it is out of sight, the line is kept out of that part too.
+- Nothing else changed: computers and tablets are the same, and your boards are not touched.
+
+## Lists fill the screen on a phone (2026-10-19)
+
+- On a phone, a new note, checklist or link is made almost as wide as the screen (a small margin each side) instead of the small desktop size.
+- When you start typing in a card or container on a phone, the board zooms and moves so that card fills the screen's width. The line you tapped stays where it was. Moving between the boxes of the same list doesn't move the board again, and you can still pinch and pan as you like while typing.
+- On a phone, the collapse arrow and the trash can now show only on the card (or container) you have selected, not on every card. Tap a card to select it, then use its buttons. A tap that only selects a card can no longer press a button that appears under your finger.
+- Computers and tablets are unchanged. Nothing about your saved boards changes; the zoom is not saved or undone.
+
+## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
+
+- On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.
+- The bar has two new buttons: Undo (at the left) and Done (at the right, which puts the keyboard away). Undo goes back one step at a time and keeps you typing.
+- The Indent and Outdent icons are clearer: like the ones in a text editor, with an arrow showing which way the item moves.
+- Checklist items on a phone no longer have a small trash can on each row; Delete is in the bar above the keyboard. Computers and tablets are unchanged.
+- Your boards are not touched: only what the buttons do while you are typing changed.
+
+## Custom hotkeys (2026-10-19)
+
+- You can now change the keys for the Hand tool, the Select tool, Select all, Copy, Paste, Duplicate and Delete. Open the Keyboard shortcuts list (the ? button or the ? key), click a key, and press the new one. Escape cancels, and a "Reset to defaults" button puts every key back.
+- If the key is taken, the list says what uses it (for example "V is already used by Select tool.") and nothing changes. Undo, redo, zoom, the arrows and the keys inside checklists stay as they are.
+- The Hand and Select buttons, and the list, show your keys. They are remembered on this device only, like dark mode: not part of your board, not synced, not undone. Your boards are not touched, and a missing or broken setting just means the usual keys.
+- Small change: the match is exact now, so Shift+H no longer picks the Hand tool and Ctrl+Shift+D no longer duplicates.
+
+## Color themes (2026-10-19)
+
+- The moon button in the toolbar is now an Appearance button (a half-filled circle). It opens a small menu with the Dark mode switch and six color themes: Honey (the look you have today, still the default), Ocean, Forest, Lavender, Rose and Slate.
+- A theme changes the accent color (the pressed tool, the Share button, switches, the New container button) and the tint of the board and the toolbar. Cards stay white, and dark mode still has its own dark version of every theme.
+- Your pick is remembered on this device only, like dark mode. It is not part of your board, is not synced and is not undone by Undo.
+- On a phone it is the Appearance row in the ⋯ menu (it replaces the Dark mode row and opens inside the menu).
+- Every theme was checked for readable contrast (WCAG AA) by an automatic test. Your boards are not touched: the pick is one small setting kept on this device, and a missing or broken one just means Honey.
+
+## Google Calendar remembered for the hour (2026-10-19)
+
+- Closing the tab or the browser and opening the site again within about an hour no longer flashes Google's window: the calendar opens straight away. Another tab works the same way.
+- Google's quick window still shows about once an hour, when the access runs out, and on another device.
+- The access is dropped when you sign out (in any tab), when someone else signs in, when Google refuses it, after about an hour, and when you delete your account. It is never in a backup.
+- If you're already connected, you aren't asked again because of this change.
+- The Privacy policy says so.
+
 ## Text size can go even bigger (2026-10-19)
 
 - A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.

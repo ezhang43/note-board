@@ -6,6 +6,31 @@ export type Theme = 'light' | 'dark';
 /** Where this device remembers a light / dark choice once the toggle has been pressed. */
 export const THEME_KEY = 'note-board:theme';
 
+/**
+ * Color themes (job 112): each changes the accent and the board's tint, in both light and dark; cards
+ * stay as they are. A per-device view setting like Theme. The colours themselves live in styles.css
+ * (`:root[data-color-theme='ocean']` and its dark twin); Honey is the plain look, with no rules of its own.
+ * `dot` is the theme's honey colour, shown in the Appearance menu (a test keeps it equal to the CSS).
+ */
+export const COLOR_THEMES = [
+  { key: 'honey', label: 'Honey', dot: '#f2b62b' },
+  { key: 'ocean', label: 'Ocean', dot: '#62b6e8' },
+  { key: 'forest', label: 'Forest', dot: '#8ccb7b' },
+  { key: 'lavender', label: 'Lavender', dot: '#b99cea' },
+  { key: 'rose', label: 'Rose', dot: '#f09ab3' },
+  { key: 'slate', label: 'Slate', dot: '#a3b6c9' },
+] as const;
+
+export type ColorTheme = (typeof COLOR_THEMES)[number]['key'];
+
+/** Where this device remembers the color theme. */
+export const COLOR_THEME_KEY = 'note-board:color-theme';
+
+/** The color theme saved on this device, or Honey. */
+export function startingColorTheme(saved: string | null): ColorTheme {
+  return COLOR_THEMES.find((t) => t.key === saved)?.key ?? 'honey';
+}
+
 /** Text colour on dark backgrounds (dark mode's --ink). */
 export const DARK_INK = '#ECE8E1';
 

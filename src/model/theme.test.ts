@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AUTO_COLOUR_ORDER, BOLD_KEYS, COLOR_KEYS, COLUMN_DEFAULT, PALETTE } from './palette';
-import { DARK_COLUMN_DEFAULT, DARK_PALETTE, DARK_INK, startingTheme, swatchFor } from './theme';
+import { COLOR_THEMES, COLOR_THEME_KEY, DARK_COLUMN_DEFAULT, DARK_PALETTE, DARK_INK, startingColorTheme, startingTheme, swatchFor } from './theme';
 
 /** WCAG contrast ratio between two #RRGGBB colours. */
 function contrast(a: string, b: string) {
@@ -112,5 +113,71 @@ describe('bold colours (owner request, 2026-10-15)', () => {
     expect(AUTO_COLOUR_ORDER.slice(0, 8)).toEqual(['ocean', 'tomato', 'emerald', 'violet', 'sunflower', 'magenta', 'grass', 'tangerine']);
     expect(AUTO_COLOUR_ORDER.slice(8)).toEqual(['sky', 'peach', 'mint', 'lavender', 'butter', 'teal', 'rose', 'lime', 'periwinkle', 'coral', 'aqua', 'orchid', 'sage', 'sand', 'slate', 'stone']);
     expect(new Set(AUTO_COLOUR_ORDER).size).toBe(24);
+  });
+});
+
+// Colour themes (job 112): each changes the accent and the board's tint; the colours live in styles.css only.
+describe('colour themes', () => {
+  const css = readFileSync('src/styles.css', 'utf8');
+  const DARK = "\\[data-theme='dark'\\]";
+  /** The variables a theme sets in styles.css ('base' = the plain Honey look), for its light or dark version. */
+  function vars(root: string, dark: boolean) {
+    const sel = root === 'base' ? `:root${dark ? DARK : ''}` : `:root\\[data-color-theme='${root}'\\]${dark ? DARK : ''}`;
+    const m = new RegExp(`(?:^|\n)${sel}\\s*\\{([^}]*)\\}`).exec(css);
+    expect(m, `${root} ${dark ? 'dark' : 'light'} block`).not.toBeNull();
+    const out: Record<string, string> = {};
+    for (const [, name, value] of m![1].matchAll(/(--[\w-]+):\s*([^;]+);/g)) out[name] = value.trim();
+    return out;
+  }
+
+  it('offers Honey (the default) and five more, in this order', () => {
+    expect(COLOR_THEMES.map((t) => t.key)).toEqual(['honey', 'ocean', 'forest', 'lavender', 'rose', 'slate']);
+    expect(COLOR_THEMES.map((t) => t.label)).toEqual(['Honey', 'Ocean', 'Forest', 'Lavender', 'Rose', 'Slate']);
+  });
+
+  it('starts with the choice saved on this device, or Honey for anything else', () => {
+    expect(COLOR_THEME_KEY).toBe('note-board:color-theme');
+    for (const t of COLOR_THEMES) expect(startingColorTheme(t.key)).toBe(t.key);
+    for (const bad of [null, '', 'purple', 'OCEAN', '__proto__']) expect(startingColorTheme(bad)).toBe('honey');
+  });
+
+  const others = COLOR_THEMES.filter((t) => t.key !== 'honey');
+
+  it('every other theme has a light and a dark version setting the same colours, and leaves cards alone', () => {
+    const base = Object.keys(vars('base', false));
+    for (const t of others) {
+      const light = vars(t.key, false);
+      const dark = vars(t.key, true);
+      expect(Object.keys(dark).sort(), t.key).toEqual(Object.keys(light).sort());
+      for (const name of Object.keys(light)) expect(base, `${t.key} ${name}`).toContain(name);
+      for (const name of ['--card-bg', '--card-edge', '--ink', '--checkbox', '--danger']) expect(light, t.key).not.toHaveProperty(name);
+      expect(light['--accent']).not.toBe(vars('base', false)['--accent']);
+      expect(light['--canvas']).not.toBe(vars('base', false)['--canvas']);
+      expect(dark['--canvas']).not.toBe(light['--canvas']);
+    }
+    expect(new Set(others.map((t) => vars(t.key, false)['--accent'])).size).toBe(others.length);
+  });
+
+  it("the dot shown for each theme is its own honey colour (the pressed tool and Share button)", () => {
+    for (const t of COLOR_THEMES) expect(t.dot.toLowerCase()).toBe(vars(t.key === 'honey' ? 'base' : t.key, false)['--honey'].toLowerCase());
+  });
+
+  it('keeps text and buttons readable (WCAG AA, 4.5:1) in every theme, light and dark', () => {
+    for (const t of COLOR_THEMES) {
+      for (const dark of [false, true]) {
+        const v = { ...vars('base', false), ...(dark ? vars('base', true) : {}), ...(t.key === 'honey' ? {} : vars(t.key, dark)) };
+        const where = `${t.key} ${dark ? 'dark' : 'light'}`;
+        for (const bg of [v['--canvas'], v['--surface'], v['--toolbar-bg'], v['--card-bg']]) {
+          expect(contrast(v['--ink'], bg), `${where} ink on ${bg}`).toBeGreaterThanOrEqual(7);
+          expect(contrast(v['--ink-soft'], bg), `${where} soft ink on ${bg}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrast(v['--accent'], bg), `${where} accent on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        }
+        expect(contrast(v['--on-accent'], v['--accent']), `${where} New container button`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(v['--honey-ink'], v['--honey']), `${where} pressed tool and Share`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(v['--accent-ink'], v['--accent-soft']), `${where} pressed switches`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(v['--accent-ink'], v['--drop-bg']), `${where} drop highlight`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(v['--accent-ink'], v['--surface']), `${where} accent text on a panel`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 });

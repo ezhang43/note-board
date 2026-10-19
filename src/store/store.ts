@@ -1,4 +1,6 @@
 import type { StorageLike } from '../model/persist';
+import { HOTKEYS_KEY, startingHotkeys } from '../model/hotkeys';
+import { COLOR_THEME_KEY, startingColorTheme } from '../model/theme';
 import { blockActions } from './actions/blocks';
 import { boardActions } from './actions/boards';
 import { checklistActions } from './actions/checklist';
@@ -17,8 +19,18 @@ export { EXPAND_WATCH_MS, IMPORT_TOP_MARGIN } from './actions/blocks';
 
 export type Store = ReturnType<typeof createStore>;
 
+function saved(storage: StorageLike | null, key: string): string | null {
+  try {
+    return storage?.getItem(key) ?? null;
+  } catch {
+    return null; // Storage blocked: the defaults (Honey, the usual keys).
+  }
+}
+
 export function createStore(storage: StorageLike | null, schedule: Schedule = later) {
   const { ctx, api } = createCore(storage, schedule);
+  // The color theme is a per-device setting like light / dark, started from what this device saved.
+  ctx.updateView((v) => ({ ...v, colorTheme: startingColorTheme(saved(storage, COLOR_THEME_KEY)), hotkeys: startingHotkeys(saved(storage, HOTKEYS_KEY)) }));
   const boards = boardActions(ctx);
   return {
     ...api,

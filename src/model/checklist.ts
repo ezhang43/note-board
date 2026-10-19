@@ -240,12 +240,25 @@ export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoIte
   const next = cloned(items);
   removeItemInPlace(next, id);
   if (!next.length) return null;
-  const order = displayOrder(items);
-  const at = order.indexOf(id);
-  const left = new Set(flatIds(next));
-  // The nearest item above that is still there; failing that, the nearest one below.
-  const focus = order.slice(0, at).reverse().find((x) => left.has(x)) ?? order.slice(at + 1).find((x) => left.has(x)) ?? null;
-  return { items: next, focus };
+  return { items: next, focus: focusAfterRemoving(displayOrder(items), next, [id]) };
+}
+
+/**
+ * Where the cursor goes after `gone` were removed: the nearest item above the first of them that is
+ * still there, else the nearest one below. Only items in `shown` (the ids on screen, top to bottom,
+ * before the change) count, so the cursor never lands in a closed Completed section. A list emptied
+ * by the delete has a new blank item, which takes the cursor.
+ */
+export function focusAfterRemoving(shown: string[], after: TodoItem[], gone: string[]): string | null {
+  const left = new Set(flatIds(after));
+  const at = shown.findIndex((x) => gone.includes(x));
+  if (at < 0) return null; // nothing that was on screen went
+  return (
+    shown.slice(0, at).reverse().find((x) => left.has(x)) ??
+    shown.slice(at + 1).find((x) => left.has(x)) ??
+    flatIds(after).find((x) => !shown.includes(x) && findItem(after, x)!.item.text === '' && !findItem(after, x)!.item.done) ??
+    null
+  );
 }
 
 /**
@@ -376,6 +389,39 @@ export function dropOnRow(
   const mode = at.lowerHalf ? 'after' : 'before';
   const markId = at.lowerHalf && t.item.children.length ? lastVisible(t.item).id : targetId;
   return { drop: { mode, targetId }, markId, markMode: mode };
+}
+
+/**
+ * Phone press-and-hold: the row that must move down to open the gap where lifted items would go.
+ * `order` is the list's rows as shown. A "before" mark opens it before that row; "after" and "nest"
+ * (nested items go first under their parent) open it before the next row not being lifted. Null: at the end.
+ */
+export function gapBefore(
+  order: string[],
+  mark: { markId: string; markMode: 'before' | 'after' | 'nest' },
+  lifted: string[],
+): string | null {
+  if (mark.markMode === 'before') return mark.markId;
+  return order.slice(order.indexOf(mark.markId) + 1).find((id) => !lifted.includes(id)) ?? null;
+}
+
+/**
+ * How far (px, up is negative) each row slides while items are lifted: up to close the space of
+ * lifted rows (`lifted`: row id -> height) above it, down by `gap` to open the space before `before`.
+ * Lifted rows themselves are not moved (they are hidden). Rows that stay put have no entry.
+ */
+export function slideOffsets(order: string[], lifted: Record<string, number>, before: string | null, gap: number): Record<string, number> {
+  const slide: Record<string, number> = {};
+  let closed = 0;
+  let opened = 0;
+  for (const id of order) {
+    if (id in lifted) closed += lifted[id];
+    else {
+      if (id === before) opened = gap;
+      if (opened !== closed) slide[id] = opened - closed;
+    }
+  }
+  return slide;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, clickEmpty, columns, freshBoardEachTest, toggleDark } from './helpers';
 
 // The app's new look, direction A "Honey Workshop" (owner decision, 2026-10-16): a calm cream
 // toolbar with honey accents, Snap / Collapse all / Same width / Clean up in an Arrange menu,
@@ -149,7 +149,7 @@ test('the Honey Workshop colours, light and dark', async ({ page }) => {
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(248, 245, 238)');
   // The pressed tool is honey.
   await expect(toolbar(page).getByRole('button', { name: 'Hand (H)' })).toHaveCSS('background-color', 'rgb(242, 182, 43)');
-  await toolbar(page).getByRole('button', { name: 'Dark mode' }).click();
+  await toggleDark(page);
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(27, 26, 23)');
   await expect(toolbar(page)).toHaveCSS('background-color', 'rgb(36, 34, 30)');
 });
@@ -157,11 +157,13 @@ test('the Honey Workshop colours, light and dark', async ({ page }) => {
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test("a card's buttons are always shown (no pointer to hover with)", async ({ page }) => {
+  // Job 113: on a phone the buttons show on the selected card only (there is no pointer to hover with).
+  test("a card's buttons are shown while it is selected, and hidden once it is not", async ({ page }) => {
     await page.getByRole('button', { name: 'Add' }).tap();
     await page.getByRole('menuitem', { name: 'Note' }).tap();
-    await clickEmpty(page);
     const note = page.locator('[data-kind="note"]');
     await expect(note.getByRole('button', { name: 'Delete card' })).toHaveCSS('opacity', '1');
+    await clickEmpty(page);
+    await expect(note.locator('button[aria-label="Delete card"]')).toBeHidden();
   });
 });

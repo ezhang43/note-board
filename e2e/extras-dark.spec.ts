@@ -1,13 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DARK_PALETTE } from '../src/model/theme';
-import { add, columns, freshBoardEachTest, looseCards } from './helpers';
+import { add, appearance, columns, freshBoardEachTest, looseCards, toggleDark } from './helpers';
 
-// Owner request: dark mode with a toggle in the toolbar. Starts following the computer's setting;
-// pressing the toggle is remembered on this device.
+// Owner request: dark mode with a switch in the toolbar's Appearance menu. Starts following the computer's setting;
+// pressing the switch is remembered on this device.
 
 freshBoardEachTest();
 
-const toggle = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Dark mode' });
+const appearanceButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Appearance', exact: true });
+/** Checks the Dark mode switch in the Appearance menu (opening it, then closing it again). */
+async function isDark(page: Page, on: boolean) {
+  const menu = await appearance(page);
+  await expect(menu.getByRole('button', { name: 'Dark mode' })).toHaveAttribute('aria-pressed', String(on));
+  await page.keyboard.press('Escape');
+}
 const bodyBg = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
 /** Rough brightness 0–255 of a computed rgb() color. */
@@ -22,27 +28,27 @@ function hexToRgb(hex: string) {
 }
 
 test('the toggle switches the whole app to dark and back, and is remembered after a reload', async ({ page }) => {
-  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+  await isDark(page, false);
   expect(brightness(await bodyBg(page))).toBeGreaterThan(200);
 
-  await toggle(page).click();
-  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+  await toggleDark(page);
+  await isDark(page, true);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect.poll(async () => brightness(await bodyBg(page))).toBeLessThan(50);
   const toolbarBg = await page.locator('header.toolbar').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(brightness(toolbarBg)).toBeLessThan(60);
 
   await page.reload();
-  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+  await isDark(page, true);
   expect(brightness(await bodyBg(page))).toBeLessThan(50);
 
-  await toggle(page).click();
+  await toggleDark(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect.poll(async () => brightness(await bodyBg(page))).toBeGreaterThan(200);
 });
 
 test('in dark mode cards are dark with light text, and columns use deep shades of their color', async ({ page }) => {
-  await toggle(page).click();
+  await toggleDark(page);
   await add(page, 'Note');
   const card = looseCards(page).first();
   const cardStyle = await card.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ink: getComputedStyle(el).color }));
@@ -57,17 +63,17 @@ test('in dark mode cards are dark with light text, and columns use deep shades o
 
 test('undo does not switch the mode back', async ({ page }) => {
   await add(page, 'Note');
-  await toggle(page).click();
+  await toggleDark(page);
   await page.keyboard.press('Control+z');
   await expect(looseCards(page)).toHaveCount(0);
-  await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+  await isDark(page, true);
 });
 
 test('the toolbar, with the toggle, still fits a 1280px-wide window', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const fits = await page.locator('header.toolbar').evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(fits).toBe(true);
-  const right = (await toggle(page).boundingBox())!;
+  const right = (await appearanceButton(page).boundingBox())!;
   expect(right.x + right.width).toBeLessThanOrEqual(1280);
 });
 
@@ -75,11 +81,11 @@ test.describe('on a computer set to dark mode', () => {
   test.use({ colorScheme: 'dark' });
 
   test('a first visit starts dark; choosing light is remembered over the computer setting', async ({ page }) => {
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await isDark(page, true);
     expect(brightness(await bodyBg(page))).toBeLessThan(50);
-    await toggle(page).click();
+    await toggleDark(page);
     await page.reload();
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+    await isDark(page, false);
     expect(brightness(await bodyBg(page))).toBeGreaterThan(200);
   });
 });

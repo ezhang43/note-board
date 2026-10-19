@@ -2051,6 +2051,8 @@ a.cal-open { align-self: flex-start; }
 .cal-card {
   position: fixed;
   z-index: 7; /* above the panel's resize strip, where a narrow window pushes it over the panel */
+  /* 8px left of the panel's edge, so it follows the panel as it is resized; kept 8px from the window's left. */
+  right: min(calc(var(--side-width) + 8px), calc(100vw - 308px));
   width: 300px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);

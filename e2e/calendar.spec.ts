@@ -32,7 +32,7 @@ const panel = (page: Page) => page.getByRole('complementary', { name: 'Google Ca
 const day = (page: Page, d: Date) => panel(page).getByRole('region', { name: label(d) });
 const form = (page: Page) => panel(page).getByRole('form');
 /** The small card an event opens (job #108). */
-const card = (page: Page) => panel(page).getByRole('dialog');
+const card = (page: Page) => page.locator('.cal-card');
 /** Clicks an event, then the card's pencil: the change form, as a click alone opened before job #108. */
 async function edit(page: Page, event: Locator) {
   await event.click();
@@ -163,7 +163,7 @@ test('delete asks first (Keep / Delete); Escape keeps the panel open; Ctrl+Z doe
 });
 
 // Repeating events and guests (owner request, 2026-10-16, job #85).
-const asked = (page: Page, name: string) => panel(page).getByRole('alertdialog', { name });
+const asked = (page: Page, name: string) => page.getByRole('alertdialog', { name });
 const WHICH = 'Save changes to which events?';
 const EMAILS = 'Send update emails to guests?';
 /** The changes sent to the calendar (adds, changes, deletes) as "METHOD url", in order. */
@@ -523,6 +523,64 @@ test('while a delete is on its way the card stays open, so a refusal is shown; c
   await page.keyboard.press('Enter');
   await expect(card(page)).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('while a delete is on its way, clicking another event waits, so Google’s refusal still shows in the card', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  let answer: () => void = () => {};
+  await page.route('**/__calendar/**', (route) =>
+    route.request().method() === 'DELETE'
+      ? new Promise<void>((done) => (answer = done)).then(() => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }))
+      : route.continue(),
+  );
+  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await page.keyboard.press('Delete');
+  const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
+  await asked(page, 'Delete “Dentist”?').getByRole('button', { name: 'Delete' }).click();
+  await deleting;
+  await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();
+  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
+  answer();
+  await expect(card(page).getByText('That change didn’t reach Google Calendar. Try again later.')).toBeVisible();
+  await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('with little board left beside a wide panel the card sits on top of the panel’s edge, not under it', async ({ page }) => {
+  const errors = await openAs(page);
+  await page.setViewportSize({ width: 760, height: 800 });
+  await button(page).click();
+  await dragTo(page, 300);
+  await expect.poll(async () => (await panel(page).boundingBox())!.x).toBe(300);
+  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  const box = (await card(page).boundingBox())!;
+  // The card runs over the resize strip (296–304): the strip must not cover it.
+  expect(box.x + box.width).toBeGreaterThan(304);
+  const onTop = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.cal-card') != null, [300, box.y + 20]);
+  expect(onTop).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('the card moves with the panel’s edge when the panel is resized', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(card(page)).toBeVisible();
+  // Resized by keyboard, so the card stays open.
+  await handle(page).focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => width(page)).toBeGreaterThan(420);
+  const panelBox = (await panel(page).boundingBox())!;
+  await expect
+    .poll(async () => {
+      const box = (await card(page).boundingBox())!;
+      return Math.round(panelBox.x - 8 - (box.x + box.width));
+    })
+    .toBe(0);
   expect(errors).toEqual([]);
 });
 

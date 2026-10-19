@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CalEvent } from './calendar';
-import { cardPosition, whenLabel } from './eventCard';
+import { cardTop, whenLabel } from './eventCard';
 
 // The small card a calendar event opens (owner request, 2026-10-19, job #108).
 
@@ -38,23 +38,21 @@ describe('when an event is, as the card says it', () => {
 });
 
 describe('where the card sits beside the panel', () => {
-  // The panel's left edge at 1000, its top (just under the toolbar) at 56.
-  const panel = { left: 1000, top: 56 };
+  // Its left side follows the panel in CSS (so it moves when the panel is resized); here only its top.
+  // The panel's top (just under the toolbar) at 56.
+  const panel = { top: 56 };
   const screen = { height: 900 };
-  const card = { width: 300, height: 200 };
-  it('just left of the panel (clear of its resize strip), its top level with the event', () => {
-    expect(cardPosition({ top: 300 }, panel, card, screen)).toEqual({ left: 692, top: 300 });
+  const card = { height: 200 };
+  it('its top level with the event', () => {
+    expect(cardTop({ top: 300 }, panel, card, screen)).toBe(300);
   });
   it('kept on screen at the bottom', () => {
-    expect(cardPosition({ top: 850 }, panel, card, screen)).toEqual({ left: 692, top: 692 });
+    expect(cardTop({ top: 850 }, panel, card, screen)).toBe(692);
   });
   it('never above the panel, so it doesn’t cover the toolbar', () => {
-    expect(cardPosition({ top: 20 }, panel, card, screen)).toEqual({ left: 692, top: 56 });
-  });
-  it('kept on screen at the left when the panel is wide', () => {
-    expect(cardPosition({ top: 300 }, { left: 200, top: 56 }, card, screen)).toEqual({ left: 8, top: 300 });
+    expect(cardTop({ top: 20 }, panel, card, screen)).toBe(56);
   });
   it('a card taller than the screen starts at the panel’s top', () => {
-    expect(cardPosition({ top: 300 }, panel, { width: 300, height: 1000 }, screen)).toEqual({ left: 692, top: 56 });
+    expect(cardTop({ top: 300 }, panel, { height: 1000 }, screen)).toBe(56);
   });
 });

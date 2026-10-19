@@ -7,6 +7,7 @@
 - Pressing Delete or Backspace while the card is open deletes the event too. It asks first, exactly like the trash can and the form's Delete button ("Delete “Dentist”?" · Keep · Delete). Calendar events can't be undone, so that question is the safeguard. It doesn't fire while you're typing in a text box.
 - Events you can only change in Google Calendar show the same card without pencil and trash, with the Open in Google Calendar link.
 - Escape, × or a click anywhere else closes the card; the next Escape closes the panel.
+- The card follows the panel's edge when you resize the panel or the window, and stays on top of the panel's edge in a narrow window. While a delete is on its way to Google, clicking another event or week waits, so a "didn't reach Google Calendar" note can't be missed.
 - Your boards and their saving are not touched.
 
 ## Phone: press and hold to move a list item (2026-10-19)

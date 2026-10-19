@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import {
   canChangeSeries,
   cellLines,
@@ -25,7 +26,7 @@ import {
   type Draft,
 } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
-import { cardPosition, whenLabel } from '../model/eventCard';
+import { cardTop, whenLabel } from '../model/eventCard';
 import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type Choice } from '../store/calendar';
 import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, TrashIcon } from './icons';
 import { isTextField, panelCovers } from './textField';
@@ -288,7 +289,8 @@ function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today:
 function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
   const phone = usePhone();
   const ref = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
+  const [top, setTop] = useState<number | null>(null);
+  const [home] = useState(() => opener.closest('.app') ?? document.body);
   const draft = draftFor(event);
   // Gone (another event's card opened, or the panel closed) before Google answered: nothing to close or focus.
   const alive = useRef(true);
@@ -316,14 +318,14 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
 
   // preventScroll: the first focus can come before the card has its place.
   useEffect(() => ref.current?.focus({ preventScroll: true }), []);
-  // simple: placed where the event was when it opened; it doesn't follow the list if the panel scrolls.
-  // Measured again when the question or a note makes it taller, so it stays on screen.
+  // simple: its top is where the event was when it opened; it doesn't follow the list if the panel scrolls.
+  // Measured again when the question or a note makes it taller, so it stays on screen. Its side
+  // follows the panel's edge in CSS, so it moves when the panel is resized.
   useLayoutEffect(() => {
     const card = ref.current;
     const panel = opener.closest('.side-panel');
     if (phone || !card || !panel || !opener.isConnected) return;
-    const size = { width: card.offsetWidth, height: card.offsetHeight };
-    setPlace(cardPosition(opener.getBoundingClientRect(), panel.getBoundingClientRect(), size, { height: window.innerHeight }));
+    setTop(cardTop(opener.getBoundingClientRect(), panel.getBoundingClientRect(), { height: card.offsetHeight }, { height: window.innerHeight }));
   }, [phone, opener, ask, note]);
 
   // Escape and Delete belong to the card while it is open, wherever the keyboard is (capture: before
@@ -348,17 +350,29 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   });
-  // A click or tap anywhere else closes it.
+  // A click or tap anywhere else closes it. While a change is on its way, clicks elsewhere in the
+  // panel (another event, another week, ×) wait too, so the card stays to show Google's answer.
   useEffect(() => {
     const down = (e: PointerEvent) => {
       if (!busy && !ref.current?.contains(e.target as Node)) onClose();
     };
+    const click = (e: MouseEvent) => {
+      if (busy && e.target instanceof Element && e.target.closest('.side-panel')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
     document.addEventListener('pointerdown', down, true);
-    return () => document.removeEventListener('pointerdown', down, true);
+    document.addEventListener('click', click, true);
+    return () => {
+      document.removeEventListener('pointerdown', down, true);
+      document.removeEventListener('click', click, true);
+    };
   });
 
-  return (
-    <div ref={ref} className="cal-card" role="dialog" aria-label={event.title} tabIndex={-1} style={phone || !place ? undefined : place}>
+  // Drawn outside the panel (whose layer would keep it under the panel's resize strip), still in the app for its look.
+  return createPortal(
+    <div ref={ref} className="cal-card" role="dialog" aria-label={event.title} tabIndex={-1} style={phone || top === null ? undefined : { top }}>
       <div className="cal-card-tools">
         {event.editable && (
           <>
@@ -400,7 +414,8 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
         </p>
       )}
       {ask && <Question event={event} draft={draft} ask={ask} next={next} onCancel={cancel} />}
-    </div>
+    </div>,
+    home,
   );
 }
 

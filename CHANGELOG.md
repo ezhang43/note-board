@@ -10,6 +10,11 @@
 - The card follows the panel's edge when you drag the panel wider or narrower (it stays open) or resize the window. In a narrow window with a wide panel, where there is no room beside the panel, it sits inside the panel instead of being partly hidden. While a delete is on its way to Google, clicking another event or week waits, so a "didn't reach Google Calendar" note is still shown.
 - Your boards and their saving are not touched.
 
+## A flaky phone test made reliable (2026-10-19)
+
+- One browser test (an item far off to the side is brought back on a phone) sometimes failed on GitHub for no real reason: the app was doing its job, bringing the item back on screen, a moment before the test looked. The test now waits for that first move to finish before sliding the board.
+- The app itself and your boards are not changed.
+
 ## Dragging and resizing keep rows together (2026-10-19)
 
 - Drag a block along a row and the blocks in that row now slide sideways out of its way and keep their left-to-right order, instead of jumping above or below the row. Drop a block onto its neighbour and they swap places.

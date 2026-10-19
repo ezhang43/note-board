@@ -17,8 +17,20 @@ const blankBoard = (): Board => ({ ...B.createBoard(), name: '' });
 export function boardActions(ctx: StoreContext) {
   const { commit, setOthers, openBoard } = ctx;
   const sharedIds = () => ctx.state.ui.shares.flatMap((s) => s.boards);
+  /** The board the Journal panel writes into: none once a share holds it (shared boards are never used). */
+  const journalId = () => {
+    const id = ctx.state.ui.journalBoard;
+    return id && !sharedIds().includes(id) ? id : null;
+  };
+  /** The Journal board left out of the Boards menu and Ctrl+arrows: never the open one, none until shares are known. */
+  const hidden = () => {
+    const { sharesKnown } = ctx.state.ui;
+    const id = sharesKnown ? hiddenJournal(ctx.workspace(), sharedIds()) : null;
+    return id === ctx.state.boards.open ? null : id;
+  };
 
   return {
+    hiddenJournal: hidden,
     openBoard,
     /** A board's name ('' if unnamed or gone). */
     boardName(id: string): string {
@@ -31,9 +43,9 @@ export function boardActions(ctx: StoreContext) {
     moveBoard(move: Parameters<typeof boardNeighbor>[2]): string | null {
       // The hidden Journal board is passed over, as in the Boards menu.
       const ws = ctx.workspace();
-      const hidden = hiddenJournal(ws, sharedIds());
+      const skip = hidden();
       let id = boardNeighbor(ws, ctx.state.boards.open, move);
-      if (id && id === hidden) id = boardNeighbor(ws, id, move);
+      if (id && id === skip) id = boardNeighbor(ws, id, move);
       if (id) openBoard(id);
       return id && ctx.state.boards.open === id ? id : null;
     },
@@ -96,18 +108,18 @@ export function boardActions(ctx: StoreContext) {
     },
     /** Typing in the Journal panel: what is written under a note's date line (the date line stays). */
     setJournalText(noteId: string, body: string) {
-      const id = ctx.state.ui.journalBoard;
+      const id = journalId();
       if (!id) return;
       const write = (text: string) => withJournalBody(text, body);
       ctx.commitTo(id, (b) => B.updateCard(b, noteId, (c) => (c.kind === 'note' && write(c.text) !== c.text ? { ...c, text: write(c.text) } : c)), `text:${noteId}`);
     },
     /** Ctrl+Z / Ctrl+Y in the Journal panel: on the Journal board's own history, whichever board is open. */
     undoJournal() {
-      const id = ctx.state.ui.journalBoard;
+      const id = journalId();
       if (id) ctx.undoOn(id, 'undo');
     },
     redoJournal() {
-      const id = ctx.state.ui.journalBoard;
+      const id = journalId();
       if (id) ctx.undoOn(id, 'redo');
     },
     /**

@@ -26,10 +26,13 @@ export function findJournalBoard(ws: Workspace, shared: string[]): string | null
   return boardTree(ws).find(({ id }) => ws.boards[id].name === JOURNAL_NAME && !shared.includes(id))?.id ?? null;
 }
 
+/** A note's first line, without trailing spaces or a Windows line end. */
+const firstLine = (text: string) => text.split('\n')[0].trimEnd();
+const isDay = (text: string, dateLine: string) => firstLine(text) === dateLine || firstLine(text).startsWith(`${dateLine} `);
+
 /** The note on `board` whose first line is `dateLine`, with or without a title after it (today's note), or null. */
 export function todaysNote(board: Board, dateLine: string): string | null {
-  const first = (text: string) => text.split('\n')[0].trimEnd();
-  const note = Object.values(board.cards).find((c) => c.kind === 'note' && (first(c.text) === dateLine || first(c.text).startsWith(`${dateLine} `)));
+  const note = Object.values(board.cards).find((c) => c.kind === 'note' && isDay(c.text, dateLine));
   return note?.id ?? null;
 }
 
@@ -50,33 +53,33 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DATE_LINE = new RegExp(`^(?:${DAYS.join('|')}) (\\d{1,2}) (${MONTHS.join('|')}) (\\d{4})(?: |$)`);
 
-/** A note's first line, without trailing spaces or a Windows line end. */
-const firstLine = (text: string) => text.split('\n')[0].trimEnd();
-
 /** What is written under a note's date line (the date line and the blank line after it left out). */
 export function journalBody(text: string): string {
   const i = text.indexOf('\n');
-  if (i < 0) return '';
-  const rest = text.slice(i + 1);
-  return rest.startsWith('\n') ? rest.slice(1) : rest;
+  return i < 0 ? '' : text.slice(i + 1).replace(/^\r?\n/, '');
 }
 
-/** The note's text with `body` under its date line, keeping the date line and the gap after it as they are. */
+/**
+ * The note's text with `body` under its date line, which is kept as it is, then a blank line, so
+ * journalBody reads back exactly `body` (a line break typed at its start included).
+ */
 export function withJournalBody(text: string, body: string): string {
-  const i = text.indexOf('\n');
-  if (i < 0) return `${text}\n\n${body}`;
-  return text.slice(0, i + 1) + (text.slice(i + 1).startsWith('\n') ? '\n' : '') + body;
+  return `${text.split('\n')[0].replace(/\r$/, '')}\n\n${body}`;
 }
 
-/** The dated notes on a Journal board, newest day first: each note's id, its date line and what is written under it. */
-export function journalEntries(board: Board): { id: string; date: string; body: string }[] {
+/**
+ * The dated notes on a Journal board: today's (`today`: its date line) first, then the others,
+ * newest day first. Each is the note's id, its date line and what is written under it.
+ */
+export function journalEntries(board: Board, today = ''): { id: string; date: string; body: string }[] {
   const out: { id: string; date: string; body: string; day: number }[] = [];
   for (const c of Object.values(board.cards)) {
     const m = c.kind === 'note' ? DATE_LINE.exec(firstLine(c.text)) : null;
     if (c.kind !== 'note' || !m) continue;
     out.push({ id: c.id, date: firstLine(c.text), body: journalBody(c.text), day: Number(m[3]) * 10000 + MONTHS.indexOf(m[2]) * 100 + Number(m[1]) });
   }
-  return out.sort((a, b) => b.day - a.day).map(({ id, date, body }) => ({ id, date, body }));
+  const rank = (e: (typeof out)[number]) => (today && isDay(e.date, today) ? 1e9 : e.day);
+  return out.sort((a, b) => rank(b) - rank(a)).map(({ id, date, body }) => ({ id, date, body }));
 }
 
 /**

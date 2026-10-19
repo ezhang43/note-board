@@ -108,6 +108,9 @@ describe('journalEntries', () => {
     const entries = journalEntries(b);
     expect(entries.map((e) => e.date)).toEqual(['Sun 18 Oct 2026 - busy', 'Sat 17 Oct 2026', 'Wed 30 Sep 2026', 'Thu 31 Dec 2025']);
     expect(entries[0]).toEqual({ id: today.id, date: 'Sun 18 Oct 2026 - busy', body: 'hello' });
+    // Today's note comes first even when a later day was written ahead (review of job 99).
+    expect(journalEntries(b, 'Sat 17 Oct 2026').map((e) => e.date)).toEqual(['Sat 17 Oct 2026', 'Sun 18 Oct 2026 - busy', 'Wed 30 Sep 2026', 'Thu 31 Dec 2025']);
+    expect(journalEntries(b, 'Sun 18 Oct 2026')[0].id).toBe(today.id);
   });
 });
 
@@ -120,10 +123,21 @@ describe('journalBody / withJournalBody', () => {
       ['Sun 18 Oct 2026', ''],
     ]) {
       expect(journalBody(text)).toBe(body);
-      expect(withJournalBody(text, body)).toBe(text === 'Sun 18 Oct 2026' ? 'Sun 18 Oct 2026\n\n' : text);
+      expect(withJournalBody(text, body)).toBe(`Sun 18 Oct 2026\n\n${body}`);
     }
     expect(withJournalBody('Sun 18 Oct 2026\n\n', 'Went for a walk')).toBe('Sun 18 Oct 2026\n\nWent for a walk');
-    expect(withJournalBody('Sun 18 Oct 2026\nold', 'new')).toBe('Sun 18 Oct 2026\nnew');
+    expect(withJournalBody('Sun 18 Oct 2026 - busy\nold', 'new')).toBe('Sun 18 Oct 2026 - busy\n\nnew');
+    expect(journalBody('Sun 18 Oct 2026\r\n\r\nfrom Windows')).toBe('from Windows');
+  });
+
+  it('reads back exactly what was written, whatever the note looked like before (review of job 99)', () => {
+    for (const text of ['Sun 18 Oct 2026\n\nhi', 'Sun 18 Oct 2026\nfoo', 'Sun 18 Oct 2026', 'Sun 18 Oct 2026\r\n\r\nx', 'Sun 18 Oct 2026 - title\n\n\nspaced']) {
+      for (const body of ['', 'new', '\nfoo', '\n\n', 'a\nb', '\r\nx']) {
+        const written = withJournalBody(text, body);
+        expect(journalBody(written)).toBe(body);
+        expect(written.split('\n')[0].trimEnd()).toBe(text.split('\n')[0].trimEnd());
+      }
+    }
   });
 });
 

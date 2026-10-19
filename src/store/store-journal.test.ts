@@ -196,6 +196,33 @@ describe('Journal panel', () => {
     expect(s.moveBoard('previous')).toBe(home);
   });
 
+  it('stops writing to the Journal board once a share holds it (review of job 99)', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    const note = journalNotes(s)[0];
+    s.setShares([{ id: 's1', root: id, boards: [id], owner: true, ownerUid: 'me', people: [], link: null }], true);
+    s.undoJournal(); // would take today's note away
+    expect(journalNotes(s)).toEqual([note]);
+    s.setJournalText(note.id, 'secret');
+    expect(journalNotes(s)).toEqual([note]);
+  });
+
+  it('only one place says which board is hidden: none until shares are known, never the open board (review of job 99)', () => {
+    const s = setup();
+    const home = s.getState().boards.home;
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    expect(s.hiddenJournal()).toBe(id);
+    s.setShares([], false);
+    expect(s.hiddenJournal()).toBeNull();
+    s.setShares([], true);
+    s.openBoard(id);
+    expect(s.hiddenJournal()).toBeNull();
+    s.openBoard(home);
+    expect(s.hiddenJournal()).toBe(id);
+  });
+
   it('makes the hidden Journal board standalone, not inside the board that is open', () => {
     const s = setup();
     const sub = s.addBoardCard();

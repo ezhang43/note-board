@@ -32,6 +32,8 @@ export function useShortcuts() {
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
+      // Keys pressed in the Journal panel never act on the board behind it.
+      if (inJournal) return;
       // Nothing below acts on the board while a panel covers it (Send feedback, Delete account),
       // wherever focus is: it can be on the page itself after a click on the panel's text.
       if (panelCovers()) return;

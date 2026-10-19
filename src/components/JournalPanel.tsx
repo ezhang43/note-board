@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { journalEntries } from '../model/journal';
+import { journalDateLine, journalEntries } from '../model/journal';
 import { appStore, useAppState } from '../store/appStore';
 import { GrowTextarea } from './GrowTextarea';
 
@@ -14,7 +14,7 @@ export function JournalPanel() {
     if (!id) return undefined;
     return id === s.boards.open ? s.board : s.boards.others[id];
   });
-  const entries = useMemo(() => (board ? journalEntries(board) : []), [board]);
+  const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date())) : []), [board]);
   const root = useRef<HTMLDivElement>(null);
   const first = useRef<HTMLTextAreaElement>(null);
   /** The entry being typed in, so the panel keeps the keyboard if undo takes that entry away. */

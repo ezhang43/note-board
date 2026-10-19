@@ -105,19 +105,35 @@ test('what is written is kept after a reload, and earlier days are listed below 
     const note = Object.values(board.cards)[0] as { id: string; y: number };
     board.cards.old = { ...note, id: 'old', text: 'Thu 1 Jan 2026\n\nnew year', y: note.y + 400 };
     board.order.push('old');
+    // A day written ahead still comes after today, which keeps the cursor (review of job 99).
+    board.cards.ahead = { ...note, id: 'ahead', text: 'Fri 1 Jan 2100\n\nplans', y: note.y + 800 };
+    board.order.push('ahead');
     localStorage.setItem('note-board:v1', JSON.stringify(raw));
   });
   await page.reload();
   await journalButton(page).click();
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Thu 1 Jan 2026']);
-  await expect(entries(page)).toHaveCount(2);
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Fri 1 Jan 2100', 'Thu 1 Jan 2026']);
+  await expect(entries(page)).toHaveCount(3);
+  await expect(entries(page).nth(0)).toBeFocused();
   await expect(entries(page).nth(0)).toHaveValue('kept');
-  await expect(entries(page).nth(1)).toHaveValue('new year');
+  await expect(entries(page).nth(2)).toHaveValue('new year');
   // Earlier days can be edited too.
-  await entries(page).nth(1).click();
+  await entries(page).nth(2).click();
   await page.keyboard.press('End');
   await page.keyboard.type('!');
-  await expect(entries(page).nth(1)).toHaveValue('new year!');
+  await expect(entries(page).nth(2)).toHaveValue('new year!');
+});
+
+test('keys pressed in the panel never act on the board behind it (review of job 99)', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape'); // the note stays selected
+  await journalButton(page).click();
+  await page.keyboard.press('Escape'); // out of the text, still in the panel
+  await expect(panel(page)).toBeVisible();
+  for (const key of ['Backspace', 'Delete', 'ArrowDown', 'Control+d']) await page.keyboard.press(key);
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('on home');
 });
 
 test('an existing Journal board and its Home card are left as they are, and the panel writes into that board', async ({ page }) => {

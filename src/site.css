@@ -397,10 +397,11 @@ a, summary { touch-action: manipulation; }
 
 /*
  * Motion (owner request 2026-10-19, Emil Kowalski's skills; docs/design-polish-review.md): the big
- * buttons shrink a little when pressed, and a fold's arrow turns instead of jumping. Not with reduced motion.
+ * buttons shrink a little when pressed (also with reduced motion: a tiny scale in place), and a fold's
+ * arrow turns instead of jumping (not with reduced motion).
  */
+.start, .site-header a:last-child { transition: transform 120ms var(--ease-out); }
+.start:active, .site-header a:last-child:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: no-preference) {
-  .start, .site-header a:last-child { transition: transform 120ms var(--ease-out); }
-  .start:active, .site-header a:last-child:active { transform: scale(0.97); }
   summary::after { transition: transform 200ms var(--ease-out); }
 }

@@ -1983,17 +1983,17 @@ a.cal-open { align-self: flex-start; }
 .share-panel { transform-origin: top right; }
 .phone-sheet { transform-origin: bottom center; }
 
+/* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all) {
+  transition: transform 100ms var(--ease-out);
+}
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow):not([aria-disabled='true'], :disabled):active {
+  transform: scale(0.97);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .collapse-arrow { transition: transform 150ms var(--ease-out); }
   html[data-input='keys'] .collapse-arrow { transition: none; }
-
-  /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). */
-  :is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all) {
-    transition: transform 100ms var(--ease-out);
-  }
-  :is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow):not([aria-disabled='true'], :disabled):active {
-    transform: scale(0.97);
-  }
 
   /* Menus, panels and the phone sheet. */
   html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .phone-sheet, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {

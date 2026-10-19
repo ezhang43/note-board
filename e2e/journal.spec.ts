@@ -112,10 +112,15 @@ test('what is written is kept after a reload, and earlier days are listed below 
   });
   await page.reload();
   await journalButton(page).click();
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Fri 1 Jan 2100', 'Thu 1 Jan 2026']);
+  // Earlier days are in shut year / month / week groups (journal-groups.spec.ts): open them all.
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today]);
+  await expect(entries(page).first()).toBeFocused();
+  const shut = panel(page).getByRole('button', { expanded: false });
+  while (await shut.count()) await shut.first().click();
+  // Newest group first, so the day written ahead is above today (today's note has the cursor, checked above).
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Fri 1 Jan 2100', today, 'Thu 1 Jan 2026']);
   await expect(entries(page)).toHaveCount(3);
-  await expect(entries(page).nth(0)).toBeFocused();
-  await expect(entries(page).nth(0)).toHaveText('kept');
+  await expect(entries(page).nth(1)).toHaveText('kept');
   await expect(entries(page).nth(2)).toHaveText('new year');
   // Earlier days can be edited too.
   await entries(page).nth(2).click();

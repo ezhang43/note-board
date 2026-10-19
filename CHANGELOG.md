@@ -1,5 +1,13 @@
 # Changelog
 
+## Journal days fold away by year, month and week (2026-10-19)
+
+- The Journal panel now groups your days under Year, then Month, then Week (Monday to Sunday). Click a heading to open or shut it. A week that runs across two months is split, with each month listing its own days.
+- When you open the Journal, this year, this month and this week are open and today's note is there to type in. Older weeks, months and years are shut.
+- Which ones you open or shut is remembered on this device only. It is not synced or undoable, and your boards are not changed.
+- The Journal panel is now as wide as the Calendar panel.
+- A day written ahead (a later date) now appears in its own group above today's instead of just below it. Today's note still gets the cursor.
+
 ## Rich text in the Journal (2026-10-19)
 
 - Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).

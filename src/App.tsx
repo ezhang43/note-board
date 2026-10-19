@@ -21,7 +21,7 @@ import { CompletedPanel } from './components/CompletedPanel';
 import { JournalPanel } from './components/JournalPanel';
 import { HabitsPanel } from './components/HabitsPanel';
 import { CalendarPanel, CalendarResizeHandle } from './components/CalendarPanel';
-import { PANEL_MIN } from './model/calendar';
+import { PANEL_DEFAULT, PANEL_MIN } from './model/calendar';
 import { calendar } from './store/calendar';
 
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
@@ -47,7 +47,9 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const calendarWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().widths[calendar.get().view]);
   const resizable = sidePanel === 'calendar' && !phone;
   const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
-  const style = resizable ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${calendarWidth}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
+  // The Journal panel is as wide as the Calendar panel's Week view starts out (owner request, 2026-10-19).
+  const sideWidth = resizable ? calendarWidth : sidePanel === 'journal' && !phone ? PANEL_DEFAULT.week : null;
+  const style = sideWidth ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${sideWidth}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
   return (
     <div className={classes} style={style}>
       <Toolbar onSignOut={onSignOut} />

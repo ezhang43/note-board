@@ -1,4 +1,4 @@
-import { dayLabel } from './calendar';
+import { addDays, addMonths, dayLabel, MONTH_NAMES, MONTHS, weekStart, type DayKey } from './calendar';
 import { dayKey } from './completed';
 import { BLOCK_GAP, CARD_W, GRID, NEW_BLOCK_H } from './constants';
 import { spotForNewBlock, topLevelRects, type MeasuredHeight } from './layout';
@@ -50,7 +50,6 @@ export function journalSpot(board: Board, measured: MeasuredHeight, centre: Poin
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DATE_LINE = new RegExp(`^(?:${DAYS.join('|')}) (\\d{1,2}) (${MONTHS.join('|')}) (\\d{4})(?: |$)`);
 
 /** What is written under a note's date line (the date line and the blank line after it left out). */
@@ -94,4 +93,95 @@ export function hiddenJournal(ws: Workspace, shared: string[]): string | null {
   if (Object.keys(board.columns).length || journalEntries(board).length !== Object.keys(board.cards).length) return null;
   const opened = Object.values(ws.boards).some((b) => Object.values(b.cards).some((c) => c.kind === 'board' && c.boardId === id));
   return opened ? null : id;
+}
+
+// Entries grouped Year > Month > Week (owner request, 2026-10-19). Weeks run Monday to Sunday, as in
+// the calendar. A week that spans two months is split: each month lists its own days.
+
+/** The day a date line names, as 'YYYY-MM-DD' (a day out of range rolls over, as the calendar's days do), or null. */
+export function journalDayKey(date: string): DayKey | null {
+  const m = DATE_LINE.exec(date);
+  if (!m) return null;
+  return addDays(`${m[3]}-${String(MONTHS.indexOf(m[2]) + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`, 0);
+}
+
+export interface JournalWeek<T> { id: string; label: string; entries: T[] }
+export interface JournalMonth<T> { id: string; label: string; weeks: JournalWeek<T>[] }
+export interface JournalYear<T> { id: string; label: string; months: JournalMonth<T>[] }
+
+/** The ids of the year, month and week group a day sits in: "2026", "2026-10", "2026-10/2026-10-12" (the week's Monday). */
+const groupIds = (key: DayKey) => [key.slice(0, 4), key.slice(0, 7), `${key.slice(0, 7)}/${weekStart(key)}`] as const;
+
+/** "12–18 Oct": the week's days that fall in the month of `key`. */
+function weekLabel(key: DayKey): string {
+  const first = `${key.slice(0, 7)}-01`;
+  const monday = weekStart(key);
+  const from = monday < first ? first : monday;
+  const sunday = addDays(monday, 6);
+  const lastOfMonth = addDays(addMonths(first, 1), -1);
+  const to = sunday > lastOfMonth ? lastOfMonth : sunday;
+  const month = MONTHS[Number(key.slice(5, 7)) - 1];
+  return from === to ? `${Number(from.slice(8))} ${month}` : `${Number(from.slice(8))}–${Number(to.slice(8))} ${month}`;
+}
+
+/**
+ * The entries (as journalEntries lists them) grouped Year > Month > Week, newest first. Entries on
+ * one day keep the order given. An entry without a readable date line is left out.
+ */
+export function groupJournal<T extends { date: string }>(entries: T[]): JournalYear<T>[] {
+  const dated = entries.flatMap((e) => {
+    const key = journalDayKey(e.date);
+    return key ? [{ e, key }] : [];
+  });
+  dated.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+  const years: JournalYear<T>[] = [];
+  for (const { e, key } of dated) {
+    const [yearId, monthId, weekId] = groupIds(key);
+    let year = years.find((y) => y.id === yearId);
+    if (!year) years.push((year = { id: yearId, label: yearId, months: [] }));
+    let month = year.months.find((m) => m.id === monthId);
+    if (!month) year.months.push((month = { id: monthId, label: MONTH_NAMES[Number(key.slice(5, 7)) - 1], weeks: [] }));
+    let week = month.weeks.find((w) => w.id === weekId);
+    if (!week) month.weeks.push((week = { id: weekId, label: weekLabel(key), entries: [] }));
+    week.entries.push(e);
+  }
+  return years;
+}
+
+/** What the person chose to open (true) or shut (false), by group id; only choices that differ from the default are kept. */
+export type JournalOpen = Record<string, boolean>;
+
+/** Open unless chosen otherwise: the groups holding `today` (the year, month and week it is in). */
+export function isGroupOpen(choices: JournalOpen, id: string, today: DayKey): boolean {
+  return choices[id] ?? (groupIds(today) as readonly string[]).includes(id);
+}
+
+/** The choices after `id` is flipped. */
+export function toggleGroup(choices: JournalOpen, id: string, today: DayKey): JournalOpen {
+  const next = { ...choices };
+  const open = !isGroupOpen(choices, id, today);
+  if (open === (groupIds(today) as readonly string[]).includes(id)) delete next[id];
+  else next[id] = open;
+  return next;
+}
+
+/** The choices with today's groups no longer shut, so opening the panel always shows today. */
+export function openToday(choices: JournalOpen, today: DayKey): JournalOpen {
+  const next = { ...choices };
+  for (const id of groupIds(today)) if (next[id] === false) delete next[id];
+  return next;
+}
+
+const GROUP_ID = /^\d{4}(-\d{2}(\/\d{4}-\d{2}-\d{2})?)?$/;
+
+/** The remembered choices; anything missing or bad is dropped, so the defaults apply. */
+export function parseJournalOpen(raw: string | null): JournalOpen {
+  let data: unknown = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    // simple: a damaged value is ignored; the defaults are used.
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  return Object.fromEntries(Object.entries(data).filter(([id, v]) => GROUP_ID.test(id) && typeof v === 'boolean'));
 }

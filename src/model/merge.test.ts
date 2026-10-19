@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard, createCard, createColumn } from './cards';
 import { mergeBoards, mergeBoardSets } from './merge';
+import { journalDateLine } from './journal';
+import { journalRich, type Rich } from './richText';
 import type { Board, Card, NoteCard, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits (real-time collaboration): base = the board both started from,
@@ -307,5 +309,77 @@ describe('review fixes: a deleted block kept for an edit keeps what was in it', 
     expect(merged.columns.c1.title).toBe('Renamed');
     expect(merged.columns.c1.cardIds).toEqual(['n2']);
     expect(B.problems(merged)).toEqual([]);
+  });
+});
+
+describe('Journal formatting edited on two devices at once (job 119)', () => {
+  // The note's text is the truth; its formatting (`rich`) is only shown while it matches the text,
+  // so the two must never come from different sides.
+  const day = journalDateLine(new Date(2026, 9, 19, 9));
+  const bold = (t: string): Rich => [{ type: 'p', runs: [{ text: t, b: true }] }];
+  const under = (t: string): Rich => [{ type: 'p', runs: [{ text: t, u: true }] }];
+  const set = (b: Board, body: string, rich?: Rich) =>
+    B.updateCard(b, 'n1', (c) => {
+      const { rich: _r, ...rest } = c as NoteCard;
+      return (rich ? { ...rest, text: `${day}\n\n${body}`, rich } : { ...rest, text: `${day}\n\n${body}` }) as Card;
+    });
+  const shown = (b: Board) => {
+    const n = b.cards.n1 as NoteCard;
+    return journalRich(n.text, n.rich);
+  };
+
+  it('one types, the other only changes formatting: the typing is kept with formatting that matches it, either way round', () => {
+    const base = set(sample(), 'hello', bold('hello'));
+    const typed = set(base, 'hello there', bold('hello there'));
+    const formatted = set(base, 'hello', under('hello'));
+    for (const merged of [mergeBoards(base, typed, formatted), mergeBoards(base, formatted, typed)]) {
+      expect(text(merged, 'n1')).toBe(`${day}\n\nhello there`);
+      expect(shown(merged)).toEqual(bold('hello there'));
+    }
+    // Both devices end on the very same note, so they don't send it back and forth.
+    expect(mergeBoards(base, typed, formatted).cards.n1).toEqual(mergeBoards(base, formatted, typed).cards.n1);
+  });
+
+  it('typing in a plain note while the other formats it: the typing is kept, with no formatting that no longer fits', () => {
+    const base = set(sample(), 'hello');
+    const typed = set(base, 'hello there');
+    const formatted = set(base, 'hello', bold('hello'));
+    for (const merged of [mergeBoards(base, typed, formatted), mergeBoards(base, formatted, typed)]) {
+      expect(text(merged, 'n1')).toBe(`${day}\n\nhello there`);
+      expect('rich' in merged.cards.n1).toBe(false);
+    }
+  });
+
+  it('formatting on one side, a move on the other: both kept', () => {
+    const base = set(sample(), 'hello', bold('hello'));
+    const formatted = set(base, 'hello', under('hello'));
+    const moved = B.updateCard(base, 'n1', (c) => ({ ...c, x: 500 }));
+    for (const merged of [mergeBoards(base, moved, formatted), mergeBoards(base, formatted, moved)]) {
+      expect(merged.cards.n1).toMatchObject({ x: 500, rich: under('hello') });
+    }
+  });
+
+  it('both typed: mine wins, text and formatting together', () => {
+    const base = set(sample(), 'hello', bold('hello'));
+    const mine = set(base, 'hello mine', bold('hello mine'));
+    const theirs = set(base, 'hello theirs', under('hello theirs'));
+    const merged = mergeBoards(base, mine, theirs);
+    expect(text(merged, 'n1')).toBe(`${day}\n\nhello mine`);
+    expect(shown(merged)).toEqual(bold('hello mine'));
+    const swapped = mergeBoards(base, theirs, mine);
+    expect(text(swapped, 'n1')).toBe(`${day}\n\nhello theirs`);
+    expect(shown(swapped)).toEqual(under('hello theirs'));
+  });
+
+  it('both changed only the formatting: mine wins, and it fits', () => {
+    const base = set(sample(), 'hello', bold('hello'));
+    const merged = mergeBoards(base, set(base, 'hello', under('hello')), set(base, 'hello', [{ type: 'h1', runs: [{ text: 'hello' }] }]));
+    expect(shown(merged)).toEqual(under('hello'));
+  });
+
+  it('a note neither side changed keeps its saved formatting, even one that no longer fits its text', () => {
+    const stale = B.updateCard(set(sample(), 'hello'), 'n1', (c) => ({ ...c, rich: bold('old words') }) as Card);
+    const merged = mergeBoards(stale, B.renameBoard(stale, 'Trip'), B.updateCard(stale, 'n2', (c) => ({ ...c, x: 400 })));
+    expect((merged.cards.n1 as NoteCard).rich).toEqual(bold('old words'));
   });
 });

@@ -1,4 +1,5 @@
-import type { Board, Card, Column, TodoCard, TodoItem } from './types';
+import { richFits } from './richText';
+import type { Board, Card, Column, NoteCard, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits to a board (real-time collaboration, owner request 2026-10-05).
 // `base` is the board both started from, `mine` this page's board, `theirs` the one someone else
@@ -177,12 +178,33 @@ function orderAll(chosen: Map<string, string>, b: Lists, m: Lists, t: Lists): Ma
 /** Positions change when blocks re-arrange themselves, which isn't an edit worth keeping a deleted block for. */
 const edited = <E extends object>(was: E, now: E) => !deepEqual({ ...was, x: 0, y: 0 }, { ...now, x: 0, y: 0 });
 
+/**
+ * A note's formatting (`rich`, from the Journal) is only used while it matches the note's text
+ * (`richFits`), so text and formatting picked from different sides would show plain, and the next
+ * keystroke would save it plain for good. When the two sides differ there, the formatting is taken
+ * from a side whose own formatting fits the combined text (job 119); with none, the note is left
+ * plain rather than keep formatting that can't be used. Notes the same on both sides are untouched.
+ */
+function fitRich(n: NoteCard, m: NoteCard, t: NoteCard): NoteCard {
+  if (n.rich === undefined || (m.text === t.text && deepEqual(m.rich, t.rich)) || richFits(n.text, n.rich)) return n;
+  const { rich: _stale, ...plain } = n;
+  // simple: formatting made on text the other side then rewrote is not re-fitted to the new text
+  // (that needs a three-way merge of the formatting); the words are always kept. Upgrade if the
+  // Journal panel ever edits shared boards, or own boards ever sync through this merge.
+  const rich = [m.rich, t.rich].find((r) => r !== undefined && richFits(n.text, r));
+  return rich ? { ...plain, rich } : plain;
+}
+
 function mergeCards(b: Board, m: Board, t: Board): Record<string, Card> {
   return mergeEntities<Card>(
     b.cards,
     m.cards,
     t.cards,
-    (bc, mc, tc) => (mc.kind !== tc.kind || (bc && bc.kind !== mc.kind) ? (pick(bc, mc, tc) as Card) : mergeFields(bc, mc, tc, ['items'])),
+    (bc, mc, tc) => {
+      if (mc.kind !== tc.kind || (bc && bc.kind !== mc.kind)) return pick(bc, mc, tc) as Card;
+      const out = mergeFields(bc, mc, tc, ['items']);
+      return out.kind === 'note' ? fitRich(out, mc as NoteCard, tc as NoteCard) : out;
+    },
     edited,
   );
 }

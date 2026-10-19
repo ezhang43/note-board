@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { appStore } from '../store/appStore';
+import { appStore, useAppState } from '../store/appStore';
 import { caretBottom } from './caret';
-import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon } from './icons';
+import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon, UndoIcon } from './icons';
 
 type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
 
@@ -22,13 +22,15 @@ function keyboardCover() {
 
 /**
  * Phone layout (owner request): while typing in a checklist item, a row of buttons for what a
- * keyboard would do on a computer (Tab, Shift+Tab, Ctrl+Shift+Up / Down, ticking, deleting).
- * It sits just above the on-screen keyboard.
+ * keyboard would do on a computer (Undo, Tab, Shift+Tab, Ctrl+Shift+Up / Down, ticking, deleting),
+ * and Done to put the keyboard away. It sits just above the on-screen keyboard. Ticking and deleting
+ * move the cursor on to another item (owner request, 2026-10-19), so the keyboard stays up.
  */
 export function ItemBar() {
   const [typing, setTyping] = useState<Typing | null>(null);
   const [cover, setCover] = useState(0);
   const bar = useRef<HTMLDivElement>(null);
+  const canUndo = useAppState((s) => s.ui.canUndo);
 
   // Keep the line being typed in clear of the keyboard and of this bar: move the board up under it.
   const keepCaretClear = () => {
@@ -76,27 +78,32 @@ export function ItemBar() {
   if (!typing?.item) return null;
   const { field } = typing;
   const { cardId, itemId } = typing.item;
-  const button = (label: string, icon: ReactNode, act: () => void) => (
+  const button = (label: string, icon: ReactNode, act: () => void, disabled = false) => (
     <button
       type="button"
       aria-label={label}
       title={label}
+      aria-disabled={disabled || undefined}
       // Pressing a button keeps the cursor (and the phone keyboard) in the item.
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
-      onClick={act}
+      onClick={() => !disabled && act()}
     >
       {icon}
     </button>
   );
+  const caret = () => field.selectionStart ?? 0;
   return (
     <div ref={bar} className="item-bar" role="toolbar" aria-label="Item actions" style={{ bottom: cover }}>
+      {button('Undo', <UndoIcon />, () => appStore.undoInItem(cardId, itemId, caret()), !canUndo)}
       {button('Outdent', <IndentIcon out />, () => appStore.itemTab(cardId, itemId, true))}
       {button('Indent', <IndentIcon />, () => appStore.itemTab(cardId, itemId, false))}
-      {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, field.selectionStart ?? 0))}
-      {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, field.selectionStart ?? 0))}
-      {button('Tick', <CheckIcon />, () => appStore.toggleItem(cardId, itemId))}
-      {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
+      {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, caret()))}
+      {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, caret()))}
+      {/* The cursor moves to the next open item; with none left it lets go, as Ctrl+Enter does. */}
+      {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()) || field.blur())}
+      {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId, true))}
+      {button('Done typing', 'Done', () => field.blur())}
     </div>
   );
 }

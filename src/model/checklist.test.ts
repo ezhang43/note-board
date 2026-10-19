@@ -93,6 +93,51 @@ describe('Enter, Tab, Shift+Tab, Backspace', () => {
   });
 });
 
+describe('where the cursor goes after items are deleted (phone item bar)', () => {
+  const after = (list: TodoItem[], gone: string[]) => C.deleteItems(list, gone, makeId);
+  const order = (list: TodoItem[]) => C.displayOrder(list);
+
+  it('goes to the item above', () => {
+    const list = [item('a'), item('b'), item('c')];
+    expect(C.focusAfterRemoving(order(list), after(list, ['b']), ['b'])).toBe('a');
+  });
+
+  it('goes to the item below when the first item went', () => {
+    const list = [item('a'), item('b')];
+    expect(C.focusAfterRemoving(order(list), after(list, ['a']), ['a'])).toBe('b');
+  });
+
+  it('skips sub-items that went with their parent, landing on the item above the parent', () => {
+    const list = [item('a'), item('b', [item('b1')]), item('c')];
+    expect(C.focusAfterRemoving(order(list), after(list, ['b']), ['b'])).toBe('a');
+  });
+
+  it('goes to the blank item that replaces a list emptied by the delete', () => {
+    const list = [item('a')];
+    const next = after(list, ['a']);
+    expect(C.focusAfterRemoving(order(list), next, ['a'])).toBe(next[0].id);
+  });
+
+  it('with several gone, goes above the first of them; only shown items count', () => {
+    const list = [item('a'), item('b'), item('c'), item('d')];
+    expect(C.focusAfterRemoving(order(list), after(list, ['b', 'c']), ['b', 'c'])).toBe('a');
+    // The Completed section is closed: its items are not in `shown`, so the cursor never lands in one.
+    const withDone = [item('a'), item('x', [], true)];
+    expect(C.focusAfterRemoving(['a'], after(withDone, ['a']), ['a'])).toBeNull();
+  });
+
+  it('does nothing for an item that was not on screen, and only a blank new item is picked as the fallback', () => {
+    const list = [item('a'), item('b')];
+    expect(C.focusAfterRemoving(['a'], list, ['b'])).toBeNull();
+    expect(C.focusAfterRemoving(['a'], [item('x')], ['a'])).toBeNull(); // an item with text that was not shown
+  });
+
+  it('when an item is gone after an undo, the same rule finds the item next to it', () => {
+    const list = [item('a'), item('b')];
+    expect(C.focusAfterRemoving(order(list), [item('a')], ['b'])).toBe('a');
+  });
+});
+
 describe('deleting a blank item that has sub-items (owner rule)', () => {
   const blank = (id: string, children: TodoItem[], done = false) => ({ ...item(id, children, done), text: '  ' });
 

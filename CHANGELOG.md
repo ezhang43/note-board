@@ -1,5 +1,13 @@
 # Changelog
 
+## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
+
+- On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.
+- The bar has two new buttons: Undo (at the left) and Done (at the right, which puts the keyboard away). Undo goes back one step at a time and keeps you typing.
+- The Indent and Outdent icons are clearer: like the ones in a text editor, with an arrow showing which way the item moves.
+- Checklist items on a phone no longer have a small trash can on each row; Delete is in the bar above the keyboard. Computers and tablets are unchanged.
+- Your boards are not touched: only what the buttons do while you are typing changed.
+
 ## Color themes (2026-10-19)
 
 - The moon button in the toolbar is now an Appearance button (a half-filled circle). It opens a small menu with the Dark mode switch and six color themes: Honey (the look you have today, still the default), Ocean, Forest, Lavender, Rose and Slate.

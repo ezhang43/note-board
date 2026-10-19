@@ -1,5 +1,10 @@
 # Changelog
 
+## A flaky phone test made reliable (2026-10-19)
+
+- One browser test (an item far off to the side is brought back on a phone) sometimes failed on GitHub for no real reason: the app was doing its job, bringing the item back on screen, a moment before the test looked. The test now waits for that first move to finish before sliding the board.
+- The app itself and your boards are not changed.
+
 ## Dragging and resizing keep rows together (2026-10-19)
 
 - Drag a block along a row and the blocks in that row now slide sideways out of its way and keep their left-to-right order, instead of jumping above or below the row. Drop a block onto its neighbour and they swap places.

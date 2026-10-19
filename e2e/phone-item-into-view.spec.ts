@@ -138,6 +138,9 @@ test('a page the person has pinched in is left alone', async ({ page }) => {
 test('an item far off to the side is brought back too', async ({ page }) => {
   await list(page, 2);
   await keyboard(page, 336);
+  // The keyboard appearing makes the app look at the cursor's box on the next frame. Let that look finish first,
+  // or it can land after the slide below and bring the box straight back before the test has seen it off screen.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   // The board is slid sideways (a wheel event stands in for a swipe), so the box with the cursor is off the screen.
   await page.evaluate(() => document.querySelector('[data-testid="canvas"]')!.dispatchEvent(new WheelEvent('wheel', { deltaX: 1200, deltaY: 0, bubbles: true, cancelable: true })));
   await expect.poll(() => page.evaluate(() => document.activeElement!.getBoundingClientRect().right < 0)).toBe(true);

@@ -8,6 +8,17 @@
 - If you're already connected, you aren't asked again because of this change.
 - The Privacy policy says so.
 
+## Text size can go even bigger (2026-10-19)
+
+- A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.
+- Your saved text size still loads as before. The sizes you set on a single note or title (Ctrl+Shift+>) are unchanged.
+
+## Bigger item buttons on a computer (2026-10-19)
+
+- On a computer, the Move up, Move down, trash and drag buttons that show when you point at a checklist item are bigger: arrows 16px to 22px wide, trash 24px to 28px, grip 14px to 18px, with their icons scaled to match.
+- They still sit at the right end of the item's first line and never cover the text, and the text doesn't move when you point at it. This holds at every A- / A+ size, inside containers and on sub-items.
+- Phones and touch screens are unchanged. Nothing about saving or your boards is touched.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

@@ -20,6 +20,22 @@ export function panBy(view: View, dx: number, dy: number): View {
   return { ...view, panX: view.panX + dx, panY: view.panY + dy };
 }
 
+/**
+ * How far to move the board (screen pixels) so `box` sits inside `area` with `margin` to spare:
+ * just enough, and none if it already does. A box too big to fit shows its top and left edge.
+ */
+export function panToShow(
+  box: { left: number; top: number; right: number; bottom: number },
+  area: { left: number; top: number; right: number; bottom: number },
+  margin: number,
+): Point {
+  const fit = (lo: number, hi: number, from: number, to: number) => {
+    const move = Math.max(Math.min(0, hi - margin - to), lo + margin - from);
+    return move || 0; // never -0
+  };
+  return { x: fit(area.left, area.right, box.left, box.right), y: fit(area.top, area.bottom, box.top, box.bottom) };
+}
+
 /** Zoom to `zoom` (clamped) while keeping the board point under screen point `at` in place. */
 export function zoomTo(view: View, at: Point, zoom: number): View {
   const next = clampZoom(zoom);

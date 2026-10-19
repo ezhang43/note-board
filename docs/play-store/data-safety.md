@@ -9,7 +9,7 @@ Files checked:
 - `firestore.rules` (only the owner reads their boards; shared boards only by the people who have them)
 - `src/calendar/google.ts`, `src/store/calendar.ts` (Google Calendar: scope `calendar.events`, access kept in memory only)
 - `public/sw.js`, `src/model/persist.ts` (copies kept on the device)
-- `package.json` and a search of `src/` and `index.html` (no analytics, advertising, crash-reporting or tracking library)
+- `package.json` and a search of `src/` and `index.html` (no advertising, crash-reporting or tracking library; since 2026-10-19 the published pages load GoatCounter, a cookie-free page-visit counter, see Analytics below)
 - `privacy/index.html` (what the policy promises)
 - `mcp/` (the Claude connector; see below, it is not part of the app)
 
@@ -25,7 +25,7 @@ Files checked:
 
 ## Data types collected
 
-For each type: Collected = yes. Shared = no. Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no analytics, advertising, personalization or fraud prevention).
+For each type: Collected = yes. Shared = no. Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no advertising, personalization or fraud prevention; the page-visit counter is covered under Analytics below).
 
 | Play category | Data type | Collected? | Why / where it comes from | Purposes |
 | --- | --- | --- | --- | --- |
@@ -60,7 +60,7 @@ OWNER CHECK: if you read it more strictly, you could answer "Yes" for Name and P
 ## The Claude connector and other items asked about
 
 - Claude connector (`mcp/`): a local tool the owner runs on their own computer, for Claude Desktop or Claude Code. It is not part of the Android app and sends nothing to BusyAnts's own servers other than the same Firestore reads and writes the signed-in person's own account makes. It does not affect the Data safety form for the app.
-- Analytics: none (checked above).
+- Analytics: since 2026-10-19 (job 117) the published site counts page visits with GoatCounter (busyants.goatcounter.com): no cookies, no custom events, board contents never sent, loaded only from the published address. OWNER CHECK: decide whether Google's form needs an answer for this (it may count as approximate usage data shared with a service provider) before filling it in.
 - Backups: "Download backup" saves a file on the person's device; BusyAnts never receives it.
 - Version history: stored online with the boards (newest 100); covered by "Other user-generated content".
 - Sign-in: Google sign-in only (OWNER CHECK: Google's form may ask whether the app lets people sign in with an account created outside the app, which is the "account creation" question. Answer: sign-in uses a Google account; account creation is Google's).
@@ -69,4 +69,4 @@ OWNER CHECK: if you read it more strictly, you could answer "Yes" for Name and P
 
 ## When the Trusted Web Activity wrapper exists
 
-Because the Android app will be the same website inside a wrapper, the answers above stay the same as long as the wrapper adds no analytics or other library. Re-check this form when the wrapper is built (a separate future job). OWNER CHECK.
+Because the Android app will be the same website inside a wrapper, the answers above stay the same as long as the wrapper adds no analytics or other library (beyond the website's GoatCounter counter above). Re-check this form when the wrapper is built (a separate future job). OWNER CHECK.

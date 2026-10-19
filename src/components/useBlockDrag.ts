@@ -4,7 +4,9 @@ import { DRAG_THRESHOLD } from '../model/constants';
 import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex, listUnder } from './canvasDom';
 import { followEdges } from './edgeFollow';
+import { trackItemDrag } from './itemDom';
 import { holdOrPan } from './touchHold';
+import { isPhone } from './usePhone';
 
 const INTERACTIVE = 'input, textarea, button, a, select, label';
 
@@ -44,6 +46,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
  * Touch screens: one finger moving straight away moves the board around; resting it on a card or
  * column for a moment, then moving, drags it (owner requests). Works on text too, since a card is
  * mostly text boxes; a quick tap still types. Grip, tick boxes and buttons keep their own meaning.
+ * On a phone, resting on a checklist item lifts the item instead (the rest of the card still drags the card).
  * A capture handler, so checklist rows can't swallow the press; a column leaves presses on its
  * cards to them.
  */
@@ -55,9 +58,12 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     if (kind === 'column' && target.closest('[data-card-id]')) return;
     const el = e.currentTarget;
     const onText = !!target.closest('input, textarea, select, label');
+    // On a phone, resting on a checklist item lifts that item, not the whole card (owner request, job 114).
+    const itemId = kind === 'card' && isPhone() ? target.closest<HTMLElement>('[data-item-id]')?.dataset.itemId : undefined;
     holdOrPan(
       e.nativeEvent,
       (start, at, done) => {
+        if (itemId) return trackItemDrag(id, itemId, start, { at, done });
         // A block that is part of a bigger selection keeps it, so the whole selection moves.
         appStore.pressBlock(id, false);
         trackDrag(kind, id, el, start, { at, done });

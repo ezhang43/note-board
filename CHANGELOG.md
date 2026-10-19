@@ -1,5 +1,11 @@
 # Changelog
 
+## Phone: press and hold to move a list item (2026-10-19)
+
+- On a phone, rest your finger on a checklist item for about half a second, then move it: the item lifts, with a shadow under it, and its label follows your finger. The other items slide aside to open a gap where it will land, and let go to drop it there. It can go into another list or onto the board, the same as dragging by the grip.
+- A quick tap still lets you type, a swipe still moves the board, and resting on the list's title or the card's empty space still picks up the whole card. The grip still drags at once.
+- With your phone set to reduce motion, the items jump instead of sliding. Computers and tablets are unchanged. Your boards are not touched: dropping is the same undoable move as before.
+
 ## Phone: the line you are typing in always stays in view (2026-10-19)
 
 - On a phone, the note, title or item you are typing in now always slides into view above the keyboard, also after Enter adds an item and after the buttons above the keyboard (Tick, Delete, Undo, Move up and down, Indent, Outdent) move the cursor.

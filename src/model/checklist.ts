@@ -392,6 +392,39 @@ export function dropOnRow(
 }
 
 /**
+ * Phone press-and-hold: the row that must move down to open the gap where lifted items would go.
+ * `order` is the list's rows as shown. A "before" mark opens it before that row; "after" and "nest"
+ * (nested items go first under their parent) open it before the next row not being lifted. Null: at the end.
+ */
+export function gapBefore(
+  order: string[],
+  mark: { markId: string; markMode: 'before' | 'after' | 'nest' },
+  lifted: string[],
+): string | null {
+  if (mark.markMode === 'before') return mark.markId;
+  return order.slice(order.indexOf(mark.markId) + 1).find((id) => !lifted.includes(id)) ?? null;
+}
+
+/**
+ * How far (px, up is negative) each row slides while items are lifted: up to close the space of
+ * lifted rows (`lifted`: row id -> height) above it, down by `gap` to open the space before `before`.
+ * Lifted rows themselves are not moved (they are hidden). Rows that stay put have no entry.
+ */
+export function slideOffsets(order: string[], lifted: Record<string, number>, before: string | null, gap: number): Record<string, number> {
+  const slide: Record<string, number> = {};
+  let closed = 0;
+  let opened = 0;
+  for (const id of order) {
+    if (id in lifted) closed += lifted[id];
+    else {
+      if (id === before) opened = gap;
+      if (opened !== closed) slide[id] = opened - closed;
+    }
+  }
+  return slide;
+}
+
+/**
  * Ctrl+Shift+Up / Down: move an item (with its sub-items) past the item above (`dir` -1) or below
  * (1) at the same level. At the top level it only passes items in the same section (open or
  * Completed). Null when there is nothing to pass.

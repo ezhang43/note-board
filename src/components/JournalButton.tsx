@@ -1,20 +1,22 @@
-import { appStore } from '../store/appStore';
+import { appStore, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { JournalIcon } from './icons';
 
 /**
- * The Journal button (owner request, 2026-10-18): opens the Journal board with today's dated note
- * ready to type in. By the zoom control, or a tile in the ⋯ panel on a phone (`labelled`).
+ * The Journal button (owner request, 2026-10-18): opens the Journal side panel with today's dated
+ * note ready to type in, or closes it. By the zoom control, or a tile in the ⋯ panel on a phone (`labelled`).
  */
 export function JournalButton({ labelled = false, onOpen }: { labelled?: boolean; onOpen?: () => void }) {
+  const open = useAppState((s) => s.ui.sidePanel === 'journal');
   return (
     <button
       type="button"
       className={labelled ? 'tb-button' : 'help-button dock-tool'}
       aria-label="Journal"
       title="Open today’s journal note"
+      aria-pressed={open}
       onClick={() => {
-        if (appStore.journal() === 'loading') collab.setNotice('Your shared boards are still loading. Try again in a moment.');
+        if (appStore.openJournal() === 'loading') collab.setNotice('Your shared boards are still loading. Try again in a moment.');
         onOpen?.();
       }}
     >

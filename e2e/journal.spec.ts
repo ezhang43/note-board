@@ -1,100 +1,183 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, cards, expectNoOverlaps, freshBoardEachTest } from './helpers';
+import { add, cards, freshBoardEachTest } from './helpers';
 
-// Daily journal (owner request, 2026-10-18): the Journal button opens the Journal board and puts
-// today's dated note at the top, or goes back to it.
+// Daily journal (owner request, 2026-10-18): the Journal button opens a side panel, like the focus
+// timer, with today's note ready to type and earlier days below. The board you are on stays open.
 
 freshBoardEachTest();
 
 const dock = (page: Page) => page.locator('.corner-controls');
 const boardName = (page: Page) => page.getByLabel('Board name');
-const noteText = (page: Page) => page.getByLabel('Note text');
-const DATE_LINE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}\n\n$/;
-
-test('Journal opens a board called Journal with today’s dated note, the cursor in it ready to type', async ({ page }) => {
-  await expect(dock(page).getByRole('button', { name: 'Journal', exact: true })).toHaveText('Journal');
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(boardName(page)).toHaveValue('Journal');
-  await expect(cards(page)).toHaveCount(1);
-  await expect(noteText(page)).toHaveValue(DATE_LINE);
-  await expect(noteText(page)).toBeFocused();
-  // The cursor is at the end, so typing goes under the date.
-  await page.keyboard.type('Went for a walk');
-  await expect(noteText(page)).toHaveValue(/\n\nWent for a walk$/);
-  // The home board has a board card that opens it.
-  await page.getByRole('button', { name: 'Boards', exact: true }).click();
-  await expect(page.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Journal' })).toBeVisible();
+const journalButton = (page: Page) => dock(page).getByRole('button', { name: 'Journal', exact: true });
+const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' });
+const entries = (page: Page) => panel(page).getByRole('textbox');
+const boardsMenu = (page: Page) => page.getByRole('menu', { name: 'Boards' });
+const DATE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/;
+/** Today's date line as the app writes it ("Sun 18 Oct 2026"), from the browser's clock. */
+let today = '';
+test.beforeEach(async ({ page }) => {
+  today = await page.evaluate(() => {
+    const d = new Date();
+    const short = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('en-GB', o).slice(0, 3);
+    return `${short({ weekday: 'short' })} ${d.getDate()} ${short({ month: 'short' })} ${d.getFullYear()}`;
+  });
 });
 
-test('pressing Journal again the same day adds no second note; it goes back to the first', async ({ page }) => {
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await page.keyboard.type('morning');
-  await page.keyboard.press('Escape');
-  await page.mouse.click(5, 300);
-  await expect(noteText(page)).not.toBeFocused();
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(cards(page)).toHaveCount(1);
-  await expect(noteText(page)).toBeFocused();
-  await page.keyboard.type(' and evening');
-  await expect(noteText(page)).toHaveValue(/morning and evening$/);
-});
-
-test('from another board, Journal goes back to the one Journal board', async ({ page }) => {
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await page.getByRole('button', { name: 'Boards', exact: true }).click();
-  await page.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'New board' }).click();
-  await expect(boardName(page)).toHaveValue('');
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(boardName(page)).toHaveValue('Journal');
-  await expect(cards(page)).toHaveCount(1);
-  await expect(noteText(page)).toBeFocused();
-});
-
-test('Ctrl+Z takes today’s note away in one step, and Journal puts it back', async ({ page }) => {
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(cards(page)).toHaveCount(1);
-  await page.keyboard.press('Control+z');
-  await expect(cards(page)).toHaveCount(0);
-  await expect(boardName(page)).toHaveValue('Journal');
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(cards(page)).toHaveCount(1);
-});
-
-test('the Journal card lands in Home’s usual spot whatever board was showing; Ctrl+Z on Home takes it away, the board stays', async ({ page }) => {
+test('Journal opens a side panel with today’s note ready to type; the board you are on stays open, with nothing added', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('on home');
   await page.keyboard.press('Escape');
-  const boardsMenu = page.getByRole('menu', { name: 'Boards' });
-  await page.getByRole('button', { name: 'Boards', exact: true }).click();
-  await boardsMenu.getByRole('menuitem', { name: 'New board' }).click();
-  await expect(boardName(page)).toHaveValue('');
-  // Pan far away on the other board.
-  await page.mouse.move(640, 400);
-  for (let i = 0; i < 10; i++) await page.mouse.wheel(3000, 3000);
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(boardName(page)).toHaveValue('Journal');
-  await page.getByRole('button', { name: 'Boards', exact: true }).click();
-  await boardsMenu.getByRole('menuitem', { name: 'My first board' }).click();
-  const journalCard = cards(page).filter({ has: page.getByRole('button', { name: 'Open board' }) });
-  await expect(journalCard).toBeInViewport();
-  await expect(cards(page).filter({ hasText: 'on home' })).toBeInViewport();
-  await expectNoOverlaps(page);
-  // Ctrl+Z on Home takes the card away, as after Add a sub-board; the Journal board is kept.
-  await page.keyboard.press('Control+z');
-  await expect(journalCard).toHaveCount(0);
+  await expect(journalButton(page)).toHaveText('Journal');
+  await journalButton(page).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(journalButton(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toHaveText(DATE);
+  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toHaveText(today);
+  await expect(entries(page).first()).toBeFocused();
+  await page.keyboard.type('Went for a walk');
+  await expect(entries(page).first()).toHaveValue('Went for a walk');
+  // Still on Home, with only its own note: no Journal card.
+  await expect(boardName(page)).not.toHaveValue('Journal');
   await expect(cards(page)).toHaveCount(1);
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(boardName(page)).toHaveValue('Journal');
+  await expect(cards(page)).toContainText('on home');
+  // The Journal board isn't in the Boards menu.
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await expect(boardsMenu(page).getByRole('menuitem', { name: 'Journal' })).toHaveCount(0);
+});
+
+test('Escape, × or the button again close it; opening again adds no second note for today', async ({ page }) => {
+  await journalButton(page).click();
+  await page.keyboard.type('morning');
+  // Escape leaves the text first, a second Escape closes the panel.
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toHaveCount(0);
+  await journalButton(page).click();
+  await expect(entries(page)).toHaveCount(1);
+  await expect(entries(page).first()).toBeFocused();
+  await page.keyboard.type(' and evening');
+  await expect(entries(page).first()).toHaveValue('morning and evening');
+  await panel(page).getByRole('button', { name: 'Close journal' }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await journalButton(page).click();
+  await expect(panel(page)).toBeVisible();
+  await journalButton(page).click();
+  await expect(panel(page)).toHaveCount(0);
+});
+
+test('it takes the place of the focus timer', async ({ page }) => {
+  await dock(page).getByRole('button', { name: 'Focus timer' }).click();
+  await expect(page.getByRole('complementary', { name: 'Focus timer' })).toBeVisible();
+  await journalButton(page).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Focus timer' })).toHaveCount(0);
+});
+
+test('Ctrl+Z in the panel undoes the journal typing, never the board behind it', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape');
+  await journalButton(page).click();
+  await page.keyboard.type('hello');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
+  // The journal typing and today's note are undone; Home's note is still there.
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('on home');
+  await expect(entries(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  // Redo brings the note and the typing back.
+  await page.keyboard.press('Control+y');
+  await page.keyboard.press('Control+y');
+  await expect(entries(page).first()).toHaveValue('hello');
   await expect(cards(page)).toHaveCount(1);
 });
 
-test('the Journal board and its note are kept after a reload', async ({ page }) => {
-  await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
+test('what is written is kept after a reload, and earlier days are listed below today', async ({ page }) => {
+  await journalButton(page).click();
   await page.keyboard.type('kept');
   await page.waitForTimeout(400);
+  // An earlier day, written into the saved Journal board.
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const [id] = Object.entries(raw.boards).find(([, b]) => (b as { name: string }).name === 'Journal')!;
+    const board = raw.boards[id];
+    const note = Object.values(board.cards)[0] as { id: string; y: number };
+    board.cards.old = { ...note, id: 'old', text: 'Thu 1 Jan 2026\n\nnew year', y: note.y + 400 };
+    board.order.push('old');
+    // A day written ahead still comes after today, which keeps the cursor (review of job 99).
+    board.cards.ahead = { ...note, id: 'ahead', text: 'Fri 1 Jan 2100\n\nplans', y: note.y + 800 };
+    board.order.push('ahead');
+    localStorage.setItem('note-board:v1', JSON.stringify(raw));
+  });
   await page.reload();
+  await journalButton(page).click();
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Fri 1 Jan 2100', 'Thu 1 Jan 2026']);
+  await expect(entries(page)).toHaveCount(3);
+  await expect(entries(page).nth(0)).toBeFocused();
+  await expect(entries(page).nth(0)).toHaveValue('kept');
+  await expect(entries(page).nth(2)).toHaveValue('new year');
+  // Earlier days can be edited too.
+  await entries(page).nth(2).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('!');
+  await expect(entries(page).nth(2)).toHaveValue('new year!');
+});
+
+test('keys pressed in the panel never act on the board behind it (review of job 99)', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape'); // the note stays selected
+  await journalButton(page).click();
+  await page.keyboard.press('Escape'); // out of the text, still in the panel
+  await expect(panel(page)).toBeVisible();
+  for (const key of ['Backspace', 'Delete', 'ArrowDown', 'Control+d']) await page.keyboard.press(key);
+  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toContainText('on home');
+});
+
+test('a click on the panel’s heading or blank space keeps board keys away from the board (check of PR #94)', async ({ page }) => {
+  await add(page, 'Note');
+  await page.keyboard.type('on home');
+  await page.keyboard.press('Escape'); // the note stays selected
+  await journalButton(page).click();
+  const box = (await panel(page).boundingBox())!;
+  for (const spot of [panel(page).getByRole('heading', { name: 'Journal', level: 2 }), null]) {
+    if (spot) await spot.click();
+    else await page.mouse.click(box.x + 20, box.y + box.height - 20); // blank space at the bottom
+    for (const key of ['Delete', 'Backspace', 'Control+z', 'Control+x', 'Control+d', 'ArrowDown']) await page.keyboard.press(key);
+    await expect(cards(page)).toHaveCount(1);
+    await expect(cards(page)).toContainText('on home');
+  }
+  // Opening the panel cleared the selection, so Delete after closing it removes nothing either.
+  await panel(page).getByRole('button', { name: 'Close journal' }).click();
+  await page.keyboard.press('Delete');
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('an existing Journal board and its Home card are left as they are, and the panel writes into that board', async ({ page }) => {
+  await boardName(page).fill('Home');
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(page).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
+  await cards(page).first().getByRole('button', { name: 'Open board' }).click();
+  await boardName(page).fill('Journal');
+  await add(page, 'Checklist');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Back to Home' }).click();
+  await expect(cards(page)).toHaveCount(1);
+
+  await journalButton(page).click();
+  await page.keyboard.type('into the old board');
+  await expect(boardName(page)).toHaveValue('Home');
+  await expect(cards(page)).toHaveCount(1); // still just its Journal card
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  // It is still listed and opens as a normal board, now with today's note beside the checklist.
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(page).getByRole('menuitem', { name: 'Journal' }).click();
   await expect(boardName(page)).toHaveValue('Journal');
-  await expect(noteText(page)).toHaveValue(/kept$/);
+  await expect(cards(page)).toHaveCount(2);
+  await expect(page.getByLabel('Note text')).toHaveValue(`${today}\n\ninto the old board`);
 });
 
 test('the panel buttons still fit beside the other controls at 1280px', async ({ page }) => {
@@ -112,12 +195,17 @@ test('the panel buttons still fit beside the other controls at 1280px', async ({
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test('⋯ → Journal opens the Journal board with today’s note', async ({ page }) => {
+  test('⋯ → Journal opens the panel over the whole screen, with today’s note', async ({ page }) => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).locator('.phone-tiles').getByRole('button', { name: 'Journal', exact: true }).tap();
     await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
-    await expect(page.getByLabel('Board name')).toHaveValue('Journal');
-    await expect(cards(page)).toHaveCount(1);
-    await expect(noteText(page)).toHaveValue(DATE_LINE);
+    await expect(panel(page)).toBeVisible();
+    const r = await panel(page).boundingBox();
+    expect(r!.width).toBeGreaterThanOrEqual(389);
+    await expect(entries(page)).toHaveCount(1);
+    await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(today);
+    await expect(cards(page)).toHaveCount(0);
+    await panel(page).getByRole('button', { name: 'Close journal' }).tap();
+    await expect(panel(page)).toHaveCount(0);
   });
 });

@@ -95,6 +95,14 @@ export interface StoreContext {
   openBoard(id: string): void;
   /** Swap in every board (from elsewhere, or a backup of every board); undo starts over. */
   replaceWorkspace(ws: Workspace): void;
+  /**
+   * A change to board `id`, open or not (the Journal panel writes into the Journal board without
+   * opening it): one undo step on that board's own history, as if it were open. Nothing while an
+   * old version is shown.
+   */
+  commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
+  /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. */
+  undoOn(id: string, which: 'undo' | 'redo'): void;
 }
 
 /** What is cleared on screen when a different board is shown. */
@@ -440,6 +448,39 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (others !== state.boards.others) set({ ...state, boards: { ...state.boards, others } });
   }
 
+  // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
+  function stepOpen(which: 'undo' | 'redo') {
+    if (state.ui.preview) return;
+    flushPendingTick();
+    const step = (which === 'undo' ? undoStep : redoStep)(history, state.board);
+    if (step && step.board !== state.board) edits++; // counted before it shows, for version history
+    restore(step);
+  }
+
+  function commitTo(id: string, fn: (b: Board) => Board, merge?: string) {
+    if (id === state.boards.open) return void commit(fn, { merge });
+    const before = state.boards.others[id];
+    if (!before || state.ui.preview) return;
+    const board = fn(before);
+    if (board === before) return;
+    histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, merge ?? null, Date.now()));
+    edits++;
+    set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });
+  }
+
+  function undoOn(id: string, which: 'undo' | 'redo') {
+    if (id === state.boards.open) return stepOpen(which);
+    const before = state.boards.others[id];
+    const h = histories.get(id);
+    if (!before || !h || state.ui.preview) return;
+    const step = (which === 'undo' ? undoStep : redoStep)(h, before);
+    if (!step) return;
+    histories.set(id, step.history);
+    if (step.board === before) return;
+    edits++;
+    set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: step.board } } });
+  }
+
   const ctx: StoreContext = {
     get state() {
       return state;
@@ -463,6 +504,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     setOthers,
     openBoard,
     replaceWorkspace,
+    commitTo,
+    undoOn,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */
@@ -518,21 +561,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       history = emptyHistory;
       restore({ history, board }, false);
     },
-    // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
-    undo() {
-      if (state.ui.preview) return;
-      flushPendingTick();
-      const step = undoStep(history, state.board);
-      if (step && step.board !== state.board) edits++; // counted before it shows, for version history
-      restore(step);
-    },
-    redo() {
-      if (state.ui.preview) return;
-      flushPendingTick();
-      const step = redoStep(history, state.board);
-      if (step && step.board !== state.board) edits++;
-      restore(step);
-    },
+    undo: () => stepOpen('undo'),
+    redo: () => stepOpen('redo'),
   };
 
   return { ctx, api };

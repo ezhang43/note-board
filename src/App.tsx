@@ -18,6 +18,7 @@ import { appStore, useAppState } from './store/appStore';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
 import { CompletedPanel } from './components/CompletedPanel';
+import { JournalPanel } from './components/JournalPanel';
 import { CalendarPanel, CalendarResizeHandle } from './components/CalendarPanel';
 import { PANEL_MIN } from './model/calendar';
 import { calendar } from './store/calendar';
@@ -25,6 +26,7 @@ import { calendar } from './store/calendar';
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 const closeCalendar = () => appStore.toggleSidePanel('calendar');
 const closeCompleted = () => appStore.toggleSidePanel('completed');
+const closeJournal = () => appStore.toggleSidePanel('journal');
 import { useShortcuts } from './components/useShortcuts';
 
 /**
@@ -66,6 +68,11 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       {sidePanel === 'completed' && (
         <SidePanel title="Completed" onClose={closeCompleted}>
           <CompletedPanel />
+        </SidePanel>
+      )}
+      {sidePanel === 'journal' && (
+        <SidePanel title="Journal" onClose={closeJournal}>
+          <JournalPanel />
         </SidePanel>
       )}
       {resizable && <CalendarResizeHandle />}

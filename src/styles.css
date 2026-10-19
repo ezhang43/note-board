@@ -1669,6 +1669,22 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .help-button.pomodoro-button.with-time { width: auto; padding: 0 10px; gap: 6px; border-radius: 17px; color: var(--accent-ink); }
 .pomodoro-left { font-variant-numeric: tabular-nums; font-weight: 600; }
 
+/* The Journal panel: each day's note as a white card, newest first, its date above it. */
+.journal-panel { display: flex; flex-direction: column; gap: 4px; }
+.journal-panel:focus, .side-panel:focus { outline: none; }
+.journal-entry h3 { margin: 12px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.journal-entry .grow {
+  padding: 6px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.journal-entry .grow > textarea { min-height: 3.1em; }
+.app.phone .journal-entry .grow { font-size: 16px; }
+
 /* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
 .confirm.delete-completed {
   position: fixed;

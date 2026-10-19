@@ -196,14 +196,9 @@ test.describe('on a phone-sized screen', () => {
     // (The card header's buttons reach up and sideways instead, so they never cover the card's text: see phone-touch.spec.ts.)
     expect(await hitBelow('Delete card', 3)).toBe(true);
     expect(await hitBelow('Collapse card', 3)).toBe(true);
-    expect(await hitBelow('Delete item', 6)).toBe(true);
     expect(await hitBelow('Drag item', 6)).toBe(true);
-    // The trash can's press area also reaches 8px to the left of it on a phone (owner request: unchanged by the hover arrows).
-    const trashLeft = await card.getByRole('button', { name: 'Delete item', exact: true }).evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return el.contains(document.elementFromPoint(r.x - 7, r.y + r.height / 2));
-    });
-    expect(trashLeft).toBe(true);
+    // (No trash can on each row on a phone since 2026-10-19: Delete is in the item bar. See phone-item-bar.spec.ts.)
+    await expect(card.getByRole('button', { name: 'Delete item', exact: true })).toBeHidden();
     const corner = await card.getByRole('button', { name: 'Resize card' }).evaluate((el) => {
       const r = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(r.right + 8, r.bottom + 8)); // just past the card's corner

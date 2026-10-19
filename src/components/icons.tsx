@@ -201,12 +201,15 @@ export function MoreIcon() {
   );
 }
 
-/** Phone item bar: indent (lines with an arrow pointing right) or outdent (pointing left). */
+/**
+ * Phone item bar: indent or outdent, as in a text editor: a full-width line above and below, the
+ * lines between pushed in, and a solid arrowhead pointing the way the item moves.
+ */
 export function IndentIcon({ out = false }: { out?: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
-      <path d="M11 6h9M11 12h9M11 18h9" />
-      {out ? <path d="M7 9l-3 3 3 3" /> : <path d="M4 9l3 3-3 3" />}
+    <svg width="22" height="22" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M3 5h18M3 19h18M12 10h9M12 14h9" />
+      <path d={out ? 'M8 9.5v5L3.5 12z' : 'M3.5 9.5v5L8 12z'} fill="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }

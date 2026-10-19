@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_ZOOM, MIN_ZOOM, WHEEL_PAN_SPEED } from './constants';
-import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelPan, wheelPixels, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo } from './view';
+import { clampZoom, createView, gridStyle, panBy, resetZoom, screenToBoard, wheelPan, wheelPixels, wheelZoomFactor, zoomBy, zoomLabel, viewShowing, viewFitting, zoomTo, panToShow } from './view';
 
 describe('wheel scrolling', () => {
   it('pans at half the scroll distance, the opposite way (owner request: scrolling was too fast)', () => {
@@ -146,5 +146,35 @@ describe('viewFitting (Fit to screen, owner request)', () => {
     expect(fit.zoom).toBeCloseTo((1000 - 80) / 3000, 3);
     const huge = viewFitting([{ x: 0, y: 0, w: 30000, h: 400 }], size, createView());
     expect(huge.zoom).toBe(0.3);
+  });
+});
+
+describe('panToShow (keep the line being typed in on screen)', () => {
+  const area = { left: 0, top: 52, right: 390, bottom: 500 };
+  const line = (top: number, bottom: number, x = 100) => ({ left: x, top, right: x, bottom });
+
+  it('does nothing when the line is already in view, margin included', () => {
+    expect(panToShow(line(200, 224), area, 12)).toEqual({ x: 0, y: 0 });
+    expect(panToShow(line(64, 488), area, 12)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('moves the board up just enough when the line is below the visible area (under the keyboard)', () => {
+    expect(panToShow(line(480, 504), area, 12)).toEqual({ x: 0, y: -16 });
+    expect(panToShow(line(700, 724), area, 12)).toEqual({ x: 0, y: -236 });
+  });
+
+  it('moves the board down just enough when the line is above the visible area (under the top bar)', () => {
+    expect(panToShow(line(40, 64), area, 12)).toEqual({ x: 0, y: 24 });
+    expect(panToShow(line(-300, -276), area, 12)).toEqual({ x: 0, y: 364 });
+  });
+
+  it('moves the board sideways when the cursor is off the left or right edge', () => {
+    expect(panToShow(line(200, 224, 420), area, 12)).toEqual({ x: -42, y: 0 });
+    expect(panToShow(line(200, 224, -60), area, 12)).toEqual({ x: 72, y: 0 });
+  });
+
+  it('shows the top of a box taller than the area, not its bottom', () => {
+    expect(panToShow({ left: 30, top: 100, right: 40, bottom: 900 }, area, 12)).toEqual({ x: 0, y: -36 });
+    expect(panToShow({ left: 30, top: 20, right: 40, bottom: 900 }, area, 12)).toEqual({ x: 0, y: 44 });
   });
 });

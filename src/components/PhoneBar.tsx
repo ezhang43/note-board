@@ -45,7 +45,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
     setOpen(null);
     if (kind === 'column') appStore.addColumn();
     else if (kind === 'board') appStore.addBoardCard();
-    else appStore.addCard(kind);
+    else appStore.addCard(kind, true);
   };
 
   return (

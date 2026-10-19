@@ -1433,7 +1433,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   font-size: 13px;
   cursor: default;
 }
-.find-scope-option:hover { background: var(--hover); }
+@media (hover: hover) {
+  .find-scope-option:hover { background: var(--hover); }
+}
 .find-scope-option.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 .find-bar .icon-button:disabled { opacity: 0.4; cursor: default; }
 .app.phone .find-bar { top: 60px; left: 8px; right: 8px; }

@@ -62,6 +62,16 @@ const GROUPS: { title: string; keys: Row[] }[] = [
     ],
   },
   {
+    title: 'Journal',
+    keys: [
+      ['Ctrl+B / Ctrl+I / Ctrl+U', 'Bold / italic / underline the selected words (or what you type next)'],
+      ['Ctrl+Shift+X', 'Strikethrough'],
+      ['Ctrl+Shift+8 / Ctrl+Shift+7', 'Bulleted / numbered list'],
+      ['Enter', 'Next list item; on an empty item, end the list'],
+      ['Tab / Shift+Tab in a list', 'Indent / outdent the item'],
+    ],
+  },
+  {
     title: 'Google Calendar',
     keys: [
       ['Delete / Backspace', 'Delete the event whose card is open (asks first; read-only events can’t be deleted)'],

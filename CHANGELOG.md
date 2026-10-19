@@ -1,5 +1,14 @@
 # Changelog
 
+## Rich text in the Journal (2026-10-19)
+
+- Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).
+- Select some words and press a button, or press it first and then type. Keys: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Shift+X (strikethrough), Ctrl+Shift+8 (bullets), Ctrl+Shift+7 (numbers).
+- In a list, Enter adds the next item, Enter on an empty item ends the list, and Tab / Shift+Tab indent and outdent.
+- Only the Journal has this. Everywhere else (other notes, search, export, copying, the note's card on the Journal board) the words show as plain text, with lists as "•" and "1.".
+- The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
+- When two edits of the same note are combined, its formatting always comes with the words that are kept. (On your own devices the latest save wins, words and formatting together, as with every board.)
+
 ## Calendar events open in a small card (2026-10-19)
 
 - Clicking an event in the calendar panel now opens a small card next to it, like Google Calendar's, instead of replacing the whole panel. The list stays in view. On a phone the card slides up from the bottom.

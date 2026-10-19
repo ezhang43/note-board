@@ -114,3 +114,35 @@ describe("saving a collapsed card's height", () => {
     expect(parseBoard(serializeBoard(bad)).cards.t.collapsedH).toBeUndefined();
   });
 });
+
+describe('saving a Journal note’s formatting (owner request, 2026-10-19)', () => {
+  const note = (extra: object) => addCard(createBoard(), { ...(createCard('note', 'n') as NoteCard), text: 'Sun 18 Oct 2026\n\n• milk', ...extra }, { type: 'loose', x: 0, y: 0 });
+
+  it('keeps it, next to the plain text', () => {
+    const board = note({ rich: [{ type: 'bullet', runs: [{ text: 'milk', b: true, hl: 'yellow' }] }] });
+    const back = parseBoard(serializeBoard(board));
+    expect(back).toEqual(board);
+    expect((back.cards.n as NoteCard).text).toBe('Sun 18 Oct 2026\n\n• milk');
+  });
+
+  it('a note saved before formatting existed loads exactly as it was', () => {
+    const board = note({});
+    const back = parseBoard(serializeBoard(board));
+    expect(back).toEqual(board);
+    expect('rich' in back.cards.n).toBe(false);
+  });
+
+  it('checks loaded formatting: anything unreadable is dropped, the text is never touched', () => {
+    const raw = serializeBoard(note({})).replace('"text":', '"rich":"<img src=x onerror=alert(1)>","text":');
+    const back = parseBoard(raw).cards.n as NoteCard;
+    expect('rich' in back).toBe(false);
+    expect(back.text).toBe('Sun 18 Oct 2026\n\n• milk');
+    const odd = serializeBoard(note({ rich: [{ type: 'bullet', runs: [{ text: 'milk', style: 'color:red', hl: 'url(x)' }] }] }));
+    expect((parseBoard(odd).cards.n as NoteCard).rich).toEqual([{ type: 'bullet', runs: [{ text: 'milk' }] }]);
+  });
+
+  it('formatting on other kinds of card is not read', () => {
+    const board = addCard(createBoard(), { ...createCard('todo', 't'), rich: [{ type: 'h1', runs: [] }] } as never, { type: 'loose', x: 0, y: 0 });
+    expect('rich' in parseBoard(serializeBoard(board)).cards.t).toBe(false);
+  });
+});

@@ -35,7 +35,7 @@ test('Journal opens a side panel with today’s note ready to type; the board yo
   await expect(panel(page).getByRole('heading', { level: 3 }).first()).toHaveText(today);
   await expect(entries(page).first()).toBeFocused();
   await page.keyboard.type('Went for a walk');
-  await expect(entries(page).first()).toHaveValue('Went for a walk');
+  await expect(entries(page).first()).toHaveText('Went for a walk');
   // Still on Home, with only its own note: no Journal card.
   await expect(boardName(page)).not.toHaveValue('Journal');
   await expect(cards(page)).toHaveCount(1);
@@ -57,7 +57,7 @@ test('Escape, × or the button again close it; opening again adds no second note
   await expect(entries(page)).toHaveCount(1);
   await expect(entries(page).first()).toBeFocused();
   await page.keyboard.type(' and evening');
-  await expect(entries(page).first()).toHaveValue('morning and evening');
+  await expect(entries(page).first()).toHaveText('morning and evening');
   await panel(page).getByRole('button', { name: 'Close journal' }).click();
   await expect(panel(page)).toHaveCount(0);
   await journalButton(page).click();
@@ -89,7 +89,7 @@ test('Ctrl+Z in the panel undoes the journal typing, never the board behind it',
   // Redo brings the note and the typing back.
   await page.keyboard.press('Control+y');
   await page.keyboard.press('Control+y');
-  await expect(entries(page).first()).toHaveValue('hello');
+  await expect(entries(page).first()).toHaveText('hello');
   await expect(cards(page)).toHaveCount(1);
 });
 
@@ -115,13 +115,13 @@ test('what is written is kept after a reload, and earlier days are listed below 
   await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Fri 1 Jan 2100', 'Thu 1 Jan 2026']);
   await expect(entries(page)).toHaveCount(3);
   await expect(entries(page).nth(0)).toBeFocused();
-  await expect(entries(page).nth(0)).toHaveValue('kept');
-  await expect(entries(page).nth(2)).toHaveValue('new year');
+  await expect(entries(page).nth(0)).toHaveText('kept');
+  await expect(entries(page).nth(2)).toHaveText('new year');
   // Earlier days can be edited too.
   await entries(page).nth(2).click();
   await page.keyboard.press('End');
   await page.keyboard.type('!');
-  await expect(entries(page).nth(2)).toHaveValue('new year!');
+  await expect(entries(page).nth(2)).toHaveText('new year!');
 });
 
 test('keys pressed in the panel never act on the board behind it (review of job 99)', async ({ page }) => {

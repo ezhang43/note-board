@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { addCard, createBoard } from '../model/board';
 import { createCard } from '../model/cards';
 import { serializeBoard } from '../model/persist';
+import { journalRich, type Rich } from '../model/richText';
+import type { NoteCard } from '../model/types';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
 import { ownBoardsGuard } from './sharing';
@@ -711,5 +713,48 @@ describe('opening from saves a closed page never sent (job 92)', () => {
     fake.send({ data: boardJson('Online'), client: 'laptop', pending: true });
     expect(onGone).not.toHaveBeenCalled();
     sync.stop();
+  });
+});
+
+describe('Journal formatting edited on two devices at once (job 119)', () => {
+  // The person's own boards sync whole, the latest save winning: a Journal note's text and its
+  // formatting always travel together, so the formatting is never separated from its words.
+  it('the note that wins keeps the formatting it was saved with, on both devices', () => {
+    vi.setSystemTime(new Date(2026, 9, 19, 9));
+    const device = (client: string) => {
+      const store = createStore(null, (fn) => fn());
+      const fake = fakeRemote();
+      const sync = startSync(store, fake.remote, { client, onReady: () => {}, onError: () => {} });
+      return { store, fake, sync };
+    };
+    const note = (s: ReturnType<typeof createStore>) => {
+      const board = s.workspace().boards[s.getState().ui.journalBoard!];
+      return Object.values(board.cards).find((c): c is NoteCard => c.kind === 'note')!;
+    };
+    const bold = (t: string): Rich => [{ type: 'p', runs: [{ text: t, b: true }] }];
+    const a = device('laptop');
+    a.fake.send(null);
+    a.store.openJournal();
+    a.store.setJournal(note(a.store).id, bold('hello'), false);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    const b = device('phone');
+    b.fake.send(a.fake.writes.at(-1)!);
+    b.store.openJournal();
+    expect(note(b.store).rich).toEqual(bold('hello'));
+
+    // At about the same time: the laptop types, the phone changes the formatting; both upload, and
+    // the phone's save lands last, so it is the one both devices end up with.
+    a.store.setJournal(note(a.store).id, bold('hello there'));
+    b.store.setJournal(note(b.store).id, [{ type: 'h1', runs: [{ text: 'hello' }] }], false);
+    vi.advanceTimersByTime(SYNC_DELAY);
+    a.fake.send(b.fake.writes.at(-1)!);
+    for (const s of [a.store, b.store]) {
+      const n = note(s);
+      expect(n.rich).toEqual([{ type: 'h1', runs: [{ text: 'hello' }] }]);
+      expect(journalRich(n.text, n.rich)).toBe(n.rich);
+    }
+    expect(note(a.store)).toEqual(note(b.store));
+    a.sync.stop();
+    b.sync.stop();
   });
 });

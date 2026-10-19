@@ -42,6 +42,8 @@ export function ItemBar() {
     const canvas = canvasRect();
     if (!field || !canvas) return;
     const v = window.visualViewport;
+    // The page is pinched in: the person is looking around on purpose, so leave the board alone.
+    if (v && v.scale > 1.01) return;
     const area = {
       left: canvas.left,
       right: canvas.right,
@@ -55,6 +57,7 @@ export function ItemBar() {
     if (move.x || move.y) appStore.panBy(Math.round(move.x), Math.round(move.y));
   };
   // A note or item grows as it is typed in, and the cursor can move within it or on to another item: check again after each.
+  // (These read only refs and the page, so the copies the listeners below keep from the first draw are as good as new ones.)
   const frame = useRef(0);
   const follow = () => {
     cancelAnimationFrame(frame.current);
@@ -103,6 +106,9 @@ export function ItemBar() {
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
       // The cursor can land in another item, or the one it is in can move: look again once it is drawn.
+      // simple: one look about a frame after the tap. A Tick with motion on closes the list up 280ms later, which only moves the items
+      // below it up into the ticked item's place (already in view), so the cursor item stays in view. Upgrade if a button ever moves
+      // the cursor to an item that a late reflow carries out of view: look again when that settles.
       onClick={() => {
         if (disabled) return;
         act();

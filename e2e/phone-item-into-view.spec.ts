@@ -9,13 +9,14 @@ import { fontsLoaded } from './helpers';
 test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
 const TOP_BAR = 52;
-type Keyboard = { setViewport: (keyboard: number, scrolled?: number) => void };
+type Keyboard = { setViewport: (keyboard: number, scrolled?: number, zoom?: number) => void };
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    const fake = Object.assign(new EventTarget(), { height: window.innerHeight, offsetTop: 0 });
+    const fake = Object.assign(new EventTarget(), { height: window.innerHeight, offsetTop: 0, scale: 1 });
     Object.defineProperty(window, 'visualViewport', { value: fake, configurable: true });
-    (window as unknown as Keyboard).setViewport = (keyboard, scrolled = 0) => {
+    (window as unknown as Keyboard).setViewport = (keyboard, scrolled = 0, zoom = 1) => {
+      fake.scale = zoom;
       fake.height = window.innerHeight - keyboard - scrolled;
       fake.offsetTop = scrolled;
       fake.dispatchEvent(new Event('resize'));
@@ -25,7 +26,8 @@ test.beforeEach(async ({ page }) => {
   await fontsLoaded(page);
 });
 
-const keyboard = (page: Page, height: number, scrolled = 0) => page.evaluate(([h, s]) => (window as unknown as Keyboard).setViewport(h, s), [height, scrolled]);
+const keyboard = (page: Page, height: number, scrolled = 0, zoom = 1) =>
+  page.evaluate(([h, s, z]) => (window as unknown as Keyboard).setViewport(h, s, z), [height, scrolled, zoom]);
 const add = async (page: Page, item: 'Note' | 'Checklist') => {
   await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'Add', exact: true }).tap();
   await page.getByRole('menuitem', { name: item }).tap();
@@ -120,14 +122,27 @@ for (const size of [{ width: 390, height: 844, keyboard: 336 }, { width: 320, he
   });
 }
 
+test('a page the person has pinched in is left alone', async ({ page }) => {
+  await list(page, 4);
+  await keyboard(page, 100);
+  await inView(page);
+  const before = (await where(page)).top;
+  // Pinched in and looking elsewhere on the page: the cursor's box is out of what can be seen, and stays put.
+  await keyboard(page, 100, before + 60, 2);
+  await page.waitForTimeout(300);
+  expect((await where(page)).top).toBe(before);
+  await keyboard(page, 100, before + 60, 1);
+  await inView(page);
+});
+
 test('an item far off to the side is brought back too', async ({ page }) => {
   await list(page, 2);
   await keyboard(page, 336);
-  // The board is slid sideways with a finger, so the box with the cursor is off the screen.
+  // The board is slid sideways (a wheel event stands in for a swipe), so the box with the cursor is off the screen.
   await page.evaluate(() => document.querySelector('[data-testid="canvas"]')!.dispatchEvent(new WheelEvent('wheel', { deltaX: 1200, deltaY: 0, bubbles: true, cancelable: true })));
   await expect.poll(() => page.evaluate(() => document.activeElement!.getBoundingClientRect().right < 0)).toBe(true);
   await page.keyboard.type('x');
-  // The cursor (near the box's left end, after the typed letter) is back on screen, so most of the box is.
+  // The cursor, not the whole row (cards can be wider than the screen), is back on screen: it is near the box's left end.
   await expect.poll(() => page.evaluate(() => document.activeElement!.getBoundingClientRect().right)).toBeGreaterThan(100);
 });
 

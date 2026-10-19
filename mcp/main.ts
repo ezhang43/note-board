@@ -13,7 +13,7 @@ import { createServer, type Write } from './server';
 // `node mcp/dist/server.js` runs the connector for Claude; with login / logout / check it is the
 // owner's setup helper (npm run mcp:login, mcp:logout, mcp:check).
 
-const NOT_SIGNED_IN = 'Not signed in. Run npm run mcp:login first.';
+const NOT_SIGNED_IN = 'Not signed in. Ask Claude to sign in to BusyAnts (its sign_in tool), or run npm run mcp:login.';
 
 /**
  * Reads everything for the signed-in owner. The saved sign-in is read on every call, so a logout
@@ -135,6 +135,40 @@ function openInBrowser(url: string) {
   }
 }
 
+/**
+ * The sign_in and sign_out tools. sign_in opens the sign-in page (login/login.ts) in the browser
+ * and answers at once, since Claude waits only so long for a tool; the page saves the sign-in by
+ * itself, and the connector reads it on its next call. Only the newest page works. Messages go to
+ * `log` (stderr: stdout belongs to Claude).
+ */
+export function signInHelper(tokenFile: string, open: (url: string) => void = openInBrowser, log: (line: string) => void = (l) => console.error(l)) {
+  let pending: { close: () => void } | null = null;
+  const close = () => {
+    pending?.close();
+    pending = null;
+  };
+  const signIn = async () => {
+    close();
+    // The key the saved sign-in was made with (a second key given with --key), else the app's web key.
+    const saved = (await loadToken(tokenFile).catch(() => null))?.apiKey;
+    const login = await startLogin({ apiKey: saved && API_KEY_SHAPE.test(saved) ? saved : WEB_API_KEY, save: (t) => saveToken(tokenFile, t) });
+    // Closed again here: another sign_in may have started a page while this one was starting.
+    close();
+    pending = login;
+    login.done.then(
+      (t) => log(`Signed in as ${t.email ?? t.uid}.`),
+      (e) => log(e instanceof Error ? e.message : String(e)),
+    );
+    open(login.url);
+    return `A BusyAnts sign-in page has opened in the web browser: sign in there with Google, using the account you use for BusyAnts. It works for 5 minutes. When the page says "Done", ask again (for example, "list my BusyAnts boards"). If no page opened, open this address in the browser on this computer:\n${login.url}`;
+  };
+  const signOut = async () => {
+    close();
+    return (await deleteToken(tokenFile)) ? 'Signed out: the saved BusyAnts sign-in on this computer was deleted.' : 'Not signed in (nothing to delete).';
+  };
+  return { signIn, signOut, close };
+}
+
 async function login(args: string[]): Promise<number> {
   const at = args.indexOf('--key');
   const apiKey = at >= 0 ? args[at + 1] ?? '' : WEB_API_KEY;
@@ -180,7 +214,8 @@ export async function main(args: string[]): Promise<number | null> {
     case undefined: {
       // Claude talks to the server over stdin / stdout, so nothing else may be printed there.
       const load = boardsLoader(file, fetch);
-      const options = { deleteAllowed: () => deleteAllowed(settingsPath(file)) };
+      const { signIn, signOut } = signInHelper(file);
+      const options = { deleteAllowed: () => deleteAllowed(settingsPath(file)), signIn, signOut };
       await createServer(async () => (await load()).snapshot, boardsWriter(load, activityPath()), options).connect(new StdioServerTransport());
       console.error('BusyAnts connector running.');
       return null;

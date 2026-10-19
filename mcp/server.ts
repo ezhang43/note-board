@@ -7,9 +7,10 @@ import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit, typ
 import { addChecklist, addItems, addNote, deleteThings, editItems, moveItems, newBoard, newColumn, planDelete, setItemsDone, type Edit } from './edits';
 
 // The BusyAnts connector's tools: listing boards and reading one; changing checklist items and
-// adding notes, checklists, links, columns and boards on the owner's own boards (shared boards are
-// read-only); and, only when the owner has switched it on, deleting in two steps (a preview, then a
-// confirm carrying the preview's id), with a backup version first. Every call reads the boards
+// adding notes, checklists, columns and boards on the owner's own boards (shared boards are
+// read-only); only when the owner has switched it on, deleting in two steps (a preview, then a
+// confirm carrying the preview's id), with a backup version first; and signing in and out (the
+// sign-in itself happens in the browser, login/login.ts). Every call reads the boards
 // afresh, so Claude always sees what is saved online now; each change is one save.
 
 const reply = (text: string, isError = false) => ({ content: [{ type: 'text' as const, text }], ...(isError ? { isError: true } : {}) });
@@ -45,10 +46,14 @@ const text = z.string().max(MAX_TEXT);
 export interface ServerOptions {
   /** Whether the owner lets Claude delete (the "Let Claude delete" setting); off when not given. */
   deleteAllowed?: () => Promise<boolean>;
+  /** Starts a sign-in in the browser, answering at once (main.ts, signInHelper). */
+  signIn?: () => Promise<string>;
+  /** Deletes the saved sign-in. */
+  signOut?: () => Promise<string>;
 }
 
 export function createServer(load: () => Promise<Snapshot>, write: Write, opts: ServerOptions = {}): McpServer {
-  const server = new McpServer({ name: 'busyants', version: '1.2.0' });
+  const server = new McpServer({ name: 'busyants', version: '1.3.0' });
   const deleteAllowed = opts.deleteAllowed ?? (async () => false);
   // Previews waiting for a confirm, by preview id; each is used once (kept only while running).
   const previews = new Map<string, Preview>();
@@ -311,6 +316,31 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
         if (!r.text.startsWith('Saved:')) return r;
         return { ...r, text: `${r.text}\n\nA copy of the boards as they were just before is in Version history (the History button in BusyAnts), so it can be put back.` };
       }),
+  );
+
+  // Signing in from inside Claude: the person signs in with Google in their own browser, on a page
+  // served by this computer only (login/login.ts); nothing about the account passes through Claude.
+  const account = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
+  const notHere = async () => 'Signing in from Claude isn’t available here: run npm run mcp:login instead.';
+  server.registerTool(
+    'sign_in',
+    {
+      title: 'Sign in to BusyAnts',
+      description:
+        'Opens a BusyAnts sign-in page in the person’s web browser, where they sign in with their own Google account. Answers at once; the person finishes in the browser, then the other tools work. Use it when a tool says "Not signed in" or the sign-in has expired, or when the person asks to sign in or switch account.',
+      annotations: account,
+    },
+    () => safely(async () => ({ text: await (opts.signIn ?? notHere)() })),
+  );
+
+  server.registerTool(
+    'sign_out',
+    {
+      title: 'Sign out of BusyAnts',
+      description: 'Signs this connector out of BusyAnts on this computer (deletes its saved sign-in). Nothing on the boards changes. Only when the person asks to sign out.',
+      annotations: account,
+    },
+    () => safely(async () => ({ text: await (opts.signOut ?? notHere)() })),
   );
 
   return server;

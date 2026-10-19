@@ -82,7 +82,7 @@ export async function startLogin(opts: { apiKey: string; save: (t: TokenFile) =>
 
   await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
   const port = (server.address() as AddressInfo).port;
-  const timer = setTimeout(() => settle.fail(new Error('No sign-in within 5 minutes. Run npm run mcp:login again.')), opts.timeoutMs ?? 5 * 60_000);
+  const timer = setTimeout(() => settle.fail(new Error('No sign-in within 5 minutes. Start the sign-in again (ask Claude to sign in to BusyAnts, or run npm run mcp:login).')), opts.timeoutMs ?? 5 * 60_000);
   const close = () => {
     clearTimeout(timer);
     server.closeAllConnections();

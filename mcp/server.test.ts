@@ -81,7 +81,7 @@ describe('the connector’s write tools', () => {
   it('offers the write tools, none marked destructive or read-only, and confirm_delete marked destructive', async () => {
     const { tools } = await (await connectWithWrites().client).listTools();
     const writes = ['add_checklist', 'add_column', 'add_items', 'add_note', 'create_board', 'edit_items', 'move_items', 'set_items_done'];
-    expect(tools.map((t) => t.name).sort()).toEqual([...writes, 'confirm_delete', 'list_boards', 'preview_delete', 'read_board'].sort());
+    expect(tools.map((t) => t.name).sort()).toEqual([...writes, 'confirm_delete', 'list_boards', 'preview_delete', 'read_board', 'sign_in', 'sign_out'].sort());
     for (const t of tools.filter((t) => writes.includes(t.name))) {
       expect(t.annotations?.destructiveHint, t.name).toBe(false);
       expect(t.annotations?.readOnlyHint, t.name).toBe(false);
@@ -300,5 +300,41 @@ describe('the connector’s safe delete', () => {
     const r = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['home'] } });
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/home board/);
+  });
+});
+
+describe('sign_in and sign_out', () => {
+  async function withSignIn(signIn?: () => Promise<string>, signOut?: () => Promise<string>) {
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '1' });
+    await Promise.all([createServer(async () => sampleSnapshot(), noSaving, { signIn, signOut }).connect(a), client.connect(b)]);
+    return client;
+  }
+
+  it('sign_in answers with what the sign-in helper says, and never reads the boards', async () => {
+    const signIn = vi.fn(async () => 'A sign-in page opened: http://localhost:1/?n=x');
+    const r = await (await withSignIn(signIn)).callTool({ name: 'sign_in', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    expect(text(r)).toBe('A sign-in page opened: http://localhost:1/?n=x');
+    expect(signIn).toHaveBeenCalledOnce();
+  });
+
+  it('sign_out answers with what the helper says', async () => {
+    const r = await (await withSignIn(undefined, async () => 'Signed out.')).callTool({ name: 'sign_out', arguments: {} });
+    expect(text(r)).toBe('Signed out.');
+  });
+
+  it('a failure starting the sign-in is a plain error', async () => {
+    const r = await (await withSignIn(async () => { throw new Error('No free port'); })).callTool({ name: 'sign_in', arguments: {} });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toBe('No free port');
+  });
+
+  it('neither changes boards nor is marked read-only or destructive', async () => {
+    const { tools } = await (await withSignIn()).listTools();
+    for (const name of ['sign_in', 'sign_out']) {
+      const t = tools.find((x) => x.name === name);
+      expect(t?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    }
   });
 });

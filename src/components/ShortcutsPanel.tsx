@@ -51,6 +51,13 @@ const GROUPS: { title: string; keys: [string, string][] }[] = [
       ['Ctrl+Shift+Backspace', 'Delete every item in the Completed sections on this board (asks first; Control on a Mac too)'],
     ],
   },
+  {
+    title: 'Google Calendar',
+    keys: [
+      ['Delete / Backspace', 'Delete the event whose card is open (asks first; read-only events can’t be deleted)'],
+      ['Escape', 'Close the event’s card, then the panel'],
+    ],
+  },
 ];
 
 /** The website pages beside the app (SPEC "Website"), opened in a new tab so the board stays open. */

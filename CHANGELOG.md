@@ -1,5 +1,14 @@
 # Changelog
 
+## Calendar events open in a small card (2026-10-19)
+
+- Clicking an event in the calendar panel now opens a small card next to it, like Google Calendar's, instead of replacing the whole panel. The list stays in view. On a phone the card slides up from the bottom.
+- The card shows the title, the date and time, and the guests. Its top has a pencil (opens the full edit form), a trash can (deletes the event) and × (closes).
+- Pressing Delete or Backspace while the card is open deletes the event too. It asks first, exactly like the trash can and the form's Delete button ("Delete “Dentist”?" · Keep · Delete). Calendar events can't be undone, so that question is the safeguard. It doesn't fire while you're typing in a text box.
+- Events you can only change in Google Calendar show the same card without pencil and trash, with the Open in Google Calendar link.
+- Escape, × or a click anywhere else closes the card; the next Escape closes the panel.
+- Your boards and their saving are not touched.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

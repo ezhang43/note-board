@@ -71,6 +71,13 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Tab / Shift+Tab in a list', 'Indent / outdent the item'],
     ],
   },
+  {
+    title: 'Google Calendar',
+    keys: [
+      ['Delete / Backspace', 'Delete the event whose card is open (asks first; read-only events can’t be deleted)'],
+      ['Escape', 'Close the event’s card, then the panel'],
+    ],
+  },
 ];
 
 /** The website pages beside the app (SPEC "Website"), opened in a new tab so the board stays open. */

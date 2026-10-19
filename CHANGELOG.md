@@ -1,5 +1,12 @@
 # Changelog
 
+## The Privacy page explains the Claude connector (2026-10-19)
+
+- The Privacy policy has a new short section, "The Claude connector (optional)". It says the connector runs only on your own computer, signs in with your own Google account, keeps that sign-in in a file on that computer, touches your boards only when you ask Claude to, has deleting switched off, and sends what Claude reads to Claude under Anthropic's privacy policy. BusyAnts stores nothing new because of it.
+- Anthropic is now listed with the other services the page names.
+- Claude Code is also kept from reading the connector's sign-in folder on a Mac or Linux computer, as it already was on Windows.
+- The app, your boards and their saving are not touched.
+
 ## Calendar events open in a small card (2026-10-19)
 
 - Clicking an event in the calendar panel now opens a small card next to it, like Google Calendar's, instead of replacing the whole panel. The list stays in view. On a phone the card slides up from the bottom.

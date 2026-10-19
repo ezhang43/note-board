@@ -16,7 +16,9 @@
     "mcp:build": "vite build --config mcp/vite.config.ts --logLevel warn",
     "mcp:login": "npm run mcp:build --silent && node mcp/dist/server.js login",
     "mcp:logout": "npm run mcp:build --silent && node mcp/dist/server.js logout",
-    "mcp:check": "npm run mcp:build --silent && node mcp/dist/server.js check"
+    "mcp:check": "npm run mcp:build --silent && node mcp/dist/server.js check",
+    "mcp:delete-on": "npm run mcp:build --silent && node mcp/dist/server.js delete-on",
+    "mcp:delete-off": "npm run mcp:build --silent && node mcp/dist/server.js delete-off"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

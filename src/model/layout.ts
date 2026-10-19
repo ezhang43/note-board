@@ -99,6 +99,54 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
   return { ...board, cards, columns };
 }
 
+/**
+ * Blocks in the same row as `id` (they overlap it by at least half the shorter one's height) that it
+ * now covers slide sideways out of its way, keeping their left-to-right order, and push the blocks
+ * beside them along too (owner decision 2026-10-19). After a resize (no `drag`) they all go right,
+ * as a block only grows to the right. For a drag, blocks whose middle is left of its middle go left,
+ * the others right; on a tie they go the way it came from (`movedX` > 0: it moved right, so they go
+ * left). Blocks in `fixed` never move; when one of them is in the way the dragged block itself will
+ * move instead, so nothing shifts. Returns the same board when nothing moves.
+ */
+export function shiftRow(board: Board, id: string, measured: MeasuredHeight, drag?: { movedX: number; fixed: string[] }): Board {
+  const a = blockRect(board, id, measured);
+  if (!a) return board;
+  const fixed = new Set(drag?.fixed);
+  const rects = board.order.flatMap((o) => {
+    const r = o === id ? null : blockRect(board, o, measured);
+    return r ? [{ id: o, r }] : [];
+  });
+  if (rects.some((m) => fixed.has(m.id) && overlaps(a, m.r, BLOCK_GAP - 1))) return board;
+  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
+  const mid = (r: Rect) => r.x + r.w / 2;
+  const goesLeft = (r: Rect) => !!drag && (mid(r) < mid(a) || (mid(r) === mid(a) && drag.movedX > 0));
+  // Each block only has to clear the blocks already placed beside it (level with it, give or take the gap).
+  const level = (p: Rect, r: Rect) => p.y < r.y + r.h + BLOCK_GAP - 1 && r.y < p.y + p.h + BLOCK_GAP - 1;
+  const moves = new Map<string, number>();
+  let placed = [a];
+  for (const { id: o, r } of mates.filter((m) => !goesLeft(m.r)).sort((p, q) => p.r.x - q.r.x)) {
+    const edge = Math.max(-Infinity, ...placed.filter((p) => level(p, r)).map((p) => p.x + p.w + BLOCK_GAP));
+    const x = r.x < edge ? (board.snap ? Math.ceil(edge / GRID) * GRID : edge) : r.x;
+    if (x !== r.x) moves.set(o, x);
+    placed.push({ ...r, x });
+  }
+  placed = [a];
+  for (const { id: o, r } of mates.filter((m) => goesLeft(m.r)).sort((p, q) => q.r.x - p.r.x)) {
+    const edge = Math.min(Infinity, ...placed.filter((p) => level(p, r)).map((p) => p.x - BLOCK_GAP));
+    const x = r.x + r.w > edge ? (board.snap ? Math.floor((edge - r.w) / GRID) * GRID : edge - r.w) : r.x;
+    if (x !== r.x) moves.set(o, x);
+    placed.push({ ...r, x });
+  }
+  if (!moves.size) return board;
+  const cards = { ...board.cards };
+  const columns = { ...board.columns };
+  for (const [o, x] of moves) {
+    if (columns[o]) columns[o] = { ...columns[o], x };
+    else cards[o] = { ...cards[o], x };
+  }
+  return { ...board, cards, columns };
+}
+
 /** Straight down from `rect` to the first spot clear of every placed block (on the grid when snapping). */
 function pushedDown(board: Board, rect: Rect, placed: Rect[]): Point {
   let y = rect.y;

@@ -1,12 +1,14 @@
 import * as B from './board';
 import { BLOCK_GAP } from './constants';
 import { overlaps, snapIf } from './geometry';
-import { blockRect, settle, type MeasuredHeight } from './layout';
+import { blockRect, settle, shiftRow, type MeasuredHeight } from './layout';
 import type { Board, Point } from './types';
 
 // Where blocks go when one is dragged, or when an expanded block collapses again.
 // The rules (owner decisions, see CLAUDE.md): a dragged block takes priority and lands on the grid
-// spot under the pointer; a single dragged card never pushes a column; collapsing a block returns
+// spot under the pointer; blocks in its row slide sideways, keeping their order, and every preview is
+// worked out from the drag's start, so they spring back once it has passed (2026-10-19);
+// a single dragged card never pushes a column; collapsing a block returns
 // the blocks its expansion pushed aside, if they haven't moved since and their old spot is free.
 
 /** A block's move: where it was and where it went. */
@@ -100,6 +102,9 @@ export function dropBoard(
     b = B.moveCard(b, d.id, { type: 'loose', ...target });
     anchors = [...b.order.filter((id) => b.columns[id]), d.id];
   }
+  // simple: only a single dragged block shifts its row sideways; several dragged together push what
+  // is in their way to the nearest free spot. Upgrade if the owner wants groups to keep rows too.
+  if (!d.group.length) b = shiftRow(b, d.id, measured, { movedX: target.x - d.startX, fixed: d.kind === 'card' ? anchors : [] });
   const board = settle(b, measured, anchors);
   const self = B.blockOf(board, d.id)!;
   const bumped = Object.fromEntries([...movedBlocks(from, board, ids)].map(([id, m]) => [id, m.to]));

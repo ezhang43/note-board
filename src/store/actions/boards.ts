@@ -1,9 +1,10 @@
 import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
+import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
 import { JOURNAL_NAME, findJournalBoard, hiddenJournal, journalDateLine, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { spotForNewBlock } from '../../model/layout';
-import type { Board } from '../../model/types';
+import type { Board, TodoCard } from '../../model/types';
 import { boardNeighbor, pathTo, withoutBoard, type Workspace } from '../../model/workspace';
 import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
@@ -22,15 +23,22 @@ export function boardActions(ctx: StoreContext) {
     const id = ctx.state.ui.journalBoard;
     return id && !sharedIds().includes(id) ? id : null;
   };
-  /** The Journal board left out of the Boards menu and Ctrl+arrows: never the open one, none until shares are known. */
-  const hidden = () => {
-    const { sharesKnown } = ctx.state.ui;
-    const id = sharesKnown ? hiddenJournal(ctx.workspace(), sharedIds()) : null;
-    return id === ctx.state.boards.open ? null : id;
+  /** The Habits panel's board, found afresh each time, so one that arrives from another device is used and a shared one never is. */
+  const habitsId = () => findHabitsBoard(ctx.workspace(), sharedIds());
+  /** The Journal and Habits boards left out of the Boards menu and Ctrl+arrows: never the open one, none until shares are known. */
+  const hidden = (): string[] => {
+    if (!ctx.state.ui.sharesKnown) return [];
+    const ws = ctx.workspace();
+    return [hiddenJournal(ws, sharedIds()), hiddenHabits(ws, sharedIds())].filter((id): id is string => !!id && id !== ctx.state.boards.open);
+  };
+  /** A change to one habit on the Habits board, as one change on that board's own undo. */
+  const changeHabit = (cardId: string, change: (c: TodoCard) => TodoCard, merge?: string) => {
+    const id = habitsId();
+    if (id) ctx.commitTo(id, (b) => B.updateCard(b, cardId, (c) => (isHabit(c) ? change(c) : c)), merge);
   };
 
   return {
-    hiddenJournal: hidden,
+    hiddenBoards: hidden,
     openBoard,
     /** A board's name ('' if unnamed or gone). */
     boardName(id: string): string {
@@ -41,11 +49,11 @@ export function boardActions(ctx: StoreContext) {
     pathToOpen: () => pathTo(ctx.workspace(), ctx.state.boards.open),
     /** Ctrl+arrow keys: opens the next / previous / parent / first inner board and returns its id; null (nothing opens) at an end. */
     moveBoard(move: Parameters<typeof boardNeighbor>[2]): string | null {
-      // The hidden Journal board is passed over, as in the Boards menu.
+      // The hidden Journal and Habits boards are passed over, as in the Boards menu.
       const ws = ctx.workspace();
       const skip = hidden();
       let id = boardNeighbor(ws, ctx.state.boards.open, move);
-      if (id && id === skip) id = boardNeighbor(ws, id, move);
+      while (id && skip.includes(id)) id = boardNeighbor(ws, id, move);
       if (id) openBoard(id);
       return id && ctx.state.boards.open === id ? id : null;
     },
@@ -124,6 +132,57 @@ export function boardActions(ctx: StoreContext) {
       if (id) ctx.undoOn(id, 'redo');
     },
     /**
+     * The Habits button (owner request, 2026-10-19): opens the Habits side panel, or closes it,
+     * leaving the open board as it is. Nothing is made until the first habit is added. Returns
+     * 'loading' (changing nothing) while it isn't yet known which boards are shared.
+     */
+    openHabits(): 'loading' | null {
+      const { ui } = ctx.state;
+      if (ui.sidePanel === 'habits') {
+        ctx.updateUi({ sidePanel: null });
+        return null;
+      }
+      if (!ui.sharesKnown) return 'loading';
+      ctx.updateUi({ preview: null }); // an old version being looked at is put away first
+      // Nothing stays selected behind the panel, so a key meant for it can't delete it.
+      ctx.updateUi({ sidePanel: 'habits', historyOpen: false, selection: [], itemSel: null });
+      return null;
+    },
+    /** A new habit at the end of the list, named `name` (trimmed; nothing for a blank name). Returns its id. */
+    addHabit(name: string): string | null {
+      const title = name.trim();
+      if (!title || ctx.state.ui.sidePanel !== 'habits') return null;
+      let id = habitsId();
+      if (!id) {
+        const made = newId('b');
+        setOthers((o) => ({ ...o, [made]: { ...blankBoard(), name: HABITS_NAME } }));
+        id = made;
+      }
+      const card: TodoCard = { ...(createCard('todo') as TodoCard), title };
+      // Placed with guessed heights (the board isn't drawn), and tidied if that board is ever opened.
+      ctx.commitTo(id, (b) => B.addCard(b, card, { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, { x: 0, y: 0 }, () => undefined) }));
+      return card.id;
+    },
+    renameHabit: (cardId: string, name: string) => changeHabit(cardId, (c) => (c.title === name ? c : { ...c, title: name }), `title:${cardId}`),
+    /** Tick or untick one day (a "YYYY-MM-DD" key) of a habit. */
+    toggleHabitDay: (cardId: string, day: string) => changeHabit(cardId, (c) => withDay(c, day, !tickedDays(c).has(day))),
+    /** Delete a habit with its ticks, as one change on the Habits board's undo (Ctrl+Z in the panel, or Version history, brings it back). */
+    deleteHabit(cardId: string) {
+      const id = habitsId();
+      if (id) ctx.commitTo(id, (b) => (b.cards[cardId] && isHabit(b.cards[cardId]) ? B.deleteBlocks(b, [cardId]) : b));
+    },
+    /** The board the Habits panel shows and changes, or null before the first habit. */
+    habitsBoard: habitsId,
+    /** Ctrl+Z / Ctrl+Y in the Habits panel: on the Habits board's own history, whichever board is open. */
+    undoHabits() {
+      const id = habitsId();
+      if (id) ctx.undoOn(id, 'undo');
+    },
+    redoHabits() {
+      const id = habitsId();
+      if (id) ctx.undoOn(id, 'redo');
+    },
+    /**
      * Delete a board and every card that opens it (the home board never). If it is open, the board
      * above it opens first. Boards inside it are kept and then stand alone.
      */
@@ -156,10 +215,9 @@ export function boardActions(ctx: StoreContext) {
     restoreVersion(ws: Workspace): string[] | 'loading' {
       if (!ctx.state.ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null });
-      // The hidden Journal board can't be opened to restore it on its own, so it comes back too
-      // (check of PR #94), as one change on its own undo; a version without it leaves it as it is.
-      const journal = hidden();
-      if (journal && ws.boards[journal]) ctx.commitTo(journal, () => ws.boards[journal]);
+      // The hidden Journal and Habits boards can't be opened to restore them on their own, so they
+      // come back too (check of PR #94), each as one change on its own undo; a version without one leaves it as it is.
+      for (const id of hidden()) if (ws.boards[id]) ctx.commitTo(id, () => ws.boards[id]);
       const open = ctx.state.boards.open;
       const missing = Object.keys(ws.boards).filter((id) => id !== open && !ctx.workspace().boards[id]);
       const { ids, kept } = restorable(ctx.state.ui.shares, ws.boards[open] ? [open, ...missing] : missing);

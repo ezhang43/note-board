@@ -54,3 +54,27 @@ test('visiting a website page never replaces the offline copy of the app', async
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   await context.setOffline(false);
 });
+
+// Job 117: the usage counter (GoatCounter) is in every published page, but only talks to the outside on the real site.
+test('every published page carries the GoatCounter loader, and nothing is requested from it on localhost', async ({ page }) => {
+  const counted: string[] = [];
+  page.on('request', (r) => /gc\.zgo\.at|goatcounter\.com/.test(r.url()) && counted.push(r.url()));
+  for (const path of ['./', 'about/', 'faq/', 'terms/', 'privacy/', 'delete-account/']) {
+    const html = await (await page.request.get(path)).text();
+    expect(html, path).toContain('https://gc.zgo.at/count.js');
+    expect(html, path).toContain('https://busyants.goatcounter.com/count');
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+  }
+  expect(counted).toEqual([]);
+});
+
+// Job 117: on the real address the counter is added, with the owner's site code, and is given the path only (a share link's key is never sent).
+test('on the published address the counter is added and sent the page path without the query', async ({ page, baseURL }) => {
+  const local = new URL(baseURL!).origin;
+  // Pretend the build is served from the published address; the counter's own script is a stub that records how it was added.
+  await page.route('https://ezhang43.github.io/note-board/**', async (route) => route.fulfill({ response: await route.fetch({ url: route.request().url().replace('https://ezhang43.github.io', local) }) }));
+  await page.route('https://gc.zgo.at/count.js', (route) => route.fulfill({ contentType: 'text/javascript', body: 'window.__gc = { site: document.currentScript.dataset.goatcounter, settings: document.currentScript.dataset.goatcounterSettings };' }));
+  await page.goto('https://ezhang43.github.io/note-board/about/?join=s_ab12cd34.k3y9secret');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __gc?: unknown }).__gc)).toEqual({ site: 'https://busyants.goatcounter.com/count', settings: '{"path":"/note-board/about/"}' });
+});

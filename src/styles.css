@@ -1971,6 +1971,64 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .app.phone .journal-tools button { min-width: 44px; height: 44px; font-size: 16px; }
 .app.phone .journal-tools select { height: 44px; font-size: 16px; }
 
+/* The Habits panel: each habit as a white card, its name, this week's seven day boxes and its streak. */
+.habits-panel { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+.habits-panel:focus { outline: none; }
+.habit-new { display: flex; gap: 6px; }
+.habits-panel input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.habits-empty { margin: 8px 4px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.habit { padding: 8px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 10px; }
+.habit-head { display: flex; align-items: center; gap: 4px; }
+.habit-new .tb-button { height: 34px; }
+/* The name lines up with the day boxes; its edge shows on hover and while typing. */
+.habits-panel .habit-head input[type='text'] { margin-left: -4px; padding: 0 4px; border-color: transparent; background: transparent; font-weight: 500; }
+.habits-panel .habit-head input[type='text']:focus { border-color: var(--control-edge); }
+.habit-delete { color: var(--ink-soft); }
+.habit-week { display: flex; gap: 4px; margin-top: 6px; }
+.habit-day {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border: 1px solid var(--control-edge);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.habit-wd { font-size: 10px; font-weight: 600; color: var(--ink-soft); }
+.habit-day[aria-current='date'] { border: 2px solid var(--accent); }
+.habit-day[aria-pressed='true'] { background: var(--checkbox); border-color: var(--checkbox); color: var(--card-bg); }
+.habit-day[aria-pressed='true'] .habit-wd { color: inherit; }
+.habit-day[aria-current='date'][aria-pressed='true'] { border-color: var(--accent); }
+@media (hover: hover) and (pointer: fine) {
+  .habit-day[aria-pressed='false']:hover { background: var(--hover); }
+  .habits-panel .habit-head input[type='text']:hover { border-color: var(--control-edge); }
+}
+.habit-streak { margin: 6px 2px 0; color: var(--ink-soft); font-size: 12px; }
+.app.phone .habits-panel input[type='text'] { height: 44px; font-size: 16px; }
+.app.phone .habit-new .tb-button { height: 44px; }
+.app.phone .habit-delete { width: 44px; height: 44px; }
+.app.phone .habit-day { height: 52px; font-size: 15px; }
+
 /* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
 .confirm.delete-completed {
   position: fixed;
@@ -2211,10 +2269,10 @@ a.cal-open { align-self: flex-start; }
 .phone-sheet { transform-origin: bottom center; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all) {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day) {
   transition: transform 100ms var(--ease-out);
 }
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow):not([aria-disabled='true'], :disabled):active {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day):not([aria-disabled='true'], :disabled):active {
   transform: scale(0.97);
 }
 

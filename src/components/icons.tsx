@@ -116,7 +116,8 @@ export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
       viewBox="0 0 12 12"
       strokeWidth="1.8"
       {...common}
-      style={{ stroke: 'var(--ink-faint)', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms ease' }}
+      className="collapse-arrow"
+      style={{ stroke: 'var(--ink-faint)', transform: collapsed ? 'rotate(-90deg)' : 'none' }}
     >
       <path d="M3 4.5l3 3 3-3" />
     </svg>

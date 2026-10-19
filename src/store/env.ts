@@ -9,6 +9,11 @@ export function reducedMotion(): boolean {
   return typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/** True when the last thing the person did was press a key (see src/main.tsx): keyboard actions are never animated. */
+export function keyboardInitiated(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.input === 'keys';
+}
+
 /** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). */
 export function copyText(text: string) {
   try {

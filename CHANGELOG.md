@@ -9,6 +9,12 @@
 - The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
 - When two edits of the same note are combined, its formatting always comes with the words that are kept. (On your own devices the latest save wins, words and formatting together, as with every board.)
 
+## Dragging and resizing keep rows together (2026-10-19)
+
+- Drag a block along a row and the blocks in that row now slide sideways out of its way and keep their left-to-right order, instead of jumping above or below the row. Drop a block onto its neighbour and they swap places.
+- Blocks only make room for where the dragged block is now: once it has moved past them, they spring back to their own spots.
+- Widening a card or container does the same when you let go: its neighbours in the row slide sideways, not down. Blocks still never overlap. Your saved boards are not changed until you move something.
+
 ## Habits (2026-10-19)
 
 - A new **Habits** button sits next to Journal in the panel pill by the zoom control (on a phone: ⋯ → Habits). It opens a Habits panel at the side; the board you are on stays open.

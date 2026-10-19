@@ -157,11 +157,13 @@ test('the Honey Workshop colours, light and dark', async ({ page }) => {
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test("a card's buttons are always shown (no pointer to hover with)", async ({ page }) => {
+  // Job 113: on a phone the buttons show on the selected card only (there is no pointer to hover with).
+  test("a card's buttons are shown while it is selected, and hidden once it is not", async ({ page }) => {
     await page.getByRole('button', { name: 'Add' }).tap();
     await page.getByRole('menuitem', { name: 'Note' }).tap();
-    await clickEmpty(page);
     const note = page.locator('[data-kind="note"]');
     await expect(note.getByRole('button', { name: 'Delete card' })).toHaveCSS('opacity', '1');
+    await clickEmpty(page);
+    await expect(note.locator('button[aria-label="Delete card"]')).toBeHidden();
   });
 });

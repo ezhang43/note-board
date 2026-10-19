@@ -1,5 +1,12 @@
 # Changelog
 
+## Lists fill the screen on a phone (2026-10-19)
+
+- On a phone, a new note, checklist or link is made almost as wide as the screen (a small margin each side) instead of the small desktop size.
+- When you start typing in a card or container on a phone, the board zooms and moves so that card fills the screen's width. The line you tapped stays where it was. Moving between the boxes of the same list doesn't move the board again, and you can still pinch and pan as you like while typing.
+- On a phone, the collapse arrow and the trash can now show only on the card (or container) you have selected, not on every card. Tap a card to select it, then use its buttons. A tap that only selects a card can no longer press a button that appears under your finger.
+- Computers and tablets are unchanged. Nothing about your saved boards changes; the zoom is not saved or undone.
+
 ## Phone: the keyboard stays up while you tick and delete items (2026-10-19)
 
 - On a phone, ticking an item in the bar above the keyboard moves the cursor to the next open item, and deleting one moves it to the item above. The keyboard no longer closes after each tap.

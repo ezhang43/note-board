@@ -1,31 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded } from './helpers';
+import { fontsLoaded, holdAndDrag, lerp, touch, type Pt, type TouchStep as Step } from './helpers';
 
 // Phone zoom taps and moving several selected blocks by finger (owner requests, 2026-10-18).
 // Everything runs on a 390x844 touch screen, with real touch events.
 
 test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-type Pt = { x: number; y: number };
-type Step = { type: 'touchStart' | 'touchMove' | 'touchEnd'; p?: Pt; wait?: number };
-
-async function touch(page: Page, steps: Step[]) {
-  const cdp = await page.context().newCDPSession(page);
-  for (const s of steps) {
-    if (s.wait) await page.waitForTimeout(s.wait);
-    await cdp.send('Input.dispatchTouchEvent', { type: s.type, touchPoints: s.p ? [{ x: s.p.x, y: s.p.y, id: 1 }] : [] });
-  }
-}
 /** A quick tap, starting `gap` ms after the last step. */
 const tapSteps = (p: Pt, gap = 0): Step[] => [{ type: 'touchStart', p, wait: gap }, { type: 'touchEnd' }];
-const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
-/** Rest a finger for `holdMs`, then move it to `to`; letting go. */
-const holdAndDrag = (page: Page, from: Pt, to: Pt, holdMs = 700) =>
-  touch(page, [
-    { type: 'touchStart', p: from },
-    ...Array.from({ length: 12 }, (_, i): Step => ({ type: 'touchMove', p: lerp(from, to, (i + 1) / 12), wait: i === 0 ? holdMs : 0 })),
-    { type: 'touchEnd' },
-  ]);
 /** A finger swipe from `from` to `to` straight away. */
 const swipe = (page: Page, from: Pt, to: Pt) => holdAndDrag(page, from, to, 0);
 

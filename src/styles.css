@@ -1783,7 +1783,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .habit-new .tb-button { height: 34px; }
 /* The name lines up with the day boxes; its edge shows on hover and while typing. */
 .habits-panel .habit-head input[type='text'] { margin-left: -4px; padding: 0 4px; border-color: transparent; background: transparent; font-weight: 500; }
-.habits-panel .habit-head input[type='text']:is(:hover, :focus) { border-color: var(--control-edge); }
+.habits-panel .habit-head input[type='text']:focus { border-color: var(--control-edge); }
 .habit-delete { color: var(--ink-soft); }
 .habit-week { display: flex; gap: 4px; margin-top: 6px; }
 .habit-day {
@@ -1811,6 +1811,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .habit-day[aria-current='date'][aria-pressed='true'] { border-color: var(--accent); }
 @media (hover: hover) and (pointer: fine) {
   .habit-day[aria-pressed='false']:hover { background: var(--hover); }
+  .habits-panel .habit-head input[type='text']:hover { border-color: var(--control-edge); }
 }
 .habit-streak { margin: 6px 2px 0; color: var(--ink-soft); font-size: 12px; }
 .app.phone .habits-panel input[type='text'] { height: 44px; font-size: 16px; }

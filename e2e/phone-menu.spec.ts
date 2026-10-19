@@ -33,14 +33,14 @@ const box = async (l: Locator) => (await l.boundingBox())!;
 /** The visible labels of the direct children, in order (accessible names for icon-only ones). */
 const names = (l: Locator) => l.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || (e.textContent ?? '').trim()));
 
-test('signed in, the top is seven tiles, three across, each at least 44px tall', async ({ page }) => {
+test('signed in, the top is eight tiles, three across, each at least 44px tall', async ({ page }) => {
   await openSignedIn(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal']);
+  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits']);
   await expect(t.nth(2)).toHaveText('History');
   await expect(t.nth(5)).toHaveText('Calendar');
   await expect(t.nth(6)).toHaveText('Journal');
-  const b = await Promise.all([0, 1, 2, 3, 4, 5, 6].map((i) => box(t.nth(i))));
+  const b = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((i) => box(t.nth(i))));
   for (const x of b) {
     expect(x.height).toBeGreaterThanOrEqual(44);
     expect(x.width).toBeGreaterThanOrEqual(44);
@@ -52,15 +52,17 @@ test('signed in, the top is seven tiles, three across, each at least 44px tall',
   expect(b[5].y).toBe(b[3].y);
   expect(b[6].y).toBeGreaterThan(b[3].y + b[3].height - 1);
   expect(b[6].x).toBe(b[0].x);
+  expect(b[7].y).toBe(b[6].y);
+  expect(b[7].x).toBeGreaterThan(b[6].x);
   expect(b[1].x).toBeGreaterThan(b[0].x);
   expect(b[2].x).toBeGreaterThan(b[1].x);
   // Every tile has an icon and a label.
-  for (let i = 0; i < 7; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
+  for (let i = 0; i < 8; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
 });
 
 test('signed out and not published: no Share, Calendar, Feedback or Sign out', async ({ page }) => {
   await openLocal(page);
-  expect(await names(tiles(page).locator('button'))).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal']);
+  expect(await names(tiles(page).locator('button'))).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits']);
   await expect(menu(page).getByRole('button', { name: 'Feedback' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Share' })).toHaveCount(0);

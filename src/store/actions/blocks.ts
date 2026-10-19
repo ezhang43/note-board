@@ -10,7 +10,7 @@ import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { boardRights, restorable } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
-import { THEME_KEY } from '../../model/theme';
+import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
 import type { Board, CardKind, Point, Tool, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
@@ -101,6 +101,11 @@ export function blockActions(ctx: StoreContext) {
       const theme = ctx.state.view.theme === 'dark' ? 'light' : 'dark';
       updateView((v) => ({ ...v, theme }));
       ctx.write(THEME_KEY, theme);
+    },
+    /** Appearance menu: picks a color theme (accent and board tint) and remembers it on this device. */
+    setColorTheme(colorTheme: ColorTheme) {
+      updateView((v) => (v.colorTheme === colorTheme ? v : { ...v, colorTheme }));
+      ctx.write(COLOR_THEME_KEY, colorTheme);
     },
     /** A+ / A−: text on cards and columns one size bigger or smaller, remembered on this device. */
     changeFontSize(step: 1 | -1) {

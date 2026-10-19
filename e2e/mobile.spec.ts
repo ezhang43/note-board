@@ -230,7 +230,7 @@ test.describe('on a phone-sized screen', () => {
     expect((await field.boundingBox())!.y).toBeGreaterThan(52); // and not up under the top bar
   });
 
-  test('press and hold anywhere on a card, even on its text, then move to drag it', async ({ page }) => {
+  test('press and hold on a card, even on its title text, then move to drag it', async ({ page }) => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'Add', exact: true }).tap();
     await page.getByRole('menuitem', { name: 'Checklist' }).tap();
@@ -244,10 +244,10 @@ test.describe('on a phone-sized screen', () => {
     const title = (await card.getByLabel('List title').boundingBox())!;
     await holdAndDrag(page, { x: title.x + 20, y: title.y + title.height / 2 }, { x: title.x + 20, y: title.y + title.height / 2 + 160 });
     await expect.poll(async () => (await card.boundingBox())!.y).toBeGreaterThan(before.y + 120);
-    // ...and on an item's text.
+    // ...and back up again. (On a phone, resting on an item lifts the item instead: e2e/phone-hold-drag.spec.ts.)
     const mid = (await card.boundingBox())!;
-    const item = (await card.getByLabel('Item text').first().boundingBox())!;
-    await holdAndDrag(page, { x: item.x + 10, y: item.y + item.height / 2 }, { x: item.x + 10, y: item.y + item.height / 2 - 160 });
+    const title2 = (await card.getByLabel('List title').boundingBox())!;
+    await holdAndDrag(page, { x: title2.x + 20, y: title2.y + title2.height / 2 }, { x: title2.x + 20, y: title2.y + title2.height / 2 - 160 });
     await expect.poll(async () => (await card.boundingBox())!.y).toBeLessThan(mid.y - 120);
     expect(await card.getByLabel('Item text').first().inputValue()).toBe('Milk');
   });

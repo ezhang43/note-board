@@ -7,7 +7,7 @@ import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
 import { copyText, keyboardInitiated, reducedMotion } from '../env';
-import type { ItemHint } from '../types';
+import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
 
@@ -19,6 +19,27 @@ export function checklistActions(ctx: StoreContext) {
   const { commit, updateUi, requestSettle } = ctx;
   /** Copied checklist items. */
   let itemClipboard: TodoItem[] | null = null;
+
+  /**
+   * Press-and-hold lift: how far each row slides. The lifted rows' list closes up over them, and the
+   * list under the finger (the same one, or another) opens a gap there. Dropping on the board or on
+   * nothing opens no gap.
+   */
+  function liftSlide(d: ItemDrag, hint: ItemHint | null): Record<string, number> {
+    const { heights } = d.lift!;
+    const gap = Object.values(heights).reduce((sum, h) => sum + h, 0);
+    const itemsOf = (cardId: string) => {
+      const card = ctx.state.board.cards[cardId];
+      return card?.kind === 'todo' ? C.displayOrder(card.items) : [];
+    };
+    const mark = hint && 'markMode' in hint && hint.markMode && hint.markId ? { markId: hint.markId, markMode: hint.markMode } : null;
+    const target = mark && hint && 'cardId' in hint ? hint.cardId : null;
+    const order = itemsOf(d.cardId);
+    const before = mark && target === d.cardId ? C.gapBefore(order, mark, d.allIds) : null;
+    const slide = C.slideOffsets(order, heights, before, gap);
+    if (!mark || !target || target === d.cardId) return slide;
+    return { ...slide, ...C.slideOffsets(itemsOf(target), {}, C.gapBefore(itemsOf(target), mark, d.allIds), gap) };
+  }
 
   /** Select the checklist items shown from `anchor` to `to` in one list. */
   function selectItemRange(cardId: string, anchor: string, to: string) {
@@ -300,7 +321,7 @@ export function checklistActions(ctx: StoreContext) {
 
     // ---------- dragging checklist items ----------
     /** Start dragging an item by its grip (or every selected item, if it is one of them). */
-    startItemDrag(cardId: string, itemId: string, at: Point) {
+    startItemDrag(cardId: string, itemId: string, at: Point, measure?: (ids: string[]) => NonNullable<ItemDrag['lift']>) {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo') return;
       const loc = C.findItem(card.items, itemId);
@@ -313,11 +334,13 @@ export function checklistActions(ctx: StoreContext) {
       const kids = allIds.length - 1;
       const label = roots.length > 1 ? `${allIds.length} items` : loc.item.text || 'Untitled item';
       const extra = roots.length > 1 || !kids ? '' : `+ ${kids} ${kids === 1 ? 'sub-item' : 'sub-items'}`;
-      updateUi({ itemDrag: { cardId, roots, allIds, height, label, extra, at, hint: null }, confirm: null });
+      const drag: ItemDrag = { cardId, roots, allIds, height, label, extra, at, hint: null };
+      if (measure) drag.lift = measure(allIds);
+      updateUi({ itemDrag: drag.lift ? { ...drag, slide: liftSlide(drag, null) } : drag, confirm: null });
     },
     moveItemDrag(at: Point, hint: ItemHint | null) {
       const d = ctx.state.ui.itemDrag;
-      if (d) updateUi({ itemDrag: { ...d, at, hint } });
+      if (d) updateUi({ itemDrag: { ...d, at, hint, ...(d.lift && { slide: liftSlide(d, hint) }) } });
     },
     cancelItemDrag: () => updateUi({ itemDrag: null }),
     /**

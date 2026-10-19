@@ -102,6 +102,10 @@ export interface ItemDrag {
   /** Pointer position, in screen pixels from the canvas's top-left. */
   at: Point;
   hint: ItemHint | null;
+  /** Lifted by press-and-hold on a phone: the rows' heights (board px) and width (screen px), measured when lifted. */
+  lift?: { heights: Record<string, number>; width: number };
+  /** With `lift`: how far (board px) each row slides to make room; rows that stay put have no entry. */
+  slide?: Record<string, number>;
 }
 
 /** What the side panel beside the board can show. */

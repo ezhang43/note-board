@@ -28,7 +28,8 @@ Each change is one save of at most 50 changes, and Claude's answer lists exactly
 - Just before deleting, a copy of your boards is saved in version history (the History button), so you can always put it back.
 - At most 20 things at a time (a column or a board counts as one, with what is inside it).
 - Never deleted: your home board, a top-level board (one no card opens), the Completed card, or anything on a shared board.
-- Previews are forgotten when Claude Desktop or the connector restarts: ask for a new one.
+- A preview works once, for 10 minutes, and is forgotten when Claude Desktop or the connector restarts: ask for a new one.
+- The setting is a file on your computer (`settings.json` in the connector's folder, next to its sign-in file). Claude Desktop's connector can't change it, but Claude Code on the same computer could, like any file. To stop that, add to `permissions.deny` in your own Claude Code user settings: `Bash(npm run mcp:delete-on*)`, and `Edit` / `Write` rules for that folder (`%APPDATA%/busyants-mcp/**` on Windows, `~/.config/busyants-mcp/**` elsewhere).
 
 **Safety:**
 - Before Claude's first change (and again after 10 quiet minutes), your boards as they were are saved in version history: open BusyAnts → Version history (the clock button, bottom right) to go back.
@@ -67,8 +68,8 @@ Run these in the project folder (`C:\Users\ezhan\Projects\note-board`).
 - **Claude's change disappeared**: if you were typing in BusyAnts at the same moment, the app may have saved over it ("most recent wins"). The connector puts it back once; look in the activity log, and ask Claude to read the board and try again.
 - **Undo a change**: in BusyAnts, open Version history and restore the version from just before (it was saved before Claude's first change, and always just before a delete).
 - **"Deleting is switched off for this connector"**: that is the default. Run `npm run mcp:delete-on` if you want Claude to delete.
-- **"No preview with id …"**: each preview works once, and they are forgotten when the connector restarts. Ask Claude to preview the delete again.
-- **"The board has changed since the preview"**: nothing was deleted. Ask Claude to preview it again.
+- **"No preview with id …"** or **"older than 10 minutes"**: each preview works once, for 10 minutes, and they are forgotten when the connector restarts. Ask Claude to preview the delete again.
+- **"The board has changed since the preview"**: something that would be deleted was changed (or moved) in between, so nothing was deleted. Ask Claude to preview it again.
 
 ## To stop
 

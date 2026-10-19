@@ -1,4 +1,4 @@
-import { addCard, addColumn, createBoard, deleteBlocks, placementForNewCard, setItemText, shownName } from '../src/model/board';
+import { addCard, addColumn, createBoard, deleteBlocks, placementForNewCard, setItemText, shownName, topLevelOf } from '../src/model/board';
 import { createBoardCard, createCard, createColumn, createItem, isPermanent, type MakeId } from '../src/model/cards';
 import { editItems as changeItems, deleteItems, extractItems, findItem, flatIds, insertItems, refill, rootsOf, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
@@ -251,7 +251,7 @@ function nearBlock(b: Board, near: string | undefined): string | undefined {
 /** A free spot for a loose block w by h: beside block `near`, or near the board's top left. */
 function looseSpot(b: Board, near: string | undefined, w: number, h: number) {
   const measured = guessedHeights(b);
-  const r = near ? blockRect(b, near, measured) : null;
+  const r = near ? blockRect(b, topLevelOf(b, near), measured) : null; // a card in a column: beside its column
   const centre = r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : { x: 40 + w / 2, y: 40 + h / 2 };
   return spotForNewBlock(b, w, h, centre, measured);
 }
@@ -376,12 +376,36 @@ function whatWent(before: Workspace, after: Workspace, boardId: string): string[
 }
 
 /**
+ * Everything a delete removes, in full (whole boards, columns, cards with their items, items with
+ * their sub-items), so confirm_delete can tell whether any of it changed since the preview, even
+ * where the preview's lines don't show it (a note's second line, a column's cards).
+ */
+function fingerprint(before: Workspace, after: Workspace): string {
+  const gone: unknown[] = [];
+  for (const [id, b] of Object.entries(before.boards)) {
+    const now = after.boards[id];
+    if (!now) gone.push(['board', id, b]);
+    if (!now || now === b) continue;
+    for (const col of Object.values(b.columns)) if (!now.columns[col.id]) gone.push(['column', id, col]);
+    for (const card of Object.values(b.cards)) {
+      const still = now.cards[card.id];
+      if (!still) gone.push(['card', id, card]);
+      else if (card.kind === 'todo' && still.kind === 'todo') {
+        const left = new Set(flatIds(still.items));
+        for (const itemId of flatIds(card.items)) if (!left.has(itemId)) gone.push(['item', id, findItem(card.items, itemId)!.item]);
+      }
+    }
+  }
+  return JSON.stringify(gone);
+}
+
+/**
  * preview_delete's plan: the boards after deleting `ids` (items, cards, columns, and boards inside
  * this one, by the id read_board shows), made with the app's own delete functions, and a line for
  * each thing that would go. Refuses the home board, a top-level board, the Completed card, and any
  * delete that would change a board in `shared`.
  */
-export function planDelete(ws: Workspace, boardId: string, ids: string[], shared: Set<string>, makeId: MakeId): { ws: Workspace; lines: string[] } | { error: string } {
+export function planDelete(ws: Workspace, boardId: string, ids: string[], shared: Set<string>, makeId: MakeId): { ws: Workspace; lines: string[]; print: string } | { error: string } {
   const board = ws.boards[boardId];
   if (!board) return { error: `The board ${boardId} isn’t there any more.` };
   const name = shownName(board.name);
@@ -426,14 +450,14 @@ export function planDelete(ws: Workspace, boardId: string, ids: string[], shared
   }
   const lines = whatWent(ws, next, boardId);
   if (!lines.length) return { error: 'Nothing would be deleted.' };
-  return { ws: next, lines };
+  return { ws: next, lines, print: fingerprint(ws, next) };
 }
 
 /**
  * confirm_delete: makes the delete the preview listed, only if it would still delete exactly that
- * (`expected` are the preview's lines). Run again once it is done, it changes nothing.
+ * (`expected` is the preview's print). Run again once it is done, it changes nothing.
  */
-export function deleteThings(boardId: string, ids: string[], shared: Set<string>, expected: string[], seed: string): Edit {
+export function deleteThings(boardId: string, ids: string[], shared: Set<string>, expected: string, seed: string): Edit {
   return (ws) => {
     const board = ws.boards[boardId];
     if (!board) return { error: `Nothing was deleted: the board ${boardId} isn’t there any more.` };
@@ -444,7 +468,7 @@ export function deleteThings(boardId: string, ids: string[], shared: Set<string>
     let n = 0;
     const r = planDelete(ws, boardId, ids, shared, (p) => `${p}_${seed}${n++ || ''}`);
     if ('error' in r) return { error: `Nothing was deleted: ${r.error}` };
-    if (JSON.stringify(r.lines) !== JSON.stringify(expected)) return changedSince;
+    if (r.print !== expected) return changedSince;
     return { ws: r.ws, changed: r.lines.map((l) => `Deleted ${l}`) };
   };
 }

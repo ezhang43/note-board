@@ -157,10 +157,16 @@ async function checkAfter(deps: SaveDeps, edit: Edit, changed: string[], saved: 
  */
 async function checkDelete(deps: SaveDeps, edit: Edit, changed: string[], saved: string): Promise<SaveResult> {
   await deps.wait(PUT_BACK_MS);
-  if ((await stillThere(deps.db, edit)) === true) return { text: saved };
+  const { raw } = await deps.db.read();
+  const safe = safeToEdit(raw);
+  if (!safe.ok) return { text: `${saved}\n\n(It couldn’t be checked a moment later: ${safe.reason}. Read the board to see it now.)` };
+  const r = edit(readWorkspace(raw)!.ws);
+  if (!('error' in r) && !r.changed.length) return { text: saved };
   await deps.log(`Saved over by the app; not deleted again: ${changed.join('; ')}`);
+  // Making it again would delete all of it: it is all back. Refused: the boards changed, so some may be.
+  const back = 'error' in r ? 'some of it may be back on the board' : 'it is back on the board';
   return {
-    text: `${saved}\n\nBut BusyAnts saved over it a moment later, so some or all of it is back on the board; it was not deleted again. Read the board to see it now.`,
+    text: `${saved}\n\nBut BusyAnts saved over it a moment later, so ${back}; it was not deleted again. Read the board to see it now.`,
     isError: true,
   };
 }

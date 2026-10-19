@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TodoCard } from '../src/model/types';
 import { readWorkspace } from '../src/model/workspace';
 import type { Snapshot } from './boards';
@@ -249,6 +249,38 @@ describe('the connector’s safe delete', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/switched off/);
     expect(home(fs).cards.noteCall).toBeDefined();
+    // Switched on again, the same preview still works: a refusal doesn't use it up.
+    on = true;
+    expect((await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } })).isError).toBeFalsy();
+    expect(home(fs).cards.noteCall).toBeUndefined();
+  });
+
+  it('a preview works for 10 minutes only', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const { fs, client } = connectWithWrites(allowed);
+      const c = await client;
+      const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+      vi.setSystemTime(Date.now() + 10 * 60_000 + 1);
+      const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+      expect(r.isError).toBe(true);
+      expect(text(r)).toMatch(/older than 10 minutes/);
+      expect(home(fs).cards.noteCall).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the app saving the deleted things back: said so, and still points to the backup in Version history', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const c = await client;
+    const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn(ownRaw());
+    };
+    const r = await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/not deleted again[\s\S]*Version history/);
   });
 
   it('never on a shared board, and at most 20 things per call', async () => {

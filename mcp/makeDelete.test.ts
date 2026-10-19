@@ -63,6 +63,13 @@ describe('add_column', () => {
     expect(ok(edit, r.ws).changed).toEqual([]);
   });
 
+  it('near a card inside a column: beside that column, not at the card’s old loose spot', () => {
+    const r = ok(newColumn('home', 'Later', 'noteCall', 'cNew'));
+    const col = r.ws.boards.home.columns.cNew;
+    const near = ok(newColumn('home', 'Later', 'colTodo', 'cNew')).ws.boards.home.columns.cNew;
+    expect([col.x, col.y]).toEqual([near.x, near.y]);
+  });
+
   it('refuses a blank title and an unknown near', () => {
     expect(fails(newColumn('home', ' ', undefined, 'c'))).toMatch(/blank/);
     expect(fails(newColumn('home', 'x', 'nope', 'c'))).toMatch(/No card or column with id "nope"/);
@@ -208,7 +215,30 @@ describe('planning a delete (preview_delete)', () => {
 });
 
 describe('deleting (confirm_delete)', () => {
-  const expected = (ws: Workspace, ids: string[]) => plan(ws, ids).lines;
+  const expected = (ws: Workspace, ids: string[]) => plan(ws, ids).print;
+  const withNote = (ws: Workspace, id: string, text: string): Workspace => {
+    const home = ws.boards.home;
+    return { ...ws, boards: { ...ws.boards, home: { ...home, cards: { ...home.cards, [id]: { ...(home.cards[id] as NoteCard), text } } } } };
+  };
+
+  it('refuses when what would go changed, even where the preview’s lines don’t show it (a note’s second line)', () => {
+    const ws = sample();
+    const print = expected(ws, ['noteCall']);
+    expect(fails(deleteThings('home', ['noteCall'], none, print, 'z'), withNote(ws, 'noteCall', 'Call the bank\nabout the NEW card'))).toMatch(/changed since the preview/);
+    // A column whose card was swapped for another (still 1 card) is refused too.
+    const colPrint = expected(ws, ['colIdeas']);
+    const swapped = ok(addChecklist('home', 'Swap', [], { column: 'Ideas' }, 'kSwap', ['s']), ok(deleteThings('home', ['noteIdea'], none, expected(ws, ['noteIdea']), 'z'), ws).ws).ws;
+    expect(fails(deleteThings('home', ['colIdeas'], none, colPrint, 'z'), swapped)).toMatch(/changed since the preview/);
+  });
+
+  it('still deletes when only something else changed (the board renamed, another note edited)', () => {
+    const ws = sample();
+    const print = expected(ws, ['noteCall']);
+    const renamed = withNote({ ...ws, boards: { ...ws.boards, home: { ...ws.boards.home, name: 'Home (renamed)' } } }, 'noteIdea', 'Paint the gate');
+    const r = ok(deleteThings('home', ['noteCall'], none, print, 'z'), renamed);
+    expect(r.ws.boards.home.cards.noteCall).toBeUndefined();
+    expect(r.changed).toEqual(['Deleted the note "Call the bank" (id: noteCall) on Home (renamed)']);
+  });
 
   it('makes the planned delete, each line saying Deleted', () => {
     const ws = sample();

@@ -32,9 +32,12 @@ const sharedIds = (snap: Snapshot) => new Set(snap.shares.flatMap((s) => Object.
 interface Preview {
   boardId: string;
   ids: string[];
-  lines: string[];
-  seed: string;
+  /** Everything the delete would remove, in full: confirm_delete refuses if any of it changed. */
+  print: string;
+  at: number;
 }
+
+const PREVIEW_MS = 10 * 60 * 1000;
 
 const itemId = z.string().min(1).describe('An item’s id, as read_board shows it');
 const text = z.string().max(MAX_TEXT);
@@ -271,12 +274,10 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
         if ('error' in got) return { text: got.error, isError: true };
         const safe = safeToEdit(got.snap.own);
         if (!safe.ok) return { text: `Nothing can be deleted: ${safe.reason}.`, isError: true };
-        const seed = newId('d').slice(2);
-        let n = 0; // the same new ids confirm_delete makes (only a blank item refilling an emptied list gets one)
-        const plan = planDelete(readWorkspace(got.snap.own)!.ws, got.id, things, got.shared, (p) => `${p}_${seed}${n++ || ''}`);
+        const plan = planDelete(readWorkspace(got.snap.own)!.ws, got.id, things, got.shared, (p) => p);
         if ('error' in plan) return { text: plan.error, isError: true };
         const key = newId('p');
-        previews.set(key, { boardId: got.id, ids: things, lines: plan.lines, seed });
+        previews.set(key, { boardId: got.id, ids: things, print: plan.print, at: Date.now() });
         const list = plan.lines.map((l) => `- ${l}`).join('\n');
         return {
           text: `This would delete (nothing is deleted yet):\n${list}\n\nPreview id: ${key}. To delete exactly this, call confirm_delete with it (once), only after the person has said yes to this list. If the boards change before then, nothing is deleted and a new preview is needed.`,
@@ -289,7 +290,7 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
     {
       title: 'Confirm a delete',
       description:
-        'Step 2 of 2 for deleting: deletes exactly what preview_delete listed, by its preview id (each preview is used once), after the person has agreed to that list. A copy of the boards as they were is saved first (Version history in the app), so it can be put back. Nothing is deleted if the boards changed since the preview.',
+        'Step 2 of 2 for deleting: deletes exactly what preview_delete listed, by its preview id (each preview is used once, within 10 minutes), after the person has agreed to that list. A copy of the boards as they were is saved first (Version history in the app), so it can be put back. Nothing is deleted if the boards changed since the preview.',
       inputSchema: { preview: z.string().min(1).describe('The preview id preview_delete gave') },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
@@ -297,13 +298,18 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
       safely(async () => {
         const p = previews.get(preview);
         if (!p) return { text: `No preview with id "${preview}" (each preview is used once). Call preview_delete again.`, isError: true };
-        previews.delete(preview);
+        if (Date.now() - p.at > PREVIEW_MS) {
+          previews.delete(preview);
+          return { text: 'This preview is older than 10 minutes, so nothing was deleted. Call preview_delete again.', isError: true };
+        }
         if (!(await deleteAllowed())) return { text: DELETE_OFF, isError: true };
         const got = await ownBoard(p.boardId);
         if ('error' in got) return { text: got.error, isError: true };
-        const r = await write(deleteThings(got.id, p.ids, got.shared, p.lines, p.seed), { deleting: true });
-        if (r.isError || !r.text.startsWith('Saved:')) return r;
-        return { text: `${r.text}\n\nA copy of the boards as they were just before is in Version history (the History button in BusyAnts), so it can be put back.` };
+        previews.delete(preview); // used once, from here on: a refusal above leaves it for a retry
+        const seed = newId('d').slice(2);
+        const r = await write(deleteThings(got.id, p.ids, got.shared, p.print, seed), { deleting: true });
+        if (!r.text.startsWith('Saved:')) return r;
+        return { ...r, text: `${r.text}\n\nA copy of the boards as they were just before is in Version history (the History button in BusyAnts), so it can be put back.` };
       }),
   );
 

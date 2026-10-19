@@ -308,7 +308,7 @@ describe('saving a delete (job 110)', () => {
     const ws = readWorkspace(ownRaw())!.ws;
     const p = planDelete(ws, 'home', ['noteCall'], new Set(), (x) => x);
     if ('error' in p) throw new Error(p.error);
-    return deleteThings('home', ['noteCall'], new Set(), p.lines, 'z');
+    return deleteThings('home', ['noteCall'], new Set(), p.print, 'z');
   };
 
   it('always saves a backup version first, even right after another change (no 10 quiet minutes needed)', async () => {
@@ -339,6 +339,18 @@ describe('saving a delete (job 110)', () => {
     expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('Work (renamed in the app)');
     expect(String(fs.field(`boards/me/versionData/${backup}`, 'data'))).toContain('"noteCall"');
     expect(fs.own()).not.toContain('"noteCall"');
+  });
+
+  it('the boards unreadable a moment later: saved, and it says it couldn’t be checked (not "back on the board")', async () => {
+    const { fs, deps } = setup();
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn('{"not": "boards"}');
+    };
+    const r = await saveChange(deps, deleteNote(), { deleting: true });
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toMatch(/^Saved:\n- Deleted the note/);
+    expect(r.text).toMatch(/couldn’t be checked/);
+    expect(r.text).not.toMatch(/back on the board/);
   });
 
   it('if the backup can’t be saved, nothing is deleted', async () => {

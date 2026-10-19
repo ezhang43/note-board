@@ -35,6 +35,8 @@ interface Gis {
 
 let cached: Access | null = null;
 let pending: Promise<string> | null = null;
+/** Who the pending ask is for, so a person who signs in meanwhile is asked afresh. */
+let pendingFor: string | null = null;
 let script: Promise<Gis> | null = null;
 /** Google's script once loaded, so a click can ask for access straight away (browsers block windows opened after a wait). */
 let loaded: Gis | null = null;
@@ -105,12 +107,20 @@ function request(gis: Gis): Promise<string> {
 /** A token for the person's calendar: the one kept (in memory or this tab) while it has over a minute left, else a new one. */
 export function token(): Promise<string> {
   const user = getAuth().currentUser?.uid ?? null;
-  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(tab, user);
+  // Written as "not good" so a bad expiry (NaN) counts as run out.
+  if (!(cached && cached.user === user && cached.expiresAt > Date.now() + 60_000)) cached = readAccess(tab, user);
   if (cached) return Promise.resolve(cached.token);
   if (!CLIENT_ID) return Promise.reject(new Error('No OAuth client ID'));
   // simple: if the script hasn't loaded yet (a very quick first click), the window opens after the
   // wait and may be blocked; the panel then says so and Connect Google Calendar works.
-  pending ??= (loaded ? request(loaded) : loadGis().then(request)).finally(() => (pending = null));
+  if (pendingFor !== user) pending = null;
+  pendingFor = user;
+  if (!pending) {
+    const ask: Promise<string> = (loaded ? request(loaded) : loadGis().then(request)).finally(() => {
+      if (pending === ask) pending = null; // an older ask ending leaves a newer one in place
+    });
+    pending = ask;
+  }
   return pending;
 }
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_KEY } from '../model/calendar';
 
 // The published site's calendar access (src/calendar/google.ts), with Firebase sign-in pretended:
@@ -66,6 +66,58 @@ describe('calendar access on the published site', () => {
     auth.listener!({ uid: 'u2' });
     expect(data.has(ACCESS_KEY)).toBe(false);
     await expect(google.token()).rejects.toThrow();
+  });
+
+  describe('with Google asked (a pretend Google script)', () => {
+    type Config = { callback: (r: { access_token?: string; expires_in?: number | string }) => void };
+    let clients: Config[];
+    beforeEach(() => {
+      clients = [];
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'client');
+      const gis = { accounts: { oauth2: { initTokenClient: (c: Config) => (clients.push(c), { requestAccessToken() {} }), hasGrantedAllScopes: () => true } } };
+      vi.stubGlobal('window', { google: gis });
+      vi.stubGlobal('document', { createElement: () => ({}), head: { appendChild: (tag: { onload(): void }) => tag.onload() } });
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.stubGlobal('window', undefined);
+      vi.stubGlobal('document', undefined);
+    });
+    const asked = (n: number) => vi.waitFor(() => expect(clients).toHaveLength(n));
+
+    it('keeps the token Google gives for the person who asked', async () => {
+      const google = await load();
+      const t = google.token();
+      await asked(1);
+      clients[0].callback({ access_token: 'new', expires_in: 3599 });
+      await expect(t).resolves.toBe('new');
+      expect(JSON.parse(data.get(ACCESS_KEY)!)).toMatchObject({ token: 'new', user: 'u1' });
+      await expect(google.token()).resolves.toBe('new');
+      expect(clients).toHaveLength(1);
+    });
+
+    it('a token arriving after another person signed in is not kept, and the new person is asked afresh', async () => {
+      const google = await load();
+      const forA = google.token();
+      await asked(1);
+      auth.currentUser = { uid: 'u2', email: 'b@example.com' };
+      auth.listener!({ uid: 'u2' });
+      void google.token();
+      await asked(2);
+      clients[0].callback({ access_token: 'for-a', expires_in: 3599 });
+      await expect(forA).resolves.toBe('for-a');
+      expect(data.has(ACCESS_KEY)).toBe(false);
+    });
+
+    it('a bad expiry from Google is not taken as never running out', async () => {
+      const google = await load();
+      const t = google.token();
+      await asked(1);
+      clients[0].callback({ access_token: 'odd', expires_in: 'soon' });
+      await expect(t).resolves.toBe('odd');
+      void google.token();
+      await asked(2);
+    });
   });
 
   it('forget (Google refused the access) drops it', async () => {

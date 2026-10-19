@@ -1,5 +1,12 @@
 # Changelog
 
+## Claude can make boards, checklists and containers, and delete safely (2026-10-19)
+
+- The Claude connector can now add a checklist, add an empty container (column), and make a new board, either inside one of your boards (with a card that opens it) or on its own.
+- Claude can also delete items, cards, containers and boards inside a board, but only if you switch it on, on your computer: `npm run mcp:delete-on` (`npm run mcp:delete-off` switches it off again). It is off to begin with.
+- Deleting always takes two steps: Claude shows you exactly what would go, and deletes only after you say yes. A copy of your boards is saved in Version history just before, so it can be put back.
+- Claude never deletes your home board, a top-level board, the Completed card or anything on a shared board, and at most 20 things at a time.
+
 ## Google Calendar stays connected across a reload (2026-10-19)
 
 - Reloading the page within about an hour of connecting no longer flashes Google's window: the calendar opens straight away with your events.

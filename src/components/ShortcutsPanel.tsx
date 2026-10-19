@@ -30,6 +30,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       { action: 'selectAll', what: 'Select every card and container (in a checklist: see below)' },
       { action: 'copy', what: 'Copy the selection' },
       { action: 'paste', what: 'Paste the selection' },
+      ['Ctrl+V with a web address copied', 'Add it as a link card (a picture or video address shows it); you can also drag an address in from another tab'],
       { action: 'duplicate', what: 'Duplicate the selection' },
       { action: 'delete', what: 'Delete the selection (Backspace too)' },
       ['Arrows (Shift: 5 steps)', 'Move the selection'],

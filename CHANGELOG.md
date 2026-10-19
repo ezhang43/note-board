@@ -1,5 +1,12 @@
 # Changelog
 
+## Pictures, videos and web addresses (2026-10-19)
+
+- Paste a web address onto the board (Ctrl+V, not while typing in a text field) or drag one in from another browser tab, and it becomes a link card. A picture or link dragged from a web page works too.
+- If the address is a picture (.jpg, .png, .gif, .webp, .avif, .svg), the card shows the picture. A YouTube or Vimeo address shows the video player, and an .mp4 or .webm address shows a video with controls. Anything else stays an ordinary link card, and a picture or video that can't load falls back to the ordinary card.
+- Nothing is uploaded. The picture or video is loaded from its own website each time, and the privacy page now says so. A picture or file from your computer can't be added yet: the board says so and suggests pasting a web address.
+- A click on a video on a card that isn't selected selects the card first, so cards still drag and select as usual. Only http and https addresses are ever used. Nothing about saving, sync or undo changed. A link card already on a board (or shared with you, or imported) whose address is a picture or video now shows it too.
+
 ## Rich text in the Journal (2026-10-19)
 
 - Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).

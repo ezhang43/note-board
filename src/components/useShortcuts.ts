@@ -143,7 +143,7 @@ const BOARD_MOVE: Record<string, 'next' | 'previous' | 'up' | 'down'> = { ArrowR
 /** A short note that goes by itself (the notice banner, cleared after a moment unless something else replaced it). */
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastText: string | null = null;
-function toast(text: string) {
+export function toast(text: string) {
   // A note someone has to read and dismiss (a failed delete, a share that stopped) is never covered.
   if (collab.notice() && collab.notice() !== toastText) return;
   toastText = text;

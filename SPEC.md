@@ -10,7 +10,7 @@ The clickable prototype (`note-board-prototype-reference.html`) is the reference
 
 - **Who it's for:** one person organizing ideas, plans and tasks on a free-form canvas.
 - **Version 1 goal:** everything in this spec working reliably, saved in the browser and synced to the owner's account.
-- **Not in version 1:** image cards. Sharing and real-time collaboration are being built (see "Sharing and editing together").
+- **Not in version 1:** uploading pictures or videos. Pictures and videos from web addresses can be put on the board (see "Pictures, videos and web addresses"). Sharing and real-time collaboration are being built (see "Sharing and editing together").
 
 ## Build rules for Claude Code
 
@@ -143,7 +143,7 @@ The board holds three card types and containers that stack cards. Cards show no 
 | --- | --- | --- |
 | Note | Free text; grows taller as you type, never scrolls | White |
 | Checklist | Title plus checklist (next section) | White |
-| Link | Title, URL field, "Open <domain>" button in a new tab | White |
+| Link | Title, URL field, "Open <domain>" button in a new tab; a picture, video or player above the URL field when the address is one (see "Pictures, videos and web addresses") | White |
 | Container | Title (box sized to its text), card count, stacked cards | Neutral stone-gray until recolored |
 
 **Headers:** cards show a collapse arrow and a small trash can (the same icon and faint color as a checklist item's, red on hover) at the top right (no "2/5 done" count); hovering them shows what they do ("Collapse card", "Delete card (Ctrl+Z brings it back)"; containers the same). With a mouse, these header buttons (collapse arrow and trash can, on cards and containers) show only while the pointer is over that card or container, while it is selected, or while one of its fields or buttons has the keyboard focus (owner decision 2026-10-16); they stay in place while hidden, so nothing shifts. On a touch screen wider than a phone they always show; on a phone (under 600px) they show only on the selected card or container (see "Phone layout"). There is no title band (owner decision 2026-10-16): cards are white with a bold title, loose or in a container; a color picked in the Color menu tints the header lightly (see "Collapse, add, delete, color"). Containers show the title and count at the left, and the collapse arrow next to the trash can on the right. No move handles and no per-block palette icons.
@@ -186,6 +186,18 @@ The board holds three card types and containers that stack cards. Cards show no 
 - Highlighting any text in a box shows a small bar just above it with B, I, the three sizes and a Font menu (each font shown in its own style). Its buttons format the whole box; hovering the bar outlines what it will change. With checklist items selected, the bar shows above them and formats all of them.
 - While typing: Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+> larger, Ctrl+Shift+< smaller, on the box you are in (with or without highlighting). With checklist items selected, they format those items; with whole cards or containers selected, every text box in them. Bold and italic turn on for all unless all already have it, then off for all.
 - Formatting is saved with the board, syncs, is one Ctrl+Z step, and is kept by copy, duplicate and paste. Enter keeps it on both halves of a split item (and on the new item below); joining two items keeps the first one's formatting. Ticked items and items in the Completed panel keep it. Text copied to other apps is plain.
+
+### Pictures, videos and web addresses
+
+Owner request, 2026-10-19 (job 124): "add the functionality of users being able to add in images, videos, urls by dragging them in, or by copy pasting them in", with no new item type for it. The owner chose that **nothing is uploaded**: a picture or video is shown from its web address, and it is an ordinary link card.
+
+- **Paste a web address** (http or https, alone on the clipboard) anywhere on the board, not while typing in a text field and not while a panel covers the board or an old version is shown: a **link card** appears with that address, selected, in the selected container (as Add does), else loose at the free spot nearest the middle of the screen (like a new card). One undo step. The board's own copy and paste wins: if blocks were copied in the app, Ctrl+V pastes them. In a text field the paste stays plain text.
+- **Drag a web address, link or picture** from another browser tab or window onto the board (not onto a text field): a link card appears with its middle at the pointer (at the end of the container, when dropped on one), selected, one undo step. The address is read from the dragged address list, else the dragged text.
+- **A file from the computer** (a dropped or pasted image or screenshot) is not supported and nothing is stored: a short note says "Images from your computer can’t be added yet. Paste a web address instead."
+- **What a link card shows**, decided from its address each time the card is drawn (nothing extra is saved, so saving, sync, backups and every other part of the app are unchanged; it also means that a link card already on a board, shared with the person or imported, whose address is a picture or video shows it from now on): an address ending in .jpg, .jpeg, .png, .gif, .webp, .avif or .svg (a query string is ignored) shows the picture, fitted to the card's width, with the title as its alt text; a YouTube address (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/) shows a player from youtube-nocookie.com and a Vimeo address (vimeo.com/<number>) a player from player.vimeo.com, in a sandboxed frame that allows only what playback needs; an address ending in .mp4 or .webm shows a video with controls (only its first moments are loaded until it is played). Anything else is the ordinary link card. A picture or video that fails to load is not shown: the ordinary link card stays, never a broken-image icon. A player the provider refuses to show (an embed switched off, say) shows the provider's own message: a page in a frame can't be told apart from one that loaded. The title, address box and Open link stay on the card in every case.
+- **Only http(s) addresses**, ever: a javascript:, data:, file: or other address is never pasted, dropped or shown as a picture, video or player (an address already typed in a card's address box is checked the same way). A paste does nothing while the Journal or Habits panel is open, or while an old version is shown.
+- **Clicking a player:** until its card is selected, a click on a video or player selects (and can drag) the card; once the card is selected, the video or player works as usual.
+- The website loading the picture or video can see that it was viewed (said in the privacy page). Copies of a board, backups and exports hold only the address.
 
 ## Checklists
 
@@ -245,6 +257,7 @@ Every block action works on one block or on a whole selection, and every change 
 | Select tool drag | Rectangle selection; hold Ctrl to add to the current selection |
 | Ctrl + A | Select every container and loose card (with checklist items selected, selects more items instead; see "Selecting several items") |
 | Ctrl + C, then Ctrl + V | Copy and paste the selection (a container copies with its cards, titled "… copy"); pastes offset by 40px each time |
+| Ctrl + V with a web address copied (not typing in a text field) | Makes a link card (see "Pictures, videos and web addresses"); the board's own copied blocks win when there are some |
 | Ctrl + D | Duplicate the selection |
 | Delete / Backspace | Delete the selection; if it includes a container, the same confirmation as the container's trash can appears first, then containers go with their cards |
 | Delete / Backspace with a calendar event's card open | Delete that event after the same question as its trash, never the board's selection (see "Google Calendar") |
@@ -354,7 +367,7 @@ Build in this order, each step tested and working before the next.
 
 After step 5 (owner additions): dragging new blocks from the toolbar, keyboard navigation between cards, smoother snapping, dragged block takes priority, importing from Milanote, white cards with 16 container colors and Auto-color, Clean up with the Completed card (now the Completed panel), Delete joining checklist items, Tab on several items, collapse returning pushed blocks, and the published site with sign-in, sync, offline use and installing as an app.
 
-**Not in version 1:** image cards. (Several boards and boards inside boards were added on 5 Oct 2026, and sharing and real-time collaboration are being built from 5 Oct 2026. Arrows between blocks were added later and removed again on 16 Oct 2026.)
+**Not in version 1:** uploading pictures or videos, and an image or video block of its own (a picture or video is a link card showing media from its web address, see "Pictures, videos and web addresses"). (Several boards and boards inside boards were added on 5 Oct 2026, and sharing and real-time collaboration are being built from 5 Oct 2026. Arrows between blocks were added later and removed again on 16 Oct 2026.)
 
 **Decisions (1 Oct 2026)**
 

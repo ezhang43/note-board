@@ -30,6 +30,7 @@ const closeCompleted = () => appStore.toggleSidePanel('completed');
 const closeJournal = () => appStore.toggleSidePanel('journal');
 const closeHabits = () => appStore.toggleSidePanel('habits');
 import { useShortcuts } from './components/useShortcuts';
+import { useDropPaste } from './components/useDropPaste';
 
 /**
  * `onSignOut` and `saveNote` ("Saving…" / "Saved" / offline) are given on the published site, where
@@ -37,6 +38,7 @@ import { useShortcuts } from './components/useShortcuts';
  */
 export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?: string | null }) {
   useShortcuts();
+  useDropPaste();
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
   const sidePanel = useAppState((s) => s.ui.sidePanel);

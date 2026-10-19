@@ -803,6 +803,11 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   background: var(--link-url-bg);
   font-size: calc(13px * var(--fs, 1));
 }
+/* Pictures, videos and players on a link card (job 124): they fit the card's width. */
+.link-media { position: relative; border-radius: 6px; overflow: hidden; background: var(--link-url-bg); line-height: 0; }
+.link-media :is(img, video) { display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain; }
+.link-media iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
+.media-cover { position: absolute; inset: 0; }
 .link-open {
   height: 32px;
   display: flex;

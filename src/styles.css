@@ -2105,6 +2105,41 @@ a.cal-open { align-self: flex-start; }
 .cal-guests li { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px; }
 .cal-guest { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cal-when input[type='email'] { flex: 1; min-width: 0; }
+/* An event's card (job #108): beside the event, over the board, with the list still in view; on a phone, a sheet from the bottom. */
+.cal-card {
+  position: fixed;
+  /* Above the panel's own lists only: it is inside the panel's layer, so the resize strip and the find
+     bar are drawn over it where they meet; eventCard.ts keeps it clear of the strip. */
+  z-index: 7;
+  width: 300px;
+  /* Narrow enough to fit inside the panel, beside its strip, when there is no room left of it. */
+  max-width: min(calc(100vw - 16px), calc(var(--side-width) - 16px));
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+}
+.cal-card:focus { outline: none; }
+.cal-card-tools { display: flex; justify-content: flex-end; gap: 2px; margin-right: -6px; color: var(--ink-soft); }
+.app.phone .cal-card {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: 70vh;
+  max-height: 70dvh;
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
 
 /* The calendar panel's drag strip (owner request, 2026-10-16): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
@@ -2181,7 +2216,8 @@ a.cal-open { align-self: flex-start; }
  */
 .file-menu, .boards-menu, .colour-menu, .fb-font-menu { transform-origin: top left; }
 .share-panel { transform-origin: top right; }
-.phone-sheet { transform-origin: bottom center; }
+.phone-sheet, .app.phone .cal-card { transform-origin: bottom center; }
+.cal-card { transform-origin: top right; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
 :is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day) {
@@ -2196,11 +2232,11 @@ a.cal-open { align-self: flex-start; }
   html[data-input='keys'] .collapse-arrow { transition: none; }
 
   /* Menus, panels and the phone sheet. */
-  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .phone-sheet, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {
     transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
   @starting-style {
-    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .phone-sheet, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
+    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
     /* The Color menu only fades: the board is moved aside by where its box is the moment it opens. */
     html:not([data-input='keys']) :is(.colour-menu, .shortcuts-backdrop) { opacity: 0; }
     html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }
@@ -2246,7 +2282,7 @@ a.cal-open { align-self: flex-start; }
   .tour-actions button { height: 44px; }
 
   /* Version history and the side panels. */
-  .history-head .icon-button { width: 44px; height: 44px; }
+  .history-head .icon-button, .cal-card-tools .icon-button { width: 44px; height: 44px; }
   .pomodoro-actions .tb-button { height: 44px; }
 
   /* Search: the box takes what the buttons leave; the count takes no room until there is one. */

@@ -14,7 +14,8 @@ export function SidePanel({ title, onClose, children }: { title: string; onClose
     const key = (e: KeyboardEvent) => {
       const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
       // A "Delete …?" question inside the panel (Google Calendar) answers its own Escape.
-      const asking = e.target instanceof Element && e.target.closest('[role="alertdialog"]');
+      // So does an event's card (job #108), wherever the keyboard is.
+      const asking = (e.target instanceof Element && e.target.closest('[role="alertdialog"]')) || document.querySelector('.cal-card');
       if (e.key === 'Escape' && !isTextField(e.target) && !panelCovers() && !shortcutsOpen && !confirm && !deleteCompleted && !asking) onClose();
     };
     // Capture: seen before the page's own shortcuts close the list that Escape was for.

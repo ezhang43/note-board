@@ -176,6 +176,15 @@ export function TrashIcon() {
   );
 }
 
+/** A pencil: change this (a calendar event's card). */
+export function PencilIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
+      <path d="M10.5 2.5l3 3L5.5 13.5 2 14l.5-3.5 8-8zM9 4l3 3" />
+    </svg>
+  );
+}
+
 export function GripIcon() {
   return (
     <svg width="8" height="12" viewBox="0 0 12 18" style={{ fill: 'var(--placeholder)' }} aria-hidden="true">

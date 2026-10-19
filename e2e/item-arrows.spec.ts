@@ -98,8 +98,19 @@ const size = async (l: Locator) => {
 };
 const iconSize = (l: Locator) => l.locator('svg').evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }));
 
+/** At the biggest text sizes a list is taller than the window: scroll the board until the row sits clear of the toolbar and the bottom bar. */
+async function panIntoView(row: Locator) {
+  for (let i = 0; i < 40; i++) {
+    const b = await box(row);
+    if (b.y >= 90 && b.y + b.height <= 780) return;
+    await row.page().mouse.wheel(0, b.y < 90 ? -150 : 150);
+    await row.page().waitForTimeout(50);
+  }
+}
+
 /** Hover a row and check its four controls: sizes, one aligned line at the row's right end, clear of the text and of each other. */
 async function checkControls(row: Locator) {
+  await panIntoView(row);
   const field = row.getByLabel('Item text');
   const fieldBefore = (await box(field)).width;
   await row.hover();
@@ -142,6 +153,7 @@ async function atEveryTextSize(page: Page, check: () => Promise<void>) {
 }
 
 test('on a computer the hover controls are bigger, in one aligned line clear of the text, at every text size', async ({ page }) => {
+  test.slow(); // six text sizes, each checked on every row
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap', 'sub item', 'Second']);
   await row(list, 1).getByLabel('Item text').click();
   await page.keyboard.press('Tab'); // 'sub item' nested under the first
@@ -152,6 +164,7 @@ test('on a computer the hover controls are bigger, in one aligned line clear of 
 });
 
 test('inside a container the hover controls have the same sizes and stay clear of the text', async ({ page }) => {
+  test.slow(); // six text sizes, each checked on every row
   await checklist(page, ['Call the plumber about the leaking kitchen tap', 'Second']);
   await clickEmpty(page);
   await add(page, 'New container');

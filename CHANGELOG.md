@@ -1,5 +1,10 @@
 # Changelog
 
+## Text size can go even bigger (2026-10-19)
+
+- A+ by the zoom control now has two more steps after Larger: Huge (150%) and Largest (175%). A+ fades at Largest; A− steps back down. The same buttons in the phone's ⋯ panel work the same way.
+- Your saved text size still loads as before. The sizes you set on a single note or title (Ctrl+Shift+>) are unchanged.
+
 ## Bigger item buttons on a computer (2026-10-19)
 
 - On a computer, the Move up, Move down, trash and drag buttons that show when you point at a checklist item are bigger: arrows 16px to 22px wide, trash 24px to 28px, grip 14px to 18px, with their icons scaled to match.

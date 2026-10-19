@@ -213,14 +213,14 @@ describe('Journal panel', () => {
     const home = s.getState().boards.home;
     s.openJournal();
     const id = s.getState().ui.journalBoard!;
-    expect(s.hiddenJournal()).toBe(id);
+    expect(s.hiddenBoards()).toEqual([id]);
     s.setShares([], false);
-    expect(s.hiddenJournal()).toBeNull();
+    expect(s.hiddenBoards()).toEqual([]);
     s.setShares([], true);
     s.openBoard(id);
-    expect(s.hiddenJournal()).toBeNull();
+    expect(s.hiddenBoards()).toEqual([]);
     s.openBoard(home);
-    expect(s.hiddenJournal()).toBe(id);
+    expect(s.hiddenBoards()).toEqual([id]);
   });
 
   it('restoring a version brings back the hidden Journal board’s writing too, and undo in the panel takes it back (check of PR #94)', () => {

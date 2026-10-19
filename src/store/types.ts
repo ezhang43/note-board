@@ -109,7 +109,7 @@ export interface ItemDrag {
 }
 
 /** What the side panel beside the board can show. */
-export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed' | 'journal';
+export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed' | 'journal' | 'habits';
 
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {

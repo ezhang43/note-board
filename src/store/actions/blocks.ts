@@ -119,9 +119,15 @@ export function blockActions(ctx: StoreContext) {
     zoomAtCentre: (factor: number) => updateView((v) => zoomBy(v, centreOf(ctx.viewportSize()), factor)),
     resetZoom: () => updateView((v) => resetZoom(v, ctx.viewportSize())),
     // ---------- search (owner request) ----------
-    openFind: () => updateUi({ find: { query: ctx.state.ui.find?.query ?? '', current: null }, colourMenuOpen: false }),
+    // A bar that opens afresh always starts on This board (owner request, 2026-10-19).
+    openFind: () => {
+      const find = ctx.state.ui.find;
+      updateUi({ find: { query: find?.query ?? '', current: null, all: find?.all ?? false, from: find?.from ?? ctx.state.boards.open }, colourMenuOpen: false });
+    },
     closeFind: () => updateUi({ find: null }),
-    setFindQuery: (query: string) => updateUi({ find: { query, current: null } }),
+    setFindQuery: (query: string) => updateUi({ find: { all: false, ...ctx.state.ui.find, query, current: null, from: ctx.state.boards.open } }),
+    /** This board / All boards: the matches start again from the open board. */
+    setFindAll: (all: boolean) => updateUi({ find: { query: '', ...ctx.state.ui.find, all, current: null, from: ctx.state.boards.open } }),
     /** The match to show and mark as the current one. */
     showMatch: (current: Match | null) => {
       const find = ctx.state.ui.find;

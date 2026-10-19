@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { findMatches, type Match } from '../model/search';
+import { shownName } from '../model/board';
+import { findMatches, findMatchesAcross, type BoardMatch, type Match } from '../model/search';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
 import { ArrowIcon, CloseIcon } from './icons';
@@ -36,9 +37,18 @@ function reveal(m: Match, inPanel: boolean, panelOpen: boolean) {
 export function FindBar() {
   const find = useAppState((s) => s.ui.find);
   const board = useAppState((s) => s.board);
+  const boards = useAppState((s) => s.boards);
+  const openId = boards.open;
+  const all = find?.all ?? false;
+  const from = find?.from ?? openId;
   const panelOpen = useAppState((s) => s.ui.sidePanel === 'completed');
   const query = find?.query ?? '';
-  const matches = useMemo(() => (query.trim() ? findMatches(board, query) : []), [board, query]);
+  // simple: every board is searched again at each change to the open board; fine for the boards this app holds, upgrade if typing lags with All boards on.
+  const matches: BoardMatch[] = useMemo(() => {
+    if (!query.trim()) return [];
+    if (all) return findMatchesAcross(appStore.workspace(), from, query);
+    return findMatches(board, query).map((m) => ({ ...m, boardId: openId }));
+  }, [board, boards, query, all, from, openId]);
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const open = find !== null;
@@ -64,26 +74,43 @@ export function FindBar() {
   }, [open]);
 
   // A new search starts at the first match.
-  useEffect(() => setIndex(0), [query]);
+  useEffect(() => setIndex(0), [query, all]);
   const at = matches.length ? Math.min(index, matches.length - 1) : -1;
   const current = at >= 0 ? matches[at] : null;
-  const currentId = current && `${current.key}:${current.start}:${current.showInstead}`;
-  const inPanel = !!current?.showInstead && board.cards[current.showInstead]?.kind === 'completed';
+  const currentId = current && `${current.boardId}:${current.key}:${current.start}:${current.showInstead}`;
+  // A match on another board is only marked once that board is open (Enter goes there).
+  const here = current?.boardId === openId;
+  const inPanel = here && !!current.showInstead && board.cards[current.showInstead]?.kind === 'completed';
 
   useEffect(() => {
     if (!open) return;
-    appStore.showMatch(current);
-  }, [open, currentId]); // the match is identified by currentId
+    appStore.showMatch(here ? current : null);
+  }, [open, currentId, openId]); // the match is identified by currentId
 
-  // Once the current match is marked on screen, bring it into view.
+  // Once the current match is marked on screen, bring it into view. After a different board has
+  // opened, wait until the board has been centred on arrival (Canvas does that two frames in).
+  const arrived = useRef(openId);
   useLayoutEffect(() => {
-    if (!open || !current) return;
-    const frame = requestAnimationFrame(() => reveal(current, inPanel, panelOpen));
+    const switched = arrived.current !== openId;
+    arrived.current = openId;
+    if (!open || !current || !here) return;
+    let frame = 0;
+    const wait = (left: number) => {
+      frame = requestAnimationFrame(() => (left > 1 ? wait(left - 1) : reveal(current, inPanel, panelOpen)));
+    };
+    wait(switched ? 3 : 1);
     return () => cancelAnimationFrame(frame);
-  }, [open, currentId, at, panelOpen]);
+  }, [open, currentId, at, panelOpen, openId]);
 
   if (!open) return null;
-  const step = (by: 1 | -1) => matches.length && setIndex((at + by + matches.length) % matches.length);
+  // Enter goes to the current match first when it is on another board (it has not been opened yet).
+  const go = (n: number) => {
+    setIndex(n);
+    if (matches[n].boardId !== openId) appStore.openBoard(matches[n].boardId);
+  };
+  const step = (by: 1 | -1) => matches.length && go(here ? (at + by + matches.length) % matches.length : at);
+  const where = current && !here ? ` · ${shownName(appStore.boardName(current.boardId))}` : '';
+  const count = !query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${where || (inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? ' · in a closed card' : '')}` : 'No matches';
   return (
     <div className="find-bar" role="search" aria-label="Search the board">
       <input
@@ -107,8 +134,8 @@ export function FindBar() {
           e.stopPropagation(); // the board's own keys stay out of the search box
         }}
       />
-      <span className="find-count" role="status">
-        {!query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? ' · in a closed card' : ''}` : 'No matches'}
+      <span className="find-count" role="status" title={count}>
+        {count}
       </span>
       <button type="button" className="icon-button" aria-label="Previous match" title="Previous (Shift+Enter)" disabled={!matches.length} onClick={() => step(-1)}>
         <ArrowIcon />
@@ -119,6 +146,20 @@ export function FindBar() {
       <button type="button" className="icon-button" aria-label="Close search" title="Close (Esc)" onClick={appStore.closeFind}>
         <CloseIcon />
       </button>
+      <div className="find-scope" role="group" aria-label="Where to search" onKeyDown={(e) => e.key === 'Escape' && appStore.closeFind()}>
+        {([false, true] as const).map((wide) => (
+          <button
+            key={String(wide)}
+            type="button"
+            aria-pressed={all === wide}
+            className={all === wide ? 'find-scope-option on' : 'find-scope-option'}
+            onMouseDown={(e) => e.preventDefault()} // the search box keeps the cursor, so Enter still steps
+            onClick={() => appStore.setFindAll(wide)}
+          >
+            {wide ? 'All boards' : 'This board'}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

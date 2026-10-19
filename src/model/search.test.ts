@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard } from './board';
-import { createCard, createColumn } from './cards';
-import { findMatches, rangesIn } from './search';
-import type { LinkCard, NoteCard, TodoCard } from './types';
+import { createBoardCard, createCard, createColumn } from './cards';
+import { findMatches, findMatchesAcross, rangesIn } from './search';
+import type { Board, LinkCard, NoteCard, TodoCard } from './types';
+import type { Workspace } from './workspace';
 
 // Search (owner request): find text anywhere on the board, and go to each match.
 
@@ -63,5 +64,66 @@ describe('finding text on the board', () => {
     expect(findMatches(b, 'shop')[0].showInstead).toBe(null);
     b = { ...b, cards: { ...b.cards, n1: { ...b.cards.n1, collapsed: true } } };
     expect(findMatches(b, 'cake')[0].showInstead).toBe('n1');
+  });
+});
+
+// Search across all boards (owner request, 2026-10-19, job 102).
+
+describe('finding text on all boards', () => {
+  const noteOn = (name: string, text: string, id: string) =>
+    addCard({ ...createBoard(), name }, { ...(createCard('note', id) as NoteCard), text }, { type: 'loose', x: 0, y: 0 });
+  const link = (b: Board, cardId: string, to: string) => addCard(b, createBoardCard(to, cardId), { type: 'loose', x: 400, y: 0 });
+
+  /** Home opens Trips (which opens Paris); Recipes and Journal stand alone. */
+  function workspace(): Workspace {
+    return {
+      home: 'h',
+      boards: {
+        h: link(noteOn('Home', 'eggs at home', 'n-h'), 'k1', 'trips'),
+        trips: link(noteOn('Trips', 'pack eggs', 'n-t'), 'k2', 'paris'),
+        paris: noteOn('Paris', 'no match here', 'n-p'),
+        recipes: noteOn('Recipes', 'Eggs and EGGS', 'n-r'),
+        journal: noteOn('Journal', 'eggs for breakfast', 'n-j'),
+      },
+    };
+  }
+  const where = (ws: Workspace, from: string, q: string) => findMatchesAcross(ws, from, q).map((m) => `${m.boardId}/${m.key}:${m.start}`);
+  const boardsOf = (ws: Workspace, from: string, q: string) => findMatchesAcross(ws, from, q).map((m) => m.boardId);
+
+  it('finds matches on every board, with the board each is on, counting every place in a box', () => {
+    expect(where(workspace(), 'h', 'eggs')).toEqual(['h/note:n-h:0', 'trips/note:n-t:5', 'recipes/note:n-r:0', 'recipes/note:n-r:9', 'journal/note:n-j:0']);
+  });
+
+  it('puts the starting board first, then the others in the Boards menu order (sub-boards under their board)', () => {
+    expect(boardsOf(workspace(), 'recipes', 'eggs')).toEqual(['recipes', 'recipes', 'h', 'trips', 'journal']);
+    expect(boardsOf(workspace(), 'trips', 'eggs')).toEqual(['trips', 'h', 'recipes', 'recipes', 'journal']);
+    expect(boardsOf(workspace(), 'journal', 'eggs')).toEqual(['journal', 'h', 'trips', 'recipes', 'recipes']);
+  });
+
+  it('uses the same match rules as one board (case, spaces around the words)', () => {
+    const ws = workspace();
+    for (const id of Object.keys(ws.boards)) {
+      const own = findMatches(ws.boards[id], ' EGGS ');
+      const across = findMatchesAcross(ws, id, ' EGGS ').filter((m) => m.boardId === id);
+      expect(across.map((m) => ({ key: m.key, start: m.start, end: m.end, showInstead: m.showInstead }))).toEqual(own);
+    }
+  });
+
+  it('finds nothing for an empty or blank search, or text that is nowhere', () => {
+    expect(findMatchesAcross(workspace(), 'h', '')).toEqual([]);
+    expect(findMatchesAcross(workspace(), 'h', '   ')).toEqual([]);
+    expect(findMatchesAcross(workspace(), 'h', 'zebra')).toEqual([]);
+  });
+
+  it('an unknown starting board is ignored: the menu order is used', () => {
+    expect(where(workspace(), 'gone', 'match here')).toEqual(['paris/note:n-p:3']);
+    expect(boardsOf(workspace(), 'gone', 'eggs')).toEqual(['h', 'trips', 'recipes', 'recipes', 'journal']);
+  });
+
+  it('only reads: the boards come back unchanged', () => {
+    const ws = workspace();
+    const before = JSON.stringify(ws);
+    findMatchesAcross(ws, 'recipes', 'eggs');
+    expect(JSON.stringify(ws)).toBe(before);
   });
 });

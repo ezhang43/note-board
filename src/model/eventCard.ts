@@ -21,7 +21,8 @@ const GAP = 8;
 /**
  * Where the card sits: just left of the panel (clear of its resize strip), its top level with the
  * event, kept on screen and never above the panel's top so it doesn't cover the toolbar. With no
- * room left of the panel it sits inside the panel, 8px from the window's right edge.
+ * room left of the panel it sits inside the panel, 8px from the window's right edge, and never over
+ * the resize strip on the panel's edge (the card's CSS keeps it narrow enough to fit).
  */
 export function cardPosition(
   event: { top: number },
@@ -31,7 +32,7 @@ export function cardPosition(
 ): { left: number; top: number } {
   const beside = panel.left - GAP - card.width;
   return {
-    left: Math.max(GAP, beside >= GAP ? beside : screen.width - GAP - card.width),
+    left: beside >= GAP ? beside : Math.max(panel.left + GAP, screen.width - GAP - card.width),
     top: Math.max(panel.top, Math.min(event.top, screen.height - card.height - GAP)),
   };
 }

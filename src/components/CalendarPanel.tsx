@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   canChangeSeries,
   cellLines,
@@ -291,6 +291,8 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
   const s = useCalendar();
   const panelWidth = s.widths[s.view];
+  // simple: level with where the event was when it opened; it doesn't follow the list if the panel scrolls.
+  const at = useMemo(() => opener.getBoundingClientRect().top, [opener]);
   const draft = draftFor(event);
   // Gone (another event's card opened, or the panel closed) before Google answered: nothing to close or focus.
   const alive = useRef(true);
@@ -318,7 +320,6 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
 
   // preventScroll: the first focus can come before the card has its place.
   useEffect(() => ref.current?.focus({ preventScroll: true }), []);
-  // simple: placed where the event was when it opened; it doesn't follow the list if the panel scrolls.
   // Measured again when the question or a note makes it taller, so it stays on screen, and when the
   // panel or the window is resized, so it keeps to the panel's edge.
   useLayoutEffect(() => {
@@ -327,12 +328,12 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
       const panel = opener.closest('.side-panel');
       if (phone || !card || !panel || !opener.isConnected) return;
       const size = { width: card.offsetWidth, height: card.offsetHeight };
-      setPlace(cardPosition(opener.getBoundingClientRect(), panel.getBoundingClientRect(), size, { width: window.innerWidth, height: window.innerHeight }));
+      setPlace(cardPosition({ top: at }, panel.getBoundingClientRect(), size, { width: window.innerWidth, height: window.innerHeight }));
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [phone, opener, ask, note, panelWidth]);
+  }, [phone, opener, at, ask, note, panelWidth]);
 
   // Escape and Delete belong to the card while it is open, wherever the keyboard is (capture: before
   // the board's own shortcuts, so a block selected on the board is never deleted behind it; and

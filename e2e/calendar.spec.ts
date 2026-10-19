@@ -32,7 +32,7 @@ const panel = (page: Page) => page.getByRole('complementary', { name: 'Google Ca
 const day = (page: Page, d: Date) => panel(page).getByRole('region', { name: label(d) });
 const form = (page: Page) => panel(page).getByRole('form');
 /** The small card an event opens (job #108). */
-const card = (page: Page) => page.locator('.cal-card');
+const card = (page: Page) => panel(page).getByRole('dialog');
 /** Clicks an event, then the card's pencil: the change form, as a click alone opened before job #108. */
 async function edit(page: Page, event: Locator) {
   await event.click();
@@ -163,7 +163,7 @@ test('delete asks first (Keep / Delete); Escape keeps the panel open; Ctrl+Z doe
 });
 
 // Repeating events and guests (owner request, 2026-10-16, job #85).
-const asked = (page: Page, name: string) => page.getByRole('alertdialog', { name });
+const asked = (page: Page, name: string) => panel(page).getByRole('alertdialog', { name });
 const WHICH = 'Save changes to which events?';
 const EMAILS = 'Send update emails to guests?';
 /** The changes sent to the calendar (adds, changes, deletes) as "METHOD url", in order. */
@@ -563,14 +563,26 @@ test('with no room beside a wide panel the card sits inside the panel, fully see
   expect(box.x).toBeGreaterThan(304);
   const onTop = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.cal-card') != null, [box.x + 4, box.y + 20]);
   expect(onTop).toBe(true);
+  // A 610px window leaves the panel 310px wide (left edge 300, strip 296–304): the card narrows to fit beside the strip.
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 610, height: 800 });
+  await expect.poll(async () => (await panel(page).boundingBox())!.x).toBe(300);
+  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await expect(card(page)).toBeInViewport({ ratio: 1 });
+  expect((await card(page).boundingBox())!.x).toBeGreaterThanOrEqual(308);
   expect(errors).toEqual([]);
 });
 
 test('the card moves with the panel’s edge when the panel or the window is resized', async ({ page }) => {
   const errors = await openAs(page);
+  await page.setViewportSize({ width: 1280, height: 420 });
   await button(page).click();
   await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
   await expect(card(page)).toBeVisible();
+  // It keeps the height it opened at, also when the list has scrolled since.
+  const top = (await card(page).boundingBox())!.y;
+  await panel(page).evaluate((el) => el.scrollBy(0, 80));
+  expect(await panel(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   const gap = async () => {
     const [p, c] = [(await panel(page).boundingBox())!, (await card(page).boundingBox())!];
     return Math.round(p.x - 8 - (c.x + c.width));
@@ -581,9 +593,10 @@ test('the card moves with the panel’s edge when the panel or the window is res
   await expect.poll(async () => (await panel(page).boundingBox())!.x).toBeLessThan(before - 100);
   await expect(card(page)).toBeVisible();
   await expect.poll(gap).toBe(0);
-  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.setViewportSize({ width: 1100, height: 420 });
   await expect(card(page)).toBeVisible();
   await expect.poll(gap).toBe(0);
+  expect((await card(page).boundingBox())!.y).toBe(top);
   expect(errors).toEqual([]);
 });
 

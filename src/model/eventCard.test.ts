@@ -57,8 +57,9 @@ describe('where the card sits beside the panel', () => {
   it('just enough room beside the panel still sits beside it', () => {
     expect(cardPosition({ top: 300 }, { left: 316, top: 56 }, card, screen)).toEqual({ left: 8, top: 300 });
   });
-  it('a window too narrow for the card keeps it 8px from the left', () => {
-    expect(cardPosition({ top: 300 }, { left: 200, top: 56 }, card, { width: 250, height: 900 })).toEqual({ left: 8, top: 300 });
+  it('inside the panel it never starts left of the panel’s edge plus 8px, so the resize strip never covers it', () => {
+    // A 610px window with the panel at its 300px minimum: 8px from the right would put it at 302, under the strip (306–314).
+    expect(cardPosition({ top: 300 }, { left: 310, top: 56 }, card, { width: 610, height: 900 })).toEqual({ left: 318, top: 300 });
   });
   it('a card taller than the screen starts at the panel’s top', () => {
     expect(cardPosition({ top: 300 }, panel, { width: 300, height: 1000 }, screen)).toEqual({ left: 692, top: 56 });

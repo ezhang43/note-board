@@ -7,6 +7,22 @@
 - Claude Code is also kept from reading the connector's sign-in folder on a Mac or Linux computer, as it already was on Windows.
 - The app, your boards and their saving are not touched.
 
+## The Claude connector in one file, with sign-in from Claude (2026-10-19)
+
+- The BusyAnts connector for Claude can now be made into one file, `busyants.mcpb` (`npm run mcp:pack`). Anyone with Claude Desktop on a Mac or Windows computer opens that file to install it: no Node, no project folder, no settings to edit.
+- Claude can sign you in: ask it to "sign in to BusyAnts" and a sign-in page opens in your web browser, where you pick your own Google account. "Sign out of BusyAnts" deletes the saved sign-in. Neither changes anything on your boards.
+- The connector's instructions (`mcp/README.md`) are now written for anyone, with Mac and Windows steps.
+- Your boards, how they save and the website are not changed. An existing sign-in keeps working, and deleting stays off unless you switch it on as before.
+
+## Rich text in the Journal (2026-10-19)
+
+- Journal notes can now be formatted. A Formatting bar at the top of the Journal panel has Bold, Italic, Underline, Strikethrough, Bulleted list and Numbered list, and menus for Style (Normal, Heading 1, Heading 2), Text size, Font and Highlight (yellow, green, blue or pink).
+- Select some words and press a button, or press it first and then type. Keys: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Shift+X (strikethrough), Ctrl+Shift+8 (bullets), Ctrl+Shift+7 (numbers).
+- In a list, Enter adds the next item, Enter on an empty item ends the list, and Tab / Shift+Tab indent and outdent.
+- Only the Journal has this. Everywhere else (other notes, search, export, copying, the note's card on the Journal board) the words show as plain text, with lists as "•" and "1.".
+- The formatting is saved, synced, kept in backups, exports and Version history, and each change is one Ctrl+Z step. Journal notes you already have open exactly as before. Formatting that is loaded or imported is checked, and it can never run as code.
+- When two edits of the same note are combined, its formatting always comes with the words that are kept. (On your own devices the latest save wins, words and formatting together, as with every board.)
+
 ## Calendar events open in a small card (2026-10-19)
 
 - Clicking an event in the calendar panel now opens a small card next to it, like Google Calendar's, instead of replacing the whole panel. The list stays in view. On a phone the card slides up from the bottom.

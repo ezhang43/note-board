@@ -1,4 +1,4 @@
-import type { Board, Card, Column, TodoCard, TodoItem } from './types';
+import type { Board, Card, Column, NoteCard, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits to a board (real-time collaboration, owner request 2026-10-05).
 // `base` is the board both started from, `mine` this page's board, `theirs` the one someone else
@@ -177,12 +177,32 @@ function orderAll(chosen: Map<string, string>, b: Lists, m: Lists, t: Lists): Ma
 /** Positions change when blocks re-arrange themselves, which isn't an edit worth keeping a deleted block for. */
 const edited = <E extends object>(was: E, now: E) => !deepEqual({ ...was, x: 0, y: 0 }, { ...now, x: 0, y: 0 });
 
+/**
+ * A note's formatting (`rich`, from the Journal) is only used while it matches the note's text, so
+ * text and formatting picked from different sides would show plain, and the next keystroke would
+ * save it plain for good (job 119). When the two sides' words differ, the formatting comes with the
+ * words that are kept: that side's formatting, or none if that side has none.
+ */
+function richWithText(n: NoteCard, m: NoteCard, t: NoteCard): NoteCard {
+  if (m.text === t.text) return n;
+  // simple: a formatting change made on words the other side changed at the same time is dropped
+  // (keeping it needs a three-way merge of the formatting); the words are always kept. Upgrade if
+  // the Journal panel ever edits shared boards, or own boards ever sync through this merge.
+  const { rich: _picked, ...rest } = n;
+  const rich = (n.text === m.text ? m : t).rich;
+  return rich ? { ...rest, rich } : rest;
+}
+
 function mergeCards(b: Board, m: Board, t: Board): Record<string, Card> {
   return mergeEntities<Card>(
     b.cards,
     m.cards,
     t.cards,
-    (bc, mc, tc) => (mc.kind !== tc.kind || (bc && bc.kind !== mc.kind) ? (pick(bc, mc, tc) as Card) : mergeFields(bc, mc, tc, ['items'])),
+    (bc, mc, tc) => {
+      if (mc.kind !== tc.kind || (bc && bc.kind !== mc.kind)) return pick(bc, mc, tc) as Card;
+      const out = mergeFields(bc, mc, tc, ['items']);
+      return out.kind === 'note' ? richWithText(out, mc as NoteCard, tc as NoteCard) : out;
+    },
     edited,
   );
 }

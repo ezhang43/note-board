@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { journalDateLine } from '../model/journal';
+import { fromPlain, type Rich } from '../model/richText';
+import type { NoteCard } from '../model/types';
 import type { StorageLike } from '../model/persist';
 import { createStore } from './store';
 
@@ -61,7 +63,7 @@ describe('Journal panel', () => {
     s.openJournal();
     const [note] = journalNotes(s);
     const edits = s.edits();
-    s.setJournalText(note.id, 'Went for a walk');
+    s.setJournal(note.id, fromPlain('Went for a walk'));
     expect(journalNotes(s)[0].text).toBe(`${today}\n\nWent for a walk`);
     expect(s.edits()).toBeGreaterThan(edits);
   });
@@ -71,7 +73,7 @@ describe('Journal panel', () => {
     const s = createStore(storage, later);
     s.openJournal();
     const [note] = journalNotes(s);
-    s.setJournalText(note.id, 'kept');
+    s.setJournal(note.id, fromPlain('kept'));
     s.flush();
     const again = createStore(storage, later);
     const boards = Object.values(again.workspace().boards).filter((b) => b.name === 'Journal');
@@ -98,9 +100,9 @@ describe('Journal panel', () => {
     const homeBoard = s.getState().board;
     s.openJournal();
     const [note] = journalNotes(s);
-    s.setJournalText(note.id, 'first');
+    s.setJournal(note.id, fromPlain('first'));
     vi.advanceTimersByTime(5000);
-    s.setJournalText(note.id, 'first, second');
+    s.setJournal(note.id, fromPlain('first, second'));
     s.undoJournal();
     expect(journalNotes(s)[0].text).toBe(`${today}\n\nfirst`);
     s.undoJournal();
@@ -126,7 +128,7 @@ describe('Journal panel', () => {
     s.openJournal();
     const id = s.getState().ui.journalBoard!;
     const [note] = journalNotes(s);
-    s.setJournalText(note.id, 'hi');
+    s.setJournal(note.id, fromPlain('hi'));
     s.openBoard(id);
     s.undo();
     expect(journalNotes(s)[0].text).toBe(`${today}\n\n`);
@@ -204,7 +206,7 @@ describe('Journal panel', () => {
     s.setShares([{ id: 's1', root: id, boards: [id], owner: true, ownerUid: 'me', people: [], link: null }], true);
     s.undoJournal(); // would take today's note away
     expect(journalNotes(s)).toEqual([note]);
-    s.setJournalText(note.id, 'secret');
+    s.setJournal(note.id, fromPlain('secret'));
     expect(journalNotes(s)).toEqual([note]);
   });
 
@@ -227,10 +229,10 @@ describe('Journal panel', () => {
     const s = setup();
     s.openJournal();
     const [note] = journalNotes(s);
-    s.setJournalText(note.id, 'old words');
+    s.setJournal(note.id, fromPlain('old words'));
     const then = s.workspace();
     vi.advanceTimersByTime(5000);
-    s.setJournalText(note.id, 'new words');
+    s.setJournal(note.id, fromPlain('new words'));
     expect(s.restoreVersion(then)).toEqual([]);
     expect(journalNotes(s)[0].text).toBe(`${today}\n\nold words`);
     s.undoJournal();
@@ -242,7 +244,7 @@ describe('Journal panel', () => {
     const then = s.workspace();
     s.openJournal();
     const [note] = journalNotes(s);
-    s.setJournalText(note.id, 'kept');
+    s.setJournal(note.id, fromPlain('kept'));
     s.restoreVersion(then);
     expect(journalNotes(s)[0].text).toBe(`${today}\n\nkept`);
   });
@@ -263,5 +265,96 @@ describe('Journal panel', () => {
     s.openJournal();
     const id = s.getState().ui.journalBoard!;
     for (const b of Object.values(s.workspace().boards)) expect(Object.values(b.cards).some((c) => c.kind === 'board' && c.boardId === id)).toBe(false);
+  });
+});
+
+describe('Journal formatting (owner request, 2026-10-19)', () => {
+  const list: Rich = [{ type: 'bullet', runs: [{ text: 'milk', b: true }] }, { type: 'bullet', runs: [{ text: 'eggs' }] }];
+
+  it('saves the formatting with the plain text beside it, which everything else reads', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, list, false);
+    const [saved] = journalNotes(s);
+    expect(saved.text).toBe(`${today}\n\n• milk\n• eggs`);
+    expect(saved.rich).toEqual(list);
+  });
+
+  it('plain typing saves no formatting at all, the shape notes had before', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, fromPlain('just words'));
+    expect('rich' in journalNotes(s)[0]).toBe(false);
+    // Taking every format off removes it again.
+    s.setJournal(note.id, list, false);
+    s.setJournal(note.id, fromPlain('plain again'), false);
+    expect('rich' in journalNotes(s)[0]).toBe(false);
+  });
+
+  it('is kept after a reload', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, list, false);
+    s.flush();
+    const again = createStore(storage, later);
+    const board = Object.values(again.workspace().boards).find((b) => b.name === 'Journal')!;
+    expect((Object.values(board.cards)[0] as NoteCard).rich).toEqual(list);
+  });
+
+  it('a formatting change is its own undo step; typing still merges', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, fromPlain('milk'));
+    s.setJournal(note.id, fromPlain('milk and eggs'));
+    vi.advanceTimersByTime(5000);
+    s.setJournal(note.id, [{ type: 'p', runs: [{ text: 'milk and eggs', u: true }] }], false);
+    expect(journalNotes(s)[0].rich).toBeDefined();
+    s.undoJournal();
+    expect(journalNotes(s)[0].text).toBe(`${today}\n\nmilk and eggs`);
+    expect('rich' in journalNotes(s)[0]).toBe(false);
+    s.redoJournal();
+    expect(journalNotes(s)[0].rich).toEqual([{ type: 'p', runs: [{ text: 'milk and eggs', u: true }] }]);
+  });
+
+  it('a Journal note saved before formatting existed is left exactly as it was by opening the panel', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, fromPlain('line one\r\nline two'));
+    s.flush();
+    const again = createStore(storage, later);
+    again.setViewportSize({ width: 1000, height: 800 });
+    const before = again.workspace();
+    again.openJournal();
+    expect(again.workspace().boards).toEqual(before.boards);
+  });
+
+  it('editing the note as a plain card on the Journal board drops its formatting, and undo brings it back', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.setJournal(note.id, list, false);
+    s.openBoard(s.getState().ui.journalBoard!);
+    s.setNoteText(note.id, `${today}\n\n• milk\n• eggs!`);
+    expect('rich' in journalNotes(s)[0]).toBe(false);
+    s.undo();
+    expect(journalNotes(s)[0].rich).toEqual(list);
+  });
+
+  it('a note too big for its formatting to load back is saved as plain text at once, not lost on a reload', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    const huge: Rich = Array.from({ length: 20001 }, () => ({ type: 'bullet' as const, runs: [{ text: 'x' }] }));
+    s.setJournal(note.id, huge, false);
+    const [saved] = journalNotes(s);
+    expect('rich' in saved).toBe(false);
+    expect(saved.text.split('\n')).toHaveLength(20003);
   });
 });

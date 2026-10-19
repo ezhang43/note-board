@@ -78,7 +78,7 @@ test('restoring a version brings back the Journal panel’s writing too (check o
   await page.getByRole('region', { name: 'Looking at an earlier version' }).getByRole('button', { name: 'Restore this version' }).click();
   await expect(page.getByLabel('Note text').first()).toHaveValue('Home note');
   await journalButton.click();
-  await expect(journal.getByRole('textbox').first()).toHaveValue('First words');
+  await expect(journal.getByRole('textbox').first()).toHaveText('First words');
 });
 
 test('versions are kept after the page is reloaded', async ({ page }) => {

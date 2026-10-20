@@ -1,16 +1,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { journalDateLine, journalEntries } from '../model/journal';
+import { groupJournal, isGroupOpen, journalDateLine, journalEntries, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
 import { HIGHLIGHTS, isList, journalRich, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 
+/** Which year, month and week groups are open: kept on this device only, never in the board's data (owner request, 2026-10-19). */
+const OPEN_KEY = 'note-board:journal-open';
+const PLAIN: Look = { type: 'p', b: false, i: false, u: false, s: false };
+
 /**
  * The Journal side panel (owner request, 2026-10-18): the dated notes on the Journal board, newest
  * day first, each one's text ready to edit. Today's note gets the cursor when the panel opens.
  * Typing goes through the store like typing on the board, so it is saved and undoable. The Journal
  * alone has rich text (owner request, 2026-10-19): the Formatting bar acts on the note last typed in.
+ * The days are grouped Year > Month > Week; only the groups holding today start open.
  */
 export function JournalPanel() {
   const board = useAppState((s) => {
@@ -19,6 +25,32 @@ export function JournalPanel() {
     return id === s.boards.open ? s.board : s.boards.others[id];
   });
   const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date())) : []), [board]);
+  const today = dayKey(new Date());
+  const years = useMemo(() => groupJournal(entries, today), [entries, today]);
+  // Opening the panel shows today, so a shut group holding today opens again.
+  const [choices, setChoices] = useState<JournalOpen>(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(OPEN_KEY);
+    } catch {
+      // Blocked storage: the defaults are used.
+    }
+    return openToday(parseJournalOpen(saved), today);
+  });
+  const isOpen = (id: string) => isGroupOpen(choices, id, today);
+  const toggle = (id: string) => setChoices((was) => toggleGroup(was, id, today));
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(choices));
+    } catch {
+      // Not saved: it still works until the page is closed.
+    }
+  }, [choices]);
+  const head = (id: string, label: string, level: 'year' | 'month' | 'week') => (
+    <button type="button" className={`jg-head jg-${level}`} aria-expanded={isOpen(id)} onClick={() => toggle(id)}>
+      {label}
+    </button>
+  );
   const root = useRef<HTMLDivElement>(null);
   const first = useRef<RichEditorHandle>(null);
   /** The entry being typed in, so the panel keeps the keyboard if undo takes that entry away. */
@@ -26,7 +58,7 @@ export function JournalPanel() {
   /** The note the Formatting bar acts on, and how its selection looks. */
   const active = useRef<RichEditorHandle | null>(null);
   const handles = useRef(new Map<string, RichEditorHandle>());
-  const [look, setLook] = useState<Look>({ type: 'p', b: false, i: false, u: false, s: false });
+  const [look, setLook] = useState<Look>(PLAIN);
 
   useEffect(() => {
     active.current = first.current;
@@ -37,6 +69,11 @@ export function JournalPanel() {
     if (typing.current && !typing.current.isConnected) {
       typing.current = null;
       root.current?.focus();
+    }
+    // A group was shut over the note the Formatting bar was acting on: the bar shows no look.
+    if (active.current && !active.current.el?.isConnected) {
+      active.current = null;
+      setLook(PLAIN);
     }
   });
 
@@ -63,6 +100,42 @@ export function JournalPanel() {
       {glyph}
     </button>
   );
+
+  const entry = (e: (typeof entries)[number]) => {
+    const card = board?.cards[e.id];
+    const value = journalRich(card?.kind === 'note' ? card.text : '', card?.kind === 'note' ? card.rich : undefined);
+    return (
+      <section key={e.id} className="journal-entry">
+        <h3>{e.date}</h3>
+        <RichEditor
+          ref={(h) => {
+            if (e.id === entries[0]?.id) first.current = h;
+            if (h) handles.current.set(e.id, h);
+            else handles.current.delete(e.id);
+          }}
+          value={value}
+          label={`Journal, ${e.date}`}
+          onChange={(rich, typed) => appStore.setJournal(e.id, rich, typed)}
+          onLook={(l) => {
+            active.current = handles.current.get(e.id) ?? null;
+            setLook((was) => (deepEqual(was, l) ? was : l));
+          }}
+          onFocus={(el) => {
+            typing.current = el;
+            active.current = handles.current.get(e.id) ?? null;
+          }}
+          onBlur={(el) => {
+            // After a blur caused by the entry going away, `typing` still names it (see above).
+            queueMicrotask(() => {
+              if (el.isConnected && typing.current === el) typing.current = null;
+            });
+          }}
+          // Escape leaves the text (a second Escape closes the panel), as on the board.
+          onEscape={() => root.current?.focus()}
+        />
+      </section>
+    );
+  };
 
   return (
     <div className="journal-panel" tabIndex={-1} ref={root}>
@@ -134,41 +207,24 @@ export function JournalPanel() {
           ))}
         </select>
       </div>
-      {entries.map((e, i) => {
-        const card = board?.cards[e.id];
-        const value = journalRich(card?.kind === 'note' ? card.text : '', card?.kind === 'note' ? card.rich : undefined);
-        return (
-          <section key={e.id} className="journal-entry">
-            <h3>{e.date}</h3>
-            <RichEditor
-              ref={(h) => {
-                if (i === 0) first.current = h;
-                if (h) handles.current.set(e.id, h);
-                else handles.current.delete(e.id);
-              }}
-              value={value}
-              label={`Journal, ${e.date}`}
-              onChange={(rich, typed) => appStore.setJournal(e.id, rich, typed)}
-              onLook={(l) => {
-                active.current = handles.current.get(e.id) ?? null;
-                setLook((was) => (deepEqual(was, l) ? was : l));
-              }}
-              onFocus={(el) => {
-                typing.current = el;
-                active.current = handles.current.get(e.id) ?? null;
-              }}
-              onBlur={(el) => {
-                // After a blur caused by the entry going away, `typing` still names it (see above).
-                queueMicrotask(() => {
-                  if (el.isConnected && typing.current === el) typing.current = null;
-                });
-              }}
-              // Escape leaves the text (a second Escape closes the panel), as on the board.
-              onEscape={() => root.current?.focus()}
-            />
-          </section>
-        );
-      })}
+      {years.map((y) => (
+        <div key={y.id} className="jg">
+          {head(y.id, y.label, 'year')}
+          {isOpen(y.id) &&
+            y.months.map((m) => (
+              <div key={m.id} className="jg jg-in">
+                {head(m.id, m.label, 'month')}
+                {isOpen(m.id) &&
+                  m.weeks.map((w) => (
+                    <div key={w.id} className="jg jg-in">
+                      {head(w.id, w.label, 'week')}
+                      {isOpen(w.id) && w.entries.map(entry)}
+                    </div>
+                  ))}
+              </div>
+            ))}
+        </div>
+      ))}
     </div>
   );
 }

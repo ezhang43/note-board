@@ -1887,6 +1887,42 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 /* The Journal panel: each day's note as a white card, newest first, its date above it. */
 .journal-panel { display: flex; flex-direction: column; gap: 4px; }
 .journal-panel:focus, .side-panel:focus { outline: none; }
+/* Year > Month > Week groups: each header is a button that opens and shuts what is under it. */
+.jg-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jg-head::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.jg-head[aria-expanded='true']::before { transform: rotate(45deg); }
+@media (hover: hover) {
+  .jg-head:hover { background: var(--hover); }
+}
+.jg-year { font-size: 14px; font-weight: 600; }
+.jg-month { font-size: 13px; font-weight: 600; }
+.jg-week { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.app.phone .jg-head { min-height: 44px; font-size: 16px; }
+.jg-in { margin-left: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .jg-head::before { transition: transform 150ms ease-out; }
+}
 .journal-entry h3 { margin: 12px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .journal-entry .rich {
   min-height: 3.1em;

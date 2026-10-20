@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { findJournalBoard, hiddenJournal, journalBody, journalDateLine, journalEntries, journalSpot, todaysNote, withJournalBody } from './journal';
+import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, journalEntries, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { overlaps } from './geometry';
 import type { Board, Card } from './types';
 import type { Workspace } from './workspace';
@@ -164,5 +164,153 @@ describe('hiddenJournal', () => {
   it('is never the home board, nor a shared board', () => {
     expect(hiddenJournal({ home: 'j', boards: { j: { ...createBoard(), name: 'Journal' } } }, [])).toBeNull();
     expect(hiddenJournal(journal(), ['j'])).toBeNull();
+  });
+});
+
+// Entries grouped Year > Month > Week, shut by default except where today is (owner request, 2026-10-19).
+
+const line = (date: string) => ({ id: date, date });
+const WED = '2026-10-14'; // a Wednesday: its week is Mon 12 to Sun 18 Oct
+
+describe('journalDayKey', () => {
+  it('reads the day from a date line, with or without a title after it', () => {
+    expect(journalDayKey('Wed 14 Oct 2026')).toBe('2026-10-14');
+    expect(journalDayKey('Thu 1 Jan 2026 - new year')).toBe('2026-01-01');
+    expect(journalDayKey('shopping')).toBeNull();
+  });
+});
+
+describe('groupJournal', () => {
+  it('groups by year, then month, then Monday-to-Sunday week, newest first', () => {
+    const years = groupJournal(['Wed 14 Oct 2026', 'Tue 13 Oct 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026', 'Wed 31 Dec 2025'].map(line));
+    expect(years.map((y) => y.label)).toEqual(['2026', '2025']);
+    expect(years[0].months.map((m) => m.label)).toEqual(['October', 'January']);
+    const oct = years[0].months[0].weeks;
+    expect(oct.map((w) => [w.label, w.entries.map((e) => e.date)])).toEqual([
+      ['12–18 Oct', ['Wed 14 Oct 2026', 'Tue 13 Oct 2026']],
+      ['5–11 Oct', ['Fri 9 Oct 2026']],
+    ]);
+  });
+
+  it('splits a week that spans two months, each month listing its own days', () => {
+    // Mon 28 Sep to Sun 4 Oct 2026.
+    const years = groupJournal(['Sun 4 Oct 2026', 'Wed 30 Sep 2026', 'Mon 28 Sep 2026'].map(line));
+    const [oct, sep] = years[0].months;
+    expect([oct.label, oct.weeks.map((w) => [w.label, w.entries.map((e) => e.date)])]).toEqual(['October', [['1–4 Oct', ['Sun 4 Oct 2026']]]]);
+    expect([sep.label, sep.weeks.map((w) => [w.label, w.entries.map((e) => e.date)])]).toEqual(['September', [['28–30 Sep', ['Wed 30 Sep 2026', 'Mon 28 Sep 2026']]]]);
+    expect(oct.weeks[0].id).not.toBe(sep.weeks[0].id);
+  });
+
+  it('splits a week across New Year between two years', () => {
+    // Mon 29 Dec 2025 to Sun 4 Jan 2026.
+    const years = groupJournal(['Sun 4 Jan 2026', 'Wed 31 Dec 2025'].map(line));
+    expect(years.map((y) => [y.label, y.months[0].label, y.months[0].weeks[0].label])).toEqual([
+      ['2026', 'January', '1–4 Jan'],
+      ['2025', 'December', '29–31 Dec'],
+    ]);
+  });
+
+  it('keeps one group per month and week however the entries are ordered, and never drops one', () => {
+    // Today first, a day written ahead next (as journalEntries lists them), then the past.
+    const entries = ['Wed 14 Oct 2026', 'Mon 2 Nov 2026', 'Tue 13 Oct 2026', 'Fri 1 Jan 2100', 'Tue 13 Oct 2026'].map((d, i) => ({ id: `${i}`, date: d }));
+    const years = groupJournal(entries);
+    expect(years.map((y) => y.label)).toEqual(['2100', '2026']);
+    expect(years[1].months.map((m) => m.label)).toEqual(['November', 'October']);
+    expect(years[1].months[1].weeks[0].entries.map((e) => e.id)).toEqual(['0', '2', '4']);
+  });
+
+  it('names a week by one day when only one of its days is in the month', () => {
+    // Mon 26 Oct to Sun 1 Nov 2026.
+    const [y] = groupJournal(['Sun 1 Nov 2026', 'Mon 26 Oct 2026'].map(line));
+    expect(y.months.map((m) => m.weeks.map((w) => w.label))).toEqual([['1 Nov'], ['26\u201331 Oct']]);
+  });
+
+  it("puts today's year, month, week and day first even when days are written ahead; the rest stay newest first", () => {
+    // Today is Wed 14 Oct 2026. Ahead: the same week, a later week, a later month, a later year.
+    const days = ['Fri 1 Jan 2100', 'Mon 2 Nov 2026', 'Mon 26 Oct 2026', 'Sun 18 Oct 2026', 'Wed 14 Oct 2026', 'Tue 13 Oct 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026', 'Wed 31 Dec 2025'];
+    const years = groupJournal(days.map(line), WED);
+    expect(years.map((y) => y.label)).toEqual(['2026', '2100', '2025']);
+    expect(years[0].months.map((m) => m.label)).toEqual(['October', 'November', 'January']);
+    expect(years[0].months[0].weeks.map((w) => w.label)).toEqual(['12–18 Oct', '26–31 Oct', '5–11 Oct']);
+    expect(years[0].months[0].weeks[0].entries.map((e) => e.date)).toEqual(['Wed 14 Oct 2026', 'Sun 18 Oct 2026', 'Tue 13 Oct 2026']);
+  });
+
+  it('keeps newest first without today, or when today has no entry', () => {
+    const days = ['Mon 2 Nov 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026'];
+    expect(groupJournal(days.map(line)).map((y) => y.months.map((m) => m.label))).toEqual([['November', 'October', 'January']]);
+    expect(groupJournal(days.map(line), '2027-03-03').map((y) => y.label)).toEqual(['2026']);
+  });
+
+  it('is empty with no entries', () => {
+    expect(groupJournal([])).toEqual([]);
+  });
+});
+
+describe('which groups are open', () => {
+  it('opens only the current year, month and week by default', () => {
+    const [year] = groupJournal(['Wed 14 Oct 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026', 'Wed 31 Dec 2025'].map(line));
+    const [oct, jan] = year.months;
+    const open = (id: string) => isGroupOpen({}, id, WED);
+    expect([year.id, oct.id, oct.weeks[0].id].map(open)).toEqual([true, true, true]);
+    expect(open(oct.weeks[1].id)).toBe(false);
+    expect(open(jan.id)).toBe(false);
+    expect(open(groupJournal([line('Wed 31 Dec 2025')])[0].id)).toBe(false);
+  });
+
+  it('on a split week, only the month holding today opens (today is visible)', () => {
+    // Today is Thu 1 Oct 2026: its week began Mon 28 Sep, so September holds the other part of it.
+    const years = groupJournal(['Thu 1 Oct 2026', 'Tue 29 Sep 2026'].map(line));
+    const [oct, sep] = years[0].months;
+    expect(isGroupOpen({}, oct.weeks[0].id, '2026-10-01')).toBe(true);
+    expect(isGroupOpen({}, oct.id, '2026-10-01')).toBe(true);
+    expect(isGroupOpen({}, sep.id, '2026-10-01')).toBe(false);
+    expect(isGroupOpen({}, sep.weeks[0].id, '2026-10-01')).toBe(false);
+  });
+
+  it("on New Year's Day, the new year, month and week are open and the old year is shut", () => {
+    const [y26, y25] = groupJournal(['Thu 1 Jan 2026', 'Wed 31 Dec 2025'].map(line));
+    expect([y26.id, y26.months[0].id, y26.months[0].weeks[0].id].map((id) => isGroupOpen({}, id, '2026-01-01'))).toEqual([true, true, true]);
+    expect([y25.id, y25.months[0].id, y25.months[0].weeks[0].id].map((id) => isGroupOpen({}, id, '2026-01-01'))).toEqual([false, false, false]);
+  });
+
+  it('a remembered choice beats the default, either way', () => {
+    const [year] = groupJournal(['Wed 14 Oct 2026', 'Thu 1 Jan 2026'].map(line));
+    const [oct, jan] = year.months;
+    expect(isGroupOpen({ [oct.id]: false }, oct.id, WED)).toBe(false);
+    expect(isGroupOpen({ [jan.id]: true }, jan.id, WED)).toBe(true);
+  });
+
+  it('toggling flips a group and keeps only the choices that differ from the default', () => {
+    const [year] = groupJournal(['Wed 14 Oct 2026', 'Thu 1 Jan 2026'].map(line));
+    const [oct, jan] = year.months;
+    const opened = toggleGroup({}, jan.id, WED);
+    expect(opened).toEqual({ [jan.id]: true });
+    expect(toggleGroup(opened, jan.id, WED)).toEqual({});
+    const shut = toggleGroup(opened, oct.id, WED);
+    expect(shut).toEqual({ [jan.id]: true, [oct.id]: false });
+    expect(toggleGroup(shut, oct.id, WED)).toEqual({ [jan.id]: true });
+    // The input is not changed.
+    expect(opened).toEqual({ [jan.id]: true });
+  });
+
+  it("opening the panel opens today's groups again, and leaves other choices alone", () => {
+    const [year] = groupJournal(['Wed 14 Oct 2026', 'Thu 1 Jan 2026'].map(line));
+    const [oct, jan] = year.months;
+    const saved = { [year.id]: false, [oct.id]: false, [oct.weeks[0].id]: false, [jan.id]: true };
+    expect(openToday(saved, WED)).toEqual({ [jan.id]: true });
+  });
+});
+
+describe('parseJournalOpen', () => {
+  it('reads what was saved', () => {
+    expect(parseJournalOpen('{"2026":true,"2026-10":false,"2026-10/2026-10-12":true}')).toEqual({ '2026': true, '2026-10': false, '2026-10/2026-10-12': true });
+  });
+
+  it('falls back to no choices (the defaults) for missing or bad data', () => {
+    for (const raw of [null, '', 'nope', '[]', '"x"', '5', 'null', '{"a":1}', '{"2026":"yes"}']) expect(parseJournalOpen(raw)).toEqual({});
+  });
+
+  it('keeps the good choices and drops the bad ones', () => {
+    expect(parseJournalOpen('{"2026":true,"2026-10":"yes","junk":true,"__proto__":true,"2025-01/x":false}')).toEqual({ '2026': true });
   });
 });

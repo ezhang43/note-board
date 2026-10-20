@@ -1,5 +1,13 @@
 # Changelog
 
+## Habits: Month and Year views, no streak (2026-10-20)
+
+- At the top of the Habits panel there is now a **Week | Month | Year** switch with ‹ and › arrows. A Today button shows up when you've moved away from today. The bar stays in view while you scroll your habits. The panel still opens on this week.
+- **Month** shows a small calendar for each habit; tap any day to tick or untick it, the same as in Week (Ctrl+Z undoes it the same way). When you make the panel wide enough, two habits sit side by side.
+- **Year** shows twelve rows of tiny squares for each habit, one square per day, so you can see the whole year at a glance. It is for looking only. Click a month's name to open that month.
+- The streak counter is gone from every habit.
+- Nothing about how habits are saved changed, so your boards and habits already saved are untouched. The view you pick is not remembered, so the panel opens on this week each time.
+
 ## Every side panel can be resized (2026-10-20)
 
 - Version history, Completed, the Focus timer, the Journal and Habits now have the same thin strip on their left edge as the calendar. Drag it to make the panel wider or narrower, or click it and use the left and right arrow keys; double-click it to put the usual width back.

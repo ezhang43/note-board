@@ -1,6 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { dayKey, dayLabel } from '../model/calendar';
-import { habitList, streak, thisWeek, tickedDays } from '../model/habits';
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { dayKey, dayLabel, monthGrid, MONTH_NAMES, MONTHS, weekDays, weekStart, type DayKey } from '../model/calendar';
+import { habitList, habitViewLabel, habitYear, isHabitViewNow, moveHabitView, tickedDays, type HabitView } from '../model/habits';
 import { appStore, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { HabitsIcon, TrashIcon } from './icons';
@@ -31,10 +31,13 @@ export function HabitsButton({ labelled = false, onOpen }: { labelled?: boolean;
 }
 
 /**
- * The Habits side panel (owner request, 2026-10-19): each habit on the Habits board with this
- * week's seven days to tick (any of them, at most once a day) and its streak, and a box to add one.
- * Every change goes through the store, so it is saved, synced and undoable (Ctrl+Z here).
+ * The Habits side panel (owner request, 2026-10-19; Month and Year views 2026-10-20): each habit on
+ * the Habits board for a week, a month (days to tick) or a year (view only), and a box to add one.
+ * Every change goes through the store, so it is saved, synced and undoable (Ctrl+Z here). Which view
+ * and which week, month or year is shown is view state: it isn't saved, and the panel opens on this week.
  */
+const VIEWS: HabitView[] = ['week', 'month', 'year'];
+const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export function HabitsPanel() {
   const board = useAppState((s) => {
     const id = appStore.habitsBoard();
@@ -44,7 +47,9 @@ export function HabitsPanel() {
   const habits = useMemo(() => (board ? habitList(board) : []), [board]);
   // simple: "today" is read when the panel draws; left open past midnight it moves on at the next change.
   const today = dayKey(new Date());
-  const week = thisWeek(today);
+  const [view, setView] = useState<HabitView>('week');
+  const [shown, setShown] = useState<DayKey>(today); // any day in the week, month or year on show
+  const year = useMemo(() => (view === 'year' ? habitYear(shown) : []), [view, shown]);
   const [name, setName] = useState('');
   // On a phone or touch screen the keyboard would pop up and cover the day boxes, so it waits for a tap.
   const touch = usePhone() || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
@@ -80,6 +85,32 @@ export function HabitsPanel() {
         });
       }}
     >
+      <div className="habit-viewbar">
+        <div className="habit-seg" role="group" aria-label="View">
+          <span className="habit-seg-thumb" style={{ transform: `translateX(${VIEWS.indexOf(view) * 100}%)` }} aria-hidden />
+          {VIEWS.map((v) => (
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>
+              {v[0].toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="habit-nav">
+          <button type="button" className="habit-step" aria-label={`Previous ${view}`} title={`Previous ${view}`} onClick={() => setShown(moveHabitView(view, shown, -1))}>
+            ‹
+          </button>
+          <span className="habit-nav-label" aria-live="polite">
+            {habitViewLabel(view, shown)}
+          </span>
+          {!isHabitViewNow(view, shown, today) && (
+            <button type="button" className="habit-today" onClick={() => setShown(today)}>
+              Today
+            </button>
+          )}
+          <button type="button" className="habit-step" aria-label={`Next ${view}`} title={`Next ${view}`} onClick={() => setShown(moveHabitView(view, shown, 1))}>
+            ›
+          </button>
+        </div>
+      </div>
       <form
         className="habit-new"
         onSubmit={(e) => {
@@ -93,47 +124,98 @@ export function HabitsPanel() {
         </button>
       </form>
       {habits.length === 0 && <p className="habits-empty">No habits yet. Add one, then tick each day you do it.</p>}
-      {habits.map((h) => {
-        const done = tickedDays(h);
-        const run = streak(done, today);
-        return (
-          <section key={h.id} className="habit">
-            <div className="habit-head">
-              <input type="text" aria-label="Habit name" placeholder="Habit name" value={h.title} onChange={(e) => appStore.renameHabit(h.id, e.currentTarget.value)} onKeyDown={leave} />
-              <button
-                type="button"
-                className="icon-button habit-delete"
-                aria-label={`Delete habit ${h.title}`}
-                title="Delete habit"
-                onClick={() => {
-                  if (window.confirm(`Delete the habit “${h.title}” and its ticks? You can bring it back from Version history, or with Ctrl+Z in this panel.`)) appStore.deleteHabit(h.id);
-                }}
-              >
-                <TrashIcon />
-              </button>
-            </div>
-            <div className="habit-week">
-              {week.map((d) => (
+      <div className={`habit-cards${view === 'month' ? ' habit-cards-month' : ''}`}>
+        {habits.map((h) => {
+          const done = tickedDays(h);
+          const dayButton = (d: DayKey, children: React.ReactNode) => (
+            <button
+              key={d}
+              type="button"
+              className="habit-day"
+              aria-label={`${h.title || 'Habit'}, ${dayLabel(d)}`}
+              aria-pressed={done.has(d)}
+              aria-current={d === today ? 'date' : undefined}
+              onClick={() => appStore.toggleHabitDay(h.id, d)}
+            >
+              {children}
+            </button>
+          );
+          return (
+            <section key={h.id} className="habit">
+              <div className="habit-head">
+                <input type="text" aria-label="Habit name" placeholder="Habit name" value={h.title} onChange={(e) => appStore.renameHabit(h.id, e.currentTarget.value)} onKeyDown={leave} />
                 <button
-                  key={d}
                   type="button"
-                  className="habit-day"
-                  aria-label={`${h.title || 'Habit'}, ${dayLabel(d)}`}
-                  aria-pressed={done.has(d)}
-                  aria-current={d === today ? 'date' : undefined}
-                  onClick={() => appStore.toggleHabitDay(h.id, d)}
+                  className="icon-button habit-delete"
+                  aria-label={`Delete habit ${h.title}`}
+                  title="Delete habit"
+                  onClick={() => {
+                    if (window.confirm(`Delete the habit “${h.title}” and its ticks? You can bring it back from Version history, or with Ctrl+Z in this panel.`)) appStore.deleteHabit(h.id);
+                  }}
                 >
-                  <span className="habit-wd" aria-hidden>
-                    {dayLabel(d)[0]}
-                  </span>
-                  <span aria-hidden>{Number(d.slice(8))}</span>
+                  <TrashIcon />
                 </button>
-              ))}
-            </div>
-            <p className="habit-streak">{run ? `${run}-day streak` : 'No streak'}</p>
-          </section>
-        );
-      })}
+              </div>
+              {view === 'week' && (
+                <div className="habit-week">
+                  {weekDays(weekStart(shown)).map((d) =>
+                    dayButton(
+                      d,
+                      <>
+                        <span className="habit-wd" aria-hidden>
+                          {dayLabel(d)[0]}
+                        </span>
+                        <span aria-hidden>{Number(d.slice(8))}</span>
+                      </>,
+                    ),
+                  )}
+                </div>
+              )}
+              {view === 'month' && (
+                <div className="habit-cal">
+                  {WEEKDAYS.map((w, i) => (
+                    <span key={i} className="habit-cal-wd" aria-hidden>
+                      {w}
+                    </span>
+                  ))}
+                  {monthGrid(shown).flat().map((d) => (d.slice(0, 7) === shown.slice(0, 7) ? dayButton(d, Number(d.slice(8))) : <span key={d} />))}
+                </div>
+              )}
+              {view === 'year' && (
+                <div className="habit-year">
+                  <span aria-hidden />
+                  {Array.from({ length: 31 }, (_, i) => (
+                    <span key={i} className="habit-year-day" aria-hidden>
+                      {i === 0 || (i + 1) % 5 === 0 ? i + 1 : ''}
+                    </span>
+                  ))}
+                  {year.map(({ month, days: inMonth }, m) => (
+                    <Fragment key={month}>
+                      <button
+                        type="button"
+                        className="habit-year-month"
+                        aria-label={`${MONTH_NAMES[m]} ${month.slice(0, 4)}, ${inMonth.filter((d) => done.has(d)).length} ticked`}
+                        aria-current={month.slice(0, 7) === today.slice(0, 7) ? 'date' : undefined}
+                        onClick={() => {
+                          setView('month');
+                          setShown(month);
+                        }}
+                      >
+                        {MONTHS[m]}
+                      </button>
+                      {Array.from({ length: 31 }, (_, i) => {
+                        const d = inMonth[i];
+                        const cls = !d ? 'none' : `${done.has(d) ? 'on' : ''} ${d > today ? 'ahead' : ''} ${d === today ? 'today' : ''}`;
+                        return <span key={i} className={`habit-sq ${cls}`} aria-hidden />;
+                      })}
+                    </Fragment>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

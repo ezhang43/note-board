@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, parsePanelWidths, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
+import { deviceStorage } from './env';
+import { createWidthStore } from './panelWidths';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
 // events are Google's, not board data, so nothing here is undone, synced with boards or kept in
@@ -116,16 +118,10 @@ export interface CalendarState {
 }
 
 export const WIDTH_KEY = 'note-board:calendar-width';
-type WidthStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
-export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: WidthStorage | null = null) {
-  let saved: string | null = null;
-  try {
-    saved = storage?.getItem(WIDTH_KEY) ?? null;
-  } catch {
-    // Blocked storage: the defaults are used.
-  }
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: parsePanelWidths(saved) };
+export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null) {
+  const widthStore = createWidthStore(WIDTH_KEY, PANEL_DEFAULT, storage);
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get() };
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
   let asked = 0;
@@ -187,12 +183,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     },
     /** The panel was dragged (or nudged) to this width for this view: remembered on this device. */
     setWidth(view: CalView, width: number) {
-      set({ widths: { ...state.widths, [view]: width } });
-      try {
-        storage?.setItem(WIDTH_KEY, JSON.stringify(state.widths));
-      } catch {
-        // Full or blocked storage: the width still holds until the page is closed.
-      }
+      widthStore.set(view, width);
+      set({ widths: widthStore.get() });
     },
     resetWidth(view: CalView) {
       this.setWidth(view, PANEL_DEFAULT[view]);
@@ -307,13 +299,6 @@ function defaultSource(): CalendarSource | null {
 }
 
 const source = defaultSource();
-function deviceStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
 export const calendar = Object.assign(createCalendar(source && calendarApi(source), undefined, deviceStorage()), { prepare: () => source?.prepare?.() });
 
 export function useCalendar(): CalendarState {

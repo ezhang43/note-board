@@ -13,9 +13,6 @@ import {
   monthGrid,
   moveDraftStart,
   newDraft,
-  clampPanelWidth,
-  PANEL_MIN,
-  PANEL_STEP,
   rangeLabel,
   timeLabel,
   weekDays,
@@ -363,7 +360,7 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
     const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.cal-resize'))) onClose();
+      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize'))) onClose();
     };
     const click = (e: MouseEvent) => {
       if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
@@ -627,47 +624,5 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * A strip on the panel's left edge to drag (or use the arrow keys on) to make the panel wider or
- * narrower; double-click puts the usual width back (owner request, 2026-10-16). Week and Month keep
- * their own widths. Not part of the panel itself, which scrolls and would clip it.
- */
-export function CalendarResizeHandle() {
-  const s = useCalendar();
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const set = (width: number) => calendar.setWidth(s.view, clampPanelWidth(width, window.innerWidth));
-  const now = clampPanelWidth(s.widths[s.view], windowWidth);
-  return (
-    <div
-      className="cal-resize"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize calendar"
-      aria-valuemin={PANEL_MIN}
-      aria-valuemax={Math.max(PANEL_MIN, windowWidth - PANEL_MIN)}
-      aria-valuenow={now}
-      tabIndex={0}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }}
-      onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && set(window.innerWidth - e.clientX)}
-      onDoubleClick={() => calendar.resetWidth(s.view)}
-      onKeyDown={(e) => {
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        // Not a board shortcut: the arrows must not nudge selected blocks.
-        e.preventDefault();
-        e.stopPropagation();
-        set(now + (e.key === 'ArrowLeft' ? PANEL_STEP : -PANEL_STEP));
-      }}
-    />
   );
 }

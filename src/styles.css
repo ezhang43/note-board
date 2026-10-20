@@ -1446,7 +1446,7 @@ html[data-input='keys'] .column {
 .help-button { display: inline-flex; align-items: center; justify-content: center; }
 a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .help-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
-/* The right-hand panel's width: 300px; the calendar sets its own (inline, from App.tsx: the person's width, keeping 300px of board beside it). */
+/* The right-hand panel's width: 300px; on a computer each panel's own (inline, from App.tsx: the person's width, keeping 300px of board beside it). */
 .app { --side-width: 300px; }
 .app.history-open .corner-controls { right: calc(var(--side-width) + 24px); }
 .history-panel {
@@ -2267,9 +2267,9 @@ a.cal-open { align-self: flex-start; }
   padding-bottom: calc(14px + env(safe-area-inset-bottom));
 }
 
-/* The calendar panel's drag strip (owner request, 2026-10-16): on the panel's left edge, not inside it
+/* The side panels' drag strip (owner request, 2026-10-16 for the calendar, 2026-10-20 for all): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
-.cal-resize {
+.panel-resize {
   position: fixed;
   top: var(--toolbar-height);
   bottom: 0;
@@ -2281,11 +2281,11 @@ a.cal-open { align-self: flex-start; }
   background: transparent;
   outline: none;
 }
-.cal-resize:active { background: var(--accent-soft); }
+.panel-resize:active { background: var(--accent-soft); }
 @media (hover: hover) {
-  .cal-resize:hover { background: var(--accent-soft); }
+  .panel-resize:hover { background: var(--accent-soft); }
 }
-.cal-resize:focus-visible { background: var(--accent); opacity: 0.6; }
+.panel-resize:focus-visible { background: var(--accent); opacity: 0.6; }
 
 /* Welcome tour (owner request, 2026-10-16): the dimmed board with one control lit up, and a small card. */
 .tour-shield { position: fixed; inset: 0; z-index: 60; }

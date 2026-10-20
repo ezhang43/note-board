@@ -20,10 +20,14 @@ import { SidePanel } from './components/SidePanel';
 import { CompletedPanel } from './components/CompletedPanel';
 import { JournalPanel } from './components/JournalPanel';
 import { HabitsPanel } from './components/HabitsPanel';
-import { CalendarPanel, CalendarResizeHandle } from './components/CalendarPanel';
-import { PANEL_DEFAULT, PANEL_MIN } from './model/calendar';
+import { CalendarPanel } from './components/CalendarPanel';
+import { PanelResizeHandle } from './components/PanelResizeHandle';
+import { PANEL_MIN } from './model/calendar';
+import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
 
+/** What a panel's resize strip is called: "Resize journal". */
+const RESIZE_NAME = { history: 'version history', pomodoro: 'focus timer', completed: 'completed', journal: 'journal', habits: 'habits' } as const;
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 const closeCalendar = () => appStore.toggleSidePanel('calendar');
 const closeCompleted = () => appStore.toggleSidePanel('completed');
@@ -42,16 +46,22 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
   const sidePanel = useAppState((s) => s.ui.sidePanel);
+  const historyShown = useAppState((s) => s.ui.historyOpen);
   // Anything in the right-hand spot (history, the side panel) moves the corner controls aside.
-  const historyOpen = useAppState((s) => s.ui.historyOpen || s.ui.sidePanel !== null);
-  // The calendar panel's width is the person's own, for Week and Month separately (owner request,
-  // 2026-10-16). The CSS clamp keeps 300px of board beside it when the window shrinks.
+  const historyOpen = historyShown || sidePanel !== null;
+  // Each panel's width is the person's own (owner requests 2026-10-16 and 2026-10-20), the calendar's
+  // for Week and Month separately. The CSS clamp keeps 300px of board beside it when the window shrinks.
   const calendarWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().widths[calendar.get().view]);
-  const resizable = sidePanel === 'calendar' && !phone;
+  const others = usePanelWidths();
+  const panel = sidePanel ?? (historyShown ? 'history' : null);
+  const resize =
+    panel && !phone
+      ? panel === 'calendar'
+        ? { name: 'calendar', width: calendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
+        : { name: RESIZE_NAME[panel], width: others[panel], set: (w: number) => panelWidths.set(panel, w), reset: () => panelWidths.reset(panel) }
+      : null;
   const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
-  // The Journal panel is as wide as the Calendar panel's Week view starts out (owner request, 2026-10-19).
-  const sideWidth = resizable ? calendarWidth : sidePanel === 'journal' && !phone ? PANEL_DEFAULT.week : null;
-  const style = sideWidth ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${sideWidth}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
+  const style = resize ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
   return (
     <div className={classes} style={style}>
       <Toolbar onSignOut={onSignOut} />
@@ -86,7 +96,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
           <HabitsPanel />
         </SidePanel>
       )}
-      {resizable && <CalendarResizeHandle />}
+      {resize && <PanelResizeHandle name={resize.name} width={resize.width} onSet={resize.set} onReset={resize.reset} />}
       <PreviewBar />
       <FormatBar />
       <ShortcutsPanel />

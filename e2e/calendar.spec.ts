@@ -760,11 +760,12 @@ test('the side panel opens 420px wide for Week and 720px for Month, and other pa
   await expect.poll(() => width(page)).toBe(460);
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect.poll(() => width(page)).toBe(720);
-  // Other side panels keep their width and have no handle.
+  // Other side panels open 300px wide and have a strip of their own (see panel-resize.spec.ts).
   const corner = page.locator('.corner-controls');
   await corner.getByRole('button', { name: 'Focus timer' }).click();
   await expect.poll(async () => (await page.getByRole('complementary', { name: 'Focus timer' }).boundingBox())!.width).toBe(300);
   await expect(handle(page)).toHaveCount(0);
+  await expect(page.getByRole('separator', { name: 'Resize focus timer' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

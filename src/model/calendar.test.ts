@@ -8,6 +8,8 @@ import {
   PANEL_STEP,
   clampPanelWidth,
   parsePanelWidths,
+  parseSideWidths,
+  SIDE_DEFAULT,
   addDays,
   addMonths,
   canChangeSeries,
@@ -464,6 +466,22 @@ describe('the calendar panel’s width', () => {
     expect(parsePanelWidths('[1,2]')).toEqual({ week: 420, month: 720 });
     expect(parsePanelWidths('{"week":"wide","month":-5}')).toEqual({ week: 420, month: 720 });
     expect(parsePanelWidths('{"week":10,"month":1e9}')).toEqual({ week: 420, month: 720 });
+  });
+});
+
+describe('the widths of the other side panels (job #127)', () => {
+  const usual = { history: 300, pomodoro: 300, completed: 300, journal: 420, habits: 300 };
+
+  it('start at 300px, the Journal at 420px', () => {
+    expect(SIDE_DEFAULT).toEqual(usual);
+    expect(parseSideWidths(null)).toEqual(usual);
+  });
+
+  it('reads each panel’s remembered width, and uses the usual one for anything missing or bad', () => {
+    expect(parseSideWidths('{"journal":600,"habits":340}')).toEqual({ ...usual, journal: 600, habits: 340 });
+    expect(parseSideWidths('junk')).toEqual(usual);
+    expect(parseSideWidths('[1,2]')).toEqual(usual);
+    expect(parseSideWidths('{"journal":"wide","habits":-5,"completed":1e9,"history":10}')).toEqual(usual);
   });
 });
 

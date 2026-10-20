@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
-import { HABITS_NAME, habitList, hiddenHabits, isHabit, streak, thisWeek, tickedDays, withDay } from './habits';
+import { HABITS_NAME, habitList, habitViewLabel, habitYear, hiddenHabits, isHabit, isHabitViewNow, moveHabitView, tickedDays, withDay } from './habits';
 import type { Board, TodoCard } from './types';
 import type { Workspace } from './workspace';
 
@@ -58,24 +58,41 @@ describe('habits', () => {
     expect(withDay(on, '2026-10-17', true)).toBe(on); // already ticked: unchanged
   });
 
-  it('this week is Monday to Sunday', () => {
-    expect(thisWeek('2026-10-19')).toEqual(['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
-    expect(thisWeek('2026-10-25')[0]).toBe('2026-10-19');
-    expect(thisWeek('2026-11-01')[0]).toBe('2026-10-26');
+  it('moves a view by a week, a month or a year', () => {
+    expect(moveHabitView('week', '2026-10-20', 1)).toBe('2026-10-27');
+    expect(moveHabitView('week', '2026-10-20', -3)).toBe('2026-09-29');
+    expect(moveHabitView('month', '2026-10-20', 1)).toBe('2026-11-20');
+    expect(moveHabitView('month', '2026-12-31', 2)).toBe('2027-02-28'); // the short month clamps
+    expect(moveHabitView('month', '2026-01-15', -1)).toBe('2025-12-15');
+    expect(moveHabitView('year', '2026-10-20', 1)).toBe('2027-10-20');
+    expect(moveHabitView('year', '2028-02-29', 1)).toBe('2029-02-28');
   });
 
-  it('the streak counts days in a row up to today, or up to yesterday while today is not ticked yet', () => {
-    const days = (...d: string[]) => new Set(d);
-    expect(streak(days(), '2026-10-19')).toBe(0);
-    expect(streak(days('2026-10-19'), '2026-10-19')).toBe(1);
-    expect(streak(days('2026-10-17', '2026-10-18', '2026-10-19'), '2026-10-19')).toBe(3);
-    expect(streak(days('2026-10-17', '2026-10-18'), '2026-10-19')).toBe(2); // today not yet ticked
-    expect(streak(days('2026-10-16', '2026-10-18', '2026-10-19'), '2026-10-19')).toBe(2); // a gap ends it
-    expect(streak(days('2026-10-17'), '2026-10-19')).toBe(0); // missed yesterday
-    expect(streak(days('2026-10-20'), '2026-10-19')).toBe(0); // a day ahead doesn't count
-    // Across a month end and the clocks going back (25 Oct 2026 in Europe).
-    expect(streak(days('2026-09-30', '2026-10-01'), '2026-10-01')).toBe(2);
-    expect(streak(days('2026-10-24', '2026-10-25', '2026-10-26'), '2026-10-26')).toBe(3);
+  it('labels a view', () => {
+    expect(habitViewLabel('week', '2026-10-21')).toBe('19–25 Oct 2026');
+    expect(habitViewLabel('week', '2026-09-30')).toBe('28 Sep – 4 Oct 2026');
+    expect(habitViewLabel('week', '2026-12-31')).toBe('28 Dec 2026 – 3 Jan 2027');
+    expect(habitViewLabel('month', '2026-10-20')).toBe('October 2026');
+    expect(habitViewLabel('year', '2026-10-20')).toBe('2026');
+  });
+
+  it('knows when a view is the current one (so Today is only offered when away from it)', () => {
+    const today = '2026-10-20';
+    expect(isHabitViewNow('week', '2026-10-25', today)).toBe(true);
+    expect(isHabitViewNow('week', '2026-10-26', today)).toBe(false);
+    expect(isHabitViewNow('month', '2026-10-01', today)).toBe(true);
+    expect(isHabitViewNow('month', '2026-09-30', today)).toBe(false);
+    expect(isHabitViewNow('year', '2026-01-01', today)).toBe(true);
+    expect(isHabitViewNow('year', '2025-10-20', today)).toBe(false);
+  });
+
+  it('a year is twelve months, each with all of its days', () => {
+    const year = habitYear('2026-10-20');
+    expect(year.map((m) => m.month)).toEqual(Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, '0')}-01`));
+    expect(year.map((m) => m.days.length)).toEqual([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
+    expect(year[9].days[0]).toBe('2026-10-01');
+    expect(year[9].days[30]).toBe('2026-10-31');
+    expect(habitYear('2028-03-01')[1].days.length).toBe(29); // a leap year
   });
 
   it('the Habits board is hidden only while it holds nothing but habits and no card opens it', () => {

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { add, cards, expectNoOverlaps, freshBoardEachTest } from './helpers';
 
 // Habits (owner request, 2026-10-19): the Habits button opens a side panel of daily habits, each
-// with this week's seven days to tick and its streak. The board you are on stays open.
+// with this week's seven days to tick, and Month and Year views (owner request 2026-10-20). The board you are on stays open.
 
 freshBoardEachTest();
 
@@ -20,7 +20,7 @@ async function addHabit(page: Page, name: string) {
   await newHabit(page).press('Enter');
 }
 
-test('Habits opens a side panel; add a habit, tick today and see the streak; the board you are on is untouched', async ({ page }) => {
+test('Habits opens a side panel; add a habit, tick today, and there is no streak; the board you are on is untouched', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('on home');
   await page.keyboard.press('Escape');
@@ -34,18 +34,92 @@ test('Habits opens a side panel; add a habit, tick today and see the streak; the
   await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toHaveValue('Walk');
   await expect(days(page, 0)).toHaveCount(7);
   await expect(days(page, 0).first()).toHaveAccessibleName(/^Walk, Mon \d+ [A-Z][a-z]{2}$/);
-  await expect(row(page, 0)).toContainText('No streak');
+  await expect(row(page, 0)).not.toContainText('streak');
   await todayBox(page, 0).click();
   await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
-  await expect(row(page, 0)).toContainText('1-day streak');
+  await expect(row(page, 0)).not.toContainText('streak');
   await todayBox(page, 0).click();
   await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'false');
-  await expect(row(page, 0)).toContainText('No streak');
   // Home still has just its note, and the Habits board isn't in the Boards menu.
   await expect(cards(page)).toHaveCount(1);
   await expect(cards(page)).toContainText('on home');
   await page.getByRole('button', { name: 'Boards', exact: true }).click();
   await expect(page.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Habits' })).toHaveCount(0);
+});
+
+const viewSwitch = (page: Page) => panel(page).getByRole('group', { name: 'View' });
+const viewBar = (page: Page) => panel(page).locator('.habit-viewbar');
+const goTo = (page: Page, view: 'Week' | 'Month' | 'Year') => viewSwitch(page).getByRole('button', { name: view, exact: true }).click();
+
+test('Month and Year views: switch, move, tick days in the month, jump from a year row; no streak', async ({ page }) => {
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await addHabit(page, 'Read');
+  // It opens on Week.
+  await expect(viewSwitch(page).getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(days(page, 0)).toHaveCount(7);
+  await expect(panel(page)).not.toContainText(/streak/i);
+  // Month: one calendar per habit, today outlined; ticking uses the same one change as Week.
+  await goTo(page, 'Month');
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'long' });
+  await expect(viewBar(page)).toContainText(`${month} ${now.getFullYear()}`);
+  const inMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  await expect(days(page, 0)).toHaveCount(inMonth);
+  await expect(viewBar(page).getByRole('button', { name: 'Today' })).toHaveCount(0);
+  await todayBox(page, 0).click();
+  await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(todayBox(page, 1)).toHaveAttribute('aria-pressed', 'false');
+  await goTo(page, 'Week');
+  await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Control+z'); // the tick in Month was one undoable change
+  await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Control+y');
+  await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
+  // Previous / next month, and back with Today.
+  await goTo(page, 'Month');
+  await viewBar(page).getByRole('button', { name: 'Previous month' }).click();
+  await expect(viewBar(page)).not.toContainText(`${month} ${now.getFullYear()}`);
+  await viewBar(page).getByRole('button', { name: 'Today' }).click();
+  await expect(viewBar(page)).toContainText(`${month} ${now.getFullYear()}`);
+  await viewBar(page).getByRole('button', { name: 'Next month' }).click();
+  await expect(todayBox(page, 0)).toHaveCount(0);
+  await viewBar(page).getByRole('button', { name: 'Today' }).click();
+  // Year: 12 rows per habit, view only; the ticked day shows; clicking a month name opens that month.
+  await goTo(page, 'Year');
+  await expect(viewBar(page)).toContainText(String(now.getFullYear()));
+  await expect(row(page, 0).locator('.habit-year-month')).toHaveCount(12);
+  await expect(row(page, 0).locator('.habit-sq.on')).toHaveCount(1);
+  await expect(row(page, 1).locator('.habit-sq.on')).toHaveCount(0);
+  await expect(days(page, 0)).toHaveCount(0); // nothing to tick here
+  await viewBar(page).getByRole('button', { name: 'Previous year' }).click();
+  await expect(viewBar(page)).toContainText(String(now.getFullYear() - 1));
+  await expect(row(page, 0).locator('.habit-sq.on')).toHaveCount(0);
+  await viewBar(page).getByRole('button', { name: 'Today' }).click();
+  await row(page, 1).getByRole('button', { name: new RegExp(`^${month} ${now.getFullYear()}`) }).click();
+  await expect(viewSwitch(page).getByRole('button', { name: 'Month', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(viewBar(page)).toContainText(`${month} ${now.getFullYear()}`);
+});
+
+test('the Month view puts two habits side by side when the panel is wide, and the ticks are saved', async ({ page }) => {
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await addHabit(page, 'Read');
+  await goTo(page, 'Month');
+  const first = (await row(page, 0).boundingBox())!;
+  const second = (await row(page, 1).boundingBox())!;
+  expect(second.y).toBeGreaterThan(first.y + first.height - 1); // 300px: one column
+  await page.getByRole('separator', { name: 'Resize habits' }).focus();
+  for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowLeft'); // 300px to 540px
+  const a = (await row(page, 0).boundingBox())!;
+  const b = (await row(page, 1).boundingBox())!;
+  expect(Math.abs(a.y - b.y)).toBeLessThan(2);
+  expect(b.x).toBeGreaterThan(a.x + a.width - 1);
+  await todayBox(page, 1).click();
+  await page.waitForTimeout(400);
+  await page.reload();
+  await habitsButton(page).click();
+  await expect(todayBox(page, 1)).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('habits, names and ticks are kept after a reload', async ({ page }) => {
@@ -161,6 +235,14 @@ test.describe('on a phone', () => {
     await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'true');
     const right = await days(page, 0).last().evaluate((el) => el.getBoundingClientRect().right);
     expect(right).toBeLessThanOrEqual(390);
+    // Month cells are tappable on a phone too (44px).
+    await viewSwitch(page).getByRole('button', { name: 'Month', exact: true }).tap();
+    const cell = (await todayBox(page, 0).boundingBox())!;
+    expect(cell.width).toBeGreaterThanOrEqual(40);
+    expect(cell.height).toBeGreaterThanOrEqual(44);
+    expect(await panel(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await todayBox(page, 0).tap();
+    await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'false');
     await panel(page).getByRole('button', { name: 'Close habits' }).tap();
     await expect(panel(page)).toHaveCount(0);
   });

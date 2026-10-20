@@ -2012,7 +2012,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .app.phone .journal-tools button { min-width: 44px; height: 44px; font-size: 16px; }
 .app.phone .journal-tools select { height: 44px; font-size: 16px; }
 
-/* The Habits panel: each habit as a white card, its name, this week's seven day boxes and its streak. */
+/* The Habits panel: each habit as a white card, its name and its week, month or year. */
 .habits-panel { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
 .habits-panel:focus { outline: none; }
 .habit-new { display: flex; gap: 6px; }
@@ -2064,11 +2064,54 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   .habit-day[aria-pressed='false']:hover { background: var(--hover); }
   .habits-panel .habit-head input[type='text']:hover { border-color: var(--control-edge); }
 }
-.habit-streak { margin: 6px 2px 0; color: var(--ink-soft); font-size: 12px; }
 .app.phone .habits-panel input[type='text'] { height: 44px; font-size: 16px; }
 .app.phone .habit-new .tb-button { height: 44px; }
 .app.phone .habit-delete { width: 44px; height: 44px; }
 .app.phone .habit-day { height: 52px; font-size: 15px; }
+
+/* Week | Month | Year and the arrows (owner request 2026-10-20): a bar that stays at the top while the habits scroll. */
+.habits-panel { container-type: inline-size; }
+.habit-viewbar { position: sticky; top: -8px; z-index: 2; display: flex; flex-direction: column; gap: 6px; margin: 0 -10px; padding: 4px 10px 8px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.habit-seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--canvas); }
+.habit-seg-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 6px; background: var(--card-bg); border: 1px solid var(--card-edge); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.08); }
+.habit-seg button { position: relative; height: 32px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; }
+.habit-seg button[aria-pressed='true'] { color: var(--ink); font-weight: 600; }
+.habit-nav { display: flex; align-items: center; gap: 4px; }
+.habit-nav-label { flex: 1; text-align: center; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.habit-step, .habit-today { height: 32px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--surface); color: var(--ink); font-weight: 500; cursor: pointer; }
+.habit-step { width: 32px; padding: 0; font-size: 18px; line-height: 1; }
+.habit-today { padding: 0 10px; font-size: 13px; }
+@media (hover: hover) and (pointer: fine) {
+  .habit-seg button[aria-pressed='false']:hover { color: var(--ink); }
+  .habit-step:hover, .habit-today:hover { background: var(--hover); }
+}
+.app.phone .habit-seg button, .app.phone .habit-step, .app.phone .habit-today { height: 44px; font-size: 15px; }
+.app.phone .habit-step { width: 44px; font-size: 20px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .habit-seg-thumb { transition: transform 200ms var(--ease-out); }
+}
+
+/* Month: one calendar per habit, two side by side when the panel is wide. */
+.habit-cards { display: flex; flex-direction: column; gap: 8px; }
+@container (min-width: 440px) {
+  .habit-cards-month { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+}
+.habit-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 6px; }
+.habit-cal-wd { text-align: center; font-size: 10px; font-weight: 600; color: var(--ink-soft); }
+.habit-cal .habit-day { flex: none; height: 32px; border-radius: 6px; font-size: 12px; }
+.app.phone .habit-cal .habit-day { height: 44px; font-size: 14px; }
+
+/* Year: twelve rows of tiny squares, one per day; view only. */
+.habit-year { display: grid; grid-template-columns: 30px repeat(31, minmax(0, 1fr)); column-gap: 1.5px; align-items: center; margin-top: 6px; }
+.habit-year-day { margin-bottom: 4px; font-size: 8px; text-align: center; white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.habit-year-month { height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: var(--ink-soft); font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }
+.habit-year-month[aria-current='date'] { color: var(--accent); }
+.habit-sq { aspect-ratio: 1; border-radius: 1.5px; background: var(--hover); }
+.habit-sq.on { background: var(--checkbox); }
+.habit-sq.none { background: transparent; }
+.habit-sq.ahead:not(.on) { background: transparent; box-shadow: inset 0 0 0 1px var(--hover); }
+.habit-sq.today { box-shadow: 0 0 0 1.5px var(--accent); }
+.app.phone .habit-year-month { height: 22px; font-size: 12px; }
 
 /* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
 .confirm.delete-completed {
@@ -2346,10 +2389,10 @@ a.cal-open { align-self: flex-start; }
 .cal-card { transform-origin: top right; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day) {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day, .habit-seg button, .habit-step, .habit-today) {
   transition: transform 100ms var(--ease-out);
 }
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day):not([aria-disabled='true'], :disabled):active {
+:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
   transform: scale(0.97);
 }
 

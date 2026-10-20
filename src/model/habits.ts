@@ -1,4 +1,4 @@
-import { addDays, weekDays, weekStart, type DayKey } from './calendar';
+import { addDays, addMonths, MONTHS, MONTH_NAMES, weekStart, type DayKey } from './calendar';
 import { newId } from './cards';
 import type { Board, Card, TodoCard, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
@@ -50,18 +50,40 @@ export function withDay(habit: TodoCard, day: DayKey, on: boolean): TodoCard {
   return { ...habit, items };
 }
 
-/** This week, Monday to Sunday, as in the calendar's month grid. */
-export const thisWeek = (today: DayKey): DayKey[] => weekDays(weekStart(today));
+/** What the panel shows for each habit (view state, not board data): a week, a month or a year. */
+export type HabitView = 'week' | 'month' | 'year';
 
-/**
- * Days ticked in a row, ending today, or ending yesterday while today isn't ticked yet (the day
- * isn't over, so that doesn't break the streak). Days ahead of today don't count.
- */
-export function streak(days: Set<DayKey>, today: DayKey): number {
-  let day = days.has(today) ? today : addDays(today, -1);
-  let n = 0;
-  for (; days.has(day); day = addDays(day, -1)) n++;
-  return n;
+/** The view's day (any day in it) moved `step` weeks, months or years; a short month clamps the day. */
+export const moveHabitView = (view: HabitView, key: DayKey, step: number): DayKey =>
+  view === 'week' ? addDays(key, 7 * step) : addMonths(key, view === 'month' ? step : 12 * step);
+
+/** "19–25 Oct 2026", "28 Sep – 4 Oct 2026", "28 Dec 2026 – 3 Jan 2027", "October 2026", "2026". */
+export function habitViewLabel(view: HabitView, key: DayKey): string {
+  if (view === 'year') return key.slice(0, 4);
+  if (view === 'month') return `${MONTH_NAMES[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`;
+  const from = weekStart(key);
+  const to = addDays(from, 6);
+  const part = (k: DayKey, year = false) => `${Number(k.slice(8))} ${MONTHS[Number(k.slice(5, 7)) - 1]}${year ? ` ${k.slice(0, 4)}` : ''}`;
+  if (from.slice(0, 4) !== to.slice(0, 4)) return `${part(from, true)} – ${part(to, true)}`;
+  if (from.slice(5, 7) !== to.slice(5, 7)) return `${part(from)} – ${part(to, true)}`;
+  return `${Number(from.slice(8))}–${part(to, true)}`;
+}
+
+/** Whether the view holds `today` (the panel offers a Today button when it doesn't). */
+export function isHabitViewNow(view: HabitView, key: DayKey, today: DayKey): boolean {
+  if (view === 'week') return weekStart(key) === weekStart(today);
+  const n = view === 'month' ? 7 : 4;
+  return key.slice(0, n) === today.slice(0, n);
+}
+
+/** The twelve months of the year `key` is in, each with its first day and all of its days. */
+export function habitYear(key: DayKey): { month: DayKey; days: DayKey[] }[] {
+  const year = Number(key.slice(0, 4));
+  return Array.from({ length: 12 }, (_, m) => {
+    const month = `${key.slice(0, 4)}-${String(m + 1).padStart(2, '0')}-01`;
+    const length = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
+    return { month, days: Array.from({ length }, (_, d) => `${month.slice(0, 8)}${String(d + 1).padStart(2, '0')}`) };
+  });
 }
 
 /**

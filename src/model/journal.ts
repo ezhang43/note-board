@@ -125,15 +125,20 @@ function weekLabel(key: DayKey): string {
 }
 
 /**
- * The entries (as journalEntries lists them) grouped Year > Month > Week, newest first. Entries on
- * one day keep the order given. An entry without a readable date line is left out.
+ * The entries (as journalEntries lists them) grouped Year > Month > Week, newest first, except that
+ * today's year, then its month, week and day come first at their level, even when days are written
+ * ahead (owner choice, 2026-10-20). Entries on one day keep the order given. An entry without a
+ * readable date line is left out.
  */
-export function groupJournal<T extends { date: string }>(entries: T[]): JournalYear<T>[] {
+export function groupJournal<T extends { date: string }>(entries: T[], today: DayKey | '' = ''): JournalYear<T>[] {
+  const here = today ? groupIds(today) : [];
+  // Sort key, biggest first: in today's year / month / week, is today, then the day itself.
+  const rank = (key: DayKey) => groupIds(key).map((id, i) => (id === here[i] ? 1 : 0)).join('') + (key === today ? 1 : 0) + key;
   const dated = entries.flatMap((e) => {
     const key = journalDayKey(e.date);
     return key ? [{ e, key }] : [];
   });
-  dated.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+  dated.sort((a, b) => (rank(a.key) < rank(b.key) ? 1 : rank(a.key) > rank(b.key) ? -1 : 0));
   const years: JournalYear<T>[] = [];
   for (const { e, key } of dated) {
     const [yearId, monthId, weekId] = groupIds(key);

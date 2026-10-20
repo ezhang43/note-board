@@ -25,8 +25,8 @@ export function JournalPanel() {
     return id === s.boards.open ? s.board : s.boards.others[id];
   });
   const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date())) : []), [board]);
-  const years = useMemo(() => groupJournal(entries), [entries]);
   const today = dayKey(new Date());
+  const years = useMemo(() => groupJournal(entries, today), [entries, today]);
   // Opening the panel shows today, so a shut group holding today opens again.
   const [choices, setChoices] = useState<JournalOpen>(() => {
     let saved: string | null = null;

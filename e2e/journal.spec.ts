@@ -117,16 +117,17 @@ test('what is written is kept after a reload, and earlier days are listed below 
   await expect(entries(page).first()).toBeFocused();
   const shut = panel(page).getByRole('button', { expanded: false });
   while (await shut.count()) await shut.first().click();
-  // Newest group first, so the day written ahead is above today (today's note has the cursor, checked above).
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Fri 1 Jan 2100', today, 'Thu 1 Jan 2026']);
+  // Today's year first (today, then the earlier day in it), then the year written ahead (owner choice, job 120).
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Thu 1 Jan 2026', 'Fri 1 Jan 2100']);
   await expect(entries(page)).toHaveCount(3);
-  await expect(entries(page).nth(1)).toHaveText('kept');
-  await expect(entries(page).nth(2)).toHaveText('new year');
+  await expect(entries(page).nth(0)).toHaveText('kept');
+  await expect(entries(page).nth(1)).toHaveText('new year');
+  await expect(entries(page).nth(2)).toHaveText('plans');
   // Earlier days can be edited too.
-  await entries(page).nth(2).click();
+  await entries(page).nth(1).click();
   await page.keyboard.press('End');
   await page.keyboard.type('!');
-  await expect(entries(page).nth(2)).toHaveText('new year!');
+  await expect(entries(page).nth(1)).toHaveText('new year!');
 });
 
 test('keys pressed in the panel never act on the board behind it (review of job 99)', async ({ page }) => {

@@ -225,6 +225,22 @@ describe('groupJournal', () => {
     expect(y.months.map((m) => m.weeks.map((w) => w.label))).toEqual([['1 Nov'], ['26\u201331 Oct']]);
   });
 
+  it("puts today's year, month, week and day first even when days are written ahead; the rest stay newest first", () => {
+    // Today is Wed 14 Oct 2026. Ahead: the same week, a later week, a later month, a later year.
+    const days = ['Fri 1 Jan 2100', 'Mon 2 Nov 2026', 'Mon 26 Oct 2026', 'Sun 18 Oct 2026', 'Wed 14 Oct 2026', 'Tue 13 Oct 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026', 'Wed 31 Dec 2025'];
+    const years = groupJournal(days.map(line), WED);
+    expect(years.map((y) => y.label)).toEqual(['2026', '2100', '2025']);
+    expect(years[0].months.map((m) => m.label)).toEqual(['October', 'November', 'January']);
+    expect(years[0].months[0].weeks.map((w) => w.label)).toEqual(['12–18 Oct', '26–31 Oct', '5–11 Oct']);
+    expect(years[0].months[0].weeks[0].entries.map((e) => e.date)).toEqual(['Wed 14 Oct 2026', 'Sun 18 Oct 2026', 'Tue 13 Oct 2026']);
+  });
+
+  it('keeps newest first without today, or when today has no entry', () => {
+    const days = ['Mon 2 Nov 2026', 'Fri 9 Oct 2026', 'Thu 1 Jan 2026'];
+    expect(groupJournal(days.map(line)).map((y) => y.months.map((m) => m.label))).toEqual([['November', 'October', 'January']]);
+    expect(groupJournal(days.map(line), '2027-03-03').map((y) => y.label)).toEqual(['2026']);
+  });
+
   it('is empty with no entries', () => {
     expect(groupJournal([])).toEqual([]);
   });

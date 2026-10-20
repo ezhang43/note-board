@@ -6,7 +6,7 @@
 - When you open the Journal, this year, this month and this week are open and today's note is there to type in. Older weeks, months and years are shut.
 - Which ones you open or shut is remembered on this device only. It is not synced or undoable, and your boards are not changed.
 - The Journal panel is now as wide as the Calendar panel.
-- A day written ahead (a later date) now appears in its own group above today's instead of just below it. Today's note still gets the cursor.
+- Today comes first: today's year, month and week are always the first ones at their level, and today's note is first in its week, even when you have written days ahead (a later date). Those later days come after, in their own groups, and everything else stays newest first.
 
 ## Pictures, videos and web addresses (2026-10-19)
 

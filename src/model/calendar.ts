@@ -419,17 +419,26 @@ export function clampPanelWidth(width: number, windowWidth: number): number {
   return Math.max(PANEL_MIN, Math.min(Math.round(width), windowWidth - PANEL_MIN));
 }
 
-/** The remembered widths; anything missing or bad (not a number from 300 to 4000) is the default. */
-export function parsePanelWidths(raw: string | null): PanelWidths {
+/** The remembered widths, one for each name in `defaults`; anything missing or bad (not a number from 300 to 4000) is its default. */
+export function readWidths<K extends string>(raw: string | null, defaults: Record<K, number>): Record<K, number> {
   let data: unknown = null;
   try {
     data = raw ? JSON.parse(raw) : null;
   } catch {
     // simple: a damaged value is ignored; the defaults are used.
   }
-  const read = (view: CalView) => {
-    const v = data && typeof data === 'object' ? (data as Record<string, unknown>)[view] : undefined;
-    return typeof v === 'number' && v >= PANEL_MIN && v <= 4000 ? Math.round(v) : PANEL_DEFAULT[view];
-  };
-  return { week: read('week'), month: read('month') };
+  const out = { ...defaults };
+  for (const k of Object.keys(defaults) as K[]) {
+    const v = data && typeof data === 'object' ? (data as Record<string, unknown>)[k] : undefined;
+    if (typeof v === 'number' && v >= PANEL_MIN && v <= 4000) out[k] = Math.round(v);
+  }
+  return out;
 }
+
+export const parsePanelWidths = (raw: string | null): PanelWidths => readWidths(raw, PANEL_DEFAULT);
+
+// The other side panels (owner request, job #127): each remembers its own width the same way, in
+// their own key. The Journal starts as wide as the calendar's Week view.
+export type SidePanelId = 'history' | 'pomodoro' | 'completed' | 'journal' | 'habits';
+export const SIDE_DEFAULT: Record<SidePanelId, number> = { history: 300, pomodoro: 300, completed: 300, journal: PANEL_DEFAULT.week, habits: 300 };
+export const parseSideWidths = (raw: string | null) => readWidths(raw, SIDE_DEFAULT);

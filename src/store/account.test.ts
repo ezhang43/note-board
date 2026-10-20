@@ -134,6 +134,7 @@ describe('accountKeys', () => {
       'note-board:tour-done',
       'note-board:pomodoro',
       'note-board:calendar-width',
+      'note-board:panel-widths',
       // The calendar access (job 107): not a setting, so it goes.
       'note-board:calendar-access',
       'unrelated',

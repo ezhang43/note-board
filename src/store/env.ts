@@ -4,6 +4,15 @@
 export type Schedule = (fn: () => void) => void;
 export const later: Schedule = (fn) => setTimeout(fn, 0);
 
+/** This device's localStorage, or null where it is blocked or missing (as in unit tests). */
+export function deviceStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 /** True when the computer is set to reduce motion (or there is no screen, as in unit tests). */
 export function reducedMotion(): boolean {
   return typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches;

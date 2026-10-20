@@ -1,5 +1,11 @@
 # Changelog
 
+## Every side panel can be resized (2026-10-20)
+
+- Version history, Completed, the Focus timer, the Journal and Habits now have the same thin strip on their left edge as the calendar. Drag it to make the panel wider or narrower, or click it and use the left and right arrow keys; double-click it to put the usual width back.
+- A panel is never narrower than 300px, and 300px of board always stays visible. The zoom buttons and the Find bar move over with the panel.
+- Each panel remembers its own width on this device only. It is not synced or undoable, and your boards are not changed. The calendar's saved widths work as before. A phone is unchanged: panels still fill the screen.
+
 ## Journal days fold away by year, month and week (2026-10-19)
 
 - The Journal panel now groups your days under Year, then Month, then Week (Monday to Sunday). Click a heading to open or shut it. A week that runs across two months is split, with each month listing its own days.

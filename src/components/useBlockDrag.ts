@@ -8,7 +8,7 @@ import { trackItemDrag } from './itemDom';
 import { holdOrPan } from './touchHold';
 import { isPhone } from './usePhone';
 
-const INTERACTIVE = 'input, textarea, button, a, select, label';
+const INTERACTIVE = 'input, textarea, button, a, select, label, video';
 
 /**
  * Pointer handling for a card or column. Pressing selects it (Ctrl / Shift + click adds or removes

@@ -5,6 +5,7 @@ import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/comp
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
 import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
 import { readImport } from '../../model/importFile';
+import { webAddress } from '../../model/media';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
@@ -268,6 +269,24 @@ export function blockActions(ctx: StoreContext) {
       const w = phone && !into ? phoneCardWidth(ctx.viewportSize().width, view.zoom) : null;
       const place = into ?? ({ type: 'loose', ...spotForNewBlock(board, w ?? CARD_W, NEW_BLOCK_H[kind], ctx.screenCentre(), measured) } as const);
       addNewCard(ctx, kind, place, w);
+    },
+    /**
+     * A web address pasted or dropped on the board (job 124): a selected link card, one undo step.
+     * It goes at the end of the container it was dropped on (`columnId`), else into the selected container,
+     * else loose with its middle at `at` (a board point, where it was dropped) or the middle of the screen.
+     * Returns false, changing nothing, for anything but an http(s) address.
+     */
+    addLinkCard(url: string, at?: Point, columnId?: string): boolean {
+      const address = webAddress(url);
+      if (!address) return false;
+      const { board, ui } = ctx.state;
+      const col = columnId ? board.columns[columnId] : undefined;
+      const into: B.Placement | null = col ? { type: 'column', columnId: col.id, index: col.cardIds.length } : at ? null : B.placementForNewCard(board, ui.selection.length === 1 ? ui.selection[0] : null);
+      const place = into ?? ({ type: 'loose', ...spotForNewBlock(board, CARD_W, NEW_BLOCK_H.link, at ?? ctx.screenCentre(), measured) } as const);
+      const card = { ...createCard('link'), url: address };
+      commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, colourMenuOpen: false, confirm: null } });
+      requestSettle([place.type === 'column' ? place.columnId : card.id]);
+      return true;
     },
     /** Phone (owner request): starting to edit in block `id` (a card in a container: the container) fills the screen's width with it; `at` is the tapped line, in canvas pixels. */
     fitBlockWidth(id: string, at: Point) {

@@ -169,6 +169,67 @@ describe('blocks in the same row slide sideways and spring back (owner decision 
     expect(wide.cards.notes).toMatchObject({ x: 820, y: 0 });
   });
 
+  describe('widening one card in a row of wide cards', () => {
+    // Three loose cards, 20px apart, plus one more on the right (owner report, job 125).
+    const wideRow = () => {
+      let b = loose(B.createBoard(), 'home', 0, 0, 300);
+      b = loose(b, 'tuesday', 460, 0, 300);
+      b = loose(b, 'mid', 880, 0, 300);
+      b = loose(b, 'returns', 1380, 0, 300);
+      return B.resizeCard(B.resizeCard(B.resizeCard(B.resizeCard(b, 'home', 440), 'tuesday', 400), 'mid', 480), 'returns', 380);
+    };
+    const ids = ['home', 'tuesday', 'mid', 'returns'];
+    const after = (id: string, w: number) => settle(shiftRow(B.resizeCard(wideRow(), id, w), id, measured), measured, [id]);
+
+    it('the middle card keeps its place; blocks to its left stay, the one it covers slides right, in order', () => {
+      const b = after('tuesday', 560);
+      expect(xs(b, ['home', 'tuesday'])).toEqual([0, 460]);
+      expect(b.cards.mid.x).toBeGreaterThanOrEqual(460 + 560 + BLOCK_GAP);
+      expect(b.cards.returns.x).toBeGreaterThanOrEqual(b.cards.mid.x + 480 + BLOCK_GAP);
+      expect(ys(b, ids)).toEqual([0, 0, 0, 0]);
+      const order = [...ids].sort((p, q) => b.cards[p].x - b.cards[q].x);
+      expect(order).toEqual(ids);
+      expectNoOverlap(b);
+    });
+
+    it('the leftmost card keeps its place and pushes everything it covers right, in order', () => {
+      const b = after('home', 800);
+      expect(b.cards.home.x).toBe(0);
+      const order = [...ids].sort((p, q) => b.cards[p].x - b.cards[q].x);
+      expect(order).toEqual(ids);
+      expect(b.cards.tuesday.x).toBeGreaterThanOrEqual(800 + BLOCK_GAP);
+      expectNoOverlap(b);
+    });
+
+    it('the rightmost card grows to the right and nothing else moves', () => {
+      const before = wideRow();
+      const b = after('returns', 700);
+      expect(xs(b, ids)).toEqual(xs(before, ids));
+      expect(b.cards.returns.w).toBe(700);
+    });
+
+    it('widening across two neighbours pushes both right, keeping their order; the left one stays', () => {
+      const b = after('tuesday', 1000);
+      expect(xs(b, ['home', 'tuesday'])).toEqual([0, 460]);
+      expect(b.cards.mid.x).toBeGreaterThanOrEqual(460 + 1000 + BLOCK_GAP);
+      expect(b.cards.returns.x).toBeGreaterThanOrEqual(b.cards.mid.x + 480 + BLOCK_GAP);
+      const order = [...ids].sort((p, q) => b.cards[p].x - b.cards[q].x);
+      expect(order).toEqual(ids);
+      expectNoOverlap(b);
+    });
+
+    it('a container resized in a row of cards behaves the same', () => {
+      let b = loose(B.createBoard(), 'left', 0, 0, 300);
+      b = B.addColumn(b, { ...createColumn('col'), x: 460, y: 0 });
+      heights.col = 300;
+      b = loose(b, 'right', 800, 0, 300);
+      const wide = shiftRow(B.resizeColumn(b, 'col', 600), 'col', measured);
+      expect(wide.cards.left.x).toBe(0);
+      expect(wide.columns.col.x).toBe(460);
+      expect(wide.cards.right.x).toBeGreaterThanOrEqual(460 + 600 + BLOCK_GAP);
+    });
+  });
+
   it('blocks stacked beside the dragged block move over together, not spread out', () => {
     let b = B.addColumn(B.createBoard(), { ...createColumn('a'), x: 0, y: 0 });
     heights.a = 600;

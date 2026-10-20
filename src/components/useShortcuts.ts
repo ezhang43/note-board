@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
 import { shownName } from '../model/board';
-import { matches } from '../model/hotkeys';
+import { DEFAULT_HOTKEYS, matches } from '../model/hotkeys';
 import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
 import { collab } from '../sync/collabSession';
@@ -124,8 +124,13 @@ export function useShortcuts() {
       // The tools and block shortcuts use the keys this device chose (hotkeys.ts); the defaults are the usual ones.
       const hk = state.view.hotkeys;
       if (matches(hk.selectAll, e)) return run(e, appStore.selectAll);
-      if (matches(hk.copy, e) && appStore.copySelection()) return e.preventDefault();
-      if (matches(hk.paste, e) && appStore.paste()) return e.preventDefault();
+      if (matches(hk.copy, e) && appStore.copySelection()) {
+        markBlocksCopied();
+        return e.preventDefault();
+      }
+      // Ctrl+V itself is left to the browser's paste event (useDropPaste), which sees what is really on the clipboard.
+      // simple: a paste key the person re-mapped can't see the clipboard, so it always pastes the copied blocks.
+      if (matches(hk.paste, e) && !matches(DEFAULT_HOTKEYS.paste, e) && appStore.paste()) return e.preventDefault();
       if (matches(hk.duplicate, e)) return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
       if (matches(hk.hand, e)) return run(e, () => appStore.setTool('hand'));
       if (matches(hk.select, e)) return run(e, () => appStore.setTool('select'));
@@ -138,12 +143,34 @@ export function useShortcuts() {
   }, []);
 }
 
+/** Put on the computer's clipboard when blocks are copied in the app: Ctrl+V pastes them only while it is still there, so a newer copy elsewhere wins. */
+export const BLOCKS_MARKER = 'application/x-note-board-blocks';
+
+/** False when the browser refused to write the marker: then the copied blocks are all there is to paste (as before the marker). */
+export let markerWritten = true;
+
+/** Writes the marker with the browser's own copy (which replaces whatever was copied before). */
+function markBlocksCopied() {
+  markerWritten = false;
+  const put = (e: ClipboardEvent) => {
+    e.clipboardData?.setData(BLOCKS_MARKER, '1');
+    e.preventDefault();
+    markerWritten = true;
+  };
+  document.addEventListener('copy', put, { once: true });
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.removeEventListener('copy', put);
+  }
+}
+
 const BOARD_MOVE: Record<string, 'next' | 'previous' | 'up' | 'down'> = { ArrowRight: 'next', ArrowLeft: 'previous', ArrowUp: 'up', ArrowDown: 'down' };
 
 /** A short note that goes by itself (the notice banner, cleared after a moment unless something else replaced it). */
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastText: string | null = null;
-function toast(text: string) {
+export function toast(text: string) {
   // A note someone has to read and dismiss (a failed delete, a share that stopped) is never covered.
   if (collab.notice() && collab.notice() !== toastText) return;
   toastText = text;

@@ -1,8 +1,9 @@
 import { boxProps } from './textBox';
-import { memo, useRef, type CSSProperties } from 'react';
+import { memo, useRef, useState, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
+import { mediaOf, type Media } from '../model/media';
 import { isBold } from '../model/palette';
 import { swatchFor } from '../model/theme';
 import type { BoardCard, Card, LinkCard, NoteCard } from '../model/types';
@@ -196,6 +197,44 @@ function NoteBody({ card }: { card: NoteCard }) {
   );
 }
 
+/**
+ * A picture, video or embedded player for a link card whose address is one (decided from the address
+ * each time it is drawn; nothing extra is saved, nothing uploaded). Media that fails to load is dropped,
+ * leaving the ordinary link card. A player swallows the pointer, so until its card is selected a clear
+ * cover lets a click select (or drag) the card instead of starting playback.
+ */
+function LinkMedia({ card }: { card: LinkCard }) {
+  const media = mediaOf(card.url);
+  // simple: a failed picture or video stays hidden until the card is drawn afresh (no retry); add a retry if offline starts to matter.
+  const [failed, setFailed] = useState<string | null>(null);
+  const selected = useAppState((s) => s.ui.selection.includes(card.id));
+  if (!media || failed === media.src) return null;
+  const fail = () => setFailed(media.src);
+  const alt = card.title || `Image from ${domainOf(card.url) ?? 'the web'}`;
+  return (
+    <div className={`link-media ${media.kind}`}>
+      <MediaElement media={media} alt={alt} onFail={fail} />
+      {media.kind !== 'image' && !selected && <div className="media-cover" />}
+    </div>
+  );
+}
+
+function MediaElement({ media, alt, onFail }: { media: Media; alt: string; onFail: () => void }) {
+  if (media.kind === 'image') return <img src={media.src} alt={alt} loading="lazy" draggable={false} referrerPolicy="no-referrer" onError={onFail} />;
+  if (media.kind === 'video') return <video src={media.src} controls preload="metadata" onError={onFail} />;
+  return (
+    <iframe
+      src={media.src}
+      title={alt}
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-presentation"
+      allow="fullscreen; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
+  );
+}
+
 function LinkBody({ card }: { card: LinkCard }) {
   const href = hrefOf(card.url);
   // The address box is a plain field: a search match there rings the whole box.
@@ -214,6 +253,7 @@ function LinkBody({ card }: { card: LinkCard }) {
         value={card.title}
         onChange={(title) => appStore.setCardTitle(card.id, title)}
       />
+      <LinkMedia card={card} />
       <input
         className={findCurrent ? 'link-url find-current' : 'link-url'}
         data-find={`url:${card.id}`}

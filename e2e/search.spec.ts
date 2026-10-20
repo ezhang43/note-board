@@ -59,6 +59,29 @@ test('Ctrl+F searches the board: every match marked, the board moves to each in 
   await expect(page.locator('mark.find-mark')).toHaveCount(0);
 });
 
+test('Find zooms a board zoomed out below 60% in to 60%, and leaves 60% and above alone', async ({ page }) => {
+  await note(page, 'Buy eggs');
+  const zoom = page.getByRole('button', { name: 'Reset zoom' });
+  const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+  await zoomOut.click();
+  await zoomOut.click();
+  await zoomOut.click();
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect(zoom).toHaveText('40%');
+  await page.keyboard.press('Control+f');
+  await page.getByRole('searchbox', { name: 'Search the board' }).fill('eggs');
+  await expect(zoom).toHaveText('60%');
+  await page.keyboard.press('Escape');
+  await zoomIn.click();
+  await expect(zoom).toHaveText('72%');
+  await page.keyboard.press('Control+f');
+  await page.getByRole('searchbox', { name: 'Search the board' }).fill('egg');
+  await page.getByRole('searchbox', { name: 'Search the board' }).press('Enter');
+  await expect(zoom).toHaveText('72%');
+});
+
 test('Ctrl+F while typing in a card opens the board search too', async ({ page }) => {
   await note(page, 'Hello');
   await page.getByLabel('Note text').first().click();

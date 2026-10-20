@@ -8,6 +8,23 @@
 - The Journal panel is now as wide as the Calendar panel.
 - A day written ahead (a later date) now appears in its own group above today's instead of just below it. Today's note still gets the cursor.
 
+## Pictures, videos and web addresses (2026-10-19)
+
+- Paste a web address onto the board (Ctrl+V, not while typing in a text field) or drag one in from another browser tab, and it becomes a link card. A picture or link dragged from a web page works too.
+- If the address is a picture (.jpg, .png, .gif, .webp, .avif, .svg), the card shows the picture. A YouTube or Vimeo address shows the video player, and an .mp4 or .webm address shows a video with controls. Anything else stays an ordinary link card, and a picture or video that can't load falls back to the ordinary card.
+- Nothing is uploaded. The picture or video is loaded from its own website each time, and the privacy page now says so. A picture or file from your computer can't be added yet: the board says so and suggests pasting a web address.
+- The newest copy wins: copy a card and then a web address somewhere else, and Ctrl+V makes the link card; copy a card after an address and Ctrl+V pastes the card (it used to keep pasting the old card until you reloaded).
+- A click on a video on a card that isn't selected selects the card first, so cards still drag and select as usual. Only http and https addresses are ever used. Nothing about saving, sync or undo changed. A link card already on a board (or shared with you, or imported) whose address is a picture or video now shows it too.
+
+## Widening a card no longer throws its row neighbours around (2026-10-19)
+
+- Fix: when you dragged a card's resize corner wider so it covered the next card, the blocks to its left in the row (such as the card at its far left) jumped to the right of it, so the row came out in the wrong order. Now the card you resize keeps its place, blocks to its left stay exactly where they were, and only the blocks it now covers slide right, in their old order.
+- This is the same for the corner, the width strip, the keyboard arrows and a finger. Dragging blocks is unchanged. Your boards and their saving are not touched.
+
+## Find zooms in less (2026-10-19)
+
+- When the board is zoomed out below 60%, Find now zooms in to 60% on the match instead of 100%, so it no longer jumps in so far. At 60% or more the zoom is left as it is.
+
 ## The Privacy page explains the Claude connector (2026-10-19)
 
 - The Privacy policy has a new short section, "The Claude connector (optional)". It says the connector runs only on your own computer, signs in with your own Google account, keeps that sign-in in a file on that computer, touches your boards only when you ask Claude to, has deleting switched off, and sends what Claude reads to Claude under Anthropic's privacy policy. BusyAnts stores nothing new because of it.

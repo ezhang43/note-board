@@ -7,6 +7,10 @@
 - **The FAQ has a new question,** "Does BusyAnts use AI?".
 - **The comparison table only says what we could confirm.** Notion's "1,000 blocks" became "Limited once shared", and two offline answers we couldn't check became dashes.
 - Nothing in the app or in saved boards changed. The spec no longer says "no tracking"; it says visits are counted privately, as the About page already did.
+## Save a board as a picture or PDF (2026-10-22)
+
+- **File → Download as picture (PNG)** and **Download as PDF** save the whole open board, every card and container and not just what is on screen, as it looks now (your color theme and dark mode included), to send or print. The PDF is one page the size of the board. On an iPhone home-screen app they open the Share sheet, like the backup. A big board shows "Preparing…" while it is drawn.
+- A picture from another site that the browser won't let us copy is left as a blank panel. Nothing about saved boards changed.
 
 ## Keys in side panels, screen readers, faster sign-in (2026-10-22)
 

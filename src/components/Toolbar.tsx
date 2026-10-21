@@ -8,6 +8,7 @@ import { COLOR_THEMES, swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { CANT_READ, IMPORT_ACCEPT, IMPORT_MAX_BYTES, isPdf, TOO_BIG } from '../model/importFile';
 import { readPdf } from './readPdf';
+import { boardPicture } from './exportBoard';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
 import { ShareButton } from './SharePanel';
@@ -48,14 +49,14 @@ function NewColumnButton() {
  * Save `text` as a file called `name` on this device. An iPhone home-screen app can't download
  * files, so there the Share sheet offers to save it (Save to Files) instead.
  */
-async function saveFile(name: string, text: string, type: string) {
-  const file = new File([text], name, { type });
+async function saveFile(name: string, data: BlobPart, type: string) {
+  const file = new File([data], name, { type });
   const homeScreenIphone = (navigator as { standalone?: boolean }).standalone === true;
   if (homeScreenIphone && navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file] }).catch(() => {}); // closing the sheet isn't an error
     return;
   }
-  const url = URL.createObjectURL(new Blob([text], { type }));
+  const url = URL.createObjectURL(new Blob([data], { type }));
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.append(a);
   a.click();
@@ -67,6 +68,25 @@ async function saveFile(name: string, text: string, type: string) {
 export function downloadBackup() {
   const name = Object.keys(appStore.getState().boards.others).length ? 'All boards' : appStore.getState().board.name;
   void saveFile(backupFileName(name, new Date(), 'json'), serializeWorkspace(appStore.workspace()), 'application/json');
+}
+
+/** Downloads the open board as a picture or a one-page PDF (job 163); a big board shows "Preparing…" meanwhile. */
+let drawing = false; // one picture at a time: a second full-size copy of a big board could run a phone out of memory
+async function downloadPicture(kind: 'png' | 'pdf') {
+  if (drawing) return;
+  drawing = true;
+  collab.setNotice('Preparing…');
+  try {
+    const blob = await boardPicture(kind);
+    if (!blob) return void window.alert('Nothing on this board to save yet.');
+    await saveFile(backupFileName(appStore.getState().board.name, new Date(), kind), blob, blob.type);
+  } catch (e) {
+    console.error(e);
+    window.alert('Couldn’t make the picture. Try again, or try a smaller board.');
+  } finally {
+    drawing = false;
+    if (collab.notice() === 'Preparing…') collab.setNotice(null);
+  }
 }
 
 /**
@@ -120,6 +140,12 @@ export function FileMenu() {
           </button>
           <button type="button" role="menuitem" title="This board as readable text" onClick={pick(() => saveFile(backupFileName(board().name, new Date(), 'md'), boardAsMarkdown(board(), appStore.boardName), 'text/markdown'))}>
             Download as text
+          </button>
+          <button type="button" role="menuitem" title="This board as a picture, to send or print" onClick={pick(() => downloadPicture('png'))}>
+            Download as picture (PNG)
+          </button>
+          <button type="button" role="menuitem" title="This board as a one-page PDF, to send or print" onClick={pick(() => downloadPicture('pdf'))}>
+            Download as PDF
           </button>
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
             Restore from backup…

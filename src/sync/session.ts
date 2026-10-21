@@ -11,6 +11,8 @@ import { flushWhenHidden } from './pageHide';
 
 /** Firebase's database code, downloaded once someone is signed in, so the sign-in screen doesn't carry it (job 169). */
 const database = () => import('./database');
+/** Starts the download early; a failure shows when the board starts (start). */
+const preloadDatabase = () => void database().catch(() => {});
 
 /**
  * checking: finding out whether someone is signed in on this device.
@@ -46,6 +48,9 @@ let held = (() => {
     return null;
   }
 })();
+// Someone signed in on this device before, so likely still is: the database code comes down
+// alongside Firebase's sign-in check rather than after it.
+if (held) preloadDatabase();
 
 function update(next: SessionStatus, error = '') {
   status = next;
@@ -83,11 +88,12 @@ watchUser((user) => {
 async function start(user: User, quiet = false) {
   if (!quiet) update('loading');
   const mine = turn;
-  let db: Awaited<ReturnType<typeof database>>;
-  try {
-    db = await database();
-  } catch {
-    // Couldn't be downloaded (offline, and not kept from an earlier visit): nothing starts.
+  const db = await database().catch((e: unknown) => {
+    // Couldn't be downloaded (offline, and not kept from an earlier visit), or didn't start: nothing starts.
+    console.error(e);
+    return null;
+  });
+  if (!db) {
     if (mine === turn) update('error');
     return;
   }
@@ -231,6 +237,8 @@ export const session = {
     };
   },
   signIn() {
+    // Downloads while Google's window is open.
+    preloadDatabase();
     signInWithGoogle().catch((e: { code?: string }) => {
       // Closing the Google window isn't an error worth showing.
       if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;

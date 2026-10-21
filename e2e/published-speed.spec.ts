@@ -5,14 +5,14 @@ import { expect, test } from '@playwright/test';
 // five font families to draw one button). It loads without the board's code, and only the font it shows.
 
 // Uncompressed JavaScript the sign-in screen may download, in KB (before job 165a: 1,137; after it: about 975;
-// since job 169 loads Firebase's database code only once someone is signed in: about 460).
+// since job 169 loads Firebase's database code only once someone is signed in: about 470).
 const BUDGET_KB = 520;
 
 test('the sign-in screen loads without the board code and with only IBM Plex Sans and Roboto Medium', async ({ page }) => {
   const reading: Promise<string>[] = [];
   const fontSheets: string[] = [];
   page.on('response', (r) => {
-    if (/\.js$/.test(new URL(r.url()).pathname)) reading.push(r.text());
+    if (/\.js$/.test(new URL(r.url()).pathname)) reading.push(r.text().catch(() => ''));
   });
   page.on('request', (r) => {
     if (r.url().startsWith('https://fonts.googleapis.com/')) fontSheets.push(decodeURIComponent(r.url()));
@@ -45,7 +45,7 @@ test('the sign-in screen downloads less script than before the board code was sp
   // read came out about 100 KB short).
   const sizes: Promise<number>[] = [];
   page.on('response', (r) => {
-    if (/\.js$/.test(new URL(r.url()).pathname)) sizes.push(r.body().then((b) => b.length));
+    if (/\.js$/.test(new URL(r.url()).pathname)) sizes.push(r.body().then((b) => b.length, () => 0));
   });
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();

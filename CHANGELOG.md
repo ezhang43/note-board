@@ -1,5 +1,11 @@
 # Changelog
 
+## Bottom bar fits beside a side panel (2026-10-21)
+
+- With a side panel open, every control in the bottom-right bar (Search, Completed, History, Timer, Calendar, Journal, Habits, ?, coffee cup, A− / A+ and zoom) now stays fully visible and clickable, even when the panel is dragged nearly as wide as it goes.
+- When space is short, the buttons in the pill drop their words and show icons only (hover one to see its name). If icons alone don't fit, the bar wraps into rows with the pill on top.
+- Nothing changes with a wide window, with no panel open, or on a phone. Saved boards are untouched.
+
 ## Calendar: press Delete twice to delete an event (2026-10-21)
 
 - With an event's card open, Delete (or Backspace) asks "Delete “Dentist”?" as before. Pressing Delete or Backspace again now answers it: the event is deleted. For a repeating event it deletes **all events in the series**.

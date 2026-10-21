@@ -1,6 +1,6 @@
 import type { StorageLike } from '../model/persist';
-import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
-import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, VERSION_GAP_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
+import { readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { boardRights } from '../model/sharing';
 import type { Sharing } from './sharing';
 import type { Store } from './store';
@@ -37,10 +37,9 @@ export const VERSION_SAVE_WAIT_MS = 3000;
  * false if the save failed within the wait, true otherwise; `onLateFailure` runs if it fails later.
  */
 export async function saveSafetyVersion(store: Store, versions: VersionStore, now: () => number, onLateFailure?: () => void) {
-  const data = serializeWorkspace(store.workspace());
-  const got = readWorkspace(data);
-  if (!got) return true;
-  const meta: VersionMeta = { id: newId(), savedAt: now(), ...summarizeWorkspace(got.ws), hash: contentHash(data) };
+  const version = versionOf(store.workspace(), now());
+  if (!version) return true;
+  const { meta, data } = version;
   const saving = (async () => versions.save(meta, data))(); // called now; a throw becomes a failed save
   let timer: ReturnType<typeof setTimeout> | undefined;
   const waited = new Promise<null>((done) => (timer = setTimeout(() => done(null), VERSION_SAVE_WAIT_MS)));
@@ -55,6 +54,14 @@ export async function saveSafetyVersion(store: Store, versions: VersionStore, no
   if (saved !== null) return saved;
   saving.catch(() => onLateFailure?.());
   return true;
+}
+
+/** `ws` as a version saved at `savedAt` (`kind`: see VersionMeta), or null if it can't be read back. */
+function versionOf(ws: Workspace, savedAt: number, kind?: VersionMeta['kind']): { meta: VersionMeta; data: string } | null {
+  const data = serializeWorkspace(ws);
+  const got = readWorkspace(data);
+  if (!got) return null;
+  return { data, meta: { id: newId(), savedAt, ...summarizeWorkspace(got.ws), hash: contentHash(data), ...(kind ? { kind } : {}) } };
 }
 
 /**
@@ -105,6 +112,8 @@ export function localVersionStore(storage: StorageLike & { removeItem?(key: stri
 }
 
 let current: VersionStore | null = null;
+/** A backup of every board is being put in place (see restoreFromBackup): not a change from another device. */
+let restoringBackup = false;
 /** The version store in use now (null until one is started), for the history panel. */
 export const activeVersionStore = () => current;
 
@@ -128,7 +137,8 @@ async function saveVersion(versions: VersionStore, data: string, savedAt: number
 
 /**
  * Watch the store and save versions into `versions`. Only changes made on this page count: a board
- * arriving from another device is that device's to save. Saving failures are ignored (history is
+ * arriving from another device is that device's to save, except that boards edited here are saved
+ * just before such a change replaces them (see below). Saving failures are ignored (history is
  * a safety net; the board itself is saved separately).
  */
 export function startVersions(store: Store, versions: VersionStore, opts: { now?: () => number } = {}) {
@@ -140,6 +150,9 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
   let lastSavedAt: number | null | undefined; // undefined until the list has been read
   let lastEditAt: number | null = null;
   let owed: { data: string; retryAt: number } | null = null;
+  // Job #147: whether this page has edits no 'outside' version holds yet, and when the last one was kept.
+  let unkept = false;
+  let lastKeptAt: number | null = null;
   let queue = versions.list().then(
     (list) => {
       lastSavedAt = list[0]?.savedAt ?? null;
@@ -156,6 +169,33 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
     lastWs = ws;
     if (store.outsideChanges() !== seenOutside) {
       seenOutside = store.outsideChanges();
+      // Job #147 (review 137, H3): another device's copy replacing the person's own boards (an old
+      // copy a phone saved offline and sent hours later, say) would lose what was edited here since
+      // the last such version (an ordinary version holds the boards from before the edits). Those
+      // boards are kept as a version first, at most once in 10 minutes (two devices used at once
+      // would fill the history otherwise), started straight away, before anything can clear this
+      // device. Only boards that were here count, and not shared ones (they sync on their own):
+      // a share's boards arriving, or someone else changing one, don't; nor does restoring a backup.
+      // simple: a version that can't be saved (over the online limit, or a failed commit) is only
+      // logged, not tried again like an ordinary one; give it a retry if that loses work in practice.
+      if (!unkept || restoringBackup) return;
+      const at = now();
+      if (lastKeptAt !== null && at - lastKeptAt < VERSION_GAP_MS) return;
+      const shared = new Set(store.getState().ui.shares.flatMap((s) => s.boards));
+      if (!Object.keys(before.boards).some((id) => !shared.has(id) && before.boards[id] !== ws.boards[id])) return;
+      const version = versionOf(before, at, 'outside');
+      if (!version) return;
+      const keptBefore = lastKeptAt;
+      unkept = false;
+      lastKeptAt = at;
+      (async () => versions.save(version.meta, version.data))().then(
+        () => tidyAfter(versions, version.meta, version.data).catch(() => {}),
+        (e) => {
+          unkept = true;
+          if (lastKeptAt === at) lastKeptAt = keptBefore;
+          console.warn('The boards from before changes from another device couldn’t be saved in Version history.', e);
+        },
+      );
       return;
     }
     // Blocks re-arranging themselves (e.g. once real heights are known) aren't an edit.
@@ -164,6 +204,7 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
     const at = now();
     const previousEdit = lastEditAt;
     lastEditAt = at;
+    unkept = true;
     // Decided here without going online, so typing doesn't read the list at every letter. A version
     // that couldn't be saved is owed, and tried again a minute later.
     if (owed ? at < owed.retryAt : lastSavedAt !== undefined && !needsVersion(lastSavedAt, previousEdit, at)) return;
@@ -246,7 +287,12 @@ export async function restoreFromBackup(store: Store, versions: VersionStore | n
   if (!store.getState().ui.sharesKnown) return 'loading'; // see restoreVersion
   // Saving the version may fail (offline): the restore still goes ahead, and Ctrl+Z still undoes it.
   if (versions) await saveSafetyVersion(store, versions, now);
-  return store.restoreBackup(text);
+  restoringBackup = true; // it saved its own safety version just now
+  try {
+    return store.restoreBackup(text);
+  } finally {
+    restoringBackup = false;
+  }
 }
 
 /**

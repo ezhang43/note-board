@@ -33,8 +33,8 @@ test('Journal opens a side panel with today’s note ready to type; the board yo
   await journalButton(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(journalButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toContainText(DATE);
-  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toContainText(today);
+  await expect(panel(page).getByRole('heading', { level: 3 }).first().locator('.sr-only')).toHaveText(DATE);
+  await expect(panel(page).getByRole('heading', { level: 3 }).first().locator('.sr-only')).toHaveText(today);
   // Today is a page of its own: its date as the heading ("Wednesday, 21 October"), the week, and a word count.
   await expect(panel(page).locator('.journal-page .jp-title')).toHaveText(/^[A-Z][a-z]+day, \d{1,2} [A-Z][a-z]+$/);
   await expect(panel(page).locator('.journal-page .jp-week')).toHaveText(/^Week \d{1,2}$/);

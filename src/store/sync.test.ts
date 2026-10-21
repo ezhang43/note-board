@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { addCard, createBoard } from '../model/board';
 import { createCard } from '../model/cards';
-import { serializeBoard } from '../model/persist';
+import { BOARD_KEY, serializeBoard } from '../model/persist';
 import { journalRich, type Rich } from '../model/richText';
 import type { NoteCard } from '../model/types';
-import { serializeWorkspace } from '../model/workspace';
-import { createStore } from './store';
-import { ownBoardsGuard } from './sharing';
+import type { VersionMeta } from '../model/versions';
+import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { createStore, type Store } from './store';
+import { claimDevice, OWNER_KEY, parkedKey } from './account';
+import { baseKey, ownBoardsGuard, sharesKey } from './sharing';
 import { ONLINE_LIMIT, startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
@@ -756,5 +758,218 @@ describe('Journal formatting edited on two devices at once (job 119)', () => {
     expect(note(a.store)).toEqual(note(b.store));
     a.sync.stop();
     b.sync.stop();
+  });
+});
+
+describe('one computer, several accounts (job #145, review 137-A finding H2)', () => {
+  /** A browser's storage; `full`: nothing bigger fits; `refuse`: keys that can't be saved; `blocked`: it can't be used at all. */
+  function memoryStorage(init: Record<string, string> = {}) {
+    const data = new Map<string, string>(Object.entries(init));
+    const control = { full: false, blocked: false, refuse: (() => false) as (key: string) => boolean };
+    const check = () => {
+      if (control.blocked) throw new Error('SecurityError');
+    };
+    return {
+      data,
+      control,
+      getItem: (k: string) => (check(), data.get(k) ?? null),
+      setItem: (k: string, v: string) => {
+        check();
+        if (control.refuse(k) || (control.full && (data.get(k)?.length ?? 0) < v.length)) throw new Error('QuotaExceededError');
+        data.set(k, v);
+      },
+      removeItem: (k: string) => (check(), void data.delete(k)),
+    };
+  }
+  /** Alice used this browser and signed out: her boards, her private journal among them, are still on it. */
+  function aliceLeftHerBoards(owner: string | null = 'alice') {
+    let diary = { ...createBoard(), name: 'Alice private journal' };
+    diary = addCard(diary, { ...(createCard('note', 'n') as NoteCard), text: 'secret' }, { type: 'loose', x: 0, y: 0 });
+    const boards = serializeWorkspace({ home: 'home', boards: { home: { ...createBoard(), name: 'Alice home' }, j: diary } });
+    return memoryStorage({ [BOARD_KEY]: boards, ...(owner ? { [OWNER_KEY]: owner } : {}) });
+  }
+  const names = (ws: { boards: Record<string, { name: string }> }) => Object.values(ws.boards).map((b) => b.name).sort();
+  /** Signs `uid` in on `store` as src/sync/session.ts does; the online copy is `online` (null: none yet). */
+  async function signIn(store: Store, storage: ReturnType<typeof memoryStorage>, uid: string, online: string | null, held: string | null) {
+    claimDevice(store, storage, uid, held);
+    const fake = fakeRemote();
+    const guard = ownBoardsGuard(store, fake.remote, () => false, new Set());
+    guard.known();
+    const sync = startSync(store, guard.remote, { client: uid, onReady: () => {}, onError: () => {}, isShared: guard.isShared });
+    fake.send(online === null ? null : { data: online, client: `${uid}-laptop` });
+    await vi.advanceTimersByTimeAsync(2000);
+    return { sync, uploaded: fake.writes.map((w) => names(readWorkspace(w.data)!.ws)) };
+  }
+  const preview = (store: Store) => store.previewVersion({ id: 'v1', savedAt: 0, label: '' } as unknown as VersionMeta, store.workspace().boards.j);
+
+  it('a new account with nothing online yet never gets, sees or uploads the boards the last account left', async () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    // She was looking at an old version of her journal when she signed out.
+    preview(store);
+    const bob = await signIn(store, storage, 'bob', null, 'alice');
+    expect(store.getState().ui.preview).toBeNull();
+    expect(names(store.workspace())).not.toContain('Alice home');
+    expect(names(store.workspace())).not.toContain('Alice private journal');
+    expect(bob.uploaded.flat()).not.toContain('Alice home');
+    expect(bob.uploaded.flat()).not.toContain('Alice private journal');
+    // Undo can't bring them back either.
+    expect(store.getState().ui.canUndo).toBe(false);
+    // Alice's copy is kept aside on the device, untouched; the device's boards are Bob's now.
+    expect(names(readWorkspace(storage.getItem(parkedKey('alice')))!.ws)).toEqual(['Alice home', 'Alice private journal']);
+    expect(storage.getItem(OWNER_KEY)).toBe('bob');
+    bob.sync.stop();
+    store.flush();
+    expect(storage.getItem(BOARD_KEY)).not.toContain('Alice');
+    // Reloaded, the page opens on Bob's boards, not Alice's.
+    expect(names(createStore(storage, (fn) => fn()).workspace())).not.toContain('Alice home');
+  });
+
+  it('a new account with boards online gets those, and nothing of the last account’s', async () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    const bob = await signIn(store, storage, 'bob', serializeWorkspace({ home: 'bh', boards: { bh: { ...createBoard(), name: 'Bob home' } } }), 'alice');
+    expect(names(store.workspace())).toEqual(['Bob home']);
+    expect(bob.uploaded).toEqual([]);
+    bob.sync.stop();
+  });
+
+  it('another open tab, still holding the last account’s boards, doesn’t give them to the new account either', async () => {
+    const storage = aliceLeftHerBoards();
+    const tabA = createStore(storage, (fn) => fn());
+    const tabB = createStore(storage, (fn) => fn());
+    // Bob signs in; tab B gets there first and keeps Alice's boards aside.
+    claimDevice(tabB, storage, 'bob', 'alice');
+    tabB.renameBoard('Bob home');
+    tabB.flush();
+    const a = await signIn(tabA, storage, 'bob', null, 'alice');
+    expect(names(tabA.workspace())).toEqual(['Bob home']);
+    expect(a.uploaded.flat()).not.toContain('Alice home');
+    expect(names(readWorkspace(storage.getItem(parkedKey('alice')))!.ws)).toEqual(['Alice home', 'Alice private journal']);
+    a.sync.stop();
+  });
+
+  it('the earlier account gets its boards back when it signs in here again', async () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    const bob = await signIn(store, storage, 'bob', null, 'alice');
+    store.renameBoard('Bob home');
+    await vi.advanceTimersByTimeAsync(2000);
+    bob.sync.stop();
+    // Alice is back offline (her online copy hasn't come yet): her boards from this device open.
+    claimDevice(store, storage, 'alice', 'bob');
+    expect(names(store.workspace())).toEqual(['Alice home', 'Alice private journal']);
+    expect(storage.getItem(OWNER_KEY)).toBe('alice');
+    expect(storage.getItem(parkedKey('alice'))).toBeNull();
+    expect(names(readWorkspace(storage.getItem(parkedKey('bob')))!.ws)).toEqual(['Bob home']);
+    // With no online copy, they go to her account (hers, so that is right).
+    const fake = fakeRemote();
+    const sync = startSync(store, fake.remote, { client: 'alice', onReady: () => {}, onError: () => {} });
+    fake.send(null);
+    expect(names(readWorkspace(fake.writes[0].data)!.ws)).toEqual(['Alice home', 'Alice private journal']);
+    sync.stop();
+  });
+
+  it('each account’s last agreed versions of its shared boards go aside and come back with its boards', () => {
+    const storage = aliceLeftHerBoards();
+    storage.setItem(sharesKey('alice'), JSON.stringify([{ id: 's1', owner: false, ownerUid: 'carol' }]));
+    storage.setItem(baseKey('s1'), 'alice-rev-5');
+    const store = createStore(storage, (fn) => fn());
+    claimDevice(store, storage, 'bob', 'alice');
+    // Bob is on the same share; his page moves its agreed version on.
+    storage.setItem(sharesKey('bob'), JSON.stringify([{ id: 's1', owner: false, ownerUid: 'carol' }]));
+    storage.setItem(baseKey('s1'), 'bob-rev-10');
+    claimDevice(store, storage, 'alice', 'bob');
+    // Alice's boards come back with the version they were agreed at, so they combine as after a reload.
+    expect(storage.getItem(baseKey('s1'))).toBe('alice-rev-5');
+    claimDevice(store, storage, 'bob', 'alice');
+    expect(storage.getItem(baseKey('s1'))).toBe('bob-rev-10');
+  });
+
+  it('a change on this page not saved on the device yet is kept aside too', () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    store.renameBoard('Alice home, renamed');
+    claimDevice(store, storage, 'bob', 'alice');
+    expect(names(readWorkspace(storage.getItem(parkedKey('alice')))!.ws)).toContain('Alice home, renamed');
+  });
+
+  it('the boards kept aside are the saved text itself, so nothing this page couldn’t read is lost', () => {
+    const storage = aliceLeftHerBoards();
+    const newer = JSON.stringify({ version: 99, boards: 'from a newer app' });
+    storage.setItem(BOARD_KEY, newer);
+    const store = createStore(storage, (fn) => fn());
+    claimDevice(store, storage, 'bob', 'alice');
+    expect(storage.getItem(parkedKey('alice'))).toBe(newer);
+  });
+
+  it('boards kept aside that can’t be read (saved by a newer version) are neither opened, emptied nor dropped', () => {
+    const storage = aliceLeftHerBoards();
+    const newer = JSON.stringify({ version: 99, boards: 'from a newer app' });
+    storage.setItem(parkedKey('bob'), newer);
+    const store = createStore(storage, (fn) => fn());
+    const before = new Map(storage.data);
+    expect(() => claimDevice(store, storage, 'bob', 'alice')).toThrow();
+    expect(storage.data).toEqual(before);
+    expect(names(store.workspace())).toEqual(['Alice home', 'Alice private journal']);
+  });
+
+  it('the same account signing in again changes nothing', () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    const before = new Map(storage.data);
+    claimDevice(store, storage, 'alice', 'alice');
+    expect(names(store.workspace())).toEqual(['Alice home', 'Alice private journal']);
+    expect(storage.data).toEqual(before);
+  });
+
+  it('boards saved before this change (no owner kept yet) stay with the first account that signs in, which is then remembered', async () => {
+    const storage = aliceLeftHerBoards(null);
+    const store = createStore(storage, (fn) => fn());
+    const first = await signIn(store, storage, 'alice', null, null);
+    expect(first.uploaded[0]).toEqual(['Alice home', 'Alice private journal']);
+    expect(storage.getItem(OWNER_KEY)).toBe('alice');
+    first.sync.stop();
+    // The next account is a different one: Alice's boards are kept aside, not given to it.
+    const bob = await signIn(store, storage, 'bob', null, 'alice');
+    expect(bob.uploaded.flat()).not.toContain('Alice home');
+    bob.sync.stop();
+  });
+
+  it('if the earlier account’s boards can’t be kept aside (storage full), nothing changes and it refuses', () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    preview(store);
+    const before = new Map(storage.data);
+    storage.control.full = true;
+    expect(() => claimDevice(store, storage, 'bob', 'alice')).toThrow();
+    expect(storage.data).toEqual(before);
+    expect(names(store.workspace())).toEqual(['Alice home', 'Alice private journal']);
+    expect(store.getState().ui.preview).not.toBeNull();
+  });
+
+  it('if the new account’s boards can’t be saved after Alice’s were kept aside, hers don’t stay as the device’s boards', () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    storage.control.refuse = (k) => k === BOARD_KEY;
+    claimDevice(store, storage, 'bob', 'alice');
+    expect(storage.getItem(BOARD_KEY)).toBeNull();
+    expect(names(readWorkspace(storage.getItem(parkedKey('alice')))!.ws)).toEqual(['Alice home', 'Alice private journal']);
+    expect(names(createStore(storage, (fn) => fn()).workspace())).not.toContain('Alice home');
+  });
+
+  it('with no owner kept and storage full, the first account still signs in', () => {
+    const storage = aliceLeftHerBoards(null);
+    const store = createStore(storage, (fn) => fn());
+    storage.control.full = true;
+    expect(() => claimDevice(store, storage, 'alice', null)).not.toThrow();
+    expect(names(store.workspace())).toEqual(['Alice home', 'Alice private journal']);
+  });
+
+  it('with the browser’s storage blocked, it can’t tell whose the boards are, so it refuses', () => {
+    const storage = aliceLeftHerBoards();
+    const store = createStore(storage, (fn) => fn());
+    storage.control.blocked = true;
+    expect(() => claimDevice(store, storage, 'bob', 'alice')).toThrow();
   });
 });

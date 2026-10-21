@@ -2,7 +2,7 @@ import { appStore } from '../store/appStore';
 import { boardsInKeptShares, ownBoardsGuard, startSharing, type Sharing } from '../store/sharing';
 import { startSync, type SaveState } from '../store/sync';
 import { activeVersionStore, startVersions } from '../store/versions';
-import { deleteAccountData } from '../store/account';
+import { claimDevice, deleteAccountData, OWNER_KEY } from '../store/account';
 import { account, finishDeletion, takeDeletedNote } from './account';
 import { collab, joinFromAddress } from './collabSession';
 import { feedback } from './feedback';
@@ -48,6 +48,14 @@ const client = crypto.randomUUID();
 let deleted = takeDeletedNote();
 /** Deleting the account is under way: signing out part-way shows nothing till the page reloads. */
 let deleting = false;
+/** The account whose boards this page holds (job #145): as loaded, then whoever it was claimed for. */
+let held = (() => {
+  try {
+    return localStorage.getItem(OWNER_KEY);
+  } catch {
+    return null;
+  }
+})();
 
 function update(next: SessionStatus, error = '') {
   status = next;
@@ -80,6 +88,14 @@ watchUser((user) => {
 /** Starts syncing `user`'s boards; `quiet`: the board stays on screen meanwhile (after a failed delete). */
 function start(user: User, quiet = false) {
   if (!quiet) update('loading');
+  // Boards another account left on this device are kept aside, never shown or uploaded (job #145).
+  try {
+    claimDevice(appStore, localStorage, user.uid, held);
+    held = user.uid;
+  } catch {
+    // They couldn't be kept aside (storage full): nothing starts, so they stay as they are.
+    return update('error');
+  }
   // Shared boards first (owner request: editing together): the person's own boards are synced
   // without them, so it must be known which boards are shared before those are.
   const backend = collabRemote(user);

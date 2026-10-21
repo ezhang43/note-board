@@ -30,16 +30,28 @@ export const ownBoardsKey = (uid: string) => `note-board:own-boards:${uid}`;
  * Every board in the shares' data kept on this device (see baseKey) for person `uid`, read straight
  * from storage, so their own-board sync can leave them alone before the shares are known. Only the
  * shares on their list kept here (sharesKey), so another account's shares on this device don't
- * count; with no list kept yet (an older version of the app), every share kept here counts.
+ * count; with no list kept yet, every share kept here counts except those on another account's
+ * list (job #145: they are that account's).
  */
 export function boardsInKeptShares(storage: { length: number; key(i: number): string | null; getItem(key: string): string | null }, uid: string): Set<string> {
   const out = new Set<string>();
   try {
-    const list = JSON.parse(storage.getItem(sharesKey(uid)) || 'null') as unknown;
-    const mine = Array.isArray(list) ? new Set(list.map((x) => baseKey(String((x as { id?: unknown })?.id)))) : null;
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (!key?.startsWith(baseKey('')) || (mine && !mine.has(key))) continue;
+    const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i) ?? '');
+    const listed = (key: string) => {
+      const list = JSON.parse(storage.getItem(key) || 'null') as unknown;
+      return Array.isArray(list) ? list.map((x) => baseKey(String((x as { id?: unknown })?.id))) : null;
+    };
+    const mine = listed(sharesKey(uid));
+    const theirs = (key: string) => {
+      try {
+        return listed(key) ?? [];
+      } catch {
+        return []; // another account's damaged list
+      }
+    };
+    const others = new Set(mine ? [] : keys.filter((k) => k.startsWith(sharesKey('')) && k !== sharesKey(uid)).flatMap(theirs));
+    for (const key of keys) {
+      if (!key.startsWith(baseKey('')) || (mine ? !mine.includes(key) : others.has(key))) continue;
       const saved = JSON.parse(storage.getItem(key) || 'null') as { data?: unknown } | null;
       const got = typeof saved?.data === 'string' ? readShare(saved.data) : null;
       Object.keys(got?.boards ?? {}).forEach((id) => out.add(id));

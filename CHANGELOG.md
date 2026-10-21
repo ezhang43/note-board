@@ -7,6 +7,20 @@
 - Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
 - Nothing about saved boards changed.
 
+## Shared computers keep each account's boards apart (2026-10-21)
+
+- **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).
+- When the earlier person signs in on that computer again, their boards come back, the same as reopening the page.
+- The same goes for boards someone else shared with the earlier person, and for other open tabs.
+- Boards already saved on a computer stay with the first account that signs in after this update.
+
+## Fix: version preview during a drag, and Escape (2026-10-21)
+
+- **No more white screen:** picking an earlier version in Version history while you were holding a card or container mid-drag could crash the whole app. Any drag or resize in progress now simply ends when a version is shown.
+- **A version that was still loading** no longer shows up late after you click Current version, close the history or press Escape.
+- **Escape now only closes a panel when it is meant for it.** With the Focus timer, Calendar, Journal, Habits, Completed or Version history open, Escape used to close the panel as well when you were closing a toolbar or Color menu, leaving a text box, closing the keyboard shortcuts list or canceling a "Delete ...?" question. Now that Escape only does the one thing, and a second Escape closes the panel.
+- Nothing already saved changed.
+
 ## Version history keeps your work before another device's changes replace it (2026-10-21)
 
 - If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.

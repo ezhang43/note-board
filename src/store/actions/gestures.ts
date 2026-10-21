@@ -3,7 +3,7 @@ import { pourList } from '../../model/checklist';
 import { CARD_W, COLUMN_W, NEW_BLOCK_H } from '../../model/constants';
 import { overlaps, snapIf } from '../../model/geometry';
 import { alignTo } from '../../model/align';
-import { blockRect, landingSpot, shiftRow, topLevelRects } from '../../model/layout';
+import { blockRect, landingSpot, pushUp, shiftRow, topLevelRects } from '../../model/layout';
 import { dropBoard } from '../../model/placement';
 import type { Board, Point, Rect } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -167,8 +167,21 @@ export function gestureActions(ctx: StoreContext) {
       const r = ctx.state.ui.resize;
       if (!r) return;
       commit(
-        // Its row neighbours slide sideways out of the way (owner decision 2026-10-19).
-        (b) => shiftRow(r.kind === 'card' ? B.resizeCard(b, r.id, r.w, r.h ?? undefined) : B.resizeColumn(b, r.id, r.w, r.h ?? undefined), r.id, measured),
+        (b) => {
+          const at = B.blockOf(b, r.id);
+          if (!at) return b;
+          // The left and top edges also move the block's corner (the far edge stays where it was);
+          // the right and bottom edges leave its position alone.
+          const west = r.dir?.includes('w') ?? false;
+          const north = r.dir?.includes('n') ?? false;
+          let next = B.resizeBlock(b, r.id, { x: west ? (r.x ?? at.x) : at.x, y: north ? (r.y ?? at.y) : at.y, w: r.w, h: r.h });
+          // Blocks it now covers make room, only now that it is let go (owner decisions 2026-10-19, 2026-10-21):
+          // from the top edge, those above it move up; its row neighbours slide sideways: right of it
+          // from the right edge, left of it from the left edge.
+          const sized = (id: string) => (north && id === r.id && r.h != null ? r.h : measured(id));
+          if (north) next = pushUp(next, r.id, sized);
+          return shiftRow(next, r.id, sized, undefined, west ? 'left' : 'right');
+        },
         { ui: { resize: null } },
       );
       requestSettle([r.id]);

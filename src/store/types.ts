@@ -3,6 +3,7 @@ import type { VersionMeta } from '../model/versions';
 import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
 import type { ListSelection } from '../model/multiSelect';
+import type { ResizeDir } from '../model/sizing';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
 import type { Person } from './collab';
 
@@ -44,6 +45,13 @@ export interface Resize {
   /** The size drawn while dragging (follows the pointer smoothly). */
   liveW: number;
   liveH: number | null;
+  /** Which edge or corner is dragged (left out = right edge / bottom-right corner, as before). */
+  dir?: ResizeDir;
+  /** Where its top-left corner goes (and is drawn while dragging) when the left or top edge is dragged. */
+  x?: number;
+  y?: number;
+  liveX?: number;
+  liveY?: number;
   matchIds: string[];
   label: string;
   /** Where to show the label, in screen pixels from the canvas's top-left. */

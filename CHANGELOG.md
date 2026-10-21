@@ -1,5 +1,13 @@
 # Changelog
 
+## Resize cards from any side (2026-10-21)
+
+- **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).
+- The opposite edge stays where it is, so dragging the left or top edge moves the card too. Like before, it eases to the grid when you let go, and one undo takes it back.
+- When you let go, blocks it now covers move out of the way: dragging the left edge out slides neighbors in its row to the left, and dragging the top edge up moves the blocks above it up. Nothing moves while you are still dragging.
+- The mouse pointer turns into a resize arrow only on the edge and corner areas; everywhere else on a card it stays the normal arrow. On a touch screen (phone or tablet) the thin edge areas are left off, since a finger is too big for them; the older bottom-right handle and right-edge strip work there as before.
+- Nothing about saved boards changed.
+
 ## Journal: fold a day's note (2026-10-21)
 
 - In the Journal panel, each day's date is now a button, like the Year, Month and Week headings. Click it (or press Enter or Space) to fold that day's note. A folded day shows its date and, after it, the first line of the note in gray (cut with … if it is long). Click again to open it and keep writing.

@@ -9,6 +9,7 @@ import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
 import { ChevronIcon, ResizeIcon, TrashIcon } from './icons';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
+import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -74,10 +75,12 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={col.title ? `Container: ${col.title}` : 'Untitled container'}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: pos.x, top: pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-text': colors.text } as CSSProperties}
+      style={{ left: resize?.liveX ?? pos.x, top: resize?.liveY ?? pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-text': colors.text } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
+      {/* The left edge and the other corners set the width too (owner request 2026-10-21); the corners of an empty one also set its minimum height. First, so the buttons paint above them. */}
+      <ResizeGrips kind="column" id={id} dirs={col.collapsed ? ['w'] : ['w', 'nw', 'ne', 'sw']} heightFree={!cardIds.length} />
       {/* Title and count on the left; collapse arrow and trash can on the right. */}
       <div className="column-header">
         <div className="column-heading">
@@ -142,15 +145,15 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         ))}
 
       {/* The width can be changed even when the column is collapsed. */}
-      <button type="button" className="resize-edge" aria-label="Resize container width" onPointerDown={resizePointerDown('column', id, 'width')} onKeyDown={resizeKeyDown('column', id, 'width')} />
+      <button type="button" className="resize-edge" aria-label="Resize container width" onPointerDown={resizePointerDown('column', id, 'e')} onKeyDown={resizeKeyDown('column', id, 'e')} />
       {!col.collapsed && (
         <>
           <button
             type="button"
             className="resize-corner"
             aria-label="Resize container"
-            onPointerDown={resizePointerDown('column', id, cardIds.length ? 'width' : 'both')}
-            onKeyDown={resizeKeyDown('column', id, cardIds.length ? 'width' : 'both')}
+            onPointerDown={resizePointerDown('column', id, cardIds.length ? 'e' : 'se')}
+            onKeyDown={resizeKeyDown('column', id, cardIds.length ? 'e' : 'se')}
           >
             <ResizeIcon />
           </button>

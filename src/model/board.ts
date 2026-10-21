@@ -130,6 +130,19 @@ export function resizeColumn(board: Board, columnId: string, w: number, h?: numb
   return next.w === col.w && next.h === col.h ? board : { ...board, columns: { ...board.columns, [columnId]: next } };
 }
 
+/**
+ * Set a loose card's or column's size and position together (resizing from the left or top edge moves
+ * its corner too). `h` null keeps the height (a container with cards). Keeps its place in the stacking order.
+ */
+export function resizeBlock(board: Board, id: string, r: { x: number; y: number; w: number; h: number | null }): Board {
+  const sized = board.columns[id] ? resizeColumn(board, id, r.w, r.h ?? undefined) : resizeCard(board, id, r.w, r.h ?? undefined);
+  const col = sized.columns[id];
+  if (col) return col.x === r.x && col.y === r.y ? sized : { ...sized, columns: { ...sized.columns, [id]: { ...col, x: r.x, y: r.y } } };
+  const card = sized.cards[id];
+  if (!card || (card.x === r.x && card.y === r.y)) return sized;
+  return { ...sized, cards: { ...sized.cards, [id]: { ...card, x: r.x, y: r.y } } };
+}
+
 /** These blocks, with the cards inside any of them that are columns. */
 function withColumnCards(board: Board, ids: string[]): string[] {
   return ids.flatMap((id) => [id, ...(board.columns[id]?.cardIds ?? [])]);

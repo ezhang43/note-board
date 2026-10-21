@@ -719,6 +719,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   background: var(--tint);
   border-radius: 9px 9px 0 0;
 }
+/* A collapsed card is all header: its color fills the whole card, whatever its height, into the rounded corners (owner request, 2026-10-21). */
+.card.tinted.collapsed { background: var(--tint); }
 .card.tinted.collapsed .card-header { border-radius: 9px; }
 /* The title spans the card, so the tint can reach both edges. */
 .todo-body > .card-title:first-child,
@@ -781,18 +783,31 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-body, .link-body { display: flex; flex-direction: column; gap: 6px; }
 
 .todo-items { display: flex; flex-direction: column; }
-.todo-item { min-height: 30px; display: flex; align-items: flex-start; gap: 6px; border-radius: 4px; }
+.todo-item {
+  /* The item's first line of text, and the item buttons' size step: they grow with A+ (never under today's, so Small keeps it). */
+  --line: calc(20px * var(--fs, 1) * var(--ts, 1));
+  --bs: max(1, var(--fs, 1));
+  --bh: calc(20px * var(--bs) + 8px);
+  min-height: 30px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border-radius: 4px;
+}
+/* On a phone the buttons keep their size, and a line is never under 22px. */
+.app.phone .todo-item { --bs: 1; }
 /* A tick box's pressable area: 4px of padding around the 16px box (24px), taken back by the margin. */
 .tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: 4px; margin: -4px; cursor: pointer; }
 .todo-item input[type='checkbox'] {
   width: 16px;
   height: 16px;
-  margin: 7px 0 0;
+  /* Centered on the first line: the text box's 4px of padding, then half a line, less half the 16px box. */
+  margin: calc(var(--line) / 2 - 4px) 0 0;
   flex-shrink: 0;
   accent-color: var(--checkbox);
   cursor: pointer;
 }
-.item-text { flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: calc(20px * var(--fs, 1) * var(--ts, 1)); --pad: 4px; }
+.item-text { flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: var(--line); --pad: 4px; }
 .todo-item.done .item-text > textarea { text-decoration: line-through; }
 
 .link-url {
@@ -1072,7 +1087,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
  * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
  */
-.todo-item { padding-right: 72px; }
+.todo-item { padding-right: calc(72px * var(--bs)); }
 .item-grip,
 .item-trash,
 .item-arrow {
@@ -1094,12 +1109,15 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .item-grip:focus-visible,
 .item-trash:focus-visible,
 .item-arrow:focus-visible { opacity: 1; }
-.item-grip { top: 3px; right: 0; width: 14px; height: 24px; cursor: default; touch-action: none; }
-.item-trash { top: 2px; right: 16px; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-arrow { top: 2px; width: 16px; height: 24px; border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-arrow svg { width: 14px; height: 14px; }
-.item-up { right: 56px; }
-.item-down { right: 40px; }
+/* The buttons' sizes below all multiply by --bs (the text size step, see .todo-item); their height follows the item's first line. */
+.item-grip { top: 3px; right: 0; width: calc(14px * var(--bs)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
+.item-grip svg { width: calc(8px * var(--bs)); height: calc(12px * var(--bs)); }
+.item-trash { top: 2px; right: calc(16px * var(--bs)); width: calc(24px * var(--bs)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-trash svg { width: calc(14px * var(--bs)); height: calc(14px * var(--bs)); }
+.item-arrow { top: 2px; width: calc(16px * var(--bs)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-arrow svg { width: calc(14px * var(--bs)); height: calc(14px * var(--bs)); }
+.item-up { right: calc(56px * var(--bs)); }
+.item-down { right: calc(40px * var(--bs)); }
 @media (hover: hover) {
   .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
 }
@@ -1111,19 +1129,20 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /*
  * On a computer the controls are bigger (owner request, 2026-10-19): arrows 22px wide, trash 28px, grip 18px,
  * in the same order and flush with each other, so the strip kept free for them grows from 72px to 92px.
- * Touch screens (no hover) keep the sizes above.
+ * Touch screens (no hover) keep the sizes above. All of them grow with the text size step (owner request,
+ * 2026-10-21), as tall as the item's first line, so at Small and Normal they are as before.
  */
 @media (hover: hover) {
-  .todo-item { padding-right: 92px; }
-  .item-grip, .item-trash, .item-arrow { top: 0; height: 28px; }
-  .item-grip { width: 18px; }
-  .item-grip svg { width: 10px; height: 15px; }
-  .item-trash { right: 20px; width: 28px; }
-  .item-trash svg { width: 16px; height: 16px; }
-  .item-arrow { width: 22px; }
-  .item-arrow svg { width: 18px; height: 18px; }
-  .item-up { right: 70px; }
-  .item-down { right: 48px; }
+  .todo-item { padding-right: calc(92px * var(--bs)); }
+  .item-grip, .item-trash, .item-arrow { top: 0; height: var(--bh); }
+  .item-grip { width: calc(18px * var(--bs)); }
+  .item-grip svg { width: calc(10px * var(--bs)); height: calc(15px * var(--bs)); }
+  .item-trash { right: calc(20px * var(--bs)); width: calc(28px * var(--bs)); }
+  .item-trash svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
+  .item-arrow { width: calc(22px * var(--bs)); }
+  .item-arrow svg { width: calc(18px * var(--bs)); height: calc(18px * var(--bs)); }
+  .item-up { right: calc(70px * var(--bs)); }
+  .item-down { right: calc(48px * var(--bs)); }
 }
 /*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
@@ -1134,7 +1153,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .todo-item:hover .item-grip, .todo-item:hover .item-trash { opacity: 0; }
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
   /* The phone already has Move up / Move down in the row above the keyboard, so the arrows never show and keep no room. */
-  .todo-item { padding-right: 40px; }
+  .todo-item { padding-right: calc(40px * var(--bs)); }
 }
 /*
  * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the
@@ -2439,7 +2458,8 @@ a.cal-open { align-self: flex-start; }
    */
   .note-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .card-title { font-size: max(16px, calc(15px * var(--fs, 1) * var(--ts, 1))); }
-  .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); line-height: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); }
+  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); }
+  .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .column-title { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .pomodoro-length input { font-size: 16px; }
 

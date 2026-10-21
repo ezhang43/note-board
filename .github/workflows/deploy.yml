@@ -1,5 +1,5 @@
-# Tests, builds and publishes the board to GitHub Pages on every push to main (publishing:
-# main is moved up to build/v1 when the owner says so; work on build/v1 alone changes nothing live).
+# Tests, builds and publishes the board to GitHub Pages when main moves (checks.yml's Publish job starts it
+# too). main is moved up to build/v1 when the owner says "publish", or by that job for low-risk pull requests.
 name: Deploy to GitHub Pages
 
 on:

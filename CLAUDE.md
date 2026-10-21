@@ -27,7 +27,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 2. **Small steps.** Build one step of the spec's build order at a time. Do not start the next step until the owner says OK.
 3. **Tests pass first.** `npm test` and `npm run test:e2e` both pass before a step is reported done. Logic that the spec names (overlap, snapping, checklist moves, undo) always gets unit tests. Write the tests before the code: write the unit and browser tests for a change, run them and see them fail, then implement until they pass.
 4. **No surprises.** Nothing that isn't in `SPEC.md`. If the spec is unclear or silent, ask instead of guessing; record the answer in `docs/decisions.md`. Exception (owner rule, 2026-10-04; narrowed 2026-10-06): when a question comes up while building, go ahead with the recommended option instead of asking, and list those calls in the report. Still ask first when unsure what the owner would want, or when the choice is high-impact: it could lose or expose the owner's data, is hard to undo, changes how saving, sync, sharing or security work, needs a change the owner must make outside the code (Firebase console, settings), or changes what the owner sees in a way the spec doesn't settle. Ask with a recommended answer.
-5. **Changelog.** Add a short, plain-English entry to `CHANGELOG.md` for every step.
+5. **Changelog.** Add a short, plain-English entry for every step, as its own file `changes/<branch>.md`, never by editing `CHANGELOG.md` (owner request, 2026-10-21: two open pull requests that both edit the top of `CHANGELOG.md` or the end of `docs/decisions.md` show "merge conflicts" on GitHub, which ignores `.gitattributes`). Calls made while building go in `changes/<branch>.decisions.md` the same way, not in `docs/decisions.md`. The crew coordinator folds the fragments into `CHANGELOG.md` and `docs/decisions.md` with `node scripts/fold-changes.mjs` when the owner says "publish". See `changes/README.md`.
 6. **Look.** Use the colours, sizes and states in the spec's "Look and feel" section, defined once as CSS variables. No focus rectangles on text fields; buttons keep a keyboard focus ring. Cursor stays the normal arrow on the canvas and blocks, except the Hand tool's glove over empty board (owner request, 2026-10-03).
 7. **Keyboard.** Block shortcuts don't fire while typing in a text field; undo/redo always do.
 8. **Spec stays current.** Whenever the owner asks for a new feature or change, or a decision is recorded in `docs/decisions.md`, update `SPEC.md` in the same commit so it always describes the app as built. No need to ask first.
@@ -53,6 +53,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 - `npm test` — unit tests
 - `npm run test:e2e` — browser tests
 - `npm run typecheck` / `npm run build`
+- `node scripts/fold-changes.mjs` — the crew coordinator's publish step: folds `changes/*.md` into `CHANGELOG.md` and `docs/decisions.md` (rule 5)
 - `node scripts/claude-hooks.mjs level` — does the current change touch a risky file (picks the review level)
 
 ## Claude helpers
@@ -66,4 +67,4 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Decisions
 
-Past decisions, with dates and reasons, are in `docs/decisions.md`. Read it when the spec is silent or unclear, or before changing how something already works, so settled questions are not reopened. Add new decisions to the end of that file.
+Past decisions, with dates and reasons, are in `docs/decisions.md`. Read it when the spec is silent or unclear, or before changing how something already works, so settled questions are not reopened. New decisions are written as `changes/<branch>.decisions.md` (rule 5) and land at the end of that file when the crew coordinator folds them, so look in `changes/` too for decisions not yet folded.

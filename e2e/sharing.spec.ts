@@ -164,11 +164,24 @@ test('deleting a shared board (by the person who shared it) deletes it for every
   await expect(boardName(bob)).not.toHaveValue('Trip');
 });
 
-test('the home board can’t be shared', async ({ browser }) => {
+test('on the home board, Share offers one button that makes a board, opens it and offers to share it', async ({ browser }) => {
   const alice = await person(browser, `Alice${tag()}`);
+  await boardName(alice).fill('My home');
   await openShare(alice);
-  await expect(sharePanel(alice).getByText('can’t be shared')).toBeVisible();
+  await expect(sharePanel(alice).getByText('can’t be shared itself')).toBeVisible();
+  // The home board itself still can't be shared: no "Share this board" until another board is open.
   await expect(sharePanel(alice).getByRole('button', { name: 'Share this board' })).toHaveCount(0);
+  await sharePanel(alice).getByRole('button', { name: 'Make a board to share' }).click();
+  // The new (empty) board is open, the panel stays open and now offers to share it; nothing is shared yet.
+  await expect(boardName(alice)).not.toHaveValue('My home');
+  await expect(sharePanel(alice).getByRole('button', { name: 'Share this board' })).toBeVisible();
+  await expect(sharePanel(alice).getByLabel('Share link')).toHaveCount(0);
+  // It is a card on the home board, as "Add a sub-board here" makes.
+  await alice.keyboard.press('Escape');
+  await alice.getByRole('button', { name: 'Back to My home' }).click();
+  await expect(boardName(alice)).toHaveValue('My home');
+  await expect(alice.locator('[data-kind="board"]')).toHaveCount(1);
+  await alice.context().close();
 });
 
 test('Share fits in the toolbar with Sign out, at 1280px', async ({ browser }) => {
@@ -347,6 +360,47 @@ test('a card to one of your own boards, pasted onto a shared board, doesn’t sh
   expect(await alice.evaluate(() => Object.values(localStorage).some((v) => v.includes('secret')))).toBe(false);
   await alice.getByRole('button', { name: 'Boards', exact: true }).click();
   await expect(boardsMenu(alice).getByRole('menuitem', { name: 'Diary' })).toHaveCount(0);
+});
+
+test('a board card copied from one shared board onto another doesn’t move its board to the other (whole-app review M2)', async ({ browser }) => {
+  const t = tag();
+  const alice = await person(browser, `Alice${t}`);
+  // "Trip" is shared with Bob first.
+  const link = await aliceSharesTrip(alice);
+  const bob = await bobJoins(browser, link, `Bob${t}`);
+  // Then Alice shares "One" (with nobody yet) and makes "Plans" inside it.
+  await alice.keyboard.press('Escape');
+  await alice.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(alice).getByRole('menuitem', { name: 'New board' }).click();
+  await boardName(alice).fill('One');
+  await add(alice, 'Note');
+  await alice.keyboard.type('Hi');
+  await alice.keyboard.press('Escape');
+  await openShare(alice);
+  await sharePanel(alice).getByRole('button', { name: 'Share this board' }).click();
+  await expect(sharePanel(alice).getByLabel('Share link')).toHaveValue(/\?join=/);
+  await alice.keyboard.press('Escape');
+  await alice.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(alice).getByRole('menuitem', { name: 'Add a sub-board here' }).click();
+  const plansCard = alice.locator('[data-card-id][data-kind="board"]').first();
+  await plansCard.getByRole('button', { name: 'Open board' }).click();
+  await boardName(alice).fill('Plans');
+  await add(alice, 'Note');
+  await alice.keyboard.type('private');
+  await alice.keyboard.press('Escape');
+  await alice.getByRole('button', { name: /^Back to/ }).click();
+  await alice.waitForTimeout(1500);
+  // She copies its card onto Trip.
+  await plansCard.click({ position: { x: 12, y: 12 } });
+  await alice.keyboard.press('Control+c');
+  await alice.getByRole('button', { name: 'Boards', exact: true }).click();
+  await boardsMenu(alice).getByRole('menuitem', { name: /Trip/ }).click();
+  await expect(boardName(alice)).toHaveValue('Trip');
+  await alice.keyboard.press('Control+v');
+  // Bob gets the card, but not the board inside One.
+  await expect(bob.locator('[data-card-id][data-kind="board"]')).toHaveCount(1, { timeout: 8000 });
+  await bob.waitForTimeout(1500);
+  expect(await bob.evaluate(() => Object.values(localStorage).some((v) => v.includes('private')))).toBe(false);
 });
 
 test('a shared board you leave can be brought back from Version history', async ({ browser }) => {

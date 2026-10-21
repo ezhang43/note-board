@@ -94,6 +94,27 @@ describe('looking at and restoring a version', () => {
     expect(store.getState().ui.preview).toBeNull();
   });
 
+  it('previewing ends a drag, resize or new-block drag in progress, and letting go afterwards does nothing', async () => {
+    const { store, versions } = setup();
+    store.renameBoard('Old');
+    await settled();
+    store.addCard('note');
+    await settled();
+    const [v] = await versions.list();
+    const id = store.getState().board.order[0];
+    store.startDrag('card', id, 100, 100);
+    store.startNewDrag('note');
+    store.startMarquee({ x: 5, y: 5 }, false);
+    expect(store.getState().ui.drag).not.toBeNull();
+    store.previewVersion(v, homeIn(await versions.get(v.id))!);
+    const { drag, resize, itemDrag, newDrag } = store.getState().ui;
+    expect([drag, resize, itemDrag, newDrag, store.getState().ui.marquee]).toEqual([null, null, null, null, null]);
+    const before = store.getState().board;
+    store.moveDrag(300, 300, null);
+    store.dropDrag(null);
+    expect(store.getState().board).toBe(before);
+  });
+
   it('restoring saves the current board as a version first, and can be undone', async () => {
     const { store, versions, clock } = setup();
     store.renameBoard('Old');

@@ -21,10 +21,10 @@ const ev = (patch: Partial<CalEvent>): CalEvent => ({
 
 describe('when an event is, as the card says it', () => {
   it('a timed event on one day: the day, then its times', () => {
-    expect(whenLabel(ev({}))).toBe('Thu 15 Oct · 10:00 – 11:00');
+    expect(whenLabel(ev({}))).toBe('Thu 15 Oct · 10 – 11am');
   });
   it('a timed event over midnight: each end with its own day', () => {
-    expect(whenLabel(ev({ start: '2026-10-15T22:00', end: '2026-10-16T01:30' }))).toBe('Thu 15 Oct 22:00 – Fri 16 Oct 01:30');
+    expect(whenLabel(ev({ start: '2026-10-15T22:00', end: '2026-10-16T01:30' }))).toBe('Thu 15 Oct 10pm – Fri 16 Oct 1:30am');
   });
   it('an all-day event of one day (Google keeps the day after as its end)', () => {
     expect(whenLabel(ev({ allDay: true, start: '2026-10-15', end: '2026-10-16' }))).toBe('Thu 15 Oct · All day');

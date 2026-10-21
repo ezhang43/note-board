@@ -15,6 +15,7 @@ import {
   canChangeSeries,
   cellLines,
   cellTime,
+  clockLabel,
   dayKey,
   dayLabel,
   draftBody,
@@ -227,9 +228,24 @@ describe('a day’s events', () => {
     expect(eventsOnDay([toMidnight], '2026-10-07')).toEqual([]);
   });
 
-  it('shows times on the 24-hour clock', () => {
-    expect(timeLabel(timed())).toBe('10:00 – 11:00');
+  it('shows times the way Google Calendar does (job #131)', () => {
+    expect(timeLabel(timed())).toBe('10 – 11am');
+    expect(timeLabel(timed({ start: '2026-10-06T11:30', end: '2026-10-06T13:00' }))).toBe('11:30am – 1pm');
+    expect(timeLabel(timed({ start: '2026-10-06T09:00', end: '2026-10-06T09:15' }))).toBe('9 – 9:15am');
+    expect(timeLabel(timed({ start: '2026-10-06T18:00', end: '2026-10-06T19:30' }))).toBe('6 – 7:30pm');
+    expect(timeLabel(timed({ start: '2026-10-06T23:00', end: '2026-10-07T00:00' }))).toBe('11pm – 12am');
     expect(timeLabel(allDay)).toBe('All day');
+  });
+
+  it('writes one time as 10am, 10:30am, 12pm, 12am', () => {
+    expect(clockLabel('10:00')).toBe('10am');
+    expect(clockLabel('10:30')).toBe('10:30am');
+    expect(clockLabel('00:00')).toBe('12am');
+    expect(clockLabel('00:05')).toBe('12:05am');
+    expect(clockLabel('12:00')).toBe('12pm');
+    expect(clockLabel('12:45')).toBe('12:45pm');
+    expect(clockLabel('13:00')).toBe('1pm');
+    expect(clockLabel('23:59')).toBe('11:59pm');
   });
 });
 
@@ -248,7 +264,7 @@ describe('a day in the month grid (job #47)', () => {
 
   it('a timed event shows its start time on the day it starts only', () => {
     const overnight = timed({ start: '2026-10-06T22:00', end: '2026-10-07T02:00' });
-    expect(cellTime(overnight, '2026-10-06')).toBe('22:00');
+    expect(cellTime(overnight, '2026-10-06')).toBe('10pm');
     expect(cellTime(overnight, '2026-10-07')).toBe('');
     expect(cellTime(timed({ allDay: true, start: '2026-10-08', end: '2026-10-09' }), '2026-10-08')).toBe('');
   });

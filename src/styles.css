@@ -1744,7 +1744,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .preview-bar {
   position: fixed;
   top: calc(var(--toolbar-height) + 12px);
-  left: calc((100% - 300px) / 2);
+  left: calc((100% - var(--side-width)) / 2);
   transform: translateX(-50%);
   z-index: 6;
   display: flex;
@@ -1758,7 +1758,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   font-size: 14px;
 }
 .app:not(.history-open) .preview-bar { left: 50%; }
-.preview-bar p { margin: 0; white-space: nowrap; }
+/* Beside the panel it never grows wider than the room left (the text then wraps). */
+.app.history-open .preview-bar { max-width: calc(100vw - var(--side-width) - 16px); }
+.preview-bar p { margin: 0; }
 .preview-actions { display: flex; gap: 6px; }
 .preview-error { color: var(--danger); }
 .app.phone .history-panel { top: 52px; left: 0; width: auto; border-left: none; box-shadow: none; z-index: 7; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
@@ -1768,6 +1770,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   bottom: calc(68px + env(safe-area-inset-bottom));
   left: 8px;
   right: 8px;
+  max-width: none;
   transform: none;
   flex-direction: column;
   align-items: stretch;
@@ -1807,7 +1810,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   font: inherit;
   font-size: 14px;
 }
-.find-bar input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 /* The count may name a board ("3 of 12 · Garage"): long names are cut short (the full text is its tooltip). */
 .find-count { min-width: 64px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--ink-soft); white-space: nowrap; text-align: center; }
 /* This board / All boards: a row of its own under the box. */

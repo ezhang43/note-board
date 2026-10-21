@@ -235,3 +235,48 @@ test.describe('on a phone', () => {
     await expect(page.getByLabel('Note text').first()).toHaveValue('Phone draft');
   });
 });
+
+// Job #144 (interface review): the bar's position with a wide panel, and a failed restore's message.
+test('the "Looking at an earlier version" bar stays clear of a widened history panel', async ({ page }) => {
+  await twoDrafts(page, 'First draft', 'Second draft');
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Version history' });
+  const strip = (await page.getByRole('separator', { name: 'Resize version history' }).boundingBox())!;
+  await page.mouse.move(strip.x + strip.width / 2, strip.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(640, strip.y + 200, { steps: 6 });
+  await page.mouse.up();
+  expect((await panel.boundingBox())!.x).toBeLessThan(700);
+  await panel.getByRole('button', { name: /card/ }).first().click();
+  const bar = (await page.getByRole('region', { name: 'Looking at an earlier version' }).boundingBox())!;
+  expect(bar.x + bar.width).toBeLessThanOrEqual((await panel.boundingBox())!.x);
+  expect(bar.x).toBeGreaterThanOrEqual(0);
+});
+
+test('"Couldn’t restore it" belongs to the version it failed on, not the next one looked at', async ({ page }) => {
+  await twoDrafts(page, 'First draft', 'Second draft');
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Version history' });
+  const versions = panel.getByRole('button', { name: /card|Empty board/ });
+  await versions.first().click();
+  const banner = page.getByRole('region', { name: 'Looking at an earlier version' });
+  await expect(banner).toBeVisible();
+  await page.evaluate(() => {
+    const w = window as unknown as { __setItem: typeof Storage.prototype.setItem };
+    w.__setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key.startsWith('note-board:version')) throw new Error('full');
+      return w.__setItem.call(this, key, value);
+    };
+  });
+  await banner.getByRole('button', { name: 'Restore this version' }).click();
+  await page.clock.fastForward('00:05');
+  await expect(banner).toContainText('Couldn’t restore it');
+  await page.evaluate(() => {
+    Storage.prototype.setItem = (window as unknown as { __setItem: typeof Storage.prototype.setItem }).__setItem;
+  });
+  await banner.getByRole('button', { name: 'Back to current' }).click();
+  await versions.nth(1).click();
+  await expect(banner).toBeVisible();
+  await expect(banner).not.toContainText('Couldn’t restore it');
+});

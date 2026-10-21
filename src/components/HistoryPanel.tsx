@@ -138,14 +138,17 @@ export function PreviewBar() {
   const preview = useAppState((s) => s.ui.preview);
   const canRestore = useAppState((s) => boardRights(s.ui.shares, s.boards.open, s.boards.home).restore);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  // Which version a restore failed on: the message belongs to it, not to the next one looked at.
+  const [failedOn, setFailedOn] = useState('');
+  const shown = preview?.meta.id;
+  useEffect(() => setFailedOn(''), [shown]);
   if (!preview) return null;
   const { meta } = preview;
   const restore = async () => {
     const store = activeVersionStore();
     if (!store || busy) return;
     setBusy(true);
-    setError('');
+    setFailedOn('');
     try {
       // Offline, the boards from before are saved once back online; if that fails, say so.
       const kept = await restoreVersion(appStore, store, meta.id, Date.now, () =>
@@ -154,7 +157,7 @@ export function PreviewBar() {
       const notice = keptNotice(kept, appStore.boardName);
       if (notice) collab.setNotice(notice);
     } catch {
-      setError('Couldn’t restore it. Try again.');
+      setFailedOn(meta.id);
     } finally {
       setBusy(false);
     }
@@ -166,7 +169,7 @@ export function PreviewBar() {
           {dayLabel(meta.savedAt, Date.now())}, {timeOf(meta.savedAt)}
         </strong>{' '}
         · {describeVersion(meta)}
-        {error && <span className="preview-error"> · {error}</span>}
+        {failedOn === meta.id && <span className="preview-error"> · Couldn’t restore it. Try again.</span>}
       </p>
       <div className="preview-actions">
         <button type="button" className="tb-button" onClick={back}>

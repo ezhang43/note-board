@@ -14,8 +14,9 @@ permissions:
   contents: read
 
 jobs:
+  # Typecheck and unit tests, in parallel with the browser shards below.
   checks:
-    name: All tests
+    name: Typecheck and unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # A newer push cancels the tests of an older one (only the tests: a publish under way finishes).
@@ -31,17 +32,47 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # The browser tests, split into 4 parallel shards (Playwright's --shard; fullyParallel spreads them).
+  browser:
+    name: Browser tests ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false # let every shard finish, so one run lists all the failures
+      matrix:
+        shard: [1, 2, 3, 4]
+    concurrency:
+      group: checks-${{ github.ref }}-browser-${{ matrix.shard }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
       # A failed browser test keeps its trace, screenshot and video; download them from the run's page.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report
             test-results
           retention-days: 7
+
+  # The one check the branch protection and Publish wait for: passes only when typecheck, unit tests
+  # and all 4 browser shards passed. Keep the name "All tests" exactly.
+  all-tests:
+    name: All tests
+    needs: [checks, browser]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.checks.result }}" = success -a "${{ needs.browser.result }}" = success
 
   # Auto-publish (build rule 9): after All tests passes on a push to build/v1, fast-forward main to
   # that commit and start the Pages deploy, but only when every change main lacks is a merged pull
@@ -49,7 +80,7 @@ jobs:
   # (scripts/publish-rules.mjs). Anything else waits for the owner's "publish".
   publish:
     name: Publish
-    needs: checks
+    needs: all-tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
     runs-on: ubuntu-latest
     permissions:

@@ -41,7 +41,6 @@
 - Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
 - Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
 - Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
-=======
 
 ## Resize cards from any side (2026-10-21)
 

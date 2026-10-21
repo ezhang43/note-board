@@ -122,6 +122,31 @@ describe('the calendar panel', () => {
     expect(api.calls.length).toBe(2);
   });
 
+  it('Month then Week keeps the picked day, and Month steps cross New Year (job #156)', async () => {
+    const api = fakeApi();
+    const cal = createCalendar(api, () => '2026-12-15');
+    await cal.open();
+    await cal.setView('month');
+    await cal.pickDay('2026-12-20');
+    await cal.setView('week');
+    expect(cal.get().day).toBe('2026-12-20');
+    expect(api.calls[api.calls.length - 1]).toBe('list 2026-12-20 2026-12-27');
+    await cal.setView('month');
+    await cal.step(1);
+    expect(cal.get().day).toBe('2027-01-20');
+    expect(api.calls[api.calls.length - 1]).toBe('list 2026-12-28 2027-02-01');
+  });
+
+  it('records today’s behavior: a month step from the 31st clamps to a shorter month and stays there', async () => {
+    const cal = createCalendar(fakeApi(), () => '2027-01-31');
+    await cal.open();
+    await cal.setView('month');
+    await cal.step(1);
+    expect(cal.get().day).toBe('2027-02-28');
+    await cal.step(1);
+    expect(cal.get().day).toBe('2027-03-28'); // not 31 Mar: the original day is not kept (asked about in job #155)
+  });
+
   it('picking a greyed day from another month in the month view shows that month, fetched', async () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
@@ -367,6 +392,15 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBe(SERIES_ZONE);
     expect(api.calls.slice(1)).toEqual(['get su']);
+  });
+
+  it('“All events” of a series Google gave no time zone for is refused safely, and nothing is changed (job #156)', async () => {
+    const api = fakeApi([standUp]);
+    api.series = { timeZone: null };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBe(SERIES_ZONE);
+    expect(api.calls.filter((c) => c.startsWith('update'))).toEqual([]);
   });
 
   it('“All events” sends the series’ own guests back (with their answers), and only when the guests changed', async () => {

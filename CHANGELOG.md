@@ -6,6 +6,10 @@
 - **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
 - Nothing about saved boards changed.
 
+## More calendar, journal and habits tests (2026-10-21)
+
+- More calendar, journal and habits tests. Nothing in the app changed.
+
 ## Touch and keyboard fixes (2026-10-21)
 
 - **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.

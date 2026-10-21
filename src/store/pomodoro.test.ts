@@ -57,6 +57,17 @@ describe('the focus timer on this device', () => {
     expect(seen).toHaveBeenCalled();
   });
 
+  it('a paused round keeps its time left through a long wait and a reload (job #156)', () => {
+    const storage = memory();
+    const t = createPomodoro(storage);
+    t.start();
+    vi.advanceTimersByTime(5 * MIN);
+    t.pause();
+    vi.setSystemTime(Date.now() + 3 * 60 * MIN);
+    const again = createPomodoro(memory(storage.data));
+    expect(again.get().timer).toMatchObject({ phase: 'focus', endsAt: null, left: 20 * MIN });
+  });
+
   it('pausing or resetting stops the round from ending', () => {
     const onRoundEnd = vi.fn();
     const t = createPomodoro(memory(), { onRoundEnd });

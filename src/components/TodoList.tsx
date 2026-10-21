@@ -230,7 +230,10 @@ function rowPointerDown(cardId: string, itemId: string) {
   return (e: ReactPointerEvent<HTMLElement>) => {
     if (e.button !== 0 || (e.target as Element).closest('button, .tick, input[type="checkbox"]')) return;
     e.stopPropagation(); // pressing a row never drags the card
-    appStore.select(cardId);
+    // By finger a bigger selection is kept for now, so holding the item moves the whole selection;
+    // a quick tap narrows it to this card (blockHoldPointerDown).
+    const sel = appStore.getState().ui.selection;
+    if (!(e.pointerType === 'touch' && sel.length > 1 && sel.includes(cardId))) appStore.select(cardId);
     // Shift+click extends the selection, or starts one from the item being typed in.
     const typingIn = document.activeElement?.closest<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id]`)?.dataset.itemId;
     if (e.shiftKey && appStore.extendItemSelection(cardId, itemId, typingIn)) {
@@ -290,6 +293,6 @@ function gripPointerDown(cardId: string, itemId: string) {
     e.stopPropagation();
     appStore.select(cardId);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY });
+    trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY }, e.pointerId);
   };
 }

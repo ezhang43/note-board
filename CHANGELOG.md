@@ -1,5 +1,9 @@
 # Changelog
 
+## More calendar, journal and habits tests (2026-10-21)
+
+- More calendar, journal and habits tests. Nothing in the app changed.
+
 ## Shared computers keep each account's boards apart (2026-10-21)
 
 - **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).

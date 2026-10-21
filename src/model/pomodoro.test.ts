@@ -50,6 +50,11 @@ describe('pomodoro timer', () => {
     expect(timeLeft(again, 55 * MIN)).toBe(10 * MIN);
   });
 
+  it('a paused round keeps the time it has left when its length changes (job #156)', () => {
+    const paused = pause(start(DEFAULT_POMODORO, 0), 5 * MIN);
+    expect(timeLeft(setLength(paused, 'focus', 10), 99 * MIN)).toBe(20 * MIN);
+  });
+
   it('starting a running timer or pausing a stopped one changes nothing', () => {
     const running = start(DEFAULT_POMODORO, 0);
     expect(start(running, 5 * MIN)).toBe(running);

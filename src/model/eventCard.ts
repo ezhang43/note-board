@@ -1,13 +1,13 @@
-import { addDays, dayLabel, timeLabel, type CalEvent } from './calendar';
+import { addDays, clockLabel, dayLabel, timeLabel, type CalEvent } from './calendar';
 
 // The small card a calendar event opens (owner request, 2026-10-19, job #108).
 
-/** "Thu 15 Oct · 10:00 – 11:00", "Thu 15 – Sat 17 Oct · All day", or each end with its day when it runs over midnight. */
+/** "Thu 15 Oct · 10 – 11am", "Thu 15 – Sat 17 Oct · All day", or each end with its day when it runs over midnight. */
 export function whenLabel(e: CalEvent): string {
   if (!e.allDay) {
     const [startDay, endDay] = [e.start.slice(0, 10), e.end.slice(0, 10)];
     if (startDay === endDay) return `${dayLabel(startDay)} · ${timeLabel(e)}`;
-    return `${dayLabel(startDay)} ${e.start.slice(11)} – ${dayLabel(endDay)} ${e.end.slice(11)}`;
+    return `${dayLabel(startDay)} ${clockLabel(e.start.slice(11))} – ${dayLabel(endDay)} ${clockLabel(e.end.slice(11))}`;
   }
   // Google keeps the day after an all-day event as its end.
   const last = addDays(e.end, -1);

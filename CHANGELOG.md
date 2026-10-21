@@ -1,5 +1,13 @@
 # Changelog
 
+## Calendar: full names, normal time, and quicker add and edit (2026-10-21)
+
+- **Month view shows full names.** Each event's name now wraps onto as many lines as it needs instead of being cut with "…", and the day's row grows taller to fit. The list under the grid shows full names too. The Week view looks the same as before.
+- **Normal time, not military time.** The calendar panel now writes times like Google Calendar: "10am", "10:30am", "10 – 11am", "11:30am – 1pm", "10am Dentist". The edit form's time boxes still follow your browser.
+- **Click the picked day to add an event.** In the Month view, clicking a day that is already picked opens the new-event form for it, like its + does.
+- **Click an open event to edit it.** Clicking an event whose card is already open opens its edit form, like the pencil. For an event you can't change, the card just stays open.
+- Nothing about saved boards changed.
+
 ## Bottom bar fits beside a side panel (2026-10-21)
 
 - With a side panel open, every control in the bottom-right bar (Search, Completed, History, Timer, Calendar, Journal, Habits, ?, coffee cup, A− / A+ and zoom) now stays fully visible and clickable, even when the panel is dragged nearly as wide as it goes.

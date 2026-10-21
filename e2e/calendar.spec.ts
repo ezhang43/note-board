@@ -52,11 +52,11 @@ test('opens beside the board with this week’s events; someone else’s event i
   await expect(panel(page)).toBeVisible();
   await expect(button(page)).toHaveAttribute('aria-pressed', 'true');
   const today = day(page, new Date());
-  await expect(today.getByRole('button', { name: '10:00 – 11:00 Dentist' })).toBeVisible();
-  await expect(today.getByRole('button', { name: /09:00 – 09:15 Team stand-up/ })).toBeVisible();
+  await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  await expect(today.getByRole('button', { name: /9 – 9:15am Team stand-up/ })).toBeVisible();
 
   // Someone else's event shows its details in the card, read-only (no pencil or trash), with a link to change it in Google Calendar.
-  await day(page, daysFromToday(2)).getByRole('button', { name: '18:00 – 19:00 Book club, read-only' }).click();
+  await day(page, daysFromToday(2)).getByRole('button', { name: '6 – 7pm Book club, read-only' }).click();
   await expect(card(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
   const link = card(page).getByRole('link', { name: 'Open in Google Calendar' });
   await expect(link).toHaveAttribute('href', /^https:\/\/(calendar|www)\.google\.com\//);
@@ -90,11 +90,11 @@ test('add an event on a day; it is still there after a reload', async ({ page })
   await form(page).getByLabel('End time').fill('07:45');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(form(page)).toHaveCount(0);
-  await expect(day(page, today).getByRole('button', { name: '07:00 – 07:45 Swim' })).toBeVisible();
+  await expect(day(page, today).getByRole('button', { name: '7 – 7:45am Swim' })).toBeVisible();
 
   await openAs(page, name);
   await button(page).click();
-  await expect(day(page, today).getByRole('button', { name: '07:00 – 07:45 Swim' })).toBeVisible();
+  await expect(day(page, today).getByRole('button', { name: '7 – 7:45am Swim' })).toBeVisible();
 });
 
 test('an end before the start is refused with a plain note', async ({ page }) => {
@@ -111,13 +111,13 @@ test('rename a simple event and move it to another day', async ({ page }) => {
   await button(page).click();
   const today = new Date();
   const other = daysFromToday(2);
-  await edit(page, day(page, today).getByRole('button', { name: '10:00 – 11:00 Dentist' }));
+  await edit(page, day(page, today).getByRole('button', { name: '10 – 11am Dentist' }));
   await form(page).getByLabel('Title').fill('Dentist check-up');
   await form(page).getByLabel('Start date').fill(key(other));
   await form(page).getByLabel('Start time').fill('14:00');
   await form(page).getByLabel('End time').fill('15:00');
   await form(page).getByRole('button', { name: 'Save' }).click();
-  await expect(day(page, other).getByRole('button', { name: '14:00 – 15:00 Dentist check-up' })).toBeVisible();
+  await expect(day(page, other).getByRole('button', { name: '2 – 3pm Dentist check-up' })).toBeVisible();
   if (key(other) !== key(today)) await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -126,14 +126,14 @@ test('a timed event can be made all-day, and back', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   const today = day(page, new Date());
-  await edit(page, today.getByRole('button', { name: '10:00 – 11:00 Dentist' }));
+  await edit(page, today.getByRole('button', { name: '10 – 11am Dentist' }));
   await form(page).getByLabel('All day').check();
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(today.getByRole('button', { name: 'All day Dentist' })).toBeVisible();
   await edit(page, today.getByRole('button', { name: 'All day Dentist' }));
   await form(page).getByLabel('All day').uncheck();
   await form(page).getByRole('button', { name: 'Save' }).click();
-  await expect(today.getByRole('button', { name: '09:00 – 10:00 Dentist' })).toBeVisible();
+  await expect(today.getByRole('button', { name: '9 – 10am Dentist' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -183,7 +183,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   const standUp = (n: number) => day(page, daysFromToday(n)).getByRole('button', { name: /Team stand-up/ });
 
   // Only this event: today's is renamed, tomorrow's isn't. No guests, so no question about emails.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Team stand-up' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Planning');
   await form(page).getByRole('button', { name: 'Save' }).click();
   const which = asked(page, WHICH);
@@ -191,8 +191,8 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await which.getByRole('button', { name: 'Only this event' }).click();
   await expect(form(page)).toHaveCount(0);
   await expect(asked(page, EMAILS)).toHaveCount(0);
-  await expect(day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Planning' })).toBeVisible();
-  await expect(standUp(1)).toHaveAccessibleName('09:00 – 09:15 Team stand-up');
+  await expect(day(page, new Date()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
+  await expect(standUp(1)).toHaveAccessibleName('9 – 9:15am Team stand-up');
 
   // All events: tomorrow's is moved to 09:30, and every other one follows, except today's (changed on its own).
   await edit(page, standUp(1));
@@ -201,10 +201,10 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
-  for (const n of [1, 2, 6]) await expect(standUp(n)).toHaveAccessibleName('09:30 – 09:45 Team stand-up');
-  await expect(day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Planning' })).toBeVisible();
+  for (const n of [1, 2, 6]) await expect(standUp(n)).toHaveAccessibleName('9:30 – 9:45am Team stand-up');
+  await expect(day(page, new Date()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
   await panel(page).getByRole('button', { name: 'Next week' }).click();
-  await expect(standUp(7)).toHaveAccessibleName('09:30 – 09:45 Team stand-up');
+  await expect(standUp(7)).toHaveAccessibleName('9:30 – 9:45am Team stand-up');
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
 
   // Moved to another day: only that one can change; Escape goes back to the form.
@@ -250,58 +250,58 @@ test('“All events” after one event was moved on its own changes only what wa
   const errors = await openAs(page);
   await button(page).click();
   // Today's stand-up moves to 10:00 on its own.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Team stand-up' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await form(page).getByLabel('Start time').fill('10:00');
   await form(page).getByLabel('End time').fill('10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
-  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Team stand-up' })).toBeVisible();
+  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' })).toBeVisible();
   // Then only its title changes, for all events: the others keep 09:00.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Team stand-up' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Daily sync');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
-  await expect(day(page, daysFromToday(1)).getByRole('button', { name: '09:00 – 09:15 Daily sync' })).toBeVisible();
-  await expect(day(page, daysFromToday(2)).getByRole('button', { name: '09:00 – 09:15 Daily sync' })).toBeVisible();
+  await expect(day(page, daysFromToday(1)).getByRole('button', { name: '9 – 9:15am Daily sync' })).toBeVisible();
+  await expect(day(page, daysFromToday(2)).getByRole('button', { name: '9 – 9:15am Daily sync' })).toBeVisible();
   // Finding 2: the edited event itself shows the new title too, at its own time.
-  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' })).toBeVisible();
+  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test('“All events” with a new time, from an event moved on its own, reaches both though the series’ new time gives its events new ids (job #88)', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await edit(page, day(page, new Date()).getByRole('button', { name: '09:00 – 09:15 Team stand-up' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await form(page).getByLabel('Start time').fill('10:00');
   await form(page).getByLabel('End time').fill('10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
   // Now a new title and a new time for all events: the series moves to 10:30, this one keeps 10:00.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Team stand-up' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Daily sync');
   await form(page).getByLabel('Start time').fill('10:30');
   await form(page).getByLabel('End time').fill('10:45');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
-  await expect(day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45 Daily sync' })).toBeVisible();
-  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' })).toBeVisible();
+  await expect(day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45am Daily sync' })).toBeVisible();
+  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
   // Tomorrow's followed the series, so it isn't one changed on its own: renaming all from it changes only the series.
   const sent = changesSent(page);
-  await edit(page, day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45 Daily sync' }));
+  await edit(page, day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45am Daily sync' }));
   await form(page).getByLabel('Title').fill('Team sync');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
-  await expect(day(page, daysFromToday(2)).getByRole('button', { name: '10:30 – 10:45 Team sync' })).toBeVisible();
+  await expect(day(page, daysFromToday(2)).getByRole('button', { name: '10:30 – 10:45am Team sync' })).toBeVisible();
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatch(/\/events\/standup(\?|$)/);
   // It can still be changed with its new id.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Daily sync' }));
+  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' }));
   await form(page).getByLabel('Title').fill('Sync');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
-  await expect(day(page, new Date()).getByRole('button', { name: '10:00 – 10:15 Sync' })).toBeVisible();
+  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Sync' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -380,7 +380,7 @@ test('an event opens a small card beside it: title, when, guests; ×, Escape and
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toBeFocused();
   await expect(card(page).getByRole('heading', { name: 'Lunch with Sam' })).toBeVisible();
-  await expect(card(page).getByText(`${label(daysFromToday(1))} · 12:30 – 13:30`)).toBeVisible();
+  await expect(card(page).getByText(`${label(daysFromToday(1))} · 12:30 – 1:30pm`)).toBeVisible();
   await expect(card(page).getByRole('listitem')).toHaveText(['sam@example.com']);
   // The list stays in view behind it, and the card sits to the left of the event.
   await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
@@ -410,7 +410,7 @@ test('an event opens a small card beside it: title, when, guests; ×, Escape and
 
   // The pencil opens the change form; an event without guests shows none.
   await button(page).click();
-  await day(page, new Date()).getByRole('button', { name: '10:00 – 11:00 Dentist' }).click();
+  await day(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' }).click();
   await expect(card(page).getByRole('listitem')).toHaveCount(0);
   await card(page).getByRole('button', { name: 'Edit event' }).click();
   await expect(card(page)).toHaveCount(0);
@@ -750,7 +750,7 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   // Today: Team stand-up (09:00, repeating) and Dentist (10:00), in time order, by name.
   const todayCell = cell(now);
   await expect(todayCell.locator('.cal-chip')).toHaveText([/Team stand-up/, /Dentist/]);
-  await expect(todayCell.getByRole('button', { name: '10:00 – 11:00 Dentist' })).toBeVisible();
+  await expect(todayCell.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
   await expect(todayCell.getByRole('button', { name: /Team stand-up/ })).not.toHaveClass(/read-only/);
   const club = daysFromToday(2);
   if (club.getMonth() === now.getMonth()) await expect(cell(club).getByRole('button', { name: /Book club, read-only/ })).toHaveClass(/read-only/);
@@ -778,7 +778,7 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
     await form(page).getByLabel('End time').fill(end);
     await form(page).getByRole('button', { name: 'Save' }).click();
   }
-  await expect(todayCell.locator('.cal-chip')).toHaveText(['06:00Run', '07:00Swim']);
+  await expect(todayCell.locator('.cal-chip')).toHaveText(['6amRun', '7amSwim']);
   await expect(todayCell.getByRole('button', { name: '+2 more' })).toBeVisible();
   // Clicking another day, then "+2 more", lists all of today's events under the grid.
   await cell(now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1)).locator('.cal-date').click();
@@ -788,6 +788,115 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   // The list is under the grid, so it is scrolled into view (not left below the bottom of the panel).
   await expect(day(page, now).locator('h3')).toBeInViewport({ ratio: 1 });
   await expect(day(page, now).locator('.cal-event').last()).toBeInViewport({ ratio: 1 });
+  expect(errors).toEqual([]);
+});
+
+// Job #131 (owner requests 2026-10-21): full names in the Month view, a click on the picked day adds an event,
+// and a click on an event whose card is open edits it.
+test('the month grid shows each event’s full name, wrapped over as many lines as it needs', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const now = new Date();
+  const long = 'Quarterly planning review with the whole design and engineering team';
+  await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
+  await page.keyboard.type(long);
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  // The Week view's names are unchanged: at most two lines, then cut.
+  await expect(day(page, now).locator('.cal-title').first()).toHaveCSS('-webkit-line-clamp', '2');
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const cell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
+  const chip = cell.locator('.cal-chip').filter({ hasText: long });
+  const title = chip.locator('.cal-chip-title');
+  await expect(title).toHaveText(long);
+  // Not cut: the text fits inside its box, and the box is taller than one 16px line.
+  const fits = await title.evaluate((el) => ({ cut: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1, height: el.clientHeight, ellipsis: getComputedStyle(el).textOverflow }));
+  expect(fits.cut).toBe(false);
+  expect(fits.height).toBeGreaterThan(20);
+  expect(fits.ellipsis).not.toBe('ellipsis');
+  // The day's row grows to fit; the chip stays inside its cell.
+  const [cellBox, chipBox] = [(await cell.boundingBox())!, (await chip.boundingBox())!];
+  expect(cellBox.height).toBeGreaterThan(77);
+  expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(cellBox.y + cellBox.height);
+  // The picked day's list under the grid shows the full name too (no two-line cut).
+  await expect(day(page, now).locator('.cal-title').filter({ hasText: long })).toHaveCSS('-webkit-line-clamp', 'none');
+  expect(errors).toEqual([]);
+});
+
+test('Month: a click on the day that is already picked opens the new-event form for it, as its + does', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const now = new Date();
+  const other = now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1);
+  const cell = (d: Date) => panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(d)}`) });
+  // A day that isn't picked yet is only picked.
+  await cell(other).locator('.cal-date').click();
+  await expect(cell(other)).toHaveAttribute('aria-selected', 'true');
+  await expect(form(page)).toHaveCount(0);
+  // Clicking it again, on the empty part of its cell, opens the form: 9:00 for an hour on that day.
+  const box = (await cell(other).boundingBox())!;
+  await cell(other).click({ position: { x: box.width - 4, y: box.height - 4 } });
+  await expect(form(page)).toBeVisible();
+  await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
+  await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
+  await expect(form(page).getByLabel('Start time')).toHaveValue('09:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('10:00');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // The picked day's date button (the keyboard's way in) does the same; an event's chip does not.
+  await cell(other).locator('.cal-date').press('Enter');
+  await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  await cell(now).locator('.cal-date').click();
+  await expect(form(page)).toHaveCount(0);
+  await cell(now).getByRole('button', { name: /Dentist/ }).click();
+  await expect(card(page)).toBeVisible();
+  await expect(form(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('clicking an event whose card is already open opens its edit form; a read-only one stays open', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const now = new Date();
+  // Week view.
+  const dentist = day(page, now).getByRole('button', { name: /Dentist/ });
+  await dentist.click();
+  await expect(card(page)).toBeVisible();
+  await dentist.click();
+  await expect(card(page)).toHaveCount(0);
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // Someone else's event: the second click does nothing new, the card stays.
+  const club = day(page, daysFromToday(2)).getByRole('button', { name: /Book club/ });
+  await club.click();
+  await club.click();
+  await expect(card(page)).toBeVisible();
+  await expect(card(page).getByRole('heading', { name: 'Book club' })).toBeVisible();
+  await expect(form(page)).toHaveCount(0);
+  // Another event's click still just opens that one.
+  await day(page, now).getByRole('button', { name: /Dentist/ }).click();
+  await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Month view: the chip, and the picked day's list under the grid.
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const chip = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) }).getByRole('button', { name: /Dentist/ });
+  await chip.click();
+  await expect(card(page)).toBeVisible();
+  await chip.click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  const listed = day(page, now).getByRole('button', { name: /Dentist/ });
+  await listed.click();
+  await expect(card(page)).toBeVisible();
+  await listed.click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // The same event shown twice (its chip in the grid, its line in the day's list) counts as the same event.
+  await chip.click();
+  await expect(card(page)).toBeVisible();
+  await listed.click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
   expect(errors).toEqual([]);
 });
 
@@ -1090,7 +1199,7 @@ test.describe('on a wide phone-layout screen (month cells 70px or wider)', () =>
     await panel(page).getByRole('button', { name: 'Month', exact: true }).tap();
     const now = new Date();
     const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
-    await expect(todayCell.locator('.cal-chip')).toHaveText(['09:00Team stand-up', '10:00Dentist']);
+    await expect(todayCell.locator('.cal-chip')).toHaveText(['9amTeam stand-up', '10amDentist']);
     await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
     // A third event still fits: three lines, no "+n more".
     await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).tap();
@@ -1098,7 +1207,7 @@ test.describe('on a wide phone-layout screen (month cells 70px or wider)', () =>
     await form(page).getByLabel('Start time').fill('07:00');
     await form(page).getByLabel('End time').fill('07:45');
     await form(page).getByRole('button', { name: 'Save' }).tap();
-    await expect(todayCell.locator('.cal-chip')).toHaveText(['07:00Swim', '09:00Team stand-up', '10:00Dentist']);
+    await expect(todayCell.locator('.cal-chip')).toHaveText(['7amSwim', '9amTeam stand-up', '10amDentist']);
     await expect(todayCell.getByRole('button', { name: /more$/ })).toHaveCount(0);
   });
 });

@@ -63,13 +63,13 @@ If the change touches `src/components/`, `src/styles.css` or any page's look, do
 
 ## 6. Documents
 
-- `CHANGELOG.md`: a short plain-English entry at the top, in the style of the ones below it (rule 5).
+- `changes/<branch>.md` (a new file): a short plain-English changelog entry, in the style of the top ones in `CHANGELOG.md`: a `## Title (date)` heading and bullets (rule 5). Never edit `CHANGELOG.md` itself: two open pull requests that both do show "merge conflicts" on GitHub. `<branch>` is the job's branch name (slashes become `-`).
 - `SPEC.md`: updated so it describes the app as built (rule 8).
-- `docs/decisions.md`: any call made while building (rule 4's exception), added to the end with today's date.
+- `changes/<branch>.decisions.md` (a new file, only if you made calls): any call made while building (rule 4's exception), one `- <today's date> ...` bullet each, in the style of the end of `docs/decisions.md`. Never edit `docs/decisions.md` itself; the coordinator folds it in at publish time.
 
 ## 7. Land it
 
-- **Crew coordinator:** commit on `build/v1`, fetch again, push. A commit pushed straight to `build/v1` holds auto-publish back until the owner says "publish"; for a change that should go live by itself, use a branch and a low-risk pull request instead.
+- **Crew coordinator:** commit on `build/v1`, fetch again, push (a change of your own also writes its fragments under `changes/`; folding them is the publish step in the crew skill). A commit pushed straight to `build/v1` holds auto-publish back until the owner says "publish"; for a change that should go live by itself, use a branch and a low-risk pull request instead.
 - **Any other session:** commit on the job's branch, push, open a pull request into `build/v1`. If step 3 said `high`, add `--label high-risk` and do not merge: give the owner the link. Otherwise watch "All tests", fix it if it fails, and merge (merge commit) once it passes (unless step 3 handed the review to the coordinator: then stop at `pr-open`).
 - **In a cloud session `gh pr ...` is blocked** (GitHub GraphQL; `HTTP 403`). Use the GitHub MCP tools if loaded, or the `gh api` REST routes in the crew skill's "GitHub in a cloud session" section: open the pull request, add the label, read the "All tests" check-run (`subscribe_pr_activity` or polling, not `gh pr checks --watch`), and merge. On the owner's Windows computer `gh pr ...` works as written.
 
@@ -97,7 +97,7 @@ The full list:
 - **What was built**: one or two sentences.
 - **How to run it**: `npm run dev`, then http://localhost:5173 (or the live site, once published).
 - **What to click**: numbered steps that show it working, and what they should see.
-- **Calls I made**: any decisions taken without asking, as recorded in docs/decisions.md.
+- **Calls I made**: any decisions taken without asking, as recorded in `changes/<branch>.decisions.md`.
 - **Review**: which level ran, what it found, what was fixed or left alone, and why.
 - **Security check**: ran or skipped (and why), what it found, what was fixed.
 - **Where it is**: committed on build/v1, or the pull request link and whether it is merged.

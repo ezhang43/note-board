@@ -229,13 +229,13 @@ test('4. a checklist tick box has a 44px wide tap area, and Completed buttons ar
 });
 
 test('5. the empty-board hint points at the Add button on a phone', async ({ page }) => {
-  await expect(page.locator('.empty-hint')).toHaveText('Tap the Add button (+) below to add a note, a checklist or a container.');
+  await expect(page.locator('.tpl-hint')).toHaveText('Or tap the Add button (+) below to add a note, a checklist or a container.');
 });
 
 test.describe('on a computer', () => {
   test.use({ hasTouch: false, isMobile: false, viewport: { width: 1440, height: 900 } });
-  test('5b. the empty-board hint keeps its usual wording', async ({ page }) => {
-    await expect(page.locator('.empty-hint')).toHaveText('Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
+  test('5b. the empty-board hint keeps its usual wording (after the template picks)', async ({ page }) => {
+    await expect(page.locator('.tpl-hint')).toHaveText('Or add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.');
   });
 });
 

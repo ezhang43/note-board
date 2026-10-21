@@ -32,6 +32,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('zoom taps on the empty board', () => {
+  // An empty board shows the template picks over the whole phone screen, so these gestures are tried on a
+  // board whose one note has been swiped off the top of the screen: nothing is under the fingers.
+  test.beforeEach(async ({ page }) => {
+    await addMenu(page, 'Note');
+    await page.mouse.click(1, 1);
+    await swipe(page, { x: 200, y: 740 }, { x: 200, y: 40 });
+    await expect(page.locator('[data-card-id]').first()).not.toBeInViewport();
+  });
+
   test('a double tap zooms in one step around the finger', async ({ page }) => {
     const z0 = await zoom(page);
     const p0 = await pan(page);

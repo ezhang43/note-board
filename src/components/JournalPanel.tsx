@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { groupJournal, isGroupOpen, journalDateLine, journalEntries, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { groupJournal, isGroupOpen, journalDateLine, journalEntries, journalPeek, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
 import { HIGHLIGHTS, isList, journalRich, type Look, type Toggle } from '../model/richText';
@@ -51,6 +51,8 @@ export function JournalPanel() {
       {label}
     </button>
   );
+  // Days folded this visit (view state: not saved, not undoable, gone when the panel closes).
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const root = useRef<HTMLDivElement>(null);
   const first = useRef<RichEditorHandle>(null);
   /** The entry being typed in, so the panel keeps the keyboard if undo takes that entry away. */
@@ -104,35 +106,54 @@ export function JournalPanel() {
   const entry = (e: (typeof entries)[number]) => {
     const card = board?.cards[e.id];
     const value = journalRich(card?.kind === 'note' ? card.text : '', card?.kind === 'note' ? card.rich : undefined);
+    const shut = folded.has(e.id);
+    const fold = (ev: React.MouseEvent<HTMLButtonElement>) => {
+      // Folding the day holding the cursor takes the cursor to this header, not to the panel (see the layout effect above).
+      if (!shut) typing.current = null;
+      ev.currentTarget.focus();
+      setFolded((was) => {
+        const next = new Set(was);
+        if (!next.delete(e.id)) next.add(e.id);
+        return next;
+      });
+    };
+    const peek = shut ? journalPeek(e.body) : '';
     return (
       <section key={e.id} className="journal-entry">
-        <h3>{e.date}</h3>
-        <RichEditor
-          ref={(h) => {
-            if (e.id === entries[0]?.id) first.current = h;
-            if (h) handles.current.set(e.id, h);
-            else handles.current.delete(e.id);
-          }}
-          value={value}
-          label={`Journal, ${e.date}`}
-          onChange={(rich, typed) => appStore.setJournal(e.id, rich, typed)}
-          onLook={(l) => {
-            active.current = handles.current.get(e.id) ?? null;
-            setLook((was) => (deepEqual(was, l) ? was : l));
-          }}
-          onFocus={(el) => {
-            typing.current = el;
-            active.current = handles.current.get(e.id) ?? null;
-          }}
-          onBlur={(el) => {
-            // After a blur caused by the entry going away, `typing` still names it (see above).
-            queueMicrotask(() => {
-              if (el.isConnected && typing.current === el) typing.current = null;
-            });
-          }}
-          // Escape leaves the text (a second Escape closes the panel), as on the board.
-          onEscape={() => root.current?.focus()}
-        />
+        <h3>
+          <button type="button" className="jg-head jg-day" aria-expanded={!shut} onClick={fold}>
+            {e.date}
+            {peek && <span className="jg-peek">{peek}</span>}
+          </button>
+        </h3>
+        {!shut && (
+          <RichEditor
+            ref={(h) => {
+              if (e.id === entries[0]?.id) first.current = h;
+              if (h) handles.current.set(e.id, h);
+              else handles.current.delete(e.id);
+            }}
+            value={value}
+            label={`Journal, ${e.date}`}
+            onChange={(rich, typed) => appStore.setJournal(e.id, rich, typed)}
+            onLook={(l) => {
+              active.current = handles.current.get(e.id) ?? null;
+              setLook((was) => (deepEqual(was, l) ? was : l));
+            }}
+            onFocus={(el) => {
+              typing.current = el;
+              active.current = handles.current.get(e.id) ?? null;
+            }}
+            onBlur={(el) => {
+              // After a blur caused by the entry going away, `typing` still names it (see above).
+              queueMicrotask(() => {
+                if (el.isConnected && typing.current === el) typing.current = null;
+              });
+            }}
+            // Escape leaves the text (a second Escape closes the panel), as on the board.
+            onEscape={() => root.current?.focus()}
+          />
+        )}
       </section>
     );
   };

@@ -80,10 +80,17 @@ export function CalendarPanel() {
 
   if (editing) return <EventForm event={editing.event} start={editing.draft} onDone={() => setEditing(null)} />;
 
-  const pick = (event: CalEvent, opener: HTMLElement) => setOpen({ event, opener });
-  const dayList = (day: DayKey) => (
-    <DayEvents key={day} day={day} today={day === today} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={() => setEditing({ event: null, draft: newDraft(day) })} />
-  );
+  const edit = (event: CalEvent) => {
+    setOpen(null);
+    setEditing({ event, draft: draftFor(event) });
+  };
+  // Clicking an event whose card is already open edits it (job #131); a read-only one has nothing to edit, so its card just stays.
+  const pick = (event: CalEvent, opener: HTMLElement) => {
+    if (open?.event.id !== event.id) setOpen({ event, opener });
+    else if (event.editable) edit(event);
+  };
+  const add = (day: DayKey) => setEditing({ event: null, draft: newDraft(day) });
+  const dayList = (day: DayKey) => <DayEvents key={day} day={day} today={day === today} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={() => add(day)} />;
 
   return (
     <div className="cal">
@@ -129,7 +136,7 @@ export function CalendarPanel() {
           weekDays(s.day).map(dayList)
         ) : (
           <>
-            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} />
+            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onAdd={add} />
             {dayList(s.day)}
           </>
         ))}
@@ -139,10 +146,7 @@ export function CalendarPanel() {
           event={open.event}
           opener={open.opener}
           onClose={() => setOpen(null)}
-          onEdit={() => {
-            setOpen(null);
-            setEditing({ event: open.event, draft: draftFor(open.event) });
-          }}
+          onEdit={() => edit(open.event)}
         />
       )}
     </div>
@@ -187,6 +191,7 @@ function DayEvents({
           key={e.id}
           type="button"
           className={`cal-event${e.editable ? '' : ' read-only'}`}
+          data-event={e.id}
           aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
         >
@@ -202,7 +207,21 @@ function DayEvents({
 /** Cells under this width keep two lines, names only: a time leaves no room for the name. */
 const NARROW_CELL = 70;
 
-function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today: DayKey; events: CalEvent[]; reveal: RefObject<boolean>; onPick: (e: CalEvent, opener: HTMLElement) => void }) {
+function MonthGrid({
+  day,
+  today,
+  events,
+  reveal,
+  onPick,
+  onAdd,
+}: {
+  day: DayKey;
+  today: DayKey;
+  events: CalEvent[];
+  reveal: RefObject<boolean>;
+  onPick: (e: CalEvent, opener: HTMLElement) => void;
+  onAdd: (day: DayKey) => void;
+}) {
   const month = day.slice(0, 7);
   const [narrow, setNarrow] = useState(true);
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
@@ -236,10 +255,12 @@ function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today:
               reveal.current = true;
               void calendar.pickDay(d);
             };
+            // A click on the day that is already picked adds an event to it, as Google Calendar does and as its + does (job #131).
+            const clickDay = () => (d === day ? onAdd(d) : pickDay());
             return (
               // The whole cell picks its day; the date is the button for the keyboard (buttons can't hold the event buttons).
-              <div key={d} role="gridcell" className={classes} aria-selected={d === day} aria-label={name} onClick={pickDay}>
-                <button type="button" className="cal-date" aria-label={`Show ${dayLabel(d)}`} onClick={(e) => (e.stopPropagation(), pickDay())}>
+              <div key={d} role="gridcell" className={classes} aria-selected={d === day} aria-label={name} onClick={clickDay}>
+                <button type="button" className="cal-date" aria-label={`Show ${dayLabel(d)}`} onClick={(e) => (e.stopPropagation(), clickDay())}>
                   {Number(d.slice(8))}
                 </button>
                 {shown.map((e) => {
@@ -249,6 +270,7 @@ function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today:
                       key={e.id}
                       type="button"
                       className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
+                      data-event={e.id}
                       aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
                       title={`${time && `${time} `}${e.title}`}
                       onClick={(ev) => {
@@ -358,12 +380,13 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
     return () => window.removeEventListener('keydown', key, true);
   });
   // A click or tap anywhere else closes it, except on the panel's resize strip, so the card can follow
-  // the edge. While a change is on its way, clicks elsewhere in the panel (another event, another
+  // the edge, and on its own event's button, whose click edits it (job #131). While a change is on its way, clicks elsewhere in the panel (another event, another
   // week, the panel's ×) wait too, so the card stays to show Google's answer.
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
     const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize'))) onClose();
+      const on = e.target instanceof Element ? e.target : null;
+      if (!busy && outside(e.target) && on?.closest('[data-event]')?.getAttribute('data-event') !== event.id && !on?.closest('.panel-resize')) onClose();
     };
     const click = (e: MouseEvent) => {
       if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {

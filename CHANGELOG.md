@@ -1,10 +1,8 @@
 # Changelog
 
-## Resizing from the edges: neighbors move the right way (2026-10-21)
+## More connector tests (2026-10-21)
 
-- Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
-- Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
-- Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
+- Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
 
 ## More calendar, journal and habits tests (2026-10-21)
 
@@ -37,6 +35,13 @@
 - If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.
 - It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board or a shared board arrived. If it can't be saved, the incoming change still goes ahead as before.
 - On the published site the online rules need the update in `firestore.rules` (pasted into the Firebase console) for this kind of version to be saved. Nothing already saved changes.
+
+## Resizing from the edges: neighbors move the right way (2026-10-21)
+
+- Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
+- Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
+- Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
+=======
 
 ## Resize cards from any side (2026-10-21)
 

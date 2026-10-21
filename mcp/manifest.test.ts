@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
@@ -50,6 +52,10 @@ describe('the Claude Desktop bundle’s manifest', () => {
     expect(manifest.server.mcp_config.env).toBeUndefined();
   });
 
+  it('the README has a table row for every tool', () => {
+    for (const t of manifest.tools as { name: string }[]) expect(readme, t.name).toContain(`| \`${t.name}\` |`);
+  });
+
   it('names the privacy policy, as the spec asks of a connector to an online service', () => {
     expect(manifest.privacy_policies).toEqual(['https://ezhang43.github.io/note-board/privacy/']);
   });
@@ -60,5 +66,41 @@ describe('the Claude Desktop bundle’s manifest', () => {
       expect(text).not.toMatch(/\/Users\/[A-Za-z]/);
       expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
     }
+  });
+});
+
+// The owner's standing rules about what the connector may do, checked in the code itself.
+const mcpDir = fileURLToPath(new URL('.', import.meta.url));
+const sources = readdirSync(mcpDir, { recursive: true, encoding: 'utf8' })
+  .filter((f) => !f.split(/[\\/]/).includes('dist') && /\.(ts|mjs|json|html)$/.test(f) && !/\.test\.ts$/.test(f))
+  .map((f) => ({ file: f.replaceAll('\\', '/'), code: readFileSync(join(mcpDir, f), 'utf8') }));
+
+describe('what the connector’s code may never do (guards, job 156)', () => {
+  it('finds the connector’s files', () => {
+    expect(sources.map((s) => s.file)).toEqual(expect.arrayContaining(['main.ts', 'server.ts', 'save.ts', 'firestore.ts', 'login/page.html']));
+  });
+
+  it('never uses the Admin SDK or a service account, and never deletes a document', () => {
+    for (const { file, code } of sources) {
+      expect(code, file).not.toMatch(/firebase-admin|google-auth-library|serviceAccount|private_key/);
+      expect(code, file).not.toMatch(/method:\s*['"]DELETE['"]/);
+      expect(code, file).not.toMatch(/["']delete["']\s*:/);
+    }
+    const pkg = JSON.parse(readFileSync(join(mcpDir, '../package.json'), 'utf8'));
+    expect({ ...pkg.dependencies, ...pkg.devDependencies }).not.toHaveProperty('firebase-admin');
+  });
+
+  it('only the owner’s command line (delete-on / delete-off in main.ts) can switch deleting on', () => {
+    const callers = sources.filter((s) => /setDeleteAllowed\(/.test(s.code.replace(/function setDeleteAllowed\(/g, '')));
+    expect(callers.map((s) => s.file)).toEqual(['main.ts']);
+    const main = sources.find((s) => s.file === 'main.ts')!.code;
+    const from = main.indexOf("case 'delete-on':");
+    const to = main.indexOf('return 0;', from);
+    const call = main.indexOf('await setDeleteAllowed(');
+    expect(from).toBeGreaterThan(-1);
+    expect(call).toBeGreaterThan(from);
+    expect(call).toBeLessThan(to);
+    const server = sources.find((s) => s.file === 'server.ts')!.code;
+    expect(server).not.toMatch(/writeFile|appendFile|settings|setDeleteAllowed/);
   });
 });

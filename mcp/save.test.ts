@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { ONLINE_LIMIT } from '../src/store/sync';
 import { addCard } from '../src/model/board';
 import { createCard } from '../src/model/cards';
 import { findItem } from '../src/model/checklist';
@@ -393,5 +395,51 @@ describe('saving a delete (job 110)', () => {
     expect(r.text).toMatch(/some of it may be back on the board[\s\S]*not deleted again/);
     expect(boardCommits(fs)).toHaveLength(1);
     expect(fs.own()).toContain('"noteCall"');
+  });
+});
+
+describe('guards (job 156)', () => {
+  it('an account deleted between reading and saving is never brought back', async () => {
+    const { fs, deps } = setup();
+    fs.hooks.beforeCommit = (n) => {
+      if (n === 2) fs.docs.delete('boards/me');
+    };
+    const r = await saveChange(deps, addItems('home', 'Groceries', [{ text: 'Apples' }], ['n1']));
+    expect(fs.own()).toBeNull();
+    expect(r.isError).toBe(true);
+    expect(r.text).toMatch(/nothing is saved online yet/);
+  });
+
+  it('the put-back can be refused too: said plainly, and logged', async () => {
+    const { fs, deps, log } = setup();
+    fs.hooks.afterCommit = (n) => {
+      if (n === 2) fs.setOwn(ownRaw().replace('"Home"', '"Home!"'));
+    };
+    let k = 0;
+    fs.hooks.beforeCommit = (n) => {
+      if (n >= 3) fs.setOwn(ownRaw().replace('"Home"', `"Home ${++k}"`));
+    };
+    const r = await saveChange(deps, addApples());
+    expect(r.isError).toBe(true);
+    expect(r.text).toMatch(/^Saved:[\s\S]*couldn’t be put back: Nothing was changed: the boards kept changing/);
+    expect(log.at(-1)).toMatch(/couldn’t put back/);
+  });
+
+  it('the safety version is written the way firestore.rules allow (keys, number type, never over an existing one)', async () => {
+    const { fs, deps } = setup();
+    await saveChange(deps, addApples());
+    const commit = fs.calls.find((c) => c.path === ':commit')!;
+    const writes = (commit.body as { writes: { update: { name: string; fields: Record<string, { integerValue?: string }> }; currentDocument: unknown }[] }).writes;
+    const of = (dir: string) => writes.find((w) => w.update.name.includes(`/${dir}/`))!;
+    const keys = Object.keys(of('versions').update.fields);
+    expect(keys.every((k) => ['savedAt', 'cards', 'columns', 'boards', 'hash', 'kind'].includes(k))).toBe(true);
+    expect(of('versions').update.fields.savedAt.integerValue).toMatch(/^\d+$/);
+    expect(Object.keys(of('versionData').update.fields)).toEqual(['data']);
+    for (const w of writes) expect(w.currentDocument).toEqual({ exists: false });
+  });
+
+  it('the 900,000 limit agrees in the connector, the app and firestore.rules', () => {
+    expect(MAX_SAVE).toBe(ONLINE_LIMIT);
+    expect(readFileSync('firestore.rules', 'utf8')).toContain(`text.size() <= ${MAX_SAVE}`);
   });
 });

@@ -1,4 +1,5 @@
-import { useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
+import './appFonts';
 import { Canvas } from './components/Canvas';
 import { DeleteCompleted } from './components/DeleteCompleted';
 import { DeleteAccountPanel } from './components/DeleteAccountPanel';
@@ -7,6 +8,7 @@ import { FindBar } from './components/FindBar';
 import { FormatBar } from './components/FormatBar';
 import { HistoryPanel, PreviewBar } from './components/HistoryPanel';
 import { ItemBar } from './components/ItemBar';
+import { LiveRegion } from './components/LiveRegion';
 import { PhoneBar } from './components/PhoneBar';
 import { NoticeBanner } from './components/SharePanel';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
@@ -25,6 +27,7 @@ import { PanelResizeHandle } from './components/PanelResizeHandle';
 import { PANEL_MIN } from './model/calendar';
 import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
+import { announce } from './store/announce';
 
 /** What a panel's resize strip is called: "Resize journal". */
 const RESIZE_NAME = { history: 'version history', pomodoro: 'focus timer', completed: 'completed', journal: 'journal', habits: 'habits' } as const;
@@ -43,6 +46,10 @@ import { useDropPaste } from './components/useDropPaste';
 export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?: string | null }) {
   useShortcuts();
   useDropPaste();
+  // null = saving online failed (the banner shows): said aloud too, as it appears.
+  useEffect(() => {
+    if (saveNote === null) announce('Couldn’t save online. Changes are on this device only.');
+  }, [saveNote]);
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
   const sidePanel = useAppState((s) => s.ui.sidePanel);
@@ -64,6 +71,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const style = resize ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
   return (
     <div className={classes} style={style}>
+      <LiveRegion />
       <Toolbar onSignOut={onSignOut} />
       <Canvas />
       {phone && <PhoneBar onSignOut={onSignOut} />}

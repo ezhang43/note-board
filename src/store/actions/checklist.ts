@@ -1,4 +1,5 @@
 import { createItem, newId } from '../../model/cards';
+import { announce, count } from '../announce';
 import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
 import { completedSectionCount, deleteCompletedSections } from '../../model/completed';
@@ -69,16 +70,19 @@ export function checklistActions(ctx: StoreContext) {
     updateUi({ itemSel: lists.length > 1 || level ? { ...sel, lists, level } : sel, selection: [first.cardId] });
   }
 
+  /** How many items are selected across these lists (what a screen reader is told). */
+  const itemsIn = (lists: ListSelection[]) => lists.reduce((n, l) => n + l.ids.length, 0);
+
   /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
     if (!sel) return false;
     if (sel.lists) {
       const lists = sel.lists;
-      commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } });
+      if (commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } })) announce(`Deleted ${count(itemsIn(lists), 'item')}`);
       return true;
     }
-    commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } });
+    if (commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } })) announce(`Deleted ${count(sel.ids.length, 'item')}`);
     return true;
   }
 
@@ -202,11 +206,20 @@ export function checklistActions(ctx: StoreContext) {
       if (!item) return;
       // One of the items selected across several lists: tick (or untick) them all at once.
       const lists = listsIncluding(cardId, itemId);
-      if (lists) return void commit((b) => setDoneAcross(b, lists, !item.done));
+      if (lists) {
+        // simple: the count includes selected sub-items, which tick but don't move; fine to say aloud.
+        if (commit((b) => setDoneAcross(b, lists, !item.done)) && !item.done) announce(`Moved to Completed: ${count(itemsIn(lists), 'item')}`);
+        return;
+      }
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
       const next = C.setItemsDone(card.items, ids, !item.done);
+      // Top-level items this tick sends to the Completed section (said to screen readers once they are there).
+      const moved = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done);
       // Applied to the list as it is then (another device's change may have arrived meanwhile).
-      const apply = () => commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+      const apply = () => {
+        const done = commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+        if (done && moved.length) announce(`Moved to Completed: ${moved.length === 1 ? moved[0].text.trim() || 'item' : count(moved.length, 'item')}`);
+      };
       // Top-level items this tick sends to the Completed section get a short leaving animation first (not when a key did it).
       const leaving = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done).flatMap(C.subtreeIds);
       if (!leaving.length || reducedMotion() || keyboardInitiated()) return void apply();
@@ -246,15 +259,19 @@ export function checklistActions(ctx: StoreContext) {
      */
     trashItem(cardId: string, itemId: string, keepTyping = false) {
       const lists = listsIncluding(cardId, itemId);
-      if (lists) return void commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } });
+      if (lists) {
+        if (commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } })) announce(`Deleted ${count(itemsIn(lists), 'item')}`);
+        return;
+      }
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      commit((b) => {
+      const done = commit((b) => {
         const card = b.cards[cardId];
         if (card?.kind !== 'todo') return null;
         const items = C.deleteItems(card.items, ids);
         const focus = keepTyping ? C.focusAfterRemoving(visibleItems(card), items, ids) : null;
         return { board: C.editItems(b, cardId, () => items), ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
       });
+      if (done) announce(`Deleted ${count(ids.length, 'item')}`);
     },
     /**
      * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so
@@ -263,7 +280,9 @@ export function checklistActions(ctx: StoreContext) {
     undoInItem(cardId: string, itemId: string, caret: number) {
       const before = ctx.state.board.cards[cardId];
       const shown = before?.kind === 'todo' ? visibleItems(before) : [];
+      const board = ctx.state.board;
       ctx.undoOn(ctx.state.boards.open, 'undo');
+      if (ctx.state.board !== board) announce('Undid the last change');
       const after = ctx.state.board.cards[cardId];
       if (after?.kind !== 'todo') return;
       const focus = C.findItem(after.items, itemId) ? itemId : C.focusAfterRemoving(shown, after.items, [itemId]);
@@ -280,8 +299,10 @@ export function checklistActions(ctx: StoreContext) {
     },
     cancelDeleteCompleted: () => updateUi({ deleteCompleted: null }),
     /** Delete every item in the open board's Completed sections. One undo step. */
-    confirmDeleteCompleted: () =>
-      commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null, itemSel: null } }) ?? updateUi({ deleteCompleted: null }),
+    confirmDeleteCompleted() {
+      if (commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null, itemSel: null } })) announce('Deleted the completed items');
+      else updateUi({ deleteCompleted: null });
+    },
 
     // ---------- selecting several checklist items ----------
     selectItemRange,

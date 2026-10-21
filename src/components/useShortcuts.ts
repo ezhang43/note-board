@@ -24,6 +24,8 @@ export function useShortcuts() {
       // In the Journal or Habits panel they step that board's own history, leaving the open board as it is.
       const panel = appStore.getState().ui.sidePanel;
       const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
+      // Any side panel, Version history too: a button or tick box in it is not a text field, but its keys aren't the board's.
+      const inAnyPanel = e.target instanceof Element && e.target.closest('.side-panel, .history-panel') !== null;
       const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
       // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
@@ -40,8 +42,9 @@ export function useShortcuts() {
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
-      // Keys pressed in the Journal or Habits panel never act on the board behind it.
-      if (inJournal) return;
+      // Keys pressed in a side panel never act on the board behind it (the Journal and Habits panels have their own
+      // history above; undo, redo and zoom, handled above, work from every panel).
+      if (inAnyPanel) return;
       // Nothing below acts on the board while a panel covers it (Send feedback, Delete account),
       // wherever focus is: it can be on the page itself after a click on the panel's text.
       if (panelCovers()) return;

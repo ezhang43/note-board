@@ -1,5 +1,12 @@
 # Changelog
 
+## Keys in side panels, screen readers, faster sign-in (2026-10-22)
+
+- **Delete and Backspace no longer delete a note behind a side panel.** With a note selected, pressing Delete while the Focus timer's buttons or a Completed tick box had the keyboard deleted the note without any sign. Now no side panel passes board keys through (undo, redo and zoom still work).
+- **Screen readers:** every checklist tick box is named for its item ("Done: Buy milk"), and a hidden live region now says what was only seen before: deletes, undo and redo, items moving to Completed, and a failed online save.
+- **The sign-in screen opens faster.** It no longer waits for the board's code or for four fonts it doesn't show. It looks the same.
+- Nothing about saved boards changed.
+
 ## Safety rails for the helper sessions (2026-10-21)
 
 - Parallel pull requests no longer clash on `CHANGELOG.md` and `docs/decisions.md`: git now keeps both sides when they each add an entry.

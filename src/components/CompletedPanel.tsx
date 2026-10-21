@@ -83,7 +83,7 @@ function CompletedChildren({ items, depth, cardId }: { items: TodoItem[]; depth:
   return items.map((it) => (
     <div key={it.id}>
       <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
-        <input type="checkbox" aria-label="Done" checked={it.done} disabled />
+        <input type="checkbox" aria-label={it.text.trim() ? `Done: ${it.text.trim()}` : 'Done'} checked={it.done} disabled />
         <span className="completed-text" data-find={`done:${cardId}:${it.id}`} style={styleCss(it.style) as CSSProperties}>
           <FindMarks find={`done:${cardId}:${it.id}`} text={it.text} />
         </span>

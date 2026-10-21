@@ -1,4 +1,5 @@
 import * as B from '../../model/board';
+import { announce, count } from '../announce';
 import { createCard, createColumn } from '../../model/cards';
 import { copyBlocks, pasteBlocks, type ClipEntry } from '../../model/clipboard';
 import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/completed';
@@ -73,14 +74,22 @@ export function blockActions(ctx: StoreContext) {
    * step. Returns how many items moved.
    */
   function cleanUpLists(now: Date, onlyCardId?: string): number {
-    let count = 0;
+    let moved = 0;
     commit((b) => {
       const result = cleanUp(b, dayKey(now), { type: 'loose', x: 0, y: 0 }, undefined, onlyCardId);
       if (!result.count) return null;
-      count = result.count;
+      moved = result.count;
       return { board: result.board, ui: { selection: onlyCardId ? [onlyCardId] : [], itemSel: null, confirm: null } };
     });
-    return count;
+    if (moved) announce(`${count(moved, 'item')} moved to the Completed panel`);
+    return moved;
+  }
+
+  /** "Deleted 2 cards", "Deleted 1 container and 3 cards", for screen readers. */
+  function announceDeleted(board: Board, ids: string[]) {
+    const columns = ids.filter((id) => board.columns[id]).length;
+    const cards = ids.length - columns;
+    announce(`Deleted ${[columns && count(columns, 'container'), cards && count(cards, 'card')].filter(Boolean).join(' and ')}`);
   }
 
   return {
@@ -430,17 +439,19 @@ export function blockActions(ctx: StoreContext) {
 
     // ---------- deleting ----------
     deleteCard(id: string) {
-      commit((b) => B.deleteCard(b, id), { ui: { selection: liveSelection(ctx.state.board, [id]) } });
+      if (commit((b) => B.deleteCard(b, id), { ui: { selection: liveSelection(ctx.state.board, [id]) } })) announce('Deleted 1 card');
     },
     askDeleteColumn: (id: string) => updateUi({ confirm: { columnId: id, ids: [id] } }),
     cancelDelete: () => updateUi({ confirm: null }),
     confirmDelete() {
       const c = ctx.state.ui.confirm;
       if (!c) return;
-      commit((b) => {
+      const board = ctx.state.board;
+      const done = commit((b) => {
         const next = B.deleteBlocks(b, c.ids);
         return { board: next, ui: { confirm: null, selection: liveSelection(next) } };
       });
+      if (done) announceDeleted(board, c.ids);
     },
     /**
      * Delete / Backspace: delete the selection. If it includes a column, the same confirmation as
@@ -457,10 +468,11 @@ export function blockActions(ctx: StoreContext) {
         updateUi({ confirm: { columnId: firstColumn, ids } });
         return true;
       }
-      commit((b) => {
+      const done = commit((b) => {
         const next = B.deleteBlocks(b, ids);
         return { board: next, ui: { selection: liveSelection(next), colourMenuOpen: false } };
       });
+      if (done) announceDeleted(board, ids);
       return true;
     },
 

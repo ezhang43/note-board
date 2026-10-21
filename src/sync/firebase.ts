@@ -174,7 +174,11 @@ export function boardRemote(uid: string): Remote {
           // "No board" from the offline copy may just mean it hasn't been downloaded yet.
           if (!d && snap.metadata.fromCache) return;
           opened = true;
-          onChange(data === null ? null : { data, client: String(d?.client ?? ''), ...(pending ? { pending: true } : {}) });
+          onChange(
+            data === null
+              ? null
+              : { data, client: String(d?.client ?? ''), ...(pending ? { pending: true } : {}), ...(snap.metadata.fromCache ? { cached: true } : {}) },
+          );
         },
         onError,
       );

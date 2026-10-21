@@ -126,6 +126,11 @@ describe('accountKeys', () => {
       'note-board:share-base:other',
       'note-board:shares:someone-else',
       'note-board:own-boards:someone-else',
+      // Whose boards the device holds, and boards kept aside while another account uses it (job #145).
+      'note-board:owner-uid',
+      'note-board:parked:me',
+      'note-board:parked-bases:me',
+      'note-board:parked:someone-else',
       // Settings of this device, not the account's data.
       'note-board:theme',
       'note-board:color-theme',
@@ -154,6 +159,9 @@ describe('accountKeys', () => {
         'note-board:own-boards:me',
         'note-board:share-base:s1',
         'note-board:share-base:s2',
+        // The owner key stays, so the boards left are never taken for the next account's.
+        'note-board:parked:me',
+        'note-board:parked-bases:me',
         'note-board:calendar-access',
       ].sort(),
     );

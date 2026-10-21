@@ -27,6 +27,8 @@ interface Props {
   onFocus?(el: HTMLDivElement): void;
   onBlur?(el: HTMLDivElement): void;
   label: string;
+  /** Gray words shown while the note is empty (the caller says when it is: nothing typed here is read back from it). */
+  placeholder?: string;
   ref?: Ref<RichEditorHandle>;
 }
 
@@ -181,7 +183,7 @@ const endOf = (rich: Rich): Pos => {
 };
 const at = (p: Pos): Sel => ({ start: p, end: p });
 
-export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur, label, ref }: Props) {
+export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur, label, placeholder, ref }: Props) {
   const root = useRef<HTMLDivElement>(null);
   /** What is on the page. */
   const cur = useRef<Rich>(value);
@@ -420,6 +422,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       role="textbox"
       aria-multiline="true"
       aria-label={label}
+      data-placeholder={placeholder}
       spellCheck
       onKeyDown={onKeyDown}
       onPaste={onPaste}

@@ -158,6 +158,27 @@ export function groupJournal<T extends { date: string }>(entries: T[], today: Da
   return years;
 }
 
+// Journal redesign (owner pick, 2026-10-22, jobs 166 + 167): today's page has a heading, a week number and a word count.
+
+/** "Wednesday, 21 October": a day as a page heading. */
+export function journalLongDate(key: DayKey): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getUTCDay()];
+  return `${weekday}, ${Number(key.slice(8))} ${MONTH_NAMES[Number(key.slice(5, 7)) - 1]}`;
+}
+
+/** The week's number the ISO way (Monday first; week 1 holds the year's first Thursday). */
+export function isoWeek(key: DayKey): number {
+  const thursday = addDays(weekStart(key), 3);
+  const jan1 = Date.parse(`${thursday.slice(0, 4)}-01-01T12:00:00Z`);
+  return Math.floor((Date.parse(`${thursday}T12:00:00Z`) - jan1) / 86400000 / 7) + 1;
+}
+
+/** The words in a note's text under its date line; the "• " and "1. " list markers are not words. */
+export function journalWords(body: string): number {
+  return body.split('\n').flatMap((l) => l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/)).filter(Boolean).length;
+}
+
 /** What the person chose to open (true) or shut (false), by group id; only choices that differ from the default are kept. */
 export type JournalOpen = Record<string, boolean>;
 

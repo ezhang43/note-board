@@ -1932,6 +1932,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .share-head h2 { margin: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-panel h3 { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
 .share-text { margin: 0; line-height: 1.45; color: var(--ink-soft); }
+.share-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.share-panel > .tb-button.add-column { align-self: stretch; justify-content: center; }
 .share-link { display: flex; gap: 6px; }
 .share-link input {
   flex: 1;

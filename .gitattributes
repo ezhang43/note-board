@@ -1,5 +1,7 @@
 *.pdf binary
 # Parallel pull requests each add a new entry at the top of these two files; keep both sides
-# instead of stopping on a merge conflict (job #153, owner "go" 2026-10-21).
+# instead of stopping on a merge conflict (job #153, owner "go" 2026-10-21). Only git on a computer
+# obeys this, not GitHub's merge button, so new work uses changes/ fragments instead (job #171);
+# these lines remain for older pull requests and can go once none edits the two files.
 CHANGELOG.md merge=union
 docs/decisions.md merge=union

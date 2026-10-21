@@ -2017,9 +2017,14 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .pomodoro-left { font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* The Journal panel: each day's note as a white card, newest first, its date above it. */
-.journal-panel { display: flex; flex-direction: column; gap: 4px; }
+/*
+ * The Journal panel, the page-and-timeline design (owner pick, 2026-10-22, jobs 166 + 167): today is a white
+ * page with its date as the heading; below it the earlier days are a timeline, each day a row with a big date
+ * number and its first lines, opening in place to edit. Month and week headers fold, as before.
+ */
+.journal-panel { display: flex; flex-direction: column; gap: 0; }
 .journal-panel:focus, .side-panel:focus { outline: none; }
-/* Year > Month > Week groups: each header is a button that opens and shuts what is under it. */
+/* Month and week groups (and a year, for years other than this one): each header is a button that opens and shuts what is under it. */
 .jg-head {
   display: flex;
   align-items: center;
@@ -2047,32 +2052,72 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (hover: hover) {
   .jg-head:hover { background: var(--hover); }
 }
-.jg-year { font-size: 14px; font-weight: 600; }
-.jg-month { font-size: 13px; font-weight: 600; }
-.jg-week { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.jg-year { padding-top: 12px; font-size: 14px; font-weight: 600; }
+.jg-month { padding-top: 14px; font-size: 13px; font-weight: 600; }
+.jg-week { padding-top: 10px; padding-bottom: 2px; color: var(--ink-soft); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.jg-week::after { content: ''; order: 2; flex: 1; height: 1px; margin-left: 6px; background: var(--line); }
+.jg-count { margin-left: auto; color: var(--ink-soft); font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.jg-week .jg-count { order: 3; margin-left: 0; }
 .app.phone .jg-head { min-height: 44px; font-size: 16px; }
-.jg-in { margin-left: 12px; }
+.app.phone .jg-week { font-size: 12px; }
 @media (prefers-reduced-motion: no-preference) {
   .jg-head::before { transition: transform 150ms ease-out; }
 }
-.journal-entry h3 { margin: 12px 0 4px; font-size: 12px; font-weight: 600; }
-/* Each day's date is a header button like the groups above it; folded, it shows the note's first line after it, in gray. */
+.journal-entry h3 { margin: 0; font-size: inherit; font-weight: inherit; }
+/* A day is a header button like the groups above it: the date, then (folded) its first lines, in gray. */
 .jg-day { color: var(--ink-soft); }
-.jg-peek { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--ink-faint); }
+.jg-day::before { display: none; }
+.jg-peek { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; color: var(--ink); font-size: 15px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
 .journal-entry .rich {
-  min-height: 3.1em;
-  padding: 6px 8px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-edge);
-  border-radius: 10px;
+  min-height: 1.6em;
+  padding: 0;
   color: var(--ink);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   outline: none;
 }
+.journal-entry .rich { position: relative; }
+.rich[data-placeholder]:not(:has(> div + div))::before { content: attr(data-placeholder); position: absolute; left: 0; top: 0; color: var(--placeholder); pointer-events: none; }
 .app.phone .journal-entry .rich { font-size: 16px; }
+/* Today's page. */
+.journal-page { margin: 12px 0 2px; padding: 18px 20px 12px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.journal-page h3 { margin-bottom: 8px; }
+.journal-page .jg-head { align-items: baseline; padding: 0; border-radius: 4px; }
+.jp-title { color: var(--ink); font-size: 17px; font-weight: 600; letter-spacing: -0.005em; }
+.jp-week { margin-left: auto; color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+.journal-page .jg-peek { padding-left: 8px; }
+.journal-page .rich { min-height: 140px; }
+.journal-page.shut .jg-head { flex-wrap: wrap; }
+.journal-page.shut h3 { margin-bottom: 0; }
+.journal-foot { display: flex; gap: 8px; margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.journal-saved { margin-left: auto; color: var(--ink-soft); opacity: 0; }
+.journal-saved.on { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .journal-saved { transition: opacity 150ms var(--ease-out); }
+}
+/* An earlier day: its date on the left, its words on the right. */
+.journal-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; margin: 0; padding: 0 8px; border-radius: 10px; }
+.journal-row + .journal-row { box-shadow: inset 0 1px 0 var(--line); }
+.journal-row h3 { grid-column: 1; }
+.journal-row.shut h3 { grid-column: 1 / -1; }
+.journal-row .jg-head { align-items: flex-start; padding: 12px 0; border-radius: 10px; }
+.jd { flex: none; width: 44px; }
+.jd b { display: block; color: var(--ink); font-size: 20px; font-weight: 600; line-height: 24px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.jd span { display: block; margin-top: 1px; color: var(--ink-soft); font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+.jg-peek { padding-top: 1px; }
+.journal-row .rich { grid-column: 2; grid-row: 1; padding: 12px 0; }
+.journal-row:not(.shut) { margin: 6px 0; padding: 0 12px; background: var(--card-bg); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+.journal-row:not(.shut) + .journal-row, .journal-row + .journal-row:not(.shut) { box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+.journal-row + .journal-row.shut:has(+ .journal-row:not(.shut)) { box-shadow: none; }
+.journal-row.shut + .journal-row:not(.shut) { box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+@media (hover: hover) {
+  .journal-row .jg-head:hover { background: none; }
+  .journal-row.shut:hover { background: var(--hover); }
+}
+.app.phone .journal-row .jg-head { min-height: 44px; }
+
 
 /* Rich text in the Journal (owner request, 2026-10-19): lines, list items and the looks of words. */
 .rich > div { position: relative; }
@@ -2109,157 +2154,305 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .rich [data-hl='blue'] { background: var(--hl-blue); }
 .rich [data-hl='pink'] { background: var(--hl-pink); }
 
-/* Its Formatting bar stays at the top of the panel while the notes scroll under it. */
+/* Its Formatting bar stays at the top of the panel while the notes scroll under it: quiet icon buttons, and one Aa menu for the rest. */
 .journal-tools {
   position: sticky;
   top: -8px;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 1px;
   margin: -8px -10px 0;
-  padding: 8px 10px;
+  padding: 6px 10px 8px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
-.journal-tools button,
-.journal-tools select {
+.journal-tools > button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
   height: 32px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
   background: transparent;
-  color: var(--ink);
+  color: var(--ink-soft);
   font: inherit;
   font-size: 14px;
+  line-height: 1;
   cursor: pointer;
 }
-.journal-tools button { min-width: 32px; padding: 0 6px; line-height: 1; }
-.journal-tools select { padding: 0 4px; border-color: var(--control-edge); max-width: 9.5em; }
 @media (hover: hover) {
-  .journal-tools button:hover { background: var(--hover); }
+  .journal-tools > button:hover { background: var(--hover); color: var(--ink); }
 }
-.journal-tools button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.journal-tools > button[aria-pressed='true'], .journal-tools > button[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); }
 .journal-tools .jt-b { font-weight: 700; }
 .journal-tools .jt-i { font-style: italic; font-family: Georgia, serif; }
 .journal-tools .jt-u { text-decoration: underline; }
 .journal-tools .jt-s { text-decoration: line-through; }
-.app.phone .journal-tools button { min-width: 44px; height: 44px; font-size: 16px; }
-.app.phone .journal-tools select { height: 44px; font-size: 16px; }
-
-/* The Habits panel: each habit as a white card, its name and its week, month or year. */
-.habits-panel { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
-.habits-panel:focus { outline: none; }
-.habit-new { display: flex; gap: 6px; }
-.habits-panel input[type='text'] {
-  flex: 1;
-  min-width: 0;
-  height: 34px;
-  padding: 0 8px;
-  border: 1px solid var(--control-edge);
-  border-radius: 6px;
-  background: var(--canvas);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-}
-.habits-empty { margin: 8px 4px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
-.habit, .weight { padding: 8px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 10px; }
-.habit-head { display: flex; align-items: center; gap: 4px; }
-.habit-new .tb-button, .weight-new .tb-button { height: 34px; }
-/* The Weight card above the habits (owner request 2026-10-21): a box for today's kg and a small chart. */
-.weight-title { margin-bottom: 6px; font-size: 14px; font-weight: 500; }
-.weight-new { display: flex; gap: 6px; }
-.weight-note { margin: 6px 2px 0; color: var(--danger); font-size: 13px; }
-.weight-today, .weight-empty { margin: 6px 2px 0; color: var(--ink-soft); font-size: 13px; }
-.weight-today { color: var(--ink); font-variant-numeric: tabular-nums; }
-.weight-chart { display: block; width: 100%; height: auto; margin-top: 6px; overflow: visible; }
-.weight-grid { stroke: var(--hover); stroke-width: 1; }
-.weight-line { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
-.weight-point { fill: var(--accent); }
-.weight-axis text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
-.weight-latest { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 2px 2px 0; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
-.weight-remove { font-size: 18px; line-height: 1; }
-/* The name lines up with the day boxes; its edge shows on hover and while typing. */
-.habits-panel .habit-head input[type='text'] { margin-left: -4px; padding: 0 4px; border-color: transparent; background: transparent; font-weight: 500; }
-.habits-panel .habit-head input[type='text']:focus { border-color: var(--control-edge); }
-.habit-delete { color: var(--ink-soft); }
-.habit-week { display: flex; gap: 4px; margin-top: 6px; }
-.habit-day {
-  flex: 1;
-  min-width: 0;
-  height: 44px;
+.jt-sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line); }
+.journal-tools .jt-aa { display: inline-flex; align-items: center; gap: 2px; padding: 0 8px; }
+.jt-aa b { font-size: 14px; font-weight: 600; }
+.jt-aa small { font-size: 11px; font-weight: 500; }
+.jt-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 10px;
+  right: 10px;
+  z-index: 8;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  padding: 0;
-  border: 1px solid var(--control-edge);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06);
 }
-.habit-wd { font-size: 10px; font-weight: 600; color: var(--ink-soft); }
-.habit-day[aria-current='date'] { border: 2px solid var(--accent); }
-.habit-day[aria-pressed='true'] { background: var(--checkbox); border-color: var(--checkbox); color: var(--card-bg); }
-.habit-day[aria-pressed='true'] .habit-wd { color: inherit; }
-.habit-day[aria-current='date'][aria-pressed='true'] { border-color: var(--accent); }
-@media (hover: hover) and (pointer: fine) {
-  .habit-day[aria-pressed='false']:hover { background: var(--hover); }
-  .habits-panel .habit-head input[type='text']:hover { border-color: var(--control-edge); }
-}
-.app.phone .habits-panel input[type='text'] { height: 44px; font-size: 16px; }
-.app.phone .habit-new .tb-button, .app.phone .weight-new .tb-button { height: 44px; }
-.app.phone .habit-delete, .app.phone .weight-remove { width: 44px; height: 44px; }
-.app.phone .habit-day { height: 52px; font-size: 15px; }
+:root[data-theme='dark'] .jt-menu { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.jt-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; }
+.jt-label { color: var(--ink-soft); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.jt-mini { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 8px; background: var(--hover); }
+.jt-mini button { height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.jt-mini button[aria-pressed='true'] { background: var(--card-bg); color: var(--ink); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12); }
+:root[data-theme='dark'] .jt-mini button[aria-pressed='true'] { background: #3b3832; }
+.jt-fonts, .jt-hls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.jt-fonts button, .jt-hls button:not(.jt-dot) { height: 28px; padding: 0 9px; border: 0; border-radius: 7px; background: var(--hover); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.jt-fonts button[aria-pressed='true'], .jt-hls button[aria-pressed='true']:not(.jt-dot) { background: var(--accent-soft); color: var(--accent-ink); }
+.jt-hls { gap: 8px; }
+.jt-hls button:not(.jt-dot) { font-size: 12px; background: transparent; color: var(--ink-soft); }
+.jt-dot { position: relative; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); cursor: pointer; }
+.jt-dot[data-hl='yellow'] { background: var(--hl-yellow); }
+.jt-dot[data-hl='green'] { background: var(--hl-green); }
+.jt-dot[data-hl='blue'] { background: var(--hl-blue); }
+.jt-dot[data-hl='pink'] { background: var(--hl-pink); }
+.jt-dot[aria-pressed='true']::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }
+.app.phone .journal-tools > button { min-width: 44px; height: 44px; font-size: 16px; }
+.app.phone .journal-tools .jt-aa { min-width: 52px; }
+.app.phone .jt-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.app.phone .jt-mini button, .app.phone .jt-fonts button, .app.phone .jt-hls button:not(.jt-dot) { min-height: 44px; }
+.app.phone .jt-dot { width: 36px; height: 36px; }
 
-/* Week | Month | Year and the arrows (owner request 2026-10-20): a bar that stays at the top while the habits scroll. */
-.habits-panel { container-type: inline-size; }
-.habit-viewbar { position: sticky; top: -8px; z-index: 2; display: flex; flex-direction: column; gap: 6px; margin: 0 -10px; padding: 4px 10px 8px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.habit-seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--canvas); }
-.habit-seg-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 6px; background: var(--card-bg); border: 1px solid var(--card-edge); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.08); }
-.habit-seg button { position: relative; height: 32px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; }
-.habit-seg button[aria-pressed='true'] { color: var(--ink); font-weight: 600; }
-.habit-nav { display: flex; align-items: center; gap: 4px; }
-.habit-nav-label { flex: 1; text-align: center; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.habit-step, .habit-today { height: 32px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--surface); color: var(--ink); font-weight: 500; cursor: pointer; }
-.habit-step { width: 32px; padding: 0; font-size: 18px; line-height: 1; }
-.habit-today { padding: 0 10px; font-size: 13px; }
-@media (hover: hover) and (pointer: fine) {
+
+/*
+ * The Habits panel, the Ledger design (owner pick, 2026-10-22, jobs 166 + 167): one white sheet, the weekdays
+ * once at the top, a soft band down today's column, a row for each habit with a tick for each day. Green
+ * only means "done" (the habit's own color, default green); the accent only marks today. The layout follows
+ * the panel's own width (container queries): names beside the ticks from about 400px, two calendars from 440px.
+ */
+.habits-panel {
+  --hc: var(--checkbox);
+  --hc-on: #fff;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+:root[data-theme='dark'] .habits-panel { --hc-on: #14130f; }
+.habits-panel:focus { outline: none; }
+/* The 8 bold swatches as habit colors; dark mode uses the light tints, with a dark check on them. */
+:root {
+  --hc-tomato: #d9482f; --hc-tangerine: #d96a0f; --hc-sunflower: #c99700; --hc-grass: #4f9a1c;
+  --hc-emerald: #168a5f; --hc-ocean: #2a78c8; --hc-violet: #7550dc; --hc-magenta: #c23b9b;
+}
+:root[data-theme='dark'] {
+  --hc-tomato: #f2806c; --hc-tangerine: #f0954a; --hc-sunflower: #f2c14e; --hc-grass: #9ad45e;
+  --hc-emerald: #5fd6a4; --hc-ocean: #5aa6f0; --hc-violet: #a48af5; --hc-magenta: #ec72c8;
+}
+.habits-panel [data-hc='tomato'], .habit-swatch[data-hc='tomato'] { --hc: var(--hc-tomato); }
+.habits-panel [data-hc='tangerine'], .habit-swatch[data-hc='tangerine'] { --hc: var(--hc-tangerine); }
+.habits-panel [data-hc='sunflower'], .habit-swatch[data-hc='sunflower'] { --hc: var(--hc-sunflower); --hc-on: #2b2000; }
+.habits-panel [data-hc='grass'], .habit-swatch[data-hc='grass'] { --hc: var(--hc-grass); }
+.habits-panel [data-hc='emerald'], .habit-swatch[data-hc='emerald'] { --hc: var(--hc-emerald); }
+.habits-panel [data-hc='ocean'], .habit-swatch[data-hc='ocean'] { --hc: var(--hc-ocean); }
+.habits-panel [data-hc='violet'], .habit-swatch[data-hc='violet'] { --hc: var(--hc-violet); }
+.habits-panel [data-hc='magenta'], .habit-swatch[data-hc='magenta'] { --hc: var(--hc-magenta); }
+:root[data-theme='dark'] .habits-panel [data-hc='sunflower'] { --hc-on: #14130f; }
+
+/* Under the panel's title: the weekday and how today is going. */
+.habits-sub { margin: -8px 2px 0; font-size: 12px; line-height: 16px; color: var(--ink-soft); }
+.habits-alldone { display: inline-flex; align-items: center; gap: 3px; color: var(--checkbox); font-weight: 500; }
+.habits-alldone svg { width: 12px; height: 12px; padding: 1.5px; border-radius: 50%; background: var(--checkbox); color: var(--hc-on); stroke-width: 3; }
+.app.phone .habits-sub { font-size: 13px; }
+
+/* Week | Month | Year and the arrows: a bar that stays at the top while the habits scroll. */
+.habit-viewbar { position: sticky; top: -8px; z-index: 2; display: flex; flex-direction: column; gap: 10px; margin: 0 -10px; padding: 8px 10px; background: var(--surface); }
+.habit-seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border-radius: 10px; background: var(--hover); }
+.habit-seg-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 8px; background: var(--card-bg); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12), 0 0 0 0.5px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .habit-seg-thumb { background: #3b3832; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+.habit-seg button { position: relative; height: 30px; padding: 0; border: none; border-radius: 8px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.habit-seg button[aria-pressed='true'] { color: var(--ink); }
+.habit-nav { display: flex; align-items: center; gap: 8px; }
+.habit-nav-label { flex: 1; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.habit-steps { display: flex; overflow: hidden; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); }
+.habit-step { width: 34px; height: 30px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.habit-step + .habit-step { border-left: 1px solid var(--control-edge); }
+.habit-today { height: 30px; padding: 0 10px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+@media (hover: hover) {
   .habit-seg button[aria-pressed='false']:hover { color: var(--ink); }
   .habit-step:hover, .habit-today:hover { background: var(--hover); }
 }
-.app.phone .habit-seg button, .app.phone .habit-step, .app.phone .habit-today { height: 44px; font-size: 15px; }
-.app.phone .habit-step { width: 44px; font-size: 20px; }
+.app.phone .habit-seg button { height: 40px; font-size: 15px; }
+.app.phone .habit-step { width: 46px; height: 42px; font-size: 20px; }
+.app.phone .habit-today { height: 42px; font-size: 15px; }
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-input='keys']) .habit-seg-thumb { transition: transform 200ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-seg button, html:not([data-input='keys']) .habit-step, html:not([data-input='keys']) .habit-today { transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-seg button:active, html:not([data-input='keys']) .habit-step:active, html:not([data-input='keys']) .habit-today:active { transform: scale(0.97); }
 }
 
-/* Month: one calendar per habit, two side by side when the panel is wide. */
-.habit-cards { display: flex; flex-direction: column; gap: 8px; }
+/* The Weight card above the habits: the latest weight big, how it changed, a box for today's kg, a small chart. */
+.weight { padding: 12px 14px 10px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.weight-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weight-title { font-size: 13px; font-weight: 600; }
+.weight-new { display: flex; align-items: center; gap: 6px; }
+.weight-new input[type='text'] { width: 84px; height: 30px; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; }
+.weight-new .tb-button { height: 30px; padding: 0 12px; font-size: 13px; }
+.weight-note { margin: 6px 2px 0; color: var(--danger); font-size: 13px; }
+.weight-empty { margin: 8px 2px 2px; color: var(--ink-soft); font-size: 13px; }
+.weight-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 6px; }
+.weight-text { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
+.weight-num { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.weight-num b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 30px; color: var(--ink); }
+.weight-today { font-size: 12px; }
+.weight-change { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.weight-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.weight-grid { stroke: var(--hover); stroke-width: 1; }
+.weight-area { fill: var(--accent); opacity: 0.09; }
+.weight-line { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.weight-point { fill: var(--accent); }
+.weight-point.latest { stroke: var(--card-bg); stroke-width: 2.5; }
+.weight-point.faint { fill: transparent; }
+.weight-axis text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+.weight-latest { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 -4px; color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.weight-remove { font-size: 18px; line-height: 1; }
+@container (min-width: 400px) {
+  .weight-body { grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: end; }
+  .weight-text { flex-direction: column; align-items: flex-start; gap: 2px; padding-bottom: 16px; }
+}
+.app.phone .weight-new input[type='text'] { width: 96px; height: 44px; font-size: 16px; }
+.app.phone .weight-new .tb-button, .app.phone .weight-remove { height: 44px; }
+.app.phone .weight-remove { width: 44px; }
+
+/* The sheet: the weekdays once, then a row for each habit, then a quiet "New habit" row. */
+.habit-sheet { background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.habit-days-head { position: sticky; top: var(--bar-h, 0px); z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 4px 12px 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: var(--card-bg); }
+.habit-dh { display: flex; flex-direction: column; align-items: center; padding: 6px 0 7px; border-radius: 8px 8px 0 0; line-height: 17px; }
+.habit-wd { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-soft); }
+.habit-dn { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.habit-dh.today { background: var(--accent-soft); }
+.habit-dh.today .habit-wd, .habit-dh.today .habit-dn { color: var(--accent-ink); }
+.habit-dh.today .habit-dn { font-weight: 600; }
+.habit { position: relative; padding: 10px 12px 8px; border-top: 1px solid var(--line); }
+.habit:first-child { border-top: 0; }
+.habit-head { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+.habit-head input[type='text'] { flex: 1; min-width: 0; height: 28px; margin-left: -4px; padding: 0 4px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; letter-spacing: -0.005em; }
+.habit-head input[type='text']:focus { border-color: var(--control-edge); }
+.habit-head input[type='text'] { text-overflow: ellipsis; }
+.habit-count { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.habit-count-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.habit-menu-wrap { position: relative; flex: none; }
+.habit-more { width: 28px; height: 28px; opacity: 0; color: var(--ink-soft); }
+.habit:focus-within .habit-more, .habit-more[aria-expanded='true'] { opacity: 1; }
+@media (hover: hover) { .habit:hover .habit-more { opacity: 1; } }
+@media (hover: none) { .habit-more { opacity: 0.7; } }
+.habit-menu { position: absolute; z-index: 6; right: 0; top: 32px; width: 232px; padding: 6px; border-radius: 12px; background: var(--surface); box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .habit-menu { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.habit-menu-item { display: flex; align-items: center; width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.habit-menu-delete { color: var(--danger); }
+.habit-menu-label { padding: 6px 10px 0; font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+.habit-swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.habit-swatch { position: relative; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%; background: var(--hc, var(--checkbox)); cursor: pointer; }
+.habit-swatch[aria-checked='true']::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }
+.app.phone .habit-menu-item { height: 44px; }
+.app.phone .habit-swatch { width: 26px; height: 26px; }
+@media (hover: hover) { .habit-menu-item:hover { background: var(--hover); } }
+
+/* A week: seven ticks under the shared weekdays; today's column has the soft band. */
+.habit-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.habit-day { display: grid; place-items: center; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.habit-week .habit-day[aria-current='date'] { background: var(--accent-soft); }
+.habit-tk { display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--control-edge); border-radius: 50%; color: var(--hc-on); }
+.habit-tk svg { width: 14px; height: 14px; }
+.habit-tk path { stroke-width: 2.6; stroke-dasharray: 20; stroke-dashoffset: 20; }
+.habit-day[aria-pressed='true'] .habit-tk { background: var(--hc); border-color: var(--hc); }
+.habit-day[aria-pressed='true'] .habit-tk path { stroke-dashoffset: 0; }
+.habit-day[aria-current='date'][aria-pressed='false'] .habit-tk { border-color: var(--ink-soft); background: var(--card-bg); }
+.habit-day.ahead[aria-pressed='false'] .habit-tk { border-style: dashed; opacity: 0.6; }
+@media (hover: hover) { .habit-week .habit-day[aria-pressed='false']:hover .habit-tk { border-color: var(--ink-faint); } }
+.app.phone .habit-day { height: 48px; }
+.app.phone .habit-tk { width: 30px; height: 30px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .habit-tk { transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-tk path { transition: stroke-dashoffset 180ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-day:active .habit-tk, html:not([data-input='keys']) .habit-day:active .habit-num { transform: scale(0.92); }
+}
+/* From about 400px the names sit beside the ticks and the columns line up under the weekdays. */
+@container (min-width: 400px) {
+  .habit-count-short { display: none; }
+  .habit-count-long { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .habit-sheet-week .habit-days-head { grid-template-columns: minmax(0, 1fr) repeat(7, 32px); padding: 4px 10px 0 16px; }
+  .habit-sheet-week .habit-dh:first-child { grid-column: 2; }
+  .habit-sheet-week .habit { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, 32px); padding: 0 10px 0 16px; }
+  .habit-sheet-week .habit-week { display: contents; }
+  .habit-sheet-week .habit-day { height: auto; min-height: 58px; border-radius: 0; }
+  .habit-sheet-week .habit-head { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 1px; padding: 9px 4px 9px 0; }
+  .habit-sheet-week .habit-menu-wrap { position: absolute; left: calc(100% - 7 * 32px - 10px - 32px); bottom: 6px; }
+}
+
+/* A month: one calendar for each habit, two side by side from 440px. */
+.habit-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; margin-top: 6px; }
+.habit-cal-wd { text-align: center; font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.habit-cal .habit-day { height: 34px; border-radius: 0; }
+.habit-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.habit-day[aria-pressed='true'] .habit-num { background: var(--hc); color: var(--hc-on); font-weight: 500; }
+.habit-day[aria-current='date'][aria-pressed='false'] .habit-num { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent-ink); font-weight: 600; }
+.habit-day.ahead[aria-pressed='false'] .habit-num { color: var(--ink-faint); opacity: 0.7; }
+.habit-sheet-month .habit, .habit-sheet-year .habit { padding: 14px 14px 8px; }
+.habit-sheet-month .habit-head, .habit-sheet-year .habit-head { padding-bottom: 0; }
+.habit-rows { display: grid; grid-template-columns: minmax(0, 1fr); }
 @container (min-width: 440px) {
-  .habit-cards-month { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .habit-sheet-month .habit-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+  .habit-sheet-month .habit { padding: 12px 10px 8px; border-top: 0; background: var(--card-bg); }
+  .habit-num { width: 24px; height: 24px; font-size: 12px; }
 }
-.habit-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 6px; }
-.habit-cal-wd { text-align: center; font-size: 10px; font-weight: 600; color: var(--ink-soft); }
-.habit-cal .habit-day { flex: none; height: 32px; border-radius: 6px; font-size: 12px; }
-.app.phone .habit-cal .habit-day { height: 44px; font-size: 14px; }
+.app.phone .habit-cal .habit-day { height: 44px; }
+.app.phone .habit-num { width: 32px; height: 32px; font-size: 14px; }
 
-/* Year: twelve rows of tiny squares, one per day; view only. */
-.habit-year { display: grid; grid-template-columns: 30px repeat(31, minmax(0, 1fr)); column-gap: 1.5px; align-items: center; margin-top: 6px; }
-.habit-year-day { margin-bottom: 4px; font-size: 8px; text-align: center; white-space: nowrap; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.habit-year-month { height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: var(--ink-soft); font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }
-.habit-year-month[aria-current='date'] { color: var(--accent); }
-.habit-sq { aspect-ratio: 1; border-radius: 1.5px; background: var(--hover); }
-.habit-sq.on { background: var(--checkbox); }
+/* A year: twelve rows of tiny squares, one per day; view only. */
+.habit-year { display: grid; grid-template-columns: 30px repeat(31, minmax(0, 1fr)); gap: 1.5px; align-items: center; margin-top: 8px; }
+.habit-year-day { margin-bottom: 4px; font-size: 9px; text-align: center; white-space: nowrap; color: var(--ink-faint); font-variant-numeric: tabular-nums; overflow: visible; }
+.habit-year-month { height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 11px; font-weight: 500; text-align: left; cursor: pointer; }
+.habit-year-month[aria-current='date'] { color: var(--accent-ink); font-weight: 600; }
+.habit-sq { aspect-ratio: 1; border-radius: 2px; background: var(--hover); }
+.habit-sq.on { background: var(--hc); }
 .habit-sq.none { background: transparent; }
 .habit-sq.ahead:not(.on) { background: transparent; box-shadow: inset 0 0 0 1px var(--hover); }
 .habit-sq.today { box-shadow: 0 0 0 1.5px var(--accent); }
 .app.phone .habit-year-month { height: 22px; font-size: 12px; }
+
+/* The last row adds a habit; the box is the row. */
+.habit-new { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 16px; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; color: var(--ink-soft); }
+.habit-new:focus-within { color: var(--ink); }
+.habit-new input[type='text'] { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; }
+.habit-new input::placeholder { color: var(--placeholder); }
+.app.phone .habit-new { height: 56px; }
+.app.phone .habit-new input[type='text'], .app.phone .habit-head input[type='text'] { font-size: 16px; }
+.app.phone .habit-head input[type='text'] { height: 36px; }
+.habits-empty { display: flex; flex-direction: column; align-items: center; padding: 28px 24px 22px; text-align: center; }
+.habits-empty-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 14px; border-radius: 16px; background: var(--accent-soft); color: var(--accent-ink); }
+.habits-empty-icon svg { width: 24px; height: 24px; }
+.habits-empty h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.habits-empty p { max-width: 220px; margin: 0 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.habits-empty-add { gap: 6px; height: 36px; border-color: transparent; background: var(--honey); color: var(--honey-ink); }
+.app.phone .habits-empty-add { height: 44px; }
+@container (min-width: 400px) {
+  .habit-viewbar { flex-direction: row; align-items: center; }
+  .habit-seg { flex: none; width: 210px; }
+  .habit-nav-label { text-align: right; }
+}
+
 
 /* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
 .confirm.delete-completed {

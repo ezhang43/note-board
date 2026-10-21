@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BusyAnts: a calm, free visual board</title>
-    <meta name="description" content="BusyAnts is a calm, free visual board for notes and checklists. Share a board by link and plan together in real time. Works offline and installs like an app." />
+    <title>BusyAnts: a free board with no limits</title>
+    <meta name="description" content="BusyAnts is a free visual board for notes and checklists, with no limit on cards, containers or boards. Undo, saved versions and downloadable backups keep your work safe. It works offline and on your phone, and it does not push AI on you." />
     <link rel="icon" href="/busyants-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/busyants-apple-180.png" />
     <meta name="theme-color" content="#FFCF3F" media="(prefers-color-scheme: light)" />
@@ -28,8 +28,8 @@
     </header>
     <main>
       <section class="hero" id="demo">
-        <h1>BusyAnts</h1>
-        <p class="lead">A calm, free visual board for notes and checklists. Plan together in real time.</p>
+        <h1>Free, with no limits. Your notes stay safe.</h1>
+        <p class="lead">BusyAnts is a visual board for notes and checklists. It works offline and on your phone, and it doesn't push AI on you.</p>
         <a class="start" href="../">Start your board, free</a>
         <div class="hero-board demo">
           <!-- A short silent clip: tick an item, fold a container, drag a card, type a new item. It always plays, whatever the "Reduce motion" setting, and has no Pause button (owner decision 2026-10-18). -->
@@ -68,22 +68,83 @@
           <summary><h2>Try it: tick one off</h2></summary>
           <ul class="highlights">
             <li>
-              <input type="checkbox" id="try-shape" />
-              <h3><label for="try-shape">Shape it your way</label></h3>
-              <p>Containers, colors, boards inside boards, five typefaces, snap-to-grid or free placement. Lay it out however your head works.</p>
+              <input type="checkbox" id="try-free" checked />
+              <h3><label for="try-free">Free, with no limits</label></h3>
+              <p>Milanote's free plan stops at 100 notes, images or links. BusyAnts has no limit on cards, containers or boards, and no ads.</p>
             </li>
             <li>
-              <input type="checkbox" id="try-fold" />
-              <h3><label for="try-fold">Fold away what you're not doing</label></h3>
-              <p>Collapse any card, container or list, or everything at once, and bring it back in one click.</p>
+              <input type="checkbox" id="try-safe" />
+              <h3><label for="try-safe">Your boards are safe</label></h3>
+              <p>Undo takes back a change. Version history keeps your newest 100 versions. You can download a backup any time, and it all works offline.</p>
             </li>
             <li>
-              <input type="checkbox" id="try-checklists" checked />
-              <h3><label for="try-checklists">Built for checklists</label></h3>
-              <p>Nested sub-items, tick with Ctrl+Enter, and one-click Clean up of everything you've finished.</p>
+              <input type="checkbox" id="try-ai" />
+              <h3><label for="try-ai">No AI pushed on you</label></h3>
+              <p>BusyAnts has no built-in AI. If you want Claude to read your boards, there's an optional connector you set up yourself.</p>
+            </li>
+            <li>
+              <input type="checkbox" id="try-phone" />
+              <h3><label for="try-phone">Works well on a phone</label></h3>
+              <p>On a small screen it switches to a layout made for thumbs, with Undo, Redo and Add in a bar along the bottom. Add it to your home screen like an app.</p>
             </li>
           </ul>
         </details>
+      </section>
+
+      <section class="band" id="safe">
+        <h2>Your boards are safe</h2>
+        <ul class="tiles">
+          <li>
+            <h3>Undo and redo</h3>
+            <p>Press Ctrl+Z (⌘Z on a Mac) to take back a change, even a deleted card. On a phone, Undo is in the bottom bar.</p>
+          </li>
+          <li>
+            <h3>Version history</h3>
+            <p>BusyAnts saves your boards as you work and keeps the newest 100 versions, free. Look at one, then restore it.</p>
+          </li>
+          <li>
+            <h3>Backups you can download</h3>
+            <p>Save every board in one file any time, or the open board as plain text. Restore from the file later.</p>
+          </li>
+          <li>
+            <h3>Works offline</h3>
+            <p>Open it once online and it opens without internet. Changes you make offline are saved when you're back.</p>
+          </li>
+          <li>
+            <h3>Saved in two places</h3>
+            <p>A copy stays on your device, and another is kept online with your Google account. Only you can see your boards, unless you share one.</p>
+          </li>
+          <li>
+            <h3>Bring your notes in</h3>
+            <p>Import Markdown, text, web pages, Trello or Google Keep exports, and PDFs.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="band" id="phone">
+        <h2>Works well on a phone</h2>
+        <ul class="tiles">
+          <li>
+            <h3>A layout made for small screens</h3>
+            <p>On a phone, your board fills the screen, with Undo, Redo, a big + and a ⋯ menu in a bar along the bottom.</p>
+          </li>
+          <li>
+            <h3>Move things with a finger</h3>
+            <p>Pinch to zoom. Hold a checklist item for half a second to lift it, then drag it where you want it.</p>
+          </li>
+          <li>
+            <h3>Installs like an app</h3>
+            <p>Add it to the home screen of an iPhone, iPad or Android phone, or install it on your computer, with its own icon and window.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="band" id="ai">
+        <h2>No AI pushed on you</h2>
+        <div class="prose">
+          <p>BusyAnts has no built-in AI. It won't summarize, rewrite or sort your notes, and nothing in the app nudges you toward any of that.</p>
+          <p>If you do use Claude, there is an optional connector. You set it up yourself on your own computer, and it reads or changes your boards only when you ask Claude to. BusyAnts works the same without it. What it handles is in the <a href="../privacy/#connector">Privacy policy</a>.</p>
+        </div>
       </section>
 
       <section class="band" id="how">
@@ -91,7 +152,7 @@
         <ol class="steps">
           <li>
             <h3>Sign in with Google</h3>
-            <p>One click, any Google account. Your boards are saved online, so they open on every device you sign in on.</p>
+            <p>One click, any Google account. Your boards are saved online and on your device, so they open on every device you sign in on.</p>
           </li>
           <li>
             <h3>Fill your board</h3>
@@ -102,36 +163,6 @@
             <p>Press Share and send the link. Anyone who opens it and signs in with Google can plan on the same board, and changes reach everyone within a second or two.</p>
           </li>
         </ol>
-      </section>
-
-      <section class="band" id="features">
-        <h2>Everything on one board</h2>
-        <ul class="tiles">
-          <li>
-            <h3>Share by link</h3>
-            <p>Send a link and plan together on the same board, in real time.</p>
-          </li>
-          <li>
-            <h3>Works offline</h3>
-            <p>Open it once online and it opens without internet. Your changes are saved when you're back.</p>
-          </li>
-          <li>
-            <h3>Installs like an app</h3>
-            <p>Add it to your computer, iPhone, iPad or Android phone, with its own window and icon.</p>
-          </li>
-          <li>
-            <h3>Version history</h3>
-            <p>Earlier versions are saved as you work. Look at one, then restore it.</p>
-          </li>
-          <li>
-            <h3>Google Calendar</h3>
-            <p>See your Google Calendar beside your board, and add or change simple events.</p>
-          </li>
-          <li>
-            <h3>Bring your notes</h3>
-            <p>Import Markdown, text, web pages, Trello or Google Keep exports, and PDFs.</p>
-          </li>
-        </ul>
       </section>
 
       <section class="compare-section" id="compare">
@@ -145,8 +176,8 @@
           <tr>
             <th scope="row">Free, with no card or board limits</th>
             <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-            <td data-app="Milanote" class="part"><span class="word">Partly</span><small>100-card cap</small></td>
-            <td data-app="Notion" class="part"><span class="word">Partly</span><small>1,000 blocks when shared</small></td>
+            <td data-app="Milanote" class="part"><span class="word">Partly</span><small>100 notes, images or links</small></td>
+            <td data-app="Notion" class="part"><span class="word">Partly</span><small>Limited once shared</small></td>
             <td data-app="Miro" class="part"><span class="word">Partly</span><small>3 editable boards</small></td>
             <td data-app="Trello" class="part"><span class="word">Partly</span><small>10 boards per Workspace</small></td>
           </tr>
@@ -155,16 +186,16 @@
             <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
             <td data-app="Milanote" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
             <td data-app="Notion" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
-            <td data-app="Miro" class="part"><span class="word">Partly</span><small>Free links are view-only</small></td>
-            <td data-app="Trello" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
+            <td data-app="Miro" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
+            <td data-app="Trello" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span></td>
           </tr>
           <tr>
             <th scope="row">Works offline</th>
             <td data-app="BusyAnts" class="yes"><span aria-hidden="true">&#10003;</span><span class="sr-only">Yes</span><small>Installs like an app</small></td>
-            <td data-app="Milanote" class="no"><span aria-hidden="true">&#10007;</span><span class="sr-only">No</span></td>
+            <td data-app="Milanote" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
             <td data-app="Notion" class="part"><span class="word">Partly</span><small>Apps only, not the browser</small></td>
             <td data-app="Miro" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
-            <td data-app="Trello" class="part"><span class="word">Partly</span><small>Phone app only</small></td>
+            <td data-app="Trello" class="unk"><span aria-hidden="true">&mdash;</span><span class="sr-only">Not confirmed</span></td>
           </tr>
           <tr>
             <th scope="row">Version history</th>
@@ -200,12 +231,12 @@
             <p>Yes. Every feature is free, with no limit on how many cards, containers or boards you make, and no ads.</p>
           </div>
           <div>
-            <h3>Does it work offline?</h3>
-            <p>Yes. Once you've opened BusyAnts online on a device, it opens there without internet too. Changes you make offline are saved online when you're back.</p>
+            <h3>How do I get a board back?</h3>
+            <p>Press Ctrl+Z (⌘Z on a Mac) to undo a recent change. For anything older, open Version history, which keeps your newest 100 versions, and press Restore this version. You can also download a backup any time.</p>
           </div>
           <div>
-            <h3>How does sharing work?</h3>
-            <p>Open a board, press Share, then Share this board, and send the link. Anyone who opens it and signs in with Google gets that board and can change everything on it. Only the person who shared it can turn the link off.</p>
+            <h3>Does BusyAnts use AI?</h3>
+            <p>No. BusyAnts has no built-in AI. There is an optional Claude connector that you set up yourself on your own computer. It reads or changes your boards only when you ask Claude to.</p>
           </div>
         </div>
         <a class="more" href="../faq/">See all questions</a>
@@ -213,7 +244,7 @@
 
       <section class="closing" id="start">
         <h2>Ready to clear your head?</h2>
-        <p class="lead">Free, no card, no limits. Works offline.</p>
+        <p class="lead">Free, no card, no limits. Works offline and on your phone.</p>
         <a class="start" href="../">Start your board, free</a>
       </section>
     </main>

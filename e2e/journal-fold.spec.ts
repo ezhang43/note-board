@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Each day's note in the Journal panel folds like the groups above it (owner request, 2026-10-21):
-// its date is a header button; folded, it shows the date and the note's first line in gray.
+// its date is a header button; folded, it shows the note's first lines (owner pick, 2026-10-22: earlier days start folded).
 
 // The browser's clock is fixed to Wed 14 Oct 2026; Tue 13 Oct is an earlier day in the same week.
 const NOW = new Date(2026, 9, 14, 10, 0, 0);
@@ -38,7 +38,7 @@ test.beforeEach(async ({ page }) => {
     const [id] = Object.entries(raw.boards).find(([, b]) => (b as { name: string }).name === 'Journal')!;
     const board = raw.boards[id];
     const note = Object.values(board.cards)[0] as { y: number };
-    board.cards.e1 = { ...note, id: 'e1', text: `${tuesday}\n\nWent for a long walk by the river and then had lunch with everyone\nsecond line`, y: note.y + 400 };
+    board.cards.e1 = { ...note, id: 'e1', text: `${tuesday}\n\nWent for a long walk by the river and then had lunch with everyone, and we talked about the trip until the café closed and the rain started again\nsecond line`, y: note.y + 400 };
     board.cards.e2 = { ...note, id: 'e2', text: `${empty}\n\n`, y: note.y + 800 };
     board.order.push('e1', 'e2');
     localStorage.setItem('note-board:v1', JSON.stringify(raw));
@@ -51,44 +51,47 @@ test.afterEach(async ({ page }) => {
   expect((page as Page & { errors: string[] }).errors).toEqual([]);
 });
 
-test('every day starts open, its date is a header button that folds it, and unfolding shows the note again', async ({ page }) => {
-  for (const d of [TODAY, TUESDAY, EMPTY]) await expect(day(page, d)).toHaveAttribute('aria-expanded', 'true');
-  await expect(boxes(page)).toHaveCount(3);
-  await day(page, TUESDAY).click();
-  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'false');
-  await expect(boxes(page)).toHaveCount(2);
-  // The date stays, and the note's first line follows it, in gray.
-  await expect(day(page, TUESDAY)).toContainText('Went for a long walk by the river and then had lunch with everyone');
+// The page-and-timeline design (owner pick, 2026-10-22): today starts open, every earlier day starts folded
+// and shows its first lines; a day opens in place and folds again.
+test('today starts open and every earlier day starts folded; its date is a header button that opens it, and folding shows the first line again', async ({ page }) => {
+  await expect(day(page, TODAY)).toHaveAttribute('aria-expanded', 'true');
+  for (const d of [TUESDAY, EMPTY]) await expect(day(page, d)).toHaveAttribute('aria-expanded', 'false');
+  await expect(boxes(page)).toHaveCount(1);
+  // The date stays, and the note's first line follows it (not the lines after it).
+  await expect(day(page, TUESDAY)).toContainText('Went for a long walk by the river');
   await expect(day(page, TUESDAY)).not.toContainText('second line');
-  // Gray: softer than the year header's ink.
-  const ink = await panel(page).getByRole('button', { name: '2026', exact: true }).evaluate((el) => getComputedStyle(el).color);
-  await expect(day(page, TUESDAY).locator('.jg-peek')).not.toHaveCSS('color', ink);
+  await expect(day(page, TUESDAY).locator('.jd')).toContainText('13');
   await day(page, TUESDAY).click();
   await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'true');
-  await expect(boxes(page)).toHaveCount(3);
+  await expect(boxes(page)).toHaveCount(2);
   await expect(boxes(page).nth(1)).toContainText('second line');
   await expect(day(page, TUESDAY).locator('.jg-peek')).toHaveCount(0);
-});
-
-test('a long first line is cut with an ellipsis, and an empty note shows only its date', async ({ page }) => {
   await day(page, TUESDAY).click();
-  const peek = day(page, TUESDAY).locator('.jg-peek');
-  await expect(peek).toHaveCSS('text-overflow', 'ellipsis');
-  expect(await peek.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
-  await day(page, EMPTY).click();
-  await expect(day(page, EMPTY)).toHaveAttribute('aria-expanded', 'false');
-  await expect(day(page, EMPTY)).toHaveText(EMPTY);
-  await expect(day(page, EMPTY).locator('.jg-peek')).toHaveCount(0);
+  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'false');
+  await expect(boxes(page)).toHaveCount(1);
 });
 
-test('Enter and Space fold a day, and the header shows a keyboard focus ring', async ({ page }) => {
+test('a long first line is cut after two lines, and an empty note shows only its date', async ({ page }) => {
+  const peek = day(page, TUESDAY).locator('.jg-peek');
+  await expect(peek).toHaveCSS('-webkit-line-clamp', '2');
+  await expect(peek).toHaveCSS('overflow', 'hidden');
+  expect(await peek.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  // A short note is shown whole, on one line.
+  await expect(day(page, EMPTY).locator('.jg-peek')).toHaveCount(0);
+  await expect(day(page, EMPTY).locator('.jd')).toContainText('12');
+  await day(page, EMPTY).click();
+  await expect(day(page, EMPTY)).toHaveAttribute('aria-expanded', 'true');
+  await expect(boxes(page).nth(1)).toHaveText('');
+});
+
+test('Enter and Space open and fold a day, and the header shows a keyboard focus ring', async ({ page }) => {
   await page.keyboard.press('Shift');
   await day(page, TUESDAY).focus();
   await expect(day(page, TUESDAY)).toHaveCSS('outline-style', 'solid');
   await page.keyboard.press('Enter');
-  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'false');
-  await page.keyboard.press('Space');
   await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Space');
+  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'false');
   await expect(day(page, TUESDAY)).toBeFocused();
 });
 
@@ -103,12 +106,13 @@ test("today's note can be folded; folding never changes the text, and it is not 
   await day(page, TUESDAY).click();
   await page.waitForTimeout(500);
   expect(await savedNotes(page)).toEqual(before);
-  // Folds are view state: nothing is saved for them, and the panel opens with every day open again.
+  // Folds are view state: nothing is saved for them, and the panel opens with today open and the earlier days folded again.
   const keys = await page.evaluate(() => Object.keys(localStorage));
   for (const k of keys) expect(await page.evaluate((key) => localStorage.getItem(key), k)).not.toContain('"folded"');
   await page.reload();
   await openJournal(page);
-  for (const d of [TODAY, TUESDAY, EMPTY]) await expect(day(page, d)).toHaveAttribute('aria-expanded', 'true');
+  await expect(day(page, TODAY)).toHaveAttribute('aria-expanded', 'true');
+  for (const d of [TUESDAY, EMPTY]) await expect(day(page, d)).toHaveAttribute('aria-expanded', 'false');
   await expect(boxes(page).first()).toContainText('hello today');
 });
 
@@ -116,29 +120,31 @@ test('folding the day that holds the cursor moves the cursor to its header', asy
   await expect(boxes(page).first()).toBeFocused();
   await day(page, TODAY).click();
   await expect(day(page, TODAY)).toBeFocused();
-  await expect(boxes(page)).toHaveCount(2);
+  await expect(boxes(page)).toHaveCount(0);
   // The keyboard still works from there: a key meant for the journal never reaches the board behind it.
   await page.keyboard.press('Space');
   await expect(day(page, TODAY)).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('folding a day does not touch the groups above it', async ({ page }) => {
+test('opening or folding a day does not touch the groups above it', async ({ page }) => {
   await day(page, TUESDAY).click();
-  for (const name of ['2026', 'October', '12–18 Oct']) await expect(panel(page).getByRole('button', { name, exact: true })).toHaveAttribute('aria-expanded', 'true');
-  // A day folded and its week shut then opened again stays folded for this visit.
+  // This year has no header of its own; its month and week are open.
+  for (const name of ['October', '12–18 Oct']) await expect(panel(page).getByRole('button', { name, exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(panel(page).getByRole('button', { name: '2026', exact: true })).toHaveCount(0);
+  // A day opened and its week shut then opened again stays open for this visit.
   await panel(page).getByRole('button', { name: '12–18 Oct', exact: true }).click();
   await panel(page).getByRole('button', { name: '12–18 Oct', exact: true }).click();
-  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'false');
+  await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'true');
 });
 
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test('the day header is at least 44px tall and folds with a tap', async ({ page }) => {
+  test('the day header is at least 44px tall and opens with a tap', async ({ page }) => {
     const header = day(page, TUESDAY);
     expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await header.tap();
-    await expect(header).toHaveAttribute('aria-expanded', 'false');
+    await expect(header).toHaveAttribute('aria-expanded', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });

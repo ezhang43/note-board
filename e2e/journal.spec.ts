@@ -12,6 +12,8 @@ const journalButton = (page: Page) => dock(page).getByRole('button', { name: 'Jo
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' });
 const entries = (page: Page) => panel(page).getByRole('textbox');
 const boardsMenu = (page: Page) => page.getByRole('menu', { name: 'Boards' });
+/** Each day's date line ("Wed 14 Oct 2026"), top to bottom: a day's heading is named by it (the page shows the date its own way). */
+const dateLines = (page: Page) => panel(page).getByRole('heading', { level: 3 }).evaluateAll((els) => els.map((e) => e.querySelector('.sr-only')?.textContent));
 const DATE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/;
 /** Today's date line as the app writes it ("Sun 18 Oct 2026"), from the browser's clock. */
 let today = '';
@@ -31,11 +33,17 @@ test('Journal opens a side panel with today’s note ready to type; the board yo
   await journalButton(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(journalButton(page)).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toHaveText(DATE);
-  await expect(panel(page).getByRole('heading', { level: 3 }).first()).toHaveText(today);
+  await expect(panel(page).getByRole('heading', { level: 3 }).first().locator('.sr-only')).toHaveText(DATE);
+  await expect(panel(page).getByRole('heading', { level: 3 }).first().locator('.sr-only')).toHaveText(today);
+  // Today is a page of its own: its date as the heading ("Wednesday, 21 October"), the week, and a word count.
+  await expect(panel(page).locator('.journal-page .jp-title')).toHaveText(/^[A-Z][a-z]+day, \d{1,2} [A-Z][a-z]+$/);
+  await expect(panel(page).locator('.journal-page .jp-week')).toHaveText(/^Week \d{1,2}$/);
+  await expect(panel(page).locator('.journal-page')).toContainText('0 words');
   await expect(entries(page).first()).toBeFocused();
   await page.keyboard.type('Went for a walk');
   await expect(entries(page).first()).toHaveText('Went for a walk');
+  await expect(panel(page).locator('.journal-page')).toContainText('4 words');
+  await expect(panel(page).locator('.journal-saved')).toHaveClass(/\bon\b/); // "Saved" shows once it has been written
   // Still on Home, with only its own note: no Journal card.
   await expect(boardName(page)).not.toHaveValue('Journal');
   await expect(cards(page)).toHaveCount(1);
@@ -113,12 +121,12 @@ test('what is written is kept after a reload, and earlier days are listed below 
   await page.reload();
   await journalButton(page).click();
   // Earlier days are in shut year / month / week groups (journal-groups.spec.ts): open them all.
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today]);
+  expect(await dateLines(page)).toEqual([today]);
   await expect(entries(page).first()).toBeFocused();
   const shut = panel(page).getByRole('button', { expanded: false });
   while (await shut.count()) await shut.first().click();
   // Today's year first (today, then the earlier day in it), then the year written ahead (owner choice, job 120).
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText([today, 'Thu 1 Jan 2026', 'Fri 1 Jan 2100']);
+  expect(await dateLines(page)).toEqual([today, 'Thu 1 Jan 2026', 'Fri 1 Jan 2100']);
   await expect(entries(page)).toHaveCount(3);
   await expect(entries(page).nth(0)).toHaveText('kept');
   await expect(entries(page).nth(1)).toHaveText('new year');
@@ -209,7 +217,7 @@ test.describe('on a phone', () => {
     const r = await panel(page).boundingBox();
     expect(r!.width).toBeGreaterThanOrEqual(389);
     await expect(entries(page)).toHaveCount(1);
-    await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(today);
+    expect(await dateLines(page)).toEqual([today]);
     await expect(cards(page)).toHaveCount(0);
     await panel(page).getByRole('button', { name: 'Close journal' }).tap();
     await expect(panel(page)).toHaveCount(0);

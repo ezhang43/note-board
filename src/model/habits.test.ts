@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
-import { HABITS_NAME, WEIGHT_TITLE, habitList, habitViewLabel, habitViewRange, habitYear, hiddenHabits, isHabit, isHabitViewNow, moveHabitView, parseKg, tickedDays, weightCard, weightChart, weightEntries, withDay, withWeight, withoutWeight } from './habits';
+import { HABITS_NAME, WEIGHT_TITLE, habitList, habitViewLabel, habitViewRange, habitYear, doneToday, habitColor, hiddenHabits, isHabit, periodCount, weekCount, withHabitColor, isHabitViewNow, moveHabitView, parseKg, tickedDays, weightCard, weightChart, weightEntries, withDay, withWeight, withoutWeight } from './habits';
 import type { Board, TodoCard } from './types';
 import type { Workspace } from './workspace';
 
@@ -210,5 +210,42 @@ describe('weight', () => {
     expect(hiddenHabits(ws(boardWith(weight('2026-10-19 72.4', 'banana'))), [])).toBeNull(); // something out of sight
     expect(hiddenHabits(ws(boardWith({ ...weight('2026-10-19 72.4'), title: 'Weights' })), [])).toBeNull();
     expect(hiddenHabits(ws(boardWith(weight('2026-10-19 72.4'), weight('2026-10-20 72.0'))), [])).toBeNull(); // a second Weight card is out of sight
+  });
+});
+
+// Habits redesign (owner picks, 2026-10-22, jobs 166 + 167): per-habit colors and the counts the Ledger shows.
+describe('habit colors and counts', () => {
+  it('a habit has one of the 8 bold swatches as its color, or none (the default green); anything else counts as none', () => {
+    const h = habit('Walk');
+    expect(habitColor(h)).toBeNull();
+    expect(habitColor(withHabitColor(h, 'ocean'))).toBe('ocean');
+    expect(withHabitColor(h, 'ocean').titleColor).toBe('ocean');
+    expect(withHabitColor(withHabitColor(h, 'ocean'), null).titleColor).toBeNull();
+    expect(withHabitColor(h, null)).toBe(h); // unchanged
+    expect(habitColor({ ...h, titleColor: 'butter' })).toBeNull(); // a pastel is not one of the 8
+    expect(withHabitColor(h, 'butter' as never)).toBe(h);
+    expect(withHabitColor({ ...h, titleColor: 'butter' }, null).titleColor).toBeNull(); // "Default" clears a color that isn't one of the 8
+  });
+
+  it('counts the ticks in the week shown (Monday to Sunday), a day ahead included', () => {
+    const h = habit('Walk', ['2026-10-18', '2026-10-19', '2026-10-21', '2026-10-25', '2026-10-26']);
+    expect(weekCount(h, '2026-10-21')).toBe(3);
+    expect(weekCount(h, '2026-10-12')).toBe(1);
+    expect(weekCount(habit('Read'), '2026-10-21')).toBe(0);
+  });
+
+  it('counts the ticks in the month or year shown, with the days that have passed in a month', () => {
+    const h = habit('Walk', ['2026-09-30', '2026-10-01', '2026-10-21', '2027-01-01']);
+    expect(periodCount(h, 'month', '2026-10-05', '2026-10-21')).toEqual({ ticked: 2, of: 21 });
+    expect(periodCount(h, 'month', '2026-09-05', '2026-10-21')).toEqual({ ticked: 1, of: 30 }); // a past month: all its days
+    expect(periodCount(h, 'month', '2026-11-05', '2026-10-21')).toEqual({ ticked: 0, of: 0 }); // a month ahead
+    expect(periodCount(h, 'year', '2026-03-03', '2026-10-21')).toEqual({ ticked: 3, of: 294 });
+    expect(periodCount(h, 'year', '2025-03-03', '2026-10-21')).toEqual({ ticked: 0, of: 365 });
+  });
+
+  it('counts the habits done on a day', () => {
+    const hs = [habit('A', ['2026-10-21']), habit('B', ['2026-10-20']), habit('C', ['2026-10-21', '2026-10-20'])];
+    expect(doneToday(hs, '2026-10-21')).toBe(2);
+    expect(doneToday([], '2026-10-21')).toBe(0);
   });
 });

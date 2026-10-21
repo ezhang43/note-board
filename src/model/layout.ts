@@ -110,8 +110,10 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
  * the others right; on a tie they go the way it came from (`movedX` > 0: it moved right, so they go
  * left). Blocks in `fixed` never move; when one of them is in the way the dragged block itself will
  * move instead, so nothing shifts. Returns the same board when nothing moves.
+ * After a resize, `was` is the block's rectangle before it: its row is the blocks level with that,
+ * so growing downwards over a block below never makes that one a row mate (job #142).
  */
-export function shiftRow(board: Board, id: string, measured: MeasuredHeight, drag?: { movedX: number; fixed: string[] }, side: 'right' | 'left' = 'right'): Board {
+export function shiftRow(board: Board, id: string, measured: MeasuredHeight, drag?: { movedX: number; fixed: string[] }, side: 'right' | 'left' = 'right', was?: Rect): Board {
   const a = blockRect(board, id, measured);
   if (!a) return board;
   const fixed = new Set(drag?.fixed);
@@ -123,7 +125,8 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
   // After a resize the block keeps its far edge and only grows towards the dragged one, so blocks on
   // the other side of it are never touched (they would otherwise be moved to its far side, as "in the way").
   const grewOver = (r: Rect) => (side === 'left' ? r.x + r.w <= a.x + a.w : r.x >= a.x);
-  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && (drag || grewOver(r)) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
+  const row = was ?? a;
+  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && (drag || grewOver(r)) && Math.min(row.y + row.h, r.y + r.h) - Math.max(row.y, r.y) >= Math.min(row.h, r.h) / 2);
   const mid = (r: Rect) => r.x + r.w / 2;
   const goesLeft = (r: Rect) => (!drag && side === 'left') || (!!drag && (mid(r) < mid(a) || (mid(r) === mid(a) && drag.movedX > 0)));
   // Each block only has to clear the blocks already placed beside it (level with it, give or take the gap).
@@ -156,15 +159,16 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
 /**
  * After a resize from the top edge (owner request 2026-10-21): blocks above `id` that it now covers
  * (or comes within 10px of) move straight up out of its way, and so do the blocks above those.
- * Blocks beside it and below it stay. On the grid when snapping is on. Returns the same board when
- * nothing moves.
+ * "Above" means starting higher than the block's top edge was before the drag (`wasTop`), so blocks
+ * beside it and below it stay even when a corner drag now covers them (job #142). On the grid when
+ * snapping is on. Returns the same board when nothing moves.
  */
-export function pushUp(board: Board, id: string, measured: MeasuredHeight): Board {
+export function pushUp(board: Board, id: string, measured: MeasuredHeight, wasTop: number): Board {
   const a = blockRect(board, id, measured);
   if (!a) return board;
   const above = board.order.flatMap((o) => {
     const r = o === id ? null : blockRect(board, o, measured);
-    return r && r.y + r.h <= a.y + a.h ? [{ id: o, r }] : [];
+    return r && r.y < wasTop ? [{ id: o, r }] : [];
   });
   above.sort((p, q) => q.r.y + q.r.h - (p.r.y + p.r.h));
   const placed = [a];

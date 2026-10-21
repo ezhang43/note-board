@@ -64,7 +64,8 @@ export function resizeTo(
   /** [final size, size to draw while dragging] for one axis. */
   const fit = (v: number, key: 'w' | 'h', lo: number, hi: number): [number, number] => {
     const clamped = clamp(v, lo, hi);
-    const m = nearest(candidates, key, clamped);
+    // A match has to be a size this block is allowed to have.
+    const m = nearest(candidates.filter((c) => c[key] >= lo && c[key] <= hi), key, clamped);
     if (m) {
       matched.push(key === 'w' ? 'width' : 'height');
       m.ids.forEach((id) => ids.add(id));

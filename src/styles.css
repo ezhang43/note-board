@@ -239,9 +239,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
   transform-origin: top right;
 }
-.toolbar-more .phone-rows .tb-button { height: 40px; font-size: 14px; }
+/* (More specific than the phone sheet's 48px rows, which this menu borrows.) */
+.toolbar .toolbar-more .phone-rows .tb-button { height: 40px; font-size: 14px; }
 @media (pointer: coarse) {
-  .toolbar-more .phone-rows .tb-button { height: 44px; }
+  .toolbar .toolbar-more .phone-rows .tb-button { height: 44px; }
 }
 @media (max-width: 880px) {
   .toolbar .tb-label { display: none; }

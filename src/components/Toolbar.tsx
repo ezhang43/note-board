@@ -549,7 +549,10 @@ function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
             <FeedbackButton onOpen={() => setOpen(false)} />
             <AppearanceMenu labelled />
             {onSignOut && (
-              <button type="button" className="tb-button" onClick={onSignOut}>
+              <button type="button" className="tb-button" onClick={() => {
+                  setOpen(false);
+                  onSignOut();
+                }}>
                 <SignOutIcon />
                 Sign out
               </button>

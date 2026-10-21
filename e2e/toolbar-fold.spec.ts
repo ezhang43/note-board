@@ -156,3 +156,31 @@ test('the Share panel still opens from the toolbar, below the fold', async ({ pa
   expect(p.x).toBeGreaterThanOrEqual(0);
   expect(p.x + p.width).toBeLessThanOrEqual(768);
 });
+
+test('an open side panel doesn’t narrow the toolbar: it still fits at 1200px with the widest panel', async ({ page }) => {
+  await start(page, 1200);
+  await page.locator('.corner-controls').getByRole('button', { name: 'Journal' }).first().click();
+  const h = await box(page.getByRole('separator', { name: 'Resize journal' }));
+  await page.mouse.move(h.x + h.width / 2, h.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(310, h.y + 200, { steps: 6 });
+  await page.mouse.up();
+  await expectFits(page, 1200);
+  expect((await box(toolbar(page))).width).toBe(1200);
+});
+
+test('the rows in ⋯ are 40px tall (the phone’s own sheet has 48px rows)', async ({ page }) => {
+  await start(page, 768);
+  await more(page).click();
+  for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out']) {
+    expect((await box(moreMenu(page).getByRole('button', { name, exact: true }))).height, name).toBe(40);
+  }
+});
+
+test('Sign out from ⋯ closes the menu', async ({ page }) => {
+  await start(page, 768);
+  page.on('dialog', (d) => void d.dismiss());
+  await more(page).click();
+  await moreMenu(page).getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(moreMenu(page)).toHaveCount(0);
+});

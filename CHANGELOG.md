@@ -1,5 +1,11 @@
 # Changelog
 
+## Opening an old copy no longer overwrites newer work (2026-10-22)
+
+- **Fixed a way to lose another device's edits with nobody typing anything.** Opening the app on a device whose offline copy was out of date, with a different text size or fonts, could tidy a few blocks and send that old copy over the newer one online. Now only changes you make count as newer; the app's own tidying never does, and it waits until the server's copy has come.
+- A tidy-up that was about to run no longer re-arranges a board that has just been opened or has just arrived from another device.
+- Boards already saved are unchanged.
+
 ## Keys in side panels, screen readers, faster sign-in (2026-10-22)
 
 - **Delete and Backspace no longer delete a note behind a side panel.** With a note selected, pressing Delete while the Focus timer's buttons or a Completed tick box had the keyboard deleted the note without any sign. Now no side panel passes board keys through (undo, redo and zoom still work).

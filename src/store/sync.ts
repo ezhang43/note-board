@@ -10,6 +10,11 @@ export interface RemoteDoc {
    * still on their way. Only ever the first version.
    */
   pending?: true;
+  /**
+   * From this device's offline copy: the server's may be newer (job #148). Automatic tidying isn't
+   * uploaded until the server's copy has come.
+   */
+  cached?: true;
 }
 
 /** Where the online copy lives (Firestore in the app, a fake in tests). */
@@ -99,24 +104,57 @@ export function startSync(
    * versions are stored as this page would save them, since another page may order fields differently.
    */
   let lastSynced: string | null = null;
+  /**
+   * The person's own boards were changed on this page since they were last sent or received (job #148):
+   * only then are they newer than a version arriving. Automatic tidying (blocks drawn at another size
+   * here), a version this sync shows, and a change to a shared board don't count.
+   */
+  let madeHere = false;
+  const synced = (key: string | null) => {
+    lastSynced = key;
+    madeHere = false;
+  };
+  let seenTidies = store.tidies();
+  /** Set while this sync shows a version that arrived: that change isn't made here. */
+  let applying = false;
+  const show = (ws: Workspace) => {
+    applying = true;
+    try {
+      store.replaceWorkspace(withShared(ws));
+    } finally {
+      applying = false;
+    }
+  };
+  /** The server's copy (or word that there is none) has come, not just this device's offline copy. */
+  let fresh = false;
   /** An online version that arrived mid-drag: applied once the drag is over. */
   let waiting: Workspace | null = null;
   /** The person's own boards here (as ownKey) when `waiting` arrived. */
   let waitingFrom = '';
   let lastBoards = store.workspace().boards;
+  /**
+   * Which of those boards were shared (once the first online version has come: until then the
+   * sharing that answers isShared may not be set up yet, and no change counts as made here).
+   */
+  let sharedBefore = new Set<string>();
   let sharesSeen = store.getState().ui.shares;
   const sharedKey = () => JSON.stringify(store.getState().ui.shares.map((s) => s.boards));
   let lastShared = sharedKey();
   /**
    * Whether any board changed since last time, or which boards are shared did (opening another
-   * board changes none: which board is open isn't synced).
+   * board changes none: which board is open isn't synced). 'own' when one of the person's own boards
+   * changed, else 'other' (only shared boards, or which boards are shared).
    */
-  const boardsChanged = () => {
-    const boards = store.workspace().boards;
-    const ids = Object.keys(boards);
-    const same = boards === lastBoards || (ids.length === Object.keys(lastBoards).length && ids.every((id) => boards[id] === lastBoards[id]));
+  const boardsChanged = (): 'own' | 'other' | false => {
+    const { home, boards } = store.workspace();
+    const before = lastBoards;
     lastBoards = boards;
-    if (!same) return true;
+    const ids = boards === before ? [] : [...new Set([...Object.keys(boards), ...Object.keys(before)])].filter((id) => boards[id] !== before[id]);
+    // A board that went counts as it was then: a share that ended takes its board away without it being one of theirs.
+    const own = (id: string) => id === home || (id in boards ? !isShared(id) : !sharedBefore.has(id));
+    const result = ready && ids.some(own) ? 'own' : 'other';
+    if (ready) sharedBefore = new Set(Object.keys(boards).filter(isShared));
+    if (ids.length) return result;
     // Which boards are shared changed: the person's own boards to upload change with it (a board
     // just shared leaves them straight away). Only the boards count: a new list of people or a
     // link turned off isn't a change here (main session check: "Saving…" flickered).
@@ -125,7 +163,7 @@ export function startSync(
     const key = sharedKey();
     if (key === lastShared) return false;
     lastShared = key;
-    return true;
+    return 'other';
   };
   let timer: ReturnType<typeof setTimeout> | null = null;
   /**
@@ -148,10 +186,11 @@ export function startSync(
     const ws = store.workspace();
     const key = ownKey(ws);
     if (key === lastSynced) {
+      madeHere = false;
       if (!failed && !unconfirmed) opts.onSaveState?.('saved');
       return;
     }
-    lastSynced = key;
+    synced(key);
     remote.write({ data: ownData(ws), client: opts.client }).then(
       () => {
         // Saved, unless a newer change has started waiting since.
@@ -170,6 +209,8 @@ export function startSync(
 
   function schedule() {
     if (!ready || stopped) return;
+    // Opened from the offline copy: tidying alone waits for the server's copy, which may be newer.
+    if (!fresh && !madeHere) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(upload, SYNC_DELAY);
     if (!failed) opts.onSaveState?.('saving');
@@ -177,13 +218,16 @@ export function startSync(
 
   const unsubscribe = store.subscribe(() => {
     const changed = boardsChanged();
+    const tidied = store.tidies() !== seenTidies;
+    seenTidies = store.tidies();
+    if (changed === 'own' && !tidied && !applying) madeHere = true;
     if (waiting && !busy()) {
       const remoteWs = waiting;
       waiting = null;
       // A change to the person's own boards made here during the drag (its drop, or one made while it
       // went on, as a resize can) is newer than the waiting version: it wins and is uploaded.
-      // Otherwise (a shared board changed, say, which syncs on its own) the waiting one is shown.
-      if (ownKey(store.workspace()) === waitingFrom) return store.replaceWorkspace(withShared(remoteWs));
+      // Otherwise (a shared board changed, or blocks were only tidied) the waiting one is shown.
+      if (!madeHere || ownKey(store.workspace()) === waitingFrom) return show(remoteWs);
       return schedule();
     }
     if (changed) schedule();
@@ -216,6 +260,8 @@ export function startSync(
   let unconfirmed = false;
   const stopWatching = remote.watch((doc) => {
     if (stopped) return;
+    const nowFresh = !fresh && !doc?.cached;
+    if (nowFresh) fresh = true;
     // Only a version the server has counts: one only on this device may yet be refused.
     if (doc) {
       if (!doc.pending) seen = true;
@@ -235,8 +281,8 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       ready = true;
-      lastSynced = ownKey(ws);
-      store.replaceWorkspace(withShared(ws));
+      synced(ownKey(ws));
+      show(ws);
       // Opened from saves not on the server yet (job 92): "Saving…" until they are.
       unconfirmed = Boolean(doc.pending);
       // Over the online limit they will be refused (job 94): shown as a refused upload straight away,
@@ -245,7 +291,7 @@ export function startSync(
       if (unconfirmed && doc.data.length > ONLINE_LIMIT && [...doc.data].length > ONLINE_LIMIT) {
         if (timer) clearTimeout(timer);
         timer = null;
-        lastSynced = null;
+        synced(null);
         failed = true;
         opts.onSaveState?.('failed');
       } else if (unconfirmed) opts.onSaveState?.('saving');
@@ -259,22 +305,32 @@ export function startSync(
       lastSynced = null;
       return upload();
     }
+    // The server's copy has come and is the one this page opened from: tidying done here meanwhile is sent now.
+    const sendTidying = () => {
+      if (nowFresh && ownKey(store.workspace()) !== lastSynced) schedule();
+    };
     // Ignore our own uploads coming back, and everything while this device has unsaved changes.
-    if (!doc || doc.client === opts.client || failed) return;
+    if (!doc || doc.client === opts.client || failed) return sendTidying();
     const ws = read(doc.data);
     if (!ws) return;
     const data = ownKey(ws);
     if (data === lastSynced) {
       if (wasUnconfirmed && !timer) opts.onSaveState?.('saved');
-      return;
+      return sendTidying();
     }
-    // A change made here is still waiting to be uploaded: it is newer, so send it now instead.
-    if (timer && ownKey(store.workspace()) !== lastSynced) return upload();
-    lastSynced = data;
+    // A change the person made here is still waiting to be uploaded: it is newer, so send it now
+    // instead. Tidying alone isn't (job #148): it is dropped, and the arriving version is shown.
+    if (timer && madeHere && ownKey(store.workspace()) !== lastSynced) return upload();
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+      opts.onSaveState?.('saved');
+    }
+    synced(data);
     if (busy()) {
       waiting = ws;
       waitingFrom = ownKey(store.workspace());
-    } else store.replaceWorkspace(withShared(ws));
+    } else show(ws);
   }, opts.onError);
 
   return {

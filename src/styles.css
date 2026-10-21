@@ -517,15 +517,27 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   font-size: 14px;
 }
 
+/*
+ * The bottom-right bar fills the room left of the board's right edge (or of an open side panel, which
+ * moves `right`), right-aligned, so a container query can tell how much room there is (owner request
+ * 2026-10-21): short of room, the pill drops its words; still short, the bar wraps into rows.
+ * The bar itself lets clicks through to the board; its controls take them.
+ */
 .corner-controls {
   position: fixed;
+  left: 12px;
   right: 24px;
   bottom: 16px;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
+  container-type: inline-size;
+  pointer-events: none;
 }
+.corner-controls > * { pointer-events: auto; }
 .help-button {
   width: 34px;
   height: 34px;
@@ -562,6 +574,18 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   font-size: 13px;
   font-weight: 500;
   .corner-controls .dock-tools .help-button.dock-tool:hover { background: var(--hover); }
+}
+
+/* Short of room: icons only (the word stays as the accessible name and tooltip); the timer keeps its time. */
+@container (max-width: 1120px) {
+  .corner-controls .dock-tools .help-button.dock-tool { width: 32px; padding: 0; gap: 0; font-size: 0; }
+  .corner-controls .dock-tools .help-button.pomodoro-button.with-time { width: auto; padding: 0 8px; gap: 6px; }
+}
+/* Still short: two rows, the pill on top, right-aligned; the rest wraps below it. */
+@container (max-width: 600px) {
+  .corner-controls::before { content: ''; order: 1; flex-basis: 100%; height: 0; }
+  .corner-controls > * { order: 2; }
+  .corner-controls > .save-note, .corner-controls > .dock-tools { order: 0; }
 }
 
 .zoom-control {
@@ -2195,6 +2219,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .cal-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
 /* A name may wrap onto a second line, then it is cut (job #56). */
 .cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+/* Under the Month grid the picked day's names show in full (job #131); the Week view keeps the two lines. */
+.cal-month ~ .cal-day .cal-title { overflow: visible; display: block; -webkit-line-clamp: none; line-clamp: none; }
 .cal-month { display: flex; flex-direction: column; gap: 2px; }
 .cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
@@ -2229,7 +2255,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .cal-cell.today .cal-date { font-weight: 600; color: var(--accent-ink); }
 .cal-chip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 3px;
   min-width: 0;
   padding: 0 3px;
@@ -2249,9 +2275,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (hover: hover) {
   .cal-chip.all-day:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 }
-.cal-chip-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.cal-chip-dot { flex-shrink: 0; width: 5px; height: 5px; margin-top: 5px; border-radius: 50%; background: var(--accent); }
 .cal-chip-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-.cal-chip-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A name wraps onto as many lines as it needs, so the day's row grows (job #131). */
+.cal-chip-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cal-month.narrow .cal-chip-time, .cal-month.narrow .cal-chip-dot { display: none; }
 .cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
 .cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }

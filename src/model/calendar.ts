@@ -1,6 +1,6 @@
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD' keys
-// in the person's own time zone, times 'HH:MM' on the 24-hour clock. The week view is seven days
-// from the day it starts on (today when it opens); the month grid's weeks start on Monday.
+// in the person's own time zone, times 'HH:MM' on the 24-hour clock (shown as 10am, 10:30am). The week view is seven days from the day
+// it starts on (today when it opens); the month grid's weeks start on Monday.
 // Calendar events aren't board data: they are never undone, synced with boards or kept in versions.
 
 export type DayKey = string;
@@ -231,14 +231,22 @@ export function cellLines(events: CalEvent[], max: number): { shown: CalEvent[];
   return { shown: events.slice(0, max - 1), more: events.length - (max - 1) };
 }
 
-/** "10:00" on the day a timed event starts; nothing on the days it runs over into, or for all-day events. */
-export function cellTime(e: CalEvent, key: DayKey): string {
-  return !e.allDay && e.start.startsWith(key) ? e.start.slice(11) : '';
+/** "10am", "10:30am", "12pm", "12am": a time the way Google Calendar writes it (from 'HH:MM'). */
+export function clockLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''}${h < 12 ? 'am' : 'pm'}`;
 }
 
-/** "10:00 – 11:00", or "All day". */
+/** "10am" on the day a timed event starts; nothing on the days it runs over into, or for all-day events. */
+export function cellTime(e: CalEvent, key: DayKey): string {
+  return !e.allDay && e.start.startsWith(key) ? clockLabel(e.start.slice(11)) : '';
+}
+
+/** "10 – 11am", "11:30am – 1pm" (the first time keeps its am or pm only when it differs), or "All day". */
 export function timeLabel(e: CalEvent): string {
-  return e.allDay ? 'All day' : `${e.start.slice(11)} – ${e.end.slice(11)}`;
+  if (e.allDay) return 'All day';
+  const [from, to] = [clockLabel(e.start.slice(11)), clockLabel(e.end.slice(11))];
+  return `${from.slice(-2) === to.slice(-2) ? from.slice(0, -2) : from} – ${to}`;
 }
 
 /** A new event: an hour from 9:00 on the chosen day. */

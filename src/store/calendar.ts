@@ -117,7 +117,7 @@ export interface CalendarState {
   widths: PanelWidths;
 }
 
-export const WIDTH_KEY = 'note-board:calendar-width';
+const WIDTH_KEY = 'note-board:calendar-width';
 
 export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null) {
   const widthStore = createWidthStore(WIDTH_KEY, PANEL_DEFAULT, storage);

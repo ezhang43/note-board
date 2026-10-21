@@ -60,10 +60,10 @@ export interface Look {
 }
 
 const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number'];
-export const SIZES: RunSize[] = ['small', 'large'];
-export const RUN_FONTS: RunFont[] = ['serif', 'rounded', 'hand', 'mono'];
+const SIZES: RunSize[] = ['small', 'large'];
+const RUN_FONTS: RunFont[] = ['serif', 'rounded', 'hand', 'mono'];
 export const HIGHLIGHTS: Highlight[] = ['yellow', 'green', 'blue', 'pink'];
-export const MAX_INDENT = 4;
+const MAX_INDENT = 4;
 const MAX_BLOCKS = 20000;
 const MAX_RUNS = 2000;
 const MARK_KEYS = ['b', 'i', 'u', 's', 'size', 'font', 'hl'] as const;

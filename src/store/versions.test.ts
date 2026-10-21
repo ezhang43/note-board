@@ -792,16 +792,88 @@ describe('changes from another device replacing work done here', () => {
     expect(await versions.list()).toHaveLength(2);
   });
 
-  it('none within 10 minutes of the last version, so using two devices at once doesn’t fill the history', async () => {
+  it('kept even soon after an ordinary version, as that one holds the boards from before the edits (review of #147)', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work'); // 9:00, an ordinary version of the board from before
+    await settled();
+    clock.now += 8 * MIN;
+    store.renameBoard('More work');
+    await settled();
+    clock.now += 1 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'From the phone'));
+    await settled();
+    const list = await versions.list();
+    expect(list).toHaveLength(2);
+    expect(list[0].kind).toBe('outside');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('More work');
+  });
+
+  it('at most one every 10 minutes, so using two devices at once doesn’t fill the history', async () => {
     const { store, versions, clock } = setup();
     const phone = store.workspace();
     store.renameBoard('Work');
     await settled();
-    clock.now += 5 * MIN;
-    store.renameBoard('More work');
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Phone 1')); // kept
+    await settled();
+    clock.now += 1 * MIN;
+    store.renameBoard('Work 2');
+    clock.now += 4 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Phone 2')); // 5 minutes later: not kept
+    await settled();
+    // (Ordinary versions are saved as usual meanwhile.)
+    const kept = async () => (await versions.list()).filter((v) => v.kind === 'outside');
+    expect(await kept()).toHaveLength(1);
+    clock.now += 6 * MIN;
+    store.renameBoard('Work 3');
+    store.replaceWorkspace(oldCopy(phone, 'Phone 3')); // 11 minutes after the last one: kept
+    await settled();
+    const list = await kept();
+    expect(list).toHaveLength(2);
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Work 3');
+  });
+
+  it('kept even when another device’s clock is ahead and its newest version looks newer than the edits here', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    const ahead = serializeWorkspace(phone);
+    await versions.save({ id: 'ahead', savedAt: clock.now + 60 * MIN, cards: 0, columns: 0, hash: contentHash(ahead) }, ahead);
+    clock.now += 20 * MIN;
+    store.renameBoard('More work'); // reads the list: the phone's version is "newer"
+    await settled();
     clock.now += 1 * MIN;
     store.replaceWorkspace(oldCopy(phone, 'From the phone'));
     await settled();
+    const kept = (await versions.list()).find((v) => v.kind === 'outside');
+    expect(homeIn(await versions.get(kept!.id))?.name).toBe('More work');
+  });
+
+  it('restoring a backup of every board keeps only its own safety version, not a second one marked as from another device (review of #147)', async () => {
+    const { store, versions, clock } = setup();
+    store.setShares([], true);
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    const home = store.getState().boards.open;
+    const backup = serializeWorkspace({ home, boards: { [home]: { ...store.getState().board, name: 'Backup home' }, other: { ...store.getState().board, name: 'Backup other' } } });
+    await restoreFromBackup(store, versions, backup, () => clock.now);
+    await settled();
+    const list = await versions.list();
+    expect(list.map((v) => v.kind)).toEqual([undefined, undefined]);
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Work');
+  });
+
+  it('a shared board arriving (joining one, before its share is listed) doesn’t save one', async () => {
+    const { store, versions, clock } = setup();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceBoards({ b_joined: { ...store.getState().board, name: 'Shared with me' } });
+    await settled();
+    expect(Object.keys(store.workspace().boards)).toContain('b_joined');
     expect(await versions.list()).toHaveLength(1);
   });
 

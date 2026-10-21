@@ -30,7 +30,9 @@ service cloud.firestore {
       allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid)
         && request.resource.data.keys().hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash', 'kind'])
-        && request.resource.data.savedAt is number;
+        && request.resource.data.savedAt is number
+        // A version kept just before changes from another device replaced the boards (job #147).
+        && (!('kind' in request.resource.data) || request.resource.data.kind == 'outside');
     }
     // ...and each version's board.
     match /boards/{uid}/versionData/{id} {

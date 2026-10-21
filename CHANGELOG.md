@@ -2,8 +2,8 @@
 
 ## Version history keeps your work before another device's changes replace it (2026-10-21)
 
-- If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page since the newest version, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.
-- It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board. If it can't be saved, the incoming change still goes ahead as before.
+- If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.
+- It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board or a shared board arrived. If it can't be saved, the incoming change still goes ahead as before.
 - On the published site the online rules need the update in `firestore.rules` (pasted into the Firebase console) for this kind of version to be saved. Nothing already saved changes.
 
 ## Resize cards from any side (2026-10-21)

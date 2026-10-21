@@ -492,6 +492,74 @@ test('Delete or Backspace with the card open asks to delete the event, never the
   expect(errors).toEqual([]);
 });
 
+// Pressing Delete again answers the question (owner request, 2026-10-21, job #132).
+test('a second fresh Delete or Backspace answers the delete question: Delete, or All events for a series; never the guest-email question', async ({ page }) => {
+  const errors = await openAs(page);
+  const sent = changesSent(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  await button(page).click();
+  const today = day(page, new Date());
+  const dentist = today.getByRole('button', { name: /Dentist/ });
+  const ask = asked(page, 'Delete “Dentist”?');
+
+  // Escape still keeps it.
+  await dentist.click();
+  await page.keyboard.press('Delete');
+  await expect(ask).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(ask).toHaveCount(0);
+  await expect(card(page)).toBeVisible();
+  expect(sent).toEqual([]);
+
+  // Holding the key down: its auto-repeat never answers the question.
+  await page.keyboard.down('Delete');
+  await expect(ask).toBeVisible();
+  await page.keyboard.down('Delete');
+  await page.keyboard.down('Delete');
+  await page.keyboard.up('Delete');
+  await expect(ask).toBeVisible();
+  expect(sent).toEqual([]);
+
+  // A one-off event: a fresh press after letting go deletes it.
+  await page.keyboard.press('Delete');
+  await expect(dentist).toHaveCount(0);
+  await expect(card(page)).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(1);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatch(/^DELETE /);
+
+  // An event with guests: the second press answers "Delete?", but the guest-email question needs a click or Enter.
+  const lunch = day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ });
+  await lunch.click();
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Backspace');
+  const emails = asked(page, EMAILS);
+  await expect(emails).toBeVisible();
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Backspace');
+  await expect(emails).toBeVisible();
+  expect(sent).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await expect(emails).toHaveCount(0);
+  await expect(lunch).toBeVisible();
+  expect(sent).toHaveLength(1);
+
+  // A repeating event: Backspace, then Backspace again, deletes the whole series.
+  await today.getByRole('button', { name: /Team stand-up/ }).click();
+  await page.keyboard.press('Backspace');
+  await expect(asked(page, 'Delete “Team stand-up”?')).toBeVisible();
+  await page.keyboard.press('Backspace');
+  await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
+  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
+  expect(sent).toHaveLength(2);
+  // The whole series, not just today's.
+  expect(sent[1]).toMatch(/^DELETE .*\/events\/standup(\?|$)/);
+  await expect(cards(page)).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test('while a delete is on its way the card stays open, so a refusal is shown; changing the week by keyboard closes it', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();

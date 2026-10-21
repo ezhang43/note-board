@@ -1,6 +1,7 @@
 import { boxProps } from './textBox';
+import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
-import { memo, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -156,7 +157,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     <div
       className={classes.filter(Boolean).join(' ')}
       data-item-id={item.id}
-      style={{ paddingLeft: depth * ITEM_INDENT, transform: lifting ? `translateY(${slide}px)` : undefined }}
+      // The row knows its text's size too, so the tick box can sit on the middle of the first line.
+      style={{ paddingLeft: depth * ITEM_INDENT, transform: lifting ? `translateY(${slide}px)` : undefined, '--ts': styleCss(item.style)['--ts'] } as CSSProperties}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}

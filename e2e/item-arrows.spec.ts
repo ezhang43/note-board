@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, clickEmpty, columns, dragTo, freshBoardEachTest } from './helpers';
+import { add, box, clickEmpty, columns, dragPointer, dragTo, freshBoardEachTest } from './helpers';
 
 // Up / down arrows on a checklist item's hover strip (owner request, 2026-10-18): the same as the
 // phone's Move up / Move down and Ctrl+Shift+Up / Down.
@@ -91,7 +91,7 @@ test('the arrows never cover the text or make it move, and take a keyboard focus
   await expect(down).not.toHaveCSS('outline-style', 'none');
 });
 
-// Bigger hover controls on a computer (owner request, 2026-10-19): arrows 22px wide, trash 28px, grip 18px.
+// Bigger hover controls on a computer (owner request, 2026-10-19): arrows 22px wide, trash 28px, grip 18px; they grow with the text size step (owner request, 2026-10-21).
 const size = async (l: Locator) => {
   const b = (await l.boundingBox())!;
   return { w: b.width, h: b.height };
@@ -121,12 +121,15 @@ async function checkControls(row: Locator) {
     boxes.push(await box(b));
   }
   const [up, down, trash, grip] = boxes;
-  expect([up.width, down.width, trash.width, grip.width]).toEqual([22, 22, 28, 18]);
-  expect([up.height, down.height, trash.height, grip.height]).toEqual([28, 28, 28, 28]);
-  expect(await iconSize(buttons[0])).toEqual({ w: 18, h: 18 });
-  expect(await iconSize(buttons[1])).toEqual({ w: 18, h: 18 });
-  expect(await iconSize(buttons[2])).toEqual({ w: 16, h: 16 });
-  expect(await iconSize(buttons[3])).toEqual({ w: 10, h: 15 });
+  // The sizes grow with the text step (never under the Small size), and as tall as the item's first line.
+  const fs = Number(await row.evaluate((el) => getComputedStyle(el).getPropertyValue('--fs')));
+  const s = Math.max(1, fs);
+  const near = (got: number, want: number) => expect(Math.abs(got - want)).toBeLessThan(0.6);
+  [up.width, down.width, trash.width, grip.width].forEach((w, i) => near(w, [22, 22, 28, 18][i] * s));
+  for (const b of boxes) near(b.height, 20 * s + 8);
+  const icons = await Promise.all(buttons.map(iconSize));
+  [18, 18, 16, 10].forEach((w, i) => near(icons[i].w, w * s));
+  near(icons[3].h, 15 * s);
   // One line, in order, never overlapping a neighbour, the grip flush with the row's right end.
   expect(new Set(boxes.map((b) => b.y)).size).toBe(1);
   for (let i = 0; i < 3; i++) expect(boxes[i].x + boxes[i].width).toBeLessThanOrEqual(boxes[i + 1].x + 0.01);
@@ -157,9 +160,14 @@ test('on a computer the hover controls are bigger, in one aligned line clear of 
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap', 'sub item', 'Second']);
   await row(list, 1).getByLabel('Item text').click();
   await page.keyboard.press('Tab'); // 'sub item' nested under the first
+  // A new card is narrow; at the biggest text the strip kept free for the buttons (161px) would leave a sub-item no room, so widen it.
+  const corner = await box(list.getByRole('button', { name: 'Resize card' }));
+  const from = { x: corner.x + corner.width / 2, y: corner.y + corner.height / 2 };
+  await dragPointer(page, from, { x: from.x + 260, y: from.y });
   await page.mouse.move(0, 0);
+  const card = page.locator('.card.loose').first(); // the resize left nothing selected
   await atEveryTextSize(page, async () => {
-    for (const n of [0, 1, 2]) await checkControls(row(list, n)); // the middle one is a sub-item
+    for (const n of [0, 1, 2]) await checkControls(row(card, n)); // the middle one is a sub-item
   });
 });
 

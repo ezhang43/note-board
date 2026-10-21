@@ -7,7 +7,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { CloseIcon } from './icons';
-import { panelCovers } from './textField';
+import { escapeIsForPanel } from './textField';
 import { usePhone } from './usePhone';
 
 const timeOf = (savedAt: number) => new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -20,14 +20,26 @@ function problem(e: unknown) {
     : 'Couldn’t load the version history. Check your connection and try again.';
 }
 
+/** Counts the versions asked for; a version that arrives after a later click, "Current version" or closing is dropped. */
+let asked = 0;
+
+/** Back to the current board, also for a version still loading. */
+function back() {
+  asked++;
+  appStore.endPreview();
+}
+
 /**
  * Show version `meta` on the board, read-only: the open board as it was then (empty if it didn't
  * exist yet; restoring then only brings back boards deleted since).
  */
 async function look(meta: VersionMeta, onError: (message: string) => void) {
+  const mine = ++asked;
+  const from = appStore.getState().boards.open;
   const data = await activeVersionStore()
     ?.get(meta.id)
     .catch(() => null);
+  if (mine !== asked || !appStore.getState().ui.historyOpen || appStore.getState().boards.open !== from) return;
   const got = data ? readWorkspace(data) : null;
   const open = appStore.getState().boards.open;
   // A version from before there were several boards is of the home board.
@@ -62,16 +74,22 @@ export function HistoryPanel() {
     };
   }, [open]);
 
-  // Escape: back to the current board first, then close the history.
+  // Escape: back to the current board first, then close the history (not one meant for something
+  // else: see escapeIsForPanel). Capture, like SidePanel: seen before the shortcuts list closes on it.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || panelCovers()) return;
-      if (appStore.getState().ui.preview) appStore.endPreview();
+      const looking = appStore.getState().ui.preview !== null;
+      if (!escapeIsForPanel(e, looking)) return;
+      if (looking) back();
       else appStore.toggleHistory();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    // Closing the history in any way drops a version still loading.
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      asked++;
+    };
   }, [open]);
 
   if (!open || (phone && preview)) return null;
@@ -84,7 +102,7 @@ export function HistoryPanel() {
           <CloseIcon />
         </button>
       </header>
-      <button type="button" className="history-row" aria-pressed={!preview} onClick={appStore.endPreview}>
+      <button type="button" className="history-row" aria-pressed={!preview} onClick={back}>
         <span className="history-time">Current version</span>
         <span className="history-detail">What’s on the board now</span>
       </button>
@@ -151,7 +169,7 @@ export function PreviewBar() {
         {error && <span className="preview-error"> · {error}</span>}
       </p>
       <div className="preview-actions">
-        <button type="button" className="tb-button" onClick={appStore.endPreview}>
+        <button type="button" className="tb-button" onClick={back}>
           Back to current
         </button>
         {canRestore ? (

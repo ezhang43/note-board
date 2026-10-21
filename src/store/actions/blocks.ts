@@ -160,8 +160,9 @@ export function blockActions(ctx: StoreContext) {
     /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history. */
     toggleSidePanel: (panel: SidePanelKind) =>
       updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null }),
-    /** Show an old version on the board, read-only (the real board is untouched). */
-    previewVersion: (meta: VersionMeta, board: Board) => updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null }),
+    /** Show an old version on the board, read-only (the real board is untouched); a drag, resize or box-select in progress ends. */
+    previewVersion: (meta: VersionMeta, board: Board) =>
+      updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null }),
     endPreview: () => updateUi({ preview: null }),
     /** Whether `text` is a BusyAnts backup (one board, or every board, that this version can read). */
     isBackup: (text: string) => readWorkspace(text) !== null,

@@ -89,6 +89,105 @@ test('versions are kept after the page is reloaded', async ({ page }) => {
   await expect(page.getByLabel('Note text').first()).toHaveValue('Keep me');
 });
 
+test('a version that arrives while a card is being dragged does not crash the board', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await twoDrafts(page, 'First draft', 'Second draft');
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Version history' });
+  const empty = panel.getByRole('button', { name: /Empty board/ });
+  await expect(empty).toBeVisible();
+  // Hold the note mid-drag, then the version from before the note existed arrives.
+  const b = (await page.locator('[data-card-id]').first().boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + 18);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 + 60, b.y + 80, { steps: 5 });
+  await expect(page.locator('.card.dragging')).toHaveCount(1);
+  await empty.evaluate((el) => (el as HTMLElement).click());
+  await expect(page.getByRole('region', { name: 'Looking at an earlier version' })).toBeVisible();
+  await page.mouse.up();
+  expect(errors).toEqual([]);
+  await expect(page.getByTestId('canvas')).toBeVisible();
+  await expect(page.locator('[data-card-id]')).toHaveCount(0);
+  await page.getByRole('region', { name: 'Looking at an earlier version' }).getByRole('button', { name: 'Back to current' }).click();
+  await expect(page.getByLabel('Note text').first()).toHaveValue('Second draft');
+});
+
+test('a version still loading when you go back, close, or press Escape does not switch the preview on', async ({ page }) => {
+  await twoDrafts(page, 'First draft', 'Second draft');
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Version history' });
+  const row = panel.getByRole('button', { name: /First draft|1 card/ }).first();
+  await expect(row).toBeVisible();
+  const banner = page.getByRole('region', { name: 'Looking at an earlier version' });
+  // Each case clicks the version and, in the same instant (before it has loaded), leaves.
+  const rowThen = (leave: string) =>
+    page.evaluate((how) => {
+      const rows = document.querySelectorAll('.history-panel .history-row');
+      (rows[1] as HTMLElement).click();
+      if (how === 'current') (rows[0] as HTMLElement).click();
+      if (how === 'close') (document.querySelector('[aria-label="Close version history"]') as HTMLElement).click();
+      if (how === 'escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }, leave);
+
+  await rowThen('current');
+  await page.clock.runFor(300);
+  await expect(banner).toHaveCount(0);
+
+  await rowThen('escape'); // closes the history, as nothing was being looked at yet
+  await page.clock.runFor(300);
+  await expect(banner).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await expect(row).toBeVisible();
+  await rowThen('close');
+  await page.clock.runFor(300);
+  await expect(banner).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByLabel('Note text').first()).toHaveValue('Second draft');
+});
+
+test('Escape goes back to the current board, then closes the history; one meant for something else leaves it open', async ({ page }) => {
+  await twoDrafts(page, 'First draft', 'Second draft');
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Version history' });
+  const banner = page.getByRole('region', { name: 'Looking at an earlier version' });
+  await panel.getByRole('button', { name: /card|Empty board/ }).first().click();
+  await expect(banner).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(banner).toHaveCount(0);
+  await expect(panel).toBeVisible();
+  // Also with the cursor in a box of the old version: Escape still goes back to the current board.
+  await panel.getByRole('button', { name: /card/ }).first().click();
+  await page.getByLabel('Note text').first().click({ force: true });
+  await page.keyboard.press('Escape');
+  await expect(banner).toHaveCount(0);
+  await expect(panel).toBeVisible();
+  // Leaving a text box.
+  await page.getByLabel('Note text').first().click();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeVisible();
+  // The shortcuts list.
+  await clickEmpty(page);
+  await page.keyboard.press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toHaveCount(0);
+  await expect(panel).toBeVisible();
+  // A toolbar menu.
+  await page.locator('header.toolbar').getByRole('button', { name: 'File' }).click();
+  const menu = page.getByRole('menu', { name: 'File' });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(panel).toBeVisible();
+  // Nothing else wants it: it closes.
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+});
+
 // Job #147: changes from another device (only on the published site) keep the boards from just
 // before them as a version; here one is put in place as that would have saved it.
 test('a version kept from just before changes from another device says so, and shows that work', async ({ page }) => {

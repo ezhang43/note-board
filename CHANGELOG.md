@@ -1,5 +1,12 @@
 # Changelog
 
+## Calendar: press Delete twice to delete an event (2026-10-21)
+
+- With an event's card open, Delete (or Backspace) asks "Delete “Dentist”?" as before. Pressing Delete or Backspace again now answers it: the event is deleted. For a repeating event it deletes **all events in the series**.
+- If the event has guests, the next question, "Send update emails to guests?", still needs a click (or Enter); the Delete key does nothing there.
+- Holding the key down never answers the question; it has to be a second, separate press. Escape still keeps the event.
+- There is still no undo for calendar events. Nothing about saved boards changed.
+
 ## Habits: Month and Year views, no streak (2026-10-20)
 
 - At the top of the Habits panel there is now a **Week | Month | Year** switch with ‹ and › arrows. A Today button shows up when you've moved away from today. The bar stays in view while you scroll your habits. The panel still opens on this week.

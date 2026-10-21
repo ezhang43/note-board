@@ -161,8 +161,10 @@ export function blockActions(ctx: StoreContext) {
     toggleSidePanel: (panel: SidePanelKind) =>
       updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null }),
     /** Show an old version on the board, read-only (the real board is untouched); a drag, resize or box-select in progress ends. */
-    previewVersion: (meta: VersionMeta, board: Board) =>
-      updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null }),
+    previewVersion(meta: VersionMeta, board: Board) {
+      ctx.flushPendingTick(); // a tick still animating would be refused while a version is shown
+      updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null });
+    },
     endPreview: () => updateUi({ preview: null }),
     /** Whether `text` is a BusyAnts backup (one board, or every board, that this version can read). */
     isBackup: (text: string) => readWorkspace(text) !== null,
@@ -387,7 +389,7 @@ export function blockActions(ctx: StoreContext) {
       }
       // Expanding the same blocks right after collapsing them gives back the layout from before.
       const saved = layout.collapseAll;
-      const same = saved && String(saved.scope) === String(scope);
+      const same = saved && (saved.scope === scope || (!!saved.scope && !!scope && saved.scope.length === scope.length && saved.scope.every((id) => scope.includes(id))));
       layout.collapseAll = null;
       layout.expandAllUntil = Date.now() + EXPAND_WATCH_MS;
       commit((b) =>

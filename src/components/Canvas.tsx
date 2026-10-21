@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DRAG_THRESHOLD, ZOOM_STEP } from '../model/constants';
 import { FONT_SCALE } from '../model/font';
 import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
@@ -26,8 +26,18 @@ export function Canvas() {
   // Nothing drawn (a Completed record is kept but never drawn): show the hint.
   const empty = useAppState((s) => s.board.order.every((id) => s.board.cards[id]?.kind === 'completed'));
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
-  const draggedColumn = useAppState((s) => (s.ui.drag?.kind === 'column' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
+  // Every block is drawn here, in place, and stays where it is in the page when the order changes (a drop
+  // brings its block to the front): moving an element in the DOM would cancel its glide into the grid and
+  // restart a playing video. A card dragged out of a container isn't in the order yet: drawn loose, last,
+  // under the same key. While one is dragged, `.dragging` lifts it with z-index.
+  const domOrder = useRef<string[]>([]);
+  const blockIds = useMemo(() => {
+    const wanted = new Set(draggedCard ? [...order, draggedCard] : order);
+    const kept = domOrder.current.filter((id) => wanted.has(id));
+    const placed = new Set(kept);
+    return (domOrder.current = [...kept, ...[...wanted].filter((id) => !placed.has(id))]);
+  }, [order, draggedCard]);
   const land = useAppState((s) => s.ui.drag?.land ?? s.ui.newDrag?.land ?? null);
   const guides = useAppState((s) => s.ui.drag?.guides ?? NO_GUIDES);
   const newDrag = useAppState((s) => s.ui.newDrag);
@@ -313,13 +323,7 @@ export function Canvas() {
         </p>
       )}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
-        {order.map((id) => {
-          if (id === draggedCard || id === draggedColumn) return null;
-          return columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />;
-        })}
-        {/* The block being dragged is drawn last so it stays on top. */}
-        {draggedColumn && <ColumnView key={draggedColumn} id={draggedColumn} />}
-        {draggedCard && <CardView key={draggedCard} id={draggedCard} inColumn={false} />}
+        {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}
         {/* Keyed by place in the list: two guides can share axis, line and start (the block lined up
             with two others at once), and repeated keys made React leave old lines on the board. */}

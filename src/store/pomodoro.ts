@@ -18,8 +18,9 @@ const LONGEST = MAX_MINUTES * 60_000;
 
 export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks = {}) {
   /** What is saved on this device (another tab may have changed it), made safe to use now. */
+  const stored = () => readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
   function saved(): Pomodoro {
-    let p = readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
+    let p = stored();
     const now = Date.now();
     if (model.timeLeft(p, now) > LONGEST) p = { ...p, timer: DEFAULT_POMODORO.timer };
     // A round that ran out while the page was closed has simply moved on (no chime for it now).
@@ -27,18 +28,21 @@ export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks
   }
 
   let state = saved();
+  /** The round end time this page last saw saved (read, or written successfully): a different one is another tab's doing. */
+  let known = stored().timer.endsAt;
   const listeners = new Set<() => void>();
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
   function show(next: Pomodoro) {
     state = next;
+    known = stored().timer.endsAt;
     schedule();
     listeners.forEach((l) => l());
   }
 
   function set(next: Pomodoro) {
     if (next === state) return;
-    safe(() => storage?.setItem(POMODORO_KEY, JSON.stringify(next)));
+    if (safe(() => (storage?.setItem(POMODORO_KEY, JSON.stringify(next)), true))) known = next.timer.endsAt;
     show(next);
   }
 
@@ -55,8 +59,8 @@ export function createPomodoro(storage: StorageLike | null, hooks: PomodoroHooks
     if (!model.roundEnded(state, Date.now())) return schedule();
     // Another tab may have ended this round already: then just show what it saved, without a chime.
     // simple: two tabs ending it at the very same moment may both chime.
-    const stored = readPomodoro(safe(() => storage?.getItem(POMODORO_KEY) ?? null));
-    if (storage && stored.timer.endsAt !== state.timer.endsAt) return show(saved());
+    // A copy that differs from what this page last saved or read is another tab's; a full disk leaves it as it was.
+    if (storage && stored().timer.endsAt !== known) return show(saved());
     const ended = state.timer.phase;
     set(model.skip(state));
     hooks.onRoundEnd?.(ended, state);

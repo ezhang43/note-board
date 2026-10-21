@@ -43,7 +43,11 @@ export function boardAsMarkdown(board: Board, nameOf: BoardNameOf = () => ''): s
     out.push(`## ${col.title.trim() || 'Untitled container'}`, '');
     for (const cardId of col.cardIds) if (board.cards[cardId]) block(cardText(board.cards[cardId], nameOf));
   }
-  const loose = board.order.filter((id) => board.cards[id]).sort((a, b) => board.cards[a].y - board.cards[b].y || board.cards[a].x - board.cards[b].x);
+  // The hidden Completed record sits at 0,0, so it goes last by hand, not by that spot.
+  const isRecord = (id: string) => board.cards[id].kind === 'completed';
+  const loose = board.order
+    .filter((id) => board.cards[id])
+    .sort((a, b) => +isRecord(a) - +isRecord(b) || board.cards[a].y - board.cards[b].y || board.cards[a].x - board.cards[b].x);
   if (loose.length) {
     if (columns.length) out.push('## On the board', '');
     for (const id of loose) block(cardText(board.cards[id], nameOf));

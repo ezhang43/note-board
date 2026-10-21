@@ -15,6 +15,8 @@ export interface VersionMeta {
   boards?: number;
   /** A short fingerprint of the board (`contentHash`), so a repeat can be spotted without downloading it. */
   hash?: string;
+  /** 'outside': saved just before changes from another device replaced the boards (job #147). */
+  kind?: 'outside';
 }
 
 /** A version is saved when editing starts again after a quiet spell this long. */
@@ -63,12 +65,12 @@ export function summarizeWorkspace(ws: Workspace): { cards: number; columns: num
   return all.length > 1 ? { ...sum, boards: all.length } : sum;
 }
 
-/** e.g. "2 boards · 12 cards · 3 containers". */
+/** e.g. "2 boards · 12 cards · 3 containers", after "Before changes from another device" for such a version. */
 export function describeVersion(v: VersionMeta): string {
   const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
   const boards = v.boards && v.boards > 1 ? n(v.boards, 'board') : '';
-  if (!v.cards && !v.columns) return boards || 'Empty board';
-  return [boards, v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'container')].filter(Boolean).join(' · ');
+  const what = !v.cards && !v.columns ? boards || 'Empty board' : [boards, v.cards && n(v.cards, 'card'), v.columns && n(v.columns, 'container')].filter(Boolean).join(' · ');
+  return v.kind === 'outside' ? `Before changes from another device · ${what}` : what;
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

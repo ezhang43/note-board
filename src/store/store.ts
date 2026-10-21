@@ -7,6 +7,7 @@ import { checklistActions } from './actions/checklist';
 import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
 import { weightActions } from './actions/weight';
+import { habitColorActions } from './actions/habitColor';
 import { createCore } from './core';
 import { later, type Schedule } from './env';
 
@@ -44,6 +45,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...blockActions(ctx),
     ...boards,
     ...weightActions(ctx, boards.habitsBoard),
+    ...habitColorActions(ctx, boards.habitsBoard),
     ...gestureActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),

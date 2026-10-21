@@ -1,6 +1,8 @@
 /** The 8 bold column colours: the Colour menu's third row (owner request, 2026-10-15). */
 export const BOLD_KEYS = ['tomato', 'tangerine', 'sunflower', 'grass', 'emerald', 'ocean', 'violet', 'magenta'] as const;
 
+export type BoldKey = (typeof BOLD_KEYS)[number];
+
 /** Whether a colour is one of the bold ones (their soft greys would be too faint on it). */
 const BOLD = new Set<string>(BOLD_KEYS);
 export function isBold(key: string | null | undefined): boolean {

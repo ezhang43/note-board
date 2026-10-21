@@ -4,6 +4,13 @@
 
 - **Buttons react to the mouse again on a computer.** Thirteen hover effects had stopped working (the toolbar buttons, the zoom and text size buttons, the small buttons on cards and in panels, Completed, Uncheck all, the formatting bar, Version history rows, the ? and coffee buttons, and the calendar's events, days and chips). They still do nothing on a phone or tablet, so a tap never leaves a button tinted.
 - **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
+
+## Touch and keyboard fixes (2026-10-21)
+
+- **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.
+- **Resizing a collapsed card with the keyboard** (arrow keys on its corner) no longer makes it jump to its open height.
+- **After resizing something by finger on a tablet**, right-click and long-press menus (spell-check, copy link) keep working. Before, they stayed blocked until you reloaded.
+- **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
 - Nothing about saved boards changed.
 
 ## Shared computers keep each account's boards apart (2026-10-21)

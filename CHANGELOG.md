@@ -8,6 +8,10 @@
 - **The Journal's today is a page**: its date as the heading, the week number, a word count and a quiet "Saved". Your earlier days are a tidy timeline: a big date and the first two lines, and a click opens the day to edit. Earlier days now start folded; today starts open. This year no longer has its own header.
 - **The four drop-down boxes are now one "Aa" menu** with labeled buttons (Style, Size, Font, Highlight), plus a highlighter button. A new empty day says "Write about today…".
 - Everything you wrote and ticked is unchanged. Nothing about saving, sync or undo changed; a habit's color is saved with the habit.
+## Helper sessions work in the cloud (2026-10-22)
+
+- The crew, finish-step and check-pr instructions now work in cloud sessions, where `gh pr` commands are blocked: they use GitHub's other route (`gh api` or the GitHub tools) to open, check and merge pull requests, and wait for the tests without `--watch`. A new spec-check skill lets a background helper run the spec check itself; when a helper can't run the code review, it says so and the coordinator reviews the pull request before it merges. A few stale lines were fixed. Nothing in the app changed.
+
 ## Save a board as a picture or PDF (2026-10-22)
 
 - **File → Download as picture (PNG)** and **Download as PDF** save the whole open board, every card and container and not just what is on screen, as it looks now (your color theme and dark mode included), to send or print. The PDF is one page the size of the board. On an iPhone home-screen app they open the Share sheet, like the backup. A big board shows "Preparing…" while it is drawn.

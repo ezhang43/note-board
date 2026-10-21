@@ -23,6 +23,8 @@ npm run test:e2e
 
 A failure means fixing the code (or a wrong test, saying why), never deleting a test to get green.
 
+Three browser failures are known to happen only in the cloud sandbox and are not real; ignore them and say so in the report: `published-iphone` (no WebKit there), quick-wins "Ctrl+click on a web address" (no internet), and backup.spec "a file that isn't a BusyAnts backup". Any other failure: re-run that spec on its own before believing it (other workers share the machine), and treat GitHub's "All tests" as the final word. Each worktree tests on its own ports (`scripts/test-ports.mjs`). Stop only a process you started, with `kill <pid>`; never a broad process-name kill of Playwright, node or vite (a hook refuses it).
+
 ## 3. Review at the right level (rule 10)
 
 Find out whether the change touches saving, sync, undo or deleting:
@@ -32,10 +34,12 @@ node scripts/claude-hooks.mjs level
 ```
 
 - Says `high` → run the `code-review` skill at `high`.
-- A normal feature → `medium`. A tiny fix (style tweak, one small behaviour) → `low` or none.
+- A normal feature → `medium`. A tiny fix (style tweak, one small behavior) → `low` or none.
 - Only wording or documents → skip.
 
 Fix what the review confirms, tests first (write the failing test, see it fail, fix), then rerun step 2.
+
+**If the `code-review` skill can't run in this session** (a background crew worker has no Agent tool, and the review runs as a background agent): do not skip it and do not improvise one. Say so in the report as `REVIEW: needs coordinator review at <level>`, open the pull request, and do not merge it (step 7), even if low-risk. The crew coordinator runs `/code-review <level> <PR>` on the pull request, sends findings back, and merges once clean (crew skill, section 3). If the level above is "skip", there is nothing to wait for.
 
 ## 4. Security check (when it applies)
 
@@ -51,7 +55,7 @@ Otherwise skip it and say so in the report. Fix what it confirms the same way as
 
 ## 5. Spec check
 
-Use the `spec-checker` subagent on the change. Fix anything it lists, or say in the report why it is fine as it is.
+Run the `spec-check` skill on the change (a worker has no Agent tool and runs the skill itself; a session that can start subagents may use the `spec-checker` agent instead, which has the same list). Fix anything it lists, or say in the report why it is fine as it is.
 
 ## 5b. Design check (UI changes only)
 
@@ -66,7 +70,8 @@ If the change touches `src/components/`, `src/styles.css` or any page's look, do
 ## 7. Land it
 
 - **Crew coordinator:** commit on `build/v1`, fetch again, push. A commit pushed straight to `build/v1` holds auto-publish back until the owner says "publish"; for a change that should go live by itself, use a branch and a low-risk pull request instead.
-- **Any other session:** commit on the job's branch, push, open a pull request into `build/v1`. If step 3 said `high`, add `--label high-risk` and do not merge: give the owner the link. Otherwise watch "All tests", fix it if it fails, and merge (merge commit) once it passes.
+- **Any other session:** commit on the job's branch, push, open a pull request into `build/v1`. If step 3 said `high`, add `--label high-risk` and do not merge: give the owner the link. Otherwise watch "All tests", fix it if it fails, and merge (merge commit) once it passes (unless step 3 handed the review to the coordinator: then stop at `pr-open`).
+- **In a cloud session `gh pr ...` is blocked** (GitHub GraphQL; `HTTP 403`). Use the GitHub MCP tools if loaded, or the `gh api` REST routes in the crew skill's "GitHub in a cloud session" section: open the pull request, add the label, read the "All tests" check-run (`subscribe_pr_activity` or polling, not `gh pr checks --watch`), and merge. On the owner's Windows computer `gh pr ...` works as written.
 
 ## 8. Report to the owner
 

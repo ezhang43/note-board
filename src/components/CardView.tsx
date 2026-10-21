@@ -46,8 +46,11 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     const h = s.ui.itemDrag?.hint;
     return s.ui.drag?.intoList === id || (!!h && 'cardId' in h && h.cardId === id && h.drop.mode === 'append');
   });
+  // Search: the current match is out of sight inside this card, so the card is marked.
+  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
+  // Every hook is above this: while a block is dragged a version can show without it, and it must still draw nothing.
   // The Completed record shows in the Completed panel, never on the board.
   if (!card || card.kind === 'completed') return null;
 
@@ -61,7 +64,6 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     ...(tint ? { '--tint': `color-mix(in srgb, ${tint.bg} 60%, var(--card-bg))`, '--tint-text': tint.text } : {}),
     ...(inColumn ? {} : { left: resize?.liveX ?? pos.x, top: resize?.liveY ?? pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
-  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const classes = [
     'card',
     inColumn ? 'in-column' : 'loose',
@@ -74,7 +76,6 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     card.collapsed && 'collapsed',
     tint && 'tinted',
     isBold(card.titleColor) && 'bold-tint',
-    // Search: the current match is out of sight inside this card, so the card is marked.
     findTarget && 'find-target',
   ];
 

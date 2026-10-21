@@ -8,6 +8,13 @@
 - **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
 - Nothing about saved boards changed.
 
+## Fix: version preview during a drag, and Escape (2026-10-21)
+
+- **No more white screen:** picking an earlier version in Version history while you were holding a card or container mid-drag could crash the whole app. Any drag or resize in progress now simply ends when a version is shown.
+- **A version that was still loading** no longer shows up late after you click Current version, close the history or press Escape.
+- **Escape now only closes a panel when it is meant for it.** With the Focus timer, Calendar, Journal, Habits, Completed or Version history open, Escape used to close the panel as well when you were closing a toolbar or Color menu, leaving a text box, closing the keyboard shortcuts list or canceling a "Delete ...?" question. Now that Escape only does the one thing, and a second Escape closes the panel.
+- Nothing already saved changed.
+
 ## Version history keeps your work before another device's changes replace it (2026-10-21)
 
 - If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.

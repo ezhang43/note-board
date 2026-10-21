@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TOUR_KEY, placeCard, tourPending } from '../model/tour';
 import { CloseIcon } from './icons';
+import { isPhone } from './usePhone';
 
 // The welcome tour (owner request, 2026-10-16): a spotlight on one control at a time, with a small
 // card beside it. It starts by itself the first time the board is shown on a device, can be skipped
@@ -64,8 +65,6 @@ function targetRect(selector: string): Rect | null {
   }
   return box && { x: box.l - PAD, y: box.t - PAD, w: box.r - box.l + 2 * PAD, h: box.b - box.t + 2 * PAD };
 }
-
-const isPhone = () => window.matchMedia?.('(max-width: 599px)').matches ?? false;
 
 /** Remember on this device that the tour is finished (a blocked store just means it may show again later). */
 function remember() {
@@ -194,6 +193,7 @@ export function Tour() {
         ref={card}
         className="tour-card"
         role="dialog"
+        aria-modal="true" // covers the board: no board key, paste or Ctrl+F acts behind it (see panelCovers)
         aria-labelledby="tour-step tour-title"
         aria-describedby="tour-text"
         style={{ left: place.left, top: place.top }}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, journalEntries, journalPeek, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { dayKey as calendarDayKey } from './calendar';
 import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
@@ -348,5 +348,30 @@ describe('journalPeek', () => {
   it('is empty when nothing is written', () => {
     expect(journalPeek('')).toBe('');
     expect(journalPeek(' \n\t\n ')).toBe('');
+  });
+});
+
+// Journal redesign (owner pick, 2026-10-22, jobs 166 + 167): the heading, week number and word count of today's page.
+describe('journal page heading', () => {
+  it('writes the day as a heading, weekday first', () => {
+    expect(journalLongDate('2026-10-21')).toBe('Wednesday, 21 October');
+    expect(journalLongDate('2026-01-05')).toBe('Monday, 5 January');
+    expect(journalLongDate('2028-02-29')).toBe('Tuesday, 29 February');
+  });
+
+  it('numbers the week the ISO way: Monday first, week 1 holds the first Thursday', () => {
+    expect(isoWeek('2026-10-21')).toBe(43);
+    expect(isoWeek('2026-10-19')).toBe(43);
+    expect(isoWeek('2026-10-18')).toBe(42);
+    expect(isoWeek('2026-01-01')).toBe(1);
+    expect(isoWeek('2027-01-01')).toBe(53); // still 2026's last week
+    expect(isoWeek('2027-01-04')).toBe(1);
+    expect(isoWeek('2024-12-30')).toBe(1); // already 2025's first week
+  });
+
+  it('counts the words in what is written, not the date line', () => {
+    expect(journalWords('')).toBe(0);
+    expect(journalWords('  \n ')).toBe(0);
+    expect(journalWords('Quiet start.\n\n• Sam’s soup\n1.  Ten  quiet minutes')).toBe(7);
   });
 });

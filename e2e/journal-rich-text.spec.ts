@@ -11,6 +11,13 @@ const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' 
 const editor = (page: Page) => panel(page).getByRole('textbox').first();
 const tools = (page: Page) => panel(page).getByRole('toolbar', { name: 'Formatting' });
 const tool = (page: Page, name: string) => tools(page).getByRole('button', { name, exact: true });
+// Style, size, font and highlight are in one Aa menu (the page-and-timeline design, owner pick 2026-10-22).
+const styleMenu = (page: Page) => tools(page).getByRole('group', { name: 'Text style' });
+const choice = (page: Page, group: string, name: string) => styleMenu(page).getByRole('group', { name: group }).getByRole('button', { name, exact: true });
+async function pick(page: Page, group: string, name: string) {
+  if (!(await styleMenu(page).isVisible())) await tool(page, 'Text style').click();
+  await choice(page, group, name).click();
+}
 const blocks = (page: Page) => editor(page).locator(':scope > div');
 const openJournal = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true }).click();
 /** The saved Journal note, straight from the browser's storage. */
@@ -97,7 +104,7 @@ test('lists: Enter continues one, Tab indents, Shift+Tab outdents, Enter on an e
 test('headings, text size, font and highlight from the toolbar', async ({ page }) => {
   await openJournal(page);
   await page.keyboard.type('Plans');
-  await tools(page).getByLabel('Style').selectOption('Heading 1');
+  await pick(page, 'Style', 'Heading 1');
   await expect(blocks(page).first()).toHaveAttribute('data-type', 'h1');
   await expect(editor(page)).toBeFocused();
   await page.keyboard.press('End');
@@ -105,15 +112,17 @@ test('headings, text size, font and highlight from the toolbar', async ({ page }
   await page.keyboard.type('a quiet day');
   await expect(blocks(page).nth(1)).toHaveAttribute('data-type', 'p');
   await selectLetters(page, 2, 7);
-  await tools(page).getByLabel('Text size').selectOption('Large');
-  await tools(page).getByLabel('Font').selectOption('Typewriter');
-  await tools(page).getByLabel('Highlight').selectOption('Yellow');
+  await pick(page, 'Text size', 'Large');
+  await pick(page, 'Font', 'Typewriter');
+  await pick(page, 'Highlight', 'Yellow');
   const quiet = editor(page).locator('[data-size="large"][data-font="mono"][data-hl="yellow"]');
   await expect(quiet).toHaveText('quiet');
   await expect(quiet).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(tools(page).getByLabel('Highlight')).toHaveValue('yellow');
+  await expect(choice(page, 'Highlight', 'Yellow')).toHaveAttribute('aria-pressed', 'true');
+  await expect(choice(page, 'Font', 'Typewriter')).toHaveAttribute('aria-pressed', 'true');
+  await expect(choice(page, 'Text size', 'Large')).toHaveAttribute('aria-pressed', 'true');
   // None takes the highlight off again.
-  await tools(page).getByLabel('Highlight').selectOption('None');
+  await pick(page, 'Highlight', 'None');
   await expect(editor(page).locator('[data-hl]')).toHaveCount(0);
 });
 
@@ -206,14 +215,17 @@ test('the menus show a mixed selection and a list line, so picking None or Norma
   await openJournal(page);
   await page.keyboard.type('ab');
   await selectLetters(page, 0, 1);
-  await tools(page).getByLabel('Highlight').selectOption('Yellow');
+  await pick(page, 'Highlight', 'Yellow');
   await selectLetters(page, 0, 2);
-  await expect(tools(page).getByLabel('Highlight')).toHaveValue('-');
-  await tools(page).getByLabel('Highlight').selectOption('None');
+  // Mixed: neither Yellow nor None is shown as the selection's, so either still acts.
+  await expect(choice(page, 'Highlight', 'Yellow')).toHaveAttribute('aria-pressed', 'false');
+  await expect(choice(page, 'Highlight', 'None')).toHaveAttribute('aria-pressed', 'false');
+  await pick(page, 'Highlight', 'None');
   await expect(editor(page).locator('[data-hl]')).toHaveCount(0);
   await tool(page, 'Bulleted list').click();
-  await expect(tools(page).getByLabel('Style')).toHaveValue('list');
-  await tools(page).getByLabel('Style').selectOption('Normal');
+  // A list line: none of Normal, Heading 1, Heading 2 is shown, so picking Normal still acts.
+  for (const name of ['Normal', 'Heading 1', 'Heading 2']) await expect(choice(page, 'Style', name)).toHaveAttribute('aria-pressed', 'false');
+  await pick(page, 'Style', 'Normal');
   await expect(blocks(page).first()).toHaveAttribute('data-type', 'p');
 });
 
@@ -286,4 +298,52 @@ test.describe('on a phone', () => {
     await expect(blocks(page).nth(1)).toHaveAttribute('data-marker', '2.');
     await expect(editor(page)).toBeFocused();
   });
+});
+
+// The Aa menu (page-and-timeline design, owner pick 2026-10-22): one popover with labeled groups; the highlighter button; Escape.
+test('the Aa menu holds Style, Size, Font and Highlight, shows the selection’s choices, and Escape shuts it without leaving the note', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('hello');
+  await expect(styleMenu(page)).toHaveCount(0);
+  await tool(page, 'Text style').click();
+  await expect(tool(page, 'Text style')).toHaveAttribute('aria-expanded', 'true');
+  for (const group of ['Style', 'Text size', 'Font', 'Highlight']) await expect(styleMenu(page).getByRole('group', { name: group })).toBeVisible();
+  await expect(choice(page, 'Style', 'Normal')).toHaveAttribute('aria-pressed', 'true');
+  await expect(choice(page, 'Text size', 'Normal')).toHaveAttribute('aria-pressed', 'true');
+  await expect(choice(page, 'Font', 'Plex Sans')).toHaveAttribute('aria-pressed', 'true');
+  await expect(styleMenu(page).getByRole('group', { name: 'Font' }).getByRole('button')).toHaveText(['Plex Sans', 'Serif', 'Rounded', 'Handwritten', 'Typewriter']);
+  await expect(styleMenu(page).getByRole('group', { name: 'Highlight' }).getByRole('button')).toHaveCount(5); // four colors and None
+  await expect(editor(page)).toBeFocused(); // using the menu never takes the cursor away
+  // Escape shuts the menu first: the panel stays and the cursor stays in the note.
+  await page.keyboard.press('Escape');
+  await expect(styleMenu(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await expect(editor(page)).toBeFocused();
+  // A press outside shuts it too.
+  await tool(page, 'Text style').click();
+  await panel(page).getByRole('heading', { name: 'Journal', level: 2 }).click();
+  await expect(styleMenu(page)).toHaveCount(0);
+});
+
+test('the highlighter button puts the yellow highlight on the selected words and takes it off again', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('mark this');
+  await selectLetters(page, 0, 4);
+  await tool(page, 'Highlight yellow').click();
+  await expect(editor(page).locator('[data-hl="yellow"]')).toHaveText('mark');
+  await expect(tool(page, 'Highlight yellow')).toHaveAttribute('aria-pressed', 'true');
+  await tool(page, 'Highlight yellow').click();
+  await expect(editor(page).locator('[data-hl]')).toHaveCount(0);
+  await expect(editor(page)).toBeFocused();
+});
+
+test('an empty note for today shows the placeholder, which goes as soon as anything is typed', async ({ page }) => {
+  await openJournal(page);
+  await expect(editor(page)).toHaveAttribute('data-placeholder', 'Write about today…');
+  await expect(editor(page)).toHaveCSS('position', 'relative');
+  const shown = () => editor(page).evaluate((el) => getComputedStyle(el, '::before').content);
+  expect(await shown()).toBe('"Write about today…"');
+  await page.keyboard.type('x');
+  await expect(editor(page)).not.toHaveAttribute('data-placeholder', /./);
+  expect(await shown()).toBe('none');
 });

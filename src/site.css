@@ -144,7 +144,8 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
   text-align: center;
   background: linear-gradient(var(--slab) calc(100% - var(--overlap)), transparent 0);
 }
-.hero h1 { font-size: clamp(58px, 11vw, 96px); }
+.hero h1 { max-width: 12em; margin-inline: auto; font-size: clamp(40px, 7.4vw, 84px); text-wrap: balance; }
+.hero .lead { max-width: 40ch; }
 .lead {
   max-width: 30ch;
   margin: 18px auto 0;
@@ -243,6 +244,10 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 /* Feature tiles: three across on a computer, two on a tablet, one on a phone */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
 .tiles li { padding: 22px 22px 24px; border: 1px solid var(--hair); border-top: 4px solid var(--honey); border-radius: 12px; background: var(--ground); }
+
+/* No AI pushed on you: two plain paragraphs in the reading column */
+.prose { max-width: var(--column); }
+.prose p { margin: 0 0 14px; font-size: 18px; }
 
 /* Trust band: a soft honey strip of plain facts (each one is in the FAQ or the Privacy policy) */
 .trust { margin-top: clamp(64px, 9vw, 112px); padding: clamp(40px, 6vw, 64px) var(--gutter); background: var(--soft); }

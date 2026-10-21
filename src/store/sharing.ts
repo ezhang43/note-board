@@ -71,7 +71,7 @@ export function boardsInKeptShares(storage: { length: number; key(i: number): st
  * another account's). Give sync `remote` in place of the online copy: that is how this learns which
  * boards the online copy has.
  */
-export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: string) => boolean, kept: Set<string>) {
+export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: string) => boolean, kept: Set<string>, ownCopy?: (ws: Workspace) => void) {
   let known = false;
   /** The first online version (or "there is none") has been dealt with. */
   let loaded = false;
@@ -81,11 +81,14 @@ export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: s
     write: (doc) => online.write(doc),
     watch: (onChange, onError) =>
       online.watch((doc) => {
+        const ws = doc && (!known || !loaded) ? readWorkspace(doc.data)?.ws : null;
         if (!known) {
           // No online copy yet: this device's boards become it (but not ones that came with a share).
           if (!doc && !loaded) Object.keys(store.workspace().boards).forEach((id) => !kept.has(id) && seen.add(id));
-          if (doc) Object.keys(readWorkspace(doc.data)?.ws.boards ?? {}).forEach((id) => seen.add(id));
+          Object.keys(ws?.boards ?? {}).forEach((id) => seen.add(id));
         }
+        // The first online copy: no share may hold one of its boards (whole-app review H4, see Sharing.ownCopy).
+        if (ws && !loaded) ownCopy?.(ws);
         try {
           onChange(doc);
         } finally {
@@ -214,8 +217,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (c && c.ws === ws && c.key.length === key.length && c.key.every((k, i) => k === key[i])) return c.groups;
     const out = new Map<string, string[]>();
     const taken = new Set<string>();
+    // A board in another share's data, or last seen in it here, is that share's, whichever share comes
+    // first here (whole-app review M2: a board card pasted from one shared board onto another doesn't
+    // move its board).
+    const held = new Map<string, Share>();
+    for (const o of shares.values()) for (const id of [...Object.keys(o.base ?? {}), ...Object.keys(o.seen)]) if (!held.has(id)) held.set(id, o);
     for (const s of shares.values()) {
-      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, taken, s.cameWith, own) : [];
+      const others = new Set(taken);
+      held.forEach((o, id) => o !== s && !s.base?.[id] && others.add(id));
+      const ids = s.root && s.base ? groupBoardIds(ws, s.root, s.base, others, s.cameWith, own) : [];
       ids.forEach((id) => taken.add(id));
       out.set(s.id, ids);
     }
@@ -639,6 +649,26 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     /** Whether board `id` is shared (it then syncs with its share, not with its owner's other boards). */
     isShared: (boardId: string) => shareOf(boardId) !== null,
     shareOf,
+    /**
+     * The person's own boards online (`ws`), as first read on this device (whole-app review H4): a
+     * share's data holding a board with the id of one of them doesn't take it, even on a device that
+     * didn't have it yet (anyone it is shared with can save anything in it). That board stays theirs.
+     * Allowed: for whoever shared it, the board they shared and the boards inside it (that copy online
+     * is from before sharing). Checked at every page load, so a board a share took before is given back.
+     * A share whose starting board is one of them holds nothing here.
+     */
+    ownCopy(ws: Workspace) {
+      for (const s of shares.values()) {
+        if (!s.root || !s.base) continue;
+        const allowed = s.owner ? boardsToShare(ws, s.root, new Set()) : [];
+        const clash = clashingBoards(ws, s.base, allowed);
+        if (!clash.length) continue;
+        if (clash.includes(s.root)) [s.root, s.base] = [null, null];
+        else s.base = Object.fromEntries(Object.entries(s.base).filter(([id]) => !clash.includes(id)));
+        saveBase(s);
+      }
+      publish();
+    },
     /** Shares board `boardId` (and the boards inside it); resolves with the share's id. */
     async share(boardId: string): Promise<string> {
       const existing = shareOf(boardId);

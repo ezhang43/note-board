@@ -15,6 +15,12 @@ const row = (page: Page, i: number) => habitRows(page).nth(i);
 const days = (page: Page, i: number) => row(page, i).getByRole('button', { name: /, (Mon|Tue|Wed|Thu|Fri|Sat|Sun) / });
 const todayBox = (page: Page, i: number) => row(page, i).locator('.habit-day[aria-current="date"]');
 
+/** A habit's ⋯ menu, then its Delete habit item (the Ledger design: nothing destructive sits beside every habit). */
+async function deleteHabit(page: Page, i: number, name: string) {
+  await row(page, i).getByRole('button', { name: `More for ${name}` }).click();
+  await row(page, i).getByRole('button', { name: 'Delete habit', exact: true }).click();
+}
+
 async function addHabit(page: Page, name: string) {
   await newHabit(page).fill(name);
   await newHabit(page).press('Enter');
@@ -150,10 +156,10 @@ test('delete asks first, and Ctrl+Z in the panel brings the habit back with its 
     expect(d.message()).toContain('Walk');
     void d.dismiss();
   });
-  await row(page, 0).getByRole('button', { name: 'Delete habit Walk' }).click();
+  await deleteHabit(page, 0, 'Walk');
   await expect(habitRows(page)).toHaveCount(1);
   page.once('dialog', (d) => void d.accept());
-  await row(page, 0).getByRole('button', { name: 'Delete habit Walk' }).click();
+  await deleteHabit(page, 0, 'Walk');
   await expect(habitRows(page)).toHaveCount(0);
   await page.keyboard.press('Control+z');
   await expect(habitRows(page)).toHaveCount(1);
@@ -236,13 +242,13 @@ test('Weight: type today’s weight, replace it, and see it in a chart; it is no
   expect((await weightCard(page).boundingBox())!.y).toBeLessThan((await row(page, 0).boundingBox())!.y);
   await enterWeight(page, '72.4');
   await expect(weightBox(page)).toHaveValue('');
-  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 72.4 kg');
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg today');
   await expect(weightPoints(page)).toHaveCount(1);
   await expect(weightCard(page)).not.toContainText('No weight entered');
   // Again for the same day: replaced, with a comma and the Save button.
   await weightBox(page).fill('71,8');
   await weightCard(page).getByRole('button', { name: 'Save weight' }).click();
-  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 71.8 kg');
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('71.8 kg today');
   await expect(weightPoints(page)).toHaveCount(1);
   // Not a habit, and the Habits board is still not in the Boards menu.
   await expect(habitRows(page)).toHaveCount(1);
@@ -252,7 +258,7 @@ test('Weight: type today’s weight, replace it, and see it in a chart; it is no
   await page.waitForTimeout(400);
   await page.reload();
   await habitsButton(page).click();
-  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 71.8 kg');
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('71.8 kg today');
   await expect(habitRows(page)).toHaveCount(1);
 });
 
@@ -309,13 +315,13 @@ test('Weight: the × removes the latest entry of the period, and Ctrl+Z brings i
   await expect(weightCard(page)).toContainText('No weight entered in this week.');
   await page.keyboard.press('Control+z');
   await expect(weightPoints(page)).toHaveCount(1);
-  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 72.4 kg');
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg today');
   await page.keyboard.press('Control+y');
   await expect(weightPoints(page)).toHaveCount(0);
 });
 
 // Job #156: the edges of a week and a year, with the browser's clock fixed so they are the same on any day.
-type SavedCard = { title?: string; items?: { text: string; done: boolean }[] };
+type SavedCard = { title?: string; titleColor?: string | null; items?: { text: string; done: boolean }[] };
 const savedHabitCards = (page: Page) =>
   page.evaluate(() => {
     const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
@@ -361,6 +367,129 @@ test('Year view marks today and the days ahead, and names each month with its ti
   await expect(squares.nth(20)).toHaveClass(/\btoday\b/);
   await expect(squares.nth(21)).toHaveClass(/\bahead\b/);
   await expect(squares.nth(19)).not.toHaveClass(/\b(ahead|today|on)\b/);
+});
+
+// The Ledger redesign (owner pick, 2026-10-22, jobs 166 + 167).
+const sub = (page: Page) => panel(page).locator('.habits-sub');
+const moreMenu = (page: Page, i: number) => row(page, i).getByRole('group', { name: /^Options for / });
+const openMenu = (page: Page, i: number, name: string) => row(page, i).getByRole('button', { name: `More for ${name}` }).click();
+
+test('Ledger: the subtitle says how today is going, each habit counts its week, the weekdays show once, and the empty state leads to the box', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 10, 0)); // Wed 21 Oct 2026
+  await page.goto('/');
+  await habitsButton(page).click();
+  await expect(sub(page)).toHaveText('Wednesday, 21 October');
+  await expect(panel(page)).toContainText('No habits yet');
+  await expect(panel(page)).toContainText('Add one, then tick each day you do it.');
+  await panel(page).getByRole('button', { name: 'Add a habit' }).click();
+  await expect(newHabit(page)).toBeFocused();
+  await addHabit(page, 'Walk');
+  await addHabit(page, 'Read');
+  await expect(newHabit(page)).toBeFocused(); // the box stays ready for the next one
+  await expect(panel(page).getByText('No habits yet')).toHaveCount(0);
+  await expect(sub(page)).toHaveText('Wednesday · 0 of 2 done');
+  await expect(row(page, 0)).toContainText('0 of 7 this week');
+  await todayBox(page, 0).click();
+  await expect(sub(page)).toHaveText('Wednesday · 1 of 2 done');
+  await expect(row(page, 0)).toContainText('1 of 7 this week');
+  await row(page, 0).getByRole('button', { name: 'Walk, Mon 19 Oct' }).click();
+  await expect(row(page, 0)).toContainText('2 of 7 this week');
+  await expect(sub(page)).toHaveText('Wednesday · 1 of 2 done'); // only today counts there
+  await todayBox(page, 1).click();
+  await expect(sub(page)).toContainText('All 2 done');
+  // The weekdays are written once, above every habit, with today's column marked.
+  await expect(panel(page).locator('.habit-days-head')).toHaveCount(1);
+  await expect(panel(page).locator('.habit-dh.today')).toContainText('21');
+  await expect(row(page, 0).locator('.habit-wd')).toHaveCount(0);
+});
+
+test('Ledger: a habit’s ⋯ menu renames it, gives it one of the 8 bold colors (saved with it, undoable) and deletes it', async ({ page }) => {
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await addHabit(page, 'Read');
+  await expect(row(page, 0)).not.toHaveAttribute('data-hc', /./);
+  await openMenu(page, 0, 'Walk');
+  await expect(moreMenu(page, 0).getByRole('radio')).toHaveCount(9); // the default and the 8 bold swatches
+  await expect(moreMenu(page, 0).getByRole('radio', { name: 'Default' })).toHaveAttribute('aria-checked', 'true');
+  await moreMenu(page, 0).getByRole('radio', { name: 'Ocean' }).click();
+  await expect(row(page, 0)).toHaveAttribute('data-hc', 'ocean');
+  await expect(row(page, 1)).not.toHaveAttribute('data-hc', /./);
+  await expect(moreMenu(page, 0)).toHaveCount(0); // choosing a color shuts the menu
+  await openMenu(page, 0, 'Walk');
+  await expect(moreMenu(page, 0).getByRole('radio', { name: 'Ocean' })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await todayBox(page, 0).click();
+  const ticked = row(page, 0).locator('.habit-day[aria-pressed="true"] .habit-tk');
+  const plain = await ticked.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await page.waitForTimeout(300);
+  expect((await savedHabitCards(page)).find((c) => c.title === 'Walk')!.titleColor).toBe('ocean');
+  // The tick takes the habit's color, not the default green.
+  await expect(panel(page)).toBeVisible();
+  expect(plain).not.toBe('rgb(47, 125, 91)');
+  // One undo takes the tick, the next takes the color.
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  await expect(row(page, 0)).not.toHaveAttribute('data-hc', /./);
+  await page.keyboard.press('Control+y');
+  await expect(row(page, 0)).toHaveAttribute('data-hc', 'ocean');
+  // Rename puts the cursor in the name, selected; Delete asks first.
+  await openMenu(page, 0, 'Walk');
+  await moreMenu(page, 0).getByRole('button', { name: 'Rename' }).click();
+  await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toBeFocused();
+  await page.keyboard.type('Run');
+  await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toHaveValue('Run');
+  await openMenu(page, 0, 'Run');
+  page.once('dialog', (d) => void d.accept());
+  await moreMenu(page, 0).getByRole('button', { name: 'Delete habit' }).click();
+  await expect(habitRows(page)).toHaveCount(1);
+});
+
+test('Ledger: Escape shuts a ⋯ menu before it closes the panel, and a press outside shuts it too', async ({ page }) => {
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await openMenu(page, 0, 'Walk');
+  await expect(moreMenu(page, 0)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(moreMenu(page, 0)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await openMenu(page, 0, 'Walk');
+  await panel(page).locator('.habits-sub').click();
+  await expect(moreMenu(page, 0)).toHaveCount(0);
+});
+
+test('Ledger: names sit beside the ticks when the panel is wide, above them when it is narrow, and Month and Year say how many days', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 10, 0));
+  await page.goto('/');
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await todayBox(page, 0).click();
+  const name = row(page, 0).getByRole('textbox', { name: 'Habit name' });
+  const firstDay = days(page, 0).first();
+  expect((await name.boundingBox())!.y).toBeLessThan((await firstDay.boundingBox())!.y - 10); // narrow: stacked
+  await page.getByRole('separator', { name: 'Resize habits' }).focus();
+  for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowLeft'); // 300px to 440px
+  const n = (await name.boundingBox())!;
+  const d = (await firstDay.boundingBox())!;
+  expect(n.x + n.width).toBeLessThanOrEqual(d.x + 1);
+  expect(Math.abs(n.y + n.height / 2 - (d.y + d.height / 2))).toBeLessThan(25); // level with the ticks
+  await goTo(page, 'Month');
+  await expect(row(page, 0)).toContainText('1 of 21 days');
+  await goTo(page, 'Year');
+  await expect(row(page, 0)).toContainText('1 day');
+});
+
+test('Ledger: the view bar and the weekdays stay in view while a long list of habits scrolls', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 600 });
+  await habitsButton(page).click();
+  for (let i = 1; i <= 14; i++) await addHabit(page, `Habit ${i}`);
+  const scroller = page.locator('.side-panel');
+  await scroller.evaluate((el) => (el.scrollTop = 500));
+  const bar = (await viewBar(page).boundingBox())!;
+  const head = (await panel(page).locator('.habit-days-head').boundingBox())!;
+  expect(bar.y).toBeLessThan(120); // still at the top of the panel
+  expect(Math.abs(head.y - (bar.y + bar.height))).toBeLessThan(3); // the weekdays sit right under it
+  // The first habit has scrolled away behind them.
+  expect((await row(page, 0).boundingBox())!.y).toBeLessThan(head.y);
 });
 
 test.describe('on a phone', () => {

@@ -81,6 +81,21 @@ describe('refresh token → id token', () => {
     await expect(idTokens(token, { fetch: fn })()).rejects.toThrow(/restricted to the site.s address.*--key/s);
   });
 
+  it('a reply without expires_in keeps the id token for 55 minutes', async () => {
+    let now = 1_000_000;
+    const { fn, calls } = fakeFetch([{ status: 200, body: { id_token: 'ID-1', refresh_token: 'REFRESH-1', user_id: 'me' } }, ok('ID-2')]);
+    const get = idTokens(token, { fetch: fn, now: () => now });
+    expect(await get()).toBe('ID-1');
+    now += 54 * 60_000;
+    expect(await get()).toBe('ID-1');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('a reply without user_id is refused as a different account', async () => {
+    const { fn } = fakeFetch([{ status: 200, body: { id_token: 'ID-1', refresh_token: 'REFRESH-1', expires_in: '3600' } }]);
+    await expect(idTokens(token, { fetch: fn })()).rejects.toThrow(/different account/);
+  });
+
   it('a token for another account is refused', async () => {
     const { fn } = fakeFetch([ok('ID-1', 'REFRESH-1', 'someone-else')]);
     await expect(idTokens(token, { fetch: fn })()).rejects.toThrow(/different account/);

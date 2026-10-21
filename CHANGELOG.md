@@ -1,5 +1,9 @@
 # Changelog
 
+## More connector tests (2026-10-21)
+
+- Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
+
 ## Shared computers keep each account's boards apart (2026-10-21)
 
 - **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).

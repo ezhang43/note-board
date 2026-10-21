@@ -94,6 +94,21 @@ describe('Journal panel', () => {
     expect(fresh.y).toBeLessThan(old.y);
   });
 
+  it('changing the date line of today’s note makes it another day’s, and the next opening adds a new note for today (job #156)', () => {
+    const s = setup();
+    s.openJournal();
+    const [note] = journalNotes(s);
+    s.openBoard(s.getState().ui.journalBoard!);
+    s.setNoteText(note.id, 'Sat 17 Oct 2026\n\nwrote it the day before'); // the date line is edited on the board itself
+    s.openJournal(); // closes the panel
+    expect(s.getState().ui.sidePanel).toBeNull();
+    s.openJournal();
+    const found = journalNotes(s);
+    expect(found).toHaveLength(2);
+    expect(found.some((c) => c.text.startsWith('Sun 18 Oct 2026'))).toBe(true);
+    expect(found.some((c) => c.text.startsWith('Sat 17 Oct 2026'))).toBe(true);
+  });
+
   it('undo in the panel undoes journal typing, and leaves the board you are on and its undo alone', () => {
     const s = setup();
     s.addCard('note'); // something to undo on Home

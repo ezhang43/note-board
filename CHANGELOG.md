@@ -1,5 +1,9 @@
 # Changelog
 
+## More calendar, journal and habits tests (2026-10-21)
+
+- More calendar, journal and habits tests. Nothing in the app changed.
+
 ## Touch and keyboard fixes (2026-10-21)
 
 - **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.

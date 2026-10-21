@@ -3,6 +3,8 @@ import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
 import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, journalEntries, journalPeek, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { dayKey as calendarDayKey } from './calendar';
+import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
 import type { Board, Card } from './types';
 import type { Workspace } from './workspace';
@@ -18,6 +20,28 @@ describe('journalDateLine', () => {
   it('writes the day in the calendar style, with the year', () => {
     expect(journalDateLine(new Date(2026, 9, 18, 23, 59))).toBe('Sun 18 Oct 2026');
     expect(journalDateLine(new Date(2026, 0, 1, 0, 0))).toBe('Thu 1 Jan 2026');
+  });
+});
+
+describe('the saved date line (job #156 guard)', () => {
+  // The Journal's saved first line is made by the calendar's day label and read back by journal.ts's
+  // own pattern. If either changes alone, every saved note stops being found, so pin both ends.
+  it('is exactly this text, with no padding or comma', () => {
+    expect(journalDateLine(new Date(2026, 9, 18, 12))).toBe('Sun 18 Oct 2026');
+    expect(journalDateLine(new Date(2026, 0, 1, 12))).toBe('Thu 1 Jan 2026');
+    expect(journalDateLine(new Date(2028, 1, 29, 12))).toBe('Tue 29 Feb 2028');
+  });
+
+  it('is read back as the same day, and kept as an entry, for every day from 2024 to 2030', () => {
+    let n = 0;
+    for (let d = new Date(2024, 0, 1, 12); d.getFullYear() < 2031; d.setDate(d.getDate() + 1), n++) {
+      const line = journalDateLine(d);
+      expect(journalDayKey(line)).toBe(calendarDayKey(d));
+      expect(completedDayKey(d)).toBe(calendarDayKey(d)); // the two copies of dayKey agree
+      const { board } = noteAt(createBoard(), `${line}\n\nx`, 0, 0);
+      expect(journalEntries(board).length).toBe(1);
+    }
+    expect(n).toBe(2557);
   });
 });
 

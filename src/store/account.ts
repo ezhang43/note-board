@@ -1,9 +1,97 @@
 import { planShares, type ShareOwner } from '../model/account';
-import { BOARD_KEY, VIEW_KEY } from '../model/persist';
-import { OPEN_BOARD_KEY } from '../model/workspace';
+import { BOARD_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
+import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { ACCESS_KEY } from '../model/calendar';
 import { baseKey, ownBoardsKey, sharesKey } from './sharing';
+import type { Store } from './store';
 import { dataKey, LIST_KEY } from './versions';
+
+/** Which account the boards kept on this device (BOARD_KEY) belong to (job #145). */
+export const OWNER_KEY = 'note-board:owner-uid';
+/** Where account `uid`'s boards wait on this device while another account uses it (job #145). */
+export const parkedKey = (uid: string) => `note-board:parked:${uid}`;
+/** The last agreed version of each of account `uid`'s shares, kept aside with its boards (see baseKey). */
+export const parkedBasesKey = (uid: string) => `note-board:parked-bases:${uid}`;
+
+/**
+ * Makes the boards on this device account `uid`'s before its sync starts (job #145, review 137-A
+ * H2: on a shared computer a new account was given the last person's boards). Boards another
+ * account left here are kept aside for it (parkedKey), with the last agreed versions of its shares
+ * (so they combine as after a reload), and put back when it signs in here again; `uid` gets its own
+ * kept-aside boards, or an empty board, then the online copy as usual. Undo starts over. Boards
+ * with no owner kept yet (saved before this) stay with the first account to sign in.
+ * `held`: the account whose boards this page holds (another tab may have changed the device's).
+ * Throws, changing nothing, when storage is blocked, the other account's boards can't be kept
+ * aside (storage full), or `uid`'s kept-aside boards can't be read (saved by a newer version).
+ */
+export function claimDevice(store: Store, storage: StorageLike & { removeItem(key: string): void }, uid: string, held: string | null) {
+  const owner = storage.getItem(OWNER_KEY);
+  if (owner && owner !== uid) {
+    const parked = storage.getItem(parkedKey(uid));
+    const back = parked === null ? parseWorkspace(null) : readWorkspace(parked)?.ws;
+    if (!back) throw new Error('The boards kept on this device could not be read.');
+    // Saves still waiting on this page, if it holds the boards on the device.
+    if (held === owner) store.flush();
+    // In this order, so a step that fails (storage full) never leaves the device's boards under the
+    // wrong owner, nor the earlier account's boards anywhere but kept aside.
+    const boards = storage.getItem(BOARD_KEY);
+    const bases: Record<string, string> = {};
+    for (const id of listedShares(storage.getItem(sharesKey(owner)))) bases[id] = storage.getItem(baseKey(id)) ?? '';
+    if (boards !== null) storage.setItem(parkedKey(owner), boards);
+    storage.setItem(parkedBasesKey(owner), JSON.stringify(bases));
+    storage.setItem(OWNER_KEY, uid);
+    let saved = true;
+    try {
+      storage.setItem(BOARD_KEY, parked ?? serializeWorkspace(back));
+    } catch {
+      // Not saved (storage full): the earlier account's copy mustn't stay there either.
+      storage.removeItem(BOARD_KEY);
+      saved = false;
+    }
+    let mine: Record<string, unknown> = {};
+    try {
+      mine = JSON.parse(storage.getItem(parkedBasesKey(uid)) ?? '{}') as Record<string, unknown>;
+    } catch {
+      // Damaged: those shares are downloaded again.
+    }
+    for (const [id, base] of Object.entries(mine)) {
+      try {
+        storage.setItem(baseKey(id), typeof base === 'string' ? base : '');
+      } catch {
+        storage.removeItem(baseKey(id)); // the other account's version mustn't be taken for this one's
+      }
+    }
+    if (saved) {
+      storage.removeItem(parkedKey(uid));
+      storage.removeItem(parkedBasesKey(uid));
+    }
+    store.endPreview();
+    store.replaceWorkspace(back);
+  } else {
+    if (!owner) {
+      try {
+        storage.setItem(OWNER_KEY, uid);
+      } catch {
+        // Storage full: still no owner kept, so the next account to sign in is again taken for the first.
+      }
+    }
+    // Another open tab already made the device `uid`'s: this page's boards are the earlier account's.
+    if (held && held !== uid) {
+      store.endPreview();
+      store.replaceWorkspace(parseWorkspace(storage.getItem(BOARD_KEY)));
+    }
+  }
+}
+
+/** The share ids on a kept list of shares (see sharesKey); none if it is damaged. */
+function listedShares(list: string | null): string[] {
+  try {
+    const got = JSON.parse(list ?? '[]') as unknown;
+    return Array.isArray(got) ? got.map((x) => (x as { id?: unknown })?.id).filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 // Deleting your account and data (job #63, required by Google Play). Firestore on the published
 // site (src/sync/firebase.ts), the pretend sharing server for demo people (src/sync/demo.ts).
@@ -57,20 +145,14 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
  * The keys in this device's storage (`keys`, all of them) that hold person `uid`'s data once their
  * account is deleted: the boards, which board is open and where it was looked at, version history
  * kept on the device, their list of shares (`kept`: its saved text) and each share's last agreed
- * version, and their own-boards list. Never another account's, nor this device's settings (dark
+ * version, their own-boards list, and their boards kept aside (job #145; which account the device's boards belong to stays, so they are never taken for the next account's). Never another account's, nor this device's settings (dark
  * mode, text size, the tour, the focus timer, the calendar's width). The Google Calendar access kept
  * on the device (job 107) goes too: it isn't a setting (one per device, so a demo person's has no prefix).
  * `prefix`: a demo person's keys start with it.
  */
 export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = ''): string[] {
-  let keptIds: string[] = [];
-  try {
-    const list = JSON.parse(kept ?? 'null') as unknown;
-    if (Array.isArray(list)) keptIds = list.map((x) => (x as { id?: unknown })?.id).filter((id): id is string => typeof id === 'string');
-  } catch {
-    // A damaged list: only the shares from the server count.
-  }
-  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, sharesKey(uid), ownBoardsKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
+  const keptIds = listedShares(kept);
+  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), sharesKey(uid), ownBoardsKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
   return keys.filter((key) => {
     if (key === ACCESS_KEY) return true;
     if (!key.startsWith(prefix)) return false;

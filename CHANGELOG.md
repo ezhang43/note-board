@@ -6,6 +6,10 @@
 - Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
 - Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
 
+## More calendar, journal and habits tests (2026-10-21)
+
+- More calendar, journal and habits tests. Nothing in the app changed.
+
 ## Touch and keyboard fixes (2026-10-21)
 
 - **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.

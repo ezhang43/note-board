@@ -35,6 +35,10 @@ vi.mock('firebase/firestore', () => {
     persistentMultipleTabManager: () => ({}),
     doc: (base: unknown, ...parts: string[]) => ref(join(base, parts)),
     collection: (base: unknown, ...parts: string[]) => ref(join(base, parts)),
+    deleteDoc: async (d: { path: string }) => {
+      fs.docs.delete(d.path);
+      fs.deleted.push(d.path);
+    },
     getDocsFromServer: async (c: { path: string }) => ({ docs: kids(c.path).map((k) => ({ id: k.split('/').at(-1), ref: ref(k), data: () => fs.docs.get(k) })) }),
     getDocFromServer: async (d: { path: string }) => {
       if (fs.refused.has(d.path)) throw Object.assign(new Error('denied'), { code: 'permission-denied' });
@@ -102,6 +106,16 @@ describe('accountRemote', () => {
     expect(fs.batches).toBeGreaterThan(2);
     // Running it again is fine.
     await accountRemote(user, shares).deleteOwnData();
+  });
+
+  it('can delete just their own boards first, so their other devices stop syncing before anything else goes (review 137-A H5)', async () => {
+    fs.docs.set('boards/me', { data: '{}' });
+    fs.docs.set('boards/me/versions/v1', { savedAt: 1 });
+    fs.docs.set('boards/bob', { data: '{}' });
+    await accountRemote(user, shares).deleteOwnBoards();
+    expect([...fs.docs.keys()].sort()).toEqual(['boards/bob', 'boards/me/versions/v1']);
+    // Running it again is fine.
+    await accountRemote(user, shares).deleteOwnBoards();
   });
 
   it('the sign-in is deleted with Firebase’s own call', async () => {

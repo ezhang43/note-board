@@ -104,6 +104,8 @@ export interface AccountBackend {
   deleteShare(id: string): Promise<void>;
   /** A board shared with them: their record on it, and on their list, goes. */
   leave(id: string): Promise<void>;
+  /** Their own boards only (not their version history): their other devices see them gone and stop syncing. */
+  deleteOwnBoards(): Promise<void>;
   /** Their own boards, version history and list of shares. */
   deleteOwnData(): Promise<void>;
   /** The sign-in itself. */
@@ -111,9 +113,12 @@ export interface AccountBackend {
 }
 
 /**
- * Deletes everything person `uid` has online (owner decision, 2026-10-16): the boards they shared
- * (for everyone), their records on boards shared with them, their own boards and version history,
- * and only then the sign-in, so a failure part-way leaves them able to sign in and try again.
+ * Deletes everything person `uid` has online (owner decision, 2026-10-16): their own boards first, so
+ * their other devices still open stop syncing before anything else goes (review 137-A H5: one that
+ * saw a shared board go first saved its boards and a version again after they were deleted), then
+ * the boards they shared (for everyone), their records on boards shared with them, their own boards
+ * and version history, and only then the sign-in, so a failure part-way leaves them able to sign in
+ * and try again.
  * Stops at the first failure: rejects with Firebase's `code` and `partial`, whether something may
  * already be deleted (a step that worked, or one made of several saves). Resolves with the shares it
  * dealt with, for clearing the device.
@@ -134,8 +139,15 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
   });
   partial = false;
   const plan = planShares(uid, shares);
+  await step(() => backend.deleteOwnBoards());
+  // Not "part-way" yet: if a later step fails, syncing starts again and puts them back from this device.
+  partial = false;
   for (const id of plan.deleteForEveryone) await step(() => backend.deleteShare(id));
   for (const id of plan.leave) await step(() => backend.leave(id));
+  await step(() => backend.deleteOwnData(), true);
+  // simple: once more, for a version another device saved as it saw a shared board go (in the same
+  // moment it saw its boards gone) and that landed just after. One saved later still would stay
+  // online; that needs the rules to refuse it (not done: it changes the online rules).
   await step(() => backend.deleteOwnData(), true);
   await step(() => backend.deleteUser());
   return { shareIds: shares.map((s) => s.id) };

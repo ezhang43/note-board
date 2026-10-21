@@ -117,6 +117,7 @@ export function accountRemote(user: User, shares: CollabBackend): AccountBackend
     },
     deleteShare: shares.deleteShare,
     leave: shares.leave,
+    deleteOwnBoards: () => deleteDoc(own),
     async deleteOwnData() {
       const subs = await Promise.all(['versions', 'versionData', 'shared'].map((name) => getDocsFromServer(collection(own, name))));
       const refs = [...subs.flatMap((s) => s.docs.map((d) => d.ref)), own];

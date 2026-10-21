@@ -23,6 +23,8 @@ npm run test:e2e
 
 A failure means fixing the code (or a wrong test, saying why), never deleting a test to get green.
 
+Locally, run the whole of `npm run typecheck` and `npm test`, but for the browser tests run only the specs for your area plus any spec you touched or that covers a file you changed (`npx playwright test e2e/<name>.spec.ts`, or `npx playwright test --only-changed=origin/build/v1`), not the full `npm run test:e2e`: the full run takes about 15 minutes on the shared cloud machine and is flaky while other workers test. GitHub runs the whole browser suite in 4 parallel shards on every pull request, and its "All tests" is the final word. Where this skill or CLAUDE.md says the browser tests must pass, that means these specs locally and the full run on GitHub. The owner's Windows computer can run the full suite if wanted.
+
 Three browser failures are known to happen only in the cloud sandbox and are not real; ignore them and say so in the report: `published-iphone` (no WebKit there), quick-wins "Ctrl+click on a web address" (no internet), and backup.spec "a file that isn't a BusyAnts backup". Any other failure: re-run that spec on its own before believing it (other workers share the machine), and treat GitHub's "All tests" as the final word. Each worktree tests on its own ports (`scripts/test-ports.mjs`). Stop only a process you started, with `kill <pid>`; never a broad process-name kill of Playwright, node or vite (a hook refuses it).
 
 ## 3. Review at the right level (rule 10)

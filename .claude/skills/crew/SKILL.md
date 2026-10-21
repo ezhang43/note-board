@@ -78,7 +78,7 @@ In a cloud session the proxy refuses every `gh` subcommand that uses GitHub's Gr
 | Add the `high-risk` label | `gh api -X POST repos/ezhang43/note-board/issues/<n>/labels -f "labels[]=high-risk"` |
 | Merge (merge commit) | `gh api -X PUT repos/ezhang43/note-board/pulls/<n>/merge -f merge_method=merge` |
 
-**Waiting for "All tests"** (instead of `gh pr checks <n> --watch`): if `subscribe_pr_activity` is available, call it for the pull request and carry on; the result arrives as a message. Otherwise poll the check-runs route for the job named `All tests` until its `status` is `completed`, then read its `conclusion` (`success` merges; anything else is read, fixed, pushed, and waited for again). Poll with a few spaced calls (`sleep` in the foreground is blocked; run the loop in the background and read its output), not a tight loop. A run takes about 12 minutes on GitHub.
+**Waiting for "All tests"** (instead of `gh pr checks <n> --watch`): if `subscribe_pr_activity` is available, call it for the pull request and carry on; the result arrives as a message. Otherwise poll the check-runs route for the job named `All tests` until its `status` is `completed`, then read its `conclusion` (`success` merges; anything else is read, fixed, pushed, and waited for again). Poll with a few spaced calls (`sleep` in the foreground is blocked; run the loop in the background and read its output), not a tight loop. A run takes about 5 minutes on GitHub (browser tests in 4 shards).
 
 Auto-merge, review threads and "ready for review" have their own routes, which the 403 message names; the crew doesn't need them. Merging is still only for a worker with a low-risk pull request, or the coordinator on the owner's word (rule 9).
 
@@ -134,8 +134,9 @@ If the permission system refuses the wait or the merge, stop and report STAGE pr
 that in BLOCKED; do not try another way around it.
 For a high-risk pull request: open it with --label high-risk and do NOT merge: the owner
 decides. Say in the report what happens to boards already saved.
+Locally, run only the browser specs for your area plus any you touched (`npx playwright test e2e/<name>.spec.ts`), not the whole suite: GitHub runs the full suite in 4 parallel shards and its "All tests" is the final word.
 Local browser tests can be flaky when another worker runs at the same time; re-run a failing
-spec on its own before treating it as real. GitHub's "All tests" is the final word. Known
+spec on its own before treating it as real. Known
 sandbox-only failures to ignore are listed in /finish-step step 2.
 Never run a broad pkill/killall of Playwright, node or vite (other workers share the machine;
 a hook refuses it): stop only a process you started, with kill <pid>.

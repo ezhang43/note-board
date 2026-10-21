@@ -1114,3 +1114,122 @@ describe('a shared board this app can’t read for another reason: damaged, old 
     expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
   });
 });
+
+describe('a share never takes one of the person’s own boards (whole-app review H4, M2)', () => {
+  const mallory = person('mallory');
+  const named = (name: string): Board => ({ ...B.createBoard(), name });
+  /** Bob's own boards online: home and "Real diary" (b_diary, an id a board card of his once showed). */
+  const bobsOwn = () => serializeWorkspace({ home: 'home', boards: { home: named('Home'), b_diary: named('Real diary') } });
+
+  /** `uid` opens the app on a new device, wired as src/sync/session.ts does; `own`: their own boards online. */
+  async function newDevice(uid: string, own: string | null, storage = memoryStorage()) {
+    const store = createStore(storage, (fn) => fn());
+    let send: ((doc: RemoteDoc | null) => void) | null = null;
+    const writes: RemoteDoc[] = [];
+    const online: Remote = { watch: (onChange) => ((send = onChange), () => {}), write: (doc) => (writes.push(doc), Promise.resolve()) };
+    let sharing: ReturnType<typeof startSharing> | null = null;
+    const guard = ownBoardsGuard(store, online, (id) => sharing!.isShared(id), boardsInKeptShares(storage, uid), (ws) => sharing!.ownCopy(ws));
+    let sync: ReturnType<typeof startSync> | null = null;
+    const startOwn = () => {
+      sync ??= startSync(store, guard.remote, { client: `${uid}-new`, onReady: () => {}, onError: () => {}, isShared: guard.isShared });
+    };
+    sharing = startSharing(store, server.backendFor(person(uid)), { client: `${uid}-new`, storage, onReady: () => (guard.known(), sync ? sync.sharedChanged() : startOwn()) });
+    await settle();
+    // Own sync has started (the shares are known): the person's own boards arrive.
+    if (own) send!({ data: own, client: `${uid}-laptop` });
+    await settle();
+    const uploaded = () => (writes.length ? readWorkspace(writes.at(-1)!.data)!.ws : null);
+    return { store, sharing, storage, uploaded, stop: () => (sharing!.stop(), sync?.stop()) };
+  }
+
+  it('on a new device, a share holding a board with the id of one of my own boards doesn’t take it', async () => {
+    // Mallory's share, which Bob has, also holds a board with that id.
+    await server.server.createShare(mallory, 'sm', 'mroot', 'k', serializeShare('mroot', { mroot: named('Trip'), b_diary: named('Fake diary') }), 'm');
+    await server.server.join(person('bob'), 'sm', 'k');
+    const d = await newDevice('bob', bobsOwn());
+    d.store.renameBoard('Home!'); // any later change uploads
+    await settle();
+    expect(d.store.workspace().boards.b_diary?.name).toBe('Real diary');
+    expect(d.uploaded()?.boards.b_diary?.name).toBe('Real diary');
+    expect(d.sharing.isShared('b_diary')).toBe(false);
+    // The rest of the share still works, and Mallory's board in it is left as it is online.
+    expect(d.sharing.isShared('mroot')).toBe(true);
+    expect(d.store.boardName('mroot')).toBe('Trip');
+    expect(readWorkspace(server.shares.get('sm')!.data)!.ws.boards.b_diary.name).toBe('Fake diary');
+    // Nor after a reload on that device.
+    d.stop();
+    d.store.flush();
+    const again = device('bob', d.storage);
+    await settle();
+    expect(again.sharing.isShared('b_diary')).toBe(false);
+    expect(again.store.workspace().boards.b_diary?.name).toBe('Real diary');
+    again.sharing.stop();
+  });
+
+  it('nor after the page was closed on that new device before its own boards arrived', async () => {
+    await server.server.createShare(mallory, 'sm', 'mroot', 'k', serializeShare('mroot', { mroot: named('Trip'), b_diary: named('Fake diary') }), 'm');
+    await server.server.join(person('bob'), 'sm', 'k');
+    const first = await newDevice('bob', null);
+    first.stop();
+    first.store.flush();
+    const d = await newDevice('bob', bobsOwn(), first.storage);
+    d.store.renameBoard('Home!');
+    await settle();
+    expect(d.store.workspace().boards.b_diary?.name).toBe('Real diary');
+    expect(d.uploaded()?.boards.b_diary?.name).toBe('Real diary');
+    expect(d.sharing.isShared('b_diary')).toBe(false);
+    d.stop();
+  });
+
+  it('on a new device, a share whose starting board has the id of one of mine holds nothing there', async () => {
+    await server.server.createShare(mallory, 'sm', 'b_diary', 'k', serializeShare('b_diary', { b_diary: named('Fake diary') }), 'm');
+    await server.server.join(person('bob'), 'sm', 'k');
+    const d = await newDevice('bob', bobsOwn());
+    d.store.renameBoard('Home!');
+    await settle();
+    expect(d.store.workspace().boards.b_diary?.name).toBe('Real diary');
+    expect(d.uploaded()?.boards.b_diary?.name).toBe('Real diary');
+    expect(d.sharing.isShared('b_diary')).toBe(false);
+    expect(readWorkspace(server.shares.get('sm')!.data)!.ws.boards.b_diary.name).toBe('Fake diary');
+    d.stop();
+  });
+
+  it('whoever shared a board still has it shared on a new device while their own online copy still holds it', async () => {
+    // Alice's own online copy is from before she shared "Trip" (with the board inside it) on another device.
+    const trip = { ...named('Trip'), cards: { k1: createBoardCard('sub', 'k1') } };
+    const own = serializeWorkspace({ home: 'home', boards: { home: named('Home'), trip, sub: named('Inside') } });
+    await server.server.createShare(person('alice'), 'sa', 'trip', 'k', serializeShare('trip', { trip, sub: named('Inside') }), 'a');
+    const d = await newDevice('alice', own);
+    expect(d.sharing.isShared('trip')).toBe(true);
+    expect(d.sharing.isShared('sub')).toBe(true);
+    d.stop();
+  });
+
+  it('a board card copied from one shared board and pasted on another doesn’t move its board between shares', async () => {
+    const alice = device('alice');
+    await settle();
+    // "Two" is shared first, then "One"; a board Y is made inside One once it is shared.
+    const two = alice.store.newBoard();
+    alice.store.renameBoard('Two');
+    alice.store.addCard('note');
+    const s2 = await alice.sharing.share(two);
+    await settle();
+    const one = alice.store.newBoard();
+    alice.store.renameBoard('One');
+    alice.store.addCard('note');
+    const s1 = await alice.sharing.share(one);
+    await settle();
+    const y = alice.store.addBoardCard();
+    expect(alice.sharing.shareOf(y)).toBe(s1);
+    // Copy Y's board card on One and paste it on Two at once (before Y has reached One's share online).
+    const card = Object.values(alice.store.getState().board.cards).find((c) => c.kind === 'board' && c.boardId === y)!;
+    alice.store.select(card.id);
+    alice.store.copySelection();
+    alice.store.openBoard(two);
+    alice.store.paste();
+    await settle();
+    const online = (id: string) => Object.keys(readWorkspace(server.shares.get(id)!.data)!.ws.boards);
+    expect({ shareOfY: alice.sharing.shareOf(y), inOne: online(s1).includes(y), inTwo: online(s2).includes(y) }).toEqual({ shareOfY: s1, inOne: true, inTwo: false });
+    alice.sharing.stop();
+  });
+});

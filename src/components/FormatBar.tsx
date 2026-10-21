@@ -51,9 +51,11 @@ export function FormatBar() {
   const [fontsOpen, setFontsOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
 
+  // After any board, view or selection change.
+  useEffect(() => setTarget(findTarget()), [board, view, itemSel]);
+
   useEffect(() => {
     const update = () => setTarget(findTarget());
-    update();
     // Text selection inside a field changes without any store change.
     const later = () => setTimeout(update, 0);
     document.addEventListener('selectionchange', update);
@@ -68,7 +70,7 @@ export function FormatBar() {
       document.removeEventListener('focusout', later, true);
       window.removeEventListener('resize', update);
     };
-  }, [board, view, itemSel]);
+  }, []);
 
   // While hovering the bar, outline the boxes it will change, so it's clear the whole box changes.
   const keys = target?.boxes.map(boxKey).join('|') ?? '';

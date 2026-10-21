@@ -44,6 +44,9 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(id, title, true);
   useMeasuredHeight(id, ref);
+  // Search: the current match is out of sight inside this collapsed column, so the column is marked.
+  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
+  // Every hook is above this: while a block is dragged a version can show without it, and it must still draw nothing.
   if (!col) return null;
 
   const colors = swatchFor(col.color, theme);
@@ -54,8 +57,6 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   // A column with cards is exactly as tall as its cards (no blank space when they collapse);
   // only an empty column keeps a minimum height, which its corner handle sets.
   const minH = col.collapsed ? undefined : cardIds.length ? 0 : (resize?.liveH ?? col.h ?? COLUMN_MIN_H);
-  // Search: the current match is out of sight inside this collapsed column, so the column is marked.
-  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const classes = [
     'column',
     selected && 'selected',

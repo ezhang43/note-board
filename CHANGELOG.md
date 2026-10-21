@@ -69,6 +69,13 @@
 - It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board or a shared board arrived. If it can't be saved, the incoming change still goes ahead as before.
 - On the published site the online rules need the update in `firestore.rules` (pasted into the Firebase console) for this kind of version to be saved. Nothing already saved changes.
 
+## Resizing from the edges: neighbors move the right way (2026-10-21)
+
+- Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
+- Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
+- Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
+- Nothing about saved boards changed.
+
 ## Resize cards from any side (2026-10-21)
 
 - **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).

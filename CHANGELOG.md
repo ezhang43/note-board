@@ -1,5 +1,18 @@
 # Changelog
 
+## Import and small checklist fixes from the code review (2026-10-21)
+
+- **Importing a big or odd file no longer freezes the page.** A .txt with a very long run of blank lines, or a Markdown file with one huge line of stray `**`, `__`, `~~`, `[` or `<` marks, took minutes to read. It now reads in well under a second, and ordinary files read exactly as before.
+- Collapse all no longer counts the hidden Completed history after Clean up, so the button says Expand all when every card you can see is collapsed, and no longer makes an undo step that does nothing.
+- Backspace in the last open blank item of a list is now refused, instead of sending the cursor to a ticked item that may be hidden.
+- Expand all gives the old layout back even if you picked the same cards in a different order.
+- Opening an old version in History right after ticking an item no longer loses the tick.
+- Dragging an item while items in several lists are selected now does nothing, as the spec says.
+- A format change that changes nothing (the size or font it already has) no longer makes an undo step.
+- The focus timer keeps running and chimes even when the device's storage is full.
+- Download as text puts the Completed history after your cards, not before them.
+- Nothing about saved boards changed.
+
 ## Version history keeps your work before another device's changes replace it (2026-10-21)
 
 - If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.

@@ -232,14 +232,15 @@ function removeItemInPlace(items: TodoItem[], id: string, keepChildren = true) {
 /**
  * Backspace in an empty item deletes it, and the cursor goes to the item shown above it.
  * Its sub-items stay (moving up a level) if any of them has text; otherwise they go too.
- * Never empties the list: a list's last item can't be deleted this way.
+ * Never empties the list: a list's last item, or its last open one, can't be deleted this way (the
+ * cursor would have nowhere to go but a ticked item, which may be hidden in a closed Completed section).
  */
 export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoItem[]; focus: string | null } | null {
   const loc = findItem(items, id);
   if (!loc || loc.item.text !== '') return null;
   const next = cloned(items);
   removeItemInPlace(next, id);
-  if (!next.length) return null;
+  if (!next.some((it) => !it.done)) return null;
   return { items: next, focus: focusAfterRemoving(displayOrder(items), next, [id]) };
 }
 

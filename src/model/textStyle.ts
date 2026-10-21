@@ -47,8 +47,11 @@ function changed(style: TextStyle | undefined, change: StyleChange): TextStyle |
   return tidy(next);
 }
 
+const sameStyle = (a?: TextStyle, b?: TextStyle) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
 /** Sets or removes `style` on an object, leaving no empty key behind. */
 function withStyle<T extends { style?: TextStyle }>(o: T, style: TextStyle | undefined): T {
+  if (sameStyle(o.style, style)) return o; // nothing changes: no new object, so no undo step
   const rest = { ...o };
   delete rest.style;
   return style ? { ...rest, style } : rest;
@@ -66,14 +69,16 @@ export function applyStyle(board: Board, boxes: Box[], change: StyleChange): Boa
   return boxes.reduce((b, box) => {
     if ('columnId' in box) {
       const col = b.columns[box.columnId];
-      return col ? { ...b, columns: { ...b.columns, [col.id]: withStyle(col, changed(col.style, change)) } } : b;
+      const next = col && withStyle(col, changed(col.style, change));
+      return col && next !== col ? { ...b, columns: { ...b.columns, [col.id]: next } } : b;
     }
     const itemId = box.itemId;
     if (!itemId) return updateCard(b, box.cardId, (c) => withStyle(c, changed(c.style, change)));
     return editItems(b, box.cardId, (items) => {
+      const now = findItem(items, itemId)?.item;
+      if (!now || sameStyle(now.style, changed(now.style, change))) return null;
       const next = structuredClone(items);
-      const loc = findItem(next, itemId);
-      if (!loc) return null;
+      const loc = findItem(next, itemId)!;
       loc.list[loc.index] = withStyle(loc.item, changed(loc.item.style, change));
       return next;
     });

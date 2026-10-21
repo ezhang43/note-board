@@ -314,7 +314,7 @@ export function ColourControl() {
  * all. With blocks selected, only those (owner request).
  */
 export function CollapseAllButton({ labelled = false }: { labelled?: boolean }) {
-  const any = useAppState((s) => Object.keys(s.board.cards).length + Object.keys(s.board.columns).length > 0);
+  const any = useAppState((s) => Object.values(s.board.cards).some((c) => c.kind !== 'completed') || Object.keys(s.board.columns).length > 0);
   const selected = useAppState((s) => s.ui.selection.length > 0);
   const expand = useAppState((s) => any && !anyExpanded(s.board, s.ui.selection.length ? s.ui.selection : undefined));
   const label = expand ? 'Expand all' : 'Collapse all';

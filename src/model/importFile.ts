@@ -29,7 +29,7 @@ export const IMPORT_ACCEPT = '.md,.markdown,.txt,.html,.htm,.json,.pdf,text/mark
 export const isPdf = (name: string, start: string) => start.startsWith('%PDF-') || /\.pdf$/i.test(name);
 
 // A heading or a checklist line makes a .txt file Markdown; a dashed line alone doesn't.
-const MARKDOWN = /^\s*(#{1,6}(\s|$)|[-*+]\s+\[[ xX]\])/m;
+const MARKDOWN = /^[ \t]*(#{1,6}(?:[ \t]|$)|[-*+][ \t]+\[[ xX]\])/m;
 
 function kindOf(name: string, text: string): 'markdown' | 'text' | 'html' | 'json' | null {
   if (text.includes('\u0000')) return null; // binary (a picture, a PDF…)

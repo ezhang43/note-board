@@ -134,6 +134,25 @@ describe('the focus timer on this device', () => {
     expect(ends).toHaveBeenCalledTimes(1); // the second tab finds it already done
   });
 
+  it('keeps going, with its chime, when the device storage is full (nothing could be saved)', () => {
+    const data: Record<string, string> = {};
+    let full = false;
+    const storage = {
+      getItem: (k: string) => data[k] ?? null,
+      setItem: (k: string, v: string) => {
+        if (full) throw new Error('QuotaExceededError');
+        data[k] = v;
+      },
+    };
+    const onRoundEnd = vi.fn();
+    const t = createPomodoro(storage, { onRoundEnd });
+    full = true;
+    t.start();
+    vi.advanceTimersByTime(25 * MIN);
+    expect(onRoundEnd).toHaveBeenCalledTimes(1);
+    expect(t.get().timer.phase).toBe('short');
+  });
+
   it('works without storage', () => {
     const t = createPomodoro(null);
     t.start();

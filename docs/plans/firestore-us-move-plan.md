@@ -1,5 +1,7 @@
 # Plan: moving BusyAnts' online data from Sydney to the US
 
+> **Not done: dropped by the owner on 2026-10-21.** The online data stays in Sydney (`australia-southeast1`), as the Privacy page says. This plan is kept only as a record. `scripts/firestore-counts.mjs`, which it uses, was deleted; get it back from the repository history if the move is ever revived.
+
 Job #37 (scout, plan only). Written 2026-10-07 from `origin/build/v1` at 41035b3. Copied into the repo by job #40 with the owner's answers and the count script's commands.
 
 ## Owner's decisions (2026-10-07)

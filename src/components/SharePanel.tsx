@@ -203,7 +203,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
 }
 
 /** A person's photo, or their initial on a coloured circle. */
-export function Avatar({ person }: { person: Person }) {
+function Avatar({ person }: { person: Person }) {
   if (person.photo?.startsWith('https://')) return <img className="avatar" src={person.photo} alt="" referrerPolicy="no-referrer" width={24} height={24} />;
   return (
     <span className="avatar" aria-hidden="true">

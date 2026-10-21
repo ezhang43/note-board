@@ -27,9 +27,9 @@ import type { SidePanelKind } from '../types';
 // copying and moving cards and columns.
 
 /** After expanding a block, blocks it pushes aside within this long (ms) are remembered, to go back when it collapses. */
-export const EXPAND_WATCH_MS = 1500;
+const EXPAND_WATCH_MS = 1500;
 /** Imported cards start this far (screen pixels) below the top of the board area. */
-export const IMPORT_TOP_MARGIN = 40;
+const IMPORT_TOP_MARGIN = 40;
 
 /** Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). A loose card can be given a width. */
 export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement, w: number | null = null) {
@@ -247,7 +247,6 @@ export function blockActions(ctx: StoreContext) {
     toggleColourMenu() {
       updateUi({ colourMenuOpen: !ctx.state.ui.colourMenuOpen });
     },
-    closeColourMenu: () => updateUi({ colourMenuOpen: false }),
     /** The keyboard shortcuts panel. */
     toggleShortcuts: () => updateUi({ shortcutsOpen: !ctx.state.ui.shortcutsOpen }),
     closeShortcuts: () => updateUi({ shortcutsOpen: false }),

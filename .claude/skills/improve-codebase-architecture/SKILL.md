@@ -7,7 +7,7 @@ disable-model-invocation: true
 # Improve Codebase Architecture (Note Board version)
 
 Adapted from Matt Pocock's `improve-codebase-architecture` skill (https://github.com/mattpocock/skills,
-MIT licence). Changed for this project: the domain language is `SPEC.md` (not `GLOSSARY.md`), past
+MIT license). Changed for this project: the domain language is `SPEC.md` (not `GLOSSARY.md`), past
 decisions are `docs/decisions.md` (not `docs/adr/`), and the grilling step uses this
 project's `grill-with-docs` skill. Write for an owner who reads code at a beginner level.
 
@@ -16,7 +16,7 @@ Surface architectural friction and propose **deepening opportunities**: refactor
 This command is _informed_ by the project's domain model and built on a shared design vocabulary:
 
 - Call the Skill tool with "codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
-- The domain language in `SPEC.md` gives names to good seams (card, column, checklist item, Completed card, settle, snap…). `docs/decisions.md` records decisions this command should not re-litigate.
+- The domain language in `SPEC.md` gives names to good seams (card, container (`column` in code), checklist item, Completed panel, settle, snap…). `docs/decisions.md` records decisions this command should not re-litigate.
 - `CLAUDE.md`'s code layout is a given: pure rules in `src/model/`, one store in `src/store/`, display-only components in `src/components/`. Prefer candidates that move rules into `src/model/` where they can be unit tested.
 
 ## Process

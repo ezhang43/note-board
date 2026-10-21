@@ -246,7 +246,7 @@ export function estimateHeight(card: Card): number {
 }
 
 /** How many lanes imported cards are laid out in. */
-export const IMPORT_LANES = 4;
+const IMPORT_LANES = 4;
 /** Space between imported cards, side by side and one under another. */
 export const IMPORT_GAP = GRID;
 

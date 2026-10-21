@@ -14,7 +14,7 @@ import type { ItemDrag, ItemHint } from '../types';
 
 /** How long a ticked item takes to leave for the Completed section, and to settle in there (ms). */
 export const COMPLETE_LEAVE_MS = 280;
-export const COMPLETE_ARRIVE_MS = 450;
+const COMPLETE_ARRIVE_MS = 450;
 
 export function checklistActions(ctx: StoreContext) {
   const { commit, updateUi, requestSettle } = ctx;

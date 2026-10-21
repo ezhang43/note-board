@@ -16,7 +16,7 @@ export type TextFont = 'sans' | 'serif' | 'rounded' | 'hand' | 'mono';
 export type StyleChange = { bold: boolean } | { italic: boolean } | { size: TextSize } | { font: TextFont };
 
 const SIZES: TextSize[] = ['small', 'normal', 'large'];
-export const TEXT_SCALE: Record<TextSize, number> = { small: 0.85, normal: 1, large: 1.3 };
+const TEXT_SCALE: Record<TextSize, number> = { small: 0.85, normal: 1, large: 1.3 };
 
 /** The typefaces, in the order the Font menu lists them. */
 export const FONTS: { key: TextFont; label: string }[] = [

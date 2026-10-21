@@ -125,7 +125,7 @@ export async function clickEmpty(page: Page) {
 type R = { x: number; y: number; width: number; height: number };
 
 /** True if the rectangles overlap or are closer than `gap` screen pixels. */
-export function tooClose(a: R, b: R, gap = 0) {
+function tooClose(a: R, b: R, gap = 0) {
   return a.x < b.x + b.width + gap && b.x < a.x + a.width + gap && a.y < b.y + b.height + gap && b.y < a.y + a.height + gap;
 }
 

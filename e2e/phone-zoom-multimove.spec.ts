@@ -32,7 +32,18 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('zoom taps on the empty board', () => {
+  // An empty board shows the template picks over the whole phone screen, so these gestures are tried on a
+  // board whose one note has been scrolled off the top of the screen: nothing is under the fingers.
+  const emptyArea = async (page: Page) => {
+    await addMenu(page, 'Note');
+    await page.mouse.click(200, 70); // done typing (a mouse click is no zoom tap)
+    await page.mouse.move(200, 300);
+    await page.mouse.wheel(0, 1600);
+    await expect(page.locator('[data-card-id]').first()).not.toBeInViewport();
+  };
+
   test('a double tap zooms in one step around the finger', async ({ page }) => {
+    await emptyArea(page);
     const z0 = await zoom(page);
     const p0 = await pan(page);
     const r = (await canvas(page).boundingBox())!;
@@ -47,6 +58,7 @@ test.describe('zoom taps on the empty board', () => {
   });
 
   test('a single tap, or two taps far apart or too slow, do not zoom', async ({ page }) => {
+    await emptyArea(page);
     const z0 = await zoom(page);
     await touch(page, tapSteps(EMPTY));
     await touch(page, [...tapSteps({ x: 100, y: 200 }), ...tapSteps({ x: 300, y: 500 })]);
@@ -56,11 +68,13 @@ test.describe('zoom taps on the empty board', () => {
   });
 
   test('double taps stop at 250%', async ({ page }) => {
+    await emptyArea(page);
     for (let i = 0; i < 8; i++) await touch(page, [...tapSteps(EMPTY, 450), ...tapSteps(EMPTY)]);
     await expect.poll(() => zoom(page)).toBe(2.5);
   });
 
   test('a long tap zooms out one step around the finger, on release', async ({ page }) => {
+    await emptyArea(page);
     const z0 = await zoom(page);
     const p0 = await pan(page);
     const r = (await canvas(page).boundingBox())!;
@@ -75,6 +89,7 @@ test.describe('zoom taps on the empty board', () => {
   test('a long tap starts no selection box with the Select tool, and a rest then a move still draws it', async ({ page }) => {
     await chooseTool(page, 'Select (V)');
     await page.mouse.click(200, 70); // the menu stays open and covers the board; this closes it
+    await emptyArea(page);
     const z0 = await zoom(page);
     await touch(page, [{ type: 'touchStart', p: EMPTY }, { type: 'touchEnd', wait: 700 }]);
     await expect.poll(() => zoom(page)).toBeCloseTo(z0 / STEP, 3);
@@ -86,6 +101,7 @@ test.describe('zoom taps on the empty board', () => {
   });
 
   test('with the Hand tool (the default), a rest then a swipe still pans and does not zoom', async ({ page }) => {
+    await emptyArea(page);
     const z0 = await zoom(page);
     const p0 = await pan(page);
     await holdAndDrag(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
@@ -101,6 +117,7 @@ test.describe('zoom taps on the empty board', () => {
   });
 
   test('a mouse double click and a mouse long press do not zoom', async ({ page }) => {
+    await emptyArea(page);
     const z0 = await zoom(page);
     await page.mouse.dblclick(EMPTY.x, EMPTY.y);
     await page.mouse.move(EMPTY.x, EMPTY.y);

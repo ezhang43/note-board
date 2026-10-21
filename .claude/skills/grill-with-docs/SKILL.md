@@ -7,7 +7,7 @@ disable-model-invocation: true
 # Grill with docs (Note Board version)
 
 Adapted from Matt Pocock's `grill-with-docs` / `grilling` / `domain-modeling` skills
-(https://github.com/mattpocock/skills, MIT licence). Changed for this project: decisions and terms go
+(https://github.com/mattpocock/skills, MIT license). Changed for this project: decisions and terms go
 into `SPEC.md` and `docs/decisions.md`, not a separate glossary or ADR folder, and the
 questions are written for an owner who reads code at a beginner level.
 
@@ -46,10 +46,10 @@ them and wait.
 
 - **Check against the spec.** If the owner uses a word differently from `SPEC.md` (for example "item"
   for a card, when the spec's item is a checklist item), say so at once and ask which they mean.
-- **Sharpen vague words.** Offer the spec's exact term ("to-do list card", "column", "checklist item",
-  "loose card", "Completed card") and ask the owner to confirm.
+- **Sharpen vague words.** Offer the spec's exact term ("checklist card", "container", "checklist item",
+  "loose card", "Completed panel") and ask the owner to confirm.
 - **Try concrete cases.** Make up specific edge cases ("what if the card is inside a collapsed
-  column?", "what happens on undo?", "and on a second device?") so the boundaries are clear.
+  container?", "what happens on undo?", "and on a second device?") so the boundaries are clear.
 - **Check the code agrees.** When the owner says how something works today, check the code. If it
   disagrees, show them: "the app currently does X, but you described Y. Which should it be?"
 
@@ -57,7 +57,7 @@ them and wait.
 
 Don't save them up until the end. As each decision is settled:
 
-- Update `SPEC.md` so it describes the agreed behaviour (it is the source of truth; build rule 8).
+- Update `SPEC.md` so it describes the agreed behavior (it is the source of truth; build rule 8).
 - Add a line at the end of `docs/decisions.md`, marked with today's date and "owner request" or
   "my call", the same way as the existing entries.
 
@@ -67,6 +67,6 @@ owner didn't agree to.
 ## Finishing
 
 The interview is done when the frontier is empty: every branch has been visited and nothing has been
-quietly assumed. Summarise the agreed design in a short list and ask the owner to confirm it. Do not
+quietly assumed. Summarize the agreed design in a short list and ask the owner to confirm it. Do not
 start building until they do. Building then follows the project rules: tests first (written and seen
 to fail), then the code, then both test suites, the changelog and a commit.

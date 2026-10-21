@@ -14,3 +14,15 @@ test('every rule nested in another rule starts with &', () => {
   });
   expect(bad).toEqual([]);
 });
+
+// Build rule 6: every color is a CSS variable. The find highlights used to hold their colors directly.
+test('the find highlight rules use color variables, not literal colors', () => {
+  const root = postcss.parse(readFileSync('src/styles.css', 'utf8'));
+  const bad: string[] = [];
+  root.walkDecls((decl) => {
+    const rule = decl.parent;
+    if (rule?.type !== 'rule' || !/find-(mark|target|current)/.test((rule as postcss.Rule).selector)) return;
+    if (/#[0-9a-f]{3,8}\b|rgba?\(/i.test(decl.value)) bad.push(`line ${decl.source?.start?.line}: ${decl.prop}: ${decl.value}`);
+  });
+  expect(bad).toEqual([]);
+});

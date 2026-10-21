@@ -37,7 +37,7 @@ export function createWidthStore<K extends string>(key: string, defaults: Record
   return store;
 }
 
-export const SIDE_WIDTH_KEY = 'note-board:panel-widths';
+const SIDE_WIDTH_KEY = 'note-board:panel-widths';
 /** The widths of every side panel but the calendar. */
 export const panelWidths = createWidthStore(SIDE_WIDTH_KEY, SIDE_DEFAULT, deviceStorage());
 

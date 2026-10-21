@@ -1,5 +1,7 @@
 # Plan: a BusyAnts connector for Claude (local MCP server), approved by the owner 2026-10-06 ("yes to all")
 
+Historical plan. Since then: due dates were removed (2026-10-16), job 110 added add_checklist, add_column, create_board and two-step deleting, and job 111 the one-file install. What the connector does now: SPEC.md "Claude connector" and mcp/README.md.
+
 ## Owner decisions
 1. Sign-in: one-time Google sign-in in the browser (`npm run mcp:login`, a localhost page using the app's Firebase project and `signInWithPopup`, one-time nonce in the address). The Firebase refresh token is kept in `%APPDATA%\busyants-mcp\token.json` (outside the repo, protected by Windows file permissions; `// simple:` upgrade to Windows Credential Manager if the computer is ever shared). `npm run mcp:logout` deletes it. Add a Claude Code deny rule so Claude can't read that file. The Admin SDK / service accounts are ruled out because they bypass firestore.rules.
 2. Shared boards are read-only in v1.

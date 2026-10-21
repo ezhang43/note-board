@@ -47,6 +47,10 @@
   --hl-green: #c8ecc0;
   --hl-blue: #cfe3fb;
   --hl-pink: #f9d2e3;
+  /* Find: the matching words, the current match and the ring round a block or button that matches. */
+  --find-mark: #ffe58a;
+  --find-current: #ffb347;
+  --find-outline: #ffb347;
 }
 
 /*
@@ -55,6 +59,8 @@
  */
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --find-mark: rgba(255, 213, 79, 0.45);
+  --find-current: rgba(255, 152, 0, 0.75);
   --canvas: #1b1a17;
   --grid-dot: #38342e;
   --grid-dot-faint: #2c2a27;
@@ -1153,8 +1159,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* ---------- checklists (step 5) ---------- */
 
 .todo-body { border-radius: 6px; }
-/* Items (or a whole dragged list) about to be added to the end of a list, open or collapsed: the whole card is ringed, top included (owner request;
-   a ring on the list itself was hidden under the title band). Dashed, like a column taking a card, so
+/* Items (or a whole dragged list) about to be added to the end of a list, open or collapsed: the whole card is ringed, top included (owner request). Dashed, like a column taking a card, so
    it never looks like the solid ring of a selected card. */
 .card.append-target { outline: 2px dashed var(--accent); outline-offset: 2px; }
 
@@ -1762,12 +1767,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   pointer-events: none;
 }
 .autosize > .find-marks { white-space: pre; overflow: hidden; padding: var(--pad, 6px 8px); }
-.find-mark { background: #ffe58a; color: inherit; border-radius: 2px; }
-.find-mark.current { background: #ffb347; box-shadow: 0 0 0 2px #ffb347; }
-:root[data-theme='dark'] .find-mark { background: rgba(255, 213, 79, 0.45); }
-:root[data-theme='dark'] .find-mark.current { background: rgba(255, 152, 0, 0.75); box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.75); }
+.find-mark { background: var(--find-mark); color: inherit; border-radius: 2px; }
+.find-mark.current { background: var(--find-current); box-shadow: 0 0 0 2px var(--find-current); }
 .find-marks .find-mark { color: transparent; }
-.card.find-target, .column.find-target, .help-button.find-target, .tb-button.find-target, .link-url.find-current { outline: 3px solid #ffb347; outline-offset: 2px; }
+.card.find-target, .column.find-target, .help-button.find-target, .tb-button.find-target, .link-url.find-current { outline: 3px solid var(--find-outline); outline-offset: 2px; }
 
 /* Download as picture / PDF (job 163): the hidden copy of the board that is drawn. It is invisible and
    untouchable (the drawing code sets it fully visible in the picture), and none of the controls

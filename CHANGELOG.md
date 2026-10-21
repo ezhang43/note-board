@@ -1,8 +1,5 @@
 # Changelog
 
-## A tidy toolbar in medium windows (2026-10-22)
-
-- In windows narrower than 1180px (an upright iPad, a small laptop), Arrange, File, Feedback, Appearance and Sign out now fold into a **⋯** button at the right end, so nothing runs off the edge any more. Share stays on the toolbar. The ⋯ menu has the same rows as on a phone. At 880px and below, Note, Checklist, Container and Color show only their icons (hover for the name). Wider windows look exactly as before. Saved boards are unchanged.
 ## Share from the home board (2026-10-22)
 
 - On your home board, the Share panel now has one button, **Make a board to share**. It adds an empty board inside home, opens it and leaves the panel open with **Share this board**, so you share in two clicks instead of hunting for how. Nothing is shared until you press Share this board, and your saved boards are unchanged.

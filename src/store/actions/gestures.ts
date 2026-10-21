@@ -15,6 +15,8 @@ import { addNewCard, addNewColumn } from './blocks';
 export function gestureActions(ctx: StoreContext) {
   const { commit, updateUi, requestSettle, measured, heights } = ctx;
   /** The last drag preview, kept while the pointer stays over the same grid spot. */
+  /** The block being resized as it was before the drag, to tell its row and what is above it from what it now covers. */
+  let resizeStart: { id: string; rect: Rect } | null = null;
   let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
 
   /** Size of a block being dragged, as it will be once dropped loose on the board. */
@@ -158,8 +160,14 @@ export function gestureActions(ctx: StoreContext) {
 
     // ---------- resizing ----------
     /** Show a resize in progress (the board itself only changes when the pointer is released). */
-    showResize: (resize: Resize) => updateUi({ resize, confirm: null }),
+    showResize(resize: Resize) {
+      // The first call of a drag still sees the block as it was (its height is not measured again yet).
+      const rect = !ctx.state.ui.resize || resizeStart?.id !== resize.id ? blockRect(ctx.state.board, resize.id, measured) : null;
+      if (rect) resizeStart = { id: resize.id, rect };
+      updateUi({ resize, confirm: null });
+    },
     cancelResize() {
+      resizeStart = null;
       updateUi({ resize: null });
       requestSettle();
     },
@@ -172,18 +180,24 @@ export function gestureActions(ctx: StoreContext) {
           if (!at) return b;
           // The left and top edges also move the block's corner (the far edge stays where it was);
           // the right and bottom edges leave its position alone.
+          const was = resizeStart?.id === r.id ? resizeStart.rect : blockRect(b, r.id, measured);
           const west = r.dir?.includes('w') ?? false;
           const north = r.dir?.includes('n') ?? false;
           let next = B.resizeBlock(b, r.id, { x: west ? (r.x ?? at.x) : at.x, y: north ? (r.y ?? at.y) : at.y, w: r.w, h: r.h });
-          // Blocks it now covers make room, only now that it is let go (owner decisions 2026-10-19, 2026-10-21):
-          // from the top edge, those above it move up; its row neighbours slide sideways: right of it
-          // from the right edge, left of it from the left edge.
+          // Blocks it now covers make room, only now that it is let go (owner decisions 2026-10-19, 2026-10-21,
+          // job #142): from the top edge, those that were above it move up; from the right edge its row
+          // neighbours (level with where it was) slide right, from the left edge left. Growing down only
+          // pushes what is below it down (the settle that follows).
           const sized = (id: string) => (north && id === r.id && r.h != null ? r.h : measured(id));
-          if (north) next = pushUp(next, r.id, sized);
-          return shiftRow(next, r.id, sized, undefined, west ? 'left' : 'right');
+          if (north && was) next = pushUp(next, r.id, sized, was.y);
+          const out = blockRect(next, r.id, sized);
+          if (west && was && out && out.x < was.x) return shiftRow(next, r.id, sized, undefined, 'left', was);
+          if (r.dir?.includes('e') && was && out && out.x + out.w > was.x + was.w) return shiftRow(next, r.id, sized, undefined, 'right', was);
+          return next;
         },
         { ui: { resize: null } },
       );
+      resizeStart = null;
       requestSettle([r.id]);
     },
   };

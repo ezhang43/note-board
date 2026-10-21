@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COLLAPSED_MIN_H } from './constants';
-import { resizeTo } from './sizing';
+import { resizeFrom, resizeTo } from './sizing';
 
 describe('resizing', () => {
   it('snaps to the 20px grid when snapping is on and nothing matches', () => {
@@ -74,5 +74,23 @@ describe('resizing a collapsed card', () => {
   it('can be as short as its header', () => {
     expect(resizeTo('card', { w: 240, h: 40 }, [], false, COLLAPSED_MIN_H).h).toBe(COLLAPSED_MIN_H);
     expect(resizeTo('card', { w: 240, h: 40 }, [], false).h).toBe(100);
+  });
+});
+
+describe('size matching stays inside the size limits (job #142)', () => {
+  it('does not match a height above the 700 limit or a width under the container minimum', () => {
+    expect(resizeTo('card', { w: 240, h: 760 }, [{ id: 'o', w: 240, h: 705 }], true).h).toBe(700);
+    expect(resizeTo('column', { w: 230, h: null }, [{ id: 'o', w: 235, h: 100 }], true).w).toBe(240);
+    expect(resizeTo('card', { w: 195, h: 100 }, [{ id: 'o', w: 197, h: 100 }], true).w).toBe(200);
+  });
+
+  it('still matches a block whose size is inside the limits', () => {
+    expect(resizeTo('card', { w: 240, h: 695 }, [{ id: 'o', w: 240, h: 700 }], true)).toMatchObject({ h: 700, matchIds: ['o'] });
+  });
+
+  it('the top edge never goes shorter than its content, even next to a block that matches', () => {
+    const r = resizeFrom('card', 'n', { x: 0, y: 100, w: 300, h: 200 }, { x: 0, y: 60 }, [{ id: 'o', w: 100, h: 145 }], true, 150);
+    expect(r.h).toBe(150);
+    expect(r.y + (r.h ?? 0)).toBe(300);
   });
 });

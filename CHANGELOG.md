@@ -1,5 +1,13 @@
 # Changelog
 
+## Touch and keyboard fixes (2026-10-21)
+
+- **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.
+- **Resizing a collapsed card with the keyboard** (arrow keys on its corner) no longer makes it jump to its open height.
+- **After resizing something by finger on a tablet**, right-click and long-press menus (spell-check, copy link) keep working. Before, they stayed blocked until you reloaded.
+- **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
+- Nothing about saved boards changed.
+
 ## Resize cards from any side (2026-10-21)
 
 - **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).

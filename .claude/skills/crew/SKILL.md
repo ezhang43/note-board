@@ -74,7 +74,7 @@ In a cloud session the proxy refuses every `gh` subcommand that uses GitHub's Gr
 | List recent pull requests | `gh api "repos/ezhang43/note-board/pulls?state=all&base=build/v1&per_page=20" --jq '.[] \| [.number, .state, .head.ref, .title] \| @tsv'` |
 | Files a pull request changes | `gh api "repos/ezhang43/note-board/pulls/<n>/files?per_page=100" --jq '.[].filename'` |
 | "All tests" result | `gh api repos/ezhang43/note-board/commits/<head sha>/check-runs --jq '.check_runs[] \| [.name, .status, .conclusion] \| @tsv'` |
-| Open a pull request | `gh api -X POST repos/ezhang43/note-board/pulls -f title="..." -f head=<branch> -f base=build/v1 -f body="..."` (note the `number` in the answer) |
+| Open a pull request | `gh api -X POST repos/ezhang43/note-board/pulls -f title="..." -f head=<branch> -f base=build/v1 -F body=@<file with the description>` (tried 2026-10-22: it works; note the `number` in the answer) |
 | Add the `high-risk` label | `gh api -X POST repos/ezhang43/note-board/issues/<n>/labels -f "labels[]=high-risk"` |
 | Merge (merge commit) | `gh api -X PUT repos/ezhang43/note-board/pulls/<n>/merge -f merge_method=merge` |
 

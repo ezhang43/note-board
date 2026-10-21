@@ -4,6 +4,10 @@
 
 - Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
 
+## More calendar, journal and habits tests (2026-10-21)
+
+- More calendar, journal and habits tests. Nothing in the app changed.
+
 ## Touch and keyboard fixes (2026-10-21)
 
 - **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.

@@ -196,6 +196,13 @@ describe('weight', () => {
     expect(weightChart([], 'week', '2026-10-21')).toMatchObject({ points: [], min: null, max: null });
   });
 
+  it('a leap day is a real day, and the chart reaches both ends of a leap year or February (job #156)', () => {
+    expect(weightEntries(weight('2028-02-29 70.0', '2027-02-29 71.0'))).toEqual([{ day: '2028-02-29', kg: 70 }]);
+    const year = weightChart([{ day: '2028-01-01', kg: 70 }, { day: '2028-12-31', kg: 71 }], 'year', '2028-06-01');
+    expect(year.points.map((p) => p.x)).toEqual([0, 1]);
+    expect(weightChart([{ day: '2028-02-29', kg: 70 }], 'month', '2028-02-10').points[0].x).toBe(1);
+  });
+
   it('the Habits board stays hidden with a Weight card on it, but not with a card that has anything else', () => {
     const ws = (b: Board): Workspace => ({ home: 'home', boards: { home: createBoard(), h: b } });
     expect(hiddenHabits(ws(boardWith(habit('A'), weight('2026-10-19 72.4'))), [])).toBe('h');

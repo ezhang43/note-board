@@ -1,5 +1,9 @@
 # Changelog
 
+## Share from the home board (2026-10-22)
+
+- On your home board, the Share panel now has one button, **Make a board to share**. It adds an empty board inside home, opens it and leaves the panel open with **Share this board**, so you share in two clicks instead of hunting for how. Nothing is shared until you press Share this board, and your saved boards are unchanged.
+
 ## Helper sessions work in the cloud (2026-10-22)
 
 - The crew, finish-step and check-pr instructions now work in cloud sessions, where `gh pr` commands are blocked: they use GitHub's other route (`gh api` or the GitHub tools) to open, check and merge pull requests, and wait for the tests without `--watch`. A new spec-check skill lets a background helper run the spec check itself; when a helper can't run the code review, it says so and the coordinator reviews the pull request before it merges. A few stale lines were fixed. Nothing in the app changed.

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { shownName } from '../model/board';
 import type { Person } from '../store/collab';
-import { useAppState } from '../store/appStore';
+import { appStore, useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
 import { collab, useNotice, useSharing } from '../sync/collabSession';
-import { CloseIcon, ShareIcon } from './icons';
+import { CloseIcon, PlusIcon, ShareIcon } from './icons';
 
 // Sharing a board (owner request, 2026-10-05: several people editing at once). The Share button
 // (toolbar; ⋯ on a phone) opens a panel to share the open board by link, copy the link, see who
@@ -104,7 +104,17 @@ function SharePanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {!share && open === home && <p className="share-text">Your home board holds all your other boards, so it can’t be shared. Open another board, or add a sub-board, to share it.</p>}
+      {!share && open === home && (
+        <>
+          <p className="share-text">Your home board holds all your other boards, so it can’t be shared itself. Share a board inside it instead.</p>
+          {/* Makes a board inside home and opens it; the panel then offers "Share this board", so sharing still takes its own click. */}
+          <button type="button" className="tb-button add-column" onClick={() => appStore.openBoard(appStore.addBoardCard())}>
+            <PlusIcon />
+            Make a board to share
+          </button>
+          <p className="share-hint">It starts empty. You can open it and add cards, then press Share this board.</p>
+        </>
+      )}
 
       {!share && open !== home && (
         <>

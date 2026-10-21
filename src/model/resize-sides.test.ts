@@ -207,21 +207,21 @@ describe('after letting go of the left or top edge', () => {
     };
 
     it('blocks above it in its column move up, keeping their order', () => {
-      const b = pushUp(taller(stack()), 'b', measured);
+      const b = pushUp(taller(stack()), 'b', measured, 120);
       // b now starts at 20: a (100 tall) must end 10px above, on the grid: y = -100.
       expect(ys(b, ['a', 'b', 'c'])).toEqual([-100, 20, 300]);
       expectNoOverlap(b);
     });
 
     it('blocks below it do not move', () => {
-      expect(pushUp(taller(stack()), 'b', measured).cards.c.y).toBe(300);
+      expect(pushUp(taller(stack()), 'b', measured, 120).cards.c.y).toBe(300);
     });
 
     it('pushes a pile of blocks up one after the other', () => {
       let b = loose(B.createBoard(), 'a0', 0, -120);
       b = loose(b, 'a', 0, 0);
       b = loose(b, 'b', 0, 120);
-      const r = pushUp(taller(b), 'b', measured);
+      const r = pushUp(taller(b), 'b', measured, 120);
       expect(r.cards.a.y).toBeLessThanOrEqual(20 - BLOCK_GAP - 100);
       expect(r.cards.a0.y).toBeLessThanOrEqual(r.cards.a.y - BLOCK_GAP - 100);
       expectNoOverlap(r);
@@ -229,16 +229,16 @@ describe('after letting go of the left or top edge', () => {
 
     it('blocks beside it (not over it) stay put', () => {
       const b = loose(stack(), 'side', 400, 0);
-      expect(pushUp(taller(b), 'b', measured).cards.side.y).toBe(0);
+      expect(pushUp(taller(b), 'b', measured, 120).cards.side.y).toBe(0);
     });
 
     it('nothing moves when the edge is still clear', () => {
       const clear = B.resizeBlock(stack(), 'b', { x: 0, y: 120, w: 200, h: 100 });
-      expect(pushUp(clear, 'b', measured)).toBe(clear);
+      expect(pushUp(clear, 'b', measured, 120)).toBe(clear);
     });
 
     it('the grown block itself never moves', () => {
-      const b = pushUp(taller(stack()), 'b', measured);
+      const b = pushUp(taller(stack()), 'b', measured, 120);
       expect(b.cards.b.y).toBe(20);
       expectNoOverlap(settle(b, measured, ['b']));
     });

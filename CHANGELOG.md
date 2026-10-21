@@ -8,6 +8,12 @@
 - **The Journal's today is a page**: its date as the heading, the week number, a word count and a quiet "Saved". Your earlier days are a tidy timeline: a big date and the first two lines, and a click opens the day to edit. Earlier days now start folded; today starts open. This year no longer has its own header.
 - **The four drop-down boxes are now one "Aa" menu** with labeled buttons (Style, Size, Font, Highlight), plus a highlighter button. A new empty day says "Write about today…".
 - Everything you wrote and ticked is unchanged. Nothing about saving, sync or undo changed; a habit's color is saved with the habit.
+## Keys in side panels, screen readers, faster sign-in (2026-10-22)
+
+- **Delete and Backspace no longer delete a note behind a side panel.** With a note selected, pressing Delete while the Focus timer's buttons or a Completed tick box had the keyboard deleted the note without any sign. Now no side panel passes board keys through (undo, redo and zoom still work).
+- **Screen readers:** every checklist tick box is named for its item ("Done: Buy milk"), and a hidden live region now says what was only seen before: deletes, undo and redo, items moving to Completed, and a failed online save.
+- **The sign-in screen opens faster.** It no longer waits for the board's code or for four fonts it doesn't show. It looks the same.
+- Nothing about saved boards changed.
 
 ## Safety rails for the helper sessions (2026-10-21)
 
@@ -70,6 +76,13 @@
 - If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.
 - It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board or a shared board arrived. If it can't be saved, the incoming change still goes ahead as before.
 - On the published site the online rules need the update in `firestore.rules` (pasted into the Firebase console) for this kind of version to be saved. Nothing already saved changes.
+
+## Resizing from the edges: neighbors move the right way (2026-10-21)
+
+- Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
+- Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
+- Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
+- Nothing about saved boards changed.
 
 ## Resize cards from any side (2026-10-21)
 

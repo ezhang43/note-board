@@ -77,7 +77,7 @@ test('tick boxes, resize corners and the item grip are at least 24px to touch', 
   const tick = (await box(l.getByRole('checkbox', { name: 'Done' }).first()))!;
   // 3px outside the drawn 16px box still hits it.
   const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('.tick')?.querySelector('input')?.getAttribute('aria-label'), { x: tick.x - 3, y: tick.y + tick.height / 2 });
-  expect(hit).toBe('Done');
+  expect(hit).toBe('Done: milk');
   await clickEmpty(page);
   await add(page, 'New container'); // has the width strip
   await page.keyboard.press('Escape');

@@ -8,6 +8,7 @@ import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
 import { weightActions } from './actions/weight';
 import { habitColorActions } from './actions/habitColor';
+import { announce } from './announce';
 import { createCore } from './core';
 import { later, type Schedule } from './env';
 
@@ -34,8 +35,16 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   // The color theme is a per-device setting like light / dark, started from what this device saved.
   ctx.updateView((v) => ({ ...v, colorTheme: startingColorTheme(saved(storage, COLOR_THEME_KEY)), hotkeys: startingHotkeys(saved(storage, HOTKEYS_KEY)) }));
   const boards = boardActions(ctx);
+  /** Undo or redo, told to screen readers when it changed the board. */
+  const step = (which: 'undo' | 'redo') => () => {
+    const before = ctx.state.board;
+    api[which]();
+    if (ctx.state.board !== before) announce(which === 'undo' ? 'Undid the last change' : 'Redid the last change');
+  };
   return {
     ...api,
+    undo: step('undo'),
+    redo: step('redo'),
     /** The checklist item or new block that was asked to take the cursor has taken it. */
     focusTaken: (id: string) => {
       const { focusItem, focusBlock } = ctx.state.ui;

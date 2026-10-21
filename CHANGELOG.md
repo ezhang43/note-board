@@ -1,17 +1,8 @@
 # Changelog
 
-## Import and small checklist fixes from the code review (2026-10-21)
+## More connector tests (2026-10-21)
 
-- **Importing a big or odd file no longer freezes the page.** A .txt with a very long run of blank lines, or a Markdown file with one huge line of stray `**`, `__`, `~~`, `[` or `<` marks, took minutes to read. It now reads in well under a second, and ordinary files read exactly as before.
-- Collapse all no longer counts the hidden Completed history after Clean up, so the button says Expand all when every card you can see is collapsed, and no longer makes an undo step that does nothing.
-- Backspace in the last open blank item of a list is now refused, instead of sending the cursor to a ticked item that may be hidden.
-- Expand all gives the old layout back even if you picked the same cards in a different order.
-- Opening an old version in History right after ticking an item no longer loses the tick.
-- Dragging an item while items in several lists are selected now does nothing, as the spec says.
-- A format change that changes nothing (the size or font it already has) no longer makes an undo step.
-- The focus timer keeps running and chimes even when the device's storage is full.
-- Download as text puts the Completed history after your cards, not before them.
-- Nothing about saved boards changed.
+- Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
 
 ## More calendar, journal and habits tests (2026-10-21)
 
@@ -23,6 +14,19 @@
 - **Resizing a collapsed card with the keyboard** (arrow keys on its corner) no longer makes it jump to its open height.
 - **After resizing something by finger on a tablet**, right-click and long-press menus (spell-check, copy link) keep working. Before, they stayed blocked until you reloaded.
 - **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
+- Nothing about saved boards changed.
+
+## Import and small checklist fixes from the code review (2026-10-21)
+
+- **Importing a big or odd file no longer freezes the page.** A .txt with a very long run of blank lines, or a Markdown file with one huge line of stray `**`, `__`, `~~`, `[` or `<` marks, took minutes to read. It now reads in well under a second, and ordinary files read exactly as before.
+- Collapse all no longer counts the hidden Completed history after Clean up, so the button says Expand all when every card you can see is collapsed, and no longer makes an undo step that does nothing.
+- Backspace in the last open blank item of a list is now refused, instead of sending the cursor to a ticked item that may be hidden.
+- Expand all gives the old layout back even if you picked the same cards in a different order.
+- Opening an old version in History right after ticking an item no longer loses the tick.
+- Dragging an item while items in several lists are selected now does nothing, as the spec says.
+- A format change that changes nothing (the size or font it already has) no longer makes an undo step.
+- The focus timer keeps running and chimes even when the device's storage is full.
+- Download as text puts the Completed history after your cards, not before them.
 - Nothing about saved boards changed.
 
 ## Shared computers keep each account's boards apart (2026-10-21)

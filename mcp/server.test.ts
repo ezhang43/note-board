@@ -338,3 +338,74 @@ describe('sign_in and sign_out', () => {
     }
   });
 });
+
+describe('guards (job 156)', () => {
+  /** Like connectWithWrites(allowed), with a snapshot the test can change between calls. */
+  async function connectChanging() {
+    const fs = fakeFirestore('me');
+    fs.setOwn(ownRaw());
+    const deps = { db: ownDb(async () => 'ID', 'me', fs.fetch), client: 'mcp-test', now: () => Date.UTC(2026, 9, 6, 12), wait: async () => {}, log: () => {}, memory: { lastEditAt: null } };
+    const extra: Snapshot['shares'] = [];
+    let fail = false;
+    const load = async () => {
+      if (fail) {
+        fail = false;
+        throw new Error('offline');
+      }
+      return { ...sampleSnapshot(), own: fs.own(), shares: [...sampleSnapshot().shares, ...extra] };
+    };
+    const client = await connect(load, (edit, opts) => saveChange(deps, edit, opts), allowed);
+    return { fs, client, extra, failNext: () => (fail = true) };
+  }
+
+  it('a confirm refused because the board became shared keeps the preview', async () => {
+    const { fs, client, extra } = await connectChanging();
+    const p = await client.callTool({ name: 'preview_delete', arguments: { board: 'work', things: ['listWork'] } });
+    expect(p.isError).toBeFalsy();
+    extra.push({ id: 'sW', owner: 'me', ownerName: 'you', mine: true, raw: serializeShare('work', { work: workBoard() }) });
+    const refused = await client.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(refused.isError).toBe(true);
+    expect(text(refused)).toMatch(/shared boards are read-only/);
+    expect(readWorkspace(fs.own())!.ws.boards.work.cards.listWork).toBeDefined();
+    extra.length = 0;
+    const done = await client.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(text(done)).toMatch(/^Saved:/);
+    expect(readWorkspace(fs.own())!.ws.boards.work.cards.listWork).toBeUndefined();
+  });
+
+  it('a confirm refused while offline keeps the preview', async () => {
+    const { fs, client, failNext } = await connectChanging();
+    const p = await client.callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    failNext();
+    const offline = await client.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(offline.isError).toBe(true);
+    expect(text(offline)).toBe('offline');
+    const done = await client.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
+    expect(text(done)).toMatch(/^Saved:/);
+    expect(home(fs).cards.noteCall).toBeUndefined();
+  });
+
+  it('a preview with deleting on, but data the connector can’t safely edit, is refused and saves nothing', async () => {
+    const { fs, client } = connectWithWrites(allowed);
+    const d = JSON.parse(ownRaw());
+    d.boards.home.cards.noteIdea.sticker = 'x';
+    fs.setOwn(JSON.stringify(d));
+    const r = await (await client).callTool({ name: 'preview_delete', arguments: { board: 'home', things: ['noteCall'] } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/^Nothing can be deleted: the boards hold data this connector doesn’t know/);
+    expect(fs.calls.some((c) => c.path === ':commit')).toBe(false);
+  });
+
+  it('two tool calls at once both land', async () => {
+    const { fs, client } = connectWithWrites();
+    const c = await client;
+    const [a, b] = await Promise.all([
+      c.callTool({ name: 'add_items', arguments: { board: 'home', list: 'Groceries', items: [{ text: 'Apples' }] } }),
+      c.callTool({ name: 'set_items_done', arguments: { board: 'home', items: ['iMilk'], done: true } }),
+    ]);
+    expect(a.isError).toBeFalsy();
+    expect(b.isError).toBeFalsy();
+    expect(items(fs).some((i) => i.text === 'Apples')).toBe(true);
+    expect(items(fs).find((i) => i.id === 'iMilk')!.done).toBe(true);
+  });
+});

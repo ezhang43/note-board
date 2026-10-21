@@ -1,12 +1,15 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it, vi } from 'vitest';
 import { WEB_API_KEY, deleteToken, saveToken } from './auth';
 import { addItems } from './edits';
 import { fakeFirestore } from './fakeFirestore';
-import { activityLog, activityPath, boardsLoader, boardsWriter, deleteAllowed, runCheck, setDeleteAllowed, settingsPath, signInHelper } from './main';
-import { ownRaw } from './sample';
+import { activityLog, activityPath, boardsLoader, boardsWriter, deleteAllowed, main, runCheck, setDeleteAllowed, settingsPath, signInHelper } from './main';
+import { ownRaw, sampleSnapshot } from './sample';
+import { createServer } from './server';
 
 describe('the connector’s sign-in', () => {
   it('after npm run mcp:logout, reading stops straight away (no restart needed)', async () => {
@@ -285,5 +288,61 @@ describe('signing in from inside Claude (the sign_in and sign_out tools)', () =>
 
   it('"not signed in" tells the person to sign in from Claude', async () => {
     await expect(boardsLoader(await tempFile(), fakeGoogle(ownRaw()))()).rejects.toThrow(/sign in to BusyAnts.*sign_in/);
+  });
+});
+
+describe('guards (job 156)', () => {
+  it('the owner’s switch commands: delete-on and delete-off write settings.json in the sign-in folder; bad commands and keys return 1', async () => {
+    // APPDATA must be a temp folder, so the real sign-in folder is never touched.
+    const dir = await mkdtemp(join(tmpdir(), 'busyants-'));
+    vi.stubEnv('APPDATA', dir);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const settings = join(dir, 'busyants-mcp', 'settings.json');
+      expect(await main(['delete-on'])).toBe(0);
+      expect(JSON.parse(await readFile(settings, 'utf8'))).toEqual({ allowDelete: true });
+      expect(await main(['delete-off'])).toBe(0);
+      expect(await deleteAllowed(settings)).toBe(false);
+      expect(await main(['bogus'])).toBe(1);
+      // Refused before any browser opens. Never call main([]) (starts the server) or login with a valid key.
+      expect(await main(['login', '--key', 'not a key'])).toBe(1);
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('only the owner’s command line can switch deleting on: no tool writes any file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'busyants-'));
+    const { signIn, signOut, close } = signInHelper(join(dir, 'token.json'), () => {}, () => {});
+    const allowed = vi.fn(async () => true);
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '1' });
+    await Promise.all([createServer(async () => sampleSnapshot(), async () => ({ text: 'Saved:\n- nothing' }), { deleteAllowed: allowed, signIn, signOut }).connect(a), client.connect(b)]);
+    try {
+      const args: Record<string, Record<string, unknown>> = {
+        list_boards: {},
+        read_board: { board: 'home' },
+        add_items: { board: 'home', list: 'Groceries', items: [{ text: 'x' }] },
+        edit_items: { board: 'home', changes: [{ item: 'iMilk', text: 'Milk!' }] },
+        set_items_done: { board: 'home', items: ['iMilk'], done: true },
+        move_items: { board: 'home', items: ['iBread'], to: { list: 'Groceries' } },
+        add_note: { board: 'home', text: 'x' },
+        add_checklist: { board: 'home', title: 'T', items: ['x'] },
+        add_column: { board: 'home', title: 'C' },
+        create_board: { name: 'B' },
+        preview_delete: { board: 'home', things: ['noteCall'] },
+        confirm_delete: { preview: 'made-up' },
+        sign_in: {},
+        sign_out: {},
+      };
+      const { tools } = await client.listTools();
+      expect(tools.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());
+      for (const t of tools) await client.callTool({ name: t.name, arguments: args[t.name] });
+      expect(allowed).toHaveBeenCalled();
+      expect(await readdir(dir)).not.toContain('settings.json');
+    } finally {
+      close();
+    }
   });
 });

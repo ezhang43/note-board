@@ -1,5 +1,9 @@
 # Changelog
 
+## More connector tests (2026-10-21)
+
+- Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
+
 ## More calendar, journal and habits tests (2026-10-21)
 
 - More calendar, journal and habits tests. Nothing in the app changed.

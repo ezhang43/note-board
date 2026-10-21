@@ -1,5 +1,12 @@
 # Changelog
 
+## Safety rails for the helper sessions (2026-10-21)
+
+- Parallel pull requests no longer clash on `CHANGELOG.md` and `docs/decisions.md`: git now keeps both sides when they each add an entry.
+- A new check before every command a Claude session runs refuses stopping every Playwright or node process on the computer (`pkill`/`killall`), force-pushing to `main` or `build/v1`, and pushing onto them from anyone but the crew coordinator.
+- Notes the project never commits (mockups, design notes, worktrees) are now ignored by git.
+- Nothing in the app changed.
+
 ## More connector tests (2026-10-21)
 
 - Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.

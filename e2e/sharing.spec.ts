@@ -164,11 +164,24 @@ test('deleting a shared board (by the person who shared it) deletes it for every
   await expect(boardName(bob)).not.toHaveValue('Trip');
 });
 
-test('the home board can’t be shared', async ({ browser }) => {
+test('on the home board, Share offers one button that makes a board, opens it and offers to share it', async ({ browser }) => {
   const alice = await person(browser, `Alice${tag()}`);
+  await boardName(alice).fill('My home');
   await openShare(alice);
-  await expect(sharePanel(alice).getByText('can’t be shared')).toBeVisible();
+  await expect(sharePanel(alice).getByText('can’t be shared itself')).toBeVisible();
+  // The home board itself still can't be shared: no "Share this board" until another board is open.
   await expect(sharePanel(alice).getByRole('button', { name: 'Share this board' })).toHaveCount(0);
+  await sharePanel(alice).getByRole('button', { name: 'Make a board to share' }).click();
+  // The new (empty) board is open, the panel stays open and now offers to share it; nothing is shared yet.
+  await expect(boardName(alice)).not.toHaveValue('My home');
+  await expect(sharePanel(alice).getByRole('button', { name: 'Share this board' })).toBeVisible();
+  await expect(sharePanel(alice).getByLabel('Share link')).toHaveCount(0);
+  // It is a card on the home board, as "Add a sub-board here" makes.
+  await alice.keyboard.press('Escape');
+  await alice.getByRole('button', { name: 'Back to My home' }).click();
+  await expect(boardName(alice)).toHaveValue('My home');
+  await expect(alice.locator('[data-kind="board"]')).toHaveCount(1);
+  await alice.context().close();
 });
 
 test('Share fits in the toolbar with Sign out, at 1280px', async ({ browser }) => {

@@ -139,7 +139,7 @@ test('tiles work: Search, History and Completed open and close the menu; the foc
 
 test('the Share tile opens the share sheet inside the menu, below the tiles', async ({ page }) => {
   await openSignedIn(page);
-  await tiles(page).getByRole('button', { name: 'Share' }).tap();
+  await tiles(page).getByRole('button', { name: 'Share', exact: true }).tap();
   const panel = menu(page).locator('.share-panel');
   await expect(panel).toBeVisible();
   const p = await box(panel);
@@ -159,7 +159,7 @@ test('the Share tile opens the share sheet inside the menu, below the tiles', as
   });
   expect(probe).toEqual({ dir: 'row', min: 'auto' });
   // The open Share tile shows it is open.
-  const tile = tiles(page).getByRole('button', { name: 'Share' });
+  const tile = tiles(page).getByRole('button', { name: 'Share', exact: true });
   await expect(tile).toHaveAttribute('aria-expanded', 'true');
   expect(await tile.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(253, 241, 207)');
 });

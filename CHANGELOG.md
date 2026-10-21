@@ -1,5 +1,9 @@
 # Changelog
 
+## Share from the home board (2026-10-22)
+
+- On your home board, the Share panel now has one button, **Make a board to share**. It adds an empty board inside home, opens it and leaves the panel open with **Share this board**, so you share in two clicks instead of hunting for how. Nothing is shared until you press Share this board, and your saved boards are unchanged.
+
 ## Shared boards can't take your own boards on a new device (2026-10-21)
 
 - **A shared board can no longer swap in for one of your own boards when you sign in on a new device or browser.** Before, someone you share a board with could add a board with the id of one of yours to it, and on a new device it replaced yours there and its next save removed yours from your online boards. Now, once your own boards arrive, yours wins and theirs is left out.

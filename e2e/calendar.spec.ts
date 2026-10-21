@@ -891,6 +891,12 @@ test('clicking an event whose card is already open opens its edit form; a read-o
   await expect(card(page)).toBeVisible();
   await listed.click();
   await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // The same event shown twice (its chip in the grid, its line in the day's list) counts as the same event.
+  await chip.click();
+  await expect(card(page)).toBeVisible();
+  await listed.click();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
   expect(errors).toEqual([]);
 });
 

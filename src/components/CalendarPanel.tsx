@@ -191,6 +191,7 @@ function DayEvents({
           key={e.id}
           type="button"
           className={`cal-event${e.editable ? '' : ' read-only'}`}
+          data-event={e.id}
           aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
         >
@@ -269,6 +270,7 @@ function MonthGrid({
                       key={e.id}
                       type="button"
                       className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
+                      data-event={e.id}
                       aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
                       title={`${time && `${time} `}${e.title}`}
                       onClick={(ev) => {
@@ -383,7 +385,8 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
     const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !opener.contains(e.target as Node) && !(e.target instanceof Element && e.target.closest('.panel-resize'))) onClose();
+      const on = e.target instanceof Element ? e.target : null;
+      if (!busy && outside(e.target) && on?.closest('[data-event]')?.getAttribute('data-event') !== event.id && !on?.closest('.panel-resize')) onClose();
     };
     const click = (e: MouseEvent) => {
       if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {

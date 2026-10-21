@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { DRAG_THRESHOLD, ZOOM_STEP } from '../model/constants';
 import { FONT_SCALE } from '../model/font';
 import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
+import { isBlank } from '../model/templates';
 import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
 import type { Point, View } from '../model/types';
@@ -10,6 +11,7 @@ import { canvasRect, clientToCanvas, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
+import { EmptyStart } from './TemplatePicker';
 import { HOLD_MS } from './touchHold';
 import { usePhone } from './usePhone';
 
@@ -23,8 +25,8 @@ export function Canvas() {
 
   const order = useAppState((s) => s.board.order);
   const phone = usePhone();
-  // Nothing drawn (a Completed record is kept but never drawn): show the hint.
-  const empty = useAppState((s) => s.board.order.every((id) => s.board.cards[id]?.kind === 'completed'));
+  // Nothing drawn (a Completed record is kept but never drawn): show the template picks (not on an old version being looked at).
+  const empty = useAppState((s) => isBlank(s.board) && !s.ui.preview);
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
   const columns = useAppState((s) => s.board.columns);
   // Every block is drawn here, in place, and stays where it is in the page when the order changes (a drop
@@ -315,13 +317,7 @@ export function Canvas() {
         backgroundPosition: `${grid.offsetX}px ${grid.offsetY}px`,
       } as CSSProperties}
     >
-      {empty && (
-        <p className="empty-hint">
-          {phone
-            ? 'Tap the Add button (+) below to add a note, a checklist or a container.'
-            : 'Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.'}
-        </p>
-      )}
+      {empty && <EmptyStart />}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}

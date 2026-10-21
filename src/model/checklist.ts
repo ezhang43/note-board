@@ -43,7 +43,7 @@ export function subtreeHeight(item: TodoItem): number {
 }
 
 /** The bottom-most item shown under (or as) this item. */
-export function lastVisible(item: TodoItem): TodoItem {
+function lastVisible(item: TodoItem): TodoItem {
   return item.children.length ? lastVisible(item.children[item.children.length - 1]) : item;
 }
 

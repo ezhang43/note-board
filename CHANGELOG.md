@@ -6,6 +6,12 @@
 - **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
 - Nothing about saved boards changed.
 
+## Version history keeps your work before another device's changes replace it (2026-10-21)
+
+- If a phone saved an old copy while offline and sends it hours later, it replaces every board on your computer. Now, if you had edited on this page, every board as it was just before is saved in Version history first, marked "Before changes from another device", so you can restore your work.
+- It is saved at most once every 10 minutes, so using two devices at the same time doesn't fill the history, and never because someone else changed a shared board or a shared board arrived. If it can't be saved, the incoming change still goes ahead as before.
+- On the published site the online rules need the update in `firestore.rules` (pasted into the Firebase console) for this kind of version to be saved. Nothing already saved changes.
+
 ## Resize cards from any side (2026-10-21)
 
 - **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).

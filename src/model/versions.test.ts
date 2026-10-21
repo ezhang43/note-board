@@ -60,6 +60,10 @@ describe('what a version says about itself', () => {
     expect(describeVersion({ id: 'a', savedAt: 0, cards: 1, columns: 1 })).toBe('1 card · 1 container');
     expect(describeVersion({ id: 'a', savedAt: 0, cards: 0, columns: 0 })).toBe('Empty board');
   });
+  it('says when it was saved just before changes from another device replaced the boards (job #147)', () => {
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 12, columns: 3, kind: 'outside' })).toBe('Before changes from another device · 12 cards · 3 containers');
+    expect(describeVersion({ id: 'a', savedAt: 0, cards: 0, columns: 0, kind: 'outside' })).toBe('Before changes from another device · Empty board');
+  });
 });
 
 describe('the list of versions', () => {

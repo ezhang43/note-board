@@ -89,6 +89,28 @@ test('versions are kept after the page is reloaded', async ({ page }) => {
   await expect(page.getByLabel('Note text').first()).toHaveValue('Keep me');
 });
 
+// Job #147: changes from another device (only on the published site) keep the boards from just
+// before them as a version; here one is put in place as that would have saved it.
+test('a version kept from just before changes from another device says so, and shows that work', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.type('Work done here');
+  await clickEmpty(page);
+  await page.clock.fastForward('00:02');
+  await page.evaluate(() => {
+    localStorage.setItem('note-board:version:x1', localStorage.getItem('note-board:v1')!);
+    localStorage.setItem('note-board:versions:v1', JSON.stringify([{ id: 'x1', savedAt: Date.now(), cards: 1, columns: 0, kind: 'outside' }]));
+  });
+  await page.reload();
+  await page.getByLabel('Note text').first().fill('Old copy from the phone');
+  await clickEmpty(page);
+  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  const row = page.getByRole('complementary', { name: 'Version history' }).getByRole('button', { name: /Before changes from another device · 1 card/ });
+  await row.click();
+  await expect(page.getByLabel('Note text').first()).toHaveValue('Work done here');
+  await expect(page.getByRole('region', { name: 'Looking at an earlier version' })).toContainText('Before changes from another device');
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 

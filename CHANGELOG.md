@@ -1,5 +1,11 @@
 # Changelog
 
+## Bottom bar fits beside a side panel (2026-10-21)
+
+- With a side panel open, every control in the bottom-right bar (Search, Completed, History, Timer, Calendar, Journal, Habits, ?, coffee cup, A− / A+ and zoom) now stays fully visible and clickable, even when the panel is dragged nearly as wide as it goes.
+- When space is short, the buttons in the pill drop their words and show icons only (hover one to see its name). If icons alone don't fit, the bar wraps into rows with the pill on top.
+- Nothing changes with a wide window, with no panel open, or on a phone. Saved boards are untouched.
+
 ## Habits: a Weight card (2026-10-21)
 
 - The Habits panel now has a **Weight** card above your habits. Type today's weight in kilograms (like 72.4, a comma works too) and press Enter or Save. Typing it again the same day replaces it. Anything outside 20.0 to 400.0 shows a short note and isn't saved.

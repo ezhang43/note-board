@@ -56,7 +56,7 @@ export function boardAsMarkdown(board: Board, nameOf: BoardNameOf = () => ''): s
 }
 
 /** "BusyAnts - Home - 2026-10-05.json": the board's name (without characters files can't have) and the day. */
-export function backupFileName(boardName: string, day: Date, ext: 'json' | 'md'): string {
+export function backupFileName(boardName: string, day: Date, ext: 'json' | 'md' | 'png' | 'pdf'): string {
   const name = boardName.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Board';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `BusyAnts - ${name} - ${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}.${ext}`;

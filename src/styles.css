@@ -1690,6 +1690,12 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .find-marks .find-mark { color: transparent; }
 .card.find-target, .column.find-target, .help-button.find-target, .tb-button.find-target, .link-url.find-current { outline: 3px solid #ffb347; outline-offset: 2px; }
 
+/* Download as picture / PDF (job 163): the hidden copy of the board that is drawn. It is invisible and
+   untouchable (the drawing code sets it fully visible in the picture), and none of the controls
+   (resize grips, trash cans, drag handles, guides) are in the picture. */
+.export-clone { position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none; }
+.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .completed-actions, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-hint, .confirm) { display: none; }
+
 /* ---------- File menu (owner request: backup, restore, import) ---------- */
 
 .file-menu-wrap { position: relative; }

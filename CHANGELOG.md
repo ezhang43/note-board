@@ -1,5 +1,13 @@
 # Changelog
 
+## The website leads with what people care about (2026-10-22)
+
+- **The About page has a new headline:** "Free, with no limits. Your notes stay safe." Under it, the four things people told us matter: free with no limits, boards that are safe, no AI pushed on you, and a good phone experience.
+- **Three new sections** say it plainly: "Your boards are safe" (undo, 100 saved versions, backups you can download, offline), "Works well on a phone" and "No AI pushed on you". The AI section is honest that there is an optional Claude connector, which you set up yourself.
+- **The FAQ has a new question,** "Does BusyAnts use AI?".
+- **The comparison table only says what we could confirm.** Notion's "1,000 blocks" became "Limited once shared", and two offline answers we couldn't check became dashes.
+- Nothing in the app or in saved boards changed. The spec no longer says "no tracking"; it says visits are counted privately, as the About page already did.
+
 ## Keys in side panels, screen readers, faster sign-in (2026-10-22)
 
 - **Delete and Backspace no longer delete a note behind a side panel.** With a note selected, pressing Delete while the Focus timer's buttons or a Completed tick box had the keyboard deleted the note without any sign. Now no side panel passes board keys through (undo, redo and zoom still work).

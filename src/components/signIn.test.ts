@@ -37,7 +37,7 @@ describe('who can use BusyAnts', () => {
     expect(rules.match(/boardText\(request\.resource\.data\.data\)/g)?.length).toBe(3);
     expect(rules).toContain("hasOnly(['data', 'client', 'updatedAt'])");
     expect(rules).toContain("hasOnly(['data'])");
-    expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash'])");
+    expect(rules).toContain("hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash', 'kind'])");
   });
 
   it('a shared board is read and changed only by the people it is shared with; joining needs the current link', () => {

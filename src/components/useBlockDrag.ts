@@ -63,7 +63,7 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     holdOrPan(
       e.nativeEvent,
       (start, at, done) => {
-        if (itemId) return trackItemDrag(id, itemId, start, { at, done });
+        if (itemId) return trackItemDrag(id, itemId, start, e.pointerId, { at, done });
         // A block that is part of a bigger selection keeps it, so the whole selection moves.
         appStore.pressBlock(id, false);
         trackDrag(kind, id, el, start, { at, done });

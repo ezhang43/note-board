@@ -98,11 +98,11 @@ function measureLift(cardId: string, ids: string[]) {
 }
 
 /**
- * Drag a checklist item (with its sub-items, or all selected items) from `start`: past 5px, or at
+ * Drag a checklist item (with its sub-items, or all selected items) from `start`, with the finger or mouse `pointerId`: past 5px, or at
  * once after a press-and-hold on a phone (`hold`: where the finger is now, and `done` to call when
  * it lets go), when the item is lifted and the other rows slide aside. Letting go drops it.
  */
-export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, hold?: { at: { x: number; y: number }; done: () => void }) {
+export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }) {
   let started = false;
   const onMove = (ev: { clientX: number; clientY: number }) => {
     if (!started) {
@@ -115,14 +115,15 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
   };
   // At the edge of the screen the board keeps moving, and the drag with it.
   const edges = followEdges((p) => started && onMove(p));
-  // Only the first finger drags; a second one touching or lifting does not move or drop it.
+  // Only the finger that pressed drags; a second one touching or lifting does not move or drop it.
+  // (By id, not isPrimary: a pinch cancels this finger with a made-up event, which is not primary.)
   const onPointerMove = (ev: PointerEvent) => {
-    if (!ev.isPrimary) return;
+    if (ev.pointerId !== pointerId) return;
     edges.track(ev);
     onMove(ev);
   };
   const finish = (ev: PointerEvent) => {
-    if (!ev.isPrimary) return;
+    if (ev.pointerId !== pointerId) return;
     edges.stop();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', finish);

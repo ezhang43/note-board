@@ -1,5 +1,13 @@
 # Changelog
 
+## Card look fixes (2026-10-21)
+
+- The checklist item buttons (Move up, Move down, trash and drag grip) now grow with the text size (A+ / A−), along with their icons and the room kept free for them, so they match bigger text. At Small and Normal they look as before; the phone layout is unchanged.
+- Checkboxes now sit exactly in the middle of their item's first line, for items and sub-items, at every text size, in light and dark mode.
+- A card with a color that is collapsed is now colored all the way from top to bottom, into its rounded corners, instead of showing a colored band with plain strips above and below.
+- Nothing about saved boards changed.
+
+
 ## Calendar: full names, normal time, and quicker add and edit (2026-10-21)
 
 - **Month view shows full names.** Each event's name now wraps onto as many lines as it needs instead of being cut with "…", and the day's row grows taller to fit. The list under the grid shows full names too. The Week view looks the same as before.

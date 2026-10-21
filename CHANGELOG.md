@@ -1,5 +1,12 @@
 # Changelog
 
+## Journal: fold a day's note (2026-10-21)
+
+- In the Journal panel, each day's date is now a button, like the Year, Month and Week headings. Click it (or press Enter or Space) to fold that day's note. A folded day shows its date and, after it, the first line of the note in gray (cut with … if it is long). Click again to open it and keep writing.
+- Every day is open when you open the panel, today's too, and today's note can be folded. Folding is only for looking: it never changes what you wrote, and it isn't remembered or saved.
+- If you fold the day you are typing in, the cursor moves to that day's heading. On a phone the headings are at least 44px tall.
+- Nothing already saved changed.
+
 ## Calendar: press Delete twice to delete an event (2026-10-21)
 
 - With an event's card open, Delete (or Backspace) asks "Delete “Dentist”?" as before. Pressing Delete or Backspace again now answers it: the event is deleted. For a repeating event it deletes **all events in the series**.

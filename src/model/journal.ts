@@ -58,6 +58,11 @@ export function journalBody(text: string): string {
   return i < 0 ? '' : text.slice(i + 1).replace(/^\r?\n/, '');
 }
 
+/** The first line with words in what is written under a note's date line, trimmed: what a folded day shows after its date ('' when nothing is written). */
+export function journalPeek(body: string): string {
+  return body.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+}
+
 /**
  * The note's text with `body` under its date line, which is kept as it is, then a blank line, so
  * journalBody reads back exactly `body` (a line break typed at its start included).

@@ -1923,7 +1923,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (prefers-reduced-motion: no-preference) {
   .jg-head::before { transition: transform 150ms ease-out; }
 }
-.journal-entry h3 { margin: 12px 4px 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.journal-entry h3 { margin: 12px 0 4px; font-size: 12px; font-weight: 600; }
+/* Each day's date is a header button like the groups above it; folded, it shows the note's first line after it, in gray. */
+.jg-day { color: var(--ink-soft); }
+.jg-peek { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--ink-faint); }
 .journal-entry .rich {
   min-height: 3.1em;
   padding: 6px 8px;

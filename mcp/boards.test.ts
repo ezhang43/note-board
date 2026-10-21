@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { recolour, resizeCard, setCollapsedFor, updateCard } from '../src/model/board';
 import { serializeBoard } from '../src/model/persist';
-import { serializeWorkspace } from '../src/model/workspace';
+import { fromPlain, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
+import { applyStyle, boxesOf, sizeStepChange } from '../src/model/textStyle';
+import type { Board } from '../src/model/types';
+import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit } from './boards';
 import { homeBoard, ownRaw, sampleSnapshot, workBoard } from './sample';
 
@@ -152,5 +156,39 @@ describe('safe to edit (round trip)', () => {
     const data = JSON.parse(ownRaw());
     const reordered = { boards: data.boards, home: data.home, version: data.version };
     expect(safeToEdit(JSON.stringify(reordered))).toEqual({ ok: true });
+  });
+});
+
+describe('boards the app makes stay editable by the connector (guard: safeToEdit is an exact round trip)', () => {
+  // Each step is something the app's own buttons do. After every one, the connector must still
+  // be allowed to edit. When a new feature saves a new field, add its step here.
+  const here = (b: Board) => safeToEdit(serializeWorkspace({ home: 'home', boards: { ...readWorkspace(ownRaw())!.ws.boards, home: b } }));
+  const rich = toggleList(
+    setMark(toggleMark(fromPlain('Hello world\nSecond'), { start: { b: 0, o: 0 }, end: { b: 0, o: 5 } }, 'b'), { start: { b: 0, o: 6 }, end: { b: 0, o: 11 } }, 'hl', 'yellow'),
+    0,
+    1,
+    'bullet',
+  );
+
+  it('the starting boards are editable', () => {
+    expect(here(homeBoard())).toEqual({ ok: true });
+  });
+
+  it('after colours, collapsing, resizing, bold, a size step and rich text', () => {
+    let b = homeBoard();
+    const steps: [string, (b: Board) => Board][] = [
+      ['column colour cleared', (x) => recolour(x, ['colIdeas'], null)],
+      ['column colour set', (x) => recolour(x, ['colIdeas'], 'tomato')],
+      ['collapsed', (x) => setCollapsedFor(x, ['noteIdea', 'listGroceries', 'colIdeas'], true)],
+      ['resized', (x) => resizeCard(x, 'linkDocs', 333, 222)],
+      ['bold', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), { bold: true })],
+      ['size step', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), sizeStepChange(x, boxesOf(x, ['noteIdea', 'listGroceries']), 1))],
+      ['rich text', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(rich), rich }))],
+      ['card colour', (x) => recolour(x, ['noteCall'], 'ocean')],
+    ];
+    for (const [name, step] of steps) {
+      b = step(b);
+      expect(here(b), name).toEqual({ ok: true });
+    }
   });
 });

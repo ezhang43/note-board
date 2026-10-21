@@ -57,6 +57,14 @@ describe('the sign-in helper page', () => {
     expect(saved).toHaveLength(0);
   });
 
+  it('an over-long body is refused without stopping the page', async () => {
+    const { origin, nonce, login } = await start();
+    // Over the 64 KB limit; the answer may be a refusal or a reset connection.
+    await fetch(`${origin}/token`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: 'x'.repeat(200_000) }).catch(() => null);
+    expect((await fetch(login.url)).status).toBe(200);
+    expect((await post(origin, good(nonce))).status).toBe(200);
+  });
+
   it('the code can’t be used twice', async () => {
     const { origin, nonce, login } = await start();
     await post(origin, good(nonce));

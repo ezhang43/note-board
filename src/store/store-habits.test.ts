@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { habitList, tickedDays } from '../model/habits';
+import { habitList, tickedDays, weightCard, weightEntries } from '../model/habits';
 import type { StorageLike } from '../model/persist';
 import { fromPlain } from '../model/richText';
 import { createStore } from './store';
@@ -214,5 +214,108 @@ describe('Habits panel', () => {
     again.openHabits();
     again.flush();
     expect(storage.getItem('note-board:v1')).toBe(saved);
+  });
+});
+
+describe('Weight', () => {
+  const weights = (s: Store) => {
+    const id = s.habitsBoard();
+    return weightEntries(id ? weightCard(s.workspace().boards[id]) : undefined);
+  };
+
+  it('the first weight makes the hidden Habits board and one Weight card; it is not a habit and the board stays out of the menu', () => {
+    const s = setup();
+    const homeBoard = s.getState().board;
+    s.openHabits();
+    expect(s.saveWeight('72.4', '2026-10-19')).toBe(72.4);
+    expect(habitsIds(s)).toHaveLength(1);
+    expect(weights(s)).toEqual([{ day: '2026-10-19', kg: 72.4 }]);
+    expect(habits(s)).toEqual([]);
+    expect(s.hiddenBoards()).toEqual([habitsIds(s)[0]]);
+    expect(s.getState().board).toBe(homeBoard);
+    s.addHabit('Walk');
+    expect(habits(s).map((h) => h.title)).toEqual(['Walk']);
+    expect(habitsIds(s)).toHaveLength(1);
+  });
+
+  it('saves nothing for a blank or out-of-range weight, or when the panel is closed', () => {
+    const s = setup();
+    const before = s.workspace();
+    s.openHabits();
+    for (const bad of ['', '  ', '19.9', '400.1', 'abc']) expect(s.saveWeight(bad, '2026-10-19')).toBeNull();
+    expect(s.workspace()).toEqual(before);
+    s.openHabits(); // closed
+    expect(s.saveWeight('72', '2026-10-19')).toBeNull();
+    expect(s.workspace()).toEqual(before);
+  });
+
+  it('entering a day again replaces it; each save is one undo step; the same Weight card is kept', () => {
+    const s = setup();
+    s.openHabits();
+    s.saveWeight('72,4', '2026-10-19');
+    s.saveWeight('72.0', '2026-10-20');
+    s.saveWeight('71.8', '2026-10-19');
+    expect(weights(s)).toEqual([
+      { day: '2026-10-19', kg: 71.8 },
+      { day: '2026-10-20', kg: 72 },
+    ]);
+    const board = s.workspace().boards[s.habitsBoard()!];
+    expect(Object.values(board.cards).filter((c) => c.kind === 'todo')).toHaveLength(1);
+    s.undoHabits();
+    expect(weights(s).map((w) => w.kg)).toEqual([72.4, 72]);
+    s.undoHabits();
+    expect(weights(s).map((w) => w.kg)).toEqual([72.4]);
+    s.redoHabits();
+    expect(weights(s).map((w) => w.kg)).toEqual([72.4, 72]);
+  });
+
+  it('removing a day is one undoable change; removing the last one removes the card, so no empty "Weight" habit appears', () => {
+    const s = setup();
+    s.openHabits();
+    s.saveWeight('72.4', '2026-10-19');
+    s.saveWeight('72.0', '2026-10-20');
+    s.removeWeight('2026-10-20');
+    expect(weights(s)).toEqual([{ day: '2026-10-19', kg: 72.4 }]);
+    s.removeWeight('2026-10-19');
+    expect(weights(s)).toEqual([]);
+    expect(habits(s)).toEqual([]);
+    expect(Object.values(s.workspace().boards[s.habitsBoard()!].cards)).toHaveLength(0);
+    s.undoHabits();
+    expect(weights(s)).toEqual([{ day: '2026-10-19', kg: 72.4 }]);
+    s.undoHabits();
+    expect(weights(s).map((w) => w.day)).toEqual(['2026-10-19', '2026-10-20']);
+    s.removeWeight('2026-01-01'); // nothing on that day
+    expect(weights(s)).toHaveLength(2);
+  });
+
+  it('weights are kept after a reload, and ticking or deleting habits leaves them alone', () => {
+    const storage = memoryStorage();
+    const s = setup(storage);
+    s.openHabits();
+    const walk = s.addHabit('Walk')!;
+    s.saveWeight('72.4', '2026-10-19');
+    s.toggleHabitDay(walk, '2026-10-19');
+    s.deleteHabit(walk);
+    s.flush();
+    const again = setup(storage);
+    again.openHabits();
+    expect(weights(again)).toEqual([{ day: '2026-10-19', kg: 72.4 }]);
+    expect(habits(again)).toEqual([]);
+    expect(again.workspace()).toEqual(s.workspace());
+  });
+
+  it('a Weight card with a malformed item is read without a crash', () => {
+    const s = setup();
+    s.openHabits();
+    s.saveWeight('72.4', '2026-10-19');
+    const id = s.habitsBoard()!;
+    const ws = s.workspace();
+    const board = ws.boards[id];
+    const card = weightCard(board)!;
+    const broken = { ...board, cards: { ...board.cards, [card.id]: { ...card, items: [...card.items, { id: 'x', text: 'banana', done: false, children: [] }] } } };
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [id]: broken } });
+    expect(weights(s)).toEqual([{ day: '2026-10-19', kg: 72.4 }]);
+    expect(s.saveWeight('73', '2026-10-20')).toBe(73);
+    expect(weights(s)).toHaveLength(2);
   });
 });

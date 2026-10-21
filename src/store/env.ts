@@ -23,12 +23,14 @@ export function keyboardInitiated(): boolean {
   return typeof document !== 'undefined' && document.documentElement.dataset.input === 'keys';
 }
 
-/** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). */
-export function copyText(text: string) {
+/** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). Says whether it got there. */
+export async function copyText(text: string): Promise<boolean> {
   try {
-    void globalThis.navigator?.clipboard?.writeText(text).catch(() => {});
+    await globalThis.navigator.clipboard.writeText(text);
+    return true;
   } catch {
     // No clipboard access: copying within the board still works.
+    return false;
   }
 }
 

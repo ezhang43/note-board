@@ -60,7 +60,17 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
   };
 
   return (
-    <div className="boards-menu-wrap" ref={wrap}>
+    <div
+      className="boards-menu-wrap"
+      ref={wrap}
+      onKeyDown={(e) => {
+        // Escape shuts the menu (and goes no further, so a side panel behind it stays open).
+        if (e.key !== 'Escape' || !open) return;
+        e.stopPropagation();
+        setOpen(false);
+        button.current?.focus();
+      }}
+    >
       <button
         ref={button}
         type="button"

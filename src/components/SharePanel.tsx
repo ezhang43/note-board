@@ -71,7 +71,8 @@ function SharePanel({ onClose }: { onClose: () => void }) {
   const rootName = useAppState((s) => (share ? shownName(share.root === s.boards.open ? s.board.name : (s.boards.others[share.root]?.name ?? '')) : ''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
+  // The link that was copied: a new link (after turning it off and on) is not "Copied" yet.
+  const [copied, setCopied] = useState('');
   const me = collab.me();
   if (!sharing) return null;
 
@@ -134,12 +135,11 @@ function SharePanel({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 className="tb-button"
-                onClick={() => {
-                  copyText(link);
-                  setCopied(true);
+                onClick={async () => {
+                  if (await copyText(link)) setCopied(link); // only when it really reached the clipboard
                 }}
               >
-                {copied ? 'Copied' : 'Copy link'}
+                {copied === link ? 'Copied' : 'Copy link'}
               </button>
             </div>
           ) : (

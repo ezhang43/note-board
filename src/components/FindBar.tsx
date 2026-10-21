@@ -58,8 +58,8 @@ export function FindBar() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === 'KeyF') {
         e.preventDefault();
-        // Behind a panel that covers the board it does nothing (neither search could be seen).
-        if (panelCovers()) return;
+        // Behind a panel that covers the board, or the shortcuts list (it may be recording a key), it does nothing.
+        if (panelCovers() || appStore.getState().ui.shortcutsOpen) return;
         appStore.openFind();
         input.current?.focus();
         input.current?.select();
@@ -112,7 +112,12 @@ export function FindBar() {
   const where = current && !here ? ` · ${shownName(appStore.boardName(current.boardId))}` : '';
   const count = !query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${where || (inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? ' · in a closed card' : '')}` : 'No matches';
   return (
-    <div className="find-bar" role="search" aria-label="Search the board">
+    <div className="find-bar" role="search" aria-label="Search the board" onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation(); // nothing else answers this Escape
+        appStore.closeFind();
+      }}
+    >
       <input
         ref={input}
         type="search"
@@ -131,7 +136,8 @@ export function FindBar() {
             e.preventDefault();
             appStore.closeFind();
           }
-          e.stopPropagation(); // the board's own keys stay out of the search box
+          // The board's own keys stay out of the search box, except the zoom keys (or the browser zooms the whole page).
+          if (!((e.ctrlKey || e.metaKey) && ['=', '+', '-', '_', '0'].includes(e.key))) e.stopPropagation();
         }}
       />
       <span className="find-count" role="status" title={count}>
@@ -146,7 +152,7 @@ export function FindBar() {
       <button type="button" className="icon-button" aria-label="Close search" title="Close (Esc)" onClick={appStore.closeFind}>
         <CloseIcon />
       </button>
-      <div className="find-scope" role="group" aria-label="Where to search" onKeyDown={(e) => e.key === 'Escape' && appStore.closeFind()}>
+      <div className="find-scope" role="group" aria-label="Where to search">
         {([false, true] as const).map((wide) => (
           <button
             key={String(wide)}

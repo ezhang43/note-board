@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { shownName } from '../model/board';
 import { boardRights } from '../model/sharing';
 import { boardTree } from '../model/workspace';
@@ -6,6 +7,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
+import { TemplatesDialog } from './TemplatesDialog';
 
 // Several boards, and boards inside boards (owner request, 2026-10-05): the Boards menu lists every
 // board (boards inside another indented under it), opens one, makes a new board, adds a board
@@ -16,7 +18,14 @@ import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
 /** Boards button and menu. */
 export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
   const [open, setOpen] = useState(false);
+  // The "Start a board" dialog (templates), opened from a row in the menu; focus goes back to the button after.
+  const [gallery, setGallery] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const closeGallery = useCallback(() => {
+    setGallery(false);
+    requestAnimationFrame(() => button.current?.focus());
+  }, []);
   const openId = useAppState((s) => s.boards.open);
   const home = useAppState((s) => s.boards.home);
   const openName = useAppState((s) => s.board.name);
@@ -53,6 +62,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
   return (
     <div className="boards-menu-wrap" ref={wrap}>
       <button
+        ref={button}
         type="button"
         className={`tb-button quiet${labelled ? '' : ' icon-only'}`}
         aria-label="Boards"
@@ -93,9 +103,13 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
             <button type="button" role="menuitem" title="A new board on its own" onClick={pick(() => appStore.newBoard())}>
               New board
             </button>
+            <button type="button" role="menuitem" aria-haspopup="dialog" title="Start a board from a ready-made one" onClick={pick(() => setGallery(true))}>
+              New from a template…
+            </button>
           </div>
         </div>
       )}
+      {gallery && createPortal(<TemplatesDialog onClose={closeGallery} />, document.querySelector('.app') ?? document.body)}
     </div>
   );
 }

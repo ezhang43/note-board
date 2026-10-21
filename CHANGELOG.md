@@ -1,5 +1,13 @@
 # Changelog
 
+## Habits and Journal, polished (2026-10-22)
+
+- **Habits is now a Ledger.** The weekdays are written once at the top of one sheet, today's column has a soft band, and each habit is a row with its tick circles. A line under the title says how today is going ("Wednesday · 2 of 6 done"), and each row says how many days you did it ("3 of 7 this week").
+- **Each habit has its own color** (the 8 bold colors, or the usual green): use the ⋯ on its row, which also has Rename and Delete habit. Delete is no longer a bin on every row.
+- **"+ New habit" is the last row**, and the box stays ready after you add one. Month calendars use filled circles, and the Weight card shows your latest weight big, how it changed, and a chart with room around the line.
+- **The Journal's today is a page**: its date as the heading, the week number, a word count and a quiet "Saved". Your earlier days are a tidy timeline: a big date and the first two lines, and a click opens the day to edit. Earlier days now start folded; today starts open. This year no longer has its own header.
+- **The four drop-down boxes are now one "Aa" menu** with labeled buttons (Style, Size, Font, Highlight), plus a highlighter button. A new empty day says "Write about today…".
+- Everything you wrote and ticked is unchanged. Nothing about saving, sync or undo changed; a habit's color is saved with the habit.
 ## Helper sessions work in the cloud (2026-10-22)
 
 - The crew, finish-step and check-pr instructions now work in cloud sessions, where `gh pr` commands are blocked: they use GitHub's other route (`gh api` or the GitHub tools) to open, check and merge pull requests, and wait for the tests without `--watch`. A new spec-check skill lets a background helper run the spec check itself; when a helper can't run the code review, it says so and the coordinator reviews the pull request before it merges. A few stale lines were fixed. Nothing in the app changed.

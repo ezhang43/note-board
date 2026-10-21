@@ -1,5 +1,6 @@
-import { addDays, addMonths, MONTHS, MONTH_NAMES, weekStart, type DayKey } from './calendar';
+import { addDays, addMonths, MONTHS, MONTH_NAMES, weekDays, weekStart, type DayKey } from './calendar';
 import { newId } from './cards';
+import { isBold, type BoldKey } from './palette';
 import type { Board, Card, TodoCard, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
 
@@ -182,3 +183,38 @@ export function weightChart(entries: { day: DayKey; kg: number }[], view: HabitV
   const points = inView.map((e) => ({ ...e, x: span(from, e.day) / span(from, to), y: max === min ? 0.5 : (e.kg - min!) / (max! - min!) }));
   return { from, to, points, min, max };
 }
+
+// Habits redesign (owner picks, 2026-10-22, jobs 166 + 167): a color for each habit and the counts the Ledger shows.
+
+/** The color a habit's ticks use: one of the 8 bold swatches it was given (its card's title color), or null for the default green. */
+export function habitColor(habit: TodoCard): BoldKey | null {
+  return isBold(habit.titleColor) ? (habit.titleColor as BoldKey) : null;
+}
+
+/** The habit with `color` (one of the 8 bold swatches, or null for the default); unchanged if it has it already or the color isn't one of the 8. */
+export function withHabitColor(habit: TodoCard, color: BoldKey | null): TodoCard {
+  if (color !== null && !isBold(color)) return habit;
+  // A title color that isn't one of the 8 counts as none, but "Default" clears it all the same.
+  return (habit.titleColor ?? null) === color ? habit : { ...habit, titleColor: color };
+}
+
+/** How many days of the week `key` is in (Monday to Sunday) the habit was ticked on. */
+export const weekCount = (habit: TodoCard, key: DayKey): number => {
+  const done = tickedDays(habit);
+  return weekDays(weekStart(key)).filter((d) => done.has(d)).length;
+};
+
+/**
+ * The ticks in the month or year `key` is in, and how many days of it have come by `today`
+ * (all of a past one, none of one ahead): "18 of 21 days".
+ */
+export function periodCount(habit: TodoCard, view: 'month' | 'year', key: DayKey, today: DayKey): { ticked: number; of: number } {
+  const { from, to } = habitViewRange(view, key);
+  const ticked = [...tickedDays(habit)].filter((d) => d >= from && d <= to).length;
+  const last = to < today ? to : today;
+  const of = from > today ? 0 : Math.round((Date.parse(`${last}T12:00Z`) - Date.parse(`${from}T12:00Z`)) / 86400000) + 1;
+  return { ticked, of };
+}
+
+/** How many of the habits are ticked on `day`. */
+export const doneToday = (habits: TodoCard[], day: DayKey): number => habits.filter((h) => tickedDays(h).has(day)).length;

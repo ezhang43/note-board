@@ -319,3 +319,25 @@ describe('Weight', () => {
     expect(weights(s)).toHaveLength(2);
   });
 });
+
+describe('habit colors (owner picks, 2026-10-22)', () => {
+  it('give a habit one of the 8 bold colors as one undoable change on the Habits board, and nothing else changes', () => {
+    const s = setup();
+    s.openHabits();
+    s.addHabit('Walk');
+    s.addHabit('Read');
+    const [walk, read] = habits(s);
+    s.setHabitColor(walk.id, 'ocean');
+    expect(habits(s).map((h) => h.titleColor ?? null)).toEqual(['ocean', null]);
+    s.setHabitColor(walk.id, 'ocean'); // the same again changes nothing, so adds nothing to undo
+    s.setHabitColor(read.id, 'butter' as never); // not one of the 8: refused
+    expect(habits(s)[1].titleColor ?? null).toBeNull();
+    s.undoHabits();
+    expect(habits(s).map((h) => h.titleColor ?? null)).toEqual([null, null]);
+    s.redoHabits();
+    expect(habits(s)[0].titleColor).toBe('ocean');
+    s.setHabitColor(walk.id, null);
+    expect(habits(s)[0].titleColor ?? null).toBeNull();
+    expect(habits(s).map((h) => h.title)).toEqual(['Walk', 'Read']);
+  });
+});

@@ -314,6 +314,55 @@ test('Weight: the × removes the latest entry of the period, and Ctrl+Z brings i
   await expect(weightPoints(page)).toHaveCount(0);
 });
 
+// Job #156: the edges of a week and a year, with the browser's clock fixed so they are the same on any day.
+type SavedCard = { title?: string; items?: { text: string; done: boolean }[] };
+const savedHabitCards = (page: Page) =>
+  page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const board = Object.values(raw.boards).find((b) => (b as { name: string }).name === 'Habits') as { cards: Record<string, SavedCard> };
+    return Object.values(board.cards);
+  });
+
+test('around New Year: a week over the year end, a tick on 31 Dec, the year views and today’s weight', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2027, 0, 2, 10, 0)); // Sat 2 Jan 2027, in the week of Mon 28 Dec to Sun 3 Jan
+  await page.goto('/');
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await expect(viewBar(page)).toContainText('28 Dec 2026 – 3 Jan 2027');
+  await row(page, 0).getByRole('button', { name: 'Walk, Thu 31 Dec' }).click();
+  await expect(row(page, 0).getByRole('button', { name: 'Walk, Thu 31 Dec' })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(400);
+  const walk = (await savedHabitCards(page)).find((c) => c.title === 'Walk')!;
+  expect(walk.items!.filter((i) => i.done).map((i) => i.text)).toEqual(['2026-12-31']);
+  await goTo(page, 'Year');
+  await expect(viewBar(page)).toContainText('2027');
+  await expect(row(page, 0).locator('.habit-sq.on')).toHaveCount(0);
+  await viewBar(page).getByRole('button', { name: 'Previous year' }).click();
+  await expect(viewBar(page)).toContainText('2026');
+  await expect(row(page, 0).locator('.habit-sq.on')).toHaveCount(1);
+  await goTo(page, 'Week');
+  await enterWeight(page, '72.4');
+  await page.waitForTimeout(400);
+  const weight = (await savedHabitCards(page)).find((c) => c.title === 'Weight')!;
+  expect(weight.items!.map((i) => i.text)).toContain('2027-01-02 72.4');
+});
+
+test('Year view marks today and the days ahead, and names each month with its ticks', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 10, 0)); // Wed 21 Oct 2026
+  await page.goto('/');
+  await habitsButton(page).click();
+  await addHabit(page, 'Walk');
+  await todayBox(page, 0).click();
+  await goTo(page, 'Year');
+  const october = row(page, 0).getByRole('button', { name: 'October 2026, 1 ticked' });
+  await expect(october).toHaveAttribute('aria-current', 'date');
+  const squares = row(page, 0).locator('.habit-year-month').nth(9).locator('xpath=following-sibling::*[position() <= 31]');
+  await expect(squares.nth(20)).toHaveClass(/\bon\b/);
+  await expect(squares.nth(20)).toHaveClass(/\btoday\b/);
+  await expect(squares.nth(21)).toHaveClass(/\bahead\b/);
+  await expect(squares.nth(19)).not.toHaveClass(/\b(ahead|today|on)\b/);
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 

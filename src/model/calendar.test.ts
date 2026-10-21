@@ -111,6 +111,32 @@ describe('day maths', () => {
   });
 });
 
+describe('month grids at New Year and in a leap February (job #156)', () => {
+  it('a month grid over New Year runs from the Monday before to the Sunday after', () => {
+    const grid = monthGrid('2027-01-15');
+    expect(grid[0][0]).toBe('2026-12-28');
+    expect(grid[grid.length - 1][6]).toBe('2027-01-31');
+    expect(grid.length).toBe(5);
+    expect(viewRange('month', '2027-01-15')).toEqual({ from: '2026-12-28', to: '2027-02-01' });
+  });
+
+  it('February in a leap year has its 29th', () => {
+    const grid = monthGrid('2028-02-10');
+    expect(grid[0][0]).toBe('2028-01-31');
+    expect(grid[grid.length - 1][6]).toBe('2028-03-05');
+    expect(grid.length).toBe(5);
+    expect(grid.flat()).toContain('2028-02-29');
+  });
+
+  it('an all-day event over New Year (Google’s end is the day after) is on its own days only', () => {
+    const e = timed({ allDay: true, start: '2026-12-31', end: '2027-01-02' });
+    expect(eventsOnDay([e], '2026-12-30')).toEqual([]);
+    expect(eventsOnDay([e], '2026-12-31')).toHaveLength(1);
+    expect(eventsOnDay([e], '2027-01-01')).toHaveLength(1);
+    expect(eventsOnDay([e], '2027-01-02')).toEqual([]);
+  });
+});
+
 describe('reading events from Google', () => {
   const simple = {
     id: 'abc',

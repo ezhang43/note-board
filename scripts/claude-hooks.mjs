@@ -1,6 +1,7 @@
 // @ts-check
 // Claude Code hooks for this project (wired up in .claude/settings.json; owner asked 2026-10-05).
 //   node scripts/claude-hooks.mjs risky      before an edit: remind Claude when the file is risky
+//   node scripts/claude-hooks.mjs bash       before a Bash command: refuse broad pkill/killall and pushes to main/build/v1
 //   node scripts/claude-hooks.mjs typecheck  after an edit: type-check when a .ts/.tsx file changed
 //   node scripts/claude-hooks.mjs level [base]  by hand: does this change touch a risky file?
 // Claude Code passes the tool call as JSON on stdin. The decisions are pure and tested in
@@ -32,7 +33,7 @@ function projectPath(filePath, projectDir) {
 }
 
 /**
- * @typedef {{ tool_name?: string, tool_input?: { file_path?: unknown } }} HookInput
+ * @typedef {{ tool_name?: string, tool_input?: { file_path?: unknown, command?: unknown } }} HookInput
  */
 
 /**
@@ -83,6 +84,56 @@ export function typecheckHook(input, projectDir, runTypecheck) {
   return { code: 2, message: `npm run typecheck failed after editing ${file}:\n${shown}${more}` };
 }
 
+const LIVE_BRANCHES = ['main', 'build/v1'];
+
+/**
+ * Before a Bash command: refuse what hurts the other crew sessions sharing this machine and repo
+ * (owner "go" 2026-10-21, job #153). Exit code 2 with the reason, else 0.
+ *   - pkill / killall: kills other workers' browsers and servers; stop only a PID you started.
+ *   - a force push to main or build/v1: never, for anyone.
+ *   - any push onto main or build/v1 (`git push origin <sha>:main`, `build/v1:main`, `HEAD:main`):
+ *     only the crew coordinator, whose Claude Code is started with CREW_COORDINATOR=1.
+ * simple: looks at each command's words, not at the shell. Quoted text that looks like a command
+ * (`echo "x; pkill y"`) is refused too, a bare `git push --force` with no branch named is not caught
+ * (it pushes the current branch), and a coordinator-only variable set inside the command itself is
+ * ignored on purpose. Upgrade if a real mix-up gets through.
+ * @param {HookInput} input
+ * @param {Record<string, string | undefined>} env
+ */
+export function bashGuardHook(input, env) {
+  const command = input.tool_name === 'Bash' ? input.tool_input?.command : undefined;
+  if (typeof command !== 'string') return { code: 0, message: '' };
+  const refuse = (/** @type {string} */ why) => ({ code: 2, message: `Blocked: ${why}` });
+  for (const segment of command.split(/[;&|\n]/)) {
+    let words = segment.trim().split(/\s+/).map((w) => w.replace(/^['"]|['"]$/g, ''));
+    while (words.length && /^(\w+=\S*|sudo|env|command|nohup|time|xargs)$/.test(words[0])) words = words.slice(1);
+    const program = (words[0] ?? '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '');
+    if (program === 'pkill' || program === 'killall') {
+      return refuse(
+        `${program} can kill other sessions' browsers and servers on this machine. ` +
+          'Stop only a process you started yourself, by its PID: kill <pid>.',
+      );
+    }
+    const push = program === 'git' ? words.indexOf('push') : -1;
+    if (push < 0) continue;
+    const args = words.slice(push + 1);
+    const forced = args.some((a) => /^--force(-with-lease|-if-includes)?(=.*)?$/.test(a) || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a));
+    const refs = args.filter((a) => !a.startsWith('-') && a !== '');
+    const live = refs.filter((r) => LIVE_BRANCHES.includes(r.replace(/^\+/, '').replace(/^.*:/, '').replace(/^refs\/heads\//, '')));
+    if (!live.length) continue;
+    if (forced || live.some((r) => r.startsWith('+'))) {
+      return refuse(`never force-push to ${live.join(', ')}. Merge origin/build/v1 into your branch instead (CLAUDE.md rule 9).`);
+    }
+    if (env.CREW_COORDINATOR !== '1') {
+      return refuse(
+        `only the crew coordinator pushes to ${live.join(', ')} (CLAUDE.md rule 9). ` +
+          'Push your own work branch and open a pull request into build/v1.',
+      );
+    }
+  }
+  return { code: 0, message: '' };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
   const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -107,6 +158,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (mode === 'risky') {
     const out = riskyEditHook(input, projectDir);
     if (out) process.stdout.write(JSON.stringify(out));
+  } else if (mode === 'bash') {
+    const res = bashGuardHook(input, process.env);
+    if (res.message) process.stderr.write(res.message + '\n');
+    process.exit(res.code);
   } else if (mode === 'typecheck') {
     const res = typecheckHook(input, projectDir, () => {
       const r = spawnSync('npm', ['run', '--silent', 'typecheck'], { cwd: projectDir, encoding: 'utf8', shell: true });

@@ -62,7 +62,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 - `/crew [request | status]` — the coordinator: the crew coordinator session takes the owner's requests, splits them into jobs, starts a background worker in its own worktree for each (at most 4 at a time), tracks every job's stage on the Crew Board (a private claude.ai page, not in git) and reports one status. Each worktree runs browser tests on its own ports (`scripts/test-ports.mjs`).
 - `emil-design-eng`, `review-animations`, `improve-animations`, `animation-performance`, `mobile-native` — Emil Kowalski's design, motion and phone-feel skills (rule 12), working with Impeccable. `/finish-step` runs a light `emil-design-eng` check on UI changes, and a `mobile-native` check on phone and touch changes.
 - `spec-checker` subagent — compares a change with `SPEC.md` and `docs/decisions.md`; `/finish-step` calls it.
-- Hooks in `.claude/settings.json` (code in `scripts/claude-hooks.mjs`): a reminder before editing a risky file, and a type check after editing a `.ts`/`.tsx` file.
+- Hooks in `.claude/settings.json` (code in `scripts/claude-hooks.mjs`): a reminder before editing a risky file, a type check after editing a `.ts`/`.tsx` file, and a guard before every Bash command that refuses `pkill`/`killall`, any force push to `main` or `build/v1`, and any push onto `main` or `build/v1` unless the session was started with `CREW_COORDINATOR=1` (the crew coordinator, rule 9). `.gitattributes` merges `CHANGELOG.md` and `docs/decisions.md` as "union" (keeps both sides), so parallel pull requests don't conflict there.
 
 ## Decisions
 

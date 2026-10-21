@@ -7,6 +7,13 @@
 - **The sign-in screen opens faster.** It no longer waits for the board's code or for four fonts it doesn't show. It looks the same.
 - Nothing about saved boards changed.
 
+## Safety rails for the helper sessions (2026-10-21)
+
+- Parallel pull requests no longer clash on `CHANGELOG.md` and `docs/decisions.md`: git now keeps both sides when they each add an entry.
+- A new check before every command a Claude session runs refuses stopping every Playwright or node process on the computer (`pkill`/`killall`), force-pushing to `main` or `build/v1`, and pushing onto them from anyone but the crew coordinator.
+- Notes the project never commits (mockups, design notes, worktrees) are now ignored by git.
+- Nothing in the app changed.
+
 ## More connector tests (2026-10-21)
 
 - Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
@@ -49,6 +56,12 @@
 - **A version that was still loading** no longer shows up late after you click Current version, close the history or press Escape.
 - **Escape now only closes a panel when it is meant for it.** With the Focus timer, Calendar, Journal, Habits, Completed or Version history open, Escape used to close the panel as well when you were closing a toolbar or Color menu, leaving a text box, closing the keyboard shortcuts list or canceling a "Delete ...?" question. Now that Escape only does the one thing, and a second Escape closes the panel.
 - Nothing already saved changed.
+
+## Hover colors and the drop glide work again (2026-10-21)
+
+- **Buttons react to the mouse again on a computer.** Thirteen hover effects had stopped working (the toolbar buttons, the zoom and text size buttons, the small buttons on cards and in panels, Completed, Uncheck all, the formatting bar, Version history rows, the ? and coffee buttons, and the calendar's events, days and chips). They still do nothing on a phone or tablet, so a tap never leaves a button tinted.
+- **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
+- Nothing about saved boards changed.
 
 ## Version history keeps your work before another device's changes replace it (2026-10-21)
 

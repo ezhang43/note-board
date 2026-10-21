@@ -1,1 +1,5 @@
 *.pdf binary
+# Parallel pull requests each add a new entry at the top of these two files; keep both sides
+# instead of stopping on a merge conflict (job #153, owner "go" 2026-10-21).
+CHANGELOG.md merge=union
+docs/decisions.md merge=union

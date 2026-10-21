@@ -220,6 +220,41 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 
 /*
+ * Medium windows (owner pick, 2026-10-22): under 1180px wide the less-used buttons fold into ⋯ (see
+ * Toolbar.tsx), a popover made of the phone's ⋯ rows; at 880px and below Note, Checklist, Container
+ * and Color show only their icons (their names stay as tooltips and accessible names).
+ */
+.toolbar-more {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 4;
+  width: 288px;
+  max-height: calc(100dvh - var(--toolbar-height) - 16px);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+  transform-origin: top right;
+}
+/* (More specific than the phone sheet's 48px rows, which this menu borrows.) */
+.toolbar .toolbar-more .phone-rows .tb-button { height: 40px; font-size: 14px; }
+@media (pointer: coarse) {
+  .toolbar .toolbar-more .phone-rows .tb-button { height: 44px; }
+}
+@media (max-width: 880px) {
+  .toolbar .tb-label { display: none; }
+  .toolbar .tb-button:has(> .tb-label) { padding: 0 9px; }
+  .toolbar .colour-control > .tb-button > svg:last-child { display: none; }
+}
+/* The 600-660px strip (just over a phone): the board name may shrink further to leave room for the buttons. */
+@media (max-width: 660px) {
+  .toolbar .board-name { min-width: 64px; }
+}
+
+/*
  * Phone layout (owner request; windows under 600px): a slim top bar with the board name, and a bar
  * along the bottom (PhoneBar) with Undo, Redo, + and ⋯. Its menus open above it.
  */
@@ -2704,7 +2739,7 @@ a.cal-open { align-self: flex-start; }
  * are on screen faster than they leave (they leave at once). Only transform and opacity move.
  */
 .file-menu, .boards-menu, .colour-menu, .fb-font-menu { transform-origin: top left; }
-.share-panel { transform-origin: top right; }
+.share-panel, .toolbar-more { transform-origin: top right; }
 .phone-sheet, .app.phone .cal-card { transform-origin: bottom center; }
 .cal-card { transform-origin: top right; }
 
@@ -2721,11 +2756,11 @@ a.cal-open { align-self: flex-start; }
   html[data-input='keys'] .collapse-arrow { transition: none; }
 
   /* Menus, panels and the phone sheet. */
-  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {
     transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
   @starting-style {
-    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
+    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
     /* The Color menu only fades: the board is moved aside by where its box is the moment it opens. */
     html:not([data-input='keys']) :is(.colour-menu, .shortcuts-backdrop) { opacity: 0; }
     html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }

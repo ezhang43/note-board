@@ -20,16 +20,16 @@ import { collab } from '../sync/collabSession';
 import { account, useAccountRemover } from '../sync/account';
 import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
-import { usePhone } from './usePhone';
-import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
+import { useMedia, usePhone } from './usePhone';
+import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
   const drag = useNewCardDrag(kind);
   return (
-    <button type="button" className={`tb-button add-${kind}`} title={`Click to add a ${label.toLowerCase()}, or drag it onto the board`} {...drag}>
+    <button type="button" className={`tb-button add-${kind}`} aria-label={label} title={`Click to add a ${label.toLowerCase()}, or drag it onto the board`} {...drag}>
       {kind === 'note' ? <NoteIcon /> : <ChecklistIcon />}
-      {label}
+      <span className="tb-label">{label}</span>
     </button>
   );
 }
@@ -40,7 +40,7 @@ function NewColumnButton() {
   return (
     <button type="button" className="tb-button add-column" aria-label="New container" title="Click to add a container, or drag it onto the board" {...drag}>
       <ContainerIcon />
-      Container
+      <span className="tb-label">Container</span>
     </button>
   );
 }
@@ -283,7 +283,7 @@ export function ColourControl() {
         onClick={appStore.toggleColourMenu}
       >
         <span className="colour-dot" aria-hidden="true" style={{ background: shown.bg, borderColor: current ? shown.text : undefined }} />
-        Color
+        <span className="tb-label">Color</span>
         <CaretIcon />
       </button>
       {open && (
@@ -530,9 +530,45 @@ function BoardName() {
   );
 }
 
+/**
+ * ⋯ (owner pick, 2026-10-22): in windows under 1180px wide, Arrange, File, Feedback, Appearance and
+ * Sign out fold into this menu, the same rows the phone's ⋯ sheet has. Share stays on the toolbar.
+ */
+function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
+  const { open, setOpen, wrap, onKeyDown } = usePopover();
+  return (
+    <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
+      <button type="button" className="tb-button icon-only" aria-label="More" title="More: Arrange, File, Feedback, Appearance, Sign out" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <MoreIcon />
+      </button>
+      {open && (
+        <div className="toolbar-more phone-more" role="dialog" aria-label="More">
+          <div className="phone-rows">
+            <ArrangeMenu />
+            <FileMenu />
+            <FeedbackButton onOpen={() => setOpen(false)} />
+            <AppearanceMenu labelled />
+            {onSignOut && (
+              <button type="button" className="tb-button" onClick={() => {
+                  setOpen(false);
+                  onSignOut();
+                }}>
+                <SignOutIcon />
+                Sign out
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   const canUndo = useAppState((s) => s.ui.canUndo);
   const canRedo = useAppState((s) => s.ui.canRedo);
+  // Under 1180px the less-used buttons fold into ⋯ (the full toolbar needs about 1160px).
+  const folded = useMedia('(max-width: 1179px)');
   // On a phone the top bar only holds the board name; everything else is in the bottom bar (PhoneBar).
   if (usePhone())
     return (
@@ -585,15 +621,20 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
 
       <div className="toolbar-divider" aria-hidden="true" />
       <ColourControl />
-      <ArrangeMenu />
-      <FileMenu />
-      <FeedbackButton />
+      {!folded && (
+        <>
+          <ArrangeMenu />
+          <FileMenu />
+          <FeedbackButton />
+        </>
+      )}
 
       <div className="toolbar-divider" aria-hidden="true" />
-      <AppearanceMenu />
+      {!folded && <AppearanceMenu />}
       <ShareButton />
+      {folded && <MoreMenu onSignOut={onSignOut} />}
 
-      {onSignOut && (
+      {onSignOut && !folded && (
         <>
           <div className="toolbar-divider" aria-hidden="true" />
           {/* An icon, so it still fits at the far right of a 1280px window (owner bug report). */}

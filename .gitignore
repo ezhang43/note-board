@@ -3,3 +3,7 @@ dist
 test-results
 playwright-report
 .claude/crew-log.md
+.claude/worktrees/
+docs/mockups/
+.impeccable/
+PRODUCT.md

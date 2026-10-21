@@ -755,3 +755,192 @@ describe('restoring a version while offline (job #93)', () => {
     expect((await local.list()).map((v) => v.id)).toEqual(['newer', 'before']);
   });
 });
+
+// Job #147 (review 137, H3): a phone's old copy, saved offline and sent hours later, replaces every
+// board on the computer. The boards as they were just before are kept as a version, so the work
+// done here can be brought back from Version history.
+describe('changes from another device replacing work done here', () => {
+  const MIN = 60_000;
+  type Ws = ReturnType<ReturnType<typeof createStore>['workspace']>;
+  /** The boards as another device last saw them, with the home board renamed. */
+  const oldCopy = (ws: Ws, name: string): Ws => ({ ...ws, boards: { ...ws.boards, [ws.home]: { ...ws.boards[ws.home], name } } });
+
+  it('saves the boards as they were just before, marked as such, and still shows the incoming copy', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work'); // 9:00, saves the first version
+    await settled();
+    clock.now += 5 * MIN;
+    store.renameBoard('More work');
+    await settled();
+    clock.now += 15 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Old phone copy'));
+    await settled();
+    expect(store.getState().board.name).toBe('Old phone copy');
+    const list = await versions.list();
+    expect(list).toHaveLength(2);
+    expect(list[0].kind).toBe('outside');
+    expect(list[0].savedAt).toBe(clock.now);
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('More work');
+    expect(list[1].kind).toBeUndefined();
+  });
+
+  it('the work can be brought back by restoring that version', async () => {
+    const { store, versions, clock } = setup();
+    store.setShares([], true);
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Old phone copy'));
+    await settled();
+    const [v] = await versions.list();
+    await restoreVersion(store, versions, v.id, () => clock.now);
+    expect(store.getState().board.name).toBe('Work');
+  });
+
+  it('no version when nothing was edited on this page since its last version', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'One'));
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Two'));
+    await settled();
+    expect(await versions.list()).toHaveLength(2);
+  });
+
+  it('kept even soon after an ordinary version, as that one holds the boards from before the edits (review of #147)', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work'); // 9:00, an ordinary version of the board from before
+    await settled();
+    clock.now += 8 * MIN;
+    store.renameBoard('More work');
+    await settled();
+    clock.now += 1 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'From the phone'));
+    await settled();
+    const list = await versions.list();
+    expect(list).toHaveLength(2);
+    expect(list[0].kind).toBe('outside');
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('More work');
+  });
+
+  it('at most one every 10 minutes, so using two devices at once doesn’t fill the history', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Phone 1')); // kept
+    await settled();
+    clock.now += 1 * MIN;
+    store.renameBoard('Work 2');
+    clock.now += 4 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Phone 2')); // 5 minutes later: not kept
+    await settled();
+    // (Ordinary versions are saved as usual meanwhile.)
+    const kept = async () => (await versions.list()).filter((v) => v.kind === 'outside');
+    expect(await kept()).toHaveLength(1);
+    clock.now += 6 * MIN;
+    store.renameBoard('Work 3');
+    store.replaceWorkspace(oldCopy(phone, 'Phone 3')); // 11 minutes after the last one: kept
+    await settled();
+    const list = await kept();
+    expect(list).toHaveLength(2);
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Work 3');
+  });
+
+  it('kept even when another device’s clock is ahead and its newest version looks newer than the edits here', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    const ahead = serializeWorkspace(phone);
+    await versions.save({ id: 'ahead', savedAt: clock.now + 60 * MIN, cards: 0, columns: 0, hash: contentHash(ahead) }, ahead);
+    clock.now += 20 * MIN;
+    store.renameBoard('More work'); // reads the list: the phone's version is "newer"
+    await settled();
+    clock.now += 1 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'From the phone'));
+    await settled();
+    const kept = (await versions.list()).find((v) => v.kind === 'outside');
+    expect(homeIn(await versions.get(kept!.id))?.name).toBe('More work');
+  });
+
+  it('restoring a backup of every board keeps only its own safety version, not a second one marked as from another device (review of #147)', async () => {
+    const { store, versions, clock } = setup();
+    store.setShares([], true);
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    const home = store.getState().boards.open;
+    const backup = serializeWorkspace({ home, boards: { [home]: { ...store.getState().board, name: 'Backup home' }, other: { ...store.getState().board, name: 'Backup other' } } });
+    await restoreFromBackup(store, versions, backup, () => clock.now);
+    await settled();
+    const list = await versions.list();
+    expect(list.map((v) => v.kind)).toEqual([undefined, undefined]);
+    expect(homeIn(await versions.get(list[0].id))?.name).toBe('Work');
+  });
+
+  it('a shared board arriving (joining one, before its share is listed) doesn’t save one', async () => {
+    const { store, versions, clock } = setup();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    store.replaceBoards({ b_joined: { ...store.getState().board, name: 'Shared with me' } });
+    await settled();
+    expect(Object.keys(store.workspace().boards)).toContain('b_joined');
+    expect(await versions.list()).toHaveLength(1);
+  });
+
+  it('a shared board changed by someone else doesn’t save one (only the person’s own boards count)', async () => {
+    const { store, versions, clock } = setup();
+    const id = store.newBoard();
+    store.setShares([{ id: 's1', root: id, boards: [id], owner: false, ownerUid: 'bob', people: [], link: null }], true);
+    store.openBoard(store.getState().boards.home);
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    const shared = store.workspace().boards[id];
+    store.replaceBoards({ [id]: { ...shared, name: 'Changed by Bob' } });
+    await settled();
+    expect(await versions.list()).toHaveLength(1);
+  });
+
+  it('a version that can’t be saved (too big for the online limit, say) doesn’t stop the incoming copy', async () => {
+    const store = createStore(null, (fn) => fn());
+    const inner = localVersionStore(memory());
+    let refuse = false;
+    const versions = { ...inner, save: (m: VersionMeta, d: string) => (refuse ? Promise.reject(new Error('too big')) : inner.save(m, d)) };
+    const clock = { now: new Date(2026, 9, 4, 9, 0).getTime() };
+    startVersions(store, versions, { now: () => clock.now });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    refuse = true;
+    clock.now += 20 * MIN;
+    store.replaceWorkspace(oldCopy(phone, 'Old phone copy'));
+    await settled();
+    expect(store.getState().board.name).toBe('Old phone copy');
+    expect(await inner.list()).toHaveLength(1);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('starts saving straight away, before anything else can clear this device (deleting a demo account)', async () => {
+    const { store, versions, clock } = setup();
+    const phone = store.workspace();
+    store.renameBoard('Work');
+    await settled();
+    clock.now += 20 * MIN;
+    const save = vi.spyOn(versions, 'save');
+    store.replaceWorkspace(oldCopy(phone, 'Old phone copy'));
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+});

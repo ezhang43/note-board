@@ -1,5 +1,9 @@
 # Changelog
 
+## A tidy toolbar in medium windows (2026-10-22)
+
+- In windows narrower than 1180px (an upright iPad, a small laptop), Arrange, File, Feedback, Appearance and Sign out now fold into a **⋯** button at the right end, so nothing runs off the edge any more. Share stays on the toolbar. The ⋯ menu has the same rows as on a phone. At 880px and below, Note, Checklist, Container and Color show only their icons (hover for the name). Wider windows look exactly as before. Saved boards are unchanged.
+
 ## Helper sessions work in the cloud (2026-10-22)
 
 - The crew, finish-step and check-pr instructions now work in cloud sessions, where `gh pr` commands are blocked: they use GitHub's other route (`gh api` or the GitHub tools) to open, check and merge pull requests, and wait for the tests without `--watch`. A new spec-check skill lets a background helper run the spec check itself; when a helper can't run the code review, it says so and the coordinator reviews the pull request before it merges. A few stale lines were fixed. Nothing in the app changed.

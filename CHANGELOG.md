@@ -1,5 +1,11 @@
 # Changelog
 
+## Hover colors and the drop glide work again (2026-10-21)
+
+- **Buttons react to the mouse again on a computer.** Thirteen hover effects had stopped working (the toolbar buttons, the zoom and text size buttons, the small buttons on cards and in panels, Completed, Uncheck all, the formatting bar, Version history rows, the ? and coffee buttons, and the calendar's events, days and chips). They still do nothing on a phone or tablet, so a tap never leaves a button tinted.
+- **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
+- Nothing about saved boards changed.
+
 ## Resize cards from any side (2026-10-21)
 
 - **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).

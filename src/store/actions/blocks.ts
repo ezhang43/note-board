@@ -21,7 +21,7 @@ import { pinchView } from '../../model/pinch';
 import { centreOf, panBy, phoneCardWidth, resetZoom, screenToBoard, viewFillingWidth, viewFitting, viewShowing, zoomBy } from '../../model/view';
 import { readWorkspace, type Workspace } from '../../model/workspace';
 import type { StoreContext } from '../core';
-import type { SidePanelKind } from '../types';
+import type { SidePanelKind, Ui } from '../types';
 
 // Board, view, selection and block actions: adding, importing, editing, collapsing, deleting,
 // copying and moving cards and columns.
@@ -85,12 +85,23 @@ export function blockActions(ctx: StoreContext) {
     return moved;
   }
 
-  /** "Deleted 2 cards", "Deleted 1 container and 3 cards", for screen readers. */
-  function announceDeleted(board: Board, ids: string[]) {
-    const columns = ids.filter((id) => board.columns[id]).length;
-    const cards = ids.length - columns;
-    announce(`Deleted ${[columns && count(columns, 'container'), cards && count(cards, 'card')].filter(Boolean).join(' and ')}`);
+  /** Deletes `ids` as one undo step, then says "Deleted 2 cards" / "Deleted 1 container and 3 cards", with Undo. */
+  function deleteBlocks(ids: string[], ui: Partial<Ui> = {}) {
+    const board = ctx.state.board;
+    const cols = ids.filter((id) => board.columns[id]);
+    // The cards inside deleted containers go too (unless also selected, so none is counted twice).
+    const cards = ids.length - cols.length + cols.reduce((n, id) => n + B.shownCardIds(board, id).filter((c) => !ids.includes(c)).length, 0);
+    const text = `Deleted ${[cols.length && count(cols.length, 'container'), cards && count(cards, 'card')].filter(Boolean).join(' and ')}`;
+    ctx.deleting(text, () =>
+      commit((b) => {
+        const next = B.deleteBlocks(b, ids);
+        return { board: next, ui: { ...ui, selection: liveSelection(next) } };
+      }),
+    );
   }
+
+  /** A container with cards in it (the hidden Completed record doesn't count): deleting it asks first. */
+  const hasCards = (b: Board, id: string) => B.shownCardIds(b, id).length > 0;
 
   return {
     // ---------- board ----------
@@ -439,23 +450,21 @@ export function blockActions(ctx: StoreContext) {
 
     // ---------- deleting ----------
     deleteCard(id: string) {
-      if (commit((b) => B.deleteCard(b, id), { ui: { selection: liveSelection(ctx.state.board, [id]) } })) announce('Deleted 1 card');
+      ctx.deleting('Deleted 1 card', () => commit((b) => B.deleteCard(b, id), { ui: { selection: liveSelection(ctx.state.board, [id]) } }));
     },
-    askDeleteColumn: (id: string) => updateUi({ confirm: { columnId: id, ids: [id] } }),
+    /** A container's trash can: asks first when it has cards; an empty one goes at once, with Undo (owner, 2026-10-22). */
+    askDeleteColumn(id: string) {
+      if (hasCards(ctx.state.board, id)) updateUi({ confirm: { columnId: id, ids: [id] } });
+      else deleteBlocks([id], { confirm: null, colourMenuOpen: false });
+    },
     cancelDelete: () => updateUi({ confirm: null }),
     confirmDelete() {
       const c = ctx.state.ui.confirm;
-      if (!c) return;
-      const board = ctx.state.board;
-      const done = commit((b) => {
-        const next = B.deleteBlocks(b, c.ids);
-        return { board: next, ui: { confirm: null, selection: liveSelection(next) } };
-      });
-      if (done) announceDeleted(board, c.ids);
+      if (c) deleteBlocks(c.ids, { confirm: null });
     },
     /**
-     * Delete / Backspace: delete the selection. If it includes a column, the same confirmation as
-     * the column's × appears first. Returns false when nothing is selected.
+     * Delete / Backspace: delete the selection. If it includes a container with cards, the same
+     * confirmation as the container's trash can appears first. Returns false when nothing is selected.
      */
     deleteSelection(): boolean {
       const { board, ui } = ctx.state;
@@ -463,16 +472,12 @@ export function blockActions(ctx: StoreContext) {
       if (ui.drag || ui.resize) return true;
       const ids = liveSelection(board);
       if (!ids.length) return false;
-      const firstColumn = ids.find((id) => board.columns[id]);
+      const firstColumn = ids.find((id) => hasCards(board, id));
       if (firstColumn) {
         updateUi({ confirm: { columnId: firstColumn, ids } });
         return true;
       }
-      const done = commit((b) => {
-        const next = B.deleteBlocks(b, ids);
-        return { board: next, ui: { selection: liveSelection(next), colourMenuOpen: false } };
-      });
-      if (done) announceDeleted(board, ids);
+      deleteBlocks(ids, { colourMenuOpen: false });
       return true;
     },
 

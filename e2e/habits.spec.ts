@@ -144,22 +144,16 @@ test('habits, names and ticks are kept after a reload', async ({ page }) => {
   await expect(todayBox(page, 0)).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('delete asks first, and Ctrl+Z in the panel brings the habit back with its ticks; Home is never undone', async ({ page }) => {
+test('delete goes at once with Undo, and Ctrl+Z in the panel brings the habit back with its ticks; Home is never undone', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('on home');
   await page.keyboard.press('Escape');
   await habitsButton(page).click();
   await addHabit(page, 'Walk');
   await todayBox(page, 0).click();
-  // Cancelled: nothing goes.
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain('Walk');
-    void d.dismiss();
-  });
+  // No question (owner, 2026-10-22): it goes at once, with the Undo message.
   await deleteHabit(page, 0, 'Walk');
-  await expect(habitRows(page)).toHaveCount(1);
-  page.once('dialog', (d) => void d.accept());
-  await deleteHabit(page, 0, 'Walk');
+  await expect(page.locator('.undo-toast')).toContainText('Walk');
   await expect(habitRows(page)).toHaveCount(0);
   await page.keyboard.press('Control+z');
   await expect(habitRows(page)).toHaveCount(1);
@@ -432,14 +426,13 @@ test('Ledger: a habit’s ⋯ menu renames it, gives it one of the 8 bold colors
   await expect(row(page, 0)).not.toHaveAttribute('data-hc', /./);
   await page.keyboard.press('Control+y');
   await expect(row(page, 0)).toHaveAttribute('data-hc', 'ocean');
-  // Rename puts the cursor in the name, selected; Delete asks first.
+  // Rename puts the cursor in the name, selected; Delete goes at once (with Undo).
   await openMenu(page, 0, 'Walk');
   await moreMenu(page, 0).getByRole('button', { name: 'Rename' }).click();
   await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toBeFocused();
   await page.keyboard.type('Run');
   await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toHaveValue('Run');
   await openMenu(page, 0, 'Run');
-  page.once('dialog', (d) => void d.accept());
   await moreMenu(page, 0).getByRole('button', { name: 'Delete habit' }).click();
   await expect(habitRows(page)).toHaveCount(1);
 });

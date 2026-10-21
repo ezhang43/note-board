@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Dialog, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { add, box, fontsLoaded } from './helpers';
 
@@ -95,8 +95,8 @@ test('the person who shared it can remove someone: the board leaves their screen
   const link = await aliceSharesTrip(alice);
   const bob = await bobJoins(browser, link, `Bob${t}`);
   await openShare(alice);
-  alice.once('dialog', (d) => d.accept());
   await sharePanel(alice).getByRole('button', { name: `Remove Bob${t}` }).click();
+  await alice.getByRole('alertdialog', { name: `Remove Bob${t}?` }).getByRole('button', { name: `Remove Bob${t}` }).click();
   await expect(sharePanel(alice).getByText(`Bob${t}`)).toHaveCount(0);
   await expect(bob.getByRole('status').filter({ hasText: '“Trip” is no longer shared with you.' })).toBeVisible({ timeout: 8000 });
   await expect(boardName(bob)).not.toHaveValue('Trip');
@@ -129,8 +129,8 @@ test('someone it was shared with can’t rename or delete the shared board, but 
   await bob.locator('header.toolbar').click({ position: { x: 600, y: 5 } });
 
   await openShare(bob);
-  bob.once('dialog', (d) => d.accept());
   await sharePanel(bob).getByRole('button', { name: 'Leave this board' }).click();
+  await bob.getByRole('alertdialog', { name: 'Leave “Trip”?' }).getByRole('button', { name: 'Leave board' }).click();
   await expect(boardName(bob)).not.toHaveValue('Trip');
   await openShare(alice);
   await expect(sharePanel(alice).getByText(`Bob${t}`)).toHaveCount(0, { timeout: 8000 });
@@ -144,8 +144,8 @@ test('leaving a board that doesn’t work says so, and the board stays', async (
   // No connection for leaving: the pretend server never hears it.
   await bob.route('**/call', (route) => (route.request().postData()?.includes('"method":"leave"') ? route.abort() : route.continue()));
   await openShare(bob);
-  bob.once('dialog', (d) => d.accept());
   await sharePanel(bob).getByRole('button', { name: 'Leave this board' }).click();
+  await bob.getByRole('alertdialog', { name: 'Leave “Trip”?' }).getByRole('button', { name: 'Leave board' }).click();
   await expect(sharePanel(bob).getByRole('alert')).toHaveText('That didn’t work. Check your connection and try again.');
   await expect(boardName(bob)).toHaveValue('Trip');
 });
@@ -157,8 +157,8 @@ test('deleting a shared board (by the person who shared it) deletes it for every
   const bob = await bobJoins(browser, link, `Bob${t}`);
   await alice.keyboard.press('Escape');
   await alice.getByRole('button', { name: 'Boards', exact: true }).click();
-  alice.once('dialog', (d) => d.accept());
   await alice.getByRole('menu', { name: 'Boards' }).getByRole('button', { name: 'Delete board Trip' }).click();
+  await alice.getByRole('alertdialog', { name: 'Delete “Trip” for everyone?' }).getByRole('button', { name: 'Delete board' }).click();
   await expect(boardName(alice)).not.toHaveValue('Trip');
   await expect(bob.getByRole('status').filter({ hasText: '“Trip” was deleted by the person who shared it.' })).toBeVisible({ timeout: 8000 });
   await expect(boardName(bob)).not.toHaveValue('Trip');
@@ -355,8 +355,8 @@ test('a shared board you leave can be brought back from Version history', async 
   const link = await aliceSharesTrip(alice);
   const bob = await bobJoins(browser, link, `Bob${t}`);
   await openShare(bob);
-  bob.once('dialog', (d) => d.accept());
   await sharePanel(bob).getByRole('button', { name: 'Leave this board' }).click();
+  await bob.getByRole('alertdialog', { name: 'Leave “Trip”?' }).getByRole('button', { name: 'Leave board' }).click();
   await expect(boardName(bob)).not.toHaveValue('Trip');
   await bob.keyboard.press('Escape');
   await bob.getByRole('button', { name: 'Version history', exact: true }).click();
@@ -396,15 +396,11 @@ test('someone it was shared with restores an old backup: their own boards come b
   const tripId = Object.keys(saved.boards).find((id) => saved.boards[id].name === 'Trip')!;
   const single = info.outputPath('trip-only.json');
   writeFileSync(single, JSON.stringify({ version: 2, board: { ...saved.boards[tripId], name: 'Trip from a file' } }));
-  let asked = false;
-  const ask = (d: Dialog) => ((asked = true), void d.dismiss());
-  bob.on('dialog', ask);
   const picking = bob.waitForEvent('filechooser');
   await fileMenu('Restore from backup…');
   await (await picking).setFiles(single);
   await expect(bob.getByRole('status').filter({ hasText: 'Only the person who shared this board can restore it.' })).toBeVisible();
-  bob.off('dialog', ask);
-  expect(asked).toBe(false);
+  await expect(bob.getByRole('alertdialog')).toHaveCount(0);
   await expect(boardName(bob)).toHaveValue('Trip');
   await bob.getByRole('status').getByRole('button', { name: 'Dismiss' }).click();
 
@@ -418,10 +414,10 @@ test('someone it was shared with restores an old backup: their own boards come b
   // Bob restores the old backup.
   const file = info.outputPath('bob-backup.json');
   writeFileSync(file, backup);
-  bob.once('dialog', (d) => d.accept());
   const chooser = bob.waitForEvent('filechooser');
   await fileMenu('Restore from backup…');
   await (await chooser).setFiles(file);
+  await bob.getByRole('alertdialog', { name: 'Replace all your boards with the backup?' }).getByRole('button', { name: 'Replace all boards' }).click();
   await expect(bob.getByRole('status').filter({ hasText: '“Trip” is shared with you, so it was left as it is.' })).toBeVisible();
   await expect(boardName(bob)).toHaveValue('My first board');
 
@@ -447,8 +443,6 @@ test('before the list of shared boards has arrived, a restore changes nothing an
   await boardName(page).fill('Now');
   const backup = info.outputPath('carol.json');
   writeFileSync(backup, JSON.stringify({ version: 2, board: { name: 'Then', snap: true, cards: {}, columns: {}, order: [] } }));
-  let asked = 0;
-  page.on('dialog', (d) => (asked++, void d.accept()));
   const restore = async () => {
     const picking = page.waitForEvent('filechooser');
     await toolbar(page).getByRole('button', { name: 'File', exact: true }).click();
@@ -460,7 +454,7 @@ test('before the list of shared boards has arrived, a restore changes nothing an
   await expect(waitNote).toBeVisible();
   await expect(boardName(page)).toHaveValue('Now');
   // Not asked "Replace this board…?" for a restore that won't happen.
-  expect(asked).toBe(0);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
 
   // Once the list has arrived, the same restore goes ahead.
   await page.unrouteAll();
@@ -469,6 +463,7 @@ test('before the list of shared boards has arrived, a restore changes nothing an
   await expect(boardName(page)).toHaveValue('Now');
   await expect(async () => {
     await restore();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Replace board' }).click({ timeout: 1000 });
     await expect(boardName(page)).toHaveValue('Then', { timeout: 1000 });
   }).toPass({ timeout: 10000 });
   await context.close();

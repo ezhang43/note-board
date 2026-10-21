@@ -199,8 +199,7 @@ test('undo and redo buttons undo moves, colors and deletes', async ({ page }) =>
   expect(p1).not.toEqual(p0);
   await page.getByRole('button', { name: 'Color of selected cards and containers' }).click();
   await page.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Peach' }).click();
-  await col.getByRole('button', { name: 'Delete container and its cards' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete container' }).click();
+  await col.getByRole('button', { name: 'Delete container and its cards' }).click(); // empty: no question (owner, 2026-10-22)
   await expect(columns(page)).toHaveCount(0);
 
   await undoButton(page).click();

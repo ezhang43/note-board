@@ -75,6 +75,17 @@ export interface ConfirmDelete {
   ids: string[];
 }
 
+/**
+ * The Undo message after a delete (job 170): `text` as said aloud, on board `board`. It only counts
+ * while nothing else has changed since (`edits`, `outside`: the store's counts when it was made).
+ */
+export interface UndoToast {
+  text: string;
+  board: string;
+  edits: number;
+  outside: number;
+}
+
 /** Checklist items selected together (by press-and-drag or Shift+click), all in one list. */
 export interface ItemSelection {
   cardId: string;
@@ -138,6 +149,7 @@ export interface Ui {
   confirm: ConfirmDelete | null;
   /** Ctrl+Shift+Backspace (owner request): asking "Delete N completed items?", or saying there are none. */
   deleteCompleted: 'ask' | 'none' | null;
+  undoToast: UndoToast | null;
   drag: Drag | null;
   /** A new card being dragged from a toolbar Add button. */
   newDrag: NewDrag | null;
@@ -225,6 +237,7 @@ export const emptyUi: Ui = {
   shortcutsOpen: false,
   confirm: null,
   deleteCompleted: null,
+  undoToast: null,
   drag: null,
   newDrag: null,
   resize: null,

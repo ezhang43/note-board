@@ -5,6 +5,7 @@ import { useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
 import { collab, useNotice, useSharing } from '../sync/collabSession';
 import { CloseIcon, ShareIcon } from './icons';
+import { ask } from './ConfirmDialog';
 
 // Sharing a board (owner request, 2026-10-05: several people editing at once). The Share button
 // (toolbar; ⋯ on a phone) opens a panel to share the open board by link, copy the link, see who
@@ -29,7 +30,8 @@ export function ShareButton({ phone = false, onOpen }: { phone?: boolean; onOpen
   // A click anywhere else, or Escape, closes the panel.
   useEffect(() => {
     if (!open) return;
-    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
+    // A press in a question the panel asked (Remove, Leave) isn't outside it.
+    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && !(e.target as Element).closest?.('dialog.ask') && setOpen(false);
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     window.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', key);
@@ -157,8 +159,9 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                     className="tb-button quiet"
                     aria-label={`Remove ${p.name}`}
                     disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Remove ${p.name}? “${rootName}” will no longer be shared with them. If the link is on, it changes: share the new one with anyone else who should join.`)) void run(() => sharing.removePerson(share.id, p.uid));
+                    onClick={async () => {
+                      const yes = await ask({ title: `Remove ${p.name}?`, body: `“${rootName}” will no longer be shared with them. If the link is on, it changes: share the new one with anyone else who should join.`, action: `Remove ${p.name}`, danger: true });
+                      if (yes) void run(() => sharing.removePerson(share.id, p.uid));
                     }}
                   >
                     Remove
@@ -173,7 +176,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
               className="tb-button quiet share-leave"
               disabled={busy}
               onClick={async () => {
-                if (!window.confirm(`Leave “${rootName}”? It will go from your boards. Whoever shared it can share it with you again.`)) return;
+                if (!(await ask({ title: `Leave “${rootName}”?`, body: 'It will go from your boards. Whoever shared it can share it with you again.', action: 'Leave board', cancel: 'Stay', danger: true }))) return;
                 // Closed only once it worked, so an error shows in the panel.
                 if (await run(() => sharing.leave(share.id))) onClose();
               }}

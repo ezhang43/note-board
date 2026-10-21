@@ -151,6 +151,9 @@ function withColumnCards(board: Board, ids: string[]): string[] {
 /** The hidden Completed record is never collapsed or expanded (it isn't drawn). */
 const drawn = (c: Card) => c.kind !== 'completed';
 
+/** The cards drawn in column `colId` (an older board can keep its Completed record there, not drawn). */
+export const shownCardIds = (board: Board, colId: string) => board.columns[colId]?.cardIds.filter((id) => board.cards[id] && drawn(board.cards[id])) ?? [];
+
 /** True if any card or column is open (not collapsed); of `ids` (and their cards) only, if given. */
 export function anyExpanded(board: Board, ids?: string[]): boolean {
   if (ids) return withColumnCards(board, ids).some((id) => board.cards[id] ? drawn(board.cards[id]) && !board.cards[id].collapsed : board.columns[id]?.collapsed === false);
@@ -274,7 +277,7 @@ export function shiftInColumn(board: Board, cardId: string, step: -1 | 1): Board
   const col = columnOf(board, cardId);
   if (!col) return board;
   // An older board can keep its Completed record (not drawn) in a column: step past it.
-  const shown = col.cardIds.filter((id) => board.cards[id]?.kind !== 'completed');
+  const shown = shownCardIds(board, col.id);
   const past = shown[shown.indexOf(cardId) + step];
   if (!past) return board;
   return moveCard(board, cardId, { type: 'column', columnId: col.id, index: col.cardIds.indexOf(past) });

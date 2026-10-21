@@ -1,5 +1,12 @@
 # Changelog
 
+## Fix: version preview during a drag, and Escape (2026-10-21)
+
+- **No more white screen:** picking an earlier version in Version history while you were holding a card or container mid-drag could crash the whole app. Any drag or resize in progress now simply ends when a version is shown.
+- **A version that was still loading** no longer shows up late after you click Current version, close the history or press Escape.
+- **Escape now only closes a panel when it is meant for it.** With the Focus timer, Calendar, Journal, Habits, Completed or Version history open, Escape used to close the panel as well when you were closing a toolbar or Color menu, leaving a text box, closing the keyboard shortcuts list or canceling a "Delete ...?" question. Now that Escape only does the one thing, and a second Escape closes the panel.
+- Nothing already saved changed.
+
 ## Resize cards from any side (2026-10-21)
 
 - **Cards can now be resized from all four edges and all four corners**, not only the bottom right. This works for open and collapsed cards. Containers resize from their left and right edges and every corner (these set the width; an empty container's corners also set its height, and a container with cards stays as tall as its cards).

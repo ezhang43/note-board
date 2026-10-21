@@ -19,15 +19,93 @@ const ITEM = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
 // A plain bullet or numbered line ("- a", "* a", "1. a"): an item when right under a heading or
 // inside a list (other Markdown apps, owner 2026-10-06); otherwise part of a note.
 const BULLET = /^(\s*)(?:[-*+]|\d{1,3}[.)])\s+(.*)$/;
-// Closing #s only count after a space ("## Learn C#" keeps its #); a bare "##" has an empty title.
-const HEADING = /^(#{1,6})(?:\s+(.*?))?(?:\s+#+)?\s*$/;
+const HEADING = /^(#{1,6})(?:\s+(.*))?$/;
+
+/** A heading's title: closing #s only count after a space ("## Learn C#" keeps its #); a bare "##" has an empty title. Plain string work: a backtracking regex here is quadratic on long lines. */
+function headingTitle(rest = ''): string {
+  const t = rest.trimEnd();
+  let j = t.length;
+  while (j > 0 && t[j - 1] === '#') j--;
+  return j > 0 && j < t.length && /\s/.test(t[j - 1]) ? t.slice(0, j).trimEnd() : t;
+}
+
+/**
+ * Drops paired ** / __ / ~~ marks on one line: an opener (not escaped, a non-space after it) and the
+ * next mark of its kind that has a non-space before it. Written by hand because the regex for it is
+ * quadratic on a long line of stray marks; here a failed search for a closer rules out every later
+ * opener of that kind, so the line is read once.
+ */
+function unmark(line: string): string {
+  const noCloser = new Set<string>();
+  let out = '';
+  let i = 0;
+  while (i < line.length) {
+    const mark = line.slice(i, i + 2);
+    if ((mark === '**' || mark === '__' || mark === '~~') && line[i - 1] !== '\\' && /\S/.test(line[i + 2] ?? '') && !noCloser.has(mark)) {
+      let j = line.indexOf(mark, i + 3);
+      while (j !== -1 && /\s/.test(line[j - 1])) j = line.indexOf(mark, j + 1);
+      if (j !== -1) {
+        out += line.slice(i + 2, j);
+        i = j + 2;
+        continue;
+      }
+      noCloser.add(mark);
+    }
+    out += line[i++];
+  }
+  return out;
+}
+
+/** For each position, the first index at or after it holding a character `hit` accepts (the length if none): one pass, so the scans below never read a stretch twice. */
+function firstFrom(s: string, hit: RegExp): Int32Array {
+  const at = new Int32Array(s.length + 1).fill(s.length);
+  for (let i = s.length - 1; i >= 0; i--) at[i] = hit.test(s[i]) ? i : at[i + 1];
+  return at;
+}
+
+/** "<https://…>" → "https://…". Hand-scanned like `unmark`: the regex is quadratic on a long run of stray "<". */
+function unangle(s: string): string {
+  if (!s.includes('<')) return s;
+  const stop = firstFrom(s, /[>\s]/);
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const from = s[i] === '<' ? (s.startsWith('https://', i + 1) ? i + 9 : s.startsWith('http://', i + 1) ? i + 8 : -1) : -1; // first character after "://"
+    if (from > 0 && stop[from] > from && s[stop[from]] === '>') {
+      out += s.slice(i + 1, stop[from]);
+      i = stop[from] + 1;
+    } else out += s[i++];
+  }
+  return out;
+}
+
+/** "[text](address)" → "address" (no text, or the same) or "text (address)". Hand-scanned like `unmark`: the regex is quadratic on a long run of stray "[". */
+function unlink(s: string): string {
+  if (!s.includes('[')) return s;
+  const closeBracket = firstFrom(s, /]/);
+  const endOfAddress = firstFrom(s, /[)\s]/);
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const close = s[i] === '[' && s[i - 1] !== '\\' ? closeBracket[i + 1] : -1;
+    const from = close + 2; // the address starts after "]("
+    const end = close >= 0 && s[close + 1] === '(' ? endOfAddress[from] : -1;
+    if (end > from && s[end] === ')') {
+      const text = s.slice(i + 1, close);
+      const url = s.slice(from, end);
+      out += !text || text === url ? url : `${text} (${url})`;
+      i = end + 1;
+    } else out += s[i++];
+  }
+  return out;
+}
 
 /** Markdown inline marks and escapes → plain text. Links keep their address in brackets. */
 export function plainText(s: string): string {
-  return s
-    .replace(/<(https?:\/\/[^>\s]+)>/g, '$1')
-    .replace(/(?<!\\)\[([^\]]*)\]\(([^)\s]+)\)/g, (_, text: string, url: string) => (!text || text === url ? url : `${text} (${url})`))
-    .replace(/(?<!\\)(\*\*|__|~~)(?=\S)(.+?)(?<=\S)\1/g, '$2')
+  return unlink(unangle(s))
+    .split('\n')
+    .map(unmark)
+    .join('\n')
     .replace(/\\([\\`*_{}[\]()#+\-.!|>~<])/g, '$1');
 }
 
@@ -97,7 +175,7 @@ export function parseMilanote(markdown: string, makeId: MakeId = newId, { splitN
       flushText();
       flushTitle();
       const isBoardName = first && heading[1] === '#';
-      if (!isBoardName) title = plainText(heading[2] ?? '');
+      if (!isBoardName) title = plainText(headingTitle(heading[2]));
       first = false;
       continue;
     }

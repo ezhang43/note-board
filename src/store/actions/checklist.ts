@@ -325,7 +325,7 @@ export function checklistActions(ctx: StoreContext) {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo') return;
       const loc = C.findItem(card.items, itemId);
-      if (!loc) return;
+      if (!loc || listsIncluding(cardId, itemId)) return; // items in several lists: dragging does nothing (owner, 2026-10-03)
       const selected = selectedItemsIncluding(cardId, itemId);
       const roots = selected ? C.rootsOf(card.items, selected) : [itemId];
       const subtrees = roots.map((id) => C.findItem(card.items, id)!.item);

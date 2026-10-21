@@ -16,6 +16,19 @@
 - **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
 - Nothing about saved boards changed.
 
+## Import and small checklist fixes from the code review (2026-10-21)
+
+- **Importing a big or odd file no longer freezes the page.** A .txt with a very long run of blank lines, or a Markdown file with one huge line of stray `**`, `__`, `~~`, `[` or `<` marks, took minutes to read. It now reads in well under a second, and ordinary files read exactly as before.
+- Collapse all no longer counts the hidden Completed history after Clean up, so the button says Expand all when every card you can see is collapsed, and no longer makes an undo step that does nothing.
+- Backspace in the last open blank item of a list is now refused, instead of sending the cursor to a ticked item that may be hidden.
+- Expand all gives the old layout back even if you picked the same cards in a different order.
+- Opening an old version in History right after ticking an item no longer loses the tick.
+- Dragging an item while items in several lists are selected now does nothing, as the spec says.
+- A format change that changes nothing (the size or font it already has) no longer makes an undo step.
+- The focus timer keeps running and chimes even when the device's storage is full.
+- Download as text puts the Completed history after your cards, not before them.
+- Nothing about saved boards changed.
+
 ## Shared computers keep each account's boards apart (2026-10-21)
 
 - **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).

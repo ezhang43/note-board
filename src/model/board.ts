@@ -148,25 +148,28 @@ function withColumnCards(board: Board, ids: string[]): string[] {
   return ids.flatMap((id) => [id, ...(board.columns[id]?.cardIds ?? [])]);
 }
 
+/** The hidden Completed record is never collapsed or expanded (it isn't drawn). */
+const drawn = (c: Card) => c.kind !== 'completed';
+
 /** True if any card or column is open (not collapsed); of `ids` (and their cards) only, if given. */
 export function anyExpanded(board: Board, ids?: string[]): boolean {
-  if (ids) return withColumnCards(board, ids).some((id) => blockOf(board, id)?.collapsed === false);
-  return Object.values(board.cards).some((c) => !c.collapsed) || Object.values(board.columns).some((c) => !c.collapsed);
+  if (ids) return withColumnCards(board, ids).some((id) => board.cards[id] ? drawn(board.cards[id]) && !board.cards[id].collapsed : board.columns[id]?.collapsed === false);
+  return Object.values(board.cards).some((c) => drawn(c) && !c.collapsed) || Object.values(board.columns).some((c) => !c.collapsed);
 }
 
 /** Collapse (or expand) these blocks; a column takes its cards with it (owner request: Collapse all on a selection). */
 export function setCollapsedFor(board: Board, ids: string[], collapsed: boolean): Board {
   const all = new Set(withColumnCards(board, ids));
-  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, all.has(id) && c.collapsed !== collapsed ? { ...c, collapsed } : c]));
+  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, all.has(id) && drawn(c) && c.collapsed !== collapsed ? { ...c, collapsed } : c]));
   const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, all.has(id) && c.collapsed !== collapsed ? { ...c, collapsed } : c]));
   return { ...board, cards, columns };
 }
 
 /** Collapse (or expand) every card and column on the board. */
 export function setAllCollapsed(board: Board, collapsed: boolean): Board {
-  const blocks = [...Object.values(board.cards), ...Object.values(board.columns)];
+  const blocks = [...Object.values(board.cards).filter(drawn), ...Object.values(board.columns)];
   if (blocks.every((b) => b.collapsed === collapsed)) return board;
-  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
+  const cards = Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, c.collapsed === collapsed || !drawn(c) ? c : { ...c, collapsed }]));
   const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, c.collapsed === collapsed ? c : { ...c, collapsed }]));
   return { ...board, cards, columns };
 }

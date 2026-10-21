@@ -62,6 +62,18 @@ describe('boards inside boards', () => {
   });
 });
 
+describe('the Completed record in the text (job #143, L10)', () => {
+  it('comes after the real loose cards, not first (its hidden spot is 0,0)', () => {
+    let b = board();
+    b = addCard(b, { id: 'done', kind: 'completed', color: 'stone', collapsed: false, x: 0, y: 0, w: null, h: null, groups: [{ date: '2 Oct 2026', entries: [{ item: { id: 'e1', text: 'Old job', done: true, children: [] }, fromCardId: 't1', fromTitle: 'Groceries' }] }] } as never, { type: 'loose', x: 0, y: 0 });
+    const text = boardAsMarkdown(b);
+    const loose = text.slice(text.indexOf('## On the board'));
+    expect(loose.indexOf('Call the plumber')).toBeLessThan(loose.indexOf('### Completed'));
+    expect(loose.indexOf('Recipe')).toBeLessThan(loose.indexOf('### Completed'));
+    expect(text).toContain('Old job');
+  });
+});
+
 describe('backup file names', () => {
   it('name the board and the day, without characters files can’t have', () => {
     expect(backupFileName('Home: plans/ideas?', new Date(2026, 9, 5), 'json')).toBe('BusyAnts - Home plans ideas - 2026-10-05.json');

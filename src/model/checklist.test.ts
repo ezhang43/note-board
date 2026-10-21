@@ -78,6 +78,11 @@ describe('Enter, Tab, Shift+Tab, Backspace', () => {
     expect(C.removeEmptyItem(sample(), 'b')).toBeNull();
   });
 
+  it("Backspace keeps a list's last open item, so the cursor never lands on a hidden ticked one", () => {
+    const list = [{ ...item('milk'), done: true }, { ...item('blank'), text: '' }];
+    expect(C.removeEmptyItem(list, 'blank')).toBeNull();
+  });
+
   it('Backspace in a blank item keeps its sub-items with text, moving them up a level', () => {
     const list = [item('a'), { ...item('p', [item('c1', [item('c1x')]), item('c2')]), text: '' }, item('q')];
     const out = C.removeEmptyItem(list, 'p')!;

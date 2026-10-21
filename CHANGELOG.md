@@ -4,6 +4,7 @@
 
 - **Buttons react to the mouse again on a computer.** Thirteen hover effects had stopped working (the toolbar buttons, the zoom and text size buttons, the small buttons on cards and in panels, Completed, Uncheck all, the formatting bar, Version history rows, the ? and coffee buttons, and the calendar's events, days and chips). They still do nothing on a phone or tablet, so a tap never leaves a button tinted.
 - **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
+- Nothing about saved boards changed.
 
 ## Touch and keyboard fixes (2026-10-21)
 

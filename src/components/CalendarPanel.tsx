@@ -280,7 +280,7 @@ function MonthGrid({ day, today, events, reveal, onPick }: { day: DayKey; today:
  * The small card a clicked event opens, as in Google Calendar (owner request, 2026-10-19, job #108):
  * beside the event with the list still in view (a sheet from the bottom on a phone). The pencil opens
  * the change form, the trash deletes (asking first, as the form's Delete does), and so do Delete and
- * Backspace. Others' events, and Google's special kinds, show without pencil and trash.
+ * Backspace; pressed again, they answer that question. Others' events, and Google's special kinds, show without pencil and trash.
  */
 function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
   const phone = usePhone();
@@ -348,7 +348,10 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (event.editable && !ask && !busy && !e.repeat) remove();
+        if (!event.editable || busy || e.repeat) return;
+        if (!ask) remove();
+        // A fresh second press answers "Delete?" (job #132): Delete, or all of a series. Never the guest-email question.
+        else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: !!event.series }, 'which');
       }
     };
     window.addEventListener('keydown', key, true);

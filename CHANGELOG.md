@@ -6,6 +6,13 @@
 - When space is short, the buttons in the pill drop their words and show icons only (hover one to see its name). If icons alone don't fit, the bar wraps into rows with the pill on top.
 - Nothing changes with a wide window, with no panel open, or on a phone. Saved boards are untouched.
 
+## Calendar: press Delete twice to delete an event (2026-10-21)
+
+- With an event's card open, Delete (or Backspace) asks "Delete “Dentist”?" as before. Pressing Delete or Backspace again now answers it: the event is deleted. For a repeating event it deletes **all events in the series**.
+- If the event has guests, the next question, "Send update emails to guests?", still needs a click (or Enter); the Delete key does nothing there.
+- Holding the key down never answers the question; it has to be a second, separate press. Escape still keeps the event.
+- There is still no undo for calendar events. Nothing about saved boards changed.
+
 ## Habits: a Weight card (2026-10-21)
 
 - The Habits panel now has a **Weight** card above your habits. Type today's weight in kilograms (like 72.4, a comma works too) and press Enter or Save. Typing it again the same day replaces it. Anything outside 20.0 to 400.0 shows a short note and isn't saved.

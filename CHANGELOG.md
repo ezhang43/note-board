@@ -1,5 +1,11 @@
 # Changelog
 
+## Shared boards can't take your own boards on a new device (2026-10-21)
+
+- **A shared board can no longer swap in for one of your own boards when you sign in on a new device or browser.** Before, someone you share a board with could add a board with the id of one of yours to it, and on a new device it replaced yours there and its next save removed yours from your online boards. Now, once your own boards arrive, yours wins and theirs is left out.
+- **Copying a board card from one shared board onto another no longer moves that board to the other board's people.** The board stays in the shared board it was made in.
+- Boards already saved are unchanged; see the pull request for details.
+
 ## Keys in side panels, screen readers, faster sign-in (2026-10-22)
 
 - **Delete and Backspace no longer delete a note behind a side panel.** With a note selected, pressing Delete while the Focus timer's buttons or a Completed tick box had the keyboard deleted the note without any sign. Now no side panel passes board keys through (undo, redo and zoom still work).

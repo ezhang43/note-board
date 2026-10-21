@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 // about/, faq/, terms/ and privacy/ beside it.
 
 const PAGES = [
-  { path: '/about/', title: 'BusyAnts: a calm, free visual board', h1: 'BusyAnts' },
+  { path: '/about/', title: 'BusyAnts: a free board with no limits', h1: 'Free, with no limits. Your notes stay safe.' },
   { path: '/faq/', title: 'BusyAnts: questions and answers', h1: 'Questions and answers' },
   { path: '/terms/', title: 'BusyAnts: terms of use', h1: 'Terms of use' },
   { path: '/privacy/', title: 'BusyAnts: privacy policy', h1: 'Privacy policy' },
@@ -85,7 +85,7 @@ for (const p of PAGES) {
 // Job #79 (owner decision 2026-10-16, "Done List" look): a second start button closes the page, after the comparison.
 test('the landing page says what BusyAnts is, shows a demo video of a board and has a start button at the top and at the end', async ({ page }) => {
   await page.goto('/about/');
-  await expect(page.getByText('A calm, free visual board for notes and checklists. Plan together in real time.')).toBeVisible();
+  await expect(page.getByText("BusyAnts is a visual board for notes and checklists. It works offline and on your phone, and it doesn't push AI on you.")).toBeVisible();
   await expect(page.locator('.hero video')).toBeVisible();
   const starts = page.getByRole('link', { name: 'Start your board, free' });
   await expect(starts).toHaveCount(2);
@@ -106,7 +106,7 @@ test('the About page ends with a honey block: a headline, one line and the start
   await expect(page.locator('.close')).toHaveCount(0);
   const block = page.locator('section.closing');
   await expect(block.getByRole('heading', { level: 2, name: 'Ready to clear your head?' })).toBeVisible();
-  await expect(block).toContainText('Free, no card, no limits. Works offline.');
+  await expect(block).toContainText('Free, no card, no limits. Works offline and on your phone.');
   const start = block.getByRole('link', { name: 'Start your board, free' });
   await expect(start).toHaveAttribute('href', '../');
   // Honey (#FFCF3F, as at the top; light mode here), and the last thing in the page before the footer.
@@ -158,10 +158,10 @@ test('"Try it: tick one off" folds as a whole section: starts open, folds and un
   await page.keyboard.press('Enter');
   await expect(fold).toHaveAttribute('open', '');
   // Ticking inside it still strikes the item through and moves it under Completed.
-  const shape = page.getByRole('checkbox', { name: 'Shape it your way' });
-  const fold2 = page.getByRole('checkbox', { name: "Fold away what you're not doing" });
-  await shape.check();
-  expect((await shape.boundingBox())!.y).toBeGreaterThan((await fold2.boundingBox())!.y);
+  const safe = page.getByRole('checkbox', { name: 'Your boards are safe' });
+  const phone = page.getByRole('checkbox', { name: 'Works well on a phone' });
+  await safe.check();
+  expect((await safe.boundingBox())!.y).toBeGreaterThan((await phone.boundingBox())!.y);
   // Printing shows it open even when it is folded.
   await fold.locator('summary').click();
   await expect(list).toBeHidden();
@@ -169,14 +169,46 @@ test('"Try it: tick one off" folds as a whole section: starts open, folds and un
   await expect(list).toBeVisible();
 });
 
-test('the About page has three highlights under the intro', async ({ page }) => {
+// Job #164 (owner, 2026-10-22): the page leads with the four things the market research found people care about.
+test('the About page leads with four points: free with no limits, boards are safe, no AI pushed on you, works well on a phone', async ({ page }) => {
   await page.goto('/about/');
   const highlights = page.locator('ul.highlights > li');
-  await expect(highlights).toHaveCount(3);
-  await expect(highlights.locator('h3')).toHaveText(['Shape it your way', "Fold away what you're not doing", 'Built for checklists']);
-  await expect(highlights.nth(0)).toContainText('five typefaces, snap-to-grid or free placement');
-  await expect(highlights.nth(1)).toContainText('Collapse any card, container or list, or everything at once, and bring it back in one click.');
-  await expect(highlights.nth(2)).toContainText('tick with Ctrl+Enter');
+  await expect(highlights).toHaveCount(4);
+  await expect(highlights.locator('h3')).toHaveText(['Free, with no limits', 'Your boards are safe', 'No AI pushed on you', 'Works well on a phone']);
+  await expect(highlights.nth(0)).toContainText('no limit on cards, containers or boards, and no ads');
+  await expect(highlights.nth(0)).toContainText('100 notes, images or links');
+  await expect(highlights.nth(1)).toContainText('newest 100 versions');
+  await expect(highlights.nth(1)).toContainText('download a backup');
+  await expect(highlights.nth(2)).toContainText('no built-in AI');
+  await expect(highlights.nth(2)).toContainText('optional connector you set up yourself');
+});
+
+test('the safety, phone and AI sections say only what the app does', async ({ page }) => {
+  await page.goto('/about/');
+  await expect(page.locator('#safe h2')).toHaveText('Your boards are safe');
+  await expect(page.locator('#safe ul.tiles h3')).toHaveText(['Undo and redo', 'Version history', 'Backups you can download', 'Works offline', 'Saved in two places', 'Bring your notes in']);
+  await expect(page.locator('#safe')).toContainText('newest 100 versions');
+  await expect(page.locator('#phone h2')).toHaveText('Works well on a phone');
+  await expect(page.locator('#phone ul.tiles > li')).toHaveCount(3);
+  await expect(page.locator('#ai h2')).toHaveText('No AI pushed on you');
+  // Honest about the connector: optional, set up by the person, on their own computer, only when asked.
+  const ai = page.locator('#ai');
+  await expect(ai).toContainText('no built-in AI');
+  await expect(ai).toContainText('optional connector');
+  await expect(ai).toContainText('You set it up yourself on your own computer');
+  await expect(ai).toContainText('only when you ask Claude to');
+  await ai.getByRole('link', { name: 'Privacy policy' }).click();
+  await expect(page).toHaveURL(/\/privacy\/#connector$/);
+  await expect(page.locator('details:has(#connector)')).toHaveAttribute('open', '');
+});
+
+test('the FAQ answers "Does BusyAnts use AI?" the same way', async ({ page }) => {
+  await page.goto('/faq/#ai');
+  const fold = page.locator('details:has(#ai)');
+  await expect(fold).toHaveAttribute('open', '');
+  await expect(fold).toContainText('BusyAnts has no built-in AI');
+  await expect(fold).toContainText('optional');
+  await expect(fold).toContainText('you set up yourself');
 });
 
 // Job #79 (owner decision 2026-10-16): the "Done List" look. The board picture is shown big under the hero text
@@ -208,29 +240,29 @@ test('the demo video is big, under the start button, framed so it stands out in 
   }
 });
 
-test('the three highlights are a small to-do list you can really tick: ticked ones move under Completed', async ({ page }) => {
+test('the four points are a small to-do list you can really tick: ticked ones move under Completed', async ({ page }) => {
   await page.goto('/about/');
   await expect(page.getByRole('heading', { level: 2, name: 'Try it: tick one off' })).toBeVisible();
   const box = (name: string) => page.getByRole('checkbox', { name });
-  const shape = box('Shape it your way');
-  const fold = box("Fold away what you're not doing");
-  const built = box('Built for checklists');
-  await expect(shape).not.toBeChecked();
-  await expect(fold).not.toBeChecked();
-  await expect(built).toBeChecked();
+  const free = box('Free, with no limits');
+  const safe = box('Your boards are safe');
+  const ai = box('No AI pushed on you');
+  await expect(free).toBeChecked();
+  await expect(safe).not.toBeChecked();
+  await expect(ai).not.toBeChecked();
   const y = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!.y;
-  expect(await y(shape)).toBeLessThan(await y(built));
-  await shape.check();
-  await expect(shape).toBeChecked();
+  expect(await y(safe)).toBeLessThan(await y(free));
+  await safe.check();
+  await expect(safe).toBeChecked();
   // Ticked: it moves below the ones still to do, and its title is struck through.
-  expect(await y(shape)).toBeGreaterThan(await y(fold));
-  const title = page.locator('ul.highlights h3').first();
+  expect(await y(safe)).toBeGreaterThan(await y(ai));
+  const title = page.locator('ul.highlights h3').nth(1);
   expect(await title.evaluate((el) => getComputedStyle(el).textDecorationLine)).toContain('line-through');
   // The keyboard works too.
-  await built.focus();
+  await free.focus();
   await page.keyboard.press('Space');
-  await expect(built).not.toBeChecked();
-  expect(await y(built)).toBeLessThan(await y(shape));
+  await expect(free).not.toBeChecked();
+  expect(await y(free)).toBeLessThan(await y(safe));
 });
 
 test('the to-do list and the table line up on shared left edges on a computer', async ({ page }) => {
@@ -255,6 +287,13 @@ test('the About page compares BusyAnts with Milanote, Notion, Miro and Trello in
   await expect(table.locator('thead th[scope="col"]')).toHaveText(['Feature', 'BusyAnts', 'Milanote', 'Notion', 'Miro', 'Trello']);
   const rows = table.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThanOrEqual(4);
+  // Only what was confirmed against each app's own pages in October 2026 (job #164).
+  const cell = (row: string, app: string) => table.locator('tbody tr', { has: page.getByRole('rowheader', { name: row }) }).locator(`td[data-app="${app}"]`);
+  await expect(cell('Free, with no card or board limits', 'Milanote')).toContainText('100 notes, images or links');
+  await expect(cell('Free, with no card or board limits', 'Notion')).toContainText('Limited once shared');
+  await expect(table).not.toContainText('1,000 blocks');
+  await expect(cell('Version history', 'Notion')).toContainText('7 days');
+  for (const app of ['Milanote', 'Trello']) await expect(cell('Works offline', app)).toContainText('Not confirmed');
   await expect(table.locator('tbody th[scope="row"]')).toHaveCount(await rows.count());
   // BusyAnts says yes to every row; every cell has words for a screen reader, not only a symbol.
   const cells = table.locator('tbody td');
@@ -538,16 +577,15 @@ test.describe('on a phone-sized screen', () => {
 // Job #87 (owner decisions, 2026-10-17): a silent looping demo video replaces the big board picture, and the About page
 // gains 3 steps, feature tiles, a trust band and a FAQ preview. The tests run with "reduce motion" on (see
 // playwright.config.ts), so the video ones turn it off for themselves.
-const SECTION_IDS = ['demo', 'try', 'how', 'features', 'compare', 'trust', 'faq', 'start'];
+const SECTION_IDS = ['demo', 'try', 'safe', 'phone', 'ai', 'how', 'compare', 'trust', 'faq', 'start'];
 
-test('the About page sections come in this order: demo, Try it, 3 steps, feature tiles, comparison, trust band, FAQ preview, closing', async ({ page }) => {
+test('the About page sections come in this order: demo, Try it, safe, phone, AI, 3 steps, comparison, trust band, FAQ preview, closing', async ({ page }) => {
   await page.goto('/about/');
   await expect(page.locator('main > *')).toHaveCount(SECTION_IDS.length);
   expect(await page.locator('main > *').evaluateAll((els) => els.map((e) => `${e.tagName}#${e.id}`))).toEqual(SECTION_IDS.map((id) => `SECTION#${id}`));
   await expect(page.locator('#how h2')).toHaveText('How it works');
   await expect(page.locator('#how ol.steps > li')).toHaveCount(3);
-  await expect(page.locator('#features h2')).toHaveText('Everything on one board');
-  expect(await page.locator('#features ul.tiles > li').count()).toBeGreaterThanOrEqual(6);
+  expect(await page.locator('#safe ul.tiles > li').count()).toBeGreaterThanOrEqual(6);
   await expect(page.locator('#trust h2')).toHaveText('What you can count on');
   await expect(page.locator('#faq h2')).toHaveText('Quick answers');
   await expect(page.locator('#faq h3')).toHaveCount(3);
@@ -621,7 +659,7 @@ test('the demo and the new sections fit a phone: no sideways scrolling', async (
     const video = (await page.locator('.hero video').boundingBox())!;
     expect(video.x).toBeGreaterThanOrEqual(16);
     expect(video.x + video.width).toBeLessThanOrEqual(width - 16 + 1);
-    for (const id of ['how', 'features', 'trust', 'faq']) {
+    for (const id of ['how', 'safe', 'phone', 'ai', 'trust', 'faq']) {
       const b = (await page.locator(`#${id}`).boundingBox())!;
       expect(b.x + b.width, id).toBeLessThanOrEqual(width);
     }
@@ -648,13 +686,12 @@ test('the FAQ preview has three questions that are on the FAQ page, and a link t
   await page.goto('/about/');
   const preview = page.locator('#faq');
   const questions = await preview.locator('h3').allTextContents();
-  expect(questions).toEqual(['Is BusyAnts free?', 'Does it work offline?', 'How does sharing work?']);
+  expect(questions).toEqual(['Is BusyAnts free?', 'How do I get a board back?', 'Does BusyAnts use AI?']);
   const all = preview.getByRole('link', { name: 'See all questions' });
   await expect(all).toHaveAttribute('href', '../faq/');
   await all.click();
   await expect(page).toHaveURL(/\/faq\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Questions and answers');
   const faqHeadings = await page.locator('main h2').allTextContents();
-  for (const q of ['Is BusyAnts free?', 'Does it work offline?']) expect(faqHeadings).toContain(q);
-  expect(faqHeadings.some((h) => h.startsWith('How does sharing work'))).toBe(true);
+  for (const q of ['Is BusyAnts free?', 'How do I get a board back?', 'Does BusyAnts use AI?']) expect(faqHeadings).toContain(q);
 });

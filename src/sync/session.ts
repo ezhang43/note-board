@@ -103,7 +103,7 @@ function start(user: User, quiet = false) {
   // Started by the timer below before the shared boards are known, own-board sync leaves alone the
   // boards that may be shared until they are (main session check, 2026-10-06). The boards of the
   // shares kept on this device are read once, before anything changes them.
-  const guard = ownBoardsGuard(appStore, boardRemote(user.uid), (id) => active.isShared(id), boardsInKeptShares(localStorage, user.uid));
+  const guard = ownBoardsGuard(appStore, boardRemote(user.uid), (id) => active.isShared(id), boardsInKeptShares(localStorage, user.uid), (ws) => active.ownCopy(ws));
   const startOwnBoards = () => {
     if (started || sharing !== active) return;
     started = true;

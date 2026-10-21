@@ -200,7 +200,7 @@ export function versionsRemote(uid: string): VersionStore {
       const snap = await getDocs(query(metas, orderBy('savedAt', 'desc')));
       return snap.docs.map((d) => {
         const v = d.data();
-        return { id: d.id, savedAt: Number(v.savedAt), cards: Number(v.cards ?? 0), columns: Number(v.columns ?? 0), ...(typeof v.boards === 'number' ? { boards: v.boards } : {}), ...(typeof v.hash === 'string' ? { hash: v.hash } : {}) };
+        return { id: d.id, savedAt: Number(v.savedAt), cards: Number(v.cards ?? 0), columns: Number(v.columns ?? 0), ...(typeof v.boards === 'number' ? { boards: v.boards } : {}), ...(typeof v.hash === 'string' ? { hash: v.hash } : {}), ...(v.kind === 'outside' ? { kind: v.kind } : {}) };
       });
     },
     async get(id) {
@@ -213,7 +213,7 @@ export function versionsRemote(uid: string): VersionStore {
       // or delete goes ahead without waiting) both are kept on this device until back online.
       const batch = writeBatch(db);
       batch.set(doc(datas, meta.id), { data });
-      batch.set(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns, ...(meta.boards ? { boards: meta.boards } : {}), ...(meta.hash ? { hash: meta.hash } : {}) });
+      batch.set(doc(metas, meta.id), { savedAt: meta.savedAt, cards: meta.cards, columns: meta.columns, ...(meta.boards ? { boards: meta.boards } : {}), ...(meta.hash ? { hash: meta.hash } : {}), ...(meta.kind ? { kind: meta.kind } : {}) });
       await batch.commit();
     },
     async remove(id) {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Leaving a shared board online (main session check, 2026-10-06): all or nothing. Firebase itself
 // is replaced by a stand-in that records what would be written.
 
-const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; sets: string[]; committed: boolean }[], deleteDoc: [] as string[], added: [] as { ref: string; data: unknown }[], fail: false }));
+const calls = vi.hoisted(() => ({ batches: [] as { deletes: string[]; sets: string[]; values: unknown[]; committed: boolean }[], deleteDoc: [] as string[], added: [] as { ref: string; data: unknown }[], fail: false }));
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/auth', () => ({
@@ -21,11 +21,11 @@ vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, ...path: string[]) => path.join('/'),
   deleteDoc: async (ref: string) => void calls.deleteDoc.push(ref),
   writeBatch: () => {
-    const batch = { deletes: [] as string[], sets: [] as string[], committed: false };
+    const batch = { deletes: [] as string[], sets: [] as string[], values: [] as unknown[], committed: false };
     calls.batches.push(batch);
     return {
       delete: (ref: string) => void batch.deletes.push(ref),
-      set: (ref: string) => void batch.sets.push(ref),
+      set: (ref: string, value: unknown) => void (batch.sets.push(ref), batch.values.push(value)),
       commit: async () => {
         if (calls.fail) throw new Error('offline');
         batch.committed = true;
@@ -97,6 +97,20 @@ describe('saving a version online (job #93)', () => {
     expect(calls.batches).toHaveLength(1);
     expect(calls.batches[0].sets).toEqual(['boards/u1/versionData/v1', 'boards/u1/versions/v1']);
     expect(calls.batches[0].committed).toBe(true);
+  });
+
+  it('keeps a version saved just before changes from another device marked as such (job #147)', async () => {
+    await versionsRemote('u1').save({ id: 'v1', savedAt: 1, cards: 2, columns: 0, kind: 'outside' }, '{}');
+    expect(calls.batches[0].values[1]).toEqual({ savedAt: 1, cards: 2, columns: 0, kind: 'outside' });
+    vi.mocked(firestore.getDocs).mockResolvedValueOnce({
+      docs: [
+        { id: 'v1', data: () => ({ savedAt: 1, cards: 2, columns: 0, kind: 'outside' }) },
+        { id: 'v0', data: () => ({ savedAt: 0, cards: 1, columns: 0, kind: 'something newer' }) },
+      ],
+    } as never);
+    const [marked, other] = await versionsRemote('u1').list();
+    expect(marked.kind).toBe('outside');
+    expect(other.kind).toBeUndefined();
   });
 });
 

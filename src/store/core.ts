@@ -180,6 +180,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
   let settleQueued = false;
+  /** Goes up when another board is opened or arrives from elsewhere (job #148): a tidy-up queued before then is dropped. */
+  let swaps = 0;
+  /** Board changes made by the app itself (tidying blocks out of each other's way), not by the person (job #148). */
+  let tidies = 0;
   let history: History = emptyHistory;
   /** Undo history of each board that isn't open (undo belongs to each board). */
   const histories = new Map<string, History>();
@@ -276,7 +280,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     });
     if (settleQueued) return;
     settleQueued = true;
+    const queuedAt = swaps;
     schedule(() => {
+      // Another board came since (opened, or from another device): this was for the one before.
+      if (queuedAt !== swaps) return;
       settleQueued = false;
       if (state.ui.drag || state.ui.resize) return;
       // The most recent change wins when two anchored blocks are in each other's way.
@@ -304,6 +311,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       board = settle(board, measured, a, true);
       const exp = layout.expanding;
       if (exp && Date.now() <= exp.until) layout.pushedBy.set(exp.id, recordPushes(layout.pushedBy.get(exp.id), state.board, board));
+      if (board !== state.board) tidies++;
       set({ ...state, board });
     });
   }
@@ -357,11 +365,18 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (tidy) requestSettle();
   }
 
+  /** A tidy-up asked for until now was for the board before (job #148). */
+  function dropQueuedSettle() {
+    swaps++;
+    settleQueued = false;
+    settleAnchors.clear();
+  }
+
   /** Forget what belongs to the board shown until now (drawn heights, layout memory). */
   function forgetShownBoard() {
     flushPendingTick();
     heights.clear();
-    settleAnchors.clear();
+    dropQueuedSettle();
     layout.pushedBy.clear();
     layout.expanding = null;
     layout.importLayout = null;
@@ -403,7 +418,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       forgetShownBoard();
       write(OPEN_BOARD_KEY, next.boards.open);
       centreOnArrival = true;
-    } else if (!state.board.order.length && next.board.order.length) centreOnArrival = true;
+    } else {
+      dropQueuedSettle(); // it would re-arrange the arriving boards with heights from before them
+      if (!state.board.order.length && next.board.order.length) centreOnArrival = true;
+    }
     outsideChanges++;
     histories.clear();
     history = emptyHistory;
@@ -550,6 +568,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     outsideChanges: () => outsideChanges,
     /** How many edits were made on this page (version history tells them apart from automatic tidying). */
     edits: () => edits,
+    /** How many times the app tidied the open board by itself (sync tells that apart from the person's changes). */
+    tidies: () => tidies,
     /** Whether a board just arrived that should be brought into view (asked once). */
     takeCentreOnArrival() {
       const wanted = centreOnArrival;

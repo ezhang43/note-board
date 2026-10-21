@@ -20,8 +20,6 @@ export const DEFAULT_BOARD_NAME = 'My first board';
 /** Block sizes, in board pixels. */
 export const CARD_W = 240;
 export const COLUMN_W = 280;
-/** A card inside a column is the column width minus 16px on each side. */
-export const COLUMN_CARD_INSET = 16;
 /** Minimum height of an open column. */
 export const COLUMN_MIN_H = 220;
 

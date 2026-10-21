@@ -66,7 +66,11 @@ export function ItemBar() {
 
   useEffect(() => {
     // After a change the item's text box can be redrawn, so look again once focus has settled.
-    const update = () => setTimeout(() => setTyping(typingIn()));
+    let later = 0;
+    const update = () => {
+      clearTimeout(later);
+      later = window.setTimeout(() => setTyping(typingIn()));
+    };
     const v = window.visualViewport;
     const onViewport = () => {
       setCover(keyboardCover());
@@ -80,6 +84,7 @@ export function ItemBar() {
     v?.addEventListener('scroll', onViewport);
     return () => {
       cancelAnimationFrame(frame.current);
+      clearTimeout(later);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
       document.removeEventListener('input', follow);

@@ -4,7 +4,7 @@ import { freshCopies } from './checklist';
 import type { Board, Card, Column } from './types';
 
 /** How far each paste is offset from the copied blocks (and from the previous paste). */
-export const PASTE_OFFSET = 40;
+const PASTE_OFFSET = 40;
 
 /** A copied block. Cards remember which column they came from so a copy can go back next to them. */
 export type ClipEntry =

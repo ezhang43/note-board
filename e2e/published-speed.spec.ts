@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
 // Uncompressed JavaScript the sign-in screen may download, in KB (before this job: 1,137; now about 975. Firebase's database code, about 380 KB, is the rest of the weight: see docs/decisions.md 2026-10-22).
 const BUDGET_KB = 1050;
 
-test('the sign-in screen loads without the board code and with only IBM Plex Sans', async ({ page }) => {
+test('the sign-in screen loads without the board code and with only IBM Plex Sans and Roboto Medium', async ({ page }) => {
   const scripts: string[] = [];
   const fontSheets: string[] = [];
   page.on('response', async (r) => {
@@ -30,6 +30,8 @@ test('the sign-in screen loads without the board code and with only IBM Plex San
   // One font sheet: the upright Plex Sans weights the screen uses, none of the typefaces only the board offers.
   expect(fontSheets).toHaveLength(1);
   expect(fontSheets[0]).toContain('family=IBM+Plex+Sans:wght@400;500;600');
+  // Plus Roboto Medium, the typeface Google's own sign-in button is set in (job #165b).
+  expect(fontSheets[0]).toContain('family=Roboto:wght@500');
   expect(fontSheets[0]).not.toMatch(/Mono|Lora|Nunito|Caveat|ital/);
 });
 

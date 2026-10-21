@@ -140,9 +140,10 @@ test('Ctrl + scroll zooms around the cursor', async ({ page }) => {
   expect((cursor.y - v.panY) / v.zoom).toBeCloseTo(200, 0);
 });
 
+// (the mouse is kept off the middle of the empty board, where the template picks are)
 test('scrolling pans the board with either tool, at half the scroll distance', async ({ page }) => {
   const box = await canvasBox(page);
-  await page.mouse.move(box.x + 400, box.y + 300);
+  await page.mouse.move(box.x + 100, box.y + 300);
   await page.mouse.wheel(120, 80);
   await expect.poll(async () => view(page)).toEqual({ panX: -60, panY: -40, zoom: 1 });
 
@@ -153,16 +154,16 @@ test('scrolling pans the board with either tool, at half the scroll distance', a
 
 test('Hand tool drags the board; Select tool does not', async ({ page }) => {
   const box = await canvasBox(page);
-  await page.mouse.move(box.x + 400, box.y + 300);
+  await page.mouse.move(box.x + 100, box.y + 300);
   await page.mouse.down();
-  await page.mouse.move(box.x + 460, box.y + 340, { steps: 5 });
+  await page.mouse.move(box.x + 160, box.y + 340, { steps: 5 });
   await page.mouse.up();
   expect(await view(page)).toEqual({ panX: 60, panY: 40, zoom: 1 });
 
   await page.getByRole('button', { name: 'Select (V)' }).click();
-  await page.mouse.move(box.x + 400, box.y + 300);
+  await page.mouse.move(box.x + 100, box.y + 300);
   await page.mouse.down();
-  await page.mouse.move(box.x + 500, box.y + 400, { steps: 5 });
+  await page.mouse.move(box.x + 200, box.y + 400, { steps: 5 });
   await page.mouse.up();
   expect(await view(page)).toEqual({ panX: 60, panY: 40, zoom: 1 });
 });

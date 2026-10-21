@@ -139,7 +139,7 @@ describe('opening your board offline with unsent changes (job 92)', () => {
   it('opens from this device’s copy, unsent changes included, saying they are not on the server yet', () => {
     const got: unknown[] = [];
     watching(got)(snap({ data: 'mine', client: 'old-page' }, true, true));
-    expect(got).toEqual([{ data: 'mine', client: 'old-page', pending: true }]);
+    expect(got).toEqual([{ data: 'mine', client: 'old-page', pending: true, cached: true }]);
   });
 
   it('once open, unconfirmed saves are still skipped', () => {
@@ -149,8 +149,19 @@ describe('opening your board offline with unsent changes (job 92)', () => {
     send(snap({ data: 'v2', client: 'me' }, true, true));
     send(snap({ data: 'v2', client: 'me' }, false, false));
     expect(got).toEqual([
-      { data: 'v1', client: 'x' },
+      { data: 'v1', client: 'x', cached: true },
       { data: 'v2', client: 'me' },
+    ]);
+  });
+
+  it('says which versions are only this device’s offline copy, and which the server sent (job #148)', () => {
+    const got: unknown[] = [];
+    const send = watching(got);
+    send(snap({ data: 'old', client: 'x' }, true, false));
+    send(snap({ data: 'newer', client: 'y' }, false, false));
+    expect(got).toEqual([
+      { data: 'old', client: 'x', cached: true },
+      { data: 'newer', client: 'y' },
     ]);
   });
 

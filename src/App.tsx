@@ -30,6 +30,8 @@ import { PANEL_MIN } from './model/calendar';
 import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
 import { announce } from './store/announce';
+import { useShortcuts } from './components/useShortcuts';
+import { useDropPaste } from './components/useDropPaste';
 
 /** What a panel's resize strip is called: "Resize journal". */
 const RESIZE_NAME = { history: 'version history', pomodoro: 'focus timer', completed: 'completed', journal: 'journal', habits: 'habits' } as const;
@@ -38,8 +40,6 @@ const closeCalendar = () => appStore.toggleSidePanel('calendar');
 const closeCompleted = () => appStore.toggleSidePanel('completed');
 const closeJournal = () => appStore.toggleSidePanel('journal');
 const closeHabits = () => appStore.toggleSidePanel('habits');
-import { useShortcuts } from './components/useShortcuts';
-import { useDropPaste } from './components/useDropPaste';
 
 /**
  * `onSignOut` and `saveNote` ("Saving…" / "Saved" / offline) are given on the published site, where

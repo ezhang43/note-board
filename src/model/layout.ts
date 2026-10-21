@@ -104,12 +104,14 @@ export function settle(board: Board, measured: MeasuredHeight, anchors: string[]
  * now covers slide sideways out of its way, keeping their left-to-right order, and push the blocks
  * beside them along too (owner decision 2026-10-19). After a resize (no `drag`) the blocks that start
  * at or right of it go right, and those starting left of it stay (a block only grows to the right).
+ * After a resize from the left edge (`side` 'left', owner request 2026-10-21) it is the other way
+ * round: the blocks that end at or left of it go left, keeping their order, and those to its right stay.
  * For a drag, blocks whose middle is left of its middle go left,
  * the others right; on a tie they go the way it came from (`movedX` > 0: it moved right, so they go
  * left). Blocks in `fixed` never move; when one of them is in the way the dragged block itself will
  * move instead, so nothing shifts. Returns the same board when nothing moves.
  */
-export function shiftRow(board: Board, id: string, measured: MeasuredHeight, drag?: { movedX: number; fixed: string[] }): Board {
+export function shiftRow(board: Board, id: string, measured: MeasuredHeight, drag?: { movedX: number; fixed: string[] }, side: 'right' | 'left' = 'right'): Board {
   const a = blockRect(board, id, measured);
   if (!a) return board;
   const fixed = new Set(drag?.fixed);
@@ -118,11 +120,12 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
     return r ? [{ id: o, r }] : [];
   });
   if (rects.some((m) => fixed.has(m.id) && overlaps(a, m.r, BLOCK_GAP - 1))) return board;
-  // After a resize the block keeps its own x and only grows right, so blocks starting left of it are
-  // never touched (they would otherwise be moved to its right, as "in the way").
-  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && (drag || r.x >= a.x) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
+  // After a resize the block keeps its far edge and only grows towards the dragged one, so blocks on
+  // the other side of it are never touched (they would otherwise be moved to its far side, as "in the way").
+  const grewOver = (r: Rect) => (side === 'left' ? r.x + r.w <= a.x + a.w : r.x >= a.x);
+  const mates = rects.filter(({ id: o, r }) => !fixed.has(o) && (drag || grewOver(r)) && Math.min(a.y + a.h, r.y + r.h) - Math.max(a.y, r.y) >= Math.min(a.h, r.h) / 2);
   const mid = (r: Rect) => r.x + r.w / 2;
-  const goesLeft = (r: Rect) => !!drag && (mid(r) < mid(a) || (mid(r) === mid(a) && drag.movedX > 0));
+  const goesLeft = (r: Rect) => (!drag && side === 'left') || (!!drag && (mid(r) < mid(a) || (mid(r) === mid(a) && drag.movedX > 0)));
   // Each block only has to clear the blocks already placed beside it (level with it, give or take the gap).
   const level = (p: Rect, r: Rect) => p.y < r.y + r.h + BLOCK_GAP - 1 && r.y < p.y + p.h + BLOCK_GAP - 1;
   const moves = new Map<string, number>();
@@ -146,6 +149,42 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
   for (const [o, x] of moves) {
     if (columns[o]) columns[o] = { ...columns[o], x };
     else cards[o] = { ...cards[o], x };
+  }
+  return { ...board, cards, columns };
+}
+
+/**
+ * After a resize from the top edge (owner request 2026-10-21): blocks above `id` that it now covers
+ * (or comes within 10px of) move straight up out of its way, and so do the blocks above those.
+ * Blocks beside it and below it stay. On the grid when snapping is on. Returns the same board when
+ * nothing moves.
+ */
+export function pushUp(board: Board, id: string, measured: MeasuredHeight): Board {
+  const a = blockRect(board, id, measured);
+  if (!a) return board;
+  const above = board.order.flatMap((o) => {
+    const r = o === id ? null : blockRect(board, o, measured);
+    return r && r.y + r.h <= a.y + a.h ? [{ id: o, r }] : [];
+  });
+  above.sort((p, q) => q.r.y + q.r.h - (p.r.y + p.r.h));
+  const placed = [a];
+  const moves = new Map<string, number>();
+  for (const { id: o, r } of above) {
+    const hit = placed.filter((p) => overlaps(r, p, BLOCK_GAP - 1));
+    let y = r.y;
+    if (hit.length) {
+      const top = Math.min(...hit.map((p) => p.y)) - BLOCK_GAP - r.h;
+      y = Math.min(r.y, board.snap ? Math.floor(top / GRID) * GRID : top);
+      if (y !== r.y) moves.set(o, y);
+    }
+    placed.push({ ...r, y });
+  }
+  if (!moves.size) return board;
+  const cards = { ...board.cards };
+  const columns = { ...board.columns };
+  for (const [o, y] of moves) {
+    if (columns[o]) columns[o] = { ...columns[o], y };
+    else cards[o] = { ...cards[o], y };
   }
   return { ...board, cards, columns };
 }

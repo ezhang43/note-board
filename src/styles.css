@@ -1029,6 +1029,34 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .card.collapsed:hover .resize-edge, .column.collapsed:hover .resize-edge { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .card.collapsed .resize-edge:hover, .column.collapsed .resize-edge:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 }
+/*
+ * Resize grips (owner request 2026-10-21): invisible strips 6px wide along the edges and 12px squares
+ * at the corners, inside the outline. The resize cursors show only on these (and on the older handles
+ * above); everywhere else a block keeps the normal arrow. They stop short of the bottom-right handle.
+ */
+.resize-grip { position: absolute; padding: 0; border: none; background: none; touch-action: none; }
+/* The grips come first in a block, so its header buttons (raised here) paint above them where they meet. */
+.card-header > .icon-button, .column-actions > .icon-button { position: relative; }
+.grip-n, .grip-s { left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
+.grip-n { top: 0; }
+.grip-s { bottom: 0; right: 20px; }
+.grip-e, .grip-w { top: 12px; bottom: 20px; width: 6px; cursor: ew-resize; }
+.grip-e { right: 0; }
+.grip-w { left: 0; }
+.grip-nw, .grip-ne, .grip-sw { width: 12px; height: 12px; }
+.grip-nw { top: 0; left: 0; cursor: nwse-resize; }
+.grip-ne { top: 0; right: 0; cursor: nesw-resize; }
+.grip-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+/* Not on touch screens: a 6px strip is too thin for a finger, and next to the bigger touch areas of the buttons it would take presses meant for the board. There the older handles stay. */
+@media (pointer: coarse) {
+  .resize-grip { display: none; }
+}
+/* A container with cards is as tall as its cards: its corners only set the width. */
+.resize-grip.width-only { cursor: ew-resize; }
+/* Like the right-edge strip: below a container's header, and clear of the bottom-right handle. */
+.column .grip-w { top: 52px; bottom: 22px; }
+.column.collapsed .grip-w { top: 4px; bottom: 4px; }
+
 /* Bigger invisible areas to press (at least 24px, for touch screens); the drawn handles stay small. */
 .resize-corner::before, .resize-edge::before, .item-grip::before { content: ''; position: absolute; }
 .resize-corner::before { inset: -3px; }

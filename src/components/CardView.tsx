@@ -15,6 +15,7 @@ import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, ExternalIcon, ResizeIcon, TrashIcon } from './icons';
 import { TodoBody } from './TodoList';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
+import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useMeasuredHeight } from './useMeasure';
 
@@ -58,7 +59,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   const tint = card.titleColor ? swatchFor(card.titleColor, theme) : null;
   const style = {
     ...(tint ? { '--tint': `color-mix(in srgb, ${tint.bg} 60%, var(--card-bg))`, '--tint-text': tint.text } : {}),
-    ...(inColumn ? {} : { left: pos.x, top: pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
+    ...(inColumn ? {} : { left: resize?.liveX ?? pos.x, top: resize?.liveY ?? pos.y, width: w, minHeight: (card.collapsed ? (resize?.liveH ?? card.collapsedH) : h) ?? undefined }),
   } as CSSProperties;
   const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const classes = [
@@ -88,6 +89,15 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       onPointerDown={blockPointerDown('card', id)}
       onPointerDownCapture={blockHoldPointerDown('card', id)}
     >
+      {/* Every other edge and corner resizes too, with the mouse or a finger (owner request 2026-10-21). First, so the buttons and tick boxes (and their touch areas) paint above them. */}
+      {!inColumn && (
+        <ResizeGrips
+          kind="card"
+          id={id}
+          dirs={card.collapsed ? ['n', 's', 'w', 'nw', 'ne', 'sw'] : ['n', 's', 'e', 'w', 'nw', 'ne', 'sw']}
+          minH={card.collapsed ? COLLAPSED_MIN_H : undefined}
+        />
+      )}
       <div className="card-header">
         <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
         <button
@@ -117,14 +127,14 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       {/* A collapsed card can still be resized: wider or narrower from its right edge, or taller from its corner. */}
       {!inColumn && card.collapsed && (
         <>
-          <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'width')} onKeyDown={resizeKeyDown('card', id, 'width')} />
-          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both', COLLAPSED_MIN_H)} onKeyDown={resizeKeyDown('card', id, 'both', COLLAPSED_MIN_H)}>
+          <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'e')} onKeyDown={resizeKeyDown('card', id, 'e')} />
+          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se', COLLAPSED_MIN_H)} onKeyDown={resizeKeyDown('card', id, 'se', COLLAPSED_MIN_H)}>
             <ResizeIcon />
           </button>
         </>
       )}
       {!inColumn && !card.collapsed && (
-        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'both')} onKeyDown={resizeKeyDown('card', id, 'both')}>
+        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se')} onKeyDown={resizeKeyDown('card', id, 'se')}>
           <ResizeIcon />
         </button>
       )}

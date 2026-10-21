@@ -80,3 +80,59 @@ export function resizeTo(
   const label = matched.length ? `${sizeText} · same ${matched.join(' & ')} as ${n} ${n === 1 ? 'block' : 'blocks'}` : sizeText;
   return { w, h, liveW, liveH, matchIds: [...ids], label };
 }
+
+/** Which edge or corner is being dragged: n = top, s = bottom, e = right, w = left. */
+export type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+export interface ResizeFromResult extends ResizeResult {
+  /** Where the block's top-left corner goes: the edge opposite the one dragged stays put. */
+  x: number;
+  y: number;
+  /** Where to draw it while still dragging. */
+  liveX: number;
+  liveY: number;
+}
+
+/**
+ * Resize a block from any edge or corner. `start` is its drawn rectangle when the drag began and `d`
+ * how far the pointer has moved since (board pixels). The edge opposite the dragged one stays where
+ * it was, so the left and top edges also move x and y. `h` is null when the height is not changed.
+ */
+export function resizeFrom(
+  kind: 'card' | 'column',
+  dir: ResizeDir,
+  start: { x: number; y: number; w: number; h: number },
+  d: { x: number; y: number },
+  candidates: SizeCandidate[],
+  snap: boolean,
+  minH = BLOCK_MIN_H,
+): ResizeFromResult {
+  const east = dir.includes('e');
+  const west = dir.includes('w');
+  const north = dir.includes('n');
+  const south = dir.includes('s');
+  const raw = {
+    w: start.w + (east ? d.x : west ? -d.x : 0),
+    h: north || south ? start.h + (south ? d.y : -d.y) : null,
+  };
+  const r = resizeTo(kind, raw, candidates, snap, minH);
+  const right = start.x + start.w;
+  const bottom = start.y + start.h;
+  // From the left or top edge it is that edge that lands on the grid, not the size (the opposite edge
+  // may be off the grid, e.g. after a size match or a card that fits its text). A matched size wins.
+  let { w, h, label } = r;
+  const [minW, maxW] = kind === 'column' ? [COLUMN_MIN_W, COLUMN_MAX_W] : [CARD_MIN_W, CARD_MAX_W];
+  if (snap && west && !r.label.includes('width')) w = clamp(right - snapToGrid(right - r.liveW), minW, maxW);
+  if (snap && north && h != null && r.liveH != null && !r.label.includes('height')) h = clamp(bottom - snapToGrid(bottom - r.liveH), minH, BLOCK_MAX_H);
+  if (w !== r.w || h !== r.h) label = h == null ? `${w} wide` : `${w} × ${h}`;
+  return {
+    ...r,
+    w,
+    h,
+    label,
+    x: west ? right - w : start.x,
+    y: north && h != null ? bottom - h : start.y,
+    liveX: west ? right - r.liveW : start.x,
+    liveY: north && r.liveH != null ? bottom - r.liveH : start.y,
+  };
+}

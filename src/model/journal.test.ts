@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, journalEntries, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, journalEntries, journalPeek, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { overlaps } from './geometry';
 import type { Board, Card } from './types';
 import type { Workspace } from './workspace';
@@ -312,5 +312,17 @@ describe('parseJournalOpen', () => {
 
   it('keeps the good choices and drops the bad ones', () => {
     expect(parseJournalOpen('{"2026":true,"2026-10":"yes","junk":true,"__proto__":true,"2025-01/x":false}')).toEqual({ '2026': true });
+  });
+});
+
+describe('journalPeek', () => {
+  it('is the first line with words in what is written under the date, trimmed', () => {
+    expect(journalPeek('Went for a walk\nthen lunch')).toBe('Went for a walk');
+    expect(journalPeek('  Went for a walk  \r\nthen lunch')).toBe('Went for a walk');
+    expect(journalPeek('\n\n  • first item\n• second')).toBe('• first item');
+  });
+  it('is empty when nothing is written', () => {
+    expect(journalPeek('')).toBe('');
+    expect(journalPeek(' \n\t\n ')).toBe('');
   });
 });

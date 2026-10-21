@@ -8,6 +8,13 @@
 - The mouse pointer turns into a resize arrow only on the edge and corner areas; everywhere else on a card it stays the normal arrow. On a touch screen (phone or tablet) the thin edge areas are left off, since a finger is too big for them; the older bottom-right handle and right-edge strip work there as before.
 - Nothing about saved boards changed.
 
+## Journal: fold a day's note (2026-10-21)
+
+- In the Journal panel, each day's date is now a button, like the Year, Month and Week headings. Click it (or press Enter or Space) to fold that day's note. A folded day shows its date and, after it, the first line of the note in gray (cut with … if it is long). Click again to open it and keep writing.
+- Every day is open when you open the panel, today's too, and today's note can be folded. Folding is only for looking: it never changes what you wrote, and it isn't remembered or saved.
+- If you fold the day you are typing in, the cursor moves to that day's heading. On a phone the headings are at least 44px tall.
+- Nothing already saved changed.
+
 ## Card look fixes (2026-10-21)
 
 - The checklist item buttons (Move up, Move down, trash and drag grip) now grow with the text size (A+ / A−), along with their icons and the room kept free for them, so they match bigger text. At Small and Normal they look as before; the phone layout is unchanged.

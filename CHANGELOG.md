@@ -6,6 +6,13 @@
 - **A dropped block glides into its grid spot again.** It used to jump, because the block was rebuilt when you picked it up and again when you let go. It is now the same block throughout, so it also no longer restarts a playing video when moved.
 - Nothing about saved boards changed.
 
+## Shared computers keep each account's boards apart (2026-10-21)
+
+- **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).
+- When the earlier person signs in on that computer again, their boards come back, the same as reopening the page.
+- The same goes for boards someone else shared with the earlier person, and for other open tabs.
+- Boards already saved on a computer stay with the first account that signs in after this update.
+
 ## Fix: version preview during a drag, and Escape (2026-10-21)
 
 - **No more white screen:** picking an earlier version in Version history while you were holding a card or container mid-drag could crash the whole app. Any drag or resize in progress now simply ends when a version is shown.

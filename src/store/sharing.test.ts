@@ -745,8 +745,55 @@ describe('code review of the main session check fixes (2026-10-06)', () => {
     // Another person on this device, with a list of their own: not theirs.
     bob.storage.setItem('note-board:shares:carol', '[]');
     expect(boardsInKeptShares(bob.storage, 'carol').size).toBe(0);
-    // No list kept yet (an older version of the app): every share kept here counts.
+    // No list kept yet: a share on another account's list here is that account's (job #145), so it doesn't count.
+    expect(boardsInKeptShares(bob.storage, 'dave').size).toBe(0);
+    // One on no account's list (kept by an older version of the app) still counts.
+    bob.storage.data.delete(sharesKey('bob'));
     expect(boardsInKeptShares(bob.storage, 'dave').size).toBe(2);
+  });
+
+  it('another account’s shared board left on the device isn’t shown to, or uploaded into, the next account (job #145)', async () => {
+    const carol = person('carol');
+    await server.server.createShare(carol, 'sc', 'cr', 'k', serializeShare('cr', { cr: { ...B.createBoard(), name: 'Carol’s plans' } }), 'c');
+    await server.server.join(person('alice'), 'sc', 'k');
+    // Alice used this browser: she has Carol's shared board here. Then she signed out.
+    const alice = device('alice');
+    await settle();
+    alice.store.flush();
+    alice.sharing.stop();
+    const storage = alice.storage;
+    expect(Object.values(readWorkspace(storage.getItem('note-board:v1'))!.ws.boards).map((b) => b.name)).toContain('Carol’s plans');
+    // Bob signs in on the same browser (he has his own boards online), wired as src/sync/session.ts
+    // does. His shares list is slow, so his own boards start syncing first (after SHARED_WAIT_MS).
+    const store = createStore(storage, (fn) => fn());
+    let send: ((doc: RemoteDoc | null) => void) | null = null;
+    const writes: RemoteDoc[] = [];
+    const online: Remote = { watch: (onChange) => ((send = onChange), () => {}), write: (doc) => (writes.push(doc), Promise.resolve()) };
+    const real = server.backendFor(person('bob'));
+    const slow = {
+      ...real,
+      watchMyShares: (...args: Parameters<typeof real.watchMyShares>) => {
+        let stop = () => {};
+        const t = setTimeout(() => (stop = real.watchMyShares(...args)), 8000);
+        return () => (clearTimeout(t), stop());
+      },
+    };
+    let sharing: ReturnType<typeof startSharing> | null = null;
+    const guard = ownBoardsGuard(store, online, (id) => sharing!.isShared(id), boardsInKeptShares(storage, 'bob'));
+    let sync: ReturnType<typeof startSync> | null = null;
+    const startOwn = () => {
+      sync ??= startSync(store, guard.remote, { client: 'bob-page', onReady: () => {}, onError: () => {}, isShared: guard.isShared });
+    };
+    sharing = startSharing(store, slow, { client: 'bob-page', storage, onReady: () => (guard.known(), sync ? sync.sharedChanged() : startOwn()) });
+    setTimeout(startOwn, 5000);
+    await vi.advanceTimersByTimeAsync(5001);
+    send!({ data: serializeWorkspace({ home: 'home', boards: { home: { ...B.createBoard(), name: 'Bob home' } } }), client: 'bob-laptop' });
+    await settle();
+    await settle();
+    const uploaded = writes.flatMap((w) => Object.values(readWorkspace(w.data)!.ws.boards).map((b) => b.name));
+    expect({ here: Object.values(store.workspace().boards).map((b) => b.name), uploaded }).toEqual({ here: ['Bob home'], uploaded: [] });
+    sharing.stop();
+    sync!.stop();
   });
 });
 

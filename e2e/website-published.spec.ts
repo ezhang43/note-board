@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 
 test('the website pages are published beside the app, with working links', async ({ page }) => {
   for (const [path, h1] of [
-    ['about/', 'BusyAnts'],
+    ['about/', 'Free, with no limits. Your notes stay safe.'],
     ['faq/', 'Questions and answers'],
     ['terms/', 'Terms of use'],
     ['privacy/', 'Privacy policy'],

@@ -4,6 +4,14 @@
 
 - Added automated checks for the Claude connector (nothing you see changes): boards the app makes stay editable by it, its safe-delete and sign-in edge cases, its fixed rules (never delete documents, only the owner's command can switch deleting on), and that the built connector starts.
 
+## Touch and keyboard fixes (2026-10-21)
+
+- **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.
+- **Resizing a collapsed card with the keyboard** (arrow keys on its corner) no longer makes it jump to its open height.
+- **After resizing something by finger on a tablet**, right-click and long-press menus (spell-check, copy link) keep working. Before, they stayed blocked until you reloaded.
+- **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
+- Nothing about saved boards changed.
+
 ## Shared computers keep each account's boards apart (2026-10-21)
 
 - **Fixed:** on a computer used by more than one person, someone signing in with a new Google account could be given the boards of the person who used it before, private Journal included, and those boards were saved into the new account. Now the computer remembers whose boards it holds. When someone else signs in, the earlier person's boards are put aside on the computer, never shown or saved into the new account, and the new person starts from their own boards (or an empty board until theirs arrive).

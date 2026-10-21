@@ -1,6 +1,7 @@
 import type React from 'react';
 import { blockOf } from '../model/board';
 import { BLOCK_MIN_H, GRID } from '../model/constants';
+import type { Card } from '../model/types';
 import { resizeFrom, type ResizeDir } from '../model/sizing';
 import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, otherBlockSizes } from './canvasDom';
@@ -18,13 +19,13 @@ export function resizePointerDown(kind: 'card' | 'column', id: string, dir: Resi
     e.preventDefault();
     const block = e.currentTarget.closest<HTMLElement>('[data-card-id], [data-col-id]')!;
     // By finger, moving straight away moves the board; resting a moment first resizes (owner request).
-    if (e.pointerType === 'touch') return holdOrPan(e.nativeEvent, (start) => beginResize(kind, id, dir, minH, block, start), () => appStore.select(id));
+    if (e.pointerType === 'touch') return holdOrPan(e.nativeEvent, (start, _at, done) => beginResize(kind, id, dir, minH, block, start, done), () => appStore.select(id));
     beginResize(kind, id, dir, minH, block, { x: e.clientX, y: e.clientY });
   };
 }
 
 /** Resize `block` as the pointer moves from `from` (screen point); letting go keeps the new size. */
-function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: number | undefined, block: HTMLElement, from: { x: number; y: number }) {
+function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: number | undefined, block: HTMLElement, from: { x: number; y: number }, done?: () => void) {
   appStore.select(id);
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
@@ -56,6 +57,7 @@ function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: 
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', finish);
     window.removeEventListener('pointercancel', finish);
+    done?.();
     if (!moved) return;
     if (ev.type === 'pointercancel') appStore.cancelResize();
     else appStore.commitResize();
@@ -83,7 +85,8 @@ export function resizeKeyDown(kind: 'card' | 'column', id: string, dir: 'e' | 's
     const saved = blockOf(appStore.getState().board, id);
     // The saved size, not the drawn one, which may still be gliding from the last press.
     const w0 = saved?.w ?? block.offsetWidth;
-    const h0 = (saved && 'collapsedH' in saved && saved.collapsed ? saved.collapsedH : saved?.h) ?? block.offsetHeight;
+    // A collapsed card starts from its own height, never its open one (saved boards often have none: use the drawn height).
+    const h0 = (kind === 'card' && saved?.collapsed ? (saved as Card).collapsedH : saved?.h) ?? block.offsetHeight;
     const start = { x: saved?.x ?? 0, y: saved?.y ?? 0, w: w0, h: h0 };
     appStore.showResize({ kind, id, dir, ...resizeFrom(kind, dir, start, { x: dw, y: dh }, [], false, minH), labelAt: { x: -9999, y: -9999 } });
     appStore.commitResize();

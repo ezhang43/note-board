@@ -5,6 +5,13 @@
 - Dragging a top corner (top left or top right) no longer throws a shorter card beside it up the board; it slides sideways out of the way and keeps its height.
 - Dragging the bottom edge (or a bottom corner) down over the card below it now pushes that card straight down instead of shoving it sideways.
 - Matching another block's size no longer breaks the size limits, and dragging the top edge never makes a card shorter than its text just because another block is almost that height.
+
+## Touch and keyboard fixes (2026-10-21)
+
+- **Pinching while a checklist item is lifted on a phone** now puts the item back. Before, the lift stayed stuck and your next swipe moved the item to a new card.
+- **Resizing a collapsed card with the keyboard** (arrow keys on its corner) no longer makes it jump to its open height.
+- **After resizing something by finger on a tablet**, right-click and long-press menus (spell-check, copy link) keep working. Before, they stayed blocked until you reloaded.
+- **On a tablet, resting a finger on a checklist item inside several selected blocks** now moves the whole selection, as it does on a note, instead of only that checklist.
 - Nothing about saved boards changed.
 
 ## Shared computers keep each account's boards apart (2026-10-21)

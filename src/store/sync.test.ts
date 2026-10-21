@@ -973,3 +973,188 @@ describe('one computer, several accounts (job #145, review 137-A finding H2)', (
     expect(() => claimDevice(store, storage, 'bob', 'alice')).toThrow();
   });
 });
+
+// Job #148 (review 137-A, finding H1): opening the app from an older offline copy, the automatic tidy-up
+// (a block drawn taller here: another text size or font) counted as a change made here, so it was
+// uploaded over the newer online copy, and another device's edit was lost everywhere.
+describe('automatic tidying never overwrites a newer online copy (job #148)', () => {
+  /** The phone's offline copy (cards A and B), and the online copy the laptop has saved since (with card C). */
+  function copies() {
+    let v1 = { ...createBoard(), name: 'Home' };
+    v1 = addCard(v1, { ...(createCard('note', 'a') as NoteCard), text: 'A' }, { type: 'loose', x: 0, y: 0 });
+    v1 = addCard(v1, { ...(createCard('note', 'b') as NoteCard), text: 'B' }, { type: 'loose', x: 0, y: 200 });
+    const v2 = addCard(v1, { ...(createCard('note', 'c') as NoteCard), text: 'From the laptop' }, { type: 'loose', x: 600, y: 0 });
+    const doc = (board: typeof v1) => serializeWorkspace({ home: 'home', boards: { home: board } });
+    return { old: doc(v1), newer: doc(v2) };
+  }
+
+  it('the newer copy arriving while a tidy-up waits to upload is shown, and nothing is uploaded', async () => {
+    const { store, fake, onSaveState } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop' });
+    store.setMeasuredHeight('a', 400); // drawn taller here: B is moved out of its way
+    expect(store.getState().board.cards.b.y).not.toBe(200);
+    vi.advanceTimersByTime(SYNC_DELAY / 2);
+    fake.send({ data: newer, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    await settled();
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+    expect(onSaveState.mock.calls.at(-1)?.[0]).toBe('saved');
+  });
+
+  it('opened from the offline copy, a tidy-up is not uploaded before the server’s copy has come, however long that takes', async () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop', cached: true });
+    store.setMeasuredHeight('a', 400);
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    await settled();
+    expect(fake.writes).toEqual([]);
+    fake.send({ data: newer, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('when the server’s copy is the same as the offline one, the tidy-up is uploaded once it has come', () => {
+    const { store, fake } = setup();
+    const { old } = copies();
+    fake.send({ data: old, client: 'laptop', cached: true });
+    store.setMeasuredHeight('a', 400);
+    const tidied = store.getState().board.cards.b.y;
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    fake.send({ data: old, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(JSON.parse(fake.writes[0].data).boards.home.cards.b.y).toBe(tidied);
+  });
+
+  it('an edit the person made before the server’s copy came still counts as newer, and is uploaded', () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop', cached: true });
+    store.renameBoard('Typed on the phone');
+    vi.advanceTimersByTime(SYNC_DELAY / 2);
+    fake.send({ data: newer, client: 'laptop' });
+    expect(store.getState().board.name).toBe('Typed on the phone');
+    expect(fake.writes).toHaveLength(1);
+    expect(JSON.parse(fake.writes[0].data).boards.home.name).toBe('Typed on the phone');
+  });
+
+  it('restoring a backup of every board counts as made here: a copy arriving just after doesn’t replace it', () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop' });
+    store.setShares([], true);
+    const backup = serializeWorkspace({ home: 'home', boards: { home: { ...createBoard(), name: 'From the backup' }, b_more: createBoard() } });
+    expect(store.restoreBackup(backup)).toEqual([]);
+    vi.advanceTimersByTime(SYNC_DELAY / 2);
+    fake.send({ data: newer, client: 'laptop' });
+    expect(store.getState().board.name).toBe('From the backup');
+    expect(fake.writes).toHaveLength(1);
+    expect(JSON.parse(fake.writes[0].data).boards.home.name).toBe('From the backup');
+  });
+
+  it('a newer copy that waited for a gesture is shown when only tidying happened meanwhile', () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop' });
+    store.startNewDrag('note');
+    fake.send({ data: newer, client: 'laptop' });
+    store.setMeasuredHeight('a', 400); // tidying runs during this gesture
+    store.cancelNewDrag();
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('an edit on a shared board doesn’t make tidying of the person’s own boards count as newer', () => {
+    const shared = { ...createBoard(), name: 'Shared' };
+    const storage = (() => {
+      const data: Record<string, string> = { [BOARD_KEY]: serializeWorkspace({ home: 'home', boards: { home: createBoard(), b_shared: shared } }) };
+      return { getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => void (data[k] = v) };
+    })();
+    const store = createStore(storage, (fn) => fn());
+    const fake = fakeRemote();
+    startSync(store, fake.remote, { client: 'me', onReady: () => {}, onError: () => {}, isShared: (id) => id === 'b_shared' });
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop', cached: true });
+    store.openBoard('b_shared');
+    store.renameBoard('Shared, renamed here');
+    store.openBoard('home');
+    store.setMeasuredHeight('a', 400);
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(fake.writes).toEqual([]);
+    fake.send({ data: newer, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a share that ends while opening from the offline copy (its board goes) isn’t taken for a change made here', () => {
+    const storage = (() => {
+      const data: Record<string, string> = { [BOARD_KEY]: serializeWorkspace({ home: 'home', boards: { home: createBoard(), b_shared: { ...createBoard(), name: 'Shared' } } }) };
+      return { getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => void (data[k] = v) };
+    })();
+    const store = createStore(storage, (fn) => fn());
+    const fake = fakeRemote();
+    const shared = new Set(['b_shared']);
+    startSync(store, fake.remote, { client: 'me', onReady: () => {}, onError: () => {}, isShared: (id) => shared.has(id) });
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop', cached: true });
+    store.setMeasuredHeight('a', 400);
+    shared.delete('b_shared'); // as sharing.ts does: the share is gone, then its board
+    store.replaceBoards({ b_shared: null });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(fake.writes).toEqual([]);
+    fake.send({ data: newer, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a newer copy that waited for a gesture is shown when an edit made meanwhile was undone', () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop' });
+    store.startNewDrag('note');
+    fake.send({ data: newer, client: 'laptop' });
+    store.renameBoard('Briefly');
+    store.renameBoard('Home');
+    store.cancelNewDrag();
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a tidy-up after an edit was uploaded doesn’t win over a newer copy either', () => {
+    const { store, fake } = setup();
+    const { old, newer } = copies();
+    fake.send({ data: old, client: 'laptop' });
+    store.addCard('note');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    store.setMeasuredHeight('a', 400);
+    vi.advanceTimersByTime(SYNC_DELAY / 2);
+    fake.send({ data: newer, client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 4);
+    expect(store.getState().board.cards.c).toBeDefined();
+    expect(fake.writes).toHaveLength(1);
+  });
+
+  it('deleting a board that no card opens counts as an edit made here, so a copy arriving just after doesn’t bring it back', () => {
+    const { store, fake } = setup();
+    let home = { ...createBoard(), name: 'Home' };
+    home = addCard(home, { ...(createCard('note', 'a') as NoteCard), text: 'A' }, { type: 'loose', x: 0, y: 0 });
+    const alone = addCard({ ...createBoard(), name: 'Alone' }, { ...(createCard('note', 'n') as NoteCard), text: 'N' }, { type: 'loose', x: 0, y: 0 });
+    fake.send({ data: serializeWorkspace({ home: 'home', boards: { home, b_alone: alone } }), client: 'laptop' });
+    store.deleteBoard('b_alone');
+    vi.advanceTimersByTime(SYNC_DELAY / 2);
+    const renamed = { ...home, name: 'Renamed on the laptop' };
+    fake.send({ data: serializeWorkspace({ home: 'home', boards: { home: renamed, b_alone: alone } }), client: 'laptop' });
+    expect(store.workspace().boards.b_alone).toBeUndefined();
+    expect(fake.writes).toHaveLength(1);
+    expect(JSON.parse(fake.writes[0].data).boards.b_alone).toBeUndefined();
+  });
+});

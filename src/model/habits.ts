@@ -94,7 +94,91 @@ export function hiddenHabits(ws: Workspace, shared: string[]): string | null {
   const id = findHabitsBoard(ws, shared);
   if (!id || id === ws.home) return null;
   const board = ws.boards[id];
-  if (Object.keys(board.columns).length || !Object.values(board.cards).every(isHabit)) return null;
+  const cards = Object.values(board.cards);
+  // A second Weight card (two devices) isn't read by the panel, so the board stays listed, to be seen.
+  if (Object.keys(board.columns).length || !cards.every((c) => isHabit(c) || isOnlyWeights(c)) || cards.filter(isWeightCard).length > 1) return null;
   const opened = Object.values(ws.boards).some((b) => Object.values(b.cards).some((c) => c.kind === 'board' && c.boardId === id));
   return opened ? null : id;
+}
+
+// Weight (owner request, 2026-10-21): one checklist card titled "Weight" on the Habits board, one
+// item per day, "2026-10-19 72.4" (local date, kg with one decimal). It is not a habit, and the
+// Habits board stays hidden with it on. It is made when the first weight is entered, and goes when
+// the last one is removed (a checklist with no weights would read as a habit named Weight).
+
+export const WEIGHT_TITLE = 'Weight';
+const WEIGHT = /^(\d{4}-\d{2}-\d{2}) (\d{2,3}\.\d)$/;
+const MIN_KG = 20;
+const MAX_KG = 400;
+
+/** What was typed as kilograms (a dot or a comma), rounded to one decimal; null unless 20.0 to 400.0. */
+export function parseKg(text: string): number | null {
+  const t = text.trim().replace(',', '.');
+  if (!/^\d{1,3}(\.\d+)?$/.test(t)) return null;
+  const kg = Math.round(Number(t) * 10) / 10;
+  return kg >= MIN_KG && kg <= MAX_KG ? kg : null;
+}
+
+/** A real day and a weight in range; a malformed item is simply not an entry. */
+function entryOf(i: TodoItem): { day: DayKey; kg: number } | null {
+  const m = WEIGHT.exec(i.text);
+  if (!m || addDays(m[1], 0) !== m[1]) return null;
+  const kg = parseKg(m[2]); // the same range as what is typed
+  return kg === null ? null : { day: m[1], kg };
+}
+const weightText = (day: DayKey, kg: number) => `${day} ${kg.toFixed(1)}`;
+
+/** The Weight card on a board: the first checklist titled Weight with at least one weight on it. */
+const isWeightCard = (c: Card): c is TodoCard => c.kind === 'todo' && c.title === WEIGHT_TITLE && c.items.some((i) => entryOf(i));
+export const weightCard = (board: Board): TodoCard | undefined => Object.values(board.cards).find(isWeightCard);
+
+/** A Weight card with nothing on it but weights (and the blank item every checklist has), so none is out of sight. */
+const isOnlyWeights = (c: Card) => isWeightCard(c) && c.items.every((i) => !i.children.length && (entryOf(i) || (!i.text && !i.done)));
+
+/** Every weight on the card by day, oldest first; a day entered twice (two devices) counts as its last item. */
+export function weightEntries(card: TodoCard | undefined): { day: DayKey; kg: number }[] {
+  const byDay = new Map<DayKey, number>();
+  for (const i of card?.items ?? []) {
+    const e = entryOf(i);
+    if (e) byDay.set(e.day, e.kg);
+  }
+  return [...byDay].map(([day, kg]) => ({ day, kg })).sort((a, b) => (a.day < b.day ? -1 : 1));
+}
+
+/** The card with `kg` on `day`, replacing that day's weight where it stands (or added at the end). */
+export function withWeight(card: TodoCard, day: DayKey, kg: number): TodoCard {
+  const text = weightText(day, kg);
+  const same = (i: TodoItem) => entryOf(i)?.day === day;
+  const first = card.items.findIndex(same);
+  if (first < 0) return { ...card, items: [...card.items, { id: newId('i'), text, done: false, children: [] }] };
+  return { ...card, items: card.items.filter((i, n) => n === first || !same(i)).map((i) => (same(i) ? { ...i, text } : i)) };
+}
+
+/** The card without `day`'s weight; unchanged if it has none. */
+export function withoutWeight(card: TodoCard, day: DayKey): TodoCard {
+  const items = card.items.filter((i) => entryOf(i)?.day !== day);
+  return items.length === card.items.length ? card : { ...card, items };
+}
+
+/** The first and last day (both included) of the week, month or year `key` is in. */
+export function habitViewRange(view: HabitView, key: DayKey): { from: DayKey; to: DayKey } {
+  if (view === 'week') return { from: weekStart(key), to: addDays(weekStart(key), 6) };
+  if (view === 'year') return { from: `${key.slice(0, 4)}-01-01`, to: `${key.slice(0, 4)}-12-31` };
+  const from = `${key.slice(0, 7)}-01`;
+  return { from, to: addDays(addMonths(from, 1), -1) };
+}
+
+/**
+ * The chart for a view: the weights inside it, each placed from 0 to 1 across the days shown (x)
+ * and from the lowest (0) to the highest (1) weight (y; a lone weight sits at 0.5).
+ */
+export function weightChart(entries: { day: DayKey; kg: number }[], view: HabitView, key: DayKey) {
+  const { from, to } = habitViewRange(view, key);
+  const inView = entries.filter((e) => e.day >= from && e.day <= to);
+  const kgs = inView.map((e) => e.kg);
+  const min = kgs.length ? Math.min(...kgs) : null;
+  const max = kgs.length ? Math.max(...kgs) : null;
+  const span = (a: DayKey, b: DayKey) => Math.round((Date.parse(`${b}T12:00Z`) - Date.parse(`${a}T12:00Z`)) / 86400000);
+  const points = inView.map((e) => ({ ...e, x: span(from, e.day) / span(from, to), y: max === min ? 0.5 : (e.kg - min!) / (max! - min!) }));
+  return { from, to, points, min, max };
 }

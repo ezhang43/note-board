@@ -25,8 +25,10 @@ export function useShortcuts() {
       const panel = appStore.getState().ui.sidePanel;
       const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
       const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
-      // The New habit box isn't saved anywhere yet, so there the browser undoes the typing.
-      if (inPanel && mod && (key === 'z' || key === 'y') && e.target instanceof Element && e.target.closest('.habit-new')) return;
+      // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
+      // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
+      const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && e.target.closest('.weight-new') !== null;
+      if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new')) return;
       const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
       if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
       if (inJournal && mod && key === 'y') return run(e, redo);

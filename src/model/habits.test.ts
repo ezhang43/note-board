@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
-import { HABITS_NAME, habitList, habitViewLabel, habitYear, hiddenHabits, isHabit, isHabitViewNow, moveHabitView, tickedDays, withDay } from './habits';
+import { HABITS_NAME, WEIGHT_TITLE, habitList, habitViewLabel, habitViewRange, habitYear, hiddenHabits, isHabit, isHabitViewNow, moveHabitView, parseKg, tickedDays, weightCard, weightChart, weightEntries, withDay, withWeight, withoutWeight } from './habits';
 import type { Board, TodoCard } from './types';
 import type { Workspace } from './workspace';
 
@@ -104,5 +104,104 @@ describe('habits', () => {
     const opened = addCard(createBoard(), createBoardCard('h'), { type: 'loose', x: 0, y: 0 });
     expect(hiddenHabits({ ...ws, boards: { ...ws.boards, home: opened } }, [])).toBeNull();
     expect(hiddenHabits({ home: 'h', boards: { h: board } }, [])).toBeNull(); // never the home board
+  });
+});
+
+// Weight (owner request, 2026-10-21): one card titled "Weight" on the Habits board, one item per day, "2026-10-19 72.4".
+
+const blank = { id: 'b', text: '', done: false, children: [] };
+const weight = (...entries: string[]): TodoCard => ({
+  ...(createCard('todo') as TodoCard),
+  title: WEIGHT_TITLE,
+  items: [blank, ...entries.map((e, i) => ({ id: `w${i}`, text: e, done: false, children: [] }))],
+});
+
+describe('weight', () => {
+  it('reads kilograms with a dot or a comma, 20.0 to 400.0, rounded to one decimal; anything else is refused', () => {
+    expect(parseKg('72.4')).toBe(72.4);
+    expect(parseKg(' 72,4 ')).toBe(72.4);
+    expect(parseKg('72')).toBe(72);
+    expect(parseKg('72.46')).toBe(72.5);
+    expect(parseKg('20')).toBe(20);
+    expect(parseKg('400')).toBe(400);
+    for (const bad of ['', '  ', '19.9', '19.96x', '400.1', '0', '-5', 'abc', '72.4kg', '7e1', '1,000.5', '72..4', '.5', 'Infinity', '19.94']) expect(parseKg(bad)).toBeNull();
+  });
+
+  it('is a checklist titled Weight with day-and-kilogram items, and is not a habit', () => {
+    const card = weight('2026-10-19 72.4');
+    expect(isHabit(card)).toBe(false);
+    expect(habitList(boardWith(habit('Walk'), card))).toHaveLength(1);
+    expect(weightCard(boardWith(habit('Walk'), card))?.id).toBe(card.id);
+    expect(weightCard(boardWith(habit('Walk')))).toBeUndefined();
+    // A habit the person named Weight is still a habit, not the weight card.
+    expect(weightCard(boardWith(habit('Weight', ['2026-10-19'])))).toBeUndefined();
+    expect(isHabit(habit('Weight', ['2026-10-19']))).toBe(true);
+    expect(weightCard(boardWith(weight()))).toBeUndefined(); // no entry: nothing to read
+  });
+
+  it('lists entries by day, ignoring malformed items and keeping the last of a doubled day', () => {
+    const card = weight('2026-10-20 72.1', 'banana', '2026-10-19 72.4', '2026-10-19 99.9', '2026-13-45 72.0', '2026-02-30 72.0','2026-10-18 19.9', '2026-10-17 400.1', '2026-10-16 72.45', '2026-10-15 72.4 kg');
+    expect(weightEntries(card)).toEqual([
+      { day: '2026-10-19', kg: 99.9 },
+      { day: '2026-10-20', kg: 72.1 },
+    ]);
+    expect(weightEntries(undefined)).toEqual([]);
+  });
+
+  it('a day is entered once; entering it again replaces it, in the same place', () => {
+    const one = withWeight(weight(), '2026-10-19', 72.4);
+    expect(one.items.map((i) => i.text)).toEqual(['', '2026-10-19 72.4']);
+    const two = withWeight(one, '2026-10-20', 72);
+    expect(two.items.map((i) => i.text)).toEqual(['', '2026-10-19 72.4', '2026-10-20 72.0']);
+    const again = withWeight(two, '2026-10-19', 71.9);
+    expect(again.items.map((i) => i.text)).toEqual(['', '2026-10-19 71.9', '2026-10-20 72.0']);
+    expect(again.items[1].id).toBe(two.items[1].id);
+    // A doubled day (two devices) collapses to one item.
+    expect(withWeight(weight('2026-10-19 70.0', '2026-10-19 71.0'), '2026-10-19', 72).items.map((i) => i.text)).toEqual(['', '2026-10-19 72.0']);
+  });
+
+  it('removes a day, and nothing else', () => {
+    const card = weight('2026-10-19 72.4', '2026-10-20 72.0');
+    expect(withoutWeight(card, '2026-10-20').items.map((i) => i.text)).toEqual(['', '2026-10-19 72.4']);
+    expect(withoutWeight(card, '2026-10-01')).toBe(card);
+  });
+
+  it('the view range is the week, month or year shown, both ends included', () => {
+    expect(habitViewRange('week', '2026-10-21')).toEqual({ from: '2026-10-19', to: '2026-10-25' });
+    expect(habitViewRange('month', '2026-10-21')).toEqual({ from: '2026-10-01', to: '2026-10-31' });
+    expect(habitViewRange('month', '2028-02-10')).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+    expect(habitViewRange('year', '2026-10-21')).toEqual({ from: '2026-01-01', to: '2026-12-31' });
+  });
+
+  it('the chart holds only the entries in the shown period, placed by day and by weight', () => {
+    const entries = [
+      { day: '2026-10-18', kg: 80 }, // the week before
+      { day: '2026-10-19', kg: 72 },
+      { day: '2026-10-22', kg: 73 },
+      { day: '2026-10-25', kg: 71 },
+      { day: '2026-10-26', kg: 90 }, // the week after
+    ];
+    const week = weightChart(entries, 'week', '2026-10-21');
+    expect(week.points.map((p) => p.day)).toEqual(['2026-10-19', '2026-10-22', '2026-10-25']);
+    expect(week.points.map((p) => p.x)).toEqual([0, 0.5, 1]);
+    expect(week.min).toBe(71);
+    expect(week.max).toBe(73);
+    expect(week.points.map((p) => p.y)).toEqual([0.5, 1, 0]); // 0 is the lowest weight, 1 the highest
+    expect(weightChart(entries, 'month', '2026-10-21').points).toHaveLength(5);
+    expect(weightChart(entries, 'year', '2026-10-21').points).toHaveLength(5);
+    expect(weightChart(entries, 'month', '2026-09-21').points).toHaveLength(0);
+    const one = weightChart([{ day: '2026-10-19', kg: 72.4 }], 'week', '2026-10-21');
+    expect(one.points[0].y).toBe(0.5); // a single weight sits in the middle
+    expect([one.min, one.max]).toEqual([72.4, 72.4]);
+    expect(weightChart([], 'week', '2026-10-21')).toMatchObject({ points: [], min: null, max: null });
+  });
+
+  it('the Habits board stays hidden with a Weight card on it, but not with a card that has anything else', () => {
+    const ws = (b: Board): Workspace => ({ home: 'home', boards: { home: createBoard(), h: b } });
+    expect(hiddenHabits(ws(boardWith(habit('A'), weight('2026-10-19 72.4'))), [])).toBe('h');
+    expect(hiddenHabits(ws(boardWith(weight('2026-10-19 72.4'))), [])).toBe('h'); // before any habit
+    expect(hiddenHabits(ws(boardWith(weight('2026-10-19 72.4', 'banana'))), [])).toBeNull(); // something out of sight
+    expect(hiddenHabits(ws(boardWith({ ...weight('2026-10-19 72.4'), title: 'Weights' })), [])).toBeNull();
+    expect(hiddenHabits(ws(boardWith(weight('2026-10-19 72.4'), weight('2026-10-20 72.0'))), [])).toBeNull(); // a second Weight card is out of sight
   });
 });

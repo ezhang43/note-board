@@ -5,6 +5,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { HabitsIcon, TrashIcon } from './icons';
 import { usePhone } from './usePhone';
+import { WeightCard } from './WeightCard';
 
 /**
  * The Habits button (owner request, 2026-10-19): opens the Habits side panel, or closes it. By the
@@ -123,6 +124,7 @@ export function HabitsPanel() {
           Add
         </button>
       </form>
+      <WeightCard board={board} view={view} shown={shown} today={today} />
       {habits.length === 0 && <p className="habits-empty">No habits yet. Add one, then tick each day you do it.</p>}
       <div className={`habit-cards${view === 'month' ? ' habit-cards-month' : ''}`}>
         {habits.map((h) => {

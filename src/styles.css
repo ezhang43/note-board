@@ -2029,9 +2029,22 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   font-size: 14px;
 }
 .habits-empty { margin: 8px 4px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
-.habit { padding: 8px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 10px; }
+.habit, .weight { padding: 8px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 10px; }
 .habit-head { display: flex; align-items: center; gap: 4px; }
-.habit-new .tb-button { height: 34px; }
+.habit-new .tb-button, .weight-new .tb-button { height: 34px; }
+/* The Weight card above the habits (owner request 2026-10-21): a box for today's kg and a small chart. */
+.weight-title { margin-bottom: 6px; font-size: 14px; font-weight: 500; }
+.weight-new { display: flex; gap: 6px; }
+.weight-note { margin: 6px 2px 0; color: var(--danger); font-size: 13px; }
+.weight-today, .weight-empty { margin: 6px 2px 0; color: var(--ink-soft); font-size: 13px; }
+.weight-today { color: var(--ink); font-variant-numeric: tabular-nums; }
+.weight-chart { display: block; width: 100%; height: auto; margin-top: 6px; overflow: visible; }
+.weight-grid { stroke: var(--hover); stroke-width: 1; }
+.weight-line { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.weight-point { fill: var(--accent); }
+.weight-axis text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+.weight-latest { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 2px 2px 0; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.weight-remove { font-size: 18px; line-height: 1; }
 /* The name lines up with the day boxes; its edge shows on hover and while typing. */
 .habits-panel .habit-head input[type='text'] { margin-left: -4px; padding: 0 4px; border-color: transparent; background: transparent; font-weight: 500; }
 .habits-panel .habit-head input[type='text']:focus { border-color: var(--control-edge); }
@@ -2065,8 +2078,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   .habits-panel .habit-head input[type='text']:hover { border-color: var(--control-edge); }
 }
 .app.phone .habits-panel input[type='text'] { height: 44px; font-size: 16px; }
-.app.phone .habit-new .tb-button { height: 44px; }
-.app.phone .habit-delete { width: 44px; height: 44px; }
+.app.phone .habit-new .tb-button, .app.phone .weight-new .tb-button { height: 44px; }
+.app.phone .habit-delete, .app.phone .weight-remove { width: 44px; height: 44px; }
 .app.phone .habit-day { height: 52px; font-size: 15px; }
 
 /* Week | Month | Year and the arrows (owner request 2026-10-20): a bar that stays at the top while the habits scroll. */

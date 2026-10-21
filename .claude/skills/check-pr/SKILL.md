@@ -15,6 +15,14 @@ git fetch origin
 gh pr view $ARGUMENTS --json number,title,body,headRefName,baseRefName,labels,files,statusCheckRollup
 ```
 
+In a cloud session `gh pr ...` is blocked (GitHub GraphQL, `HTTP 403`). Use the GitHub MCP tools (`pull_request_read`) if loaded, or the REST form (more in the crew skill's "GitHub in a cloud session" section):
+
+```
+gh api repos/ezhang43/note-board/pulls/$ARGUMENTS --jq '{title, body, base: .base.ref, head: .head.ref, sha: .head.sha, labels: [.labels[].name]}'
+gh api "repos/ezhang43/note-board/pulls/$ARGUMENTS/files?per_page=100" --jq '.[].filename'
+gh api repos/ezhang43/note-board/commits/<head sha>/check-runs --jq '.check_runs[] | [.name, .status, .conclusion] | @tsv'
+```
+
 Check the base is `build/v1`. Note its labels and the "All tests" result.
 
 ## 2. Combine it with the latest build/v1, away from the owner's copy
@@ -39,7 +47,7 @@ npm test
 npm run test:e2e
 ```
 
-The browser tests need port 5173; if another dev server holds it, stop that first or say why the browser tests could not run.
+The browser tests run on this worktree's own ports (`scripts/test-ports.mjs`), so another session's dev server doesn't get in the way. If they still report a port in use, set `E2E_DEV_PORT` / `E2E_PREVIEW_PORT` to free ports, or say why they could not run. The known sandbox-only failures in /finish-step step 2 are not real.
 
 ## 4. Review
 
@@ -47,7 +55,7 @@ The browser tests need port 5173; if another dev server holds it, stop that firs
 node scripts/claude-hooks.mjs level origin/build/v1
 ```
 
-Run the `code-review` skill on the pull request: `high` if that says high or the pull request has the `high-risk` label, else `medium`. Also use the `spec-checker` subagent on the merged result.
+Run the `code-review` skill on the pull request: `high` if that says high or the pull request has the `high-risk` label, else `medium`. Also run the `spec-check` skill (or the `spec-checker` agent) on the merged result.
 
 ## 5. Report to the owner
 

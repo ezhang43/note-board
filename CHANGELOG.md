@@ -1,5 +1,9 @@
 # Changelog
 
+## Helper sessions work in the cloud (2026-10-22)
+
+- The crew, finish-step and check-pr instructions now work in cloud sessions, where `gh pr` commands are blocked: they use GitHub's other route (`gh api` or the GitHub tools) to open, check and merge pull requests, and wait for the tests without `--watch`. A new spec-check skill lets a background helper run the spec check itself; when a helper can't run the code review, it says so and the coordinator reviews the pull request before it merges. A few stale lines were fixed. Nothing in the app changed.
+
 ## Save a board as a picture or PDF (2026-10-22)
 
 - **File → Download as picture (PNG)** and **Download as PDF** save the whole open board, every card and container and not just what is on screen, as it looks now (your color theme and dark mode included), to send or print. The PDF is one page the size of the board. On an iPhone home-screen app they open the Share sheet, like the backup. A big board shows "Preparing…" while it is drawn.

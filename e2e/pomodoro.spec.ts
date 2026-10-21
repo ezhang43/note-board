@@ -153,6 +153,30 @@ test('it shares the right-hand spot with Version history: one at a time; Escape 
   await expect(panel(page)).toHaveCount(0);
 });
 
+test('Escape that closes a toolbar menu or the Color menu leaves the panel open', async ({ page }) => {
+  await button(page).click();
+  await expect(panel(page)).toBeVisible();
+  await page.locator('header.toolbar').getByRole('button', { name: 'File' }).click();
+  const menu = page.getByRole('menu', { name: 'File' });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await page.locator('header.toolbar').getByRole('button', { name: 'Appearance' }).click();
+  const look = page.getByRole('group', { name: 'Appearance' });
+  await expect(look).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(look).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await page.locator('header.toolbar').getByRole('button', { name: 'Color of selected cards and containers' }).click();
+  await expect(page.locator('.colour-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.colour-menu')).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toHaveCount(0);
+});
+
 test('undo leaves the timer alone', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('Plan');

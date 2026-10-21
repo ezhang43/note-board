@@ -217,8 +217,121 @@ test('a board and a journal saved before Habits existed load unchanged', async (
   await expect(page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox').first()).toHaveText('old journal');
 });
 
+// Weight (owner request, 2026-10-21): a Weight card above the habits, kg with one decimal, a chart that follows the view.
+const weightCard = (page: Page) => panel(page).locator('.weight');
+const weightBox = (page: Page) => weightCard(page).getByRole('textbox', { name: 'Today’s weight in kg' });
+const weightPoints = (page: Page) => weightCard(page).locator('.weight-point');
+async function enterWeight(page: Page, text: string) {
+  await weightBox(page).fill(text);
+  await weightBox(page).press('Enter');
+}
+
+test('Weight: type today’s weight, replace it, and see it in a chart; it is not a habit and is kept after a reload', async ({ page }) => {
+  await habitsButton(page).click();
+  await expect(weightCard(page)).toBeVisible();
+  await expect(weightCard(page)).toContainText('No weight entered in this week.');
+  await expect(weightPoints(page)).toHaveCount(0);
+  // The Weight card sits above the habits.
+  await addHabit(page, 'Walk');
+  expect((await weightCard(page).boundingBox())!.y).toBeLessThan((await row(page, 0).boundingBox())!.y);
+  await enterWeight(page, '72.4');
+  await expect(weightBox(page)).toHaveValue('');
+  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 72.4 kg');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await expect(weightCard(page)).not.toContainText('No weight entered');
+  // Again for the same day: replaced, with a comma and the Save button.
+  await weightBox(page).fill('71,8');
+  await weightCard(page).getByRole('button', { name: 'Save weight' }).click();
+  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 71.8 kg');
+  await expect(weightPoints(page)).toHaveCount(1);
+  // Not a habit, and the Habits board is still not in the Boards menu.
+  await expect(habitRows(page)).toHaveCount(1);
+  await page.getByRole('button', { name: 'Boards', exact: true }).click();
+  await expect(page.getByRole('menu', { name: 'Boards' }).getByRole('menuitem', { name: 'Habits' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await page.reload();
+  await habitsButton(page).click();
+  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 71.8 kg');
+  await expect(habitRows(page)).toHaveCount(1);
+});
+
+test('Weight: a blank does nothing; an entry outside 20.0 to 400.0 kg shows a short note and saves nothing', async ({ page }) => {
+  await habitsButton(page).click();
+  await weightBox(page).press('Enter');
+  await expect(weightCard(page).locator('.weight-note')).toHaveCount(0);
+  for (const bad of ['abc', '19.9', '400.1']) {
+    await enterWeight(page, bad);
+    await expect(weightCard(page).locator('.weight-note')).toHaveText('Enter a weight from 20.0 to 400.0 kg.');
+    await expect(weightPoints(page)).toHaveCount(0);
+    await expect(weightBox(page)).toHaveValue(bad); // kept, so it can be fixed
+  }
+  await enterWeight(page, '72.4');
+  await expect(weightCard(page).locator('.weight-note')).toHaveCount(0);
+  await expect(weightPoints(page)).toHaveCount(1);
+});
+
+test('Weight: the chart follows Week, Month and Year and the arrows', async ({ page }) => {
+  await habitsButton(page).click();
+  await enterWeight(page, '72.4');
+  for (const [view, word] of [['Week', 'week'], ['Month', 'month'], ['Year', 'year']] as const) {
+    await goTo(page, view);
+    await expect(weightPoints(page)).toHaveCount(1);
+    await viewBar(page).getByRole('button', { name: `Previous ${word}` }).click();
+    await expect(weightPoints(page)).toHaveCount(0);
+    await expect(weightCard(page)).toContainText(`No weight entered in this ${word}.`);
+    await viewBar(page).getByRole('button', { name: 'Today' }).click();
+    await expect(weightPoints(page)).toHaveCount(1);
+  }
+});
+
+test('Weight: Ctrl+Z right after Save takes the saved weight back; while typing it undoes the typing', async ({ page }) => {
+  await habitsButton(page).click();
+  await enterWeight(page, '72.4');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await weightBox(page).click();
+  await page.keyboard.press('Control+z');
+  await expect(weightPoints(page)).toHaveCount(0);
+  await page.keyboard.press('Control+y');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await weightBox(page).click();
+  await page.keyboard.type('73');
+  await page.keyboard.press('Control+z');
+  await expect(weightPoints(page)).toHaveCount(1); // the typing, not the saved weight
+});
+
+test('Weight: the × removes the latest entry of the period, and Ctrl+Z brings it back', async ({ page }) => {
+  await habitsButton(page).click();
+  await enterWeight(page, '72.4');
+  await expect(weightCard(page).locator('.weight-latest')).toContainText('72.4 kg');
+  await weightCard(page).getByRole('button', { name: /^Remove weight for/ }).click();
+  await expect(weightPoints(page)).toHaveCount(0);
+  await expect(weightCard(page)).toContainText('No weight entered in this week.');
+  await page.keyboard.press('Control+z');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await expect(weightCard(page).locator('.weight-today')).toHaveText('Today: 72.4 kg');
+  await page.keyboard.press('Control+y');
+  await expect(weightPoints(page)).toHaveCount(0);
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+
+  test('Weight: full width, a box that does not zoom the page, 44px buttons', async ({ page }) => {
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).locator('.phone-tiles').getByRole('button', { name: 'Habits', exact: true }).tap();
+    const card = (await weightCard(page).boundingBox())!;
+    const wide = (await panel(page).boundingBox())!;
+    expect(card.width).toBeGreaterThan(wide.width - 40);
+    expect(await weightBox(page).evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+    expect((await weightBox(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await weightCard(page).getByRole('button', { name: 'Save weight' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await weightBox(page).fill('72.4');
+    await weightCard(page).getByRole('button', { name: 'Save weight' }).tap();
+    await expect(weightPoints(page)).toHaveCount(1);
+    expect((await weightCard(page).getByRole('button', { name: /^Remove weight for/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect(await panel(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  });
 
   test('⋯ → Habits opens the panel over the whole screen, with day boxes big enough to tap', async ({ page }) => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();

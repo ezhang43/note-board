@@ -7,6 +7,13 @@
 - Holding the key down never answers the question; it has to be a second, separate press. Escape still keeps the event.
 - There is still no undo for calendar events. Nothing about saved boards changed.
 
+## Habits: a Weight card (2026-10-21)
+
+- The Habits panel now has a **Weight** card above your habits. Type today's weight in kilograms (like 72.4, a comma works too) and press Enter or Save. Typing it again the same day replaces it. Anything outside 20.0 to 400.0 shows a short note and isn't saved.
+- A small line chart shows your weights for the week, month or year the panel is on, and moves with the ‹ › arrows. A × next to the latest one removes it, and Ctrl+Z brings it back.
+- Weights are kept on the same hidden Habits board as your habits, so they are saved, synced, undone and restored from Version history the same way. They don't show up as a habit, and the Habits board still stays out of the Boards menu.
+- Nothing already saved changed: the Weight card is only made when you enter your first weight.
+
 ## Habits: Month and Year views, no streak (2026-10-20)
 
 - At the top of the Habits panel there is now a **Week | Month | Year** switch with ‹ and › arrows. A Today button shows up when you've moved away from today. The bar stays in view while you scroll your habits. The panel still opens on this week.

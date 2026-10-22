@@ -81,7 +81,7 @@ describe('leaving a shared board online', () => {
     await collabRemote(user).leave('s1');
     expect(calls.deleteDoc).toEqual([]);
     expect(calls.batches).toHaveLength(1);
-    expect(calls.batches[0].deletes.sort()).toEqual(['boards/u1/shared/s1', 'shared/s1/members/u1']);
+    expect(calls.batches[0].deletes.sort()).toEqual(['boards/u1/shared/s1', 'shared/s1/joins/u1', 'shared/s1/members/u1']);
     expect(calls.batches[0].committed).toBe(true);
   });
 

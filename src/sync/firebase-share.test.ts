@@ -20,10 +20,14 @@ const fs = vi.hoisted(() => {
     refuse: (code?: string) => void;
   }>();
   const kids = (path: string) => [...local.keys()].filter((k) => k.startsWith(path + '/') && !k.slice(path.length + 1).includes('/'));
+  /** Paths refused whoever asks (a viewer's private links record, say). */
+  const denied = new Set<string>();
+  /** How many writes each batch or transaction sent. */
+  const sizes: number[] = [];
   /** The rules, as in firestore.rules: a shared board (and its people) only for its people. */
   const allowed = (path: string, uid: string) => {
     const m = /^shared\/([^/]+)/.exec(path);
-    return !m || server.has(`shared/${m[1]}/members/${uid}`);
+    return !denied.has(path) && (!m || server.has(`shared/${m[1]}/members/${uid}`));
   };
   const isPending = (path: string) => pending.some((p) => p.writes.some(([k]) => k === path));
   const changed = () => Promise.resolve().then(() => watches.forEach((w) => w.deliver()));
@@ -33,10 +37,14 @@ const fs = vi.hoisted(() => {
     watches,
     uid: 'u1',
     unreachable: false,
+    denied,
+    sizes,
     reset() {
       this.unreachable = false;
       server.clear();
       local.clear();
+      denied.clear();
+      sizes.length = 0;
       pending = [];
       waiting = [];
       watches.clear();
@@ -46,6 +54,7 @@ const fs = vi.hoisted(() => {
     isPending,
     changed,
     write(writes: [string, Data | null][]) {
+      sizes.push(writes.length);
       for (const [k, v] of writes) v ? local.set(k, v) : local.delete(k);
       changed();
       return new Promise<void>((done) => pending.push({ writes, done }));
@@ -104,7 +113,8 @@ vi.mock('firebase/firestore', () => {
     writeBatch: () => {
       const writes: [string, Data | null][] = [];
       return {
-        set: (ref: string, v: Data) => void writes.push([ref, v]),
+        set: (ref: string, v: Data, o?: { merge?: boolean }) => void writes.push([ref, o?.merge ? { ...fs.local.get(ref), ...v } : v]),
+        update: (ref: string, v: Data) => void writes.push([ref, { ...fs.local.get(ref), ...v }]),
         delete: (ref: string) => void writes.push([ref, null]),
         commit: () => fs.write(writes),
       };
@@ -113,7 +123,9 @@ vi.mock('firebase/firestore', () => {
       const writes: [string, Data | null][] = [];
       const out = await fn({
         get: async (ref: string) => docSnap(ref, false),
+        set: (ref: string, v: Data, o?: { merge?: boolean }) => void writes.push([ref, o?.merge ? { ...fs.local.get(ref), ...v } : v]),
         update: (ref: string, v: Data) => void writes.push([ref, { ...fs.local.get(ref), ...v }]),
+        delete: (ref: string) => void writes.push([ref, null]),
       });
       if (writes.length) await fs.write(writes);
       return out;
@@ -151,12 +163,12 @@ vi.mock('firebase/firestore', () => {
       return () => void fs.watches.delete(w);
     },
     getDoc: vi.fn(),
-    getDocs: vi.fn(),
+    getDocs: async (ref: string) => ({ docs: fs.kids(ref).map((k) => ({ id: k.split('/').pop(), ref: k })) }),
     orderBy: vi.fn(),
     query: vi.fn(),
     setDoc: vi.fn(),
     updateDoc: vi.fn(),
-    deleteDoc: vi.fn(),
+    deleteDoc: vi.fn(async () => {}),
   };
 });
 
@@ -324,7 +336,7 @@ describe('sharing a new board on the published site (job 22)', () => {
       await ticks();
       expect(fs.watches.size).toBe(0);
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(fs.watches.size).toBe(1);
+      expect([...fs.watches].filter((w) => w.path === 'shared/s1')).toHaveLength(1);
       fs.answerWatches();
       await ticks();
       expect(errors).toMatchObject([{ code: 'permission-denied' }]);
@@ -377,5 +389,154 @@ describe('joining by link says whether it added the person (owner decision, 2026
   it('when the server can’t say: no, so a refused share never takes them off', async () => {
     fs.unreachable = true;
     expect(await join()).toBe(false);
+  });
+});
+
+// Job 161 (roles, PR 1): the link key moves from the share (which viewers will be able to read) to
+// shared/{id}/private/links (editors only), and joining proves the key in shared/{id}/joins/{uid}
+// (read by nobody). These are the shapes rules/share-roles.test.ts checks against firestore.rules.
+describe('links in a private record and joining through joins (job 161)', () => {
+  /** Lets every save sent while `p` runs arrive (several in a row, one after another). */
+  const arrived = async (p: Promise<unknown>) => {
+    for (let i = 0; i < 5; i++) {
+      await ticks();
+      fs.arrive();
+    }
+    return p;
+  };
+  const oldShare = { owner: 'u1', root: 'b1', link: 'old-key', data: '{}', client: '', rev: 1 };
+  const put = (docs: Record<string, Data>) => {
+    for (const [k, v] of Object.entries(docs)) {
+      fs.server.set(k, v);
+      fs.local.set(k, v);
+    }
+  };
+
+  it('sharing keeps the key only in the private record; the person who shared it is an editor', async () => {
+    await arrived(collabRemote(user).createShare('s1', 'b1', 'k', '{}', 'page'));
+    expect(fs.server.get('shared/s1')).toMatchObject({ owner: 'u1', root: 'b1', link: null });
+    expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: 'k' });
+    expect(fs.server.get('shared/s1/members/u1')).toEqual({ name: 'Eric', photo: null, role: 'edit', joinedAt: 0 });
+    expect(fs.server.has('boards/u1/shared/s1')).toBe(true);
+  });
+
+  it('joining writes the key in the joins record, never in the member record', async () => {
+    put({ 'shared/s1': { ...oldShare, owner: 'u2' } });
+    await arrived(collabRemote(user).join('s1', 'k'));
+    expect(fs.server.get('shared/s1/joins/u1')).toEqual({ key: 'k' });
+    expect(fs.server.get('shared/s1/members/u1')).toEqual({ name: 'Eric', photo: null, role: 'edit', joinedAt: 0 });
+  });
+
+  it('the link comes from the private record, or from the share itself for one from before', async () => {
+    put({ 'shared/s1': oldShare, 'shared/s1/members/u1': { name: 'Eric', photo: null, joinedAt: 0 } });
+    const links: (string | null)[] = [];
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.link ?? null), () => {});
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    expect(links.at(-1)).toBe('old-key');
+    void fs.write([['shared/s1/private/links', { edit: 'new-key' }]]);
+    fs.arrive();
+    await ticks();
+    expect(links.at(-1)).toBe('new-key');
+    void fs.write([
+      ['shared/s1/private/links', { edit: null }],
+      ['shared/s1', { ...oldShare, link: null }],
+    ]);
+    fs.arrive();
+    await ticks();
+    expect(links.at(-1)).toBe(null);
+  });
+
+  it('turning the link on or off writes the private record and takes the key out of the share', async () => {
+    put({ 'shared/s1': oldShare });
+    await arrived(collabRemote(user).setLink('s1', 'k2'));
+    expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: 'k2' });
+    expect(fs.server.get('shared/s1')).toMatchObject({ link: null, rev: 1 });
+    await arrived(collabRemote(user).setLink('s1', null));
+    expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: null });
+  });
+
+  it('removing someone takes their records and changes a link that is on (moved out of a share from before)', async () => {
+    put({ 'shared/s1': oldShare, 'shared/s1/members/u2': { name: 'Ann', photo: null, key: 'old-key', joinedAt: 0 }, 'shared/s1/joins/u2': { key: 'old-key' } });
+    await arrived(collabRemote(user).removePerson('s1', 'u2', 'k2'));
+    expect(fs.server.has('shared/s1/members/u2')).toBe(false);
+    expect(fs.server.has('shared/s1/joins/u2')).toBe(false);
+    expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: 'k2' });
+    expect(fs.server.get('shared/s1')).toMatchObject({ link: null });
+  });
+
+  it('removing someone while the link is off leaves it off', async () => {
+    put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/private/links': { edit: null }, 'shared/s1/members/u2': { name: 'Ann', photo: null, role: 'edit', joinedAt: 0 } });
+    await arrived(collabRemote(user).removePerson('s1', 'u2', 'k2'));
+    expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: null });
+    expect(fs.server.has('shared/s1/members/u2')).toBe(false);
+  });
+
+  it('leaving takes the joins record too', async () => {
+    put({ 'shared/s1/joins/u1': { key: 'k' } });
+    await arrived(collabRemote(user).leave('s1'));
+    expect(fs.server.has('shared/s1/joins/u1')).toBe(false);
+  });
+
+  it('deleting a shared board takes its links and everyone’s joins records', async () => {
+    put({
+      'shared/s1': { ...oldShare, link: null },
+      'shared/s1/private/links': { edit: 'k' },
+      'shared/s1/members/u1': { name: 'Eric', photo: null, role: 'edit', joinedAt: 0 },
+      'shared/s1/members/u2': { name: 'Ann', photo: null, role: 'edit', joinedAt: 0 },
+      'shared/s1/joins/u2': { key: 'k' },
+    });
+    await arrived(collabRemote(user).deleteShare('s1'));
+    expect([...fs.server.keys()].filter((k) => k.startsWith('shared/'))).toEqual([]);
+  });
+
+  // Code review (high): comments can be written online already, and two records per person
+  // overflowed a batch (at most 500 writes) sooner than before.
+  it('deleting a shared board takes its comments too, and never sends more than 500 writes at once', async () => {
+    const docs: Record<string, Data> = { 'shared/s1': { ...oldShare, link: null }, 'shared/s1/private/links': { edit: 'k' } };
+    for (let i = 0; i < 300; i++) {
+      docs[`shared/s1/members/m${i}`] = { name: 'M', photo: null, role: 'edit', joinedAt: 0 };
+      docs[`shared/s1/joins/m${i}`] = { key: 'k' };
+      docs[`shared/s1/comments/c${i}`] = { card: 'c_1', text: 'hi', author: 'm1', name: 'M', photo: null, at: 0, resolved: false };
+    }
+    put(docs);
+    await arrived(collabRemote(user).deleteShare('s1'));
+    expect([...fs.server.keys()].filter((k) => k.startsWith('shared/'))).toEqual([]);
+    expect(Math.max(...fs.sizes)).toBeLessThanOrEqual(500);
+  });
+
+  // Code review (high): a share whose key is kept in the private record (link: null in the share)
+  // must not show its link as off before that record has answered (a click on "Turn link on" then
+  // would replace a working link).
+  it('the link isn’t given as off before the private record has answered', async () => {
+    put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/members/u1': { name: 'Eric', photo: null, role: 'edit', joinedAt: 0 } });
+    fs.server.set('shared/s1/private/links', { edit: 'k' });
+    const links: (string | null | undefined)[] = [];
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.link), () => {});
+    await ticks();
+    expect(links.length).toBeGreaterThan(0);
+    expect(links).not.toContain(null);
+    fs.local.set('shared/s1/private/links', { edit: 'k' });
+    fs.answerWatches();
+    await ticks();
+    expect(links.at(-1)).toBe('k');
+    expect(links).not.toContain(null);
+  });
+
+  it('once the private record is refused (no longer an editor, say), its key isn’t offered any more', async () => {
+    put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/members/u1': { name: 'Eric', photo: null, role: 'edit', joinedAt: 0 }, 'shared/s1/private/links': { edit: 'k' } });
+    const links: (string | null | undefined)[] = [];
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.link), () => {});
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    expect(links.at(-1)).toBe('k');
+    fs.denied.add('shared/s1/private/links');
+    fs.answerWatches();
+    await ticks();
+    void fs.write([['shared/s1', { ...oldShare, link: null, rev: 2 }]]);
+    await ticks();
+    expect(links.at(-1)).toBe(null);
   });
 });

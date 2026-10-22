@@ -446,7 +446,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (!doc || (s.ownerUid && doc.owner !== s.ownerUid)) return gone(s, 'deleted');
     s.owner = doc.owner === backend.me.uid;
     s.ownerUid = doc.owner;
-    s.link = doc.link;
+    if (doc.link !== undefined) s.link = doc.link;
     remember();
     const now = boardsOf(s);
     // Its starting board missing here (gone from this device while the page was closed, say): the

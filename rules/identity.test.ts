@@ -48,11 +48,14 @@ describe('a member record is the person as Google names them (181-A M1)', () => 
     await assertFails(join(bob(), bobAs('Bob', BOB_PHOTO)));
   });
 
-  it('as the app writes them: a photo may be left out, the name is trimmed, cut to 200 characters, or “Someone” when Google has none', async () => {
+  it('as the app writes them: a photo may be left out, the name is trimmed, or “Someone” when Google has none', async () => {
     await seedShare();
     await assertSucceeds(join(bob(), bobAs('Bob Member', null)));
     await assertSucceeds(join(bob({ name: '  Bob Member ' }), bobAs('Bob Member', null)));
-    await assertSucceeds(join(bob({ name: 'x'.repeat(250) }), bobAs('x'.repeat(200), null)));
+    // A name over 200 characters can't be checked as the app cuts it, so it is refused (code review:
+    // otherwise any name would pass); Google names are far shorter.
+    await assertFails(join(bob({ name: 'x'.repeat(250) }), bobAs('Alice Owner', null)));
+    await assertFails(join(bob({ name: 'x'.repeat(250) }), bobAs('x'.repeat(200), null)));
     await assertSucceeds(join(bob({}), bobAs('Someone', null)));
     await assertFails(join(bob({}), bobAs('Alice Owner', null)));
     await assertFails(join(bob({ name: '   ' }), bobAs('Alice Owner', null)));

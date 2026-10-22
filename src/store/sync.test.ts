@@ -810,6 +810,37 @@ describe('changes held back while the account is being deleted elsewhere (181-A 
     expect(next.fake.writes).toEqual([]);
   });
 
+  it('opened from this device’s offline copy, it waits for the server’s: newer work there wins (code review)', () => {
+    const { first, base } = typedWhileHeld();
+    const next = page({ ...started(), cached: true }, base, first.store);
+    expect(next.store.getState().board.name).toBe('Typed while held');
+    // The deleting failed long ago, and another device worked on the boards since.
+    next.fake.send({ data: boardJson('Newer, from another device'), client: 'laptop' });
+    expect(next.store.getState().board.name).toBe('Newer, from another device');
+    expect(next.onHeld).toHaveBeenCalledWith(null);
+    vi.advanceTimersByTime(DELETING_WAIT_MS * 2);
+    expect(next.fake.writes).toEqual([]);
+  });
+
+  it('opened from this device’s offline copy, the server’s still holding the same boards: this device’s copy goes', () => {
+    const { first, base } = typedWhileHeld();
+    const next = page({ data: boardJson('Mine'), client: 'old-page', cached: true }, base, first.store);
+    next.fake.send({ data: boardJson('Mine'), client: 'old-page' });
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(next.fake.writes).toHaveLength(1);
+    expect(next.fake.writes[0].data).toContain('Typed while held');
+  });
+
+  it('a change already taken back when the marker comes isn’t noted, and the note goes once the boards are back', () => {
+    const { store, fake, onHeld, onSaveState } = page({ data: boardJson('Mine'), client: 'old-page' });
+    store.renameBoard('Typed');
+    store.renameBoard('Mine');
+    fake.send(started());
+    expect(onHeld).not.toHaveBeenCalled();
+    fake.send({ data: boardJson('Mine'), client: 'old-page' });
+    expect(onSaveState).not.toHaveBeenLastCalledWith('held');
+  });
+
   it('a page still open sends its changes once the boards are back, and drops the note', async () => {
     const { store, fake, onHeld } = page(started());
     store.renameBoard('Typed while held');

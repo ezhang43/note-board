@@ -145,12 +145,14 @@ service cloud.firestore {
         return photo == null || (photo is string && photo.size() <= 2000 && photo.matches('https://lh[0-9]+[.]googleusercontent[.]com/.*'));
       }
       // The name and photo Google gives the person (their sign-in token), as the app writes them
-      // (personFrom): the name trimmed, cut to 200 characters, or 'Someone' when there is none; the
-      // photo, or none. So no one shows up as someone else, the owner included (review 181-A M1).
+      // (personFrom): the name trimmed, or 'Someone' when there is none; the photo, or none. So no one
+      // shows up as someone else, the owner included (review 181-A M1).
+      // simple: a name over 200 characters (which the app cuts) is refused rather than checked as cut,
+      // since these rules can't take part of a text; Google names are far shorter.
       function ownName(name) {
         let given = request.auth.token.get('name', '');
         let trimmed = given is string ? given.trim() : '';
-        return trimmed == '' ? name == 'Someone' : (name == trimmed || (trimmed.size() > 200 && name.size() <= 200));
+        return trimmed == '' ? name == 'Someone' : name == trimmed;
       }
       function ownPhoto(photo) {
         return googlePhoto(photo) && (photo == null || photo == request.auth.token.get('picture', null));

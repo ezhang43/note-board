@@ -258,8 +258,8 @@ export function startSync(
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   /** The marker said it is done, and opts.onGone was told. */
   let toldGone = false;
-  /** The boards in the marker holding this page back (as ownKey; '' when there are none). */
-  let heldOn = '';
+  /** A fingerprint of the boards in the marker holding this page back (null when there are none). */
+  let heldOn: string | null = null;
   /** The note on the device of changes held back (see opts.heldBase). */
   let heldBase = opts.heldBase ?? null;
   const noteHeld = (base: string | null) => {
@@ -270,8 +270,10 @@ export function startSync(
   /** A change made here waits while the account is being deleted elsewhere: said so, and noted on the device. */
   const holdChange = () => {
     if (!failed) opts.onSaveState?.('held');
-    if (heldOn) noteHeld(contentHash(heldOn));
+    if (heldOn) noteHeld(heldOn);
   };
+  /** Opened on this device's offline copy with changes held back noted: the server's copy decides (see the watch). */
+  let checkHeld = false;
   const release = () => {
     held = false;
     toldGone = false;
@@ -327,7 +329,7 @@ export function startSync(
   function schedule() {
     if (!ready || stopped) return;
     if (held) {
-      if (madeHere) holdChange();
+      if (madeHere && ownKey(store.workspace()) !== lastSynced) holdChange();
       return;
     }
     // Opened from the offline copy: tidying alone waits for the server's copy, which may be newer.
@@ -393,9 +395,10 @@ export function startSync(
         if (timer) clearTimeout(timer);
         timer = null;
         const inIt = marker.deleting === 'started' && marker.data ? readWorkspace(marker.data)?.ws : null;
-        heldOn = inIt ? ownKey(inIt) : '';
+        heldOn = inIt ? contentHash(ownKey(inIt)) : null;
         held = true;
-        if (madeHere) holdChange();
+        const waitsHere = ready && madeHere && ownKey(store.workspace()) !== lastSynced;
+        if (waitsHere) holdChange();
         if (marker.deleting === 'done' || !marker.data) {
           if (holdTimer) clearTimeout(holdTimer);
           holdTimer = null;
@@ -416,7 +419,7 @@ export function startSync(
             upload();
           }, DELETING_WAIT_MS);
         // The boards in it are shown as any version arriving, unless a change made here waits to go (it is newer).
-        if (ready && madeHere && ownKey(store.workspace()) !== lastSynced) return;
+        if (waitsHere) return;
       }
     } else if (held && doc) {
       // The deleting failed and the boards are back: a change made here meanwhile is the newest.
@@ -425,6 +428,29 @@ export function startSync(
         lastSynced = null;
         return upload();
       }
+      if (!failed) opts.onSaveState?.('saved');
+    }
+    // Changes held back on this device (opts.heldBase), and it opened on its offline copy: the
+    // server's copy says whether they were made on the boards still online (review 181-A H1).
+    if (checkHeld && doc?.data && !doc.cached && !doc.pending) {
+      checkHeld = false;
+      fresh = seen = true;
+      const ws = read(doc.data);
+      if (!ws) return;
+      const key = ownKey(ws);
+      const same = contentHash(key) === heldBase;
+      if (!same) noteHeld(null);
+      if (same || madeHere) {
+        // This device's copy is newer: it goes as soon as it may.
+        synced(key);
+        madeHere = true;
+        if (held) holdChange();
+        else schedule();
+        return;
+      }
+      synced(key);
+      sawOnline(ws, key);
+      return show(ws);
     }
     const nowFresh = !fresh && !doc?.cached;
     if (nowFresh) fresh = true;
@@ -447,11 +473,17 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       ready = true;
-      synced(ownKey(ws));
+      const key = ownKey(ws);
+      synced(key);
       sharedBefore = new Set(Object.keys(store.workspace().boards).filter(isShared));
-      // Changes a page here made on these very boards while the account was being deleted elsewhere
-      // (review 181-A H1): this device's copy is newer, and goes online as soon as it may.
-      if (heldBase !== null && heldBase === contentHash(ownKey(ws))) {
+      // Changes a page here made while the account was being deleted elsewhere (review 181-A H1).
+      // Only this device's offline copy so far: this device's boards stay until the server's copy decides.
+      if (heldBase !== null && (doc.cached || doc.pending)) {
+        checkHeld = true;
+        return opts.onReady();
+      }
+      // Made on these very boards: this device's copy is newer, and goes online as soon as it may.
+      if (heldBase !== null && heldBase === contentHash(key)) {
         madeHere = true;
         if (held) holdChange();
         else schedule();
@@ -459,7 +491,7 @@ export function startSync(
       }
       // Changed online since: they win, as on any open.
       noteHeld(null);
-      sawOnline(ws, ownKey(ws));
+      sawOnline(ws, key);
       show(ws);
       // Opened from saves not on the server yet (job 92): "Saving…" until they are.
       unconfirmed = Boolean(doc.pending);

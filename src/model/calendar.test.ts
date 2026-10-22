@@ -7,8 +7,7 @@ import {
   PANEL_DEFAULT,
   PANEL_STEP,
   clampPanelWidth,
-  parsePanelWidths,
-  parseSideWidths,
+  readWidths,
   SIDE_DEFAULT,
   addDays,
   addMonths,
@@ -501,13 +500,13 @@ describe('the calendar panel’s width', () => {
   });
 
   it('reads the remembered widths, and falls back to the defaults for anything bad', () => {
-    expect(parsePanelWidths('{"week":500,"month":900}')).toEqual({ week: 500, month: 900 });
-    expect(parsePanelWidths('{"week":500}')).toEqual({ week: 500, month: 720 });
-    expect(parsePanelWidths(null)).toEqual({ week: 420, month: 720 });
-    expect(parsePanelWidths('junk')).toEqual({ week: 420, month: 720 });
-    expect(parsePanelWidths('[1,2]')).toEqual({ week: 420, month: 720 });
-    expect(parsePanelWidths('{"week":"wide","month":-5}')).toEqual({ week: 420, month: 720 });
-    expect(parsePanelWidths('{"week":10,"month":1e9}')).toEqual({ week: 420, month: 720 });
+    expect(readWidths('{"week":500,"month":900}', PANEL_DEFAULT)).toEqual({ week: 500, month: 900 });
+    expect(readWidths('{"week":500}', PANEL_DEFAULT)).toEqual({ week: 500, month: 720 });
+    expect(readWidths(null, PANEL_DEFAULT)).toEqual({ week: 420, month: 720 });
+    expect(readWidths('junk', PANEL_DEFAULT)).toEqual({ week: 420, month: 720 });
+    expect(readWidths('[1,2]', PANEL_DEFAULT)).toEqual({ week: 420, month: 720 });
+    expect(readWidths('{"week":"wide","month":-5}', PANEL_DEFAULT)).toEqual({ week: 420, month: 720 });
+    expect(readWidths('{"week":10,"month":1e9}', PANEL_DEFAULT)).toEqual({ week: 420, month: 720 });
   });
 });
 
@@ -516,14 +515,14 @@ describe('the widths of the other side panels (job #127)', () => {
 
   it('start at 300px, the Journal at 420px', () => {
     expect(SIDE_DEFAULT).toEqual(usual);
-    expect(parseSideWidths(null)).toEqual(usual);
+    expect(readWidths(null, SIDE_DEFAULT)).toEqual(usual);
   });
 
   it('reads each panel’s remembered width, and uses the usual one for anything missing or bad', () => {
-    expect(parseSideWidths('{"journal":600,"habits":340}')).toEqual({ ...usual, journal: 600, habits: 340 });
-    expect(parseSideWidths('junk')).toEqual(usual);
-    expect(parseSideWidths('[1,2]')).toEqual(usual);
-    expect(parseSideWidths('{"journal":"wide","habits":-5,"completed":1e9,"history":10}')).toEqual(usual);
+    expect(readWidths('{"journal":600,"habits":340}', SIDE_DEFAULT)).toEqual({ ...usual, journal: 600, habits: 340 });
+    expect(readWidths('junk', SIDE_DEFAULT)).toEqual(usual);
+    expect(readWidths('[1,2]', SIDE_DEFAULT)).toEqual(usual);
+    expect(readWidths('{"journal":"wide","habits":-5,"completed":1e9,"history":10}', SIDE_DEFAULT)).toEqual(usual);
   });
 });
 

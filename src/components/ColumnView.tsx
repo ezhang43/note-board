@@ -1,4 +1,5 @@
 import { boxProps } from './textBox';
+import { shownCardIds } from '../model/board';
 import { memo, useRef, type CSSProperties } from 'react';
 import { swatchFor } from '../model/theme';
 import { isBold } from '../model/palette';
@@ -30,7 +31,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   // …and how many cards go with them.
   const confirmCards = useAppState((s) =>
     s.ui.confirm?.columnId === id
-      ? s.ui.confirm.ids.reduce((n, x) => n + (s.board.columns[x]?.cardIds.filter((c) => s.board.cards[c]?.kind !== 'completed').length ?? 0), 0)
+      ? s.ui.confirm.ids.reduce((n, x) => n + shownCardIds(s.board, x).length, 0)
       : 0,
   );
   // An older board can keep its Completed record in a column: it isn't drawn or counted there.
@@ -95,7 +96,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}
           />
-          <span className="column-count" aria-label={`${cardIds.length} cards`}>
+          <span className="column-count" aria-label={cardIds.length === 1 ? '1 card' : `${cardIds.length} cards`}>
             {cardIds.length}
           </span>
         </div>

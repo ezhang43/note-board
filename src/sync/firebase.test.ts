@@ -47,7 +47,8 @@ vi.mock('firebase/firestore', () => ({
   },
 }));
 
-const { collabRemote, sendFeedback, boardRemote, versionsRemote, watchUser } = await import('./firebase');
+const { collabRemote, sendFeedback, boardRemote, versionsRemote } = await import('./database');
+const { watchUser } = await import('./firebase');
 const auth = await import('firebase/auth');
 const { ACCESS_KEY: KEY } = await import('../model/calendar');
 const firestore = await import('firebase/firestore');

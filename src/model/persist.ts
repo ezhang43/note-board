@@ -9,6 +9,8 @@ import { DEFAULT_COLOR } from './cards';
 
 export const BOARD_KEY = 'note-board:v1';
 export const VIEW_KEY = 'note-board:view:v1';
+/** Where a save on this device that can't be read is kept (job #160); a second one goes in `-2`, and so on. */
+export const UNREADABLE_KEY = 'note-board:v1:unreadable';
 /** Bump when the saved shape changes, and teach parseBoard to read the old shape. */
 export const BOARD_VERSION = 2;
 

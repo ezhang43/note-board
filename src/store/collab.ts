@@ -33,7 +33,7 @@ export interface ShareDoc {
 }
 
 /** A thing that was refused because the person isn't allowed to (not a member, not the owner, wrong link). */
-export class NotAllowed extends Error {
+class NotAllowed extends Error {
   code = 'permission-denied';
 }
 

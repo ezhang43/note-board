@@ -169,3 +169,26 @@ test('a blocked localStorage never crashes the page', async ({ page }) => {
   await expect(tour(page)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+// Job #144: the tour never changes board data, with the mouse or the keyboard.
+test('keys pressed during the tour change nothing behind it, and Ctrl+F leaves the search shut', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press('Escape'); // ends the tour for now
+  await page.locator('header.toolbar').getByRole('button', { name: 'Note', exact: true }).click();
+  await page.keyboard.type('keep me');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => localStorage.removeItem('note-board:tour-done'));
+  await page.reload();
+  await fontsLoaded(page);
+  await expect(tour(page)).toBeVisible();
+  await expect(cards(page)).toHaveCount(1);
+  for (const key of ['Control+a', 'Delete', 'Backspace', 'Control+d', 'v', 'h', 'Control+f']) await page.keyboard.press(key);
+  await expect(tour(page)).toBeVisible();
+  await expect(cards(page)).toHaveCount(1);
+  await expect(page.getByRole('search')).toHaveCount(0);
+  await expect(page.getByTestId('canvas')).toHaveClass(/tool-hand/);
+  // Enter on the focused Next button still works.
+  expect(await page.evaluate(() => document.activeElement?.closest('.tour-card') !== null)).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(tour(page)).toContainText('Step 2 of');
+});

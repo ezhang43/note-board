@@ -6,6 +6,7 @@ import { boardActions } from './actions/boards';
 import { checklistActions } from './actions/checklist';
 import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
+import { templateActions } from './actions/templates';
 import { weightActions } from './actions/weight';
 import { habitColorActions } from './actions/habitColor';
 import { announce } from './announce';
@@ -17,8 +18,7 @@ import { later, type Schedule } from './env';
 
 export type * from './types';
 export { BOARD_SAVE_DELAY, VIEW_SAVE_DELAY } from './core';
-export { COMPLETE_ARRIVE_MS, COMPLETE_LEAVE_MS } from './actions/checklist';
-export { EXPAND_WATCH_MS, IMPORT_TOP_MARGIN } from './actions/blocks';
+export { COMPLETE_LEAVE_MS } from './actions/checklist';
 
 export type Store = ReturnType<typeof createStore>;
 
@@ -45,6 +45,16 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...api,
     undo: step('undo'),
     redo: step('redo'),
+    /** The Undo message's button: the same undo as Ctrl+Z, on the board the delete was on. */
+    undoDelete() {
+      const t = api.undoToast();
+      if (!t) return;
+      const before = api.edits();
+      ctx.undoOn(t.board, 'undo');
+      ctx.updateUi({ undoToast: null });
+      if (api.edits() !== before) announce('Undid the last change');
+    },
+    dismissUndoToast: () => ctx.updateUi({ undoToast: null }),
     /** The checklist item or new block that was asked to take the cursor has taken it. */
     focusTaken: (id: string) => {
       const { focusItem, focusBlock } = ctx.state.ui;
@@ -56,6 +66,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...weightActions(ctx, boards.habitsBoard),
     ...habitColorActions(ctx, boards.habitsBoard),
     ...gestureActions(ctx),
+    ...templateActions(ctx),
     ...checklistActions(ctx),
     ...formatActions(ctx),
   };

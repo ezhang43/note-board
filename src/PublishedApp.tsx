@@ -25,7 +25,6 @@ class BoardLoadFailed extends Component<{ children: ReactNode }, { failed: boole
 
 /**
  * The published app: the board only for its signed-in owner, a sign-in screen for everyone else.
- * (src/sync/SyncedApp.tsx was this before the board's code was split off; nothing uses it any more.)
  */
 export function PublishedApp() {
   const status = useSyncExternalStore(session.subscribe, session.getStatus);

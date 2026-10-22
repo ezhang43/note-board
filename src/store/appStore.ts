@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { collab } from '../sync/collabSession';
 import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
 import { POMODORO_KEY, type Phase } from '../model/pomodoro';
@@ -17,6 +18,8 @@ function browserStorage() {
 
 /** The one store the app uses. */
 export const appStore = createStore(browserStorage());
+// The save on this device couldn't be read: say what happened to it (job #160).
+if (appStore.startNote) collab.setNotice(appStore.startNote);
 
 /**
  * Puts the light / dark choice and the color theme on the page (<html data-theme data-color-theme>), so the stylesheet can switch

@@ -21,6 +21,7 @@ import { account, useAccountRemover } from '../sync/account';
 import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
 import { useMedia, usePhone } from './usePhone';
+import { ask } from './ConfirmDialog';
 import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
@@ -78,11 +79,11 @@ async function downloadPicture(kind: 'png' | 'pdf') {
   collab.setNotice('Preparing…');
   try {
     const blob = await boardPicture(kind);
-    if (!blob) return void window.alert('Nothing on this board to save yet.');
+    if (!blob) return void collab.setNotice('Nothing on this board to save yet.');
     await saveFile(backupFileName(appStore.getState().board.name, new Date(), kind), blob, blob.type);
   } catch (e) {
     console.error(e);
-    window.alert('Couldn’t make the picture. Try again, or try a smaller board.');
+    collab.setNotice('Couldn’t make the picture. Try again, or try a smaller board.');
   } finally {
     drawing = false;
     if (collab.notice() === 'Preparing…') collab.setNotice(null);
@@ -171,14 +172,17 @@ export function FileMenu() {
           e.currentTarget.value = ''; // so picking the same file again works again
           if (!file) return;
           const text = await file.text();
-          if (!appStore.isBackup(text)) return void window.alert('That file isn’t a BusyAnts backup, so nothing was changed.');
+          if (!appStore.isBackup(text)) return void collab.setNotice('That file isn’t a BusyAnts backup, so nothing was changed.');
           const { ui, boards } = appStore.getState();
           if (!ui.sharesKnown) return void collab.setNotice(keptNotice('loading', appStore.boardName));
           if (!appStore.isFullBackup(text) && !boardRights(ui.shares, boards.open, boards.home).restore) return void collab.setNotice('Only the person who shared this board can restore it.');
-          const question = appStore.isFullBackup(text)
-            ? 'Replace all your boards with the ones in the backup? Your boards as they are now are kept in Version history.'
-            : 'Replace this board with the backup? This board is kept in Version history, and Ctrl+Z brings it back.';
-          if (!window.confirm(question)) return;
+          const yes = await ask(
+            appStore.isFullBackup(text)
+              ? { title: 'Replace all your boards with the backup?', body: 'Your boards as they are now are kept in Version history.', action: 'Replace all boards' }
+              : { title: 'Replace this board with the backup?', body: 'This board is kept in Version history first, and Ctrl+Z brings it back.', action: 'Replace board' },
+          );
+          // Asked about the board open then: if another opened meanwhile (it was deleted elsewhere, say), nothing happens.
+          if (!yes || appStore.getState().boards.open !== boards.open) return;
           const kept = await restoreFromBackup(appStore, activeVersionStore(), text);
           const notice = kept && keptNotice(kept, appStore.boardName);
           if (notice) collab.setNotice(notice);
@@ -196,17 +200,17 @@ export function FileMenu() {
           const file = e.currentTarget.files?.[0];
           e.currentTarget.value = ''; // so picking the same file again imports it again
           if (!file) return;
-          if (file.size > IMPORT_MAX_BYTES) return void window.alert(TOO_BIG); // before reading it all in
+          if (file.size > IMPORT_MAX_BYTES) return void collab.setNotice(TOO_BIG); // before reading it all in
           let source: Awaited<ReturnType<typeof readPdf>> | string;
           if (isPdf(file.name, await file.slice(0, 5).text())) {
             try {
               source = await readPdf(await file.arrayBuffer());
             } catch {
-              return void window.alert(CANT_READ); // broken, or locked with a password
+              return void collab.setNotice(CANT_READ); // broken, or locked with a password
             }
           } else source = await file.text();
           const { note } = appStore.importFile(source, file.name);
-          if (note) window.alert(note);
+          if (note) collab.setNotice(note);
         }}
       />
     </div>

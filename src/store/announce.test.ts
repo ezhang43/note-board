@@ -74,11 +74,12 @@ describe('announcements from the board', () => {
     s.setViewportSize({ width: 1200, height: 800 });
     s.addColumn();
     const id = s.getState().ui.selection[0];
+    s.addCard('note'); // into the selected container: an empty one goes without asking
     announce('');
     s.askDeleteColumn(id);
     expect(spoken()).toBe('');
     s.confirmDelete();
-    expect(spoken()).toBe('Deleted 1 container');
+    expect(spoken()).toBe('Deleted 1 container and 1 card');
   });
 
   it('deleting checklist items says how many', () => {
@@ -146,8 +147,7 @@ describe('announcements from the board', () => {
 
   it('deleting every completed item says so', () => {
     const { s, cardId, id } = setup(['a', 'b']);
-    s.toggleItem(cardId, id('a'));
-    s.cleanUp();
+    s.toggleItem(cardId, id('a')); // into the list's Completed section (Clean up would move it out of the list)
     announce('');
     s.askDeleteCompleted();
     s.confirmDeleteCompleted();

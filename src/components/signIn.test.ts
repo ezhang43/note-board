@@ -25,6 +25,41 @@ describe('who can use BusyAnts', () => {
     expect(html).toContain('Sign out');
   });
 
+  it('the sign-in screen is a card: logo, the About page’s pitch, Google’s own button, a note, and About, Privacy and Terms links (job #165b)', () => {
+    const html = screen('signed-out');
+    expect(html).toContain('busyants-icon.svg');
+    expect(html).toContain('Free, with no limits. Your notes stay safe.');
+    // Google's standard button: the unmodified four-color G, then "Sign in with Google" (Google's branding guidelines).
+    expect(html).toMatch(/<button[^>]*class="google-button"[^>]*>.*#EA4335.*#4285F4.*#FBBC05.*#34A853.*<span>Sign in with Google<\/span><\/button>/);
+    expect(html).toMatch(/only you can see it/i);
+    for (const [name, path] of [['About', 'about/'], ['Privacy', 'privacy/'], ['Terms', 'terms/']]) expect(html).toContain(`<a href="/${path}">${name}</a>`);
+  });
+
+  it('the pitch and the Google button show only where there is something to sign in to', () => {
+    const checking = renderToStaticMarkup(createElement(SignInScreen, { status: 'checking', error: '', onSignIn: () => {}, onSignOut: () => {} }));
+    expect(checking).toContain('Opening your board');
+    for (const html of [checking, screen('no-access')]) {
+      expect(html).not.toContain('Free, with no limits');
+      expect(html).not.toContain('google-button');
+    }
+    expect(screen('no-access')).toContain('Sign out');
+  });
+
+  it('a share link adds "Sign in to open the board shared with you." above the button; an error shows under it', () => {
+    const global = globalThis as { location?: unknown };
+    const had = global.location;
+    global.location = { search: '?join=abc.def' };
+    try {
+      expect(screen('signed-out')).toContain('Sign in to open the board shared with you.');
+    } finally {
+      global.location = had;
+    }
+    expect(screen('signed-out')).not.toContain('shared with you');
+    const bad = renderToStaticMarkup(createElement(SignInScreen, { status: 'signed-out', error: 'Sign-in failed', onSignIn: () => {}, onSignOut: () => {} }));
+    expect(bad).toContain('role="alert"');
+    expect(bad).toContain('Sign-in failed');
+  });
+
   it('the online rules let any verified Google account in, each to its own board only', () => {
     expect(rules).toContain('request.auth.uid == uid');
     expect(rules).toContain('email_verified == true');

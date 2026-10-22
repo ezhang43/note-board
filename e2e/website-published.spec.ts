@@ -40,7 +40,7 @@ test('visiting a website page never replaces the offline copy of the app', async
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect
-    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v5')).keys()).length))
+    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v6')).keys()).length))
     .toBeGreaterThan(2);
 
   await page.goto('faq/');

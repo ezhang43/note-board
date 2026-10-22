@@ -3,7 +3,8 @@
 // Bump the version when files without a unique name (icons, manifest) change: the new worker
 // then starts a fresh copy and deletes the old ones, so returning visitors get the new files.
 // v5: a worker from before the website pages could keep one of them as the app's offline page.
-const CACHE = 'busyants-v5';
+// v6: starts a fresh copy, so the built files of every past publish (never deleted before) go at once.
+const CACHE = 'busyants-v6';
 const SCOPE = self.registration.scope;
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -17,6 +18,20 @@ async function save(cache, url) {
   } catch {
     // Offline or blocked: try again next visit.
   }
+}
+
+// Built files have a name per version, so each publish would add a set that the next one never uses. Saves the
+// app's page; when it differs from the saved one (a new build), the saved built files of the old build go after
+// it, before the page asks for its own. Fonts stay. The same page (the usual visit) deletes nothing, so files
+// loaded on demand (the picture and PDF code) stay for offline use.
+async function savePage(res) {
+  const cache = await caches.open(CACHE);
+  const saved = await cache.match(SCOPE, { ignoreVary: true });
+  const changed = saved && (await saved.text()) !== (await res.clone().text());
+  await cache.put(SCOPE, res);
+  if (!changed) return;
+  const built = new URL('assets/', SCOPE).href;
+  for (const req of await cache.keys()) if (req.url.startsWith(built)) await cache.delete(req);
 }
 
 self.addEventListener('install', (event) => {
@@ -50,9 +65,10 @@ self.addEventListener('fetch', (event) => {
     // The newest page when online (and keep it); the saved page when offline.
     event.respondWith(
       fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          if (res.ok) caches.open(CACHE).then((cache) => cache.put(SCOPE, copy));
+        .then(async (res) => {
+          // Saved before the page asks for its files, so a new build's page clears the old build's files first.
+          // Whatever goes wrong while saving, the page itself is still the one that came from the network.
+          if (res.ok) await savePage(res.clone()).catch(() => {});
           return res;
         })
         .catch(() => caches.match(SCOPE, { ignoreVary: true })),

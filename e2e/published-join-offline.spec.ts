@@ -8,7 +8,7 @@ test('a share link opened without internet shows the sign-in screen and keeps th
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect
-    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v5')).keys()).length))
+    .poll(() => page.evaluate(async () => (await (await caches.open('busyants-v6')).keys()).length))
     .toBeGreaterThan(2);
   test.skip(browserName === 'webkit', "Playwright's WebKit can't fake offline past a service worker");
 

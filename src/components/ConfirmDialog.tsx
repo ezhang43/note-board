@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 
 // The app's own question before something that can't simply be undone (job 170, owner's option 3A):
 // a modal card (a bottom sheet on a phone) in place of the browser's confirm(). Screen state only,
@@ -49,6 +49,8 @@ export function ConfirmDialog() {
   const safe = useRef<HTMLButtonElement>(null);
   const pressedScrim = useRef(false);
   const id = useId();
+  // If the app goes away with a question open (signed out in another tab), it is answered no, not asked again on the way back in.
+  useEffect(() => () => open?.answer(false), []);
   // The browser's modal dialog: it keeps Tab inside, makes the rest of the page inert and shows the scrim.
   // Opened before it is drawn, with the safe button focused (so a stray Enter never deletes).
   useLayoutEffect(() => {

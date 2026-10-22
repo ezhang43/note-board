@@ -214,7 +214,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       >
         <TrashIcon />
       </button>
-      <button type="button" className="item-grip" aria-label="Drag item" onPointerDown={gripPointerDown(cardId, item.id)}>
+      <button type="button" className="item-grip" aria-label="Drag item" tabIndex={-1} onPointerDown={gripPointerDown(cardId, item.id)}>
         <GripIcon />
       </button>
     </div>

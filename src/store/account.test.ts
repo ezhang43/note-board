@@ -37,8 +37,12 @@ function fakeAccount(shares: { id: string; owner: string | null }[]) {
     },
     async markDeleting() {
       step('markDeleting');
-      state.board = 'started';
+      if (state.board !== 'done') state.board = 'started';
       land();
+    },
+    unmarkDeleting() {
+      calls.push('unmarkDeleting');
+      if (state.board === 'started') state.board = 'boards';
     },
     async deleteShare(id) {
       step(`deleteShare ${id}`);
@@ -77,13 +81,13 @@ function fakeAccount(shares: { id: string; owner: string | null }[]) {
 const gone = { shares: [], board: 'done', ownData: false, user: false };
 
 describe('deleteAccountData', () => {
-  it('marks the boards as being deleted first, deletes shared boards for everyone, leaves the others’ shares, marks it done, then the person’s own data, and the sign-in last', async () => {
+  it('marks the boards as being deleted first, lists the shares, deletes shared boards for everyone, leaves the others’ shares, marks it done, then the person’s own data, and the sign-in last', async () => {
     const { backend, calls, state } = fakeAccount([
       { id: 's1', owner: 'me' },
       { id: 's2', owner: 'bob' },
     ]);
     const done = await deleteAccountData('me', backend);
-    expect(calls).toEqual(['myShares', 'markDeleting', 'deleteShare s1', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
+    expect(calls).toEqual(['markDeleting', 'myShares', 'deleteShare s1', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
     expect(done.shareIds).toEqual(['s1', 's2']);
     expect(state).toEqual(gone);
   });
@@ -103,7 +107,9 @@ describe('deleteAccountData', () => {
     fail.add('leave s2');
     // Something was already deleted, so the person is told it stopped part-way.
     await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: true });
-    expect(calls).toEqual(['myShares', 'markDeleting', 'deleteShare s1', 'leave s2']);
+    // The boards are no longer marked, so the person's pages carry on syncing (and saving versions).
+    expect(calls).toEqual(['markDeleting', 'myShares', 'deleteShare s1', 'leave s2', 'unmarkDeleting']);
+    expect(state.board).toBe('boards');
     expect(state.user).toBe(true);
     expect(state.ownData).toBe(true);
 
@@ -111,7 +117,7 @@ describe('deleteAccountData', () => {
     fail.clear();
     calls.length = 0;
     await deleteAccountData('me', backend);
-    expect(calls).toEqual(['myShares', 'markDeleting', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
+    expect(calls).toEqual(['markDeleting', 'myShares', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
     expect(state).toEqual(gone);
   });
 
@@ -121,13 +127,23 @@ describe('deleteAccountData', () => {
     await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: false });
   });
 
-  it('a failure deleting the sign-in itself is part-way, and trying again finishes it', async () => {
-    const { backend, fail, state } = fakeAccount([]);
+  it('a failure deleting the sign-in itself is part-way, and trying again finishes it, the boards staying marked done', async () => {
+    const { backend, fail, state, calls } = fakeAccount([]);
     fail.add('deleteUser');
     await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: true });
+    expect(calls).not.toContain('unmarkDeleting');
+    expect(state.board).toBe('done');
     fail.clear();
     await deleteAccountData('me', backend);
     expect(state).toEqual(gone);
+  });
+
+  it('a failure listing the shares, just after marking, takes the mark off and isn’t part-way', async () => {
+    const { backend, fail, state, calls } = fakeAccount([{ id: 's1', owner: 'me' }]);
+    fail.add('myShares');
+    await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: false });
+    expect(calls).toEqual(['markDeleting', 'myShares', 'unmarkDeleting']);
+    expect(state.board).toBe('boards');
   });
 
   it('with the pretend sharing server: the board Alice shared is gone for Bob, Bob’s board stays with Bob, without Alice', async () => {
@@ -146,6 +162,7 @@ describe('deleteAccountData', () => {
       deleteShare: a.deleteShare,
       leave: a.leave,
       markDeleting: async () => {},
+      unmarkDeleting: () => {},
       deleteOwnData: async () => {},
       markDeleted: async () => {},
       deleteUser: async () => {},

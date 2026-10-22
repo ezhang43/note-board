@@ -21,8 +21,6 @@ export interface RemoteDoc {
    * empty). The online rules let no other page save boards or versions while there is one.
    */
   deleting?: 'started' | 'done';
-  /** When the marker was set (ms since 1970, the server's time), if known. */
-  since?: number;
 }
 
 /** Where the online copy lives (Firestore in the app, a fake in tests). */
@@ -51,9 +49,11 @@ export const SYNC_DELAY = 800;
 export const ONLINE_LIMIT = 900_000;
 
 /**
- * How long after it was set another page's 'started' marker holds this page's uploads back: after
- * it, that page is taken to have closed part-way and the boards go online again. The online rules
- * allow that after 10 minutes (firestore.rules); a little to spare for clocks that differ.
+ * How long another page's 'started' marker holds this page's uploads back: after it, that page is
+ * taken to have closed part-way and the boards go online again. The online rules allow that 10 minutes
+ * after it was set (firestore.rules; a test checks they match). Counted from when it arrived, so this
+ * device's clock doesn't matter.
+ * simple: a page opened on a marker left behind long ago still waits this long.
  */
 export const DELETING_WAIT_MS = 10.5 * 60_000;
 
@@ -185,8 +185,11 @@ export function startSync(
   let held = false;
   /** Ends `held` if the deleting page's marker is left behind. */
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The marker said it is done, and opts.onGone was told. */
+  let toldGone = false;
   const release = () => {
     held = false;
+    toldGone = false;
     if (holdTimer) clearTimeout(holdTimer);
     holdTimer = null;
   };
@@ -299,24 +302,27 @@ export function startSync(
         // changes wait, and it isn't signed out, since the deleting may yet fail.
         if (timer) clearTimeout(timer);
         timer = null;
+        if (madeHere && !failed && !held) opts.onSaveState?.('saving');
         held = true;
-        if (holdTimer) clearTimeout(holdTimer);
-        holdTimer = null;
-        if (madeHere && !failed) opts.onSaveState?.('saving');
-        if (marker.deleting === 'done') {
+        if (marker.deleting === 'done' || !marker.data) {
+          if (holdTimer) clearTimeout(holdTimer);
+          holdTimer = null;
           if (!ready) {
             ready = true;
             opts.onReady();
           }
+          if (marker.deleting === 'started' || toldGone) return;
+          toldGone = true;
           return opts.onGone?.();
         }
         // Left over 10 minutes, its page is taken to have closed part-way: the boards go back online.
-        const wait = Math.max(0, (marker.since ?? Date.now()) + DELETING_WAIT_MS - Date.now());
-        holdTimer = setTimeout(() => {
-          release();
-          lastSynced = null;
-          upload();
-        }, wait);
+        // Only once the server has it (this device's offline copy may be out of date).
+        if (!holdTimer && !marker.cached)
+          holdTimer = setTimeout(() => {
+            release();
+            lastSynced = null;
+            upload();
+          }, DELETING_WAIT_MS);
         // The boards in it are shown as any version arriving, unless a change made here waits to go (it is newer).
         if (ready && madeHere && ownKey(store.workspace()) !== lastSynced) return;
       }

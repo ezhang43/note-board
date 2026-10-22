@@ -38,6 +38,12 @@ vi.mock('firebase/firestore', () => {
     setDoc: async (d: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) =>
       void fs.docs.set(d.path, opts?.merge ? { ...fs.docs.get(d.path), ...data } : data),
     serverTimestamp: () => 'SERVER_TIME',
+    deleteField: () => 'DELETE_FIELD',
+    updateDoc: async (d: { path: string }, data: Record<string, unknown>) => {
+      const next = { ...fs.docs.get(d.path), ...data };
+      for (const [k, v] of Object.entries(data)) if (v === 'DELETE_FIELD') delete next[k];
+      fs.docs.set(d.path, next);
+    },
     getDocsFromServer: async (c: { path: string }) => ({ docs: kids(c.path).map((k) => ({ id: k.split('/').at(-1), ref: ref(k), data: () => fs.docs.get(k) })) }),
     getDocFromServer: async (d: { path: string }) => {
       if (fs.refused.has(d.path)) throw Object.assign(new Error('denied'), { code: 'permission-denied' });
@@ -115,6 +121,19 @@ describe('accountRemote', () => {
     await accountRemote(user, shares, 'page1').markDeleted();
     expect(fs.docs.get('boards/me')).toEqual({ deleting: 'done', client: 'page1', updatedAt: 'SERVER_TIME' });
     expect(fs.docs.get('boards/bob')).toEqual({ data: '{}' });
+  });
+
+  it('marked done before (only the sign-in failed to go), marking again leaves it done', async () => {
+    fs.docs.set('boards/me', { deleting: 'done', client: 'old-page', updatedAt: 1 });
+    await accountRemote(user, shares, 'page1').markDeleting();
+    expect(fs.docs.get('boards/me')).toEqual({ deleting: 'done', client: 'old-page', updatedAt: 1 });
+  });
+
+  it('takes the mark off again, keeping the boards', async () => {
+    fs.docs.set('boards/me', { data: '{}', deleting: 'started', client: 'page1', updatedAt: 1 });
+    accountRemote(user, shares, 'page1').unmarkDeleting();
+    await new Promise((done) => setTimeout(done, 0));
+    expect(fs.docs.get('boards/me')).toEqual({ data: '{}', client: 'page1', updatedAt: 1 });
   });
 
   it('the sign-in is deleted with Firebase’s own call', async () => {

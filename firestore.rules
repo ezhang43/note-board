@@ -23,7 +23,7 @@ service cloud.firestore {
     // so the person's other pages can't put anything back; deleting still works. While 'started', only
     // the page that set it may change it (to put the boards back if deleting fails, or to finish), or
     // any page once it is over 10 minutes old (that page closed part-way). Once 'done', any page may
-    // only go through deleting again (only the sign-in failed to go).
+    // only set it 'done' again (going through deleting again: only the sign-in failed to go).
     function boardPath(uid) {
       return /databases/$(database)/documents/boards/$(uid);
     }
@@ -53,7 +53,7 @@ service cloud.firestore {
           || (resource.data.deleting == 'started'
             && (request.resource.data.client == resource.data.client
               || request.time > resource.data.updatedAt + duration.value(10, 'm')))
-          || (resource.data.deleting == 'done' && marker()));
+          || (resource.data.deleting == 'done' && marker() && request.resource.data.deleting == 'done'));
     }
 
     // Version history: the list (what the panel shows)...

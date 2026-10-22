@@ -561,8 +561,8 @@ describe('the account deleted on another device', () => {
 // ('started'), which the online rules hold every other page to (no board or version saved), and sets it
 // to 'done' once everything else is gone.
 describe('the account being deleted on another page', () => {
-  const started = (name = 'Mine', client = 'laptop', since = Date.now()): RemoteDoc => ({ data: boardJson(name), client, deleting: 'started', since });
-  const done = (client = 'laptop'): RemoteDoc => ({ data: '', client, deleting: 'done', since: Date.now() });
+  const started = (name = 'Mine', client = 'laptop'): RemoteDoc => ({ data: boardJson(name), client, deleting: 'started' });
+  const done = (client = 'laptop'): RemoteDoc => ({ data: '', client, deleting: 'done' });
   function open(first: RemoteDoc | null = { data: boardJson('Mine'), client: 'laptop' }) {
     const store = createStore(null, (fn) => fn());
     const fake = fakeRemote();
@@ -655,27 +655,57 @@ describe('the account being deleted on another page', () => {
     expect(fake.writes).toEqual([]);
   });
 
-  it('a marker left behind (the deleting page closed part-way) holds this page back only so long from when it was set, then the boards go back online', () => {
+  it('a marker left behind (the deleting page closed part-way) holds this page back only so long, then the boards go back online', () => {
     const { store, fake } = open();
-    fake.send(started('Mine', 'laptop', Date.now() - 9 * 60_000));
+    fake.send(started('Mine'));
     store.renameBoard('Typed meanwhile');
-    vi.advanceTimersByTime(DELETING_WAIT_MS - 9 * 60_000 - 1);
+    vi.advanceTimersByTime(DELETING_WAIT_MS - 1);
     expect(fake.writes).toEqual([]);
     vi.advanceTimersByTime(1);
     expect(fake.writes).toHaveLength(1);
     expect(fake.writes[0].data).toContain('Typed meanwhile');
   });
 
-  it('opened on a marker left behind long ago, the online boards in it show and go back online at once', () => {
+  it('a marker only in this device’s offline copy never sends its boards: the server’s copy may be newer', () => {
+    const { fake } = open(null);
+    fake.writes.length = 0;
+    fake.send({ ...started('Old'), cached: true });
+    vi.advanceTimersByTime(DELETING_WAIT_MS * 2);
+    expect(fake.writes).toEqual([]);
+    // The server's copy: the boards are back (the deleting failed long ago).
+    fake.send({ data: boardJson('Newer'), client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a marker with no boards in it (there were none online) holds this page back without an error', () => {
     const store = createStore(null, (fn) => fn());
-    store.renameBoard('Old copy on this device');
     const fake = fakeRemote();
-    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn() });
-    fake.send(started('Online', 'laptop', Date.now() - 60 * 60_000));
-    vi.advanceTimersByTime(0);
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0].data).toContain('Online');
-    expect(fake.writes[0].data).not.toContain('Old copy');
+    const onError = vi.fn();
+    const onReady = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady, onError });
+    fake.send({ data: '', client: 'laptop', deleting: 'started' });
+    expect(onError).not.toHaveBeenCalled();
+    expect(onReady).toHaveBeenCalledOnce();
+    store.renameBoard('Typed');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('told it is done once, however often the marker comes again', () => {
+    const { fake, onGone } = open();
+    fake.send({ ...done(), cached: true });
+    fake.send(done());
+    fake.send(done());
+    expect(onGone).toHaveBeenCalledOnce();
+  });
+
+  it('waits a little longer than the online rules hold the boards for (firestore.rules)', () => {
+    const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
+    const minutes = Number(/updatedAt \+ duration\.value\((\d+), 'm'\)/.exec(rules)?.[1]);
+    expect(minutes).toBeGreaterThan(0);
+    expect(DELETING_WAIT_MS).toBeGreaterThan(minutes * 60_000);
+    expect(DELETING_WAIT_MS).toBeLessThanOrEqual((minutes + 1) * 60_000);
   });
 
   it('this page’s own marker (its deleting failed, and syncing starts again here): its boards are uploaded, putting them back', () => {

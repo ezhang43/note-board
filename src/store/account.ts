@@ -106,9 +106,12 @@ export interface AccountBackend {
   leave(id: string): Promise<void>;
   /**
    * Marks their own boards as being deleted by this page ('started', see RemoteDoc.deleting in
-   * sync.ts): from then on the online rules let none of their other pages save boards or versions.
+   * sync.ts): from then on the online rules let none of their other pages save boards, versions or
+   * shares. Already marked done (only the sign-in failed to go before), it stays so.
    */
   markDeleting(): Promise<void>;
+  /** Takes that mark off again (deleting failed before their boards went), keeping the boards. */
+  unmarkDeleting(): void;
   /** Replaces their boards with the marker that it is done: nothing can ever be saved there again. */
   markDeleted(): Promise<void>;
   /** Their version history and list of shares (the marker stays). */
@@ -121,8 +124,8 @@ export interface AccountBackend {
  * Deletes everything person `uid` has online (owner decisions, 2026-10-16 and 2026-10-22): their own
  * boards are first marked as being deleted, which the online rules hold their other pages to (review
  * 137-A H5: a page that saw a shared board go saved its boards and a version again after they were
- * deleted), then the boards they shared (for everyone) and their records on boards shared with them
- * go, their boards are replaced by the marker that it is done, their version history and list of
+ * deleted), then their shares are listed, the boards they shared (for everyone) and their records on
+ * boards shared with them go, their boards are replaced by the marker that it is done, their version history and list of
  * shares go, and only then the sign-in, so a failure part-way leaves them able to sign in and try again.
  * Stops at the first failure: rejects with Firebase's `code` and `partial`, whether something may
  * already be deleted (a step that worked, or one made of several saves). Resolves with the shares it
@@ -138,18 +141,27 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
       throw Object.assign(new Error('Deleting the account stopped', { cause: e }), { code: (e as { code?: string })?.code, partial: partial || severalSaves });
     }
   };
-  let shares: ShareOwner[] = [];
-  await step(async () => {
-    shares = await backend.myShares();
-  });
-  partial = false;
-  const plan = planShares(uid, shares);
+  // Marked first, so no page of theirs saves or joins a share after they are listed.
   await step(() => backend.markDeleting());
-  // Not "part-way" yet: if a later step fails, syncing starts again and puts the boards back from this page.
+  // Not "part-way": until the boards are marked done, a failure takes the mark off (below).
   partial = false;
-  for (const id of plan.deleteForEveryone) await step(() => backend.deleteShare(id));
-  for (const id of plan.leave) await step(() => backend.leave(id));
-  // Done before the version history goes, so a version another page saved just before it is deleted too.
+  let shares: ShareOwner[] = [];
+  try {
+    await step(async () => {
+      shares = await backend.myShares();
+    });
+    partial = false;
+    const plan = planShares(uid, shares);
+    for (const id of plan.deleteForEveryone) await step(() => backend.deleteShare(id));
+    for (const id of plan.leave) await step(() => backend.leave(id));
+  } catch (e) {
+    // Their pages carry on syncing and saving versions (a shared board already gone is kept there
+    // first). Sent, not waited for: offline it goes once the connection is back, before anything
+    // this page saves after it.
+    backend.unmarkDeleting();
+    throw e;
+  }
+  // Before the version history goes, so a version another page saved just before is deleted too.
   await step(() => backend.markDeleted());
   await step(() => backend.deleteOwnData(), true);
   await step(() => backend.deleteUser());

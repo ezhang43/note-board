@@ -4,6 +4,7 @@ import {
   clearIndexedDbPersistence,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocFromServer,
@@ -69,7 +70,15 @@ export function accountRemote(user: User, shares: CollabBackend, client: string)
     },
     deleteShare: shares.deleteShare,
     leave: shares.leave,
-    markDeleting: () => setDoc(own, { deleting: 'started', client, updatedAt: serverTimestamp() }, { merge: true }),
+    async markDeleting() {
+      if ((await getDocFromServer(own)).data()?.deleting === 'done') return;
+      await setDoc(own, { deleting: 'started', client, updatedAt: serverTimestamp() }, { merge: true });
+    },
+    unmarkDeleting() {
+      updateDoc(own, { deleting: deleteField() }).catch(() => {
+        // Refused (no boards in it) or not sent: this page's sync puts its boards back instead.
+      });
+    },
     async deleteOwnData() {
       const subs = await Promise.all(['versions', 'versionData', 'shared'].map((name) => getDocsFromServer(collection(own, name))));
       const refs = subs.flatMap((s) => s.docs.map((d) => d.ref));
@@ -131,10 +140,7 @@ export function boardRemote(uid: string): Remote {
           // "No board" from the offline copy may just mean it hasn't been downloaded yet.
           if (!d && snap.metadata.fromCache) return;
           opened = true;
-          if (deleting) {
-            const since = (d?.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.();
-            return onChange({ data: data ?? '', client: String(d?.client ?? ''), deleting, ...(since ? { since } : {}), ...(snap.metadata.fromCache ? { cached: true as const } : {}) });
-          }
+          if (deleting) return onChange({ data: data ?? '', client: String(d?.client ?? ''), deleting, ...(snap.metadata.fromCache ? { cached: true as const } : {}) });
           onChange(
             data === null
               ? null

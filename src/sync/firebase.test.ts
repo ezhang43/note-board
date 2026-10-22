@@ -189,8 +189,8 @@ describe('opening your board offline with unsent changes (job 92)', () => {
     send(snap({ deleting: 'done', client: 'p', updatedAt: { toMillis: () => 2000 } }, true, false));
     expect(got).toEqual([
       { data: 'v1', client: 'x' },
-      { data: 'v1', client: 'p', deleting: 'started', since: 1000 },
-      { data: '', client: 'p', deleting: 'done', since: 2000, cached: true },
+      { data: 'v1', client: 'p', deleting: 'started' },
+      { data: '', client: 'p', deleting: 'done', cached: true },
     ]);
   });
 

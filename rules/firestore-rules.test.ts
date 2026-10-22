@@ -5,6 +5,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -426,6 +427,12 @@ describe('deleting an account: the marker on boards/{uid}', () => {
     await assertSucceeds(deleteDoc(doc(db, 'boards/alice/shared/s1')));
   });
 
+  it('the page deleting can take the mark off if deleting fails (as unmarkDeleting does); no other page can', async () => {
+    await seed({ 'boards/alice': startedBy('p') });
+    await assertFails(updateDoc(doc(as('alice'), 'boards/alice'), { deleting: deleteField(), client: 'q' }));
+    await assertSucceeds(updateDoc(doc(as('alice'), 'boards/alice'), { deleting: deleteField() }));
+  });
+
   it('the page deleting can put her boards back if deleting fails, or finish it (a "done" holds no boards)', async () => {
     await seed({ 'boards/alice': startedBy('p') });
     await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), board()));
@@ -448,10 +455,11 @@ describe('deleting an account: the marker on boards/{uid}', () => {
     await assertFails(createShare(db));
   });
 
-  it('once done, any page of hers can go through deleting again (only the sign-in failed to go, and the page was reloaded)', async () => {
+  it('once done, any page of hers can go through deleting again (only the sign-in failed to go, and the page was reloaded), but never back to started', async () => {
     await seed({ 'boards/alice': { deleting: 'done', client: 'p', updatedAt: minutesAgo(1) } });
     const db = as('alice');
-    await assertSucceeds(setDoc(doc(db, 'boards/alice'), marker('started', 'q'), { merge: true }));
+    await assertFails(setDoc(doc(db, 'boards/alice'), marker('started', 'q'), { merge: true }));
+    await assertFails(setDoc(doc(db, 'boards/alice'), marker('started', 'p'), { merge: true }));
     await assertSucceeds(setDoc(doc(db, 'boards/alice'), marker('done', 'q')));
   });
 

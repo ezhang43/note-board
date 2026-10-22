@@ -42,6 +42,9 @@ let deleted = takeDeletedNote();
 let deleting = false;
 /** What Firebase says when a sign-in is asked about after the account was deleted. */
 const GONE_CODES = ['auth/user-token-expired', 'auth/user-not-found', 'auth/user-disabled'];
+/** After the account is marked deleted elsewhere, the sign-in is asked about this often, this many more times. */
+const GONE_CHECK_MS = 60_000;
+const GONE_CHECKS = 10;
 /** The account whose boards this page holds (job #145): as loaded, then whoever it was claimed for. */
 let held = (() => {
   try {
@@ -142,15 +145,23 @@ async function start(user: User, quiet = false) {
       // signs every tab out by deleting it), or deleting it failed and can be tried again from here.
       // No connection to ask: it stays as it is.
       onGone: () => {
+        // simple: set before Google answers, so a tab here signed out by the deleting tab shows the note;
+        // after a failed delete, signing out by hand on this page shows it too (until the next sign-in).
         deleted = true;
-        user.getIdToken(true).then(
-          () => {},
-          (e: unknown) => {
-            if (!GONE_CODES.includes((e as { code?: string })?.code ?? '')) return;
-            stopAll();
-            void signOutUser();
-          },
-        );
+        const mine = turn;
+        const check = (left: number) => {
+          user.getIdToken(true).then(
+            () => {
+              if (left > 0 && mine === turn) setTimeout(() => mine === turn && check(left - 1), GONE_CHECK_MS);
+            },
+            (e: unknown) => {
+              if (!GONE_CODES.includes((e as { code?: string })?.code ?? '') || mine !== turn) return;
+              stopAll();
+              void signOutUser();
+            },
+          );
+        };
+        check(GONE_CHECKS);
       },
     });
   };

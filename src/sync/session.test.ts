@@ -154,6 +154,8 @@ describe('the database code loads only after sign-in (job 169)', () => {
 // Review 137-A H5: another page deleted the account (its marker says 'done'). It may have got only as
 // far as the sign-in, or be just about to delete it; and a sign-out in one tab signs out every tab of
 // the browser, the deleting one too. So the page asks Google whether the sign-in is still there.
+const GONE_CHECK_MS = 60_000;
+
 describe('the account deleted on another page', () => {
   /** A page signed in as `user`, with her own boards syncing; returns what its sync was told. */
   async function signedInPage(user: { uid: string; getIdToken?: (force: boolean) => Promise<string> }) {
@@ -181,12 +183,38 @@ describe('the account deleted on another page', () => {
     expect(session.wasDeleted()).toBe(true);
   });
 
-  it('the sign-in is still there (another tab here is about to delete it, or deleting it failed): the page isn’t signed out', async () => {
-    const getIdToken = vi.fn(async () => 'token');
+  it('the sign-in is still there (another page is about to delete it, or deleting it failed): the page isn’t signed out, and asks again a while', async () => {
+    let gone = false;
+    const getIdToken = vi.fn(async () => {
+      if (gone) throw Object.assign(new Error('gone'), { code: 'auth/user-token-expired' });
+      return 'token';
+    });
     const { syncOpts, signOutUser } = await signedInPage({ uid: 'ann', getIdToken });
-    syncOpts.onGone();
-    await new Promise((done) => setTimeout(done, 0));
-    expect(signOutUser).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    try {
+      syncOpts.onGone();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(signOutUser).not.toHaveBeenCalled();
+      // The deleting page deletes the sign-in a moment later.
+      gone = true;
+      await vi.advanceTimersByTimeAsync(GONE_CHECK_MS);
+      expect(signOutUser).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('it stops asking after a while (deleting stopped at the sign-in)', async () => {
+    const getIdToken = vi.fn(async () => 'token');
+    const { syncOpts } = await signedInPage({ uid: 'ann', getIdToken });
+    vi.useFakeTimers();
+    try {
+      syncOpts.onGone();
+      await vi.advanceTimersByTimeAsync(GONE_CHECK_MS * 100);
+      expect(getIdToken.mock.calls.length).toBeLessThanOrEqual(11);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('no connection to ask: the page isn’t signed out', async () => {

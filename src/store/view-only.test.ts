@@ -4,6 +4,8 @@ import { boardRights, viewOnly } from '../model/sharing';
 import { readWorkspace } from '../model/workspace';
 import { memoryServer, NO_LINKS, type Person, type Role } from './collab';
 import { sharesKey, startSharing } from './sharing';
+import { localVersionStore, type VersionStore } from './versions';
+import { collab } from '../sync/collabSession';
 import { BOARD_SAVE_DELAY, createStore, type ShareInfo } from './store';
 
 // Read-only boards (job 161, PR 3): a board shared with someone as Can comment or Can view can't
@@ -186,18 +188,18 @@ async function settle() {
   for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(1000);
 }
 
-function device(server: ReturnType<typeof memoryServer>, uid: string, storage = memoryStorage(), slow = false) {
+function device(server: ReturnType<typeof memoryServer>, uid: string, storage = memoryStorage(), slow = false, versions?: VersionStore) {
   const store = createStore(storage, (fn) => fn());
   const real = server.backendFor(person(uid));
   // `slow`: the server's answer to each save takes 3 seconds to come back, so one can be on its way while more is typed.
   const backend = slow ? { ...real, updateShare: (...a: Parameters<typeof real.updateShare>) => real.updateShare(...a).then((v) => new Promise<typeof v>((r) => setTimeout(() => r(v), 3000))) } : real;
   const states: string[] = [];
   const notices: string[] = [];
-  const sharing = startSharing(store, backend, { client: `${uid}-page`, storage, onSaveState: (x) => states.push(x), onNotice: (t) => notices.push(t) });
+  const sharing = startSharing(store, backend, { client: `${uid}-page`, storage, onSaveState: (x) => states.push(x), onNotice: (t) => notices.push(t), ...(versions ? { versions: () => versions } : {}) });
   return { store, sharing, states, notices, storage, server };
 }
 
-async function shared(role: Role, deliver?: (fn: () => void) => void, slow = false) {
+async function shared(role: Role, deliver?: (fn: () => void) => void, slow = false, versions?: VersionStore) {
   const server = memoryServer(deliver);
   const alice = device(server, 'alice');
   await settle();
@@ -211,7 +213,7 @@ async function shared(role: Role, deliver?: (fn: () => void) => void, slow = fal
   await alice.sharing.makeLink(shareId, role);
   await settle();
   const key = new URL(alice.sharing.link(shareId, 'https://x.test/', role)!).searchParams.get('join')!.split('.')[1];
-  const bob = device(server, 'bob', undefined, slow);
+  const bob = device(server, 'bob', undefined, slow, versions);
   await settle();
   const joined = bob.sharing.join(shareId, key);
   await settle();
@@ -278,6 +280,22 @@ describe('sharing with a read-only role', () => {
     expect(server.shares.get(shareId)!.data).not.toContain('stove');
     expect(bob.notices).toEqual([expect.stringMatching(/^Your last change to “Trip” wasn’t saved: you can only view it now\./)]);
     expect(bob.states.at(-1)).toBe('saved'); // no red "couldn't save" banner left behind
+  });
+
+  it('the notice says the change is kept in Version history only when it is: not over its size limit (PR 3 leftover)', async () => {
+    for (const limit of [undefined, 10, 'fails'] as const) {
+      const local = localVersionStore(memoryStorage());
+      // 'fails': saving the version is refused (storage full, say): nothing is kept either (code review).
+      const versions: VersionStore = limit === 'fails' ? { ...local, save: async () => Promise.reject(new Error('full')) } : { ...local, ...(limit ? { limit } : {}) };
+      const { alice, bob, shareId, note } = await shared('edit', undefined, false, versions);
+      bob.store.setNoteText(note, 'Tent and stove');
+      await alice.sharing.setRole(shareId, 'bob', 'view');
+      for (let i = 0; i < 5; i++) await settle();
+      expect(bob.notices).toHaveLength(1);
+      if (limit) expect(bob.notices[0], String(limit)).not.toContain('Version history');
+      else expect(bob.notices[0]).toContain('It’s kept in Version history.');
+      collab.setNotice(null);
+    }
   });
 
   it('an editor lowered before their page hears of it: the server refuses the change; once the role arrives it is put back, told once, not retried', async () => {

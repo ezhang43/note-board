@@ -4,8 +4,8 @@
 // comments). The shapes today's live app writes are in firestore-rules.test.ts and the "older app"
 // tests below. Run with `npm run test:rules`.
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
-import { describe, it } from 'vitest';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch, type Firestore } from 'firebase/firestore';
+import { describe, expect, it } from 'vitest';
 import { as, seed, signedOut, useRulesEnv } from './env';
 
 useRulesEnv();
@@ -483,6 +483,26 @@ describe('comments (shared/{sid}/comments)', () => {
     await assertSucceeds(resolve(as('bob'), 'c1'));
     await assertSucceeds(resolve(as('carol'), 'c1', { resolved: false }));
     await assertSucceeds(resolve(as('alice'), 'c2'));
+  });
+
+  it('PR 4, as database.ts writes them: a commenter reopens someone else’s resolved thread by replying (a new comment), not by changing it', async () => {
+    await seedShare({ bob: 'comment', carol: 'edit' });
+    await seed({ 'shared/s1/comments/c1': { ...stored('carol'), resolved: true, resolvedAt: 5 } });
+    await assertSucceeds(add(as('bob'), 'mreply', comment('bob', { card: 'c_1' })));
+    await assertFails(updateDoc(doc(as('bob'), 'shared/s1/comments/c1'), { resolved: false, resolvedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(as('carol'), 'shared/s1/comments/c1'), { resolved: false, resolvedAt: serverTimestamp() }));
+  });
+
+  it('PR 4, deleting an account: they find their own comments with a query and delete them; once removed, they can’t', async () => {
+    await seedShare({ bob: 'comment' });
+    await seed({ 'shared/s1/comments/c1': stored('bob'), 'shared/s1/comments/c2': stored('alice'), 'shared/s1/comments/c3': stored('bob') });
+    const db = as('bob');
+    const mine = await getDocs(query(collection(db, 'shared/s1/comments'), where('author', '==', 'bob')));
+    expect(mine.docs.map((d) => d.id).sort()).toEqual(['c1', 'c3']);
+    const b = writeBatch(db);
+    mine.docs.forEach((d) => b.delete(d.ref));
+    await assertSucceeds(b.commit());
+    await assertFails(getDocs(query(collection(as('frank'), 'shared/s1/comments'), where('author', '==', 'frank'))));
   });
 
   it('only its author or the person who shared the board can delete one', async () => {

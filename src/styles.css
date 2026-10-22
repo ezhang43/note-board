@@ -28,6 +28,8 @@
   --checkbox: #2f7d5b;
   /* Honey (direction A, owner decision 2026-10-16): the pressed tool and the Share button. */
   --honey: #f2b62b;
+  /* The Undo message's button: honey on the dark pill (light mode), a deep honey on the light pill (dark mode). */
+  --toast-action: var(--honey);
   --honey-ink: #1f1d1a;
   --nest-mark: #b07a0e;
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
@@ -85,6 +87,7 @@
   --link-url-bg: rgba(0, 0, 0, 0.22);
   --checkbox: #5fb38a;
   --honey: #f2c14e;
+  --toast-action: #8a5a00;
   --honey-ink: #1b1a17;
   --hl-yellow: #6b5a14;
   --hl-green: #2e5a2c;
@@ -1037,6 +1040,73 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .confirm-cancel { border: 1px solid var(--control-edge); background: var(--surface); }
 .confirm-delete { border: none; background: var(--danger); color: var(--on-accent); }
+
+/*
+ * The app's questions (job 170, owner's option 3A): the browser's modal <dialog>, filling the window so
+ * a press beside the card (on the scrim) answers "no"; a card in the middle, a bottom sheet on a phone.
+ */
+dialog.ask {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+dialog.ask[open] { display: flex; align-items: center; justify-content: center; }
+dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.ask-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.ask-card h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.ask-card p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
+.ask-card .confirm-actions { margin-top: 12px; }
+.ask-card .confirm-actions button { height: 40px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--ink); }
+.ask-card .confirm-actions :is(.confirm-delete, .confirm-send) { color: var(--on-accent); }
+.app.phone dialog.ask[open] { align-items: flex-end; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
+.app.phone .ask-card { max-width: none; padding: 20px 16px 16px; border-radius: 14px; }
+/* The action nearest the thumb comes first; the safe button under it. */
+.app.phone .ask-card .confirm-actions { flex-direction: column-reverse; gap: 8px; }
+.app.phone .ask-card .confirm-actions button { height: 48px; font-size: 15px; }
+
+/* The Undo message after a delete (job 170): a dark pill at the bottom center (light in dark mode), above the bottom controls. */
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  z-index: 9; /* over a side panel (on a phone it covers the board), so a habit's Undo shows */
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100vw - 32px);
+  padding: 4px 4px 4px 16px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.24);
+  font-size: 14px;
+  font-weight: 500;
+}
+.undo-toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast button { flex: none; height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-weight: 600; color: var(--toast-action); cursor: pointer; }
+.undo-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.app.phone .undo-toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
+.app.phone .undo-toast button { height: 44px; }
 
 /* ---------- layout and resizing (step 3) ---------- */
 
@@ -2887,7 +2957,7 @@ a.cal-open { align-self: flex-start; }
   html[data-input='keys'] .collapse-arrow { transition: none; }
 
   /* Menus, panels and the phone sheet. */
-  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel) {
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast) {
     transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
   @starting-style {
@@ -2897,6 +2967,9 @@ a.cal-open { align-self: flex-start; }
     html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }
     html:not([data-input='keys']) .find-bar { opacity: 0; transform: translateY(-8px); }
     html:not([data-input='keys']) .confirm:not(.delete-completed) { opacity: 0; transform: translateY(-4px); }
+    /* A question and the Undo message rise a few pixels as they fade in. */
+    html:not([data-input='keys']) .ask-card { opacity: 0; transform: translateY(4px); }
+    html:not([data-input='keys']) .undo-toast { opacity: 0; transform: translate(-50%, 4px); }
   }
 }
 

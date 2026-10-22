@@ -6,6 +6,7 @@ import { boardTree } from '../model/workspace';
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely } from '../store/versions';
 import { collab } from '../sync/collabSession';
+import { ask } from './ConfirmDialog';
 import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
 import { TemplatesDialog } from './TemplatesDialog';
 
@@ -48,15 +49,22 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
     setOpen(false);
     action();
   };
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     setOpen(false);
+    wrap.current?.querySelector('button')?.focus(); // the menu goes: the question hands focus back to the Boards button
     const sharing = collab.sharing();
-    const ask =
-      boardRights(shares, id, home).deleteForEveryone && sharing
-        ? `Delete the shared board “${nameOf(id)}” for everyone it’s shared with? Boards inside it are kept on your boards. You can bring it back from Version history.`
-        : `Delete the board “${nameOf(id)}” and everything on it? Boards inside it are kept. You can bring it back from Version history.`;
-    if (!window.confirm(ask)) return;
-    deleteBoardSafely(appStore, activeVersionStore(), id, sharing).catch(() => collab.setNotice(`“${nameOf(id)}” couldn’t be deleted. Check your connection and try again.`));
+    const name = nameOf(id);
+    const forEveryone = () => boardRights(appStore.getState().ui.shares, id, home).deleteForEveryone && !!collab.sharing();
+    const everyone = forEveryone();
+    // Deleting a board isn't on Ctrl+Z (only Version history brings it back), so it always asks.
+    const yes = await ask(
+      everyone
+        ? { title: `Delete “${name}” for everyone?`, body: 'It goes for everyone it’s shared with. Boards inside it are kept on your boards. You can bring it back from Version history.', action: 'Delete board', cancel: 'Keep board', danger: true }
+        : { title: `Delete “${name}”?`, body: 'Everything on it goes. Boards inside it are kept. You can bring it back from Version history.', action: 'Delete board', cancel: 'Keep board', danger: true },
+    );
+    // Only what was asked: not if the board went, or started or stopped being shared, meanwhile.
+    if (!yes || !appStore.workspace().boards[id] || forEveryone() !== everyone) return;
+    deleteBoardSafely(appStore, activeVersionStore(), id, sharing).catch(() => collab.setNotice(`“${name}” couldn’t be deleted. Check your connection and try again.`));
   };
 
   return (
@@ -99,7 +107,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
                   )}
                 </button>
                 {boardRights(shares, id, home).delete && (
-                  <button type="button" className="icon-button" aria-label={`Delete board ${nameOf(id)}`} title="Delete this board" onClick={() => remove(id)}>
+                  <button type="button" className="icon-button" aria-label={`Delete board ${nameOf(id)}`} title="Delete this board" onClick={() => void remove(id)}>
                     <CloseIcon />
                   </button>
                 )}

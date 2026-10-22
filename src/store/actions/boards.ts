@@ -182,9 +182,12 @@ export function boardActions(ctx: StoreContext) {
     /** Tick or untick one day (a "YYYY-MM-DD" key) of a habit. */
     toggleHabitDay: (cardId: string, day: string) => changeHabit(cardId, (c) => withDay(c, day, !tickedDays(c).has(day))),
     /** Delete a habit with its ticks, as one change on the Habits board's undo (Ctrl+Z in the panel, or Version history, brings it back). */
+    /** Deletes a habit at once, with the Undo message (owner, 2026-10-22): Undo or Ctrl+Z in the panel brings it back. */
     deleteHabit(cardId: string) {
       const id = habitsId();
-      if (id) ctx.commitTo(id, (b) => (b.cards[cardId] && isHabit(b.cards[cardId]) ? B.deleteBlocks(b, [cardId]) : b));
+      const habit = id ? ctx.workspace().boards[id]?.cards[cardId] : undefined;
+      if (!id || !habit || !isHabit(habit)) return;
+      ctx.deleting(`Deleted the habit “${habit.title}”`, () => ctx.commitTo(id, (b) => (b.cards[cardId] ? B.deleteBlocks(b, [cardId]) : b)), id);
     },
     /** The board the Habits panel shows and changes, or null before the first habit. */
     habitsBoard: habitsId,

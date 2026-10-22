@@ -36,11 +36,11 @@ test('a backup of two boards holds both, and restoring it asks "Replace all your
   await boardName(page).fill('Changed');
   const file = info.outputPath('all-boards.json');
   writeFileSync(file, text);
-  const asked = new Promise<string>((resolve) => page.once('dialog', (dlg) => (resolve(dlg.message()), dlg.accept())));
   const chooser = page.waitForEvent('filechooser');
   await fileMenu(page, 'Restore from backup…');
   await (await chooser).setFiles(file);
-  expect(await asked).toMatch(/^Replace all your boards with the ones in the backup\?/);
+  // The app's own question (job 170), not the browser's.
+  await page.getByRole('alertdialog', { name: 'Replace all your boards with the backup?' }).getByRole('button', { name: 'Replace all boards' }).click();
 
   await openBoardsMenu(page);
   await expect(boardsMenu(page).getByRole('menuitem', { name: 'Home' })).toBeVisible();

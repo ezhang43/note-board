@@ -9,6 +9,7 @@ import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
+import { announce } from './announce';
 import { prefersDark, type Schedule } from './env';
 import { emptyUi, type AppState, type Boards, type Ui } from './types';
 
@@ -103,6 +104,11 @@ export interface StoreContext {
   commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
   /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. */
   undoOn(id: string, which: 'undo' | 'redo'): void;
+  /**
+   * A delete: `run` makes it, as one change on board `board` (the open one by default). When it changed
+   * something, `text` is said aloud and shown with Undo. Returns whether it did.
+   */
+  deleting(text: string, run: () => unknown, board?: string): boolean;
 }
 
 /** What is cleared on screen when a different board is shown. */
@@ -110,6 +116,7 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   selection: [],
   confirm: null,
   deleteCompleted: null,
+  undoToast: null,
   drag: null,
   resize: null,
   marquee: null,
@@ -499,6 +506,22 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: step.board } } });
   }
 
+  function deleting(text: string, run: () => unknown, board = state.boards.open) {
+    flushPendingTick(); // a tick still animating is its own change, not part of the delete
+    const before = edits;
+    run();
+    if (edits === before) return false;
+    announce(text);
+    set({ ...state, ui: uiWith({ undoToast: { text, board, edits, outside: outsideChanges } }) });
+    return true;
+  }
+
+  /** The Undo message, while its Undo would still undo just that delete (nothing changed since). */
+  function undoToast() {
+    const t = state.ui.undoToast;
+    return t && !state.ui.preview && t.edits === edits && t.outside === outsideChanges ? t : null;
+  }
+
   const ctx: StoreContext = {
     get state() {
       return state;
@@ -524,6 +547,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceWorkspace,
     commitTo,
     undoOn,
+    deleting,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */
@@ -583,6 +607,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     },
     undo: () => stepOpen('undo'),
     redo: () => stepOpen('redo'),
+    undoToast,
   };
 
   return { ctx, api };

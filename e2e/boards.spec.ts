@@ -66,8 +66,8 @@ test('deleting a board (after a confirmation) removes it and its card', async ({
   await page.getByRole('button', { name: 'Back to Home' }).click();
 
   await openBoardsMenu(page);
-  page.once('dialog', (d) => d.accept());
   await boardsMenu(page).getByRole('button', { name: 'Delete board Old plans' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete “Old plans”?' }).getByRole('button', { name: 'Delete board' }).click();
   await expect(cards(page)).toHaveCount(0);
   await openBoardsMenu(page);
   await expect(boardsMenu(page).getByRole('menuitem', { name: 'Old plans' })).toHaveCount(0);

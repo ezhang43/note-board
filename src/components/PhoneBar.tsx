@@ -34,7 +34,8 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
   useEffect(() => {
     if (!open) return;
     const close = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(null);
+      // A press in a question asked from the sheet (the Share panel's Remove, Leave) isn't outside it.
+      if (!root.current?.contains(e.target as Node) && !(e.target as Element).closest?.('dialog.ask')) setOpen(null);
     };
     window.addEventListener('pointerdown', close, true);
     return () => window.removeEventListener('pointerdown', close, true);

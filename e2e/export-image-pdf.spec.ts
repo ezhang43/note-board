@@ -97,9 +97,8 @@ test('a picture from another site that the browser won’t let us copy is left b
 
 test('an empty board has nothing to save, and the menu says so', async ({ page }) => {
   await page.locator('header.toolbar').getByRole('button', { name: 'File', exact: true }).click();
-  const message = new Promise<string>((resolve) => page.once('dialog', (d) => (resolve(d.message()), d.dismiss())));
   await page.getByRole('menuitem', { name: 'Download as PDF' }).click();
-  expect(await message).toContain('Nothing on this board to save yet');
+  await expect(page.locator('.notice-banner')).toContainText('Nothing on this board to save yet'); // the note banner, not a pop-up (job 170)
 });
 
 test('the export leaves the board as it was: selection, toolbar and view untouched', async ({ page }) => {

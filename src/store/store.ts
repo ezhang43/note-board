@@ -45,6 +45,16 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...api,
     undo: step('undo'),
     redo: step('redo'),
+    /** The Undo message's button: the same undo as Ctrl+Z, on the board the delete was on. */
+    undoDelete() {
+      const t = api.undoToast();
+      if (!t) return;
+      const before = api.edits();
+      ctx.undoOn(t.board, 'undo');
+      ctx.updateUi({ undoToast: null });
+      if (api.edits() !== before) announce('Undid the last change');
+    },
+    dismissUndoToast: () => ctx.updateUi({ undoToast: null }),
     /** The checklist item or new block that was asked to take the cursor has taken it. */
     focusTaken: (id: string) => {
       const { focusItem, focusBlock } = ctx.state.ui;

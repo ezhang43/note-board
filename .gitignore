@@ -7,3 +7,5 @@ playwright-report
 docs/mockups/
 .impeccable/
 PRODUCT.md
+firebase-debug.log
+firestore-debug.log

@@ -32,10 +32,10 @@ test('Download backup saves the whole board as a file, which Restore from backup
   await add(page, 'Note');
   const file = info.outputPath('backup.json');
   writeFileSync(file, backup.text);
-  page.once('dialog', (d) => d.accept());
   const chooser = page.waitForEvent('filechooser');
   await fileMenu(page, 'Restore from backup…');
   await (await chooser).setFiles(file);
+  await page.getByRole('alertdialog', { name: 'Replace this board with the backup?' }).getByRole('button', { name: 'Replace board' }).click();
   await expect(cards(page)).toHaveCount(1);
   await expect(cards(page).first().getByLabel('Note text')).toHaveValue('Keep me');
 
@@ -48,11 +48,10 @@ test('a file that isn’t a BusyAnts backup changes nothing and says so', async 
   await add(page, 'Note');
   const file = info.outputPath('not-a-backup.json');
   writeFileSync(file, '{"hello": 1}');
-  const message = new Promise<string>((resolve) => page.once('dialog', (d) => (resolve(d.message()), d.dismiss())));
   const chooser = page.waitForEvent('filechooser');
   await fileMenu(page, 'Restore from backup…');
   await (await chooser).setFiles(file);
-  expect(await message).toContain('isn’t a BusyAnts backup');
+  await expect(page.locator('.notice-banner')).toContainText('isn’t a BusyAnts backup');
   await expect(cards(page)).toHaveCount(1);
 });
 

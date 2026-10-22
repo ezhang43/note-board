@@ -6,21 +6,13 @@ import { claimDevice, deleteAccountData, OWNER_KEY } from '../store/account';
 import { account, finishDeletion, takeDeletedNote } from './account';
 import { collab, joinFromAddress } from './collabSession';
 import { feedback } from './feedback';
-import {
-  accountRemote,
-  boardRemote,
-  clearOfflineCopy,
-  collabRemote,
-  confirmSignIn,
-  currentUser,
-  sendFeedback,
-  signInWithGoogle,
-  signOutUser,
-  versionsRemote,
-  watchUser,
-  type User,
-} from './firebase';
+import { confirmSignIn, currentUser, signInWithGoogle, signOutUser, watchUser, type User } from './firebase';
 import { flushWhenHidden } from './pageHide';
+
+/** Firebase's database code, downloaded once someone is signed in, so the sign-in screen doesn't carry it (job 169). */
+const database = () => import('./database');
+/** Starts the download early; a failure shows when the board starts (start). */
+const preloadDatabase = () => void database().catch(() => {});
 
 /**
  * checking: finding out whether someone is signed in on this device.
@@ -56,6 +48,9 @@ let held = (() => {
     return null;
   }
 })();
+// Someone signed in on this device before, so likely still is: the database code comes down
+// alongside Firebase's sign-in check rather than after it.
+if (held) preloadDatabase();
 
 function update(next: SessionStatus, error = '') {
   status = next;
@@ -73,7 +68,11 @@ function stopAll() {
   sharing = null;
 }
 
+/** Goes up on every sign-in, sign-out or change of person, so a start still waiting for the database code can tell it is out of date. */
+let turn = 0;
+
 watchUser((user) => {
+  turn++;
   stopAll();
   collab.set(null, null);
   feedback.reset();
@@ -82,12 +81,25 @@ watchUser((user) => {
     return;
   }
   deleted = false;
-  start(user);
+  void start(user);
 });
 
 /** Starts syncing `user`'s boards; `quiet`: the board stays on screen meanwhile (after a failed delete). */
-function start(user: User, quiet = false) {
+async function start(user: User, quiet = false) {
   if (!quiet) update('loading');
+  const mine = turn;
+  const db = await database().catch((e: unknown) => {
+    // Couldn't be downloaded (offline, and not kept from an earlier visit), or didn't start: nothing starts.
+    console.error(e);
+    return null;
+  });
+  if (!db) {
+    if (mine === turn) update('error');
+    return;
+  }
+  // Signed out, or someone else signed in, while it was on its way: that start is the one that counts.
+  if (mine !== turn) return;
+  const { boardRemote, collabRemote, versionsRemote } = db;
   // Boards another account left on this device are kept aside, never shown or uploaded (job #145).
   try {
     claimDevice(appStore, localStorage, user.uid, held);
@@ -161,6 +173,8 @@ async function deleteAccount() {
   const user = currentUser();
   if (!user || !sharing) throw new Error('Not signed in');
   await confirmSignIn(user);
+  // Already downloaded when syncing started.
+  const { accountRemote, clearOfflineCopy, collabRemote } = await database();
   const backend = collabRemote(user);
   // Changes still waiting are sent first, so if deleting fails and syncing starts again from the
   // online copy, none are lost.
@@ -173,7 +187,7 @@ async function deleteAccount() {
     done = await deleteAccountData(user.uid, accountRemote(user, backend));
   } catch (e) {
     deleting = false;
-    if (currentUser()?.uid === user.uid) start(user, true);
+    if (currentUser()?.uid === user.uid) void start(user, true);
     else update('signed-out');
     throw e;
   }
@@ -186,7 +200,7 @@ account.setRemover(deleteAccount);
 feedback.setSender(async (text) => {
   const user = currentUser();
   if (!user) throw new Error('Not signed in');
-  await sendFeedback(user, text);
+  await (await database()).sendFeedback(user, text);
 });
 
 flushWhenHidden(document, window, () => {
@@ -223,6 +237,8 @@ export const session = {
     };
   },
   signIn() {
+    // Downloads while Google's window is open.
+    preloadDatabase();
     signInWithGoogle().catch((e: { code?: string }) => {
       // Closing the Google window isn't an error worth showing.
       if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;

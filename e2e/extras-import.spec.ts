@@ -108,20 +108,17 @@ test('imports an HTML file without running its scripts: headings, nested lists w
   await expect(cards(page)).toHaveCount(0);
 });
 
+const banner = (page: import('@playwright/test').Page) => page.locator('.notice-banner');
+
 test('a file it can’t read, or one over 5 MB, adds nothing and says so', async ({ page }) => {
-  const dialogs: string[] = [];
-  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
   await importFile(page, 'scan.pdf', '%PDF-1.7');
-  await expect.poll(() => dialogs, { timeout: 20_000 }).toEqual(['BusyAnts can’t read that file yet.']); // a broken PDF: the reader loads first
+  await expect(banner(page)).toHaveText('BusyAnts can’t read that file yet.', { timeout: 20_000 }); // a broken PDF: the reader loads first
   await importFile(page, 'huge.txt', Buffer.alloc(5 * 1024 * 1024 + 1, 'a'));
-  await expect.poll(() => dialogs.length).toBe(2);
-  expect(dialogs[1]).toMatch(/too big/);
+  await expect(banner(page)).toContainText('too big');
   await expect(cards(page)).toHaveCount(0);
 });
 
 test('imports a Trello board export and a Google Keep note; other JSON adds nothing and says so', async ({ page }) => {
-  const dialogs: string[] = [];
-  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
   const trello = {
     name: 'Home jobs',
     lists: [{ id: 'L1', name: 'To do', closed: false, pos: 1 }, { id: 'L2', name: 'Old', closed: true, pos: 2 }],
@@ -147,7 +144,7 @@ test('imports a Trello board export and a Google Keep note; other JSON adds noth
   await expect(cards(page).getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Eggs was ticked
 
   await importFile(page, 'other.json', '{"hello": "world"}');
-  await expect.poll(() => dialogs).toEqual(['BusyAnts can only import JSON files from Trello or Google Keep.']);
+  await expect(banner(page)).toHaveText('BusyAnts can only import JSON files from Trello or Google Keep.');
   await expect(cards(page)).toHaveCount(1);
 });
 
@@ -186,9 +183,7 @@ test('imports a PDF: headings, lists (ticked ones too) and text become cards, se
 });
 
 test('a PDF with no text (a scan) adds nothing and says so', async ({ page }) => {
-  const dialogs: string[] = [];
-  page.on('dialog', (d) => void (dialogs.push(d.message()), d.dismiss()));
   await importFixture(page, 'pdf-scan.pdf');
-  await expect.poll(() => dialogs, { timeout: 20_000 }).toEqual(['That PDF has no text BusyAnts can read (it may be a scan), so nothing was added.']);
+  await expect(banner(page)).toHaveText('That PDF has no text BusyAnts can read (it may be a scan), so nothing was added.', { timeout: 20_000 });
   await expect(cards(page)).toHaveCount(0);
 });

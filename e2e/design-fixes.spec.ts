@@ -255,9 +255,8 @@ test('card and column delete buttons show the same trash can as checklist items,
   expect(await colDelete.locator('svg').innerHTML()).toBe(trash);
   await expect(colDelete).toHaveCSS('color', faint);
 
-  await colDelete.click();
-  await expect(page.getByRole('alertdialog')).toBeVisible();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete container' }).click();
+  await colDelete.click(); // empty: it goes without asking, with Undo (owner, 2026-10-22)
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect(columns(page)).toHaveCount(0);
 
   await card.getByRole('button', { name: 'Delete card' }).click();

@@ -160,7 +160,7 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
-const { collabRemote } = await import('./firebase');
+const { collabRemote } = await import('./database');
 const { createStore } = await import('../store/store');
 const { startSharing } = await import('../store/sharing');
 const { serializeShare } = await import('../model/sharing');

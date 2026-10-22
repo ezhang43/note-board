@@ -39,10 +39,11 @@ test.describe('desktop', () => {
   test('deleting several containers asks in the same words', async ({ page }) => {
     await add(page, 'New container');
     await add(page, 'New container');
+    await add(page, 'Note'); // into it: empty containers alone go without asking (owner, 2026-10-22)
     await clickEmpty(page); // out of the title box, so Ctrl+A selects blocks
     await page.keyboard.press('Control+a');
     await page.keyboard.press('Delete');
-    await expect(page.getByRole('alertdialog')).toContainText('Delete 2 containers?');
+    await expect(page.getByRole('alertdialog')).toContainText('Delete 2 containers and their card?');
     await expect(page.getByRole('button', { name: 'Delete containers' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Keep containers' })).toBeVisible();
   });

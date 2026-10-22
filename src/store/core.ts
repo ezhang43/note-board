@@ -2,13 +2,15 @@ import { centreOf, screenToBoard } from '../model/view';
 import { emptyHistory, recordChange, redo as redoStep, undo as undoStep, type History } from '../model/history';
 import { closeGaps, settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
-import { BOARD_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
-import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
+import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
+import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
+import { savedByNewer } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
+import { announce } from './announce';
 import { prefersDark, type Schedule } from './env';
 import { emptyUi, type AppState, type Boards, type Ui } from './types';
 
@@ -103,6 +105,11 @@ export interface StoreContext {
   commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
   /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. */
   undoOn(id: string, which: 'undo' | 'redo'): void;
+  /**
+   * A delete: `run` makes it, as one change on board `board` (the open one by default). When it changed
+   * something, `text` is said aloud and shown with Undo. Returns whether it did.
+   */
+  deleting(text: string, run: () => unknown, board?: string): boolean;
 }
 
 /** What is cleared on screen when a different board is shown. */
@@ -110,6 +117,7 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   selection: [],
   confirm: null,
   deleteCompleted: null,
+  undoToast: null,
   drag: null,
   resize: null,
   marquee: null,
@@ -156,8 +164,32 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     }
   }
 
+  // A save here that can't be read is never lost (job #160). One saved by a newer version of the app
+  // is left as it is, for the updated app to open (as with the online copy). A damaged one is kept
+  // under its own key, beside any copy kept earlier, before starting fresh; if no copy can be kept,
+  // it is left as it is. Either way, this page then doesn't save over it.
+  const saved = read(BOARD_KEY);
+  const got = readWorkspace(saved);
+  let startNote: string | null = null;
+  let keepSave = false;
+  if (saved != null && !got) {
+    if (savedByNewer(saved)) {
+      keepSave = true;
+      startNote = 'Your boards were saved by a newer version of the app. Reload the page to get it. Until then, changes here aren’t saved on this device.';
+    } else {
+      let key = UNREADABLE_KEY;
+      let held: string | null;
+      for (let n = 2; (held = read(key)) != null && held !== saved; n++) key = `${UNREADABLE_KEY}-${n}`;
+      if (held !== saved) write(key, saved);
+      keepSave = read(key) !== saved;
+      startNote = keepSave
+        ? 'Your saved boards couldn’t be read, so this is a fresh board. Changes here aren’t saved on this device, so the old save is left as it is.'
+        : 'Your saved boards couldn’t be read, so this is a fresh board. A copy was kept on this device.';
+    }
+  }
+
   let state: AppState = {
-    ...split(parseWorkspace(read(BOARD_KEY)), read(OPEN_BOARD_KEY)),
+    ...split(got?.ws ?? parseWorkspace(null), read(OPEN_BOARD_KEY)),
     view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()), fontSize: startingFontSize(read(FONT_KEY)) },
     ui: emptyUi,
   };
@@ -201,6 +233,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (!boardTimer) return;
     clearTimeout(boardTimer);
     boardTimer = null;
+    // Until something else replaces the save that can't be read (another account signing in), it stays.
+    if (keepSave && read(BOARD_KEY) === saved) return;
+    keepSave = false;
     write(BOARD_KEY, serializeWorkspace(workspace()));
   }
 
@@ -499,6 +534,22 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: step.board } } });
   }
 
+  function deleting(text: string, run: () => unknown, board = state.boards.open) {
+    flushPendingTick(); // a tick still animating is its own change, not part of the delete
+    const before = edits;
+    run();
+    if (edits === before) return false;
+    announce(text);
+    set({ ...state, ui: uiWith({ undoToast: { text, board, edits, outside: outsideChanges } }) });
+    return true;
+  }
+
+  /** The Undo message, while its Undo would still undo just that delete (nothing changed since). */
+  function undoToast() {
+    const t = state.ui.undoToast;
+    return t && !state.ui.preview && t.edits === edits && t.outside === outsideChanges ? t : null;
+  }
+
   const ctx: StoreContext = {
     get state() {
       return state;
@@ -524,11 +575,14 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceWorkspace,
     commitTo,
     undoOn,
+    deleting,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */
   const api = {
     getState: () => state,
+    /** A note to show when the page opens (the save here couldn't be read), or null. */
+    startNote,
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => {
@@ -583,6 +637,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     },
     undo: () => stepOpen('undo'),
     redo: () => stepOpen('redo'),
+    undoToast,
   };
 
   return { ctx, api };

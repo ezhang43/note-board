@@ -119,7 +119,8 @@ function HabitMenu({ habit, onRename }: { habit: TodoCard; onRename: () => void 
             className="habit-menu-item habit-menu-delete"
             onClick={() => {
               setOpen(false);
-              if (window.confirm(`Delete the habit “${habit.title}” and its ticks? You can bring it back from Version history, or with Ctrl+Z in this panel.`)) appStore.deleteHabit(habit.id);
+              button.current?.focus(); // the habit's row goes; focus is then kept in the panel (see `focused`)
+              appStore.deleteHabit(habit.id); // at once, with the Undo message (owner, 2026-10-22)
             }}
           >
             Delete habit

@@ -1,7 +1,8 @@
-# Runs every check (typecheck, unit tests, browser tests) on each pull request into build/v1 and
-# on build/v1 itself. A pull request shows pass / fail on GitHub, and one with auto-merge turned on
-# merges by itself once this passes (build rule 9). On a push to build/v1 that passes, the Publish job
-# puts it live when every unpublished change is a low-risk pull request (owner chose this on 2026-10-05).
+# Runs every check (typecheck, unit tests, Firestore rules tests, browser tests) on each pull request
+# into build/v1 and on build/v1 itself. A pull request shows pass / fail on GitHub, and one with
+# auto-merge turned on merges by itself once this passes (build rule 9). On a push to build/v1 that
+# passes, the Publish job puts it live when every unpublished change is a low-risk pull request (owner
+# chose this on 2026-10-05).
 name: Checks
 
 on:
@@ -64,15 +65,43 @@ jobs:
             test-results
           retention-days: 7
 
-  # The one check the branch protection and Publish wait for: passes only when typecheck, unit tests
-  # and all 4 browser shards passed. Keep the name "All tests" exactly.
+  # The Firestore rules tests (rules/), on the local Firestore emulator, which needs Java. A demo-
+  # project id: nothing here reaches the real Firebase project, and no secrets are used.
+  rules:
+    name: Firestore rules tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: checks-${{ github.ref }}-rules
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      # The emulator (about 60 MB) is downloaded on first use; keep it between runs. The key is the
+      # firebase-tools version in package.json's test:rules script: change both together.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-15.32.1
+      - run: npm run test:rules
+
+  # The one check the branch protection and Publish wait for: passes only when typecheck, unit tests,
+  # the rules tests and all 4 browser shards passed. Keep the name "All tests" exactly.
   all-tests:
     name: All tests
-    needs: [checks, browser]
+    needs: [checks, browser, rules]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.checks.result }}" = success -a "${{ needs.browser.result }}" = success
+      - run: test "${{ needs.checks.result }}" = success -a "${{ needs.browser.result }}" = success -a "${{ needs.rules.result }}" = success
 
   # Auto-publish (build rule 9): after All tests passes on a push to build/v1, fast-forward main to
   # that commit and start the Pages deploy, but only when every change main lacks is a merged pull

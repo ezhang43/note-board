@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The Firestore side of sharing, version history and the board (src/sync/firebase.ts), against a
+// The Firestore side of sharing, version history and the board (src/sync/database.ts), against a
 // small pretend Firestore that keeps documents by path and records what each batch, transaction and
 // delete did. These are the code paths behind the promises in SPEC "Sharing": removing someone
 // changes the link in the same step, a save is refused (not retried quietly) once the share is
@@ -90,7 +90,7 @@ vi.mock('firebase/firestore', () => ({
   },
 }));
 
-const { collabRemote, boardRemote, versionsRemote } = await import('./firebase');
+const { collabRemote, boardRemote, versionsRemote } = await import('./database');
 const user = { uid: 'u1', displayName: 'Eric', photoURL: null } as unknown as Parameters<typeof collabRemote>[0];
 
 beforeEach(() => {

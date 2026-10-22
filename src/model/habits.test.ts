@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
-import { HABITS_NAME, WEIGHT_TITLE, habitList, habitViewLabel, habitViewRange, habitYear, doneToday, habitColor, hiddenHabits, isHabit, periodCount, weekCount, withHabitColor, isHabitViewNow, moveHabitView, parseKg, tickedDays, weightCard, weightChart, weightEntries, withDay, withWeight, withoutWeight } from './habits';
+import { HABITS_NAME, WEIGHT_TITLE, habitList, habitViewLabel, habitViewRange, habitYear, doneToday, habitColor, hiddenHabits, isHabit, periodCount, weekCount, withHabitColor, isHabitViewNow, moveHabitView, parseKg, isWeightDay, tickedDays, weightCard, weightChart, weightEntries, withDay, withWeight, withoutWeight } from './habits';
 import type { Board, TodoCard } from './types';
 import type { Workspace } from './workspace';
 
@@ -117,6 +117,25 @@ const weight = (...entries: string[]): TodoCard => ({
 });
 
 describe('weight', () => {
+  it('a weight can be entered for today or any earlier real day, never a later one (job 177)', () => {
+    expect(isWeightDay('2026-10-21', '2026-10-21')).toBe(true);
+    expect(isWeightDay('2026-10-01', '2026-10-21')).toBe(true);
+    expect(isWeightDay('2000-01-01', '2026-10-21')).toBe(true);
+    for (const bad of ['2026-10-22', '2999-01-01', '2026-02-30', '2026-13-01', '', 'x', '21 Oct', '2026-1-5', '1999-12-31']) expect(isWeightDay(bad, '2026-10-21')).toBe(false);
+  });
+
+  it('weights entered out of date order are listed and charted by date; entering an earlier day again replaces it (job 177)', () => {
+    let card = { ...(createCard('todo') as TodoCard), title: WEIGHT_TITLE };
+    for (const [d, kg] of [['2026-10-20', 72], ['2026-10-05', 74.1], ['2026-10-12', 73.3], ['2026-10-05', 74.5]] as const) card = withWeight(card, d, kg);
+    expect(weightEntries(card)).toEqual([
+      { day: '2026-10-05', kg: 74.5 },
+      { day: '2026-10-12', kg: 73.3 },
+      { day: '2026-10-20', kg: 72 },
+    ]);
+    expect(weightChart(weightEntries(card), 'month', '2026-10-21').points.map((p) => p.day)).toEqual(['2026-10-05', '2026-10-12', '2026-10-20']);
+    expect(card.items.filter((i) => i.text.startsWith('2026-10-05'))).toHaveLength(1);
+  });
+
   it('reads kilograms with a dot or a comma, 20.0 to 400.0, rounded to one decimal; anything else is refused', () => {
     expect(parseKg('72.4')).toBe(72.4);
     expect(parseKg(' 72,4 ')).toBe(72.4);

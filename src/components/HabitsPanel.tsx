@@ -281,7 +281,7 @@ export function HabitsPanel() {
           </span>
         </div>
       </div>
-      <WeightCard board={board} view={view} shown={shown} today={today} />
+      <WeightCard board={board} view={view} shown={shown} today={today} onShow={setShown} />
       <div className={`habit-sheet habit-sheet-${view}`}>
         {n === 0 && (
           <div className="habits-empty">

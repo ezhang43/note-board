@@ -1,7 +1,8 @@
 import * as B from '../../model/board';
 import { createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
-import { HABITS_NAME, WEIGHT_TITLE, parseKg, weightCard, weightEntries, withWeight, withoutWeight } from '../../model/habits';
+import { dayKey } from '../../model/calendar';
+import { HABITS_NAME, WEIGHT_TITLE, isWeightDay, parseKg, weightCard, weightEntries, withWeight, withoutWeight } from '../../model/habits';
 import { spotForNewBlock } from '../../model/layout';
 import type { TodoCard } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -12,13 +13,13 @@ import type { StoreContext } from '../core';
 export function weightActions(ctx: StoreContext, habitsBoard: () => string | null) {
   return {
     /**
-     * Today's weight, typed as kilograms: kept for `day` (replacing that day's), as one change on the
-     * Habits board's undo. Returns the weight kept, or null (changing nothing) for a blank or
-     * out-of-range entry. The Habits board and the Weight card are made by the first one.
+     * A weight, typed as kilograms: kept for `day` (today or an earlier day; replacing that day's), as one
+     * change on the Habits board's undo. Returns the weight kept, or null (changing nothing) for a blank or
+     * out-of-range entry, or a later or unreal day. The Habits board and the Weight card are made by the first one.
      */
     saveWeight(text: string, day: string): number | null {
       const kg = parseKg(text);
-      if (kg === null || ctx.state.ui.sidePanel !== 'habits') return null;
+      if (kg === null || !isWeightDay(day, dayKey(new Date())) || ctx.state.ui.sidePanel !== 'habits') return null;
       let id = habitsBoard();
       if (!id) {
         const made = newId('b');

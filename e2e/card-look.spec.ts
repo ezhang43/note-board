@@ -124,6 +124,13 @@ for (const dark of [false, true]) {
     await clickEmpty(page);
     await page.mouse.move(0, 0);
     await expect(card).toHaveClass(/collapsed/);
+    // Let color fades and the collapse finish first: on a slow machine the middle pixel was read mid-fade.
+    await page.evaluate(() =>
+      Promise.race([
+        Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))),
+        new Promise((done) => setTimeout(done, 2000)),
+      ]),
+    );
     const b = await box(card);
     expect(b.height).toBeGreaterThanOrEqual(59);
     const x = b.x + b.width * 0.75;

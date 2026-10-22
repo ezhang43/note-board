@@ -191,6 +191,9 @@ describe('accountKeys', () => {
       'note-board:share-base:other',
       'note-board:shares:someone-else',
       'note-board:own-boards:someone-else',
+      // Up to when each card's comments were seen (job 161, PR 4).
+      'note-board:comments-seen:me',
+      'note-board:comments-seen:someone-else',
       // Whose boards the device holds, and boards kept aside while another account uses it (job #145).
       'note-board:owner-uid',
       'note-board:parked:me',
@@ -222,6 +225,7 @@ describe('accountKeys', () => {
         'note-board:version:v123',
         'note-board:shares:me',
         'note-board:own-boards:me',
+        'note-board:comments-seen:me',
         'note-board:share-base:s1',
         'note-board:share-base:s2',
         // The owner key stays, so the boards left are never taken for the next account's.

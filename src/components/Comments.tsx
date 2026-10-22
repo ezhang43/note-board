@@ -157,7 +157,8 @@ function Thread({ share, cardId, title, opener }: { share: ShareInfo; cardId: st
     };
     const down = (e: PointerEvent) => {
       const t = e.target as Element;
-      if (!ref.current?.contains(t) && !opener?.contains(t) && !t.closest?.('dialog.ask')) setOpen(null);
+      // The phone's scrim closes it on its own click, so that tap never reaches what is under it.
+      if (!ref.current?.contains(t) && !opener?.contains(t) && !t.closest?.('dialog.ask, .comment-scrim')) setOpen(null);
     };
     window.addEventListener('keydown', key, true);
     window.addEventListener('pointerdown', down, true);
@@ -165,7 +166,7 @@ function Thread({ share, cardId, title, opener }: { share: ShareInfo; cardId: st
       window.removeEventListener('keydown', key, true);
       window.removeEventListener('pointerdown', down, true);
     };
-  });
+  }, [opener]); // simple: `close` only uses `opener`
 
   const send = () => {
     const text = draft;
@@ -198,7 +199,7 @@ function Thread({ share, cardId, title, opener }: { share: ShareInfo; cardId: st
   const now = Date.now();
   return (
     <>
-      {phone && <div className="comment-scrim" />}
+      {phone && <div className="comment-scrim" onClick={() => setOpen(null)} />}
       <div ref={ref} className="comment-thread" role="dialog" aria-label={`Comments on ${title}`} tabIndex={-1} style={phone || !place ? undefined : place} onKeyDown={keys}>
         <div className="comment-head">
           <h2>

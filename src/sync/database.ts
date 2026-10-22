@@ -22,6 +22,7 @@ import {
   terminate,
   updateDoc,
   waitForPendingWrites,
+  where,
   writeBatch,
   type DocumentData,
   type DocumentSnapshot,
@@ -72,7 +73,11 @@ export function accountRemote(user: User, shares: CollabBackend, client: string)
       );
     },
     deleteShare: shares.deleteShare,
-    leave: shares.leave,
+    // Their comments first (job 161, PR 4): once off the board they can't read them to find them.
+    async leave(id) {
+      await shares.deleteMyComments(id);
+      await shares.leave(id);
+    },
     async markDeleting() {
       if ((await getDocFromServer(own)).data()?.deleting === 'done') return;
       await setDoc(own, { deleting: 'started', client, updatedAt: serverTimestamp() }, { merge: true });
@@ -532,6 +537,22 @@ export function collabRemote(user: User): CollabBackend {
     },
     async deleteComment(id, commentId) {
       await deleteDoc(doc(db, 'shared', id, 'comments', commentId));
+    },
+    async deleteMyComments(id) {
+      let mine: QuerySnapshot;
+      try {
+        mine = await getDocsFromServer(query(collection(db, 'shared', id, 'comments'), where('author', '==', me.uid)));
+      } catch (e) {
+        // Not on it any more (removed, or the board deleted with its comments): none can be read or deleted.
+        if ((e as { code?: string }).code === 'permission-denied') return;
+        throw e;
+      }
+      // A batch takes at most 500 writes.
+      for (let i = 0; i < mine.docs.length; i += 400) {
+        const batch = writeBatch(db);
+        mine.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
     },
   };
 }

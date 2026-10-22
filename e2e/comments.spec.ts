@@ -194,9 +194,13 @@ test('on a phone the thread is a sheet from the bottom, with 44px buttons and a 
   expect(await sheet.getByLabel('Add a comment').evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
   await sheet.getByRole('button', { name: 'Comment', exact: true }).tap();
   await expect(sheet.getByText('From my phone')).toBeVisible();
-  // A tap above the sheet closes it.
-  await bob.mouse.click(200, 100);
+  // A tap above the sheet, on the scrim, closes it, and goes no further (code review): the note under it isn't touched.
+  const text = await box(tentCard(bob).getByLabel('Note text'));
+  await bob.touchscreen.tap(text.x + 20, text.y + 10);
   await expect(sheet).toHaveCount(0);
+  await expect(tentCard(bob).getByLabel('Note text')).not.toBeFocused();
+  await bob.waitForTimeout(300);
+  await expect(tentCard(bob).getByLabel('Note text')).not.toBeFocused();
   expect(await bob.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect([...alice.errors, ...bob.errors]).toEqual([]);
 });

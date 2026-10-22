@@ -194,7 +194,55 @@ describe('deleting', () => {
   });
 });
 
+describe('deleting an account', () => {
+  it('deleteMyComments takes only this person’s comments off a board (for deleting their account); not someone else’s', async () => {
+    const { alice, bob, cat, shareId, note } = await setup();
+    await bob.sharing.addComment(shareId, note, 'mine');
+    await cat.sharing.addComment(shareId, note, 'cat’s');
+    await alice.sharing.addComment(shareId, note, 'alice’s');
+    await bob.backend.deleteMyComments(shareId);
+    expect(server.shares.get(shareId)!.comments.map((c) => c.author)).toEqual(['cat', 'alice']);
+    // Not on it: nothing to delete, and no failure (it may have been removed, or the board deleted).
+    await device('zed').backend.deleteMyComments(shareId);
+  });
+});
+
 describe('the “new” dot, remembered on this device (D2)', () => {
+  it('only others’ comments count for “seen”: this person’s own (whose time may still be this device’s guess) never moves it', async () => {
+    const { alice, bob, shareId, note } = await setup();
+    await bob.sharing.addComment(shareId, note, 'hi');
+    await settle();
+    const at = server.shares.get(shareId)!.comments[0].at;
+    await alice.sharing.addComment(shareId, note, 'mine, later');
+    await settle();
+    alice.sharing.markSeen(shareId, note);
+    expect(alice.store.getState().ui.shares[0].seen?.[note]).toBe(at);
+  });
+
+  it('another tab’s “seen” is kept, not written over', async () => {
+    const { alice, bob, cat, shareId, note } = await setup();
+    alice.store.addCard('note');
+    const other = alice.store.getState().ui.selection[0];
+    await settle();
+    await bob.sharing.addComment(shareId, note, 'one');
+    await cat.sharing.addComment(shareId, other, 'two');
+    await settle();
+    const tab2 = device('alice', alice.storage);
+    await settle();
+    alice.sharing.markSeen(shareId, note);
+    tab2.sharing.markSeen(shareId, other);
+    expect(Object.keys(JSON.parse(alice.storage.data.get(commentsSeenKey('alice'))!)).sort()).toEqual([`${shareId}/${note}`, `${shareId}/${other}`].sort());
+  });
+
+  it('a shared board that goes from this device takes its “seen” with it', async () => {
+    const { bob, alice, shareId, note } = await setup();
+    await alice.sharing.addComment(shareId, note, 'hi');
+    await settle();
+    bob.sharing.markSeen(shareId, note);
+    await bob.sharing.leave(shareId);
+    expect(JSON.parse(bob.storage.data.get(commentsSeenKey('bob'))!)).toEqual({});
+  });
+
   it('seen up to the newest comment when a thread is opened; kept on the device for that person', async () => {
     const { alice, bob, shareId, note } = await setup();
     await bob.sharing.addComment(shareId, note, 'hi');

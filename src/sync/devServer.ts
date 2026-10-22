@@ -41,7 +41,7 @@ async function call(server: CollabServer, req: IncomingMessage, res: ServerRespo
   res.setHeader('Content-Type', 'application/json');
   try {
     const { who, method, args } = JSON.parse(await readBody(req)) as { who: Person; method: string; args: unknown[] };
-    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare', 'addComment', 'resolveComment', 'deleteComment'];
+    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare', 'addComment', 'resolveComment', 'deleteComment', 'deleteMyComments'];
     if (!allowed.includes(method)) throw new Error('Unknown call');
     const fn = (server as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method];
     const ok = await fn(who, ...args);

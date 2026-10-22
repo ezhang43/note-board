@@ -136,6 +136,13 @@ describe('accountRemote', () => {
     expect(fs.docs.get('boards/me')).toEqual({ data: '{}', client: 'page1', updatedAt: 1 });
   });
 
+  it('leaving a board shared with them deletes the comments they wrote on it first, then their record (job 161, PR 4: their name and photo go)', async () => {
+    const calls: string[] = [];
+    const both = { deleteMyComments: async (id: string) => void calls.push(`comments ${id}`), leave: async (id: string) => void calls.push(`leave ${id}`) } as unknown as CollabBackend;
+    await accountRemote(user, both, 'page1').leave('s2');
+    expect(calls).toEqual(['comments s2', 'leave s2']);
+  });
+
   it('the sign-in is deleted with Firebase’s own call', async () => {
     await accountRemote(user, shares, 'page1').deleteUser();
     expect(fs.deleteUser).toHaveBeenCalledWith(user);

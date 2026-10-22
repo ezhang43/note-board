@@ -129,6 +129,8 @@ export interface CollabBackend {
   resolveComment(id: string, commentId: string, resolved: boolean): Promise<void>;
   /** Its author, or the person who shared the board. */
   deleteComment(id: string, commentId: string): Promise<void>;
+  /** Every comment this person wrote on it (deleting their account); nothing if they aren't on it. */
+  deleteMyComments(id: string): Promise<void>;
 }
 
 /**
@@ -154,6 +156,7 @@ export interface CollabServer {
   addComment(who: Person, id: string, comment: NewComment): Promise<void>;
   resolveComment(who: Person, id: string, commentId: string, resolved: boolean): Promise<void>;
   deleteComment(who: Person, id: string, commentId: string): Promise<void>;
+  deleteMyComments(who: Person, id: string): Promise<void>;
 }
 
 /** A CollabBackend for `me` on top of a CollabServer. */
@@ -184,6 +187,7 @@ export function serverBackend(server: CollabServer, me: Person): CollabBackend {
     addComment: (id, comment) => server.addComment(me, id, comment),
     resolveComment: (id, commentId, resolved) => server.resolveComment(me, id, commentId, resolved),
     deleteComment: (id, commentId) => server.deleteComment(me, id, commentId),
+    deleteMyComments: (id) => server.deleteMyComments(me, id),
   };
 }
 
@@ -388,6 +392,13 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       const c = s?.comments.find((x) => x.id === commentId);
       check(Boolean(c) && (c!.author === who.uid || s!.owner === who.uid));
       s!.comments = s!.comments.filter((x) => x !== c);
+      notify();
+    },
+    async deleteMyComments(who, id) {
+      check(true);
+      const s = shares.get(id);
+      if (!s || !member(who, s)) return;
+      s.comments = s.comments.filter((x) => x.author !== who.uid);
       notify();
     },
   };

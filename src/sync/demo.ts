@@ -104,6 +104,7 @@ export function demoBackend(person: Person) {
     addComment: async (_who, ...args) => void (await call('addComment', ...args)),
     resolveComment: async (_who, ...args) => void (await call('resolveComment', ...args)),
     deleteComment: async (_who, ...args) => void (await call('deleteComment', ...args)),
+    deleteMyComments: async (_who, ...args) => void (await call('deleteMyComments', ...args)),
   };
   return serverBackend(server, person);
 }
@@ -148,7 +149,7 @@ export async function startDemo(person: Person) {
     sharing.stop();
     let done: { shareIds: string[] };
     try {
-      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: backend.leave, markDeleting: async () => {}, unmarkDeleting: () => {}, deleteOwnData: async () => {}, markDeleted: async () => {}, deleteUser: async () => {} });
+      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: async (id) => (await backend.deleteMyComments(id), await backend.leave(id)), markDeleting: async () => {}, unmarkDeleting: () => {}, deleteOwnData: async () => {}, markDeleted: async () => {}, deleteUser: async () => {} });
     } catch (e) {
       sharing = start();
       throw e;

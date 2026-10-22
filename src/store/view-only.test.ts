@@ -283,14 +283,16 @@ describe('sharing with a read-only role', () => {
   });
 
   it('the notice says the change is kept in Version history only when it is: not over its size limit (PR 3 leftover)', async () => {
-    for (const limit of [undefined, 10]) {
-      const versions: VersionStore = { ...localVersionStore(memoryStorage()), ...(limit ? { limit } : {}) };
+    for (const limit of [undefined, 10, 'fails'] as const) {
+      const local = localVersionStore(memoryStorage());
+      // 'fails': saving the version is refused (storage full, say): nothing is kept either (code review).
+      const versions: VersionStore = limit === 'fails' ? { ...local, save: async () => Promise.reject(new Error('full')) } : { ...local, ...(limit ? { limit } : {}) };
       const { alice, bob, shareId, note } = await shared('edit', undefined, false, versions);
       bob.store.setNoteText(note, 'Tent and stove');
       await alice.sharing.setRole(shareId, 'bob', 'view');
       for (let i = 0; i < 5; i++) await settle();
       expect(bob.notices).toHaveLength(1);
-      if (limit) expect(bob.notices[0]).not.toContain('Version history');
+      if (limit) expect(bob.notices[0], String(limit)).not.toContain('Version history');
       else expect(bob.notices[0]).toContain('It’s kept in Version history.');
       collab.setNotice(null);
     }

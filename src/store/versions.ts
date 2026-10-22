@@ -30,8 +30,7 @@ export interface VersionStore {
 // note says why. simple: shared boards' versions saved apart, so they don't count, is a later job.
 export const TOO_BIG_NOTE = 'Your boards are now too big for Version history, so new versions (and copies of deleted boards) aren’t being saved. Removing boards or long notes you don’t need makes room.';
 export const TOO_BIG_RESTORE = 'Couldn’t restore it. Your boards are too big for Version history, so they couldn’t be saved first.';
-/** Whether `data` (every board) is too big for `versions`. */
-export const tooBig = (versions: VersionStore, data: string) => versions.limit !== undefined && overLimit(data, versions.limit);
+const tooBig = (versions: VersionStore, data: string) => versions.limit !== undefined && overLimit(data, versions.limit);
 /** The note, unless another is showing (it may say something more urgent, such as changes not being saved). */
 const tellTooBig = () => void (collab.notice() || collab.setNotice(TOO_BIG_NOTE));
 /** A restore refused because the boards as they are are too big to keep first. */

@@ -78,11 +78,12 @@ describe('who can use BusyAnts', () => {
 
   it('a shared board is read and changed only by the people it is shared with; joining needs the current link', () => {
     expect(rules).toContain('allow read: if isMember();');
-    expect(rules).toContain('request.resource.data.key == share().link');
+    // Job 161: the key is checked in the joins record, and gives the role of its link (rules/share-roles.test.ts).
+    expect(rules).toContain('keyFor(getAfter(joinPath()).data.key, newRole())');
     expect(rules).toContain('request.resource.data.rev == resource.data.rev + 1');
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
     // A member's photo is only ever a secure web address (review fix).
-    expect(rules).toContain("request.resource.data.photo.matches('https://.*')");
+    expect(rules).toContain("photo.matches('https://.*')");
   });
 
   it('after deleting an account, the sign-in screen says so (job #63)', () => {
@@ -96,7 +97,7 @@ describe('who can use BusyAnts', () => {
     expect(rules.match(/allow read, delete: if isOwner\(uid\);/g)?.length).toBe(4);
     // The boards they shared, everyone's records on those, and their own record on anyone's.
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
-    expect(rules).toContain('(request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid)');
+    expect(rules).toContain('get(sharePath()).data.owner == request.auth.uid && (!existsAfter(sharePath()) || linksChanged())');
   });
 
   it('feedback (job #69): only a verified signed-in person can send it, as themselves, and no one can read, change or delete it from the app', () => {

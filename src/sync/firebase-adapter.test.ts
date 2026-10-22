@@ -61,7 +61,8 @@ vi.mock('firebase/firestore', () => ({
   writeBatch: () => {
     const ops: { op: string; path: string; value?: Data }[] = [];
     return {
-      set: (ref: string, value: Data) => void ops.push({ op: 'set', path: ref, value }),
+      set: (ref: string, value: Data, o?: { merge?: boolean }) => void ops.push({ op: o?.merge ? 'update' : 'set', path: ref, value }),
+      update: (ref: string, value: Data) => void ops.push({ op: 'update', path: ref, value }),
       delete: (ref: string | { path?: string }) => void ops.push({ op: 'delete', path: typeof ref === 'string' ? ref : String(ref) }),
       commit: async () => {
         fs.state.commits.push({ kind: 'batch', ops });
@@ -73,6 +74,8 @@ vi.mock('firebase/firestore', () => ({
     const ops: { op: string; path: string; value?: Data }[] = [];
     const out = await fn({
       get: async (ref: string) => fs.snap(ref),
+      // A merged set changes only the fields given, as an update does (here it may also make the record).
+      set: (ref: string, value: Data, o?: { merge?: boolean }) => void ops.push({ op: o?.merge ? 'update' : 'set', path: ref, value }),
       update: (ref: string, value: Data) => void ops.push({ op: 'update', path: ref, value }),
       delete: (ref: string) => void ops.push({ op: 'delete', path: ref }),
     });
@@ -116,20 +119,40 @@ describe('removing someone from a shared board (G14)', () => {
     await collabRemote(user).removePerson('s1', 'u2', 'k2');
     expect(fs.state.commits).toHaveLength(1);
     expect(fs.state.commits[0].kind).toBe('transaction');
+    // Job 161: the new key goes in the private record, and one still in the share moves out of it.
     expect(fs.state.commits[0].ops).toEqual([
       { op: 'delete', path: 'shared/s1/members/u2' },
-      { op: 'update', path: 'shared/s1', value: { link: 'k2' } },
+      { op: 'delete', path: 'shared/s1/joins/u2' },
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k2' } },
+      { op: 'update', path: 'shared/s1', value: { link: null } },
     ]);
     expect(fs.docs.has('shared/s1/members/u2')).toBe(false);
-    expect(fs.docs.get('shared/s1')!.link).toBe('k2');
+    expect(fs.docs.get('shared/s1/private/links')!.edit).toBe('k2');
+    expect(fs.docs.get('shared/s1')!.link).toBeNull();
     expect(fs.docs.has('shared/s1/members/u1')).toBe(true);
+  });
+
+  it('changes a key kept in the private record (job 161)', async () => {
+    seedShare(null);
+    fs.docs.set('shared/s1/private/links', { edit: 'k' });
+    await collabRemote(user).removePerson('s1', 'u2', 'k2');
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'delete', path: 'shared/s1/members/u2' },
+      { op: 'delete', path: 'shared/s1/joins/u2' },
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k2' } },
+    ]);
   });
 
   it('a link turned off stays off (decided from the online copy, not the caller)', async () => {
     seedShare(null);
+    fs.docs.set('shared/s1/private/links', { edit: null });
     await collabRemote(user).removePerson('s1', 'u2', 'k2');
-    expect(fs.state.commits[0].ops).toEqual([{ op: 'delete', path: 'shared/s1/members/u2' }]);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'delete', path: 'shared/s1/members/u2' },
+      { op: 'delete', path: 'shared/s1/joins/u2' },
+    ]);
     expect(fs.docs.get('shared/s1')!.link).toBeNull();
+    expect(fs.docs.get('shared/s1/private/links')!.edit).toBeNull();
   });
 
   it('a share that is gone is refused as "not allowed", and nothing is written', async () => {
@@ -171,12 +194,23 @@ describe('saving a shared board (G15)', () => {
 });
 
 describe('deleting a shared board (G16)', () => {
-  it('deletes every person record and the share in one batch, then the owner’s list entry', async () => {
+  it('deletes every person, joins and links record and the share in one batch, then the owner’s list entry', async () => {
     seedShare('k', ['u1', 'u2', 'u3']);
     fs.docs.set('boards/u1/shared/s1', { joinedAt: 1 });
+    fs.docs.set('shared/s1/private/links', { edit: 'k' });
+    fs.docs.set('shared/s1/joins/u2', { key: 'k' });
     await collabRemote(user).deleteShare('s1');
     expect(fs.state.commits).toHaveLength(1);
-    expect(fs.state.commits[0].ops.map((o) => `${o.op} ${o.path}`).sort()).toEqual(['delete shared/s1', 'delete shared/s1/members/u1', 'delete shared/s1/members/u2', 'delete shared/s1/members/u3']);
+    expect(fs.state.commits[0].ops.map((o) => `${o.op} ${o.path}`).sort()).toEqual([
+      'delete shared/s1',
+      'delete shared/s1/joins/u1',
+      'delete shared/s1/joins/u2',
+      'delete shared/s1/joins/u3',
+      'delete shared/s1/members/u1',
+      'delete shared/s1/members/u2',
+      'delete shared/s1/members/u3',
+      'delete shared/s1/private/links',
+    ]);
     expect(fs.state.deletes).toEqual(['boards/u1/shared/s1']);
     expect([...fs.docs.keys()]).toEqual([]);
   });

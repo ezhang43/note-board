@@ -167,6 +167,11 @@ describe('accountKeys', () => {
     );
   });
 
+  it('copies kept of an unreadable save go too (job #160)', () => {
+    const got = accountKeys(['note-board:v1:unreadable', 'note-board:v1:unreadable-2', 'note-board:view:v1'], 'me', [], null);
+    expect(got).toEqual(['note-board:v1:unreadable', 'note-board:v1:unreadable-2', 'note-board:view:v1']);
+  });
+
   it('a damaged kept list of shares is ignored', () => {
     expect(accountKeys(keys, 'me', [], '{not json')).not.toContain('note-board:share-base:s2');
   });

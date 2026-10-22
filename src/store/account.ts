@@ -1,5 +1,5 @@
 import { planShares, type ShareOwner } from '../model/account';
-import { BOARD_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
+import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
 import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { ACCESS_KEY } from '../model/calendar';
 import { baseKey, ownBoardsKey, sharesKey } from './sharing';
@@ -144,7 +144,7 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
 /**
  * The keys in this device's storage (`keys`, all of them) that hold person `uid`'s data once their
  * account is deleted: the boards, which board is open and where it was looked at, version history
- * kept on the device, their list of shares (`kept`: its saved text) and each share's last agreed
+ * kept on the device, copies kept of a save that couldn't be read (job #160), their list of shares (`kept`: its saved text) and each share's last agreed
  * version, their own-boards list, and their boards kept aside (job #145; which account the device's boards belong to stays, so they are never taken for the next account's). Never another account's, nor this device's settings (dark
  * mode, text size, the tour, the focus timer, the calendar's width). The Google Calendar access kept
  * on the device (job 107) goes too: it isn't a setting (one per device, so a demo person's has no prefix).
@@ -157,6 +157,6 @@ export function accountKeys(keys: string[], uid: string, shareIds: string[], kep
     if (key === ACCESS_KEY) return true;
     if (!key.startsWith(prefix)) return false;
     const k = key.slice(prefix.length);
-    return exact.has(k) || k.startsWith(dataKey(''));
+    return exact.has(k) || k.startsWith(dataKey('')) || k.startsWith(UNREADABLE_KEY);
   });
 }

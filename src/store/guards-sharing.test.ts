@@ -48,7 +48,7 @@ describe('a list of shares from the offline copy never takes a share away (G21)'
     const bob = createStore(storage, (fn) => fn());
     const bobSharing = startSharing(bob, server.backendFor(person('bob')), { client: 'bob-page-1', storage });
     await settle();
-    const joined = bobSharing.join(shareId, server.shares.get(shareId)!.link!);
+    const joined = bobSharing.join(shareId, server.shares.get(shareId)!.links.edit!);
     await settle();
     await joined;
     bobSharing.stop();

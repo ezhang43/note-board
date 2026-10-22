@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   remotes: new Map<string, unknown>(),
   server: null as unknown as {
     control: { refuse: boolean; offline: boolean };
-    shares: Map<string, { data: string; rev: number; link: string }>;
+    shares: Map<string, { data: string; rev: number; links: { edit: string } }>;
     backendFor: (who: { uid: string; name: string; photo: null }) => Record<string, unknown>;
   },
   account: null as unknown,
@@ -458,9 +458,9 @@ describe('session: shared boards', () => {
     const board = s.appStore.newBoard();
     await s.collab.sharing()!.share(board);
     await settle();
-    const [id, stored] = [...h.server.shares.entries()][0] as [string, { link: string }];
+    const [id, stored] = [...h.server.shares.entries()][0] as [string, { links: { edit: string } }];
     h.userCb!(null);
-    loc.search = `?join=${id}.${stored.link}`;
+    loc.search = `?join=${id}.${stored.links.edit}`;
     loc.href = `https://x/${loc.search}`;
     await signInReady(alice);
     await settle();

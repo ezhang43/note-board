@@ -23,11 +23,13 @@ import {
   updateDoc,
   waitForPendingWrites,
   writeBatch,
+  type DocumentData,
   type DocumentSnapshot,
   type QuerySnapshot,
+  type Transaction,
 } from 'firebase/firestore';
 import type { AccountBackend } from '../store/account';
-import { personFrom, type CollabBackend, type ShareDoc } from '../store/collab';
+import { NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 import { app } from './firebase';
@@ -250,9 +252,34 @@ export function collabRemote(user: User): CollabBackend {
   const memberRef = (id: string, uid: string) => doc(db, 'shared', id, 'members', uid);
   const joinRef = (id: string, uid: string) => doc(db, 'shared', id, 'joins', uid);
   const mineRef = (id: string) => doc(db, 'boards', me.uid, 'shared', id);
-  // simple: every member is an editor until the Share panel offers comment and view links (job 161, PR 2).
-  const myRecord = () => ({ name: me.name, photo: me.photo, role: 'edit', joinedAt: serverTimestamp() });
   const notAllowed = () => Object.assign(new Error('Not allowed'), { code: 'permission-denied' });
+  /** A member record's role (none, from before roles, or one not known, is edit, as in the rules). */
+  const roleOf = (d: DocumentData | undefined): Role => (ROLES.includes(d?.role) ? d!.role : 'edit');
+  /** The links record's keys (only text counts) and whether roles are in use (a comment or view field is there). */
+  const linksIn = (d: DocumentData | undefined): Links => {
+    const key = (r: Role) => (typeof d?.[r] === 'string' ? (d[r] as string) : null);
+    return { edit: key('edit'), comment: key('comment'), view: key('view'), roles: Boolean(d && ('comment' in d || 'view' in d)) };
+  };
+  /**
+   * In a transaction: the share (refused as "not allowed" once it is gone), its links, and a key
+   * still kept in the share itself (one from before, counted as the edit key).
+   */
+  async function readLinks(tx: Transaction, id: string) {
+    const snap = await tx.get(shareRef(id));
+    if (!snap.exists()) throw notAllowed();
+    const old = typeof snap.data().link === 'string' ? (snap.data().link as string) : null;
+    const links = linksIn((await tx.get(linksRef(id))).data());
+    return { links: { ...links, edit: links.edit ?? old }, old };
+  }
+  /**
+   * In a transaction: every link of `roles` that is on gets its key from `keys`, a key still in the
+   * share moving to the private record with it (job 161).
+   */
+  function changeLinks(tx: Transaction, id: string, now: { links: Links; old: string | null }, roles: readonly Role[], keys: NewKeys) {
+    const next = Object.fromEntries(roles.filter((r) => now.links[r] !== null).map((r) => [r, keys[r]]));
+    if (Object.keys(next).length) tx.set(linksRef(id), next, { merge: true });
+    if (now.old && 'edit' in next) tx.update(shareRef(id), { link: null });
+  }
   return {
     me,
     watchMyShares(onChange, onError) {
@@ -265,14 +292,17 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchShare(id, onChange, onError) {
-      let last: ShareDoc | null = null;
-      // The key in the private record (null while off, or kept in the share: one from before), once
-      // that record has answered. Till then the link isn't given as off (undefined: the last one stays),
-      // so a click on "Turn link on" can't replace a working link.
+      /** The share, with the key still kept in it (one from before), if any. */
+      let last: (Omit<ShareDoc, 'links'> & { link: string | null }) | null = null;
+      // The links in the private record (each null while off; the edit key may still be kept in the
+      // share: one from before), once that record has answered. Till then they aren't given as off
+      // (undefined: the last ones stay), so a click on "Turn links on" can't replace a working link.
       let known = false;
-      let key: string | null = null;
+      let got: Links = NO_LINKS;
       const send = () => {
-        if (last) onChange({ ...last, link: known ? (key ?? last.link) : (last.link ?? undefined) });
+        if (!last) return;
+        const { link, ...share } = last;
+        onChange({ ...share, links: known ? { ...got, edit: got.edit ?? link } : link ? { ...NO_LINKS, edit: link } : undefined });
       };
       const stopShare = watchAllowed(
         (next, refused) => onSnapshot(shareRef(id), next, refused),
@@ -296,14 +326,13 @@ export function collabRemote(user: User): CollabBackend {
         (snap: DocumentSnapshot) => {
           // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
           if (!snap.exists() && snap.metadata.fromCache) return;
-          const edit = snap.exists() ? snap.data().edit : null;
           known = true;
-          key = typeof edit === 'string' ? edit : null;
+          got = linksIn(snap.data());
           send();
         },
         () => {
           known = true;
-          key = null;
+          got = NO_LINKS;
           send();
         },
       );
@@ -318,9 +347,9 @@ export function collabRemote(user: User): CollabBackend {
         (snap: QuerySnapshot) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
           const people = snap.docs
-            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, at: when(d.data().joinedAt) }))
+            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, role: roleOf(d.data()), at: when(d.data().joinedAt) }))
             .sort((a, b) => a.at - b.at)
-            .map(({ uid, name, photo }) => ({ uid, name, photo }));
+            .map(({ uid, name, photo, role }) => ({ uid, name, photo, role }));
           onChange(people);
         },
         onError,
@@ -342,7 +371,7 @@ export function collabRemote(user: User): CollabBackend {
       const batch = writeBatch(db);
       batch.set(shareRef(id), { owner: me.uid, root, link: null, data, client, rev: 1, updatedAt: serverTimestamp() });
       batch.set(linksRef(id), { edit: link });
-      batch.set(memberRef(id, me.uid), myRecord());
+      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, role: 'edit', joinedAt: serverTimestamp() });
       batch.set(mineRef(id), { joinedAt: serverTimestamp() });
       await batch.commit();
     },
@@ -352,17 +381,34 @@ export function collabRemote(user: User): CollabBackend {
       // simple: any other answer (offline, say) counts as "maybe on it": nobody is taken off then, so
       // a newcomer could stay on a refused share, invisible (rare); and the read and the write are two
       // steps, so a join from another tab in between isn't seen. Upgrade if either shows up.
-      const added = await getDocFromServer(memberRef(id, me.uid)).then(
-        (snap) => !snap.exists(),
-        (e: unknown) => (e as { code?: string }).code === 'permission-denied',
+      const had = await getDocFromServer(memberRef(id, me.uid)).then(
+        (snap) => (snap.exists() ? roleOf(snap.data()) : null),
+        (e: unknown) => ((e as { code?: string }).code === 'permission-denied' ? null : undefined),
       );
-      // The key goes in a record nobody can read, in the same step (job 161): the rules check it there.
-      const batch = writeBatch(db);
-      batch.set(joinRef(id, me.uid), { key });
-      batch.set(memberRef(id, me.uid), myRecord());
-      batch.set(mineRef(id), { joinedAt: serverTimestamp() });
-      await batch.commit();
-      return added;
+      // The key goes in a record nobody can read, in the same step (job 161): the rules check it there
+      // and allow only the role of that key. Which role that is only the rules know (the links are
+      // hidden from all but editors), so each is tried from the highest down, stopping at the role
+      // the person already has: their own record may always be written again with it, so opening a
+      // lower-role link never lowers them.
+      // simple: up to three tries (each refused one is a round trip); a hint in the link would save
+      // them, at the cost of links people could edit. Upgrade if joining feels slow.
+      const tries = had ? ROLES.slice(0, ROLES.indexOf(had) + 1) : ROLES;
+      let refused: unknown = notAllowed();
+      for (const role of tries) {
+        const batch = writeBatch(db);
+        batch.set(joinRef(id, me.uid), { key });
+        // Merged: someone already on it keeps their place in the list, and an old key the rules want unchanged.
+        batch.set(memberRef(id, me.uid), had ? { name: me.name, photo: me.photo, role } : { name: me.name, photo: me.photo, role, joinedAt: serverTimestamp() }, { merge: true });
+        batch.set(mineRef(id), { joinedAt: serverTimestamp() });
+        try {
+          await batch.commit();
+          return had === null;
+        } catch (e) {
+          if ((e as { code?: string }).code !== 'permission-denied') throw e;
+          refused = e;
+        }
+      }
+      throw refused;
     },
     async leave(id) {
       // One batch (main session check, 2026-10-06): off the board and off their list together, or
@@ -374,26 +420,45 @@ export function collabRemote(user: User): CollabBackend {
       batch.delete(mineRef(id));
       await batch.commit();
     },
-    removePerson(id, uid, newKey) {
-      // One transaction: removed and the link changed together, or neither; whether the link is on
-      // is read online, so a link turned off on another device stays off. A key still in the share
-      // (one from before) moves to the private record.
+    removePerson(id, uid, keys) {
+      // One transaction: removed and every link that is on changed together, or neither; which links
+      // are on is read online, so a link turned off on another device stays off.
       return runTransaction(db, async (tx) => {
-        const snap = await tx.get(shareRef(id));
-        if (!snap.exists()) throw notAllowed();
-        const links = await tx.get(linksRef(id));
+        const now = await readLinks(tx, id);
         tx.delete(memberRef(id, uid));
         tx.delete(joinRef(id, uid));
-        const old = typeof snap.data().link === 'string';
-        if (old || typeof links.data()?.edit === 'string') tx.set(linksRef(id), { edit: newKey }, { merge: true });
-        if (old) tx.update(shareRef(id), { link: null });
+        changeLinks(tx, id, now, ROLES, keys);
       });
     },
-    async setLink(id, key) {
-      const batch = writeBatch(db);
-      batch.set(linksRef(id), { edit: key }, { merge: true });
-      batch.update(shareRef(id), { link: null });
-      await batch.commit();
+    makeLink(id, role, keys) {
+      return runTransaction(db, async (tx) => {
+        const now = await readLinks(tx, id);
+        const next: Partial<Record<Role, string>> = { [role]: keys[role] };
+        // D1: the first comment or view link changes an edit link that is on, in the same step.
+        if (role !== 'edit' && !now.links.roles && now.links.edit !== null) next.edit = keys.edit;
+        tx.set(linksRef(id), next, { merge: true });
+        if (now.old && next.edit) tx.update(shareRef(id), { link: null });
+      });
+    },
+    linksOff(id) {
+      return runTransaction(db, async (tx) => {
+        const now = await readLinks(tx, id);
+        // Before roles are in use no comment or view field is added (that would shut out the app from before roles).
+        tx.set(linksRef(id), now.links.roles ? { edit: null, comment: null, view: null } : { edit: null }, { merge: true });
+        if (now.old) tx.update(shareRef(id), { link: null });
+      });
+    },
+    setRole(id, uid, role, keys) {
+      return runTransaction(db, async (tx) => {
+        const now = await readLinks(tx, id);
+        const member = await tx.get(memberRef(id, uid));
+        if (!member.exists()) throw notAllowed();
+        const had = roleOf(member.data());
+        if (had === role) return;
+        tx.update(memberRef(id, uid), { role });
+        // Lowered: the links above the new role that are on change (they may have seen them).
+        if (ROLES.indexOf(role) > ROLES.indexOf(had)) changeLinks(tx, id, now, ROLES.slice(0, ROLES.indexOf(role)), keys);
+      });
     },
     async deleteShare(id) {
       // Its member, joins and links records go with it (security review fix), so if its id were ever

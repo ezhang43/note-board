@@ -176,7 +176,7 @@ describe('which boards a shared board holds: a card to one of your own boards (2
 });
 
 describe('what this person may do with a board', () => {
-  const share = (owner: boolean) => ({ id: 's1', root: 'trip', boards: ['trip', 'days'], owner, ownerUid: 'a', people: [], link: null });
+  const share = (owner: boolean) => ({ id: 's1', root: 'trip', boards: ['trip', 'days'], owner, ownerUid: 'a', people: [], links: { edit: null, comment: null, view: null, roles: false } });
 
   it('their own boards: everything, but the home board can’t be deleted', () => {
     expect(boardRights([], 'trip', 'home')).toEqual({ rename: true, delete: true, deleteForEveryone: false, restore: true });

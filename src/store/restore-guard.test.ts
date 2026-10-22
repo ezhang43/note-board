@@ -40,7 +40,7 @@ function setup(owner: boolean) {
   rename(mine, 'Mine now');
   rename(home, 'Home now');
   // (Set last: a board shared with them can't be renamed here.)
-  store.setShares([{ id: 's1', root: trip, boards: [trip, days], owner, ownerUid: 'alice', people: [], link: null }], true);
+  store.setShares([{ id: 's1', root: trip, boards: [trip, days], owner, ownerUid: 'alice', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
   return { store, versions, home, trip, days, mine, backup };
 }
 

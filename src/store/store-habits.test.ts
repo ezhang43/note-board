@@ -141,7 +141,7 @@ describe('Habits panel', () => {
     const shared = s.newBoard();
     s.renameBoard('Habits');
     s.openBoard(home);
-    s.setShares([{ id: 's1', root: shared, boards: [shared], owner: false, ownerUid: 'alice', people: [], link: null }], true);
+    s.setShares([{ id: 's1', root: shared, boards: [shared], owner: false, ownerUid: 'alice', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     s.openHabits();
     s.addHabit('Walk');
     expect(s.habitsBoard()).not.toBe(shared);
@@ -153,7 +153,7 @@ describe('Habits panel', () => {
     s.openHabits();
     const id = s.addHabit('Walk')!;
     const board = s.habitsBoard()!;
-    s.setShares([{ id: 's1', root: board, boards: [board], owner: true, ownerUid: 'me', people: [], link: null }], true);
+    s.setShares([{ id: 's1', root: board, boards: [board], owner: true, ownerUid: 'me', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     const before = s.workspace().boards[board];
     s.toggleHabitDay(id, '2026-10-19');
     s.deleteHabit(id);

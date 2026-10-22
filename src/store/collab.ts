@@ -17,17 +17,37 @@ export function personFrom(user: { uid: string; displayName?: string | null; pho
   return { uid: user.uid, name: user.displayName?.trim().slice(0, 200) || 'Someone', photo };
 }
 
+/** What someone may do on a shared board (job 161). */
+export type Role = 'edit' | 'comment' | 'view';
+export const ROLES: readonly Role[] = ['edit', 'comment', 'view'];
+/** Someone on a shared board, with their role. */
+export interface Member extends Person {
+  role: Role;
+}
+
+/**
+ * A shared board's three links (job 161): each role's secret key, or null while that link is off.
+ * Only editors are given them (null for everyone else). `roles`: a comment or view link was ever
+ * made, so the edit link already changed once for it (D1).
+ */
+export interface Links {
+  edit: string | null;
+  comment: string | null;
+  view: string | null;
+  roles: boolean;
+}
+export const NO_LINKS: Links = { edit: null, comment: null, view: null, roles: false };
+/** A new key for each role, for whichever of them a change needs. */
+export type NewKeys = Record<Role, string>;
+
 /** A shared board online: its boards' JSON (see serializeShare) and who may do what. */
 export interface ShareDoc {
   /** The person who shared it. */
   owner: string;
   /** The shared board (the others are inside it). */
   root: string;
-  /**
-   * The key in the current share link, or null when the link is turned off; undefined while not
-   * known yet (the last one known stays).
-   */
-  link: string | null | undefined;
+  /** Its links; undefined while not known yet (the last ones known stay). */
+  links: Links | undefined;
   data: string;
   /** Which open page last wrote it. */
   client: string;
@@ -49,8 +69,8 @@ export interface CollabBackend {
   watchMyShares(onChange: (ids: string[], confirmed: boolean) => void, onError: (e: unknown) => void): () => void;
   /** A shared board as it changes; null once it is deleted. onError gets NotAllowed once access is lost. */
   watchShare(id: string, onChange: (doc: ShareDoc | null) => void, onError: (e: unknown) => void): () => void;
-  /** Everyone who has a shared board (its owner first). */
-  watchPeople(id: string, onChange: (people: Person[]) => void, onError: (e: unknown) => void): () => void;
+  /** Everyone who has a shared board (its owner first), with their roles. */
+  watchPeople(id: string, onChange: (people: Member[]) => void, onError: (e: unknown) => void): () => void;
   /**
    * Reads the latest boards and writes `change(latest)` in one go: if someone else wrote in between,
    * it reads again and calls `change` again (`change` returns null to write nothing). Resolves
@@ -59,19 +79,30 @@ export interface CollabBackend {
   updateShare(id: string, change: (latest: string) => string | null, client: string): Promise<{ data: string; rev: number }>;
   createShare(id: string, root: string, link: string, data: string, client: string): Promise<void>;
   /**
-   * Joins with a share link's key (refused if the link is wrong or turned off). Resolves true only
-   * if this join added the person (they weren't on it already); when unsure, false.
+   * Joins with a share link's key (refused if the link is wrong or turned off), with the role of
+   * that link; someone already on it never gets a lower role than theirs. Resolves true only if this
+   * join added the person (they weren't on it already); when unsure, false.
    */
   join(id: string, key: string): Promise<boolean>;
   leave(id: string): Promise<void>;
   /**
-   * Owner only: removes someone and, if the link is on, changes it to `newKey`, in one go, so the
-   * copy of the link they have never lets them back in, not even for a moment. A link turned off
-   * stays off (decided online, so a page that hasn't heard of it yet can't turn it back on).
+   * Owner only: removes someone and changes every link that is on to its key in `keys`, in one go,
+   * so the copy of a link they have never lets them back in, not even for a moment. A link turned
+   * off stays off (decided online, so a page that hasn't heard of it yet can't turn it back on).
    */
-  removePerson(id: string, uid: string, newKey: string): Promise<void>;
-  /** Owner only: a new link key, or null to turn the link off. */
-  setLink(id: string, key: string | null): Promise<void>;
+  removePerson(id: string, uid: string, keys: NewKeys): Promise<void>;
+  /**
+   * Owner only: turns `role`'s link on with a new key (`keys[role]`). The first comment or view link
+   * also changes an edit link that is on to `keys.edit`, in the same step (D1).
+   */
+  makeLink(id: string, role: Role, keys: NewKeys): Promise<void>;
+  /** Owner only: turns all three links off (D4). */
+  linksOff(id: string): Promise<void>;
+  /**
+   * Owner only: changes someone else's role. Lowering them changes, in the same step, every link
+   * that is on for a role above their new one (they may have seen those links).
+   */
+  setRole(id: string, uid: string, role: Role, keys: NewKeys): Promise<void>;
   /** Owner only. */
   deleteShare(id: string): Promise<void>;
 }
@@ -83,15 +114,17 @@ export interface CollabBackend {
 export interface CollabServer {
   watchMyShares(who: Person, onChange: (ids: string[]) => void, onError: (e: unknown) => void): () => void;
   watchShare(who: Person, id: string, onChange: (doc: ShareDoc | null) => void, onError: (e: unknown) => void): () => void;
-  watchPeople(who: Person, id: string, onChange: (people: Person[]) => void, onError: (e: unknown) => void): () => void;
+  watchPeople(who: Person, id: string, onChange: (people: Member[]) => void, onError: (e: unknown) => void): () => void;
   read(who: Person, id: string): Promise<{ data: string; rev: number }>;
   /** Writes only if the share is still at `rev`; false if someone wrote first. */
   write(who: Person, id: string, data: string, client: string, rev: number): Promise<boolean>;
   createShare(who: Person, id: string, root: string, link: string, data: string, client: string): Promise<void>;
   join(who: Person, id: string, key: string): Promise<boolean>;
   leave(who: Person, id: string): Promise<void>;
-  removePerson(who: Person, id: string, uid: string, newKey: string): Promise<void>;
-  setLink(who: Person, id: string, key: string | null): Promise<void>;
+  removePerson(who: Person, id: string, uid: string, keys: NewKeys): Promise<void>;
+  makeLink(who: Person, id: string, role: Role, keys: NewKeys): Promise<void>;
+  linksOff(who: Person, id: string): Promise<void>;
+  setRole(who: Person, id: string, uid: string, role: Role, keys: NewKeys): Promise<void>;
   deleteShare(who: Person, id: string): Promise<void>;
 }
 
@@ -114,20 +147,27 @@ export function serverBackend(server: CollabServer, me: Person): CollabBackend {
     createShare: (id, root, link, data, client) => server.createShare(me, id, root, link, data, client),
     join: (id, key) => server.join(me, id, key),
     leave: (id) => server.leave(me, id),
-    removePerson: (id, uid, newKey) => server.removePerson(me, id, uid, newKey),
-    setLink: (id, key) => server.setLink(me, id, key),
+    removePerson: (id, uid, keys) => server.removePerson(me, id, uid, keys),
+    makeLink: (id, role, keys) => server.makeLink(me, id, role, keys),
+    linksOff: (id) => server.linksOff(me, id),
+    setRole: (id, uid, role, keys) => server.setRole(me, id, uid, role, keys),
     deleteShare: (id) => server.deleteShare(me, id),
   };
 }
 
-interface Stored extends ShareDoc {
-  people: Person[];
+interface Stored extends Omit<ShareDoc, 'links'> {
+  links: Links;
+  people: Member[];
 }
+
+const rank = (role: Role) => ROLES.length - ROLES.indexOf(role);
 
 /**
  * A pretend server kept in memory, with the same rules as firestore.rules: only people a board is
- * shared with can read or change it; joining needs the current link; only the owner turns the link
- * off, removes people or deletes it. Changes reach watchers a moment later, as over a network.
+ * shared with can read it, and only its editors change it; joining needs a current link, and gives
+ * that link's role (never lowering someone already on it); only editors see the links; only the
+ * owner changes links or roles, removes people or deletes it, and removing or lowering someone
+ * changes the links they may have. Changes reach watchers a moment later, as over a network.
  * `offline` makes every call fail, as without a connection.
  */
 export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTimeout(fn, 0)) {
@@ -138,7 +178,11 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
   const control = { offline: false, refuse: false, writes: 0 };
   const notify = () => deliver(() => watchers.forEach((w) => w()));
   const myIds = (uid: string) => [...(mine.get(uid) ?? [])].sort();
-  const member = (who: Person, s: Stored | undefined) => Boolean(s && s.people.some((p) => p.uid === who.uid));
+  const roleIn = (who: Person, s: Stored | undefined) => s?.people.find((p) => p.uid === who.uid)?.role ?? null;
+  const member = (who: Person, s: Stored | undefined) => roleIn(who, s) !== null;
+  const owns = (who: Person, s: Stored | undefined) => Boolean(s && s.owner === who.uid);
+  /** Every link that is on, for `roles`, gets its new key. */
+  const change = (s: Stored, roles: readonly Role[], keys: NewKeys) => roles.forEach((r) => s.links[r] !== null && (s.links[r] = keys[r]));
   const check = (ok: boolean) => {
     if (control.offline) throw new Error('offline');
     if (!ok) throw new NotAllowed('Not allowed');
@@ -180,8 +224,9 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
           stop();
           return onError(new NotAllowed('No longer shared with you'));
         }
-        const doc = { owner: s.owner, root: s.root, link: s.link, data: s.data, client: s.client, rev: s.rev };
-        const now = JSON.stringify([doc.rev, doc.link]);
+        const links = roleIn(who, s) === 'edit' ? { ...s.links } : { ...NO_LINKS };
+        const doc = { owner: s.owner, root: s.root, links, data: s.data, client: s.client, rev: s.rev };
+        const now = JSON.stringify([doc.rev, doc.links]);
         if (now === last) return;
         last = now;
         onChange(doc);
@@ -209,7 +254,7 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     async write(who, id, data, client, rev) {
       const s = shares.get(id);
       control.writes++;
-      check(member(who, s) && !control.refuse);
+      check(roleIn(who, s) === 'edit' && !control.refuse);
       if (s!.rev !== rev) return false;
       Object.assign(s!, { data, client, rev: rev + 1 });
       notify();
@@ -217,15 +262,18 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     },
     async createShare(who, id, root, link, data, client) {
       check(!shares.has(id));
-      shares.set(id, { owner: who.uid, root, link, data, client, rev: 1, people: [who] });
+      shares.set(id, { owner: who.uid, root, links: { ...NO_LINKS, edit: link }, data, client, rev: 1, people: [{ ...who, role: 'edit' }] });
       addMine(who.uid, id);
       notify();
     },
     async join(who, id, key) {
       const s = shares.get(id);
-      check(Boolean(s && (member(who, s) || (s.link !== null && s.link === key))));
-      const added = !member(who, s);
-      if (added) s!.people = [...s!.people, who];
+      const had = roleIn(who, s);
+      const got = s ? (ROLES.find((r) => s.links[r] !== null && s.links[r] === key) ?? null) : null;
+      check(Boolean(s && (had || got)));
+      const role = s!.owner === who.uid ? 'edit' : !had || (got && rank(got) > rank(had)) ? got! : had;
+      const added = !had;
+      s!.people = added ? [...s!.people, { ...who, role }] : s!.people.map((p) => (p.uid === who.uid ? { ...p, role } : p));
       addMine(who.uid, id);
       notify();
       return added;
@@ -237,17 +285,34 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       dropMine(who.uid, id);
       notify();
     },
-    async removePerson(who, id, uid, newKey) {
+    async removePerson(who, id, uid, keys) {
       const s = shares.get(id);
-      check(Boolean(s && s.owner === who.uid && uid !== who.uid));
+      check(owns(who, s) && uid !== who.uid);
       s!.people = s!.people.filter((p) => p.uid !== uid);
-      if (s!.link !== null) s!.link = newKey;
+      change(s!, ROLES, keys);
       notify();
     },
-    async setLink(who, id, key) {
+    async makeLink(who, id, role, keys) {
       const s = shares.get(id);
-      check(Boolean(s && s.owner === who.uid));
-      s!.link = key;
+      check(owns(who, s));
+      // D1: the first comment or view link changes the edit link.
+      if (role !== 'edit' && !s!.links.roles) change(s!, ['edit'], keys);
+      s!.links = { ...s!.links, [role]: keys[role], roles: s!.links.roles || role !== 'edit' };
+      notify();
+    },
+    async linksOff(who, id) {
+      const s = shares.get(id);
+      check(owns(who, s));
+      s!.links = { ...NO_LINKS, roles: s!.links.roles };
+      notify();
+    },
+    async setRole(who, id, uid, role, keys) {
+      const s = shares.get(id);
+      const had = s?.people.find((p) => p.uid === uid)?.role;
+      check(owns(who, s) && uid !== s!.owner && Boolean(had));
+      if (had === role) return;
+      if (rank(role) < rank(had!)) change(s!, ROLES.filter((r) => rank(r) > rank(role)), keys);
+      s!.people = s!.people.map((p) => (p.uid === uid ? { ...p, role } : p));
       notify();
     },
     async deleteShare(who, id) {

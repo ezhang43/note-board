@@ -3,7 +3,7 @@ import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, savedByNewer, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
 import { readWorkspace, type Workspace } from '../model/workspace';
-import type { CollabBackend, Person, ShareDoc } from './collab';
+import { NO_LINKS, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
 import type { Store } from './store';
 import { SYNC_DELAY, type Remote, type SaveState } from './sync';
 import type { ShareInfo } from './types';
@@ -114,8 +114,8 @@ interface Share {
   root: string | null;
   owner: boolean;
   ownerUid: string;
-  link: string | null;
-  people: Person[];
+  links: Links;
+  people: Member[];
   /** The boards as last agreed with the server (null: never downloaded here). */
   base: Record<string, Board> | null;
   baseRev: number;
@@ -348,7 +348,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function publish() {
     const infos: ShareInfo[] = [...shares.values()]
       .filter((s) => s.root && s.ready)
-      .map((s) => ({ id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, link: s.link }));
+      .map((s) => ({ id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links }));
     const known = said && [...shares.values()].every((s) => s.ready);
     const ui = store.getState().ui;
     if (!deepEqual(infos, ui.shares) || known !== ui.sharesKnown) store.setShares(infos, known);
@@ -446,7 +446,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (!doc || (s.ownerUid && doc.owner !== s.ownerUid)) return gone(s, 'deleted');
     s.owner = doc.owner === backend.me.uid;
     s.ownerUid = doc.owner;
-    if (doc.link !== undefined) s.link = doc.link;
+    if (doc.links !== undefined) s.links = doc.links;
     remember();
     const now = boardsOf(s);
     // Its starting board missing here (gone from this device while the page was closed, say): the
@@ -532,12 +532,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     remember();
   }
 
-  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; link: string }, owner = false, ownerUid = '') {
+  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; links: Links }, owner = false, ownerUid = '') {
     const had = shares.get(id);
     // Opened by the list of shares before `share` got here (Firestore shows a write before it
     // resolves): what was shared is its agreed version, so text typed meanwhile is sent (review 137-A L1).
     if (had && start && !had.root && !had.base) {
-      Object.assign(had, { root: start.root, owner: start.owner, ownerUid: backend.me.uid, link: start.link, people: [backend.me], ready: true });
+      Object.assign(had, { root: start.root, owner: start.owner, ownerUid: backend.me.uid, links: start.links, people: [{ ...backend.me, role: 'edit' }], ready: true });
       agree(had, start.boards, start.rev);
       remember();
       publish();
@@ -550,8 +550,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       root: saved?.root ?? null,
       owner: start?.owner ?? owner,
       ownerUid: start ? backend.me.uid : ownerUid,
-      link: start?.link ?? null,
-      people: start ? [backend.me] : [],
+      links: start?.links ?? NO_LINKS,
+      people: start ? [{ ...backend.me, role: 'edit' }] : [],
       base: saved?.boards ?? null,
       baseRev: saved?.rev ?? 0,
       ready: Boolean(saved),
@@ -700,15 +700,20 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const id = `s${randomKey(12)}`;
       const link = randomKey(20);
       await backend.createShare(id, boardId, link, serializeShare(boardId, boards), opts.client);
-      open(id, { root: boardId, boards, rev: 1, owner: true, link });
+      open(id, { root: boardId, boards, rev: 1, owner: true, links: { ...NO_LINKS, edit: link } });
       // Changes made while it was being shared.
       if (!deepEqual(boardsOf(shares.get(id)!), boards)) schedule(shares.get(id)!);
       return id;
     },
     /** Joins a share from its link; resolves with its board's id once that has arrived. */
     async join(id: string, key: string): Promise<string> {
-      // Opening a link to a board already here just opens it.
-      const added = !shares.has(id) && (await backend.join(id, key));
+      // Opening a link to a board already here just opens it. The link is also tried online, not
+      // waited for (offline, a save waits for the connection), when it may give a higher role (a
+      // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
+      const here = shares.get(id);
+      const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
+      if (here && role !== 'edit') backend.join(id, key).catch(() => {});
+      const added = !here && (await backend.join(id, key));
       const s = open(id) ?? need(id);
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root || !shares.has(id)) {
@@ -725,15 +730,19 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       }
       return s.root;
     },
-    /** The share link (null while turned off). */
-    link(id: string, page: string): string | null {
-      const s = shares.get(id);
-      return s?.link ? joinLink(page, id, s.link) : null;
+    /** The share link for `role` (null while turned off, or not given to this person). */
+    link(id: string, page: string, role: Role = 'edit'): string | null {
+      const key = shares.get(id)?.links[role];
+      return key ? joinLink(page, id, key) : null;
     },
-    /** Owner: turn the link off, or on again with a new link (the old one stays off). */
-    setLinkOn: (id: string, on: boolean) => backend.setLink(id, on ? randomKey(20) : null),
-    /** Owner: removes someone. The link changes too, so the copy of it they have stops working. */
-    removePerson: (id: string, uid: string) => backend.removePerson(id, uid, randomKey(20)),
+    /** Owner: turns `role`'s link on, with a new key (the first comment or view link changes the edit link too, D1). */
+    makeLink: (id: string, role: Role) => backend.makeLink(id, role, newKeys()),
+    /** Owner: turns all three links off (old copies stop working for good). */
+    linksOff: (id: string) => backend.linksOff(id),
+    /** Owner: changes someone's role (lowering them changes the links above their new role). */
+    setRole: (id: string, uid: string, role: Role) => backend.setRole(id, uid, role, newKeys()),
+    /** Owner: removes someone. Every link that is on changes too, so the copies they have stop working. */
+    removePerson: (id: string, uid: string) => backend.removePerson(id, uid, newKeys()),
     /** Stop having a board someone shared: it goes from this person's boards. */
     async leave(id: string) {
       const s = need(id);
@@ -771,5 +780,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     },
   };
 }
+
+/** A new key for each link, for whichever a change needs. */
+const newKeys = (): NewKeys => ({ edit: randomKey(20), comment: randomKey(20), view: randomKey(20) });
 
 export type Sharing = ReturnType<typeof startSharing>;

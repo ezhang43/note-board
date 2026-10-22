@@ -103,11 +103,11 @@ describe('sharing a board', () => {
     const { alice, shareId } = await aliceShares();
     const bob = device('bob');
     await expect(bob.sharing.join(shareId, 'wrongkey')).rejects.toThrow();
-    const key = server.shares.get(shareId)!.link!;
-    await alice.sharing.setLinkOn(shareId, false);
+    const key = server.shares.get(shareId)!.links.edit!;
+    await alice.sharing.linksOff(shareId);
     await expect(bob.sharing.join(shareId, key)).rejects.toThrow();
-    await alice.sharing.setLinkOn(shareId, true);
-    expect(server.shares.get(shareId)!.link).not.toBe(key);
+    await alice.sharing.makeLink(shareId, 'edit');
+    expect(server.shares.get(shareId)!.links.edit).not.toBe(key);
   });
 });
 
@@ -132,7 +132,7 @@ async function together() {
   const shared = await aliceShares();
   const bob = device('bob');
   await settle();
-  const joined = bob.sharing.join(shared.shareId, server.shares.get(shared.shareId)!.link!);
+  const joined = bob.sharing.join(shared.shareId, server.shares.get(shared.shareId)!.links.edit!);
   await settle();
   await joined;
   return { ...shared, bob };
@@ -247,7 +247,7 @@ describe('leaving and removing', () => {
   it('only the owner can remove people, turn the link off or delete', async () => {
     const { bob, shareId } = await together();
     await expect(bob.sharing.removePerson(shareId, 'alice')).rejects.toThrow();
-    await expect(bob.sharing.setLinkOn(shareId, false)).rejects.toThrow();
+    await expect(bob.sharing.linksOff(shareId)).rejects.toThrow();
     await expect(bob.sharing.deleteShare(shareId)).rejects.toThrow();
   });
 });
@@ -276,10 +276,10 @@ describe('a busy board', () => {
 describe('review fixes (2026-10-05)', () => {
   it('removing someone changes the link, so the copy they have stops working', async () => {
     const { alice, bob, shareId } = await together();
-    const oldKey = server.shares.get(shareId)!.link!;
+    const oldKey = server.shares.get(shareId)!.links.edit!;
     await alice.sharing.removePerson(shareId, 'bob');
     await settle();
-    expect(server.shares.get(shareId)!.link).not.toBe(oldKey);
+    expect(server.shares.get(shareId)!.links.edit).not.toBe(oldKey);
     await expect(bob.sharing.join(shareId, oldKey)).rejects.toThrow();
   });
 
@@ -388,11 +388,11 @@ describe('security review fixes: a share never takes this person’s own boards 
 describe('security review fixes: removing someone and opening a page again (2026-10-05)', () => {
   it('removing someone and changing the link happen in one go: the old link never lets them back in', async () => {
     const { alice, shareId } = await together();
-    const oldKey = server.shares.get(shareId)!.link!;
+    const oldKey = server.shares.get(shareId)!.links.edit!;
     // Bob tries the old link at every step of Alice’s change.
     const bobBackend = server.backendFor(person('bob'));
     const original = { ...server.server };
-    for (const step of ['removePerson', 'setLink'] as const) {
+    for (const step of ['removePerson', 'makeLink'] as const) {
       (server.server as unknown as Record<string, unknown>)[step] = async (...args: unknown[]) => {
         await (original[step] as (...a: unknown[]) => Promise<void>)(...args);
         await bobBackend.join(shareId, oldKey).catch(() => {});
@@ -401,17 +401,17 @@ describe('security review fixes: removing someone and opening a page again (2026
     await alice.sharing.removePerson(shareId, 'bob');
     await settle();
     expect(server.shares.get(shareId)!.people.map((p) => p.uid)).toEqual(['alice']);
-    expect(server.shares.get(shareId)!.link).not.toBe(oldKey);
+    expect(server.shares.get(shareId)!.links.edit).not.toBe(oldKey);
   });
 
   it('if removing someone fails, nothing changes', async () => {
     const { alice, shareId } = await together();
-    const oldKey = server.shares.get(shareId)!.link!;
+    const oldKey = server.shares.get(shareId)!.links.edit!;
     server.control.offline = true;
     await expect(alice.sharing.removePerson(shareId, 'bob')).rejects.toThrow();
     server.control.offline = false;
     expect(server.shares.get(shareId)!.people.map((p) => p.uid)).toEqual(['alice', 'bob']);
-    expect(server.shares.get(shareId)!.link).toBe(oldKey);
+    expect(server.shares.get(shareId)!.links.edit).toBe(oldKey);
   });
 
   it('on a page opened again, the shared boards are known as shared straight away, even when the list can’t be read', async () => {
@@ -525,10 +525,10 @@ describe('code review fixes (2026-10-06)', () => {
 
   it('removing someone keeps the link turned off if it was turned off meanwhile (on another device)', async () => {
     const { alice, shareId } = await together();
-    await server.server.setLink(person('alice'), shareId, null);
+    await server.server.linksOff(person('alice'), shareId);
     // Alice's page hasn't heard yet.
     await alice.sharing.removePerson(shareId, 'bob');
-    expect(server.shares.get(shareId)!.link).toBeNull();
+    expect(server.shares.get(shareId)!.links.edit).toBeNull();
   });
 });
 
@@ -543,7 +543,7 @@ describe('security review fix: a deleted share’s id used again (2026-10-06)', 
     // Someone who had it makes a new share with the same id; Bob's old member record still lets him in.
     const mallory = person('mallory');
     await server.server.createShare(mallory, shareId, trip, 'k', serializeShare(trip, { [trip]: { ...B.createBoard(), name: 'Trip' } }), 'm');
-    server.shares.get(shareId)!.people.push(person('bob'));
+    server.shares.get(shareId)!.people.push({ ...person('bob'), role: 'edit' });
     const again = device('bob', bob.storage);
     await settle();
     expect(again.sharing.shareOf(trip)).toBeNull();
@@ -607,7 +607,7 @@ describe('main session check fixes (2026-10-06)', () => {
     const shared = await aliceShares();
     const bob = device('bob', memoryStorage(), versions);
     await settle();
-    const joined = bob.sharing.join(shared.shareId, server.shares.get(shared.shareId)!.link!);
+    const joined = bob.sharing.join(shared.shareId, server.shares.get(shared.shareId)!.links.edit!);
     await settle();
     await joined;
     return { ...shared, bob };

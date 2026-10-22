@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
+    "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-note-board \"vitest run --config vitest.rules.config.ts\"",
     "mcp:build": "vite build --config mcp/vite.config.ts --logLevel warn",
     "mcp:login": "npm run mcp:build --silent && node mcp/dist/server.js login",
     "mcp:logout": "npm run mcp:build --silent && node mcp/dist/server.js logout",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/mcpb": "2.1.2",
+    "@firebase/rules-unit-testing": "5.0.2",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",

@@ -10,6 +10,8 @@ const googleButton = (page: Page) => page.getByRole('button', { name: 'Sign in w
 async function open(page: Page, dark = false) {
   await page.goto('./');
   await expect(googleButton(page)).toBeVisible();
+  // Wait for the web fonts: a late font swap changes the text height by a pixel (the "About" link measured 35, not 36).
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   if (dark) await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
 }
 

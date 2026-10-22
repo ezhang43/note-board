@@ -485,6 +485,14 @@ describe('comments (shared/{sid}/comments)', () => {
     await assertSucceeds(resolve(as('alice'), 'c2'));
   });
 
+  it('PR 4, as database.ts writes them: a commenter reopens someone else’s resolved thread by replying (a new comment), not by changing it', async () => {
+    await seedShare({ bob: 'comment', carol: 'edit' });
+    await seed({ 'shared/s1/comments/c1': { ...stored('carol'), resolved: true, resolvedAt: 5 } });
+    await assertSucceeds(add(as('bob'), 'mreply', comment('bob', { card: 'c_1' })));
+    await assertFails(updateDoc(doc(as('bob'), 'shared/s1/comments/c1'), { resolved: false, resolvedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(as('carol'), 'shared/s1/comments/c1'), { resolved: false, resolvedAt: serverTimestamp() }));
+  });
+
   it('only its author or the person who shared the board can delete one', async () => {
     await seedShare({ bob: 'comment', carol: 'edit' });
     await seed({ 'shared/s1/comments/c1': stored('bob'), 'shared/s1/comments/c2': stored('bob') });

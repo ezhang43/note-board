@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
 import './appFonts';
 import { Canvas } from './components/Canvas';
+import { CommentThread } from './components/Comments';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { UndoToast } from './components/UndoToast';
 import { DeleteCompleted } from './components/DeleteCompleted';
@@ -119,6 +120,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <DeleteAccountPanel />
       <FeedbackPanel />
       <Tour />
+      <CommentThread />
       <ConfirmDialog />
     </div>
   );

@@ -81,10 +81,11 @@ test('Alice shares a board by link; Bob opens it, and what each one does shows o
   // Both see who has the board; only Alice manages it.
   await openShare(alice);
   await expect(sharePanel(alice).getByText(`Bob${t}`)).toBeVisible();
-  await expect(sharePanel(alice).getByRole('button', { name: `Remove Bob${t}` })).toBeVisible();
+  // Job 161: Remove is in the person's role menu.
+  await expect(sharePanel(alice).getByRole('button', { name: `Bob${t}’s role: Can edit` })).toBeVisible();
   await openShare(bob);
   await expect(sharePanel(bob).getByText(`Alice${t}`)).toBeVisible();
-  await expect(sharePanel(bob).getByRole('button', { name: /Remove/ })).toHaveCount(0);
+  await expect(sharePanel(bob).getByRole('button', { name: /’s role:/ })).toHaveCount(0);
   await expect(sharePanel(bob).getByRole('button', { name: 'Leave this board' })).toBeVisible();
   expect([...alice.errors, ...bob.errors]).toEqual([]);
 });
@@ -95,7 +96,8 @@ test('the person who shared it can remove someone: the board leaves their screen
   const link = await aliceSharesTrip(alice);
   const bob = await bobJoins(browser, link, `Bob${t}`);
   await openShare(alice);
-  await sharePanel(alice).getByRole('button', { name: `Remove Bob${t}` }).click();
+  await sharePanel(alice).getByRole('button', { name: `Bob${t}’s role: Can edit` }).click();
+  await sharePanel(alice).getByRole('menuitem', { name: `Remove Bob${t}` }).click();
   await alice.getByRole('alertdialog', { name: `Remove Bob${t}?` }).getByRole('button', { name: `Remove Bob${t}` }).click();
   await expect(sharePanel(alice).getByText(`Bob${t}`)).toHaveCount(0);
   await expect(bob.getByRole('status').filter({ hasText: '“Trip” is no longer shared with you.' })).toBeVisible({ timeout: 8000 });
@@ -108,8 +110,8 @@ test('a link that was turned off doesn’t let anyone in', async ({ browser }) =
   const t = tag();
   const alice = await person(browser, `Alice${t}`);
   const link = await aliceSharesTrip(alice);
-  await sharePanel(alice).getByRole('button', { name: 'Turn link off' }).click();
-  await expect(sharePanel(alice).getByText('The link is turned off')).toBeVisible();
+  await sharePanel(alice).getByRole('button', { name: 'Turn links off' }).click();
+  await expect(sharePanel(alice).getByText('The links are turned off')).toBeVisible();
   const bob = await person(browser, `Bob${t}`, link);
   await expect(bob.getByRole('status').filter({ hasText: 'This share link doesn’t work' })).toBeVisible({ timeout: 8000 });
   await expect(boardName(bob)).not.toHaveValue('Trip');
@@ -420,11 +422,11 @@ test('a shared board you leave can be brought back from Version history', async 
   await expect(boardsMenu(bob).getByRole('menuitem', { name: /Trip/ })).toBeVisible();
 });
 
-test('the link can be turned off and on again', async ({ browser }) => {
+test('the links can be turned off and the edit link on again', async ({ browser }) => {
   const alice = await person(browser, `Alice${tag()}`);
   await aliceSharesTrip(alice);
-  await sharePanel(alice).getByRole('button', { name: 'Turn link off' }).click();
-  await sharePanel(alice).getByRole('button', { name: 'Turn link on', exact: true }).click();
+  await sharePanel(alice).getByRole('button', { name: 'Turn links off' }).click();
+  await sharePanel(alice).getByRole('button', { name: 'Make an edit link' }).click();
   await expect(sharePanel(alice).getByLabel('Share link')).toHaveValue(/\?join=/);
 });
 

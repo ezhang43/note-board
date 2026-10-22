@@ -327,6 +327,16 @@ export function ShareIcon({ size = 17 }: { size?: number }) {
   );
 }
 
+/** A chain link: the Share panel's "Anyone with this link". */
+export function LinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
+      <path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1" />
+      <path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" />
+    </svg>
+  );
+}
+
 /** The toolbar's Add buttons and menus (Honey Workshop look, 2026-10-16). */
 export function NoteIcon() {
   return (

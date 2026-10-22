@@ -4,6 +4,7 @@ import {
   clearIndexedDbPersistence,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocFromServer,
@@ -43,12 +44,13 @@ const db = initializeFirestore(app, {
 /**
  * Deleting `user`'s account (job #63): everything under boards/{uid} (their boards, version history
  * and list of shares), the shares they shared and their records on the others (through `shares`),
- * and the sign-in. The rules in firestore.rules already let a person delete all of it. Reads go to
- * the server, so without a connection it fails at once rather than working from the offline copy.
+ * and the sign-in. Their boards first get a marker set by this page (`client`), replaced once the shares
+ * are dealt with by one that says it is done, holds no boards and stays (review 137-A H5; firestore.rules). Reads go to the server, so
+ * without a connection it fails at once rather than working from the offline copy.
  */
 // simple: a connection lost part-way leaves the deletes already sent waiting until it is back (the
 // panel keeps saying "Deleting…"); they then finish, and running it again is fine.
-export function accountRemote(user: User, shares: CollabBackend): AccountBackend {
+export function accountRemote(user: User, shares: CollabBackend, client: string): AccountBackend {
   const own = doc(db, 'boards', user.uid);
   return {
     async myShares() {
@@ -68,9 +70,18 @@ export function accountRemote(user: User, shares: CollabBackend): AccountBackend
     },
     deleteShare: shares.deleteShare,
     leave: shares.leave,
+    async markDeleting() {
+      if ((await getDocFromServer(own)).data()?.deleting === 'done') return;
+      await setDoc(own, { deleting: 'started', client, updatedAt: serverTimestamp() }, { merge: true });
+    },
+    unmarkDeleting() {
+      updateDoc(own, { deleting: deleteField() }).catch(() => {
+        // Refused (no boards in it) or not sent: this page's sync puts its boards back instead.
+      });
+    },
     async deleteOwnData() {
       const subs = await Promise.all(['versions', 'versionData', 'shared'].map((name) => getDocsFromServer(collection(own, name))));
-      const refs = [...subs.flatMap((s) => s.docs.map((d) => d.ref)), own];
+      const refs = subs.flatMap((s) => s.docs.map((d) => d.ref));
       // A batch takes at most 500 writes.
       for (let i = 0; i < refs.length; i += 400) {
         const batch = writeBatch(db);
@@ -78,6 +89,7 @@ export function accountRemote(user: User, shares: CollabBackend): AccountBackend
         await batch.commit();
       }
     },
+    markDeleted: () => setDoc(own, { deleting: 'done', client, updatedAt: serverTimestamp() }),
     deleteUser: () => deleteUser(user),
   };
 }
@@ -114,6 +126,9 @@ export function boardRemote(uid: string): Remote {
           const pending = snap.metadata.hasPendingWrites;
           const d = snap.exists() ? snap.data() : undefined;
           const data = typeof d?.data === 'string' ? d.data : null;
+          // The account being deleted (review 137-A H5): passed on once the server has it, like a board
+          // (an unsent one is skipped below, as `data` is null or the page has opened).
+          const deleting = d?.deleting === 'started' || d?.deleting === 'done' ? (d.deleting as 'started' | 'done') : null;
           // Our own write, not yet confirmed by the server: skipped, except to open the board. Saves
           // this device hadn't sent when it was last closed stay unconfirmed while offline, so the
           // board opens from them (job 92: it stayed on "Opening your board…"); they are its newest
@@ -121,10 +136,11 @@ export function boardRemote(uid: string): Remote {
           // simple: an unsent delete (or anything but a board) is skipped, so it is never taken for
           // "no board" (which would upload this device's boards again); reopened offline it still
           // waits on "Opening your board…". Only deleting the account makes one.
-          if (pending && (opened || data === null)) return;
+          if (pending && (opened || data === null || deleting)) return;
           // "No board" from the offline copy may just mean it hasn't been downloaded yet.
           if (!d && snap.metadata.fromCache) return;
           opened = true;
+          if (deleting) return onChange({ data: data ?? '', client: String(d?.client ?? ''), deleting, ...(snap.metadata.fromCache ? { cached: true as const } : {}) });
           onChange(
             data === null
               ? null

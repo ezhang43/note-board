@@ -17,13 +17,19 @@ const m = vi.hoisted(() => ({
   startSharing: vi.fn(() => ({ stop: vi.fn(), flush: vi.fn(), retry: vi.fn(), isShared: () => false, ownCopy: vi.fn() })),
   claimDevice: vi.fn(),
   startSync: vi.fn((..._args: unknown[]) => ({ stop: vi.fn(), flush: vi.fn(), sharedChanged: vi.fn() })),
+  /** This browser's storage (shared by its tabs). */
+  storage: new Map<string, string>(),
+  user: null as { uid: string } | null,
+  deleteAccountData: vi.fn(async () => ({ shareIds: [] as string[] })),
+  accountRemote: vi.fn(),
+  remover: null as (() => Promise<void>) | null,
 }));
 
 vi.mock('./firebase', () => ({
   watchUser: (fn: typeof m.onUser) => {
     m.onUser = fn;
   },
-  currentUser: () => null,
+  currentUser: () => m.user,
   confirmSignIn: vi.fn(),
   signInWithGoogle: vi.fn(async () => {}),
   signOutUser: vi.fn(),
@@ -36,13 +42,17 @@ vi.mock('../store/sharing', () => ({
 }));
 vi.mock('../store/sync', () => ({ startSync: m.startSync }));
 vi.mock('../store/versions', () => ({ activeVersionStore: () => null, startVersions: vi.fn() }));
-vi.mock('../store/account', () => ({ claimDevice: m.claimDevice, deleteAccountData: vi.fn(), OWNER_KEY: 'owner' }));
-vi.mock('./account', () => ({ account: { setRemover: vi.fn() }, finishDeletion: vi.fn(), takeDeletedNote: () => false }));
+vi.mock('../store/account', () => ({ claimDevice: m.claimDevice, deleteAccountData: m.deleteAccountData, OWNER_KEY: 'owner' }));
+vi.mock('./account', () => ({ account: { setRemover: (fn: unknown) => void (m.remover = fn as typeof m.remover) }, finishDeletion: vi.fn(), takeDeletedNote: () => false }));
 vi.mock('./collabSession', () => ({ collab: { set: vi.fn(), setNotice: vi.fn() }, joinFromAddress: vi.fn() }));
 vi.mock('./feedback', () => ({ feedback: { reset: vi.fn(), setSender: vi.fn() } }));
 vi.mock('./pageHide', () => ({ flushWhenHidden: vi.fn() }));
 
-vi.stubGlobal('localStorage', { getItem: () => m.held, setItem: () => {}, removeItem: () => {} });
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => (k === 'owner' ? m.held : (m.storage.get(k) ?? null)),
+  setItem: (k: string, v: string) => void m.storage.set(k, v),
+  removeItem: (k: string) => void m.storage.delete(k),
+});
 vi.stubGlobal('window', { addEventListener: () => {} });
 vi.stubGlobal('document', {});
 vi.stubGlobal('navigator', { onLine: true });
@@ -55,7 +65,7 @@ async function openPage() {
     m.requested = true;
     await gate;
     if (m.fail) throw new Error('Failed to fetch dynamically imported module');
-    return { collabRemote: m.collabRemote, boardRemote: vi.fn(() => ({})), versionsRemote: vi.fn(() => ({})), accountRemote: vi.fn(), clearOfflineCopy: vi.fn(), sendFeedback: vi.fn() };
+    return { collabRemote: m.collabRemote, boardRemote: vi.fn(() => ({})), versionsRemote: vi.fn(() => ({})), accountRemote: m.accountRemote, clearOfflineCopy: vi.fn(), sendFeedback: vi.fn() };
   });
   const { session } = await import('./session');
   return session;
@@ -76,6 +86,10 @@ beforeEach(() => {
   m.startSharing.mockClear();
   m.claimDevice.mockClear();
   m.startSync.mockClear();
+  m.storage.clear();
+  m.user = null;
+  m.deleteAccountData.mockClear();
+  m.accountRemote.mockClear();
 });
 
 describe('the database code loads only after sign-in (job 169)', () => {
@@ -162,4 +176,90 @@ describe('"Couldn’t save online" belongs to the account it happened to (job 17
       expect(session.getSaveNote()).toBe('Saved');
     });
   }
+});
+
+// Review 137-A H5: another page deleted the account (its marker says 'done'). It may have got only as
+// far as the sign-in, or be just about to delete it; and a sign-out in one tab signs out every tab of
+// the browser, the deleting one too. So the page asks Google whether the sign-in is still there.
+const GONE_CHECK_MS = 60_000;
+
+describe('the account deleted on another page', () => {
+  /** A page signed in as `user`, with her own boards syncing; returns what its sync was told. */
+  async function signedInPage(user: { uid: string; getIdToken?: (force: boolean) => Promise<string> }) {
+    const session = await openPage();
+    m.onUser!(user);
+    await arrive();
+    const sharingOpts = (m.startSharing.mock.calls[0] as unknown as [unknown, unknown, { onReady: () => void }])[2];
+    sharingOpts.onReady();
+    const { startSync } = await import('../store/sync');
+    const syncOpts = vi.mocked(startSync).mock.calls.at(-1)![2] as { onGone: () => void; client: string };
+    const { signOutUser } = await import('./firebase');
+    vi.mocked(signOutUser).mockClear();
+    return { session, syncOpts, signOutUser: vi.mocked(signOutUser) };
+  }
+
+  it('the sign-in is gone too: the page signs out, with the note', async () => {
+    const getIdToken = vi.fn(async () => {
+      throw Object.assign(new Error('gone'), { code: 'auth/user-token-expired' });
+    });
+    const { session, syncOpts, signOutUser } = await signedInPage({ uid: 'ann', getIdToken });
+    syncOpts.onGone();
+    await new Promise((done) => setTimeout(done, 0));
+    expect(getIdToken).toHaveBeenCalledWith(true);
+    expect(signOutUser).toHaveBeenCalledOnce();
+    expect(session.wasDeleted()).toBe(true);
+  });
+
+  it('the sign-in is still there (another page is about to delete it, or deleting it failed): the page isn’t signed out, and asks again a while', async () => {
+    let gone = false;
+    const getIdToken = vi.fn(async () => {
+      if (gone) throw Object.assign(new Error('gone'), { code: 'auth/user-token-expired' });
+      return 'token';
+    });
+    const { syncOpts, signOutUser } = await signedInPage({ uid: 'ann', getIdToken });
+    vi.useFakeTimers();
+    try {
+      syncOpts.onGone();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(signOutUser).not.toHaveBeenCalled();
+      // The deleting page deletes the sign-in a moment later.
+      gone = true;
+      await vi.advanceTimersByTimeAsync(GONE_CHECK_MS);
+      expect(signOutUser).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('it stops asking after a while (deleting stopped at the sign-in)', async () => {
+    const getIdToken = vi.fn(async () => 'token');
+    const { syncOpts } = await signedInPage({ uid: 'ann', getIdToken });
+    vi.useFakeTimers();
+    try {
+      syncOpts.onGone();
+      await vi.advanceTimersByTimeAsync(GONE_CHECK_MS * 100);
+      expect(getIdToken.mock.calls.length).toBeLessThanOrEqual(11);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no connection to ask: the page isn’t signed out', async () => {
+    const getIdToken = vi.fn(async () => {
+      throw Object.assign(new Error('offline'), { code: 'auth/network-request-failed' });
+    });
+    const { syncOpts, signOutUser } = await signedInPage({ uid: 'ann', getIdToken });
+    syncOpts.onGone();
+    await new Promise((done) => setTimeout(done, 0));
+    expect(signOutUser).not.toHaveBeenCalled();
+  });
+
+  it('the page deleting sets the marker as itself', async () => {
+    const user = { uid: 'ann' };
+    const { syncOpts } = await signedInPage(user);
+    m.user = user;
+    vi.stubGlobal('location', { reload: vi.fn() });
+    await m.remover!();
+    expect(m.accountRemote).toHaveBeenCalledWith(user, expect.anything(), syncOpts.client);
+  });
 });

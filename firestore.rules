@@ -16,28 +16,64 @@ service cloud.firestore {
       return text is string && text.size() <= 900000;
     }
 
+    // Deleting the account (review 137-A H5): the page deleting it first adds a marker to the board,
+    // {deleting: 'started', client, updatedAt} (the boards stay in it), and once the shares are dealt
+    // with replaces it with {deleting: 'done', client, updatedAt}, which holds no boards and stays.
+    // While there is a marker, no board, version or new shared board can be saved under boards/{uid},
+    // so the person's other pages can't put anything back; deleting still works. While 'started', only
+    // the page that set it may change it (to put the boards back if deleting fails, or to finish), or
+    // any page once it is over 10 minutes old (that page closed part-way). Once 'done', any page may
+    // only set it 'done' again (going through deleting again: only the sign-in failed to go).
+    function boardPath(uid) {
+      return /databases/$(database)/documents/boards/$(uid);
+    }
+    function deleting(uid) {
+      return exists(boardPath(uid)) && 'deleting' in get(boardPath(uid)).data;
+    }
+
     // The board itself.
     match /boards/{uid} {
+      function saved() {
+        return request.resource.data.keys().hasOnly(['data', 'client', 'updatedAt'])
+          && boardText(request.resource.data.data)
+          && request.resource.data.client is string;
+      }
+      function marker() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['deleting', 'client', 'updatedAt', 'data'])
+          && d.deleting in ['started', 'done']
+          && d.client is string
+          && d.updatedAt == request.time
+          && (!('data' in d) || (d.deleting == 'started' && boardText(d.data)));
+      }
       allow read, delete: if isOwner(uid);
-      allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['data', 'client', 'updatedAt'])
-        && boardText(request.resource.data.data)
-        && request.resource.data.client is string;
+      allow create: if isOwner(uid) && (saved() || marker());
+      allow update: if isOwner(uid) && (saved() || marker())
+        && (!('deleting' in resource.data)
+          || (resource.data.deleting == 'started'
+            && (request.resource.data.client == resource.data.client
+              || request.time > resource.data.updatedAt + duration.value(10, 'm')))
+          || (resource.data.deleting == 'done' && marker() && request.resource.data.deleting == 'done'));
     }
 
     // Version history: the list (what the panel shows)...
     match /boards/{uid}/versions/{id} {
       allow read, delete: if isOwner(uid);
-      allow create, update: if isOwner(uid)
+      allow create, update: if isOwner(uid) && !deleting(uid)
         && request.resource.data.keys().hasOnly(['savedAt', 'cards', 'columns', 'boards', 'hash', 'kind'])
         && request.resource.data.savedAt is number
+        // Counts and a short fingerprint (job 173: they had no check); older copies of the app leave some out.
+        && (!('cards' in request.resource.data) || request.resource.data.cards is number)
+        && (!('columns' in request.resource.data) || request.resource.data.columns is number)
+        && (!('boards' in request.resource.data) || request.resource.data.boards is number)
+        && (!('hash' in request.resource.data) || (request.resource.data.hash is string && request.resource.data.hash.size() <= 100))
         // A version kept just before changes from another device replaced the boards (job #147).
         && (!('kind' in request.resource.data) || request.resource.data.kind == 'outside');
     }
     // ...and each version's board.
     match /boards/{uid}/versionData/{id} {
       allow read, delete: if isOwner(uid);
-      allow create, update: if isOwner(uid)
+      allow create, update: if isOwner(uid) && !deleting(uid)
         && request.resource.data.keys().hasOnly(['data'])
         && boardText(request.resource.data.data);
     }
@@ -50,7 +86,8 @@ service cloud.firestore {
     // Each person's list of the shared boards they have (shared by them or joined).
     match /boards/{uid}/shared/{sid} {
       allow read, delete: if isOwner(uid);
-      allow create, update: if isOwner(uid) && request.resource.data.keys().hasOnly(['joinedAt']);
+      allow create, update: if isOwner(uid) && !deleting(uid) && request.resource.data.keys().hasOnly(['joinedAt'])
+        && (!('joinedAt' in request.resource.data) || request.resource.data.joinedAt is timestamp);
     }
 
     // A shared board (with the boards inside it): only the people it is shared with can read or
@@ -92,6 +129,7 @@ service cloud.firestore {
         allow read: if isMember();
         allow create, update: if signedIn() && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['name', 'photo', 'key', 'joinedAt'])
+          && (!('joinedAt' in request.resource.data) || request.resource.data.joinedAt is timestamp)
           && request.resource.data.name is string && request.resource.data.name.size() <= 200
           && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 2000
             && request.resource.data.photo.matches('https://.*')))

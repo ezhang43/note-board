@@ -5,12 +5,14 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   writeBatch,
   type Firestore,
@@ -116,6 +118,19 @@ describe('versions (boards/{uid}/versions and versionData)', () => {
     await assertFails(setDoc(doc(db, 'boards/alice/versions/v4'), { ...version, foo: 1 }));
   });
 
+  // Job 173: these had no type or size check, so any amount of anything could be stored in them.
+  it('a list entry takes number counts and a short text hash (job 173)', async () => {
+    const db = as('alice');
+    await assertSucceeds(setDoc(doc(db, 'boards/alice/versions/v1'), { ...version, boards: 3, hash: 'abc-def-1x' }));
+    // As older copies of the app saved them: without boards, hash or kind.
+    await assertSucceeds(setDoc(doc(db, 'boards/alice/versions/v2'), { savedAt: 1, cards: 4, columns: 2 }));
+    await assertFails(setDoc(doc(db, 'boards/alice/versions/v3'), { ...version, cards: 'x'.repeat(5000) }));
+    await assertFails(setDoc(doc(db, 'boards/alice/versions/v4'), { ...version, columns: [1, 2] }));
+    await assertFails(setDoc(doc(db, 'boards/alice/versions/v5'), { ...version, boards: { a: 1 } }));
+    await assertFails(setDoc(doc(db, 'boards/alice/versions/v6'), { ...version, hash: 5 }));
+    await assertFails(setDoc(doc(db, 'boards/alice/versions/v7'), { ...version, hash: 'x'.repeat(101) }));
+  });
+
   it("a version's board takes only data, capped like the board", async () => {
     const db = as('alice');
     await assertSucceeds(setDoc(doc(db, 'boards/alice/versionData/v1'), { data: 'x'.repeat(ONLINE_LIMIT) }));
@@ -145,6 +160,11 @@ describe("a person's list of shared boards (boards/{uid}/shared)", () => {
     await assertFails(getDocs(collection(as('bob'), 'boards/alice/shared')));
     await assertFails(deleteDoc(doc(as('bob'), 'boards/alice/shared/s1')));
     await assertSucceeds(deleteDoc(doc(as('alice'), 'boards/alice/shared/s1')));
+  });
+
+  it('joinedAt is a time (job 173)', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'boards/alice/shared/s2'), { joinedAt: 'x'.repeat(5000) }));
+    await assertFails(setDoc(doc(as('alice'), 'boards/alice/shared/s3'), { joinedAt: { a: 1 } }));
   });
 });
 
@@ -280,6 +300,12 @@ describe('joining a shared board (shared/{sid}/members/{uid})', () => {
     await assertSucceeds(join(as('bob'), 'bob', 'k', { name: 'x'.repeat(200), photo: 'https://lh3.example/p.png' }));
   });
 
+  it('joinedAt on the member record is a time (job 173)', async () => {
+    await seedShare();
+    await assertFails(join(as('bob'), 'bob', 'k', { joinedAt: 'x'.repeat(5000) }));
+    await assertFails(join(as('bob'), 'bob', 'k', { joinedAt: 12 }));
+  });
+
   it('a member can update their own record while it holds the current key', async () => {
     await seedShare(withBob);
     await assertSucceeds(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...member('k'), name: 'Bobby' }));
@@ -358,6 +384,90 @@ describe('deleting an account (deleteOwnData)', () => {
     for (const p of ['boards/alice/versions/v1', 'boards/alice/versionData/v1', 'boards/alice/shared/s1', 'boards/alice']) b.delete(doc(db, p));
     await assertSucceeds(b.commit());
     await assertFails(deleteDoc(doc(db, 'boards/bob')));
+  });
+});
+
+// Review 137-A H5: a page deleting the account first replaces the board with a marker, so the
+// person's other pages can't save their boards or versions again while it deletes the rest.
+describe('deleting an account: the marker on boards/{uid}', () => {
+  const marker = (deleting: 'started' | 'done', client = 'p') => ({ deleting, client, updatedAt: serverTimestamp() });
+  const saved = { data: '{"a":1}', client: 'q', updatedAt: 1 };
+  const minutesAgo = (m: number) => Timestamp.fromMillis(Date.now() - m * 60_000);
+  const startedBy = (client: string, minutes = 1) => ({ data: '{"a":1}', deleting: 'started', client, updatedAt: minutesAgo(minutes) });
+  const saveVersion = (db: Firestore) => {
+    const b = writeBatch(db);
+    b.set(doc(db, 'boards/alice/versionData/v2'), { data: '{}' });
+    b.set(doc(db, 'boards/alice/versions/v2'), version);
+    return b.commit();
+  };
+
+  it('alice marks her board as markDeleting does (the boards stay in it), and only with the known fields', async () => {
+    await seed({ 'boards/alice': saved });
+    const db = as('alice');
+    const mark = (over: object) => setDoc(doc(db, 'boards/alice'), { ...marker('started'), ...over }, { merge: true });
+    await assertFails(mark({ deleting: 'soon' }));
+    await assertFails(mark({ updatedAt: 1 }));
+    await assertFails(mark({ foo: 1 }));
+    await assertFails(setDoc(doc(as('bob'), 'boards/alice'), marker('started'), { merge: true }));
+    await assertSucceeds(mark({}));
+    // With no board online yet, too.
+    await assertSucceeds(setDoc(doc(as('carol'), 'boards/carol'), marker('started'), { merge: true }));
+  });
+
+  it('while deleting, another page of hers can save neither her boards, nor a version, nor a new shared board', async () => {
+    await seed({ 'boards/alice': startedBy('p'), 'boards/alice/versions/v1': version, 'boards/alice/shared/s1': { joinedAt: 1 } });
+    const db = as('alice');
+    await assertFails(setDoc(doc(db, 'boards/alice'), { ...board(), client: 'q' }));
+    await assertFails(setDoc(doc(db, 'boards/alice'), { ...marker('started'), client: 'q' }));
+    await assertFails(saveVersion(db));
+    await assertFails(setDoc(doc(db, 'boards/alice/versionData/v3'), { data: '{}' }));
+    await assertFails(createShare(db));
+    // Deleting still works.
+    await assertSucceeds(deleteDoc(doc(db, 'boards/alice/versions/v1')));
+    await assertSucceeds(deleteDoc(doc(db, 'boards/alice/shared/s1')));
+  });
+
+  it('the page deleting can take the mark off if deleting fails (as unmarkDeleting does); no other page can', async () => {
+    await seed({ 'boards/alice': startedBy('p') });
+    await assertFails(updateDoc(doc(as('alice'), 'boards/alice'), { deleting: deleteField(), client: 'q' }));
+    await assertSucceeds(updateDoc(doc(as('alice'), 'boards/alice'), { deleting: deleteField() }));
+  });
+
+  it('the page deleting can put her boards back if deleting fails, or finish it (a "done" holds no boards)', async () => {
+    await seed({ 'boards/alice': startedBy('p') });
+    await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), board()));
+    await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), marker('started'), { merge: true }));
+    await assertFails(setDoc(doc(as('alice'), 'boards/alice'), marker('done'), { merge: true }));
+    await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), marker('done')));
+  });
+
+  it('a marker left over 10 minutes (the deleting page closed part-way) no longer holds her other pages back', async () => {
+    await seed({ 'boards/alice': startedBy('p', 11) });
+    await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), { ...board(), client: 'q' }));
+  });
+
+  it('once done, no page can save her boards or a version there again, however late', async () => {
+    await seed({ 'boards/alice': { deleting: 'done', client: 'p', updatedAt: minutesAgo(60 * 24) } });
+    const db = as('alice');
+    await assertFails(setDoc(doc(db, 'boards/alice'), board()));
+    await assertFails(setDoc(doc(db, 'boards/alice'), { ...board(), client: 'q' }));
+    await assertFails(saveVersion(db));
+    await assertFails(createShare(db));
+  });
+
+  it('once done, any page of hers can go through deleting again (only the sign-in failed to go, and the page was reloaded), but never back to started', async () => {
+    await seed({ 'boards/alice': { deleting: 'done', client: 'p', updatedAt: minutesAgo(1) } });
+    const db = as('alice');
+    await assertFails(setDoc(doc(db, 'boards/alice'), marker('started', 'q'), { merge: true }));
+    await assertFails(setDoc(doc(db, 'boards/alice'), marker('started', 'p'), { merge: true }));
+    await assertSucceeds(setDoc(doc(db, 'boards/alice'), marker('done', 'q')));
+  });
+
+  it('saves as before when there is no marker', async () => {
+    await seed({ 'boards/alice': saved });
+    await assertSucceeds(setDoc(doc(as('alice'), 'boards/alice'), board()));
+    await assertSucceeds(saveVersion(as('alice')));
+    await assertSucceeds(createShare(as('alice')));
   });
 });
 

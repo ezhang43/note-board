@@ -102,7 +102,17 @@ vi.mock('./database', async () => {
 vi.mock('../store/appStore', async () => ({ appStore: (await import('../store/store')).createStore(null, (fn) => fn()) }));
 
 const remote = (uid: string) => h.remotes.get(uid) as FakeRemote;
-const alice = { uid: 'alice', displayName: 'Alice', photoURL: null };
+/** Asked again (review 137-A H5), alice's sign-in is gone once her account is deleted, unless a test says otherwise. */
+const signIn = { gone: true };
+const alice = {
+  uid: 'alice',
+  displayName: 'Alice',
+  photoURL: null,
+  getIdToken: async () => {
+    if (signIn.gone) throw Object.assign(new Error('gone'), { code: 'auth/user-token-expired' });
+    return 'token';
+  },
+};
 const bob = { uid: 'bob', displayName: 'Bob', photoURL: null };
 
 /** Lets the pretend server's answers (microtasks) and uploads arrive. */
@@ -167,7 +177,7 @@ afterEach(() => {
 });
 
 /** Signs `user` in and has their online boards answer, so the session is ready. */
-async function signInReady(user = alice, send: RemoteDoc | null = null) {
+async function signInReady(user: { uid: string; displayName: string; photoURL: null } = alice, send: RemoteDoc | null = null) {
   h.user = user;
   h.userCb!(user);
   await settle();
@@ -318,6 +328,25 @@ describe('session: signing out and an account deleted elsewhere', () => {
     expect(s.session.wasDeleted()).toBe(false);
   });
 
+  it('another page marking the account deleted while its sign-in is still there (about to go, or deleting it failed): this one isn’t signed out and uploads nothing (review 137-A H5)', async () => {
+    const s = await load();
+    signIn.gone = false;
+    try {
+      await signInReady(alice, { data: serializeWorkspace(parseWorkspace(null)), client: 'other' });
+      remote('alice').send({ data: '', client: 'other', deleting: 'done' });
+      await settle();
+      expect(h.calls).not.toContain('signOutUser');
+      expect(s.session.getStatus()).toBe('ready');
+      const writes = remote('alice').writes.length;
+      s.appStore.renameBoard('Edit after');
+      vi.advanceTimersByTime(800);
+      await settle();
+      expect(remote('alice').writes).toHaveLength(writes);
+    } finally {
+      signIn.gone = true;
+    }
+  });
+
   it('a different person signing in gets the sharing and sync of their own, and the earlier person’s is stopped', async () => {
     const s = await load();
     await signInReady(alice);
@@ -464,6 +493,9 @@ describe('session: deleting the account', () => {
       myShares: async () => [],
       deleteShare: async () => {},
       leave: async () => {},
+      markDeleting: async () => void calls.push('markDeleting'),
+      unmarkDeleting: () => void calls.push('unmarkDeleting'),
+      markDeleted: async () => void calls.push('markDeleted'),
       deleteOwnData: async () => {
         calls.push('deleteOwnData');
         if (failOwn) throw Object.assign(new Error('offline'), { code: 'unavailable' });
@@ -498,7 +530,7 @@ describe('session: deleting the account', () => {
     const acct = fakeAccount();
     h.account = acct;
     await s.account.remover()!();
-    expect(acct.calls).toEqual(['deleteOwnData', 'deleteUser']);
+    expect(acct.calls).toEqual(['markDeleting', 'markDeleted', 'deleteOwnData', 'deleteUser']);
     expect(h.calls).toEqual(['clearOfflineCopy']);
     expect(loc.reload).toHaveBeenCalledOnce();
     expect(sessionStore.getItem('note-board:account-deleted')).toBe('1');

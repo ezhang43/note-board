@@ -58,7 +58,7 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
-const { accountRemote } = await import('./firebase');
+const { accountRemote } = await import('./database');
 
 beforeEach(() => {
   fs.docs.clear();

@@ -94,7 +94,7 @@ function listedShares(list: string | null): string[] {
 }
 
 // Deleting your account and data (job #63, required by Google Play). Firestore on the published
-// site (src/sync/firebase.ts), the pretend sharing server for demo people (src/sync/demo.ts).
+// site (src/sync/database.ts), the pretend sharing server for demo people (src/sync/demo.ts).
 
 /** Where a person's account lives online. Every call is fine to make again after it worked. */
 export interface AccountBackend {

@@ -57,7 +57,7 @@ At BusyAnts' size everything stays inside the free quota (50,000 reads and 20,00
 
 | File | What it does now | Change needed with the **recommended** route (same name `(default)`) | Change needed with a **named** database (route A or B) |
 |---|---|---|---|
-| `src/sync/firebase.ts` | `initializeFirestore(app, { localCache: persistentLocalCache(...) })` with no database name, so it uses `(default)`. Every save and load goes through `db`. | **None** | Add the database name as the third argument. Note: the device's offline copy (IndexedDB) is kept separately for each database, so changes waiting offline in the old one would be stranded (see section 4). High-risk file. |
+| `src/sync/database.ts` (job 169; was in `firebase.ts`) | `initializeFirestore(app, { localCache: persistentLocalCache(...) })` with no database name, so it uses `(default)`. Every save and load goes through `db`. | **None** | Add the database name as the third argument. Note: the device's offline copy (IndexedDB) is kept separately for each database, so changes waiting offline in the old one would be stranded (see section 4). High-risk file. |
 | `firestore.rules` | Rules for `/databases/{database}/documents`, which already fits any database. The owner pastes them into the console. | **None to the file.** The owner pastes it again into the new database's Rules tab (a new database starts with its own rules). | Same, pasted into the named database's Rules tab. |
 | `mcp/firestore.ts` | REST address `.../projects/note-board-a672a/databases/(default)/documents/` | **None** | Change `(default)` to the new name, plus its test `mcp/firestore.test.ts`. |
 | `src/sync/firebase.test.ts`, `src/sync/firebase-share.test.ts` | Fake `firebase/firestore` (`initializeFirestore: () => ({})`) | None | Probably none (the fake ignores arguments). A test that the name is passed would be added. |
@@ -67,7 +67,7 @@ At BusyAnts' size everything stays inside the free quota (50,000 reads and 20,00
 | `docs/decisions.md` | No location decision recorded | Add the decision (date, location, why) | Same |
 | `CHANGELOG.md` | | One plain line: "Your boards are now stored in the United States." | Same |
 | `mcp/README.md` | Mentions Cloud Firestore API, no location | None | None |
-| `scripts/publish-rules.mjs` | `src/sync/` and `firestore.rules` are on the risky list | None | A code change to `firebase.ts` would be held for the owner's "publish". |
+| `scripts/publish-rules.mjs` | `src/sync/` and `firestore.rules` are on the risky list | None | A code change to `database.ts` would be held for the owner's "publish". |
 
 There is no `firebase.json` or `.firebaserc` in the repo. Rules are only ever pasted in the console.
 
@@ -114,7 +114,7 @@ These behaviors decide how risky each route is:
 
 ### A. New named US database, managed export / import, app switched by code
 1. Blaze. Make a database `us` in nam5 (locked). Export Sydney to a bucket and import into `us`.
-2. A high-risk pull request changes `firebase.ts` (and the MCP address) to `us`. The owner publishes it.
+2. A high-risk pull request changes `database.ts` (and the MCP address) to `us`. The owner publishes it.
 3. Sydney's rules become read-only so old pages can't save there. Delete Sydney later.
 
 - **Cost:** cents for the move. But `us` is **not** the free database while Sydney exists, so every read and write is billed. Probably still cents a month, but no longer free. After Sydney is deleted, `us` likely still isn't the free one (the docs say the *next database created* gets the free quota).
@@ -305,4 +305,4 @@ Who does what: **Owner** = clicks in Firebase / Google Cloud. **Crew** = code, d
 
 - **Job #40: Firestore count script** (done): `scripts/firestore-counts.mjs`, read only, with unit tests in `scripts/firestore-counts.test.ts`.
 - **Job: wording after the move.** Privacy, SPEC, decisions, changelog (step 18). Wording only, after verification.
-- No app code change. If the owner prefers route A instead, a separate **high-risk** job changes `src/sync/firebase.ts` and `mcp/firestore.ts` (labeled `high-risk`, waits for the owner's OK and "publish").
+- No app code change. If the owner prefers route A instead, a separate **high-risk** job changes `src/sync/database.ts` and `mcp/firestore.ts` (labeled `high-risk`, waits for the owner's OK and "publish").

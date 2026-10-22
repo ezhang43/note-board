@@ -3,7 +3,7 @@
 Worked out from the code and `SPEC.md` on 2026-10-16. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
 
 Files checked:
-- `src/sync/firebase.ts` (Google sign-in with Firebase Authentication, Cloud Firestore, offline cache; `sendFeedback`: Send feedback saves the note with the person's email and account number, job #69)
+- `src/sync/firebase.ts` (Google sign-in with Firebase Authentication) and `src/sync/database.ts` (Cloud Firestore, offline cache; `sendFeedback`: Send feedback saves the note with the person's email and account number, job #69)
 - `src/store/collab.ts` (what other people see when a board is shared: Google name and photo address, never the email)
 - `src/store/sync.ts`, `src/store/versions.ts` (what is saved online: boards and version history)
 - `firestore.rules` (only the owner reads their boards; shared boards only by the people who have them)

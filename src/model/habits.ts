@@ -137,6 +137,12 @@ const weightText = (day: DayKey, kg: number) => `${day} ${kg.toFixed(1)}`;
 const isWeightCard = (c: Card): c is TodoCard => c.kind === 'todo' && c.title === WEIGHT_TITLE && c.items.some((i) => entryOf(i));
 export const weightCard = (board: Board): TodoCard | undefined => Object.values(board.cards).find(isWeightCard);
 
+/**
+ * Where the next weight goes when no card has one: the Weight card that was left with other text on it
+ * after its last weight was removed (a checklist titled Weight that isn't a habit), so there is only ever one.
+ */
+export const weightHolder = (board: Board): TodoCard | undefined => Object.values(board.cards).find((c): c is TodoCard => c.kind === 'todo' && c.title === WEIGHT_TITLE && !isHabit(c));
+
 /** A Weight card with nothing on it but weights (and the blank item every checklist has), so none is out of sight. */
 const isOnlyWeights = (c: Card) => isWeightCard(c) && c.items.every((i) => !i.children.length && (entryOf(i) || (!i.text && !i.done)));
 

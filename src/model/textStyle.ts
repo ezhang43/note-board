@@ -64,25 +64,33 @@ export function styleOf(board: Board, box: Box): TextStyle | undefined {
   return card?.kind === 'todo' ? findItem(card.items, box.itemId)?.item.style : undefined;
 }
 
-/** Apply one change to every box. */
+/** Apply one change to every box. A checklist's items are changed together, in one copy of its items. */
 export function applyStyle(board: Board, boxes: Box[], change: StyleChange): Board {
-  return boxes.reduce((b, box) => {
+  const itemsOf = new Map<string, string[]>();
+  let out = boxes.reduce((b, box) => {
     if ('columnId' in box) {
       const col = b.columns[box.columnId];
       const next = col && withStyle(col, changed(col.style, change));
       return col && next !== col ? { ...b, columns: { ...b.columns, [col.id]: next } } : b;
     }
-    const itemId = box.itemId;
-    if (!itemId) return updateCard(b, box.cardId, (c) => withStyle(c, changed(c.style, change)));
-    return editItems(b, box.cardId, (items) => {
-      const now = findItem(items, itemId)?.item;
-      if (!now || sameStyle(now.style, changed(now.style, change))) return null;
+    if (box.itemId) {
+      itemsOf.set(box.cardId, [...(itemsOf.get(box.cardId) ?? []), box.itemId]);
+      return b;
+    }
+    return updateCard(b, box.cardId, (c) => withStyle(c, changed(c.style, change)));
+  }, board);
+  for (const [cardId, ids] of itemsOf) {
+    out = editItems(out, cardId, (items) => {
+      if (!ids.some((id) => { const now = findItem(items, id)?.item; return now && !sameStyle(now.style, changed(now.style, change)); })) return null;
       const next = structuredClone(items);
-      const loc = findItem(next, itemId)!;
-      loc.list[loc.index] = withStyle(loc.item, changed(loc.item.style, change));
+      for (const id of ids) {
+        const loc = findItem(next, id);
+        if (loc) loc.list[loc.index] = withStyle(loc.item, changed(loc.item.style, change));
+      }
       return next;
     });
-  }, board);
+  }
+  return out;
 }
 
 /** Bold / italic on several boxes: on for all, unless all have it already; then off for all. */

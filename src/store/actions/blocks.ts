@@ -112,11 +112,13 @@ export function blockActions(ctx: StoreContext) {
       const { ui, boards } = ctx.state;
       if (boardRights(ui.shares, boards.open, boards.home).rename) commit((b) => B.renameBoard(b, name), { merge: 'board-name' });
     },
-    /** Turning snapping back on moves every block (position and resized sizes) onto the grid. */
+    /**
+     * Turning snapping back on moves every block (position and resized sizes) onto the grid. Whatever
+     * that makes overlap moves to the nearest free spot (not straight down), in the same undo step.
+     */
     toggleSnap() {
       const on = !ctx.state.board.snap;
-      commit((b) => (on ? snapAll(B.setSnap(b, true)) : B.setSnap(b, false)));
-      if (on) requestSettle();
+      commit((b) => (on ? settle(snapAll(B.setSnap(b, true)), measured) : B.setSnap(b, false)));
     },
 
     // ---------- view ----------
@@ -334,6 +336,7 @@ export function blockActions(ctx: StoreContext) {
       if (ctx.viewOnly()) return { added: 0, note: VIEW_ONLY_NOTE };
       const { cards, note } = readImport(name, text, (html) => new DOMParser().parseFromString(html, 'text/html'));
       if (!cards.length) return { added: 0, note };
+      updateUi({ preview: null }); // an old version being looked at is put away first (edits are refused while it is shown)
       const ids = cards.map((c) => c.id);
       const guess = new Map(cards.map((c) => [c.id, estimateHeight(c)]));
       const size = packInLanes(ids, (id) => guess.get(id)!, { x: 0, y: 0 });

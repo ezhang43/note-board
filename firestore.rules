@@ -132,6 +132,13 @@ service cloud.firestore {
       function linksAfter() {
         return existsAfter(linksPath()) ? getAfter(linksPath()).data : {};
       }
+      // `role`'s key is off, or this request changes it (for the edit key, the one in a share from before too).
+      function keyChanged(role) {
+        let before = exists(linksPath()) ? get(linksPath()).data : {};
+        let old = get(sharePath()).data.get('link', null);
+        return (before.get(role, null) == null || linksAfter().get(role, null) != before[role])
+          && (role != 'edit' || old == null || !existsAfter(sharePath()) || getAfter(sharePath()).data.get('link', null) != old);
+      }
       function photoOk(photo) {
         return photo == null || (photo is string && photo.size() <= 2000 && photo.matches('https://.*'));
       }
@@ -181,13 +188,6 @@ service cloud.firestore {
         function newRole() {
           return roleOf(request.resource.data);
         }
-        function linksChanged() {
-          let before = exists(linksPath()) ? get(linksPath()).data : {};
-          let after = linksAfter();
-          return (before.get('edit', null) == null || after.get('edit', null) != before.edit)
-            && (before.get('comment', null) == null || after.get('comment', null) != before.comment)
-            && (before.get('view', null) == null || after.get('view', null) != before.view);
-        }
         allow read: if isMember();
         allow create, update: if signedIn() && request.auth.uid == uid && record()
           && (
@@ -202,21 +202,27 @@ service cloud.firestore {
             || ('key' in request.resource.data && newRole() == 'edit' && !rolesIn(linksAfter())
               && keyFor(request.resource.data.key, 'edit'))
           );
-        // The person who shared it changes someone else's role, and nothing else.
+        // The person who shared it changes someone else's role, and nothing else. Lowering someone
+        // changes the keys of the roles above their new one in the same step (they may know them).
         allow update: if signedIn() && request.auth.uid != uid
           && get(sharePath()).data.owner == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
-          && request.resource.data.role in ['edit', 'comment', 'view'];
+          && request.resource.data.role in ['edit', 'comment', 'view']
+          && (newRole() == 'edit'
+            || (keyChanged('edit') && (newRole() == 'comment' || keyChanged('comment')))
+            || (newRole() == 'comment' && roleOf(resource.data) == 'view'));
         // Leaving, or removed by the person who shared it: then every link that is on changes in the
         // same step (unless the share goes too), so their copy of a link never lets them back in.
         allow delete: if signedIn()
           && (request.auth.uid == uid
-            || (get(sharePath()).data.owner == request.auth.uid && (!existsAfter(sharePath()) || linksChanged())));
+            || (get(sharePath()).data.owner == request.auth.uid
+              && (!existsAfter(sharePath()) || (keyChanged('edit') && keyChanged('comment') && keyChanged('view')))));
       }
 
-      // The key someone joined with: written by them, read by nobody (only these rules look at it).
+      // The key someone joined with: written by them together with their member record (so only on a
+      // real join), read by nobody (only these rules look at it).
       match /joins/{uid} {
-        allow create, update: if signedIn() && request.auth.uid == uid
+        allow create, update: if signedIn() && request.auth.uid == uid && existsAfter(memberPath(uid))
           && request.resource.data.keys().hasOnly(['key'])
           && request.resource.data.key is string && request.resource.data.key.size() <= 100;
         allow delete: if signedIn() && (request.auth.uid == uid || get(sharePath()).data.owner == request.auth.uid);

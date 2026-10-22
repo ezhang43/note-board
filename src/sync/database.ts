@@ -266,10 +266,13 @@ export function collabRemote(user: User): CollabBackend {
     },
     watchShare(id, onChange, onError) {
       let last: ShareDoc | null = null;
-      // The key in the private record; null while off, not known yet, or kept in the share (one from before).
+      // The key in the private record (null while off, or kept in the share: one from before), once
+      // that record has answered. Till then the link isn't given as off (undefined: the last one stays),
+      // so a click on "Turn link on" can't replace a working link.
+      let known = false;
       let key: string | null = null;
       const send = () => {
-        if (last) onChange({ ...last, link: key ?? last.link });
+        if (last) onChange({ ...last, link: known ? (key ?? last.link) : (last.link ?? undefined) });
       };
       const stopShare = watchAllowed(
         (next, refused) => onSnapshot(shareRef(id), next, refused),
@@ -286,15 +289,23 @@ export function collabRemote(user: User): CollabBackend {
         },
         onError,
       );
-      // Refused (no longer on it, say) is left to the share's own watch above to report.
+      // Refused (not an editor, or no longer on it): no key from it; losing the board itself is left
+      // to the share's own watch above to report.
       const stopLinks = watchAllowed(
         (next, refused) => onSnapshot(linksRef(id), next, refused),
         (snap: DocumentSnapshot) => {
+          // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
+          if (!snap.exists() && snap.metadata.fromCache) return;
           const edit = snap.exists() ? snap.data().edit : null;
+          known = true;
           key = typeof edit === 'string' ? edit : null;
           send();
         },
-        () => {},
+        () => {
+          known = true;
+          key = null;
+          send();
+        },
       );
       return () => {
         stopShare();
@@ -386,13 +397,17 @@ export function collabRemote(user: User): CollabBackend {
     },
     async deleteShare(id) {
       // Its member, joins and links records go with it (security review fix), so if its id were ever
-      // used again they wouldn't let anyone into the new one.
-      const members = await getDocs(collection(db, 'shared', id, 'members'));
-      const batch = writeBatch(db);
-      for (const m of members.docs) {
-        batch.delete(m.ref);
-        batch.delete(joinRef(id, m.id));
+      // used again they wouldn't let anyone into the new one; so do its comments. Comments and joins
+      // records first, a batch at a time (a batch takes at most 500 writes); then the rest in one go.
+      const [members, comments] = await Promise.all([getDocs(collection(db, 'shared', id, 'members')), getDocs(collection(db, 'shared', id, 'comments'))]);
+      const first = [...comments.docs.map((c) => c.ref), ...members.docs.map((m) => joinRef(id, m.id))];
+      for (let i = 0; i < first.length; i += 400) {
+        const some = writeBatch(db);
+        first.slice(i, i + 400).forEach((ref) => some.delete(ref));
+        await some.commit();
       }
+      const batch = writeBatch(db);
+      for (const m of members.docs) batch.delete(m.ref);
       batch.delete(linksRef(id));
       batch.delete(shareRef(id));
       await batch.commit();

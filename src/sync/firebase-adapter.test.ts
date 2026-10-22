@@ -194,18 +194,23 @@ describe('saving a shared board (G15)', () => {
 });
 
 describe('deleting a shared board (G16)', () => {
-  it('deletes every person, joins and links record and the share in one batch, then the owner’s list entry', async () => {
+  it('deletes every comment, person, joins and links record and the share, then the owner’s list entry', async () => {
     seedShare('k', ['u1', 'u2', 'u3']);
     fs.docs.set('boards/u1/shared/s1', { joinedAt: 1 });
     fs.docs.set('shared/s1/private/links', { edit: 'k' });
     fs.docs.set('shared/s1/joins/u2', { key: 'k' });
+    fs.docs.set('shared/s1/comments/c1', { text: 'hi' });
     await collabRemote(user).deleteShare('s1');
-    expect(fs.state.commits).toHaveLength(1);
+    // Comments and joins records first (in batches of at most 400), then the rest in one go.
+    expect(fs.state.commits).toHaveLength(2);
     expect(fs.state.commits[0].ops.map((o) => `${o.op} ${o.path}`).sort()).toEqual([
-      'delete shared/s1',
+      'delete shared/s1/comments/c1',
       'delete shared/s1/joins/u1',
       'delete shared/s1/joins/u2',
       'delete shared/s1/joins/u3',
+    ]);
+    expect(fs.state.commits[1].ops.map((o) => `${o.op} ${o.path}`).sort()).toEqual([
+      'delete shared/s1',
       'delete shared/s1/members/u1',
       'delete shared/s1/members/u2',
       'delete shared/s1/members/u3',
@@ -261,7 +266,10 @@ describe('watching one shared board (G18)', () => {
     const onChange = vi.fn();
     collabRemote(user).watchShare('s1', onChange, vi.fn());
     listener('shared/s1').next(docSnap({ owner: 'u9', root: 'b1', link: 5, data: '{}' }, false));
-    expect(onChange).toHaveBeenCalledWith({ owner: 'u9', root: 'b1', link: null, data: '{}', client: '', rev: 0 });
+    // Job 161: the link isn't known until the private links record has answered (here: there is none).
+    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', link: undefined, data: '{}', client: '', rev: 0 });
+    listener('shared/s1/private/links').next(docSnap(undefined, false));
+    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', link: null, data: '{}', client: '', rev: 0 });
   });
 
   it('ignores a record without text data or without a root', () => {

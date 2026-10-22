@@ -97,7 +97,7 @@ describe('who can use BusyAnts', () => {
     expect(rules.match(/allow read, delete: if isOwner\(uid\);/g)?.length).toBe(4);
     // The boards they shared, everyone's records on those, and their own record on anyone's.
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
-    expect(rules).toContain('get(sharePath()).data.owner == request.auth.uid && (!existsAfter(sharePath()) || linksChanged())');
+    expect(rules).toContain("(!existsAfter(sharePath()) || (keyChanged('edit') && keyChanged('comment') && keyChanged('view')))");
   });
 
   it('feedback (job #69): only a verified signed-in person can send it, as themselves, and no one can read, change or delete it from the app', () => {

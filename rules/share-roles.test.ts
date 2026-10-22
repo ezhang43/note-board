@@ -153,12 +153,19 @@ describe('joining through joins/{uid}', () => {
   });
 
   it('a joins record is only for oneself, holds only a key, and its key is short text', async () => {
-    await seedShare();
+    await seedShare({ bob: 'edit' });
     await assertFails(setDoc(doc(as('bob'), 'shared/s1/joins/carol'), { key: EDIT }));
     await assertFails(setDoc(doc(as('bob'), 'shared/s1/joins/bob'), { key: EDIT, foo: 1 }));
     await assertFails(setDoc(doc(as('bob'), 'shared/s1/joins/bob'), { key: 5 }));
     await assertFails(setDoc(doc(as('bob'), 'shared/s1/joins/bob'), { key: 'x'.repeat(101) }));
     await assertSucceeds(setDoc(doc(as('bob'), 'shared/s1/joins/bob'), { key: EDIT }));
+  });
+
+  // Code review (high): otherwise anyone could fill the storage with joins records under made-up ids.
+  it('a joins record is only written with a member record (joining), never on its own', async () => {
+    await seedShare();
+    await assertFails(setDoc(doc(as('carol'), 'shared/s1/joins/carol'), { key: 'wrong-key-0123456789' }));
+    await assertFails(setDoc(doc(as('carol'), 'shared/nothing/joins/carol'), { key: 'x' }));
   });
 
   it('a joins record left from an old key lets nobody back in once the key changed', async () => {
@@ -214,13 +221,33 @@ describe('roles: nobody raises their own', () => {
   });
 
   it('only the person who shared it changes someone else’s role, and only the role', async () => {
-    await seedShare({ bob: 'view', carol: 'edit' }, { edit: EDIT, comment: COMMENT, view: VIEW });
+    await seedShare({ bob: 'view', carol: 'edit', dan: 'view' }, { edit: EDIT, comment: COMMENT, view: VIEW });
     await assertFails(updateDoc(doc(as('carol'), 'shared/s1/members/bob'), { role: 'edit' }));
     await assertFails(updateDoc(doc(as('alice'), 'shared/s1/members/bob'), { role: 'boss' }));
     await assertFails(updateDoc(doc(as('alice'), 'shared/s1/members/bob'), { role: 'edit', name: 'X' }));
     await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/frank'), record('view')));
     await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1/members/bob'), { role: 'edit' }));
-    await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1/members/carol'), { role: 'view' }));
+    await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1/members/dan'), { role: 'comment' }));
+  });
+
+  // Code review (high): an editor has read every key, so lowering them must change the keys above their new role.
+  it('lowering someone changes the keys of every role above their new one, in the same step', async () => {
+    await seedShare({ bob: 'edit', carol: 'comment' }, { edit: EDIT, comment: COMMENT, view: VIEW });
+    const lower = (uid: string, role: string, links: object) => {
+      const db = as('alice');
+      const b = writeBatch(db);
+      b.update(doc(db, `shared/s1/members/${uid}`), { role });
+      b.set(doc(db, LINKS), links, { merge: true });
+      return b.commit();
+    };
+    await assertFails(updateDoc(doc(as('alice'), 'shared/s1/members/bob'), { role: 'view' }));
+    await assertFails(lower('bob', 'view', { edit: 'new-edit-0123456789' }));
+    await assertFails(lower('carol', 'view', { edit: 'new-edit-0123456789' }));
+    await assertSucceeds(lower('bob', 'comment', { edit: 'new-edit-0123456789' }));
+    await assertFails(join(as('bob'), 'bob', EDIT, 'edit'));
+    await assertSucceeds(lower('carol', 'view', { edit: 'newer-edit-012345678', comment: 'new-comment-0123456' }));
+    // Raising someone needs no new keys.
+    await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1/members/carol'), { role: 'edit' }));
   });
 
   it('the person who shared it is always an editor', async () => {
@@ -320,6 +347,12 @@ describe('removing someone changes every link that is on', () => {
     await assertFails(join(as('bob'), 'bob', 'k'));
   });
 
+  // Code review (high): the key of a share from before is in the share itself.
+  it('on a share from before, removing someone needs the key in the share to change too', async () => {
+    await seed({ 'shared/s1': { ...share, link: 'k' }, 'shared/s1/members/alice': person(), 'shared/s1/members/bob': { name: 'B', photo: null, key: 'k', joinedAt: 1 } });
+    await assertFails(deleteDoc(doc(as('alice'), 'shared/s1/members/bob')));
+  });
+
   it('with every link off, nothing has to change', async () => {
     await seedShare({ bob: 'edit' }, { edit: null });
     await assertSucceeds(deleteDoc(doc(as('alice'), 'shared/s1/members/bob')));
@@ -327,18 +360,18 @@ describe('removing someone changes every link that is on', () => {
 });
 
 describe('deleting a shared board takes its links, joins and comments', () => {
-  it('as deleteShare does now, in one batch', async () => {
+  it('as deleteShare does now: comments and joins records first, then the rest in one batch', async () => {
     await seedShare({ bob: 'edit', carol: 'comment' });
     await seed({ 'shared/s1/joins/bob': { key: EDIT }, 'shared/s1/comments/c1': { card: 'c_1', text: 'hi', author: 'carol', name: 'C', photo: null, at: 1, resolved: false } });
     const db = as('alice');
     const members = await getDocs(collection(db, 'shared/s1/members'));
     const comments = await getDocs(collection(db, 'shared/s1/comments'));
+    const first = writeBatch(db);
+    comments.docs.forEach((c) => first.delete(c.ref));
+    members.docs.forEach((m) => first.delete(doc(db, `shared/s1/joins/${m.id}`)));
+    await assertSucceeds(first.commit());
     const b = writeBatch(db);
-    members.docs.forEach((m) => {
-      b.delete(m.ref);
-      b.delete(doc(db, `shared/s1/joins/${m.id}`));
-    });
-    comments.docs.forEach((c) => b.delete(c.ref));
+    members.docs.forEach((m) => b.delete(m.ref));
     b.delete(doc(db, LINKS));
     b.delete(doc(db, 'shared/s1'));
     await assertSucceeds(b.commit());

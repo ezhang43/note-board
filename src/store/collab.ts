@@ -23,8 +23,11 @@ export interface ShareDoc {
   owner: string;
   /** The shared board (the others are inside it). */
   root: string;
-  /** The key in the current share link, or null when the link is turned off. */
-  link: string | null;
+  /**
+   * The key in the current share link, or null when the link is turned off; undefined while not
+   * known yet (the last one known stays).
+   */
+  link: string | null | undefined;
   data: string;
   /** Which open page last wrote it. */
   client: string;

@@ -1,0 +1,1 @@
+- Every Claude Code session on this project, in the cloud or on the owner's computer, now loads the owner's plugins (Impeccable, frontend-design, claude-code-setup, security-guidance) from the project settings.

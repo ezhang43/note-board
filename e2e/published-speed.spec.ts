@@ -25,7 +25,7 @@ test('the sign-in screen loads without the board code and with only IBM Plex San
 
   // Words only the board's own screens contain (the version bar, the panels): none of that code came down.
   expect(scripts.length).toBeGreaterThan(0);
-  for (const marker of ['Looking at an earlier version', 'Nothing cleaned up yet', 'Resize journal']) {
+  for (const marker of ['Looking at an earlier version', 'Ticked items stay in their list', 'Resize journal']) {
     expect(scripts.some((js) => js.includes(marker)), marker).toBe(false);
   }
   // Only Firebase's sign-in code (job 169): its database code (Firestore) comes down once someone is signed in.

@@ -43,7 +43,7 @@ export function PomodoroButton({ labelled = false, onOpen }: { labelled?: boolea
       }}
     >
       <TimerIcon />
-      {labelled ? 'Focus timer' : !time && 'Timer'}
+      {(labelled || !time) && 'Timer'}
       {time && <span className="pomodoro-left">{time}</span>}
     </button>
   );

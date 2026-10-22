@@ -54,7 +54,7 @@ test('Clean up fills the Completed panel, not the board; unticking there sends a
   // Untick: back to Groceries.
   await panel(page).getByLabel('Send "milk" back to Groceries').click();
   expect(await texts(groceries)).toEqual(['bread', 'eggs', 'milk']);
-  await expect(panel(page).getByText('Nothing cleaned up yet')).toBeVisible();
+  await expect(panel(page).getByText('Ticked items stay in their list.')).toBeVisible();
 
   // One undo step brings it back into the panel.
   await page.keyboard.press('Control+z');
@@ -164,6 +164,6 @@ test.describe('on a phone-sized screen', () => {
     await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
     const box = await panel(page).boundingBox();
     expect(box!.width).toBeGreaterThan(380);
-    await expect(panel(page).getByText('Nothing cleaned up yet')).toBeVisible();
+    await expect(panel(page).getByText('Ticked items stay in their list.')).toBeVisible();
   });
 });

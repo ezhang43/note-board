@@ -316,6 +316,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  overscroll-behavior: contain; /* a sheet that scrolls keeps its scroll to itself (the page already has none) */
 }
 .phone-add > button {
   height: 48px;
@@ -336,9 +337,13 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .phone-label { margin: 0 0 6px 2px; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
 .phone-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
 .phone-more .zoom-control button { min-width: 44px; height: 44px; font-size: 15px; }
-.phone-more .tool-button { width: 44px; height: 44px; }
+.phone-more .tool-button { width: auto; min-width: 44px; height: 44px; padding: 0 12px; gap: 6px; font: inherit; font-size: 15px; font-weight: 500; }
+/* A small grab handle marks it as a sheet (it closes on a tap outside, as before). */
+.phone-grab { flex: none; align-self: center; width: 36px; height: 4px; margin: -2px 0 -2px; border-radius: 2px; background: var(--control-edge); }
 /* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
 .phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+/* Eight panels sit four across (two full rows), six three across (two full rows too): never an empty tile. */
+.phone-tiles:has(> :nth-child(8)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .phone-trio { margin-top: 6px; }
 .phone-more .share-wrap.phone { display: contents; }
 .phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }
@@ -934,7 +939,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* ---------- the Completed panel (Clean up) ---------- */
 
 .completed-panel { display: flex; flex-direction: column; gap: 6px; padding: 0 2px; }
-.completed-empty { padding: 4px; font-size: calc(13px * var(--fs, 1)); color: var(--ink-faint); }
+.completed-empty { padding: 4px; font-size: calc(13px * var(--fs, 1)); line-height: 1.45; color: var(--ink-soft); }
+.completed-empty b { color: var(--ink); font-weight: 600; }
 .completed-day { display: flex; flex-direction: column; }
 .completed-date {
   margin: 6px 0 2px;
@@ -2726,9 +2732,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .weight-num { color: var(--ink-soft); font-size: 14px; font-variant-numeric: tabular-nums; }
 .weight-num b { color: var(--ink); font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 34px; }
 .weight-when { margin-left: auto; color: var(--ink-soft); font-size: 12px; }
-.weight-empty { margin-top: 6px; color: var(--ink-soft); font-size: 13px; }
-.weight-empty b { display: block; color: var(--ink); font-size: 15px; font-weight: 600; }
-.weight-ghost { height: 64px; margin-top: 10px; border-bottom: 1px dashed var(--control-edge); border-radius: 4px; background: linear-gradient(to top, color-mix(in srgb, var(--accent) 5%, transparent), transparent); }
 .weight-chart { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
 .weight-grid { stroke: var(--line); stroke-width: 1; }
 .weight-area { fill: var(--accent); opacity: 0.09; }
@@ -2754,7 +2757,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .weight-new:has(.weight-msg[role='alert']) .weight-kg { border-color: var(--danger); }
 .weight-kg input::placeholder { color: var(--placeholder); }
 .weight-kg span { color: var(--ink-soft); font-size: 12px; }
-.weight-save { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.weight-save { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.weight-save.ready { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .weight-acts { display: flex; gap: 6px; margin-top: 6px; }
 .weight-acts button { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .weight-acts .weight-remove { margin-right: auto; padding-left: 4px; color: var(--danger); }
@@ -2777,13 +2781,14 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (hover: hover) {
   .weight-row:hover { background: var(--hover); }
   .weight-row[aria-pressed='true']:hover { background: var(--accent-soft); }
-  .weight-save:hover { filter: brightness(1.08); }
+  .weight-save.ready:hover { filter: brightness(1.08); }
+  .weight-save:not(.ready):hover { background: var(--hover); }
   .weight-day:hover, .weight-acts button:hover { background: var(--hover); }
   .weight-undo:hover { text-decoration: underline; }
 }
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-input='keys']) .weight-new { transition: background-color 150ms var(--ease-out); }
-  html:not([data-input='keys']) .weight-day, html:not([data-input='keys']) .weight-save, html:not([data-input='keys']) .weight-acts button { transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out); }
+  html:not([data-input='keys']) .weight-day, html:not([data-input='keys']) .weight-save, html:not([data-input='keys']) .weight-acts button { transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out); }
   html:not([data-input='keys']) .weight-day:active, html:not([data-input='keys']) .weight-save:active, html:not([data-input='keys']) .weight-acts button:active { transform: scale(0.97); }
 }
 /* A phone: 44px controls, 16px text in the box (so the page doesn't zoom), rows of 46px. */
@@ -2908,6 +2913,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .habits-empty p { max-width: 220px; margin: 0 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
 .habits-empty-add { gap: 6px; height: 36px; border-color: transparent; background: var(--honey); color: var(--honey-ink); }
 .app.phone .habits-empty-add { height: 44px; }
+/* With no habits the box for the first one stands in for the button, inside the card. */
+.habits-empty .habit-new { align-self: stretch; border: 1px solid var(--control-edge); border-radius: 10px; }
 @container (min-width: 400px) {
   .habit-viewbar { flex-direction: row; align-items: center; }
   .habit-seg { flex: none; width: 210px; }
@@ -3291,4 +3298,9 @@ a.cal-open { align-self: flex-start; }
   .phone-more .colour-menu { grid-template-columns: repeat(auto-fill, 44px); gap: 8px; }
   .phone-more .swatch { width: 44px; height: 44px; aspect-ratio: auto; }
   .phone-more .swatch-default { height: 44px; }
+}
+/* A 320px phone: Hand, Select and A− A+ still share one row, so the tools are tighter. */
+@media (max-width: 340px) {
+  .phone-more .tool-button { padding: 0 8px; gap: 4px; font-size: 14px; }
+  .phone-more .tool-group, .phone-more .zoom-control { gap: 4px; }
 }

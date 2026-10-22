@@ -40,7 +40,7 @@ export function CompletedPanel() {
   return (
     <div className="completed-panel">
       {!card?.groups.length ? (
-        <p className="completed-empty">Nothing cleaned up yet</p>
+        <p className="completed-empty">Ticked items stay in their list. Press <b>Clean up</b> (in a list or the toolbar) to move them here, grouped by day.</p>
       ) : (
         card.groups.map((g) => (
           <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>

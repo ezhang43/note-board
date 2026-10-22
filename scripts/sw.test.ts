@@ -10,7 +10,7 @@ const SCOPE = 'https://example.test/note-board/';
 const source = readFileSync('public/sw.js', 'utf8');
 
 /** A tiny in-memory Cache Storage and fetch, and the worker's listeners to drive by hand. */
-function worker(network: { page: string | null; files: Record<string, string> }) {
+function worker(network: { page: string | null; files: Record<string, string> }, breakSaving = { on: false }) {
   const stores = new Map<string, Map<string, string>>();
   const cacheOf = (name: string) => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -18,7 +18,10 @@ function worker(network: { page: string | null; files: Record<string, string> })
     const key = (r: string | { url: string }) => (typeof r === 'string' ? r : r.url);
     return {
       match: async (r: string | { url: string }) => (m.has(key(r)) ? new Response(m.get(key(r))) : undefined),
-      put: async (r: string | { url: string }, res: Response) => void m.set(key(r), await res.text()),
+      put: async (r: string | { url: string }, res: Response) => {
+        if (breakSaving.on) throw new Error('quota');
+        m.set(key(r), await res.text());
+      },
       add: async (u: string) => void m.set(u, network.page ?? ''),
       keys: async () => [...m.keys()].map((url) => ({ url })),
       delete: async (r: { url: string } | string) => m.delete(key(r)),
@@ -47,7 +50,7 @@ function worker(network: { page: string | null; files: Record<string, string> })
     URL,
     Response,
   });
-  const all = () => stores.get('busyants-v5') ?? new Map<string, string>();
+  const all = () => stores.get('busyants-v6') ?? new Map<string, string>();
   /** Fetches `url` through the worker the way the browser would; resolves once everything it started has finished. */
   async function request(url: string, navigate = false) {
     const pending: Promise<unknown>[] = [];
@@ -58,7 +61,7 @@ function worker(network: { page: string | null; files: Record<string, string> })
     await new Promise((r) => setTimeout(r, 0));
     return res;
   }
-  return { all, request, setNetwork: (n: typeof network) => Object.assign(network, n) };
+  return { all, request, setNetwork: (n: typeof network) => Object.assign(network, n), breakSaving };
 }
 
 describe('the offline copy’s built files', () => {
@@ -84,6 +87,18 @@ describe('the offline copy’s built files', () => {
     await w.request(`${SCOPE}assets/lazy.js`);
     await w.request(SCOPE, true);
     expect([...w.all().keys()]).toEqual(expect.arrayContaining([`${SCOPE}assets/a1.js`, `${SCOPE}assets/lazy.js`]));
+  });
+
+  it('a cache that fails to save still serves the new page, and deletes nothing', async () => {
+    const net = { page: '<script src="assets/a1.js">', files: { [`${SCOPE}assets/a1.js`]: 'old' } };
+    const w = worker(net);
+    await w.request(SCOPE, true);
+    await w.request(`${SCOPE}assets/a1.js`);
+    w.setNetwork({ page: '<script src="assets/b2.js">', files: net.files });
+    w.breakSaving.on = true;
+    const res = await w.request(SCOPE, true);
+    expect(await res.text()).toContain('b2.js');
+    expect(w.all().has(`${SCOPE}assets/a1.js`)).toBe(true);
   });
 
   it('opened offline, nothing is cleared and the saved page is served', async () => {

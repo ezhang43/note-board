@@ -13,13 +13,12 @@ import { addNewCard, addNewColumn } from './blocks';
 // Pointer gestures on blocks: dragging a block, dragging a new block from the toolbar, resizing.
 
 export function gestureActions(ctx: StoreContext) {
-  const { commit, updateUi, requestSettle, measured, heights } = ctx;
+  const { commit, updateUi, requestSettle, measured } = ctx;
   /** The last drag preview, kept while the pointer stays over the same grid spot. */
   /** The block being resized as it was before the drag, to tell its row and what is above it from what it now covers. */
   let resizeStart: { id: string; rect: Rect } | null = null;
   let dragPreview: { board: Board; tx: number; ty: number; at: Point; bumped: Record<string, Point> } | null = null;
 
-  /** Size of a block being dragged, as it will be once dropped loose on the board. */
   /** The box around every block of a group drag, moved by `by` from where they were. */
   function groupBox(d: Drag, by: { x: number; y: number }) {
     const rects = [d.id, ...d.group].flatMap((id) => blockRect(ctx.state.board, id, measured) ?? []);
@@ -30,11 +29,10 @@ export function gestureActions(ctx: StoreContext) {
     return { x: left + by.x, y: top + by.y, w: right - left, h: bottom - top };
   }
 
+  /** Size of a block being dragged, as it will be once dropped loose on the board (a card not drawn yet is as tall as a card). */
   function draggedSize(d: Drag) {
-    const { board } = ctx.state;
-    const h = heights.get(d.id) ?? NEW_BLOCK_H.column;
-    if (d.kind === 'column') return { w: board.columns[d.id]?.w ?? COLUMN_W, h };
-    return { w: board.cards[d.id]?.w ?? CARD_W, h };
+    const r = blockRect(ctx.state.board, d.id, measured);
+    return { w: r?.w ?? (d.kind === 'column' ? COLUMN_W : CARD_W), h: r?.h ?? NEW_BLOCK_H.column };
   }
 
   return {

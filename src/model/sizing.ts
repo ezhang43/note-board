@@ -122,10 +122,12 @@ export function resizeFrom(
   // From the left or top edge it is that edge that lands on the grid, not the size (the opposite edge
   // may be off the grid, e.g. after a size match or a card that fits its text). A matched size wins.
   let { w, h, label } = r;
+  // The label's "· same height as N blocks" part, kept when only the size part has to change.
+  const same = r.label.slice((r.h == null ? `${r.w} wide` : `${r.w} × ${r.h}`).length);
   const [minW, maxW] = kind === 'column' ? [COLUMN_MIN_W, COLUMN_MAX_W] : [CARD_MIN_W, CARD_MAX_W];
-  if (snap && west && !r.label.includes('width')) w = clamp(right - snapToGrid(right - r.liveW), minW, maxW);
-  if (snap && north && h != null && r.liveH != null && !r.label.includes('height')) h = clamp(bottom - snapToGrid(bottom - r.liveH), minH, BLOCK_MAX_H);
-  if (w !== r.w || h !== r.h) label = h == null ? `${w} wide` : `${w} × ${h}`;
+  if (snap && west && !same.includes('width')) w = clamp(right - snapToGrid(right - r.liveW), minW, maxW);
+  if (snap && north && h != null && r.liveH != null && !same.includes('height')) h = clamp(bottom - snapToGrid(bottom - r.liveH), minH, BLOCK_MAX_H);
+  if (w !== r.w || h !== r.h) label = (h == null ? `${w} wide` : `${w} × ${h}`) + same;
   return {
     ...r,
     w,

@@ -51,12 +51,25 @@ export function returnPushes(board: Board, pushes: Pushes, top: string, measured
   });
   const going = new Set([top, ...back.map(([id]) => id)]);
   const others = board.order.filter((id) => !going.has(id)).flatMap((id) => blockRect(board, id, measured) ?? []);
+  // A block that can't go back stays where it is, and so blocks its neighbours' old spots too (job 183:
+  // otherwise two pushed blocks could both be sent to the same spot). Repeat until none more is stopped.
+  const blockers = [...others];
+  const stays = new Set<string>();
+  for (let again = true; again; ) {
+    again = false;
+    for (const [id, p] of back) {
+      const r = blockRect(board, id, measured);
+      if (!r || stays.has(id) || !blockers.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
+      stays.add(id);
+      blockers.push(r);
+      again = true;
+    }
+  }
   const cards = { ...board.cards };
   const columns = { ...board.columns };
   let moved = false;
   for (const [id, p] of back) {
-    const r = blockRect(board, id, measured);
-    if (!r || others.some((o) => overlaps({ ...r, ...p.from }, o, BLOCK_GAP - 1))) continue;
+    if (stays.has(id) || !blockRect(board, id, measured)) continue;
     if (columns[id]) columns[id] = { ...columns[id], ...p.from };
     else cards[id] = { ...cards[id], ...p.from };
     moved = true;

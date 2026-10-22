@@ -1,7 +1,7 @@
 import { addCard, type Placement } from './board';
 import { newId, type MakeId } from './cards';
 import { MAX_DEPTH, editItems, findItem, flatIds, refill, sections, setItemsDone, subtreeHeight } from './checklist';
-import type { Board, Card, CompletedCard, CompletedEntry, TodoItem } from './types';
+import type { Board, Card, CompletedCard, CompletedEntry, CompletedGroup, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
 // Completed card, grouped by the day Clean up was clicked. The Completed card is never deleted.
@@ -20,8 +20,42 @@ export function dayLabel(day: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+const isRecord = (c: Card): c is CompletedCard => c.kind === 'completed';
+
+/** The days of several records as one list: entries of the same day together, newest day first. */
+function mergeDays(records: CompletedCard[]): CompletedGroup[] {
+  const days = new Map<string, CompletedEntry[]>();
+  for (const g of records.flatMap((r) => r.groups)) days.set(g.date, [...(days.get(g.date) ?? []), ...g.entries]);
+  return [...days].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)).map(([date, entries]) => ({ date, entries }));
+}
+
+const viewOf = new WeakMap<Board, CompletedCard | null>();
+
+/**
+ * The board's Completed record. A shared board can end up with two (each device made its own at its
+ * first Clean up, job 183): then this is the first one (lowest id) with every record's days in it, so
+ * nothing is hidden. The same board always gives the same object.
+ */
 export function completedCardOf(board: Board): CompletedCard | null {
-  return Object.values(board.cards).find((c): c is CompletedCard => c.kind === 'completed') ?? null;
+  if (viewOf.has(board)) return viewOf.get(board)!;
+  const all = Object.values(board.cards).filter(isRecord).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const view = all.length > 1 ? { ...all[0], groups: mergeDays(all) } : (all[0] ?? null);
+  viewOf.set(board, view);
+  return view;
+}
+
+/** `place`, or a loose spot when it names a column that is gone (the card is never left in no place). */
+const placeOrLoose = (board: Board, place: Placement): Placement => (place.type === 'column' && !board.columns[place.columnId] ? { type: 'loose', x: 0, y: 0 } : place);
+
+/** Folds a second Completed record into the first, so Clean up and restore have just one to change. */
+function oneRecord(board: Board): Board {
+  const view = completedCardOf(board);
+  const extra = Object.values(board.cards).filter((c) => isRecord(c) && c.id !== view?.id).map((c) => c.id);
+  if (!view || !extra.length) return board;
+  const cards = { ...board.cards, [view.id]: view };
+  for (const id of extra) delete cards[id];
+  const columns = Object.fromEntries(Object.entries(board.columns).map(([id, c]) => [id, { ...c, cardIds: c.cardIds.filter((k) => !extra.includes(k)) }]));
+  return { ...board, cards, columns, order: board.order.filter((id) => !extra.includes(id)) };
 }
 
 /** To-do lists in the order they appear: loose ones and columns back to front, cards in a column top to bottom. */
@@ -94,7 +128,7 @@ export function cleanUp(
   onlyCardId?: string,
 ): { board: Board; count: number; cardId: string | null } {
   const entries: CompletedEntry[] = [];
-  let b = board;
+  let b = oneRecord(board);
   for (const id of onlyCardId ? [onlyCardId] : listsInOrder(board)) {
     const card = board.cards[id];
     if (card?.kind !== 'todo') continue;
@@ -108,7 +142,7 @@ export function cleanUp(
   let done = completedCardOf(b);
   if (!done) {
     const card: CompletedCard = { id: makeId('k'), kind: 'completed', color: 'stone', collapsed: false, x: 0, y: 0, w: null, h: null, groups: [] };
-    b = addCard(b, card, place);
+    b = addCard(b, card, placeOrLoose(b, place));
     done = card;
   }
   const groups = done.groups.some((g) => g.date === day)
@@ -126,13 +160,14 @@ export function cleanUp(
  * Its sub-items keep their ticks. Returns the board and the list it went to.
  */
 export function restoreEntry(board: Board, itemId: string, place: Placement, makeId: MakeId = newId): { board: Board; cardId: string | null } {
-  const done = completedCardOf(board);
+  const folded = oneRecord(board);
+  const done = completedCardOf(folded);
   const entry = done?.groups.flatMap((g) => g.entries).find((e) => e.item.id === itemId);
   if (!done || !entry) return { board, cardId: null };
   const groups = done.groups
     .map((g) => ({ ...g, entries: g.entries.filter((e) => e !== entry) }))
     .filter((g) => g.entries.length);
-  let b: Board = { ...board, cards: { ...board.cards, [done.id]: { ...done, groups } } };
+  let b: Board = { ...folded, cards: { ...folded.cards, [done.id]: { ...done, groups } } };
   const item: TodoItem = { ...structuredClone(entry.item), done: false };
 
   const src = b.cards[entry.fromCardId];
@@ -160,5 +195,5 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
     items: [item],
     completedOpen: true,
   };
-  return { board: addCard(b, card, place), cardId: card.id };
+  return { board: addCard(b, card, placeOrLoose(b, place)), cardId: card.id };
 }

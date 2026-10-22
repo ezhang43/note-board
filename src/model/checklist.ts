@@ -145,8 +145,13 @@ export function enterItem(
  */
 export function indentItem(items: TodoItem[], id: string): TodoItem[] | null {
   const next = cloned(items);
-  const loc = findItem(next, id);
-  if (!loc || loc.depth + 1 + subtreeHeight(loc.item) > MAX_DEPTH) return null;
+  return indentIn(next, id) ? next : null;
+}
+
+/** Nests the item in place (`items` must be a copy). False if it can't move. */
+function indentIn(items: TodoItem[], id: string): boolean {
+  const loc = findItem(items, id);
+  if (!loc || loc.depth + 1 + subtreeHeight(loc.item) > MAX_DEPTH) return false;
   let above: TodoItem | null = null;
   for (let i = loc.index - 1; i >= 0; i--) {
     if (loc.parent || loc.list[i].done === loc.item.done) {
@@ -154,40 +159,49 @@ export function indentItem(items: TodoItem[], id: string): TodoItem[] | null {
       break;
     }
   }
-  if (!above) return null;
+  if (!above) return false;
   loc.list.splice(loc.index, 1);
   above.children.push(loc.item);
-  return next;
+  reopenAbove(items, loc.item);
+  return true;
 }
 
 /** Shift+Tab: move an item out one level, to just after the item it was nested under. */
 export function outdentItem(items: TodoItem[], id: string): TodoItem[] | null {
   const next = cloned(items);
-  const loc = findItem(next, id);
-  if (!loc || !loc.parent) return null;
-  const parentLoc = findItem(next, loc.parent.id)!;
+  return outdentIn(next, id) ? next : null;
+}
+
+/** Moves the item out in place (`items` must be a copy). False if it can't move. */
+function outdentIn(items: TodoItem[], id: string): boolean {
+  const loc = findItem(items, id);
+  if (!loc || !loc.parent) return false;
+  const parentLoc = findItem(items, loc.parent.id)!;
   loc.list.splice(loc.index, 1);
   parentLoc.list.splice(parentLoc.index + 1, 0, loc.item);
-  return next;
+  return true;
 }
 
 /**
  * Tab with several items selected: every selected item (with its sub-items) moves in one level,
  * each as Tab would move it. One that can't (e.g. the first item of a list, with nothing above it)
  * stays, and the ones after it nest under it. Null if none of them can move.
+ * The list is copied once, then changed in place (a copy per item made 1,000 items take seconds).
  */
 export function indentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
-  let next = items;
-  for (const id of rootsOf(items, ids)) next = indentItem(next, id) ?? next;
-  return next === items ? null : next;
+  const next = cloned(items);
+  let moved = false;
+  for (const id of rootsOf(items, ids)) moved = indentIn(next, id) || moved;
+  return moved ? next : null;
 }
 
 /** Shift+Tab with several items selected: every selected item that can moves out one level. */
 export function outdentItems(items: TodoItem[], ids: string[]): TodoItem[] | null {
-  let next = items;
+  const next = cloned(items);
+  let moved = false;
   // Bottom one first, so items that end up side by side keep their order.
-  for (const id of rootsOf(items, ids).reverse()) next = outdentItem(next, id) ?? next;
-  return next === items ? null : next;
+  for (const id of rootsOf(items, ids).reverse()) moved = outdentIn(next, id) || moved;
+  return moved ? next : null;
 }
 
 /**
@@ -281,6 +295,14 @@ function ancestorsOf(items: TodoItem[], id: string): TodoItem[] {
     if (inner.length || it.children.some((c) => c.id === id)) return [it, ...inner];
   }
   return [];
+}
+
+/**
+ * An open item can't sit under a ticked one (Clean up would sweep it away unticked): in a copy of the
+ * list, untick the items an open `item` is nested in (owner decision, 2026-10-22, job 183).
+ */
+function reopenAbove(items: TodoItem[], item: TodoItem): void {
+  if (!item.done) for (const a of ancestorsOf(items, item.id)) a.done = false;
 }
 
 /**
@@ -486,6 +508,7 @@ export function insertItems(items: TodoItem[], drop: ItemDrop, moving: TodoItem[
     if (t.depth + height > MAX_DEPTH) return null;
     t.list.splice(t.index + (drop.mode === 'after' ? 1 : 0), 0, ...moving);
   }
+  for (const m of moving) reopenAbove(next, m);
   return next;
 }
 

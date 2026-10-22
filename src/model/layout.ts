@@ -1,4 +1,4 @@
-import { BLOCK_GAP, BLOCK_MIN_H, CARD_MIN_W, CARD_W, COLUMN_MIN_W, GRID, NEW_BLOCK_H } from './constants';
+import { BLOCK_GAP, BLOCK_MIN_H, CARD_MIN_W, CARD_W, COLLAPSED_MIN_H, COLUMN_MIN_W, GRID, NEW_BLOCK_H } from './constants';
 import { freeSpot, overlaps, snapIf, snapToGrid } from './geometry';
 import type { Board, Point, Rect } from './types';
 
@@ -159,8 +159,9 @@ export function shiftRow(board: Board, id: string, measured: MeasuredHeight, dra
 /**
  * After a resize from the top edge (owner request 2026-10-21): blocks above `id` that it now covers
  * (or comes within 10px of) move straight up out of its way, and so do the blocks above those.
- * "Above" means starting higher than the block's top edge was before the drag (`wasTop`), so blocks
- * beside it and below it stay even when a corner drag now covers them (job #142). On the grid when
+ * "Above" means ending at or above the block's top edge as it was before the drag (`wasTop`, give or
+ * take the gap's slack), so blocks beside it (even a taller one that starts a little higher, job 183) and
+ * below it stay even when a corner drag now covers them (job #142). On the grid when
  * snapping is on. Returns the same board when nothing moves.
  */
 export function pushUp(board: Board, id: string, measured: MeasuredHeight, wasTop: number): Board {
@@ -168,7 +169,7 @@ export function pushUp(board: Board, id: string, measured: MeasuredHeight, wasTo
   if (!a) return board;
   const above = board.order.flatMap((o) => {
     const r = o === id ? null : blockRect(board, o, measured);
-    return r && r.y < wasTop ? [{ id: o, r }] : [];
+    return r && r.y < wasTop && r.y + r.h <= wasTop + BLOCK_GAP - 1 ? [{ id: o, r }] : [];
   });
   above.sort((p, q) => q.r.y + q.r.h - (p.r.y + p.r.h));
   const placed = [a];
@@ -212,7 +213,7 @@ export function snapAll(board: Board): Board {
   const cards = Object.fromEntries(
     Object.entries(board.cards).map(([id, c]) => [
       id,
-      { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y), w: snapSize(c.w, CARD_MIN_W), h: snapSize(c.h, BLOCK_MIN_H) },
+      { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y), w: snapSize(c.w, CARD_MIN_W), h: snapSize(c.h, BLOCK_MIN_H), ...(c.collapsedH != null && { collapsedH: snapSize(c.collapsedH, COLLAPSED_MIN_H) }) },
     ]),
   );
   const columns = Object.fromEntries(

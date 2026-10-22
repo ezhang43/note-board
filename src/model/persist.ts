@@ -11,6 +11,8 @@ export const BOARD_KEY = 'note-board:v1';
 export const VIEW_KEY = 'note-board:view:v1';
 /** Where a save on this device that can't be read is kept (job #160); a second one goes in `-2`, and so on. */
 export const UNREADABLE_KEY = 'note-board:v1:unreadable';
+/** Which account the boards kept on this device (BOARD_KEY) belong to (job #145). */
+export const OWNER_KEY = 'note-board:owner-uid';
 /** Bump when the saved shape changes, and teach parseBoard to read the old shape. */
 export const BOARD_VERSION = 2;
 

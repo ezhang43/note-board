@@ -2,7 +2,7 @@ import { centreOf, screenToBoard } from '../model/view';
 import { emptyHistory, recordChange, redo as redoStep, undo as undoStep, type History } from '../model/history';
 import { closeGaps, settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
-import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
+import { BOARD_KEY, OWNER_KEY, UNREADABLE_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
 import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
@@ -190,6 +190,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     }
   }
 
+  /**
+   * The account whose boards this page holds (job #145; null: none kept yet). Its boards aren't saved
+   * once another tab has made the device another account's (review 181-A L1).
+   */
+  let owner = read(OWNER_KEY);
+
   let state: AppState = {
     ...split(got?.ws ?? parseWorkspace(null), read(OPEN_BOARD_KEY)),
     view: { ...parseView(read(VIEW_KEY)), theme: startingTheme(read(THEME_KEY), prefersDark()), fontSize: startingFontSize(read(FONT_KEY)) },
@@ -237,6 +243,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     boardTimer = null;
     // Until something else replaces the save that can't be read (another account signing in), it stays.
     if (keepSave && read(BOARD_KEY) === saved) return;
+    const now = read(OWNER_KEY);
+    if (owner !== null && now !== null && now !== owner) return;
     keepSave = false;
     write(BOARD_KEY, serializeWorkspace(workspace()));
   }
@@ -603,6 +611,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       return () => {
         listeners.delete(listener);
       };
+    },
+    /** This page now holds account `uid`'s boards (claimDevice, job #145). */
+    holdBoardsOf(uid: string) {
+      owner = uid;
     },
     /** Saves any waiting board change and pan/zoom now (used when the page is hidden or closed). */
     flush() {

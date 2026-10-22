@@ -31,7 +31,7 @@ import {
 } from 'firebase/firestore';
 import type { Comment } from '../model/comments';
 import type { AccountBackend } from '../store/account';
-import { above, lowers, NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
+import { above, googlePhoto, lowers, NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
 import { ONLINE_LIMIT, type Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 import { app } from './firebase';
@@ -372,7 +372,7 @@ export function collabRemote(user: User): CollabBackend {
         (snap: QuerySnapshot) => {
           const when = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
           const people = snap.docs
-            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: typeof d.data().photo === 'string' && (d.data().photo as string).startsWith('https://') ? (d.data().photo as string) : null, role: roleOf(d.data()), at: when(d.data().joinedAt) }))
+            .map((d) => ({ uid: d.id, name: String(d.data().name ?? ''), photo: googlePhoto(d.data().photo), role: roleOf(d.data()), at: when(d.data().joinedAt) }))
             .sort((a, b) => a.at - b.at)
             .map(({ uid, name, photo, role }) => ({ uid, name, photo, role }));
           onChange(people);
@@ -520,8 +520,7 @@ export function collabRemote(user: User): CollabBackend {
             // A comment still on its way has no server time yet: this device's estimate stands in.
             const c = d.data({ serverTimestamps: 'estimate' });
             if (typeof c.card !== 'string' || typeof c.text !== 'string' || typeof c.author !== 'string' || typeof c.name !== 'string') continue;
-            const photo = typeof c.photo === 'string' && c.photo.startsWith('https://') ? c.photo : null;
-            list.push({ id: d.id, card: c.card, text: c.text, author: c.author, name: c.name, photo, at: ms(c.at) ?? Date.now(), resolved: c.resolved === true, resolvedAt: ms(c.resolvedAt) });
+            list.push({ id: d.id, card: c.card, text: c.text, author: c.author, name: c.name, photo: googlePhoto(c.photo), at: ms(c.at) ?? Date.now(), resolved: c.resolved === true, resolvedAt: ms(c.resolvedAt) });
           }
           onChange(list);
         },

@@ -298,6 +298,25 @@ describe('sharing a new board on the published site (job 22)', () => {
     expect(seen.at(-1)).toEqual(['u1']);
   });
 
+  it('a photo from anywhere but Google’s photo server isn’t shown, in People or on a comment (review 181-A M2)', async () => {
+    const tracker = 'https://tracker.example/pixel.png';
+    const google = 'https://lh3.googleusercontent.com/a/ann';
+    for (const m of [fs.server, fs.local]) {
+      m.set('shared/s1/members/u2', { name: 'Ann', photo: tracker, role: 'edit', joinedAt: 0 });
+      m.set('shared/s1/members/u3', { name: 'Bo', photo: google, role: 'edit', joinedAt: 1 });
+      m.set('shared/s1/comments/c1', { card: 'c_1', text: 'hi', author: 'u2', name: 'Ann', photo: tracker, at: 0, resolved: false });
+    }
+    const people: (string | null)[][] = [];
+    const comments: (string | null)[][] = [];
+    collabRemote(user).watchPeople('s1', (list) => people.push(list.map((p) => p.photo)), () => {});
+    collabRemote(user).watchComments('s1', (list) => comments.push(list.map((c) => c.photo)), () => {});
+    await ticks();
+    fs.answerWatches();
+    await ticks();
+    expect(people.at(-1)).toEqual([null, google]);
+    expect(comments.at(-1)).toEqual([null]);
+  });
+
   it('other errors (no connection, say) are passed on at once', async () => {
     void fs.write([['boards/u1/shared/s1', { joinedAt: 0 }]]);
     const errors: unknown[] = [];

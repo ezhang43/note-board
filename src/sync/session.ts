@@ -2,7 +2,7 @@ import { appStore } from '../store/appStore';
 import { boardsInKeptShares, ownBoardsGuard, startSharing, type Sharing } from '../store/sharing';
 import { startSync, type SaveState } from '../store/sync';
 import { activeVersionStore, startVersions } from '../store/versions';
-import { claimDevice, deleteAccountData, OWNER_KEY } from '../store/account';
+import { claimDevice, deleteAccountData, heldKey, OWNER_KEY } from '../store/account';
 import { account, finishDeletion, takeDeletedNote } from './account';
 import { collab, joinFromAddress } from './collabSession';
 import { feedback } from './feedback';
@@ -130,6 +130,15 @@ async function start(user: User, quiet = false) {
     sync = startSync(appStore, guard.remote, {
       client,
       isShared: guard.isShared,
+      heldBase: localStorage.getItem(heldKey(user.uid)),
+      onHeld: (base) => {
+        try {
+          if (base) localStorage.setItem(heldKey(user.uid), base);
+          else localStorage.removeItem(heldKey(user.uid));
+        } catch {
+          // Storage full or blocked: the changes still go online once this page may send them.
+        }
+      },
       onReady: () => {
         // Version history starts once the online board is in, so its arrival isn't taken for an edit.
         versions = startVersions(appStore, versionsRemote(user.uid));
@@ -245,6 +254,7 @@ for (const event of ['online', 'offline'] as const) {
 /** The small note by the zoom control (null while the "couldn't save" banner shows instead). */
 function saveNote(): string | null {
   if (saveState === 'failed' || shareSaveState === 'failed') return null;
+  if (saveState === 'held') return 'Your account is being deleted on another device; changes here aren’t saved yet';
   if (!online) return 'Offline. Will save when you’re back online';
   return saveState === 'saving' || shareSaveState === 'saving' ? 'Saving…' : 'Saved';
 }

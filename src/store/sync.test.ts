@@ -594,7 +594,8 @@ describe('the account being deleted on another page', () => {
     vi.advanceTimersByTime(SYNC_DELAY * 2);
     expect(fake.writes).toEqual([]);
     expect(onGone).not.toHaveBeenCalled();
-    expect(onSaveState).toHaveBeenLastCalledWith('saving');
+    // Said plainly, not "Saving…" (review 181-A H1 c).
+    expect(onSaveState).toHaveBeenLastCalledWith('held');
   });
 
   it('a change waiting here when it starts is kept, not replaced by the boards in the marker', () => {
@@ -731,6 +732,92 @@ describe('the account being deleted on another page', () => {
     expect(onGone).not.toHaveBeenCalled();
     expect(fake.writes).toHaveLength(1);
     expect(fake.writes[0].data).toContain('Mine here');
+  });
+});
+
+// Review 181-A H1: a marker left behind held a page's changes back, and closing or reloading that page
+// threw them away (the marker's boards showed on the next open). Changes held back are now noted on the
+// device (onHeld: a fingerprint of the online boards they were made on), and a page opened on those same
+// boards keeps this device's copy and sends it once it may.
+describe('changes held back while the account is being deleted elsewhere (181-A H1)', () => {
+  const started = (name = 'Mine'): RemoteDoc => ({ data: boardJson(name), client: 'old-page', deleting: 'started' });
+  function page(first: RemoteDoc | null, heldBase: string | null = null, from?: Store) {
+    const store = createStore(null, (fn) => fn());
+    if (from) store.replaceWorkspace(from.workspace());
+    const fake = fakeRemote();
+    const onSaveState = vi.fn();
+    const onHeld = vi.fn();
+    const onReady = vi.fn();
+    const sync = startSync(store, fake.remote, { client: crypto.randomUUID(), onReady, onError: vi.fn(), onSaveState, heldBase, onHeld });
+    fake.send(first);
+    return { store, fake, onSaveState, onHeld, onReady, sync };
+  }
+  /** A first page, opened on a marker left behind, where the person typed: the fingerprint it noted. */
+  function typedWhileHeld() {
+    const first = page(started());
+    first.store.renameBoard('Typed while held');
+    expect(first.onHeld).toHaveBeenCalledTimes(1);
+    const base = first.onHeld.mock.calls[0][0] as string;
+    expect(base).toEqual(expect.any(String));
+    first.sync.stop();
+    return { first, base };
+  }
+
+  it('changes held back are noted once, and the note says so plainly', () => {
+    const { first } = typedWhileHeld();
+    expect(first.onSaveState).toHaveBeenLastCalledWith('held');
+    expect(first.fake.writes).toEqual([]);
+  });
+
+  it('nothing is noted, nor said, when nothing was changed here', () => {
+    const { onHeld, onSaveState } = page(started());
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(onHeld).not.toHaveBeenCalled();
+    expect(onSaveState).not.toHaveBeenCalledWith('held');
+  });
+
+  it('the next page, opened on the same marker, keeps this device’s copy and sends it once the marker is taken to be left behind', async () => {
+    const { first, base } = typedWhileHeld();
+    const next = page(started(), base, first.store);
+    expect(next.onReady).toHaveBeenCalledOnce();
+    expect(next.store.getState().board.name).toBe('Typed while held');
+    expect(next.onSaveState).toHaveBeenLastCalledWith('held');
+    vi.advanceTimersByTime(DELETING_WAIT_MS - 1);
+    expect(next.fake.writes).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(next.fake.writes).toHaveLength(1);
+    expect(next.fake.writes[0].data).toContain('Typed while held');
+    await settled();
+    expect(next.onHeld).toHaveBeenLastCalledWith(null);
+    expect(next.onSaveState).toHaveBeenLastCalledWith('saved');
+  });
+
+  it('the next page, opened once the same boards are back online (the deleting failed), sends this device’s copy', () => {
+    const { first, base } = typedWhileHeld();
+    const next = page({ data: boardJson('Mine'), client: 'old-page' }, base, first.store);
+    expect(next.store.getState().board.name).toBe('Typed while held');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(next.fake.writes).toHaveLength(1);
+    expect(next.fake.writes[0].data).toContain('Typed while held');
+  });
+
+  it('if the boards online changed since (work done elsewhere later), they win as on any open, and the note is dropped', () => {
+    const { first, base } = typedWhileHeld();
+    const next = page({ data: boardJson('Newer, from another device'), client: 'old-page' }, base, first.store);
+    expect(next.store.getState().board.name).toBe('Newer, from another device');
+    expect(next.onHeld).toHaveBeenCalledWith(null);
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(next.fake.writes).toEqual([]);
+  });
+
+  it('a page still open sends its changes once the boards are back, and drops the note', async () => {
+    const { store, fake, onHeld } = page(started());
+    store.renameBoard('Typed while held');
+    fake.send({ data: boardJson('Mine'), client: 'old-page' });
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    await settled();
+    expect(onHeld).toHaveBeenLastCalledWith(null);
   });
 });
 
@@ -1024,6 +1111,26 @@ describe('one computer, several accounts (job #145, review 137-A finding H2)', (
     expect(a.uploaded.flat()).not.toContain('Alice home');
     expect(names(readWorkspace(storage.getItem(parkedKey('alice')))!.ws)).toEqual(['Alice home', 'Alice private journal']);
     a.sync.stop();
+  });
+
+  it('a change in a tab still holding the last account’s boards isn’t saved over the new account’s (review 181-A L1)', async () => {
+    const storage = aliceLeftHerBoards();
+    const tabA = createStore(storage, (fn) => fn());
+    const tabB = createStore(storage, (fn) => fn());
+    claimDevice(tabB, storage, 'bob', 'alice');
+    tabB.renameBoard('Bob home');
+    tabB.flush();
+    // Something still changes Alice's boards in tab A (a late tidy, say), and is saved there.
+    tabA.renameBoard('Alice home, edited');
+    tabA.flush();
+    expect(names(readWorkspace(storage.getItem(BOARD_KEY))!.ws)).toEqual(['Bob home']);
+    const a = await signIn(tabA, storage, 'bob', null, 'alice');
+    expect(a.uploaded.flat()).not.toContain('Alice private journal');
+    a.sync.stop();
+    // Tab B, the one holding Bob's boards, still saves.
+    tabB.renameBoard('Bob home 2');
+    tabB.flush();
+    expect(names(readWorkspace(storage.getItem(BOARD_KEY))!.ws)).toEqual(['Bob home 2']);
   });
 
   it('the earlier account gets its boards back when it signs in here again', async () => {

@@ -347,6 +347,22 @@ describe('session: signing out and an account deleted elsewhere', () => {
     }
   });
 
+  it('a marker left behind by a delete that stopped part-way: the note says so plainly, and changes held back survive a reload (review 181-A H1)', async () => {
+    const online = parseWorkspace(null);
+    online.boards[online.home] = { ...online.boards[online.home], name: 'From the marker' };
+    const marker: RemoteDoc = { data: serializeWorkspace(online), client: 'closed-page', deleting: 'started' };
+    let s = await load();
+    await signInReady(alice, marker);
+    s.appStore.renameBoard('Typed while held');
+    expect(s.session.getSaveNote()).toBe('Your account is being deleted on another device; changes here aren’t saved yet');
+    expect(local.getItem('note-board:held-edits:alice')).toEqual(expect.any(String));
+    // Reloaded: the marker's boards don't replace this device's (here, the page's own board).
+    s = await load();
+    await signInReady(alice, marker);
+    expect(s.appStore.getState().board.name).not.toBe('From the marker');
+    expect(s.session.getSaveNote()).toBe('Your account is being deleted on another device; changes here aren’t saved yet');
+  });
+
   it('a different person signing in gets the sharing and sync of their own, and the earlier person’s is stopped', async () => {
     const s = await load();
     await signInReady(alice);

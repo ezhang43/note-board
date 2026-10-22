@@ -1,11 +1,13 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyEvent } from 'react';
 import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
 import { appStore, useAppState } from '../store/appStore';
 import { boxKey, focusedBox } from './textBox';
+import { panelCovers } from './textField';
 
 // The small format bar (owner request): shows above a text box when some of its text is
 // highlighted, or above selected checklist items. Its buttons format whole text boxes.
+// From the keyboard (job 174): Alt+F10 moves into it; arrows and Tab go round it; Escape goes back to the text.
 
 interface Target {
   boxes: Box[];
@@ -35,6 +37,17 @@ function findTarget(): Target | null {
   };
 }
 
+/** While the keyboard is in the bar, the text it formats has lost focus: the bar must stay. */
+const focusInBar = () => document.activeElement?.closest('.format-bar') != null;
+
+/** The same boxes, at their new place (after undo, zoom or a resize); gone when one of them is. */
+function refollow(t: Target): Target | null {
+  const rects = t.boxes.map((b) => document.querySelector(`[data-box="${CSS.escape(boxKey(b))}"]`)?.getBoundingClientRect());
+  if (rects.some((r) => !r)) return null;
+  const r = rects as DOMRect[];
+  return { boxes: t.boxes, left: Math.min(...r.map((x) => x.left)), top: Math.min(...r.map((x) => x.top)), bottom: Math.max(...r.map((x) => x.bottom)) };
+}
+
 const BAR_H = 36;
 const SIZES: { key: TextSize; label: string; px: number }[] = [
   { key: 'small', label: 'Small', px: 11 },
@@ -50,24 +63,42 @@ export function FormatBar() {
   const [target, setTarget] = useState<Target | null>(null);
   const [fontsOpen, setFontsOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const fontButton = useRef<HTMLButtonElement>(null);
+  const fontMenu = useRef<HTMLDivElement>(null);
+  // Where Alt+F10 came from, so Escape can put the cursor and the highlighted text back.
+  const back = useRef<{ el: HTMLElement; start: number | null; end: number | null } | null>(null);
 
   // After any board, view or selection change.
-  useEffect(() => setTarget(findTarget()), [board, view, itemSel]);
+  const refresh = () => setTarget(focusInBar() ? (t) => t && refollow(t) : findTarget());
+  useEffect(refresh, [board, view, itemSel]); // simple: `refresh` is new each render but only uses setTarget (stable)
 
   useEffect(() => {
-    const update = () => setTarget(findTarget());
+    const update = refresh;
+    // Alt+F10 (as in Google Docs): into the bar, while some text is highlighted.
+    const toBar = (e: KeyboardEvent) => {
+      if (e.key !== 'F10' || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || panelCovers() || focusInBar()) return;
+      const first = document.querySelector<HTMLElement>('.format-bar button');
+      if (!first) return;
+      e.preventDefault();
+      const el = document.activeElement;
+      const field = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el : null;
+      back.current = el instanceof HTMLElement ? { el, start: field?.selectionStart ?? null, end: field?.selectionEnd ?? null } : null;
+      first.focus();
+    };
     // Text selection inside a field changes without any store change.
     const later = () => setTimeout(update, 0);
     document.addEventListener('selectionchange', update);
     document.addEventListener('select', update, true);
     document.addEventListener('keyup', update, true);
     document.addEventListener('focusout', later, true);
+    document.addEventListener('keydown', toBar);
     window.addEventListener('resize', update);
     return () => {
       document.removeEventListener('selectionchange', update);
       document.removeEventListener('select', update, true);
       document.removeEventListener('keyup', update, true);
       document.removeEventListener('focusout', later, true);
+      document.removeEventListener('keydown', toBar);
       window.removeEventListener('resize', update);
     };
   }, []);
@@ -88,6 +119,11 @@ export function FormatBar() {
     }
   }, [target]);
 
+  // Opened from the keyboard, the Font menu takes the keyboard (opened with the mouse it must not take the cursor).
+  useEffect(() => {
+    if (fontsOpen && focusInBar()) (fontMenu.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? fontMenu.current?.querySelector('button'))?.focus();
+  }, [fontsOpen]);
+
   if (!target) return null;
   const now = styleOf(board, target.boxes[0]) ?? {};
   const size: TextSize = now.size ?? 'normal';
@@ -97,6 +133,42 @@ export function FormatBar() {
   const apply = (ask: FormatAsk) => appStore.formatBoxes(target.boxes, ask);
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();
+  // Keyboard inside the bar: Escape goes back to the text (or closes the open Font menu), Tab goes round, arrows walk along.
+  const onKeyDown = (e: ReactKeyEvent<HTMLDivElement>) => {
+    const here = document.activeElement as HTMLElement;
+    if (e.key === 'Escape') {
+      e.stopPropagation(); // not for a panel or the selection behind it
+      e.preventDefault();
+      if (fontsOpen) {
+        setFontsOpen(false);
+        fontButton.current?.focus();
+        return;
+      }
+      const to = back.current;
+      back.current = null;
+      if (to && to.el !== document.body && to.el.isConnected) {
+        to.el.focus();
+        if (to.start !== null && to.end !== null) (to.el as HTMLTextAreaElement).setSelectionRange(to.start, to.end);
+      } else here.blur();
+      return;
+    }
+    // Tab goes round every button; in the open Font menu the arrows go up and down it, otherwise left and right along the bar.
+    const buttons = (within: ParentNode) => [...within.querySelectorAll<HTMLButtonElement>('button')];
+    const inMenu = !!fontMenu.current?.contains(here);
+    let step = 0;
+    let walk = buttons(e.currentTarget);
+    if (e.key === 'Tab') step = e.shiftKey ? -1 : 1;
+    else if (inMenu) {
+      walk = buttons(fontMenu.current!);
+      step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    } else {
+      walk = walk.filter((b) => !fontMenu.current?.contains(b));
+      step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    }
+    if (!step) return;
+    e.preventDefault();
+    walk[(walk.indexOf(here as HTMLButtonElement) + step + walk.length) % walk.length]?.focus();
+  };
 
   return (
     <div
@@ -105,6 +177,7 @@ export function FormatBar() {
       aria-label="Text format"
       style={style}
       onMouseDown={keep}
+      onKeyDown={onKeyDown}
       onPointerEnter={() => setHovering(true)}
       onPointerLeave={() => setHovering(false)}
     >
@@ -130,11 +203,11 @@ export function FormatBar() {
       ))}
       <span className="fb-divider" />
       <div className="fb-font">
-        <button type="button" aria-label="Font" title="Font" aria-haspopup="menu" aria-expanded={fontsOpen} style={{ fontFamily: fontVar(font) }} onClick={() => setFontsOpen((o) => !o)}>
+        <button ref={fontButton} type="button" aria-label="Font" title="Font" aria-haspopup="menu" aria-expanded={fontsOpen} style={{ fontFamily: fontVar(font) }} onClick={() => setFontsOpen((o) => !o)}>
           {FONTS.find((f) => f.key === font)!.label} ▾
         </button>
         {fontsOpen && (
-          <div className="fb-font-menu" role="menu" aria-label="Fonts">
+          <div ref={fontMenu} className="fb-font-menu" role="menu" aria-label="Fonts">
             {FONTS.map((f) => (
               <button
                 key={f.key}
@@ -144,6 +217,7 @@ export function FormatBar() {
                 style={{ fontFamily: fontVar(f.key) }}
                 onClick={() => {
                   apply({ font: f.key });
+                  if (focusInBar()) fontButton.current?.focus(); // from the keyboard: stay in the bar
                   setFontsOpen(false);
                 }}
               >

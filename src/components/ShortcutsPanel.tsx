@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HOTKEY_NAMES, hotkeyFromEvent, labelOf, type HotkeyAction } from '../model/hotkeys';
 import { appStore, useAppState } from '../store/appStore';
 import { CloseIcon } from './icons';
+import { useCoverBoard } from './textField';
 
 /**
  * A row's keys: fixed text, or a key the person can change (job 118: `{ action }`, shown as the key
@@ -44,6 +45,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Ctrl+B / Ctrl+I', 'Bold / italic: the whole text box, selected items, or every box in selected cards'],
       ['Ctrl+Shift+> / <', 'Larger / smaller (Small, Normal, Large)'],
       ['Highlight some text', 'Shows the format bar: bold, italic, size and font'],
+      ['Alt+F10', 'With text highlighted: move into the format bar (arrows or Tab to move around it, Enter to press, Escape to go back to the text)'],
     ],
   },
   {
@@ -89,19 +91,39 @@ const SITE_LINKS = [
   ['Privacy policy', 'privacy'],
 ];
 
-/** The keyboard shortcuts panel: opened by the ? button (bottom right) or the ? key; Escape closes it. */
+/**
+ * The keyboard shortcuts panel: opened by the ? button (bottom right) or the ? key; Escape, the ? key or its × closes it.
+ * It covers the board like Send feedback does (U9): no board key acts behind it, focus moves into it and Tab stays in it,
+ * and closing puts focus back where it was.
+ */
 export function ShortcutsPanel() {
-  const open = useAppState((s) => s.ui.shortcutsOpen);
+  return useAppState((s) => s.ui.shortcutsOpen) ? <Panel /> : null;
+}
+
+function Panel() {
   const keys = useAppState((s) => s.view.hotkeys);
+  const backdrop = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  useCoverBoard(backdrop);
+  useEffect(() => {
+    const opener = document.activeElement;
+    panel.current?.focus({ preventScroll: true });
+    return () => opener instanceof HTMLElement && opener.isConnected && opener !== document.body ? opener.focus({ preventScroll: true }) : undefined;
+  }, []);
+  // Escape or ? closes it (the board's keys are off while it covers the board, so it listens itself).
+  // While a key is being recorded, that handler (below) takes the keys first.
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && !(e.key === '?' && !e.ctrlKey && !e.metaKey)) return;
+      e.preventDefault();
+      appStore.closeShortcuts();
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, []);
   // Which key is waiting for a new one, and the short note under the heading (why a key was refused).
   const [recording, setRecording] = useState<HotkeyAction | null>(null);
   const [note, setNote] = useState('');
-  useEffect(() => {
-    if (!open) {
-      setRecording(null);
-      setNote('');
-    }
-  }, [open]);
   // While recording, the next key press goes here and nowhere else (so it can't also act on the board).
   useEffect(() => {
     if (!recording) return;
@@ -131,10 +153,9 @@ export function ShortcutsPanel() {
     setRecording(null);
     setNote('');
   };
-  if (!open) return null;
   return (
-    <div className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && appStore.closeShortcuts()}>
-      <section className="shortcuts-panel" role="dialog" aria-label="Keyboard shortcuts">
+    <div ref={backdrop} className="shortcuts-backdrop" onPointerDown={(e) => e.target === e.currentTarget && appStore.closeShortcuts()}>
+      <section ref={panel} className="shortcuts-panel" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" tabIndex={-1}>
         <header className="shortcuts-header">
           <h2>Keyboard shortcuts</h2>
           <button type="button" className="tb-button quiet" onClick={reset}>

@@ -1547,6 +1547,8 @@ html[data-input='keys'] .column {
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(31, 29, 26, 0.2);
 }
+/* The panel itself takes the keyboard when it opens (a text field's no-rectangle rule, applied to a box with no keys of its own). */
+.shortcuts-panel:focus { outline: none; }
 .shortcuts-header { display: flex; align-items: center; gap: 8px; }
 .shortcuts-hint { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
 .shortcuts-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }

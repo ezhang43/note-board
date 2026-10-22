@@ -379,9 +379,9 @@ test.describe('7. 44px touch areas around the small card controls', () => {
       expect(r.h).toBeGreaterThanOrEqual(44);
       expect(await keepsItsOwnBox(c)).toBe(true);
     }
-    // The drawn buttons do not move.
-    expect(await rect(collapse)).toMatchObject({ width: 28, height: 28 });
-    expect(await rect(del)).toMatchObject({ width: 28, height: 28 });
+    // The drawn buttons are 32px (owner request 2026-10-22), as on a computer.
+    expect(await rect(collapse)).toMatchObject({ width: 32, height: 32 });
+    expect(await rect(del)).toMatchObject({ width: 32, height: 32 });
     expect(await rect(corner)).toMatchObject({ width: 18, height: 18 });
     // Delete's area never covers another control; and the text box under the header keeps its top.
     expect(await takenFromOthers(del)).toBe(0);

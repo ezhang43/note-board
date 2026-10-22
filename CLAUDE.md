@@ -54,6 +54,7 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 - `npm run dev` — run the app at http://localhost:5173
 - `npm test` — unit tests
 - `npm run test:e2e` — browser tests
+- `npm run test:rules` — Firestore rules tests on the local emulator (needs Java; part of "All tests")
 - `npm run typecheck` / `npm run build`
 - `node scripts/fold-changes.mjs` — the crew coordinator's publish step: folds `changes/*.md` into `CHANGELOG.md` and `docs/decisions.md` (rule 5)
 - `node scripts/claude-hooks.mjs level` — does the current change touch a risky file (picks the review level)

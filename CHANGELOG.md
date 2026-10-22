@@ -1,5 +1,99 @@
 # Changelog
 
+## Tidy-up of old notes and unused code (2026-10-21)
+- Docs only, and a few leftovers removed; nothing in the app looks or works differently.
+- The spec's "Build rules" list is now a short pointer to `CLAUDE.md`, so the two can't drift apart. The spec's opening no longer calls the app "single-user", and its dates and spellings are updated (American English throughout).
+- `CLAUDE.md` now lists every folder, the real test setup, the fonts and the helper skills; two helper skills use today's words (container, Completed panel).
+- The move of the online data to the US is dropped: the count script and its test are deleted and the plan is marked "not done".
+- Removed code nothing used: a store action, a constant, two test-only helpers and some needless exports. The find highlight colors are now CSS variables (same look).
+
+## Faster checks on GitHub (2026-10-22)
+
+- The browser tests now run on GitHub in 4 parts at the same time, so "All tests" should finish in roughly 5 minutes instead of about 12.
+- "All tests" is still the one check that must pass; it now turns green only when the typecheck, the unit tests and all 4 browser parts passed. Publishing works as before.
+- Crew workers now run only the browser tests for their own area on the shared machine; GitHub runs the full set.
+
+## Deleting your account with another device or tab open (2026-10-22)
+
+- Deleting your account now first marks your boards online as "being deleted". While they are marked, your other phones, computers and tabs can't save your boards, a version or a new shared board back online. Before, one of them could put your boards back just after they were deleted.
+- Those other devices keep your boards on screen and hold any changes while it deletes. If deleting fails, they carry on syncing and their changes are saved. Once it is done, they sign out with "Your account and data were deleted.".
+- Another tab of the same browser no longer signs out the tab doing the deleting part-way through.
+- If only the last step failed (deleting the sign-in), you can run Delete account again from any page to finish.
+- A small marker that the account was deleted stays online. It holds no boards, name or email. The Privacy policy and the Delete your account page now say so.
+- The online rules now also check the type and size of a few fields that had no check: when someone joined a shared board, and a version's counts and fingerprint (job 173).
+- The owner pastes the new firestore.rules into the Firebase console before this version is published. The rules accept everything older copies of the app save.
+
+## "Couldn't save online" no longer follows you to the next account (2026-10-22)
+
+- Fixed: if a save was refused for one account, the red "Couldn't save online" note kept showing after signing out and signing in with another account on the same computer. It now clears whenever someone signs out or another account signs in, and the gray note says "Saved" for the new account.
+- An upload from the earlier account that finishes or fails after the switch is no longer shown to the new account either.
+- No change to what is saved: boards, kept-aside boards and anything still being sent are untouched.
+
+## Interface fixes from the review, the rest (2026-10-21)
+
+- The welcome tour now really covers the board: keys (Delete, Ctrl+A, Ctrl+D, H, V, Ctrl+F) and paste pressed while it is up no longer change the board or open the search behind it.
+- The "Looking at an earlier version" bar keeps clear of Version history when you widen the panel.
+- "Couldn't restore it" now stays with the version it failed on, instead of showing on the next version you look at.
+- The Boards menu closes with Escape (and leaves a side panel open behind it). Escape with the keyboard on a Search bar button closes the Search bar and not the panel behind it.
+- Zoom keys (Ctrl and +, -, 0) typed in the Search box zoom the board, instead of zooming the whole browser page.
+- The Search box no longer draws a focus rectangle. Ctrl+F while the keyboard shortcuts list is open (for example while recording a key) no longer opens the search behind it.
+- The Share panel says "Copied" only for the link that was copied, and only if the copy worked.
+- A container with one card is read out as "1 card" by screen readers.
+- Small tidy-ups: the format bar sets up its listeners once, a phone's pending timer is cleared, one phone-size rule and a misplaced comment were fixed.
+- New browser tests for all of the above, plus guards for dark mode of the panels, Tab focus rings, the Hand tool after a reload and the always-visible card buttons on a tablet.
+
+## More safety-net tests (2026-10-21)
+- Tests only; nothing in the app looks or works differently.
+- Signing in and out is now tested end to end (opening your boards, the 5-second wait for shared boards, signing out, an account deleted on another device, deleting your own account, the page being hidden, going offline and the "Saved" note).
+- The online side of sharing is tested too (removing someone changes the link in the same step, saves to a deleted share are refused, deleting a share removes its people, the shared-boards list from the offline copy).
+- Also covered: a random mix of edits merged from two people (now with deleted items, changed text and Completed groups), Version history day headings across Sydney's clock changes, deleting a board that cards on other boards open, and letting go of a resize on a block that is gone.
+- In the browser: the side panels in dark mode, the focus ring on buttons (and none on text fields), the welcome tour keeping Tab inside its card, the Focus timer following another tab, a share link opened offline, card buttons on a tablet, a double-click on a board card, and a deleted board coming back from Version history.
+
+## More safety tests (2026-10-21)
+
+- **No change to how the app works.** About 80 new automated tests that pin down behavior which already works but had no test: layout when snapping is off, moving checklist items when the target was deleted on another device, importing and "Download as text" edge cases, backup and restore, the order in which the board tidies itself, undo depth, and that every saved field survives a save and reload.
+- Two browser checks: a note typed or a board renamed just before a reload is kept, and undo stays on its own board. A third checks that a backup of two boards holds both and restores both.
+
+## A save that can't be read is never lost (2026-10-21)
+
+- If the boards saved in this browser are damaged when the page opens, a copy of them is now kept on this device before the page starts on a fresh board. Before, the first change on the fresh board wrote over them and they were gone. A note in the usual banner says "Your saved boards couldn’t be read, so this is a fresh board. A copy was kept on this device."
+- If they were saved by a newer version of the app (an old copy of the page still open or cached), they are now left as they are for the updated app to open, and the note says to reload the page. Changes made on that old page aren't saved on this device.
+- If there's no room to keep the copy, the damaged save is left as it is and that page's changes aren't saved on this device (the note says so).
+- Deleting your account also clears any such copy from the device.
+
+## Keyboard reach for the format bar and the shortcuts list (2026-10-22)
+
+- **The text format bar works from the keyboard.** Highlight some text, press Alt+F10, and the keyboard moves into the bar (Bold first). Left and Right walk along it, Tab goes round it, Enter presses a button, and Enter on Font opens the typeface list (Up and Down choose, Enter picks, Escape closes just the list). Escape goes back to your text with the highlight still there. The key is listed in the ? panel under Text.
+- **The Keyboard shortcuts list now covers the board**, like Send feedback does: Delete and the other board keys do nothing behind it, the keyboard moves into it when it opens, Tab stays in it, and Escape (or the ? key, or ×) closes it and puts the keyboard back where it was.
+- Nothing about saving or boards changed.
+
+## Tests for the online rules (2026-10-21)
+
+- **No change to how the app works, and the online rules themselves are unchanged.** 38 new automated tests check what `firestore.rules` lets each person read and write: your own boards and versions only by you, shared boards only by their people, joining only with the current link, only the person who shared a board changing its link, removing people or deleting it, deleting an account, and feedback.
+- The tests run on a local copy of Firestore (Google's emulator) with a made-up project, so they never touch the real online data. Run them with `npm run test:rules`; GitHub runs them too, as part of "All tests".
+
+## The sign-in screen downloads less (2026-10-22)
+
+- The sign-in screen now downloads only Firebase's sign-in code. Its database code comes down once you are signed in, while "Opening your board…" shows. The sign-in screen's scripts went from about 1,000 KB to about 470 KB (about 307 KB to 154 KB compressed), so it opens faster, most of all on a phone. Signing in, syncing, sharing links and saved boards work exactly as before.
+- Removed an old file the app no longer used.
+
+## Start from a template (2026-10-22)
+
+- **An empty board now offers six ready-made boards:** Weekly plan, Project plan, Trip plan, Reading list, Mood board and Study plan, each with a small picture of its containers. Click one and it fills the empty board (Ctrl+Z gives the empty board back). Under them, "Weekend in Lisbon" is a finished example you can open to look around in; it opens as a board of its own.
+- **Boards menu → New from a template…** opens the same picks in a "Start a board" window (a sheet from the bottom on a phone). On a board that already has cards, a pick makes a new board and leaves yours alone.
+- Nothing about how boards are saved changed: a template is an ordinary board, with its own cards, saved and backed up like any other.
+
+## Questions in the app, and Undo after deleting (2026-10-22)
+
+- **No more browser pop-ups.** Deleting a board, restoring a backup, removing someone from a shared board and leaving one now ask in a BusyAnts card ("Delete “Trip”?" · Keep board · Delete board), a sheet at the bottom on a phone. Escape or a click beside it keeps things as they are. Notes like "That file isn’t a BusyAnts backup" show in the banner under the toolbar.
+- **Undo after deleting.** Delete cards, containers, checklist items or a habit and a dark message at the bottom says what went, with an **Undo** button (the same as Ctrl+Z). It goes after 6 seconds or as soon as you change something else.
+- **Fewer questions.** An empty container, and a habit, are deleted without asking, since Undo brings them back. A container with cards still asks.
+- Nothing in your saved boards changed.
+
+## A nicer sign-in screen (2026-10-22)
+
+- The sign-in screen is now a centered card with the BusyAnts logo, a one-line pitch ("Free, with no limits. Your notes stay safe."), Google's standard "Sign in with Google" button (its dark version in dark mode), the short note about your board being private, and About, Privacy and Terms links. It works on a phone too. Signing in works exactly as before, and saved boards are unchanged.
+
 ## Fewer merge conflicts on pull requests (2026-10-21)
 
 - Pull requests no longer edit `CHANGELOG.md` or `docs/decisions.md` directly. Each one adds its own small file under `changes/`, so two open pull requests can't clash on those files and GitHub stops showing "merge conflicts". A new script, `node scripts/fold-changes.mjs`, which the coordinator runs when you say "publish", folds those files into the two logs.

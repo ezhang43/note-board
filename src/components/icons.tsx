@@ -337,6 +337,25 @@ export function LinkIcon() {
   );
 }
 
+/** An eye: the View only badge (job 161). */
+export function EyeIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.8" />
+    </svg>
+  );
+}
+
+/** A speech bubble: the Can comment badge (job 161). */
+export function CommentIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4.5 5.5h15a1 1 0 011 1v9a1 1 0 01-1 1H10l-4.5 3.5v-3.5h-1a1 1 0 01-1-1v-9a1 1 0 011-1z" />
+    </svg>
+  );
+}
+
 /** The toolbar's Add buttons and menus (Honey Workshop look, 2026-10-16). */
 export function NoteIcon() {
   return (

@@ -2222,6 +2222,27 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .share-wrap.phone .role-button, .share-wrap.phone .role-option, .share-wrap.phone .share-link .tb-button { min-height: 44px; }
 .share-wrap.phone .share-link input { height: 44px; font-size: 16px; }
 .share-error { margin: 0; color: var(--danger); }
+/* Read-only boards (job 161): the badge beside the board's name, in the accent tint (follows every theme and dark mode). */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+.toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
+/* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrow, .item-trash, .item-grip, .completed-actions) { display: none; }
+/* Its Completed section shows as it was left; opening or closing it would change the board. */
+.app.view-only .completed-toggle { pointer-events: none; }
 .avatar {
   display: inline-flex;
   align-items: center;

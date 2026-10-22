@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { shownName } from '../model/board';
 import { boardRights } from '../model/sharing';
 import { boardTree } from '../model/workspace';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { ask } from './ConfirmDialog';
@@ -21,6 +21,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
   const [open, setOpen] = useState(false);
   // The "Start a board" dialog (templates), opened from a row in the menu; focus goes back to the button after.
   const [gallery, setGallery] = useState(false);
+  const viewOnly = useViewOnly();
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const closeGallery = useCallback(() => {
@@ -115,9 +116,12 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
             ))}
           </div>
           <div className="boards-actions">
-            <button type="button" role="menuitem" title="A new board inside this one, with a card here that opens it" onClick={pick(() => appStore.addBoardCard())}>
-              Add a sub-board here
-            </button>
+            {/* Not on a read-only board (job 161), where its card couldn't go. */}
+            {!viewOnly && (
+              <button type="button" role="menuitem" title="A new board inside this one, with a card here that opens it" onClick={pick(() => appStore.addBoardCard())}>
+                Add a sub-board here
+              </button>
+            )}
             <button type="button" role="menuitem" title="A new board on its own" onClick={pick(() => appStore.newBoard())}>
               New board
             </button>

@@ -4,7 +4,8 @@ import { FONT_SCALE } from '../model/font';
 import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
 import { isBlank } from '../model/templates';
 import { gridStyle, wheelPan, wheelPixels, wheelZoomFactor } from '../model/view';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { BoardReadOnly } from './textBox';
 import type { Point, View } from '../model/types';
 import type { ItemDrag } from '../store/store';
 import { canvasRect, clientToCanvas, setCanvasElement } from './canvasDom';
@@ -25,6 +26,7 @@ export function Canvas() {
 
   const order = useAppState((s) => s.board.order);
   const phone = usePhone();
+  const readOnly = useViewOnly();
   // Nothing drawn (a Completed record is kept but never drawn): show the template picks (not on an old version being looked at).
   const empty = useAppState((s) => isBlank(s.board) && !s.ui.preview);
   const draggedCard = useAppState((s) => (s.ui.drag?.kind === 'card' ? s.ui.drag.id : null));
@@ -228,7 +230,8 @@ export function Canvas() {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const at = clientToCanvas(e.clientX, e.clientY);
-    const mode = appStore.getState().view.tool === 'hand' ? 'pan' : 'marquee';
+    // A read-only board (job 161) has no tools: dragging always moves it.
+    const mode = appStore.getState().view.tool === 'hand' || appStore.viewOnly() ? 'pan' : 'marquee';
     drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
     press.current = e.pointerType === 'touch' ? { id: e.pointerId, down: { x: e.clientX, y: e.clientY, t: Date.now() }, moved: false } : null;
     if (mode === 'pan') setPanning(true);
@@ -317,9 +320,11 @@ export function Canvas() {
         backgroundPosition: `${grid.offsetX}px ${grid.offsetY}px`,
       } as CSSProperties}
     >
-      {empty && <EmptyStart />}
+      {empty && !readOnly && <EmptyStart />}
       <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
-        {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
+        <BoardReadOnly value={readOnly}>
+          {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
+        </BoardReadOnly>
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}
         {/* Keyed by place in the list: two guides can share axis, line and start (the block lined up
             with two others at once), and repeated keys made React leave old lines on the board. */}

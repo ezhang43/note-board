@@ -1,7 +1,7 @@
-import { boxProps } from './textBox';
+import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
-import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -79,6 +79,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
 
 const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const readOnly = use(BoardReadOnly);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
   const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
   const picked = useAppState((s) => {
@@ -163,7 +164,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       <label className="tick">
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done || leaving} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} />
       </label>
       <GrowTextarea
         ref={ref}

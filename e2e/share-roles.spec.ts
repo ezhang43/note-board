@@ -23,7 +23,6 @@ const boardName = (page: Page) => page.getByLabel('Board name');
 const panel = (page: Page) => page.getByRole('dialog', { name: /Share/ });
 const linkBox = (page: Page) => panel(page).getByLabel('Share link');
 const linkRole = (page: Page) => panel(page).getByRole('button', { name: /^Link role:/ });
-const noteTexts = (page: Page) => page.getByLabel('Note text');
 
 async function openShare(page: Page) {
   if (!(await panel(page).isVisible())) await page.locator('header.toolbar').getByRole('button', { name: 'Share' }).click();
@@ -200,26 +199,6 @@ test('the role menus work from the keyboard: arrows move, Escape closes only the
   await expect(linkRole(alice)).toBeFocused();
   await alice.keyboard.press('Escape');
   await expect(panel(alice)).toHaveCount(0);
-});
-
-test('a viewer’s change (until read-only boards) never reaches the others, and isn’t sent again and again', async ({ browser }) => {
-  const t = tag();
-  const alice = await person(browser, `Alice${t}`);
-  await aliceSharesTrip(alice);
-  await pickLinkRole(alice, 'Can view');
-  await panel(alice).getByRole('button', { name: 'Make a view link' }).click();
-  const view = await linkBox(alice).inputValue();
-  const cat = await joins(browser, view, `Cat${t}`);
-  let writes = 0;
-  cat.on('request', (r) => r.url().includes('/__collab/call') && r.postData()?.includes('"method":"read"') && writes++);
-  await add(cat, 'Note');
-  await cat.keyboard.type('Cat was here');
-  await cat.waitForTimeout(4000);
-  // One try (read, then the refused write), not a loop.
-  expect(writes).toBeLessThanOrEqual(2);
-  await expect(noteTexts(alice)).toHaveCount(1);
-  await expect(noteTexts(alice)).toHaveValue('Tent');
-  expect(cat.errors).toEqual([]);
 });
 
 test('on a phone, the role buttons and menu items are at least 44px tall, and the panel doesn’t scroll sideways', async ({ browser }) => {

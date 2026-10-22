@@ -4,6 +4,7 @@ import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
 import { POMODORO_KEY, type Phase } from '../model/pomodoro';
 import { askToNotify, chime, notifyIfHidden } from './env';
+import { viewOnly } from '../model/sharing';
 import { createPomodoro } from './pomodoro';
 
 function browserStorage() {
@@ -60,6 +61,9 @@ function shownState(): AppState {
 export function useAppState<T>(select: (s: AppState) => T): T {
   return useSyncExternalStore(appStore.subscribe, () => select(shownState()));
 }
+
+/** Whether the open board is shared with this person to view or comment on only (job 161): nothing on it can be changed. */
+export const useViewOnly = () => useAppState((s) => viewOnly(s.ui.shares, s.boards.open));
 
 const ROUND_NAME: Record<Phase, string> = { focus: 'focus round', short: 'short break', long: 'long break' };
 

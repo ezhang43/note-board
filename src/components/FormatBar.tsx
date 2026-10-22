@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyEvent } from 'react';
 import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { boxKey, focusedBox } from './textBox';
 import { panelCovers } from './textField';
 
@@ -61,6 +61,7 @@ export function FormatBar() {
   const view = useAppState((s) => s.view);
   const itemSel = useAppState((s) => s.ui.itemSel);
   const [target, setTarget] = useState<Target | null>(null);
+  const viewOnly = useViewOnly();
   const [fontsOpen, setFontsOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
   const fontButton = useRef<HTMLButtonElement>(null);
@@ -124,7 +125,7 @@ export function FormatBar() {
     if (fontsOpen && focusInBar()) (fontMenu.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? fontMenu.current?.querySelector('button'))?.focus();
   }, [fontsOpen]);
 
-  if (!target) return null;
+  if (!target || viewOnly) return null; // nothing is formatted on a read-only board (job 161)
   const now = styleOf(board, target.boxes[0]) ?? {};
   const size: TextSize = now.size ?? 'normal';
   const font: TextFont = now.font ?? 'sans';

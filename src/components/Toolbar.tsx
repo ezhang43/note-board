@@ -14,7 +14,8 @@ import { BoardPath, BoardsMenu } from './BoardsMenu';
 import { ShareButton } from './SharePanel';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { RoleBadge } from './ViewOnly';
 import { activeVersionStore, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { account, useAccountRemover } from '../sync/account';
@@ -126,6 +127,7 @@ export function FileMenu() {
     action();
   };
   const board = () => appStore.getState().board;
+  const viewOnly = useViewOnly();
   // Delete your account (job #63): only where there is an account (signed in, or a demo person).
   const canDeleteAccount = useAccountRemover() !== null;
   return (
@@ -151,9 +153,12 @@ export function FileMenu() {
           <button type="button" role="menuitem" onClick={pick(() => backup.current?.click())}>
             Restore from backup…
           </button>
-          <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
-            Import file…
-          </button>
+          {/* Nothing is added to a read-only board (job 161). */}
+          {!viewOnly && (
+            <button type="button" role="menuitem" title="Add cards from a Markdown, text, web page, JSON or PDF file (Milanote, Obsidian, Notion, Evernote, Trello, Google Keep…)" onClick={pick(() => importer.current?.click())}>
+              Import file…
+            </button>
+          )}
           {canDeleteAccount && (
             <button type="button" role="menuitem" className="file-menu-danger" onClick={pick(account.open)}>
               Delete account…
@@ -540,6 +545,7 @@ function BoardName() {
  */
 function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
   const { open, setOpen, wrap, onKeyDown } = usePopover();
+  const viewOnly = useViewOnly();
   return (
     <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
       <button type="button" className="tb-button icon-only" aria-label="More" title="More: Arrange, File, Feedback, Appearance, Sign out" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
@@ -548,7 +554,7 @@ function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
       {open && (
         <div className="toolbar-more phone-more" role="dialog" aria-label="More">
           <div className="phone-rows">
-            <ArrangeMenu />
+            {!viewOnly && <ArrangeMenu />}
             <FileMenu />
             <FeedbackButton onOpen={() => setOpen(false)} />
             <AppearanceMenu labelled />
@@ -573,6 +579,8 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
   const canRedo = useAppState((s) => s.ui.canRedo);
   // Under 1180px the less-used buttons fold into ⋯ (the full toolbar needs about 1160px).
   const folded = useMedia('(max-width: 1179px)');
+  // A board shared with this person to view or comment on only (job 161): a badge, and no buttons that change it.
+  const viewOnly = useViewOnly();
   // On a phone the top bar only holds the board name; everything else is in the bottom bar (PhoneBar).
   if (usePhone())
     return (
@@ -581,6 +589,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
         <BoardsMenu labelled={false} />
         <BoardPath />
         <BoardName />
+        <RoleBadge />
       </header>
     );
 
@@ -590,44 +599,49 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <BoardsMenu labelled={false} />
       <BoardPath />
       <BoardName />
+      <RoleBadge />
       <div className="toolbar-spacer" />
 
-      <ToolGroup />
+      {!viewOnly && (
+        <>
+          <ToolGroup />
 
-      {/* Faded when there is nothing to undo or redo. */}
-      <button
-        type="button"
-        className="tb-button icon-only faded-undo"
-        aria-label="Undo (Ctrl+Z)"
-        title="Undo (Ctrl+Z)"
-        aria-disabled={canUndo ? undefined : true}
-        onClick={appStore.undo}
-      >
-        <UndoIcon />
-      </button>
-      <button
-        type="button"
-        className="tb-button icon-only faded-undo"
-        aria-label="Redo (Ctrl+Y)"
-        title="Redo (Ctrl+Y)"
-        aria-disabled={canRedo ? undefined : true}
-        onClick={appStore.redo}
-      >
-        <RedoIcon />
-      </button>
+          {/* Faded when there is nothing to undo or redo. */}
+          <button
+            type="button"
+            className="tb-button icon-only faded-undo"
+            aria-label="Undo (Ctrl+Z)"
+            title="Undo (Ctrl+Z)"
+            aria-disabled={canUndo ? undefined : true}
+            onClick={appStore.undo}
+          >
+            <UndoIcon />
+          </button>
+          <button
+            type="button"
+            className="tb-button icon-only faded-undo"
+            aria-label="Redo (Ctrl+Y)"
+            title="Redo (Ctrl+Y)"
+            aria-disabled={canRedo ? undefined : true}
+            onClick={appStore.redo}
+          >
+            <RedoIcon />
+          </button>
 
-      <div className="toolbar-divider" aria-hidden="true" />
-      <span className="toolbar-label">Add</span>
+          <div className="toolbar-divider" aria-hidden="true" />
+          <span className="toolbar-label">Add</span>
 
-      <AddCardButton kind="note" label="Note" />
-      <AddCardButton kind="todo" label="Checklist" />
-      <NewColumnButton />
+          <AddCardButton kind="note" label="Note" />
+          <AddCardButton kind="todo" label="Checklist" />
+          <NewColumnButton />
 
-      <div className="toolbar-divider" aria-hidden="true" />
-      <ColourControl />
+          <div className="toolbar-divider" aria-hidden="true" />
+          <ColourControl />
+        </>
+      )}
       {!folded && (
         <>
-          <ArrangeMenu />
+          {!viewOnly && <ArrangeMenu />}
           <FileMenu />
           <FeedbackButton />
         </>

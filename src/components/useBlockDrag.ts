@@ -37,6 +37,8 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     // By finger the board moves instead, unless the finger rests first (blockHoldPointerDown).
     if (additive || e.pointerType === 'touch') return;
+    // On a read-only board (job 161) dragging a block moves the board, as the Hand tool does.
+    if (appStore.viewOnly()) return trackPan({ x: e.clientX, y: e.clientY });
 
     trackDrag(kind, id, e.currentTarget, { x: e.clientX, y: e.clientY });
   };
@@ -63,6 +65,7 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     holdOrPan(
       e.nativeEvent,
       (start, at, done) => {
+        if (appStore.viewOnly()) return done(); // nothing to lift on a read-only board (job 161)
         if (itemId) return trackItemDrag(id, itemId, start, e.pointerId, { at, done });
         // A block that is part of a bigger selection keeps it, so the whole selection moves.
         appStore.pressBlock(id, false);
@@ -71,6 +74,23 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
       () => onText && appStore.select(id),
     );
   };
+}
+
+/** Moves the board with the pointer from `start` until it lets go. */
+function trackPan(start: { x: number; y: number }) {
+  let at = start;
+  const onMove = (ev: PointerEvent) => {
+    appStore.panBy(ev.clientX - at.x, ev.clientY - at.y);
+    at = { x: ev.clientX, y: ev.clientY };
+  };
+  const finish = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', finish);
+    window.removeEventListener('pointercancel', finish);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', finish);
+  window.addEventListener('pointercancel', finish);
 }
 
 /**

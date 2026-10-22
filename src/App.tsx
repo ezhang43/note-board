@@ -18,7 +18,8 @@ import { Tour } from './components/Tour';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { usePhone } from './components/usePhone';
-import { appStore, useAppState } from './store/appStore';
+import { appStore, useAppState, useViewOnly } from './store/appStore';
+import { ViewOnlyNote } from './components/ViewOnly';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
 import { CompletedPanel } from './components/CompletedPanel';
@@ -54,6 +55,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   }, [saveNote]);
   const phone = usePhone();
   const previewing = useAppState((s) => s.ui.preview !== null);
+  const viewOnly = useViewOnly();
   const sidePanel = useAppState((s) => s.ui.sidePanel);
   const historyShown = useAppState((s) => s.ui.historyOpen);
   // Anything in the right-hand spot (history, the side panel) moves the corner controls aside.
@@ -69,7 +71,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         ? { name: 'calendar', width: calendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
         : { name: RESIZE_NAME[panel], width: others[panel], set: (w: number) => panelWidths.set(panel, w), reset: () => panelWidths.reset(panel) }
       : null;
-  const classes = ['app', phone && 'phone', previewing && 'previewing', historyOpen && 'history-open'].filter(Boolean).join(' ');
+  const classes = ['app', phone && 'phone', previewing && 'previewing', viewOnly && 'view-only', historyOpen && 'history-open'].filter(Boolean).join(' ');
   const style = resize ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
   return (
     <div className={classes} style={style}>
@@ -112,6 +114,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <ShortcutsPanel />
       <DeleteCompleted />
       <NoticeBanner />
+      <ViewOnlyNote />
       <UndoToast />
       <DeleteAccountPanel />
       <FeedbackPanel />

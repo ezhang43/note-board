@@ -1,4 +1,5 @@
-import type { CSSProperties, InputHTMLAttributes, Ref } from 'react';
+import { use, type CSSProperties, type InputHTMLAttributes, type Ref } from 'react';
+import { BoardReadOnly } from './textBox';
 import { FindMarks } from './FindMarks';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'className'> & {
@@ -15,11 +16,13 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 
 
 /** A single-line text box whose width follows its text. */
 export function AutoSizeInput({ value, onChange, className, placeholder, ref, box, boxStyle, find, ...rest }: Props) {
+  const readOnly = use(BoardReadOnly) || rest.readOnly;
   return (
     <span className={`autosize ${className ?? ''}`} data-value={value || placeholder || ''} data-box={box} data-find={find} style={boxStyle}>
       {find && <FindMarks find={find} text={value} overlay />}
       <input
         {...rest}
+        readOnly={readOnly}
         ref={ref}
         placeholder={placeholder}
         size={1}

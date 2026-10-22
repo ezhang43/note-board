@@ -712,7 +712,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
-      if (here && role !== 'edit') backend.join(id, key).catch(() => {});
+      // Not while their role isn't known yet (the People list hasn't answered): code review.
+      if (here && role && role !== 'edit') backend.join(id, key).catch(() => {});
       const added = !here && (await backend.join(id, key));
       const s = open(id) ?? need(id);
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));

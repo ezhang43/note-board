@@ -29,7 +29,7 @@ import {
   type Transaction,
 } from 'firebase/firestore';
 import type { AccountBackend } from '../store/account';
-import { NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
+import { above, lowers, NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 import { app } from './firebase';
@@ -275,8 +275,8 @@ export function collabRemote(user: User): CollabBackend {
    * In a transaction: every link of `roles` that is on gets its key from `keys`, a key still in the
    * share moving to the private record with it (job 161).
    */
-  function changeLinks(tx: Transaction, id: string, now: { links: Links; old: string | null }, roles: readonly Role[], keys: NewKeys) {
-    const next = Object.fromEntries(roles.filter((r) => now.links[r] !== null).map((r) => [r, keys[r]]));
+  function changeLinks(tx: Transaction, id: string, now: { links: Links; old: string | null }, roles: readonly Role[], keys: NewKeys, also: DocumentData = {}) {
+    const next = { ...also, ...Object.fromEntries(roles.filter((r) => now.links[r] !== null).map((r) => [r, keys[r]])) };
     if (Object.keys(next).length) tx.set(linksRef(id), next, { merge: true });
     if (now.old && 'edit' in next) tx.update(shareRef(id), { link: null });
   }
@@ -321,24 +321,42 @@ export function collabRemote(user: User): CollabBackend {
       );
       // Refused (not an editor, or no longer on it): no key from it; losing the board itself is left
       // to the share's own watch above to report.
-      const stopLinks = watchAllowed(
-        (next, refused) => onSnapshot(linksRef(id), next, refused),
+      let refused = false;
+      let stopLinks = () => {};
+      const watchLinks = () => {
+        refused = false;
+        stopLinks = watchAllowed(
+          (next, no) => onSnapshot(linksRef(id), next, no),
+          (snap: DocumentSnapshot) => {
+            // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
+            if (!snap.exists() && snap.metadata.fromCache) return;
+            known = true;
+            got = linksIn(snap.data());
+            send();
+          },
+          () => {
+            refused = true;
+            known = true;
+            got = NO_LINKS;
+            send();
+          },
+        );
+      };
+      watchLinks();
+      // Made an editor later (code review, job 161): the links, refused till then, are watched again.
+      const stopMe = onSnapshot(
+        memberRef(id, me.uid),
         (snap: DocumentSnapshot) => {
-          // "Not there" from the offline copy may just mean it hasn't been downloaded yet.
-          if (!snap.exists() && snap.metadata.fromCache) return;
-          known = true;
-          got = linksIn(snap.data());
-          send();
+          if (!refused || snap.metadata.fromCache || !snap.exists() || roleOf(snap.data()) !== 'edit') return;
+          stopLinks();
+          watchLinks();
         },
-        () => {
-          known = true;
-          got = NO_LINKS;
-          send();
-        },
+        () => {},
       );
       return () => {
         stopShare();
         stopLinks();
+        stopMe();
       };
     },
     watchPeople(id, onChange, onError) {
@@ -392,16 +410,19 @@ export function collabRemote(user: User): CollabBackend {
       // lower-role link never lowers them.
       // simple: up to three tries (each refused one is a round trip); a hint in the link would save
       // them, at the cost of links people could edit. Upgrade if joining feels slow.
+      // Each try is a transaction, not a batch (code review): a batch shows on this device before the
+      // server answers, so a refused "edit" try would show the person as an editor for a moment.
       const tries = had ? ROLES.slice(0, ROLES.indexOf(had) + 1) : ROLES;
       let refused: unknown = notAllowed();
       for (const role of tries) {
-        const batch = writeBatch(db);
-        batch.set(joinRef(id, me.uid), { key });
-        // Merged: someone already on it keeps their place in the list, and an old key the rules want unchanged.
-        batch.set(memberRef(id, me.uid), had ? { name: me.name, photo: me.photo, role } : { name: me.name, photo: me.photo, role, joinedAt: serverTimestamp() }, { merge: true });
-        batch.set(mineRef(id), { joinedAt: serverTimestamp() });
         try {
-          await batch.commit();
+          await runTransaction(db, async (tx) => {
+            tx.set(joinRef(id, me.uid), { key });
+            // Merged: someone who may be on it already keeps their place in the list, and an old key the
+            // rules want unchanged (only someone surely new gets the time they joined).
+            tx.set(memberRef(id, me.uid), had === null ? { name: me.name, photo: me.photo, role, joinedAt: serverTimestamp() } : { name: me.name, photo: me.photo, role }, { merge: true });
+            tx.set(mineRef(id), { joinedAt: serverTimestamp() });
+          });
           return had === null;
         } catch (e) {
           if ((e as { code?: string }).code !== 'permission-denied') throw e;
@@ -456,8 +477,11 @@ export function collabRemote(user: User): CollabBackend {
         const had = roleOf(member.data());
         if (had === role) return;
         tx.update(memberRef(id, uid), { role });
-        // Lowered: the links above the new role that are on change (they may have seen them).
-        if (ROLES.indexOf(role) > ROLES.indexOf(had)) changeLinks(tx, id, now, ROLES.slice(0, ROLES.indexOf(role)), keys);
+        if (!lowers(had, role)) return;
+        // Lowered: the links above the new role that are on change (they may have seen them), and roles
+        // count as in use from now on (code review), as for D1: the app from before roles would put
+        // the new edit key in a member record or the share, where everyone on it can read it.
+        changeLinks(tx, id, now, above(role), keys, now.links.roles ? {} : { comment: null, view: null });
       });
     },
     async deleteShare(id) {

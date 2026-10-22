@@ -20,6 +20,10 @@ export function personFrom(user: { uid: string; displayName?: string | null; pho
 /** What someone may do on a shared board (job 161). */
 export type Role = 'edit' | 'comment' | 'view';
 export const ROLES: readonly Role[] = ['edit', 'comment', 'view'];
+/** The roles above `role` (whose links someone lowered to it may have seen). */
+export const above = (role: Role) => ROLES.slice(0, ROLES.indexOf(role));
+/** Whether going from role `had` to `role` lowers someone. */
+export const lowers = (had: Role, role: Role) => ROLES.indexOf(role) > ROLES.indexOf(had);
 /** Someone on a shared board, with their role. */
 export interface Member extends Person {
   role: Role;
@@ -160,8 +164,6 @@ interface Stored extends Omit<ShareDoc, 'links'> {
   people: Member[];
 }
 
-const rank = (role: Role) => ROLES.length - ROLES.indexOf(role);
-
 /**
  * A pretend server kept in memory, with the same rules as firestore.rules: only people a board is
  * shared with can read it, and only its editors change it; joining needs a current link, and gives
@@ -271,7 +273,7 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       const had = roleIn(who, s);
       const got = s ? (ROLES.find((r) => s.links[r] !== null && s.links[r] === key) ?? null) : null;
       check(Boolean(s && (had || got)));
-      const role = s!.owner === who.uid ? 'edit' : !had || (got && rank(got) > rank(had)) ? got! : had;
+      const role = s!.owner === who.uid ? 'edit' : !had || (got && lowers(got, had)) ? got! : had;
       const added = !had;
       s!.people = added ? [...s!.people, { ...who, role }] : s!.people.map((p) => (p.uid === who.uid ? { ...p, role } : p));
       addMine(who.uid, id);
@@ -311,7 +313,10 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
       const had = s?.people.find((p) => p.uid === uid)?.role;
       check(owns(who, s) && uid !== s!.owner && Boolean(had));
       if (had === role) return;
-      if (rank(role) < rank(had!)) change(s!, ROLES.filter((r) => rank(r) > rank(role)), keys);
+      if (lowers(had!, role)) {
+        change(s!, above(role), keys);
+        s!.links = { ...s!.links, roles: true };
+      }
       s!.people = s!.people.map((p) => (p.uid === uid ? { ...p, role } : p));
       notify();
     },

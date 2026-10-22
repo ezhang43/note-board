@@ -82,6 +82,7 @@ vi.mock('firebase/firestore', () => ({
       update: (ref: string, value: Data) => void ops.push({ op: 'update', path: ref, value }),
       delete: (ref: string) => void ops.push({ op: 'delete', path: ref }),
     });
+    if (fs.state.refuseBatch?.(ops)) throw Object.assign(new Error('refused'), { code: 'permission-denied' });
     if (ops.length) {
       fs.state.commits.push({ kind: 'transaction', ops });
       ops.forEach((o) => fs.apply(o.op, o.path, o.value));
@@ -190,6 +191,39 @@ describe('roles on a shared board (job 161, PR 2)', () => {
       { op: 'update', path: 'shared/s1/members/u2', value: { role: 'comment' } },
       { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k9' } },
     ]);
+  });
+
+  // Code review (high): otherwise an old app could put the new edit key where the lowered person reads it.
+  it('lowering someone on a share with no comment or view link yet puts roles in use (both fields, empty)', async () => {
+    seedShare(null);
+    fs.docs.set('shared/s1/members/u2', { name: 'u2' });
+    fs.docs.set('shared/s1/private/links', { edit: 'k' });
+    await collabRemote(user).setRole('s1', 'u2', 'view', keys);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'update', path: 'shared/s1/members/u2', value: { role: 'view' } },
+      { op: 'update', path: 'shared/s1/private/links', value: { comment: null, view: null, edit: 'k2' } },
+    ]);
+  });
+
+  // Code review (high): the links watch, refused while they weren't an editor, starts again once they are one.
+  it('someone made an editor gets the links without reloading', async () => {
+    const onChange = vi.fn();
+    collabRemote(user).watchShare('s1', onChange, vi.fn());
+    listener('shared/s1').next(docSnap({ owner: 'u9', root: 'b1', link: null, data: '{}' }, false));
+    const refused = Object.assign(new Error('no'), { code: 'permission-denied' });
+    listener('shared/s1/private/links').error(refused);
+    await new Promise((done) => setTimeout(done, 0));
+    listener('shared/s1/private/links').error(refused);
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: null, comment: null, view: null, roles: false } }));
+    // (This pretend Firestore keeps refused watches on its list: the newest one is the one in use.)
+    const watch = () => fs.state.listeners.filter((l) => l.path === 'shared/s1/private/links').at(-1);
+    const before = watch();
+    listener('shared/s1/members/u1').next(docSnap({ name: 'Eric', role: 'view' }, false));
+    expect(watch()).toBe(before);
+    listener('shared/s1/members/u1').next(docSnap({ name: 'Eric', role: 'edit' }, false));
+    expect(watch()).not.toBe(before);
+    fs.state.listeners.filter((l) => l.path === 'shared/s1/private/links').at(-1)!.next(docSnap({ edit: 'e', comment: null, view: 'v' }, false));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: 'e', comment: null, view: 'v', roles: true } }));
   });
 
   it('someone not on it, or a share that is gone: refused as "not allowed", nothing written', async () => {

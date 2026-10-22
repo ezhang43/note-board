@@ -532,6 +532,8 @@ describe('links in a private record and joining through joins (job 161)', () => 
     fs.answerWatches();
     await ticks();
     expect(links.at(-1)).toBe('k');
+    // Made a viewer (the person who shared it lowered them).
+    for (const m of [fs.server, fs.local]) m.set('shared/s1/members/u1', { name: 'Eric', photo: null, role: 'view', joinedAt: 0 });
     fs.denied.add('shared/s1/private/links');
     fs.answerWatches();
     await ticks();

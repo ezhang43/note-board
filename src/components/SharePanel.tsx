@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { shownName } from '../model/board';
-import { ROLES, type Person, type Role } from '../store/collab';
+import { above, lowers, ROLES, type Person, type Role } from '../store/collab';
 import { appStore, useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
 import { collab, useNotice, useSharing } from '../sync/collabSession';
@@ -221,8 +221,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                     role={p.role}
                     onPick={async (role) => {
                       // Lowered: the links above their new role that are on change (they may have seen them).
-                      const lower = ROLES.indexOf(role) > ROLES.indexOf(p.role);
-                      const changing = lower ? ROLES.slice(0, ROLES.indexOf(role)).filter((r) => share.links[r]) : [];
+                      const changing = lowers(p.role, role) ? above(role).filter((r) => share.links[r]) : [];
                       if (changing.length && !(await ask({ title: `Change ${p.name} to ${ROLE_NAME[role]}?`, body: `Your ${changing.join(' and ')} ${changing.length > 1 ? 'links change too, since they may have seen them. Share the new ones' : 'link changes too, since they may have seen it. Share the new one'} with anyone else who should join.`, action: 'Change role', cancel: 'Keep role' })))
                         return;
                       void run(() => sharing.setRole(share.id, p.uid, role));

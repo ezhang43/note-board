@@ -496,13 +496,13 @@ describe('comments (shared/{sid}/comments)', () => {
 
 // Job 161, PR 2: exactly the writes src/sync/database.ts now makes for the Share panel's roles.
 describe('the Share panel’s writes (PR 2)', () => {
-  /** join as database.ts does: their record merged (an existing one keeps its place and old key). */
+  /** join as database.ts does: one transaction, their record merged (an existing one keeps its place and old key). */
   function appJoin(db: Firestore, uid: string, key: string, role: string, existing: boolean) {
-    const b = writeBatch(db);
-    b.set(doc(db, `shared/s1/joins/${uid}`), { key });
-    b.set(doc(db, `shared/s1/members/${uid}`), existing ? { name: 'B', photo: null, role } : { name: 'B', photo: null, role, joinedAt: serverTimestamp() }, { merge: true });
-    b.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
-    return b.commit();
+    return runTransaction(db, async (t) => {
+      t.set(doc(db, `shared/s1/joins/${uid}`), { key });
+      t.set(doc(db, `shared/s1/members/${uid}`), existing ? { name: 'B', photo: null, role } : { name: 'B', photo: null, role, joinedAt: serverTimestamp() }, { merge: true });
+      t.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
+    });
   }
   /** A transaction that reads the share and its links first, as every one in database.ts does. */
   const tx = (uid: string, fn: (t: Parameters<Parameters<typeof runTransaction>[1]>[0], db: Firestore) => void) => {
@@ -586,6 +586,22 @@ describe('the Share panel’s writes (PR 2)', () => {
         t.update(doc(db, 'shared/s1/members/bob'), { role: 'comment' });
       }),
     );
+  });
+
+  it('setRole: lowering on a share with no comment or view link yet also puts roles in use; then an old app can’t join', async () => {
+    await seedShare({ bob: 'edit' }, { edit: EDIT });
+    const db = as('alice');
+    await assertSucceeds(
+      runTransaction(db, async (t) => {
+        await t.get(doc(db, 'shared/s1'));
+        await t.get(doc(db, LINKS));
+        await t.get(doc(db, 'shared/s1/members/bob'));
+        t.update(doc(db, 'shared/s1/members/bob'), { role: 'view' });
+        t.set(doc(db, LINKS), { comment: null, view: null, edit: 'new-edit-0123456789' }, { merge: true });
+      }),
+    );
+    await assertFails(oldJoin(as('carol'), 'carol', 'new-edit-0123456789'));
+    await assertSucceeds(join(as('carol'), 'carol', 'new-edit-0123456789'));
   });
 
   it('removePerson: every link that is on changes, in one transaction', async () => {

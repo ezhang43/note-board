@@ -20,8 +20,8 @@ export function templateActions(ctx: StoreContext) {
       if (!template) return null;
       const made = templateBoard(template);
       const { ui, boards } = ctx.state;
-      // An old version being shown can't be changed, so then (like New board) a board of its own is made.
-      if (!separate && !ui.preview && isBlank(ctx.state.board)) {
+      // An old version being shown, or a read-only board (job 161), can't be changed, so then (like New board) a board of its own is made.
+      if (!separate && !ui.preview && !ctx.viewOnly() && isBlank(ctx.state.board)) {
         // Naming the board is a rename: not allowed on a board someone shared with this person.
         const rename = boardRights(ui.shares, boards.open, boards.home).rename && (!ctx.state.board.name.trim() || ctx.state.board.name === DEFAULT_BOARD_NAME);
         const filled = ctx.commit((b) => ({

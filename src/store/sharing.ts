@@ -1,9 +1,10 @@
 import { deepEqual, mergeBoardSets } from '../model/merge';
+import { shownName } from '../model/board';
 import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, savedByNewer, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
 import { readWorkspace, type Workspace } from '../model/workspace';
-import { NO_LINKS, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
+import { NO_LINKS, ROLES, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
 import type { Store } from './store';
 import { SYNC_DELAY, type Remote, type SaveState } from './sync';
 import type { ShareInfo } from './types';
@@ -116,6 +117,8 @@ interface Share {
   ownerUid: string;
   links: Links;
   people: Member[];
+  /** This person's role on it (job 161): from People, else as kept on this device; null while not known. Use roleOf. */
+  role: Role | null;
   /** The boards as last agreed with the server (null: never downloaded here). */
   base: Record<string, Board> | null;
   baseRev: number;
@@ -199,6 +202,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     }
   }
 
+  /** This person's role on share `s` (whoever shared it is always an editor); null while not known. */
+  const roleOf = (s: Share): Role | null => (s.owner ? 'edit' : s.role);
+  /** They may only view or comment on it (job 161): nothing of theirs is sent. */
+  const readOnly = (s: Share) => roleOf(s) === 'view' || roleOf(s) === 'comment';
+
   const busy = () => {
     const ui = store.getState().ui;
     return Boolean(ui.drag || ui.resize || ui.newDrag || ui.itemDrag);
@@ -259,14 +267,14 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    */
   let said = false;
 
-  /** The shares this device had (see sharesKey). */
-  function readRemembered(): { id: string; owner: boolean; ownerUid: string }[] {
+  /** The shares this device had (see sharesKey), with this person's role on each when it was known (job 161). */
+  function readRemembered(): { id: string; owner: boolean; ownerUid: string; role: Role | null }[] {
     try {
       const got = JSON.parse(opts.storage?.getItem(sharesKey(backend.me.uid)) ?? 'null') as unknown;
       if (!Array.isArray(got)) return [];
-      const ok = got.filter((x): x is { id: string; owner: boolean; ownerUid: string } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
+      const ok = got.filter((x): x is { id: string; owner: boolean; ownerUid: string; role?: unknown } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
       said = ok.length === got.length;
-      return ok;
+      return ok.map((x) => ({ ...x, role: ROLES.find((r) => r === x.role) ?? null }));
     } catch {
       return [];
     }
@@ -275,7 +283,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   let remembered = '';
   function remember() {
     if (stopped) return;
-    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner, ownerUid: s.ownerUid })));
+    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner, ownerUid: s.ownerUid, role: roleOf(s) ?? undefined })));
     if (list === remembered) return;
     remembered = list;
     try {
@@ -348,7 +356,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function publish() {
     const infos: ShareInfo[] = [...shares.values()]
       .filter((s) => s.root && s.ready)
-      .map((s) => ({ id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links }));
+      .map((s) => {
+        const role = roleOf(s);
+        return { id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links, ...(role ? { role } : {}) };
+      });
     const known = said && [...shares.values()].every((s) => s.ready);
     const ui = store.getState().ui;
     if (!deepEqual(infos, ui.shares) || known !== ui.sharesKnown) store.setShares(infos, known);
@@ -379,6 +390,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (s.timer) clearTimeout(s.timer);
     s.timer = null;
     if (!s.ready || !s.root || !s.base || s.deleting || stopped || !shares.has(s.id)) return report();
+    if (readOnly(s)) return putBack(s);
     if (s.uploading) {
       s.again = true;
       return;
@@ -425,6 +437,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         },
         (e: { code?: string }) => {
           s.uploading = false;
+          // Refused since this person can now only view or comment (lowered while it was on its way).
+          if (readOnly(s)) return putBack(s);
           // Refused (too big, say, in characters or in bytes: review 137-A L3): the red banner, and the
           // next change tries again (trying the same save again would only be refused again). No
           // connection: it tries again quietly.
@@ -437,6 +451,29 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           report();
         },
       );
+  }
+
+  /**
+   * A share this person may only view or comment on (job 161) sends nothing. A change made here (as
+   * an editor, just before being lowered, say) is put back as the server has it, kept in Version
+   * history first, and the person is told; it isn't tried again.
+   */
+  function putBack(s: Share) {
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = null;
+    s.again = false;
+    s.failed = false;
+    const now = boardsOf(s);
+    if (s.root && s.base?.[s.root] && !deepEqual(now, s.base)) {
+      const name = shownName(s.base[s.root].name);
+      const versions = opts.versions?.();
+      if (versions) void saveSafetyVersion(store, versions, Date.now);
+      applyBoards(now, s.base);
+      s.seen = boardsOf(s);
+      const can = roleOf(s) === 'comment' ? 'comment on' : 'view';
+      opts.onNotice?.(`Your last change to “${name}” wasn’t saved: you can only ${can} it now.${versions ? ' It’s kept in Version history.' : ''}`);
+    }
+    report();
   }
 
   /** A new version arrived from the server. */
@@ -532,7 +569,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     remember();
   }
 
-  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; links: Links }, owner = false, ownerUid = '') {
+  function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; links: Links }, owner = false, ownerUid = '', role: Role | null = null) {
     const had = shares.get(id);
     // Opened by the list of shares before `share` got here (Firestore shows a write before it
     // resolves): what was shared is its agreed version, so text typed meanwhile is sent (review 137-A L1).
@@ -552,6 +589,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       ownerUid: start ? backend.me.uid : ownerUid,
       links: start?.links ?? NO_LINKS,
       people: start ? [{ ...backend.me, role: 'edit' }] : [],
+      role,
       base: saved?.boards ?? null,
       baseRev: saved?.rev ?? 0,
       ready: Boolean(saved),
@@ -583,9 +621,16 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         id,
         (people) => {
           s.people = people;
+          const was = roleOf(s);
+          s.role = people.find((p) => p.uid === backend.me.uid)?.role ?? s.role;
+          if (roleOf(s) !== was) remember();
+          // Lowered to Can comment or Can view (job 161): changes not sent yet are put back now
+          // (one on its way is dealt with when the server answers).
+          if (readOnly(s) && s.ready && !s.uploading) putBack(s);
           publish();
+          s.arrived.splice(0).forEach((fn) => fn()); // a join waiting for the role
         },
-        () => {},
+        () => s.arrived.splice(0).forEach((fn) => fn()),
       ),
     );
     publish();
@@ -594,7 +639,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   // The shares this device had, straight away: their boards are known as shared before the server
   // answers (or if it can't), so the person's own boards never take them as theirs.
-  for (const r of readRemembered()) open(r.id, undefined, r.owner, r.ownerUid);
+  for (const r of readRemembered()) open(r.id, undefined, r.owner, r.ownerUid, r.role);
   noting = true;
   groupCache = null;
   groups();
@@ -716,7 +761,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       if (here && role && role !== 'edit') backend.join(id, key).catch(() => {});
       const added = !here && (await backend.join(id, key));
       const s = open(id) ?? need(id);
-      if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
+      // (People arriving wake it too: it waits on until the board has, or the share has gone.)
+      while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
+      // Just joined: their role first (job 161), so a board they may only view never shows as editable.
+      if (added && !roleOf(s) && s.root && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root || !shares.has(id)) {
         // Can't be used here (see refuse): off this person's list again, only if this join added them
         // (owner decision, 2026-10-18: someone already on it, on a new device whose shared-boards list

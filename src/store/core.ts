@@ -4,7 +4,7 @@ import { closeGaps, settle, type MeasuredHeight } from '../model/layout';
 import { packInLanes, placeCards } from '../model/milanote';
 import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, parseView, serializeView, type StorageLike } from '../model/persist';
 import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
-import { savedByNewer } from '../model/sharing';
+import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { FONT_KEY, startingFontSize } from '../model/font';
@@ -110,6 +110,8 @@ export interface StoreContext {
    * something, `text` is said aloud and shown with Undo. Returns whether it did.
    */
   deleting(text: string, run: () => unknown, board?: string): boolean;
+  /** Whether board `id` (the open one by default) is shared with this person to view or comment on only (job 161): it can't be changed. */
+  viewOnly(id?: string): boolean;
 }
 
 /** What is cleared on screen when a different board is shown. */
@@ -267,19 +269,30 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     pending.tick.apply();
   }
 
+  /** Whether board `id` can only be viewed or commented on here (job 161). */
+  const locked = (id = state.boards.open) => viewOnly(state.ui.shares, id);
+
+  /** A change that can't be made: a gesture that ends still clears what it showed (a drag outline, a size label). */
+  function refuse(change: Partial<Ui> = {}) {
+    const ended = Object.fromEntries(Object.entries(change).filter(([key]) => GESTURE_UI.has(key)));
+    if (Object.keys(ended).length) set({ ...state, ui: uiWith(ended) });
+    return null;
+  }
+
   const commit: StoreContext['commit'] = (fn, opts = {}) => {
-    // Looking at an old version: nothing can be changed (the board shown isn't the real one), but a
-    // gesture that ends still clears what it showed (a drag outline, a size label).
-    if (state.ui.preview) {
-      const ended = Object.fromEntries(Object.entries(opts.ui ?? {}).filter(([key]) => GESTURE_UI.has(key)));
-      if (Object.keys(ended).length) set({ ...state, ui: uiWith(ended) });
-      return null;
-    }
+    // Looking at an old version: nothing can be changed (the board shown isn't the real one).
+    if (state.ui.preview) return refuse(opts.ui);
     flushPendingTick();
     const before = state.board;
     const result = fn(before);
     if (!result) return null;
     const { board, ui } = 'board' in result ? result : { board: result, ui: undefined };
+    // A board this person may only view or comment on (job 161): every change to it stops here,
+    // whatever asked for it (a button, a key, a paste, a drop); screen-only changes still apply.
+    if (board !== before && locked()) {
+      announce('This board is view only.');
+      return refuse({ ...opts.ui, ...ui });
+    }
     if (board !== before) {
       history = recordChange(history, before, opts.merge ?? null, Date.now());
       edits++;
@@ -313,7 +326,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       // Another board came since (opened, or from another device): this was for the one before.
       if (queuedAt !== swaps) return;
       settleQueued = false;
-      if (state.ui.drag || state.ui.resize) return;
+      // Not on a read-only board: the heights drawn here may differ from the editors' (job 161).
+      if (state.ui.drag || state.ui.resize || locked()) return;
       // The most recent change wins when two anchored blocks are in each other's way.
       const a = [...settleAnchors].reverse();
       settleAnchors.clear();
@@ -351,7 +365,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
    */
   function relayoutImport() {
     const pendingImport = layout.importLayout;
-    if (!pendingImport) return;
+    if (!pendingImport || locked()) return;
     const ids = pendingImport.ids.filter((id) => state.board.cards[id] && state.board.order.includes(id));
     if (!ids.length) layout.importLayout = null;
     if (!layout.importLayout || !ids.every((id) => heights.has(id))) return;
@@ -503,7 +517,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
 
   // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
   function stepOpen(which: 'undo' | 'redo') {
-    if (state.ui.preview) return;
+    if (state.ui.preview || locked()) return;
     flushPendingTick();
     const step = (which === 'undo' ? undoStep : redoStep)(history, state.board);
     if (step && step.board !== state.board) edits++; // counted before it shows, for version history
@@ -513,7 +527,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   function commitTo(id: string, fn: (b: Board) => Board, merge?: string) {
     if (id === state.boards.open) return void commit(fn, { merge });
     const before = state.boards.others[id];
-    if (!before || state.ui.preview) return;
+    if (!before || state.ui.preview || locked(id)) return;
     const board = fn(before);
     if (board === before) return;
     histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, merge ?? null, Date.now()));
@@ -525,7 +539,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (id === state.boards.open) return stepOpen(which);
     const before = state.boards.others[id];
     const h = histories.get(id);
-    if (!before || !h || state.ui.preview) return;
+    if (!before || !h || state.ui.preview || locked(id)) return;
     const step = (which === 'undo' ? undoStep : redoStep)(h, before);
     if (!step) return;
     histories.set(id, step.history);
@@ -576,6 +590,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     commitTo,
     undoOn,
     deleting,
+    viewOnly: locked,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */
@@ -638,6 +653,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     undo: () => stepOpen('undo'),
     redo: () => stepOpen('redo'),
     undoToast,
+    /** Whether the open board is shared with this person to view or comment on only (job 161). */
+    viewOnly: () => locked(),
   };
 
   return { ctx, api };

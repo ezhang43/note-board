@@ -247,24 +247,26 @@ describe('removing someone', () => {
   });
 });
 
-describe('a viewer or commenter changing the board (until read-only boards, PR 3)', () => {
-  it('is refused online: the save shows as failed once, the board online is unchanged, and it isn’t tried again and again', async () => {
+describe('a viewer or commenter changing the board (PR 3: read-only boards)', () => {
+  it('is refused on their page: nothing is sent, nothing shows as failed, and Alice’s changes still reach them', async () => {
     const { alice, trip, shareId } = await aliceShares();
     const dan = await joins(alice, shareId, 'dan', 'view');
     const before = server.shares.get(shareId)!.data;
     const writes = server.control.writes;
     dan.store.openBoard(trip);
+    const board = dan.store.getState().board;
     dan.store.addCard('note');
     await settle();
     await vi.advanceTimersByTimeAsync(60_000);
+    expect(dan.store.getState().board).toBe(board);
     expect(server.shares.get(shareId)!.data).toBe(before);
-    expect(dan.states.at(-1)).toBe('failed');
-    expect(server.control.writes - writes).toBe(1);
-    // Alice’s next change reaches Dan; his page tries once more, then waits again.
+    expect(server.control.writes).toBe(writes);
+    expect(dan.states).not.toContain('failed');
     alice.store.openBoard(trip);
     alice.store.addCard('note');
     await settle();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(server.control.writes - writes).toBeLessThanOrEqual(3);
+    expect(Object.keys(dan.store.getState().board.cards)).toHaveLength(Object.keys(board.cards).length + 1);
+    expect(server.control.writes - writes).toBe(1); // Alice's
   });
 });

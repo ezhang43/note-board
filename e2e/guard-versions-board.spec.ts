@@ -31,10 +31,10 @@ test('a deleted sub-board, with its note, is brought back by restoring the versi
   await page.getByRole('button', { name: 'Back to Home' }).click();
   await expect(cards(page)).toHaveCount(1);
 
-  // Delete it (a confirmation may ask first).
+  // Delete it, after the confirmation.
   await openBoardsMenu(page);
-  page.once('dialog', (d) => d.accept());
   await boardsMenu(page).getByRole('button', { name: 'Delete board Trips' }).click();
+  await page.getByRole('alertdialog', { name: 'Delete “Trips”?' }).getByRole('button', { name: 'Delete board' }).click();
   await expect(cards(page)).toHaveCount(0);
   await openBoardsMenu(page);
   await expect(boardsMenu(page).getByRole('menuitem', { name: 'Trips' })).toHaveCount(0);

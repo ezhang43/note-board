@@ -7,7 +7,7 @@ import { SignInScreen } from './SignInScreen';
 // Open to the public (owner request, 2026-10-05; replaces invite-only): any Google account can sign
 // in and gets its own private board. The online rules keep boards apart and cap their size.
 
-const screen = (status: 'signed-out' | 'no-access') =>
+const screen = (status: 'signed-out' | 'no-access' | 'error') =>
   renderToStaticMarkup(createElement(SignInScreen, { status, error: '', onSignIn: () => {}, onSignOut: () => {} }));
 
 const rules = readFileSync('firestore.rules', 'utf8');
@@ -23,6 +23,14 @@ describe('who can use BusyAnts', () => {
     const html = screen('no-access');
     expect(html).not.toContain('invite');
     expect(html).toContain('Sign out');
+  });
+
+  it('a board that couldn’t be loaded can be tried again, not only signed out of (interface review 181 C-L12)', () => {
+    const html = screen('error');
+    expect(html).toContain('couldn’t be loaded');
+    expect(html).toMatch(/<button[^>]*>Try again<\/button>/);
+    expect(html).toContain('Sign out');
+    expect(screen('no-access')).not.toContain('Try again');
   });
 
   it('the sign-in screen is a card: logo, the About page’s pitch, Google’s own button, a note, and About, Privacy and Terms links (job #165b)', () => {

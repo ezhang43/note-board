@@ -63,7 +63,10 @@ export function SignInScreen({ status, error, deleted = false, onSignIn, onSignO
         )}
         {status === 'error' && (
           <>
-            <p className="sign-in-text">Your board couldn’t be loaded. Check your connection and reload the page.</p>
+            <p className="sign-in-text">Your board couldn’t be loaded. Check your connection and try again.</p>
+            <button type="button" className="tb-button" onClick={() => location.reload()}>
+              Try again
+            </button>
             <button type="button" className="tb-button" onClick={onSignOut}>
               Sign out
             </button>

@@ -7,6 +7,7 @@ import { boardRights, keptNotice } from '../model/sharing';
 import { COLOR_THEMES, swatchFor } from '../model/theme';
 import { backupFileName, boardAsMarkdown } from '../model/exportText';
 import { CANT_READ, IMPORT_ACCEPT, IMPORT_MAX_BYTES, isPdf, TOO_BIG } from '../model/importFile';
+import { isStaleCodeError, UPDATED_NOTICE } from '../model/updated';
 import { readPdf } from './readPdf';
 import { boardPicture } from './exportBoard';
 import { serializeWorkspace } from '../model/workspace';
@@ -85,7 +86,7 @@ async function downloadPicture(kind: 'png' | 'pdf') {
     await saveFile(backupFileName(appStore.getState().board.name, new Date(), kind), blob, blob.type);
   } catch (e) {
     console.error(e);
-    collab.setNotice('Couldn’t make the picture. Try again, or try a smaller board.');
+    collab.setNotice(isStaleCodeError(e) ? UPDATED_NOTICE : 'Couldn’t make the picture. Try again, or try a smaller board.');
   } finally {
     drawing = false;
     if (collab.notice() === 'Preparing…') collab.setNotice(null);
@@ -213,8 +214,8 @@ export function FileMenu() {
           if (isPdf(file.name, await file.slice(0, 5).text())) {
             try {
               source = await readPdf(await file.arrayBuffer());
-            } catch {
-              return void collab.setNotice(CANT_READ); // broken, or locked with a password
+            } catch (err) {
+              return void collab.setNotice(isStaleCodeError(err) ? UPDATED_NOTICE : CANT_READ); // else broken, or locked with a password
             }
           } else source = await file.text();
           const { note } = appStore.importFile(source, file.name);

@@ -4,6 +4,7 @@ import { readWorkspace, serializeWorkspace, type Workspace } from '../model/work
 import { boardRights } from '../model/sharing';
 import { collab } from '../sync/collabSession';
 import type { Sharing } from './sharing';
+import { overLimit } from './sync';
 import type { Store } from './store';
 
 // Version history (owner request, like Google Docs). When editing starts after a quiet spell, every
@@ -29,8 +30,17 @@ export interface VersionStore {
 // note says why. simple: shared boards' versions saved apart, so they don't count, is a later job.
 export const TOO_BIG_NOTE = 'Your boards are now too big for Version history, so new versions (and copies of deleted boards) aren’t being saved. Removing boards or long notes you don’t need makes room.';
 export const TOO_BIG_RESTORE = 'Couldn’t restore it. Your boards are too big for Version history, so they couldn’t be saved first.';
-/** Whether `data` is more than `versions` may hold, counted in characters as the rules count them (an emoji is one). */
-const tooBig = (versions: VersionStore, data: string) => versions.limit !== undefined && data.length > versions.limit && [...data].length > versions.limit;
+const tooBig = (versions: VersionStore, data: string) => versions.limit !== undefined && overLimit(data, versions.limit);
+/** The note, unless another is showing (it may say something more urgent, such as changes not being saved). */
+const tellTooBig = () => void (collab.notice() || collab.setNotice(TOO_BIG_NOTE));
+/** A restore refused because the boards as they are are too big to keep first. */
+export class TooBigError extends Error {
+  constructor() {
+    super(TOO_BIG_RESTORE);
+  }
+}
+/** Whether every board as it is now is too big for the version history in use (the delete and backup questions say so). */
+export const historyFull = (store: Store) => current !== null && tooBig(current, serializeWorkspace(store.workspace()));
 
 export const LIST_KEY = 'note-board:versions:v1';
 /**
@@ -52,7 +62,7 @@ export async function saveSafetyVersion(store: Store, versions: VersionStore, no
   if (!version) return true;
   const { meta, data } = version;
   if (tooBig(versions, data)) {
-    collab.setNotice(TOO_BIG_NOTE);
+    tellTooBig();
     return false;
   }
   const saving = (async () => versions.save(meta, data))(); // called now; a throw becomes a failed save
@@ -203,7 +213,7 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       const keptBefore = lastKeptAt;
       unkept = false;
       lastKeptAt = at; // also when too big: the note comes back at most once in 10 minutes
-      if (tooBig(versions, version.data)) return collab.setNotice(TOO_BIG_NOTE);
+      if (tooBig(versions, version.data)) return tellTooBig();
       (async () => versions.save(version.meta, version.data))().then(
         () => tidyAfter(versions, version.meta, version.data).catch(() => {}),
         (e) => {
@@ -238,7 +248,7 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       // Not sent, and not tried again until the next version is due (the note would come back at every edit).
       if (tooBig(versions, data)) {
         owed = null;
-        return collab.setNotice(TOO_BIG_NOTE);
+        return tellTooBig();
       }
       try {
         await saveVersion(versions, data, at, list ?? undefined);
@@ -269,7 +279,7 @@ export async function restoreVersion(store: Store, versions: VersionStore, id: s
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
   // Too big to save first (review 137-A M6): nothing is restored, and the bar says why.
-  if (tooBig(versions, serializeWorkspace(store.workspace()))) throw new Error(TOO_BIG_RESTORE);
+  if (tooBig(versions, serializeWorkspace(store.workspace()))) throw new TooBigError();
   const pressed = store.getState();
   // The safety version's save starts first, at the press, so it is queued on this device even while
   // reading the chosen version waits (just offline). Saving may wait too: the restore goes ahead after

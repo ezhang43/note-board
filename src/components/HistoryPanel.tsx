@@ -4,7 +4,7 @@ import { boardRights, keptNotice } from '../model/sharing';
 import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
 import { appStore, useAppState } from '../store/appStore';
-import { activeVersionStore, restoreVersion, TOO_BIG_RESTORE } from '../store/versions';
+import { activeVersionStore, restoreVersion, TooBigError } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { CloseIcon } from './icons';
 import { escapeIsForPanel } from './textField';
@@ -157,7 +157,7 @@ export function PreviewBar() {
       const notice = keptNotice(kept, appStore.boardName);
       if (notice) collab.setNotice(notice);
     } catch (e) {
-      setFailed({ on: meta.id, why: e instanceof Error && e.message === TOO_BIG_RESTORE ? TOO_BIG_RESTORE : 'Couldn’t restore it. Try again.' });
+      setFailed({ on: meta.id, why: e instanceof TooBigError ? e.message : 'Couldn’t restore it. Try again.' });
     } finally {
       setBusy(false);
     }

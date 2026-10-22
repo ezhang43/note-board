@@ -58,6 +58,9 @@ describe('save, load, save again', () => {
 // fails when the shape (every field name, card kind and allowed value) differs from the one recorded
 // for the current number. To fix it: raise WORKSPACE_VERSION in src/model/workspace.ts and add the
 // new shape below under the new number. Never edit a shape already recorded (it is published).
+// A new card kind fails the type check on KINDS below; add a card of it to the fixture above too.
+// Not covered, so raise the number by hand for it: a change to a number's range or a length limit
+// (an indent of 5, say), which an older app would clamp.
 
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 /** Fails `npm run typecheck` when a list below no longer matches its type. */
@@ -75,8 +78,6 @@ same<NonNullable<TextStyle['font']>, (typeof FONTS)[number]>(true);
 const HIGHLIGHTS = ['blue', 'green', 'pink', 'yellow'] as const;
 same<Highlight, (typeof HIGHLIGHTS)[number]>(true);
 same<ColorKey, (typeof COLOR_KEYS)[number]>(true);
-// Every card kind is in the fixture above, so its fields are in the shape.
-same<keyof typeof board.cards extends never ? never : (typeof board.cards)[keyof typeof board.cards]['kind'], Card['kind']>(true);
 
 /** The saved shape: each field's path (ids as `*`, a card's as its kind, list entries as `[]`), then the allowed values. */
 function shapeOf(raw: string): string[] {

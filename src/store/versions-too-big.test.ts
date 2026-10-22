@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { VERSION_GAP_MS } from '../model/versions';
 import { collab } from '../sync/collabSession';
 import { createStore } from './store';
-import { deleteBoardSafely, localVersionStore, restoreFromBackup, restoreVersion, saveSafetyVersion, startVersions, TOO_BIG_NOTE, TOO_BIG_RESTORE, type VersionStore } from './versions';
+import { deleteBoardSafely, historyFull, localVersionStore, restoreFromBackup, restoreVersion, saveSafetyVersion, startVersions, TOO_BIG_NOTE, TOO_BIG_RESTORE, TooBigError, type VersionStore } from './versions';
 
 // Review 137-A M6 (owner: "m6 yes", job 175). A version holds every board, shared ones too, and the
 // online rules refuse one over 900,000 characters. Past that, versions silently stopped saving, a
@@ -90,6 +90,7 @@ describe('boards too big for Version history (review 137-A M6)', () => {
     const { store, versions, local, saves } = setup();
     await local.save({ id: 'v1', savedAt: 1, cards: 0, columns: 0 }, JSON.stringify({ version: 3, home: 'home', boards: { home: { name: 'Old', snap: true, cards: {}, columns: {}, order: [] } } }));
     store.renameBoard(long);
+    await expect(restoreVersion(store, versions, 'v1', () => 2)).rejects.toThrow(TooBigError);
     await expect(restoreVersion(store, versions, 'v1', () => 2)).rejects.toThrow(TOO_BIG_RESTORE);
     expect(store.getState().board.name).toBe(long);
     expect(saves).toEqual([]);
@@ -103,6 +104,24 @@ describe('boards too big for Version history (review 137-A M6)', () => {
     expect(store.getState().board.name).toBe('From the backup');
     expect(saves).toEqual([]);
     expect(collab.notice()).toBe(TOO_BIG_NOTE);
+  });
+
+  it('the note doesn’t replace one already showing (a more urgent one, say)', async () => {
+    const { store, versions } = setup();
+    collab.setNotice('Your boards were saved by a newer version of the app.');
+    store.renameBoard(long);
+    expect(await saveSafetyVersion(store, versions, () => 1)).toBe(false);
+    expect(collab.notice()).toBe('Your boards were saved by a newer version of the app.');
+  });
+
+  it('the delete and backup questions can tell whether a copy can be kept', () => {
+    const { store, versions, clock } = setup();
+    const recorder = startVersions(store, versions, { now: () => clock.now });
+    expect(historyFull(store)).toBe(false);
+    store.renameBoard(long);
+    expect(historyFull(store)).toBe(true);
+    recorder.stop();
+    expect(historyFull(store)).toBe(false);
   });
 
   it('versions kept on this device have no such limit', async () => {

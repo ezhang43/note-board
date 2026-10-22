@@ -49,50 +49,92 @@ function setup() {
 const sent = (doc: RemoteDoc | undefined) => (doc ? readWorkspace(doc.data)!.ws : null);
 
 describe('a board back from a deleted share (review 137-A M3)', () => {
-  it('takes the online copy of it when the share turns out to be gone, and uploads nothing', () => {
+  it('takes the online copy of it when the share turns out to be gone, and uploads nothing', async () => {
     const { store, fake, trip, shared, sync, online } = setup();
     fake.send({ data: online, client: 'other-device' });
     // While it still counts as shared, this device's copy stays.
     expect(store.workspace().boards[trip].cards.fromB).toBeUndefined();
     shared.delete(trip);
     sync.sharedChanged();
+    await Promise.resolve();
     expect(store.workspace().boards[trip].cards.fromB).toBeDefined();
     vi.advanceTimersByTime(SYNC_DELAY * 3);
     expect(fake.writes).toEqual([]);
   });
 
-  it('also when the list of shares changing on screen is what says so', () => {
+  it('also when the list of shares changing on screen is what says so', async () => {
     const { store, fake, trip, shared, online } = setup();
     store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], link: null }], true);
     fake.send({ data: online, client: 'other-device' });
     shared.delete(trip);
     store.setShares([], true);
+    await Promise.resolve();
     expect(store.workspace().boards[trip].cards.fromB).toBeDefined();
     vi.advanceTimersByTime(SYNC_DELAY * 3);
     expect(fake.writes).toEqual([]);
   });
 
-  it('a later change to the person’s boards uploads the online copy of it, not the old one', () => {
+  it('a later change to the person’s boards uploads the online copy of it, not the old one', async () => {
     const { store, fake, home, trip, shared, sync, online } = setup();
     fake.send({ data: online, client: 'other-device' });
     shared.delete(trip);
     sync.sharedChanged();
+    await Promise.resolve();
     store.openBoard(home);
     store.renameBoard('Home, renamed');
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(sent(fake.writes.at(-1))!.boards[trip].cards.fromB).toBeDefined();
   });
 
-  it('keeps this device’s copy when it was changed here after the online copy came (the most recent change wins)', () => {
+  it('keeps this device’s copy when it was changed here after the online copy came (the most recent change wins)', async () => {
     const { store, fake, trip, shared, sync, online } = setup();
     fake.send({ data: online, client: 'other-device' });
     store.openBoard(trip);
     store.renameBoard('Trip, renamed here');
     shared.delete(trip);
     sync.sharedChanged();
+    await Promise.resolve();
     expect(store.boardName(trip)).toBe('Trip, renamed here');
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(sent(fake.writes.at(-1))!.boards[trip].name).toBe('Trip, renamed here');
+  });
+
+  it('waits for a drag to end; the drop is a change made here, so this device’s copy wins', async () => {
+    const { store, fake, home, trip, shared, sync } = setup();
+    store.openBoard(trip);
+    store.addCard('note');
+    const id = store.getState().board.order[0];
+    const card = store.getState().board.cards[id];
+    const there = addCard(store.workspace().boards[trip], note('fromB', 'Written on the other device'), { type: 'loose', x: 0, y: 600 });
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: store.workspace().boards[home], [trip]: there } }), client: 'other-device' });
+    const before = store.workspace().boards[trip];
+    store.startDrag('card', id, card.x, card.y);
+    shared.delete(trip);
+    sync.sharedChanged();
+    await Promise.resolve();
+    expect(store.getState().ui.drag).not.toBeNull();
+    expect(store.workspace().boards[trip]).toBe(before);
+    store.moveDrag(card.x + 40, card.y + 40, null);
+    store.dropDrag(null);
+    await Promise.resolve();
+    expect(store.workspace().boards[trip].cards.fromB).toBeUndefined();
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(sent(fake.writes.at(-1))!.boards[trip].cards[id]).toBeDefined();
+  });
+
+  it('a board with the same content online is left as it is', async () => {
+    const { store, fake, home, trip, shared, sync } = setup();
+    store.openBoard(trip);
+    store.renameBoard('Trip, renamed');
+    const same = serializeWorkspace({ home, boards: { [home]: store.workspace().boards[home], [trip]: store.workspace().boards[trip] } });
+    fake.send({ data: same, client: 'other-device' });
+    const before = store.workspace().boards[trip];
+    shared.delete(trip);
+    sync.sharedChanged();
+    await Promise.resolve();
+    expect(store.workspace().boards[trip]).toBe(before);
+    vi.advanceTimersByTime(SYNC_DELAY * 3);
+    expect(fake.writes).toEqual([]);
   });
 
   it('uploads this device’s copy, as before, when the online copy doesn’t have it', () => {

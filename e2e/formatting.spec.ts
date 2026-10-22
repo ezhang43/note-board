@@ -91,7 +91,7 @@ test('with whole cards selected, Ctrl+B formats every text box in them', async (
   await add(page, 'Note');
   await page.keyboard.type('hello');
   await page.keyboard.press('Escape');
-  await l.click({ position: { x: 30, y: 10 }, modifiers: ['Control'] });
+  await l.click({ position: { x: 8, y: 18 }, modifiers: ['Control'] });
   await page.keyboard.press('Control+b');
   for (const f of [l.getByLabel('List title'), l.getByLabel('Item text').first(), page.getByLabel('Note text')])
     await expect.poll(() => css(f, 'font-weight')).toBe('600');

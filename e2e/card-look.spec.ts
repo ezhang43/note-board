@@ -56,7 +56,7 @@ test("a tick box is centered on its item's first line at Normal and Largest text
 
 test('the item buttons and the strip kept free for them grow with the text size, never below the Small size', async ({ page }) => {
   test.slow(); // six text sizes
-  const list = await checklist(page, ['Call the plumber about the leaking kitchen tap']);
+  const list = await checklist(page, ['Call the plumber about the leaking kitchen tap', 'Second']); // two items, so the first has somewhere to move
   const row = list.locator('[data-item-id]').first();
   await page.mouse.move(0, 0);
   const smaller = page.getByRole('button', { name: 'Smaller text' });
@@ -84,8 +84,8 @@ test('the item buttons and the strip kept free for them grow with the text size,
     near(trash.icon.w, 16 * s);
     near(grip.icon.w, 10 * s);
     near(grip.icon.h, 15 * s);
-    // The strip kept free is 92px at Normal and Small, bigger from Large up.
-    expect(await row.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight))).toBeCloseTo(92 * s, 0);
+    // The strip kept free (for the trash can and the grip; the arrows float in a pill) is 46px at Normal and Small, bigger from Large up.
+    expect(await row.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight))).toBeCloseTo(46 * s, 0);
     // The press area is at least 24 x 24 at every size.
     for (const x of [up, down, trash, grip]) expect(Math.min(x.b.width, x.b.height)).toBeGreaterThanOrEqual(18);
     for (const x of [up, down, trash, grip]) expect(x.b.height).toBeGreaterThanOrEqual(24);

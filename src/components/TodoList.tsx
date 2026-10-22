@@ -17,31 +17,37 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
   return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
 }
 
-/** A to-do list's body: title, open items, and the "Completed" section. */
+/** A to-do list's title. It sits on the card's button row (see CardView), so the list's body starts right under it. */
+export function TodoTitle({ card }: { card: TodoCard }) {
+  const title = useRef<HTMLInputElement>(null);
+  useTakeFocus(card.id, title);
+  return (
+    <AutoSizeInput
+      className="card-title"
+      ref={title}
+      aria-label="List title"
+      {...boxProps({ cardId: card.id }, card.style)}
+      find={`title:${card.id}`}
+      placeholder="List title"
+      value={card.title}
+      onChange={(text) => appStore.setCardTitle(card.id, text)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        appStore.focusFirstItem(card.id);
+      }}
+    />
+  );
+}
+
+/** A to-do list's body: open items, and the "Completed" section. */
 export function TodoBody({ card }: { card: TodoCard }) {
   const { open, done } = sections(card.items);
   // A read-only board's Completed section stays as it was left (opening it would change the board, job 161).
   const readOnly = use(BoardReadOnly);
-  const title = useRef<HTMLInputElement>(null);
-  useTakeFocus(card.id, title);
 
   return (
     <div className="todo-body" data-todo-of={card.id}>
-      <AutoSizeInput
-        className="card-title"
-        ref={title}
-        aria-label="List title"
-        {...boxProps({ cardId: card.id }, card.style)}
-        find={`title:${card.id}`}
-        placeholder="List title"
-        value={card.title}
-        onChange={(text) => appStore.setCardTitle(card.id, text)}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          appStore.focusFirstItem(card.id);
-        }}
-      />
       <div className="todo-items">
         {flatten(open).map(({ item, depth }) => (
           <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />
@@ -181,27 +187,31 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
       />
-      {/* Move up / down on hover, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18). */}
-      {/* Faded (aria-disabled) at the end of its level. The cursor goes into the item, as with the keyboard. */}
-      {([-1, 1] as const).map((dir) => {
-        const label = dir < 0 ? 'Move up' : 'Move down';
-        const can = (moves & (dir < 0 ? 1 : 2)) !== 0;
-        return (
-          <button
-            key={dir}
-            type="button"
-            className={dir < 0 ? 'item-arrow item-up' : 'item-arrow item-down'}
-            aria-label={label}
-            title={label}
-            aria-disabled={!can || undefined}
-            tabIndex={can ? undefined : -1}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => can && appStore.moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
-          >
-            <ArrowIcon down={dir > 0} />
-          </button>
-        );
-      })}
+      {/* Move up / down in a small pill over the free end of the row above (below the first row), on hover or keyboard focus, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18; the pill, 2026-10-22). */}
+      {/* Faded (aria-disabled) at the end of its level; a list of one item has nothing to move, so no pill. The cursor goes into the item, as with the keyboard. */}
+      {moves !== 0 && (
+        <span className="item-arrows">
+          {([-1, 1] as const).map((dir) => {
+            const label = dir < 0 ? 'Move up' : 'Move down';
+            const can = (moves & (dir < 0 ? 1 : 2)) !== 0;
+            return (
+              <button
+                key={dir}
+                type="button"
+                className="item-arrow"
+                aria-label={label}
+                title={label}
+                aria-disabled={!can || undefined}
+                tabIndex={can ? undefined : -1}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => can && appStore.moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
+              >
+                <ArrowIcon down={dir > 0} />
+              </button>
+            );
+          })}
+        </span>
+      )}
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
       {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}
       <button

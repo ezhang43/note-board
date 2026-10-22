@@ -2718,12 +2718,14 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 
 /* The Weight card above the habits: the latest weight big, how it changed, a box for today's kg, a small chart. */
 .weight { padding: 12px 14px 10px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
-.weight-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weight-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .weight-title { font-size: 13px; font-weight: 600; }
-.weight-new { display: flex; align-items: center; gap: 6px; }
-.weight-new input[type='text'] { width: 84px; height: 30px; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; }
+.weight-new { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+.weight-new input[type='date'], .weight-row input[type='text'], .weight-new input[type='text'] { width: 64px; height: 30px; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--canvas); color: var(--ink); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; }
+.weight-new input[type='date'] { flex: 1 1 auto; width: auto; min-width: 0; max-width: 150px; padding: 0 6px; font-size: 13px; }
 .weight-new .tb-button { height: 30px; padding: 0 12px; font-size: 13px; }
 .weight-note { margin: 6px 2px 0; color: var(--danger); font-size: 13px; }
+.weight-note.ok { color: var(--ink-soft); }
 .weight-empty { margin: 8px 2px 2px; color: var(--ink-soft); font-size: 13px; }
 .weight-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 6px; }
 .weight-text { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
@@ -2741,11 +2743,20 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .weight-axis text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
 .weight-latest { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 -4px; color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
 .weight-remove { font-size: 18px; line-height: 1; }
+.weight-entries { margin-top: 6px; border-top: 1px solid var(--line); font-size: 13px; }
+.weight-entries summary { padding: 8px 2px 4px; color: var(--ink-soft); font-size: 12px; cursor: pointer; }
+.weight-entries ul { max-height: 224px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.weight-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.weight-row-day { flex: 1; min-width: 0; }
+.weight-row input[type='text'] { width: 72px; text-align: right; }
+.weight-row-unit { color: var(--ink-soft); font-size: 12px; }
 @container (min-width: 400px) {
   .weight-body { grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: end; }
   .weight-text { flex-direction: column; align-items: flex-start; gap: 2px; padding-bottom: 16px; }
 }
-.app.phone .weight-new input[type='text'] { width: 96px; height: 44px; font-size: 16px; }
+.app.phone .weight-new input[type='text'], .app.phone .weight-new input[type='date'], .app.phone .weight-row input[type='text'] { height: 44px; font-size: 16px; }
+.app.phone .weight-new input[type='text'] { width: 96px; }
+.app.phone .weight-entries summary { padding: 12px 2px 8px; font-size: 13px; }
 .app.phone .weight-new .tb-button, .app.phone .weight-remove { height: 44px; }
 .app.phone .weight-remove { width: 44px; }
 

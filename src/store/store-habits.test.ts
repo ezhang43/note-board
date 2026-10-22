@@ -218,6 +218,7 @@ describe('Habits panel', () => {
 });
 
 describe('Weight', () => {
+  beforeEach(() => vi.setSystemTime(new Date(2026, 9, 21, 10, 0))); // Wed 21 Oct 2026, so 19 and 20 Oct are earlier days
   const weights = (s: Store) => {
     const id = s.habitsBoard();
     return weightEntries(id ? weightCard(s.workspace().boards[id]) : undefined);
@@ -286,6 +287,39 @@ describe('Weight', () => {
     expect(weights(s).map((w) => w.day)).toEqual(['2026-10-19', '2026-10-20']);
     s.removeWeight('2026-01-01'); // nothing on that day
     expect(weights(s)).toHaveLength(2);
+  });
+
+  it('an earlier day can be entered, replaced and removed, in any order, each one undoable (job 177)', () => {
+    const s = setup();
+    s.openHabits();
+    expect(s.saveWeight('72.4', '2026-10-21')).toBe(72.4);
+    expect(s.saveWeight('74.0', '2026-10-05')).toBe(74);
+    expect(s.saveWeight('73.1', '2026-10-12')).toBe(73.1);
+    expect(weights(s).map((w) => w.day)).toEqual(['2026-10-05', '2026-10-12', '2026-10-21']);
+    expect(s.saveWeight('74.6', '2026-10-05')).toBe(74.6); // replaces that day's
+    expect(weights(s)[0]).toEqual({ day: '2026-10-05', kg: 74.6 });
+    expect(weights(s)).toHaveLength(3);
+    s.removeWeight('2026-10-12');
+    expect(weights(s).map((w) => w.day)).toEqual(['2026-10-05', '2026-10-21']);
+    s.undoHabits();
+    expect(weights(s).map((w) => w.day)).toEqual(['2026-10-05', '2026-10-12', '2026-10-21']);
+    s.undoHabits();
+    expect(weights(s)[0].kg).toBe(74);
+    s.redoHabits();
+    expect(weights(s)[0].kg).toBe(74.6);
+    const board = s.workspace().boards[s.habitsBoard()!];
+    expect(Object.values(board.cards).filter((c) => c.kind === 'todo')).toHaveLength(1);
+    // The saved shape is unchanged: one item "day kg" per day, not done.
+    expect(weightCard(board)!.items.filter((i) => i.text).map((i) => i.text).sort()).toEqual(['2026-10-05 74.6', '2026-10-12 73.1', '2026-10-21 72.4']);
+  });
+
+  it('a later day, or a day that is not a real date, saves nothing', () => {
+    const s = setup();
+    s.openHabits();
+    s.saveWeight('72.4', '2026-10-21');
+    const before = s.workspace();
+    for (const bad of ['2026-10-22', '2999-01-01', '2026-02-30', '', 'today', '1999-12-31']) expect(s.saveWeight('72.4', bad)).toBeNull();
+    expect(s.workspace()).toEqual(before);
   });
 
   it('weights are kept after a reload, and ticking or deleting habits leaves them alone', () => {

@@ -531,3 +531,134 @@ test.describe('on a phone', () => {
     await expect(panel(page)).toHaveCount(0);
   });
 });
+
+// Job #177 (owner, 2026-10-22): weights for earlier days. A date next to the weight box (today to start with, nothing later),
+// a list of the period's entries to correct or remove, one weight per day, the chart in date order.
+const weightDate = (page: Page) => weightCard(page).getByLabel('Date of weight');
+const weightRows = (page: Page) => weightCard(page).locator('.weight-row');
+async function enterWeightOn(page: Page, day: string, text: string) {
+  await weightDate(page).fill(day);
+  await enterWeight(page, text);
+}
+async function openWeightsOn21Oct(page: Page) {
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 10, 0)); // Wed 21 Oct 2026, in the week of Mon 19 Oct
+  await page.goto('/');
+  await habitsButton(page).click();
+}
+
+test('Weight: a date next to the box starts at today, and an earlier day can be entered; the chart puts it in date order', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await expect(weightDate(page)).toHaveValue('2026-10-21');
+  await expect(weightDate(page)).toHaveAttribute('max', '2026-10-21');
+  await enterWeight(page, '72.4');
+  await enterWeightOn(page, '2026-10-19', '73.0');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Saved 73.0 kg for Mon 19 Oct.');
+  await expect(weightDate(page)).toHaveValue('2026-10-21'); // back to today for the next one
+  await expect(weightBox(page)).toHaveValue('');
+  await expect(weightPoints(page)).toHaveCount(2);
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg today'); // the latest is still the latest by date
+  await expect(weightCard(page).locator('.weight-change')).toHaveText('−0.6 kg this week'); // from 73.0 on the 19th
+  await enterWeightOn(page, '2026-10-20', '72.8');
+  const xs = await weightPoints(page).evaluateAll((els) => els.map((e) => Number(e.getAttribute('cx'))));
+  expect(xs).toEqual([...xs].sort((a, b) => a - b));
+  await expect(weightCard(page).locator('.weight-latest')).toContainText('Latest: 72.4 kg, Wed 21 Oct');
+  await page.reload();
+  await habitsButton(page).click();
+  await expect(weightPoints(page)).toHaveCount(3);
+});
+
+test('Weight: entering a day that already has a weight replaces it, and says so', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await enterWeightOn(page, '2026-10-19', '73.0');
+  await enterWeightOn(page, '2026-10-19', '73.5');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Replaced 73.0 kg with 73.5 kg for Mon 19 Oct.');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await enterWeight(page, '72.4');
+  await enterWeight(page, '72.0');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Replaced 72.4 kg with 72.0 kg for today.');
+  await expect(weightPoints(page)).toHaveCount(2);
+  await page.keyboard.press('Control+z'); // focus is back in the empty weight box: takes the replacement back
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg today');
+});
+
+test('Weight: a later day, or no day at all, is refused with a note and nothing is saved', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await enterWeightOn(page, '2026-10-22', '72.4');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Pick today or an earlier day.');
+  await expect(weightPoints(page)).toHaveCount(0);
+  await expect(weightBox(page)).toHaveValue('72.4'); // kept
+  await weightDate(page).fill('');
+  await weightBox(page).press('Enter');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Pick today or an earlier day.'); // an empty date is not guessed to be today
+  await expect(weightPoints(page)).toHaveCount(0);
+  await weightDate(page).fill('2026-10-21');
+  await weightBox(page).press('Enter');
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg today');
+});
+
+test('Weight: a day outside the shown week takes the panel to that week', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await enterWeightOn(page, '2026-09-15', '75.2');
+  await expect(panel(page).locator('.habit-nav-label')).toContainText('14');
+  await expect(weightPoints(page)).toHaveCount(1);
+  await expect(weightCard(page).locator('.weight-num')).toHaveText('75.2 kg');
+});
+
+test('Weight: the entries list corrects or removes any entry of the period, and Ctrl+Z undoes each', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await enterWeight(page, '72.4');
+  await enterWeightOn(page, '2026-10-19', '73.0');
+  await enterWeightOn(page, '2026-10-20', '72.8');
+  await expect(weightRows(page).first()).toBeHidden(); // folded away until opened
+  await weightCard(page).getByText('Entries', { exact: false }).click();
+  await expect(weightRows(page)).toHaveCount(3);
+  await expect(weightRows(page).first()).toContainText('Wed 21 Oct'); // newest first
+  await expect(weightRows(page).last()).toContainText('Mon 19 Oct');
+  const earlier = weightCard(page).getByRole('textbox', { name: 'Weight for Mon 19 Oct in kg' });
+  await expect(earlier).toHaveValue('73.0');
+  await earlier.fill('73,4');
+  await earlier.press('Enter');
+  await expect(earlier).toHaveValue('73.4');
+  await expect(weightCard(page).locator('.weight-change')).toHaveText('−1.0 kg this week');
+  await page.keyboard.press('Control+z');
+  await expect(earlier).toHaveValue('73.0');
+  await page.keyboard.press('Control+y');
+  await expect(earlier).toHaveValue('73.4');
+  // A bad entry shows the note and puts the old weight back.
+  await earlier.fill('7');
+  await earlier.press('Enter');
+  await expect(weightCard(page).locator('.weight-note')).toHaveText('Enter a weight from 20.0 to 400.0 kg.');
+  await expect(earlier).toHaveValue('73.4');
+  // Escape drops what was typed.
+  await earlier.fill('70');
+  await earlier.press('Escape');
+  await expect(earlier).toHaveValue('73.4');
+  // Remove the middle one.
+  await weightRows(page).nth(1).getByRole('button', { name: 'Remove weight for Tue 20 Oct' }).click();
+  await expect(weightRows(page)).toHaveCount(2);
+  await expect(weightPoints(page)).toHaveCount(2);
+  await page.keyboard.press('Control+z');
+  await expect(weightRows(page)).toHaveCount(3);
+  await page.reload();
+  await habitsButton(page).click();
+  await expect(weightPoints(page)).toHaveCount(3);
+});
+
+// Review of job 177.
+test('Weight: pressing × on a row right after typing in it removes it (the edit is kept first, the button is not replaced)', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await enterWeight(page, '72.4');
+  await enterWeightOn(page, '2026-10-19', '73.0');
+  await weightCard(page).getByText('Entries', { exact: false }).click();
+  await weightCard(page).getByRole('textbox', { name: 'Weight for Mon 19 Oct in kg' }).fill('73.4');
+  await weightRows(page).last().getByRole('button', { name: 'Remove weight for Mon 19 Oct' }).click();
+  await expect(weightRows(page)).toHaveCount(1);
+  await expect(weightPoints(page)).toHaveCount(1);
+});
+
+test('Weight: clearing part of the date by keyboard is not put back to today while typing', async ({ page }) => {
+  await openWeightsOn21Oct(page);
+  await weightDate(page).focus();
+  await page.keyboard.press('Backspace');
+  await expect(weightDate(page)).toHaveValue('');
+});

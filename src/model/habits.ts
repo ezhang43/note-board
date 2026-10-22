@@ -120,6 +120,10 @@ export function parseKg(text: string): number | null {
   return kg >= MIN_KG && kg <= MAX_KG ? kg : null;
 }
 
+export const FIRST_WEIGHT_DAY = '2000-01-01';
+/** Today or an earlier real day (from 2000 on): the days a weight can be entered for (job 177). */
+export const isWeightDay = (day: string, today: DayKey) => /^\d{4}-\d{2}-\d{2}$/.test(day) && addDays(day, 0) === day && day >= FIRST_WEIGHT_DAY && day <= today;
+
 /** A real day and a weight in range; a malformed item is simply not an entry. */
 function entryOf(i: TodoItem): { day: DayKey; kg: number } | null {
   const m = WEIGHT.exec(i.text);

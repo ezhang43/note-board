@@ -9,15 +9,15 @@ import { memoryServer, type Person } from './collab';
 /** A pretend account online: its own data, its shares and whether the sign-in still exists. */
 function fakeAccount(shares: { id: string; owner: string | null }[]) {
   const calls: string[] = [];
-  const state = { shares: [...shares], ownBoards: true, ownData: true, user: true };
+  /** board: the own boards online, or the marker of deleting the account ('started', 'done'). */
+  const state = { shares: [...shares], board: 'boards' as 'boards' | 'started' | 'done', ownData: true, user: true };
   const fail = new Set<string>();
   /**
-   * Another device of this person's, still open (review 137-A H5). It stops syncing once it sees its
-   * own boards gone online. A share of theirs deleted while it still syncs makes it save a version
-   * and its own boards again; `sameSnapshot`: it sees the share go together with its own boards, so
-   * it still saves the version before it stops. Its saves land online one step later.
+   * Another device of this person's, still open (review 137-A H5). When a board they shared goes, it
+   * saves a version and its own boards again, and those saves land online one step later, unless the
+   * online rules refuse them (they do while the marker is there).
    */
-  const other = { open: false, syncing: true, sameSnapshot: false };
+  const other = { open: false };
   let landing: (() => void)[] = [];
   let sent: (() => void)[] = [];
   const step = (name: string) => {
@@ -35,13 +35,18 @@ function fakeAccount(shares: { id: string; owner: string | null }[]) {
       step('myShares');
       return state.shares;
     },
+    async markDeleting() {
+      step('markDeleting');
+      state.board = 'started';
+      land();
+    },
     async deleteShare(id) {
       step(`deleteShare ${id}`);
       state.shares = state.shares.filter((s) => s.id !== id);
-      if (other.open && (other.syncing || other.sameSnapshot))
+      if (other.open)
         sent.push(() => {
+          if (state.board !== 'boards') return; // refused by the rules
           state.ownData = true; // its safety version
-          if (other.syncing) state.ownBoards = true;
         });
       land();
     },
@@ -50,17 +55,14 @@ function fakeAccount(shares: { id: string; owner: string | null }[]) {
       state.shares = state.shares.filter((s) => s.id !== id);
       land();
     },
-    async deleteOwnBoards() {
-      step('deleteOwnBoards');
-      state.ownBoards = false;
-      other.syncing = false;
-      land();
-    },
     async deleteOwnData() {
       step('deleteOwnData');
-      state.ownBoards = false;
       state.ownData = false;
-      other.syncing = false;
+      land();
+    },
+    async markDeleted() {
+      step('markDeleted');
+      state.board = 'done';
       land();
     },
     async deleteUser() {
@@ -72,32 +74,25 @@ function fakeAccount(shares: { id: string; owner: string | null }[]) {
   return { backend, calls, state, fail, other };
 }
 
+const gone = { shares: [], board: 'done', ownData: false, user: false };
+
 describe('deleteAccountData', () => {
-  it('deletes shared boards for everyone, leaves the others’ shares, then the person’s own data, and the sign-in last', async () => {
+  it('marks the boards as being deleted first, deletes shared boards for everyone, leaves the others’ shares, marks it done, then the person’s own data, and the sign-in last', async () => {
     const { backend, calls, state } = fakeAccount([
       { id: 's1', owner: 'me' },
       { id: 's2', owner: 'bob' },
     ]);
     const done = await deleteAccountData('me', backend);
-    expect(calls).toEqual(['myShares', 'deleteOwnBoards', 'deleteShare s1', 'leave s2', 'deleteOwnData', 'deleteOwnData', 'deleteUser']);
+    expect(calls).toEqual(['myShares', 'markDeleting', 'deleteShare s1', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
     expect(done.shareIds).toEqual(['s1', 's2']);
-    expect(state).toEqual({ shares: [], ownBoards: false, ownData: false, user: false });
+    expect(state).toEqual(gone);
   });
 
-  it('another device still open stops syncing before any shared board goes, so it never puts the boards back online (review 137-A H5)', async () => {
+  it('another device still open can’t put a version back online as a shared board goes (review 137-A H5)', async () => {
     const { backend, state, other } = fakeAccount([{ id: 's1', owner: 'me' }]);
     other.open = true;
     await deleteAccountData('me', backend);
-    expect(other.syncing).toBe(false);
-    expect(state).toEqual({ shares: [], ownBoards: false, ownData: false, user: false });
-  });
-
-  it('a version the other device saves as it stops, landing after the own data went, is deleted before the sign-in (review 137-A H5)', async () => {
-    const { backend, state, other } = fakeAccount([{ id: 's1', owner: 'me' }]);
-    other.open = true;
-    other.sameSnapshot = true;
-    await deleteAccountData('me', backend);
-    expect(state).toEqual({ shares: [], ownBoards: false, ownData: false, user: false });
+    expect(state).toEqual(gone);
   });
 
   it('stops at the first failure: the sign-in stays, so the person can sign in and try again', async () => {
@@ -108,30 +103,31 @@ describe('deleteAccountData', () => {
     fail.add('leave s2');
     // Something was already deleted, so the person is told it stopped part-way.
     await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: true });
-    expect(calls).toEqual(['myShares', 'deleteOwnBoards', 'deleteShare s1', 'leave s2']);
+    expect(calls).toEqual(['myShares', 'markDeleting', 'deleteShare s1', 'leave s2']);
     expect(state.user).toBe(true);
-    // Only the own boards went (this device uploads them again when syncing starts again).
     expect(state.ownData).toBe(true);
 
     // Trying again finishes the job.
     fail.clear();
     calls.length = 0;
     await deleteAccountData('me', backend);
-    expect(calls).toEqual(['myShares', 'deleteOwnBoards', 'leave s2', 'deleteOwnData', 'deleteOwnData', 'deleteUser']);
-    expect(state).toEqual({ shares: [], ownBoards: false, ownData: false, user: false });
+    expect(calls).toEqual(['myShares', 'markDeleting', 'leave s2', 'markDeleted', 'deleteOwnData', 'deleteUser']);
+    expect(state).toEqual(gone);
   });
 
-  it('a failure before anything was deleted is not called part-way', async () => {
+  it('a failure before anything but the marker is not called part-way (syncing starts again and puts the boards back)', async () => {
     const { backend, fail } = fakeAccount([{ id: 's1', owner: 'me' }]);
-    // The own boards went first, but this device puts them back as syncing starts again.
     fail.add('deleteShare s1');
     await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: false });
   });
 
-  it('a failure deleting the sign-in itself still rejects (Firebase wanting a recent sign-in, say)', async () => {
-    const { backend, fail } = fakeAccount([]);
+  it('a failure deleting the sign-in itself is part-way, and trying again finishes it', async () => {
+    const { backend, fail, state } = fakeAccount([]);
     fail.add('deleteUser');
-    await expect(deleteAccountData('me', backend)).rejects.toThrow();
+    await expect(deleteAccountData('me', backend)).rejects.toMatchObject({ partial: true });
+    fail.clear();
+    await deleteAccountData('me', backend);
+    expect(state).toEqual(gone);
   });
 
   it('with the pretend sharing server: the board Alice shared is gone for Bob, Bob’s board stays with Bob, without Alice', async () => {
@@ -149,8 +145,9 @@ describe('deleteAccountData', () => {
       myShares: async () => ['trip', 'work'].filter((id) => shares.get(id)?.people.some((p) => p.uid === 'alice')).map((id) => ({ id, owner: shares.get(id)!.owner })),
       deleteShare: a.deleteShare,
       leave: a.leave,
-      deleteOwnBoards: async () => {},
+      markDeleting: async () => {},
       deleteOwnData: async () => {},
+      markDeleted: async () => {},
       deleteUser: async () => {},
     };
     await deleteAccountData('alice', backend);

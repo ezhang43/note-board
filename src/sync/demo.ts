@@ -103,7 +103,7 @@ export async function startDemo(person: Person) {
     sharing.stop();
     let done: { shareIds: string[] };
     try {
-      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: backend.leave, deleteOwnBoards: async () => {}, deleteOwnData: async () => {}, deleteUser: async () => {} });
+      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: backend.leave, markDeleting: async () => {}, deleteOwnData: async () => {}, markDeleted: async () => {}, deleteUser: async () => {} });
     } catch (e) {
       sharing = start();
       throw e;

@@ -15,6 +15,14 @@ export interface RemoteDoc {
    * uploaded until the server's copy has come.
    */
   cached?: true;
+  /**
+   * The marker of the account being deleted (review 137-A H5), set by the page deleting it (`client`):
+   * 'started' while it deletes (`data` still holds the boards), 'done' once they are gone (`data` is
+   * empty). The online rules let no other page save boards or versions while there is one.
+   */
+  deleting?: 'started' | 'done';
+  /** When the marker was set (ms since 1970, the server's time), if known. */
+  since?: number;
 }
 
 /** Where the online copy lives (Firestore in the app, a fake in tests). */
@@ -41,6 +49,13 @@ export const SYNC_DELAY = 800;
  * (a unit test checks). Firestore's own 1 MiB per document (counted in bytes) isn't checked here.
  */
 export const ONLINE_LIMIT = 900_000;
+
+/**
+ * How long after it was set another page's 'started' marker holds this page's uploads back: after
+ * it, that page is taken to have closed part-way and the boards go online again. The online rules
+ * allow that after 10 minutes (firestore.rules); a little to spare for clocks that differ.
+ */
+export const DELETING_WAIT_MS = 10.5 * 60_000;
 
 /**
  * Keeps the store's board and the online copy the same. The first online version wins over
@@ -166,6 +181,15 @@ export function startSync(
     return 'other';
   };
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /** Another page is deleting the account (see RemoteDoc.deleting): nothing is uploaded meanwhile. */
+  let held = false;
+  /** Ends `held` if the deleting page's marker is left behind. */
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  const release = () => {
+    held = false;
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = null;
+  };
   /**
    * The last upload was refused: this device's board is newer than the online copy until a later
    * upload succeeds, so versions from elsewhere (including Firestore putting its copy back) are not applied.
@@ -182,7 +206,7 @@ export function startSync(
     timer = null;
     // A newer version waits for a drag to end: this device's boards are older (the drag's own
     // change, if it makes one, is sent after it).
-    if (stopped || waiting) return;
+    if (stopped || waiting || held) return;
     const ws = store.workspace();
     const key = ownKey(ws);
     if (key === lastSynced) {
@@ -209,6 +233,10 @@ export function startSync(
 
   function schedule() {
     if (!ready || stopped) return;
+    if (held) {
+      if (!failed) opts.onSaveState?.('saving');
+      return;
+    }
     // Opened from the offline copy: tidying alone waits for the server's copy, which may be newer.
     if (!fresh && !madeHere) return;
     if (timer) clearTimeout(timer);
@@ -258,8 +286,48 @@ export function startSync(
   let seen = false;
   /** Opened from saves not yet on the server (`pending`), and no version has come since. */
   let unconfirmed = false;
-  const stopWatching = remote.watch((doc) => {
+  const stopWatching = remote.watch((got) => {
     if (stopped) return;
+    let doc = got;
+    if (doc?.deleting) {
+      const marker = doc;
+      // This page's own marker, from deleting that failed: as if there were no online boards, so this
+      // page's go back (the rules let only it do that).
+      if (marker.deleting === 'started' && marker.client === opts.client) doc = null;
+      else {
+        // Another page is deleting the account (or did, or got as far as the sign-in): this page's
+        // changes wait, and it isn't signed out, since the deleting may yet fail.
+        if (timer) clearTimeout(timer);
+        timer = null;
+        held = true;
+        if (holdTimer) clearTimeout(holdTimer);
+        holdTimer = null;
+        if (madeHere && !failed) opts.onSaveState?.('saving');
+        if (marker.deleting === 'done') {
+          if (!ready) {
+            ready = true;
+            opts.onReady();
+          }
+          return opts.onGone?.();
+        }
+        // Left over 10 minutes, its page is taken to have closed part-way: the boards go back online.
+        const wait = Math.max(0, (marker.since ?? Date.now()) + DELETING_WAIT_MS - Date.now());
+        holdTimer = setTimeout(() => {
+          release();
+          lastSynced = null;
+          upload();
+        }, wait);
+        // The boards in it are shown as any version arriving, unless a change made here waits to go (it is newer).
+        if (ready && madeHere && ownKey(store.workspace()) !== lastSynced) return;
+      }
+    } else if (held && doc) {
+      // The deleting failed and the boards are back: a change made here meanwhile is the newest.
+      release();
+      if (madeHere) {
+        lastSynced = null;
+        return upload();
+      }
+    }
     const nowFresh = !fresh && !doc?.cached;
     if (nowFresh) fresh = true;
     // Only a version the server has counts: one only on this device may yet be refused.
@@ -345,6 +413,7 @@ export function startSync(
     stop() {
       if (timer) clearTimeout(timer);
       timer = null;
+      release();
       unsubscribe();
       stopWatching();
     },

@@ -179,6 +179,32 @@ describe('opening your board offline with unsent changes (job 92)', () => {
     watching(got)(snap({ data: 42 }, true, true));
     expect(got).toEqual([]);
   });
+
+  // Review 137-A H5: the marker of the account being deleted (see RemoteDoc.deleting).
+  it('passes on the marker of the account being deleted, and which page set it', () => {
+    const got: unknown[] = [];
+    const send = watching(got);
+    send(snap({ data: 'v1', client: 'x' }, false, false));
+    send(snap({ data: 'v1', deleting: 'started', client: 'p', updatedAt: { toMillis: () => 1000 } }, false, false));
+    send(snap({ deleting: 'done', client: 'p', updatedAt: { toMillis: () => 2000 } }, true, false));
+    expect(got).toEqual([
+      { data: 'v1', client: 'x' },
+      { data: 'v1', client: 'p', deleting: 'started', since: 1000 },
+      { data: '', client: 'p', deleting: 'done', since: 2000, cached: true },
+    ]);
+  });
+
+  it('a marker another tab of this browser hasn’t sent yet waits until the server has it', () => {
+    const got: unknown[] = [];
+    const send = watching(got);
+    send(snap({ data: 'v1', client: 'x' }, false, false));
+    send(snap({ data: 'v1', deleting: 'started', client: 'p', updatedAt: null }, true, true));
+    expect(got).toEqual([{ data: 'v1', client: 'x' }]);
+    // Nor is it opened from.
+    const fresh: unknown[] = [];
+    watching(fresh)(snap({ data: 'v1', deleting: 'started', client: 'p', updatedAt: null }, true, true));
+    expect(fresh).toEqual([]);
+  });
 });
 
 describe('the calendar access kept on this device (job 103, owner check of PR #98; job 107)', () => {

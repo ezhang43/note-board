@@ -10,7 +10,7 @@ import { readWorkspace, serializeWorkspace } from '../model/workspace';
 import { createStore, type Store } from './store';
 import { claimDevice, OWNER_KEY, parkedKey } from './account';
 import { baseKey, ownBoardsGuard, sharesKey } from './sharing';
-import { ONLINE_LIMIT, startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
+import { DELETING_WAIT_MS, ONLINE_LIMIT, startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 /** A pretend online copy: tests decide when versions arrive. */
 function fakeRemote() {
@@ -554,6 +554,140 @@ describe('the account deleted on another device', () => {
     await settled();
     fake.send(null);
     expect(onGone).not.toHaveBeenCalled();
+  });
+});
+
+// Review 137-A H5: a page deleting the account first replaces the online boards with a marker
+// ('started'), which the online rules hold every other page to (no board or version saved), and sets it
+// to 'done' once everything else is gone.
+describe('the account being deleted on another page', () => {
+  const started = (name = 'Mine', client = 'laptop', since = Date.now()): RemoteDoc => ({ data: boardJson(name), client, deleting: 'started', since });
+  const done = (client = 'laptop'): RemoteDoc => ({ data: '', client, deleting: 'done', since: Date.now() });
+  function open(first: RemoteDoc | null = { data: boardJson('Mine'), client: 'laptop' }) {
+    const store = createStore(null, (fn) => fn());
+    const fake = fakeRemote();
+    const onGone = vi.fn();
+    const onReady = vi.fn();
+    const onSaveState = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady, onError: vi.fn(), onGone, onSaveState });
+    fake.send(first);
+    return { store, fake, onGone, onReady, onSaveState };
+  }
+
+  it('while it deletes, this page uploads nothing and isn’t told it is gone (the deleting may yet fail)', () => {
+    const { store, fake, onGone, onSaveState } = open();
+    fake.send(started());
+    store.renameBoard('Typed meanwhile');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+    expect(onGone).not.toHaveBeenCalled();
+    expect(onSaveState).toHaveBeenLastCalledWith('saving');
+  });
+
+  it('a change waiting here when it starts is kept, not replaced by the boards in the marker', () => {
+    const { store, fake } = open();
+    store.renameBoard('Typed before');
+    fake.send(started('Mine'));
+    expect(store.getState().board.name).toBe('Typed before');
+  });
+
+  it('a refused upload still shows as refused while it deletes', async () => {
+    const { store, fake, onSaveState } = open();
+    fake.control.fail = true;
+    store.renameBoard('Refused');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    fake.send(started());
+    store.renameBoard('Typed meanwhile');
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+  });
+
+  it('once it is done, this page is told (it then checks the sign-in), and still uploads nothing', () => {
+    const { store, fake, onGone } = open();
+    fake.send(started());
+    fake.send(done());
+    expect(onGone).toHaveBeenCalledOnce();
+    store.renameBoard('Typed after');
+    vi.advanceTimersByTime(DELETING_WAIT_MS * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('opened after it was done (a device that was closed or offline), it never uploads its boards again', () => {
+    const { store, fake, onGone, onReady } = open(done());
+    expect(onGone).toHaveBeenCalledOnce();
+    expect(onReady).toHaveBeenCalledOnce();
+    store.renameBoard('Typed after');
+    vi.advanceTimersByTime(DELETING_WAIT_MS * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('opened while it deletes, the online boards in the marker show, and nothing is uploaded', () => {
+    const store = createStore(null, (fn) => fn());
+    store.renameBoard('Old copy on this device');
+    const fake = fakeRemote();
+    const onReady = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady, onError: vi.fn() });
+    fake.send(started('Online'));
+    expect(onReady).toHaveBeenCalledOnce();
+    expect(store.getState().board.name).toBe('Online');
+    store.renameBoard('Typed meanwhile');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('if the deleting failed and the boards came back, syncing goes on: a change made meanwhile is the newest and is uploaded', () => {
+    const { store, fake } = open();
+    fake.send(started());
+    store.renameBoard('Typed meanwhile');
+    fake.send({ data: boardJson('Put back'), client: 'laptop' });
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Typed meanwhile');
+  });
+
+  it('if the deleting failed and the boards came back, with nothing changed here, they show', () => {
+    const { store, fake } = open();
+    fake.send(started());
+    fake.send({ data: boardJson('Put back'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Put back');
+    vi.advanceTimersByTime(SYNC_DELAY * 2);
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('a marker left behind (the deleting page closed part-way) holds this page back only so long from when it was set, then the boards go back online', () => {
+    const { store, fake } = open();
+    fake.send(started('Mine', 'laptop', Date.now() - 9 * 60_000));
+    store.renameBoard('Typed meanwhile');
+    vi.advanceTimersByTime(DELETING_WAIT_MS - 9 * 60_000 - 1);
+    expect(fake.writes).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Typed meanwhile');
+  });
+
+  it('opened on a marker left behind long ago, the online boards in it show and go back online at once', () => {
+    const store = createStore(null, (fn) => fn());
+    store.renameBoard('Old copy on this device');
+    const fake = fakeRemote();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn() });
+    fake.send(started('Online', 'laptop', Date.now() - 60 * 60_000));
+    vi.advanceTimersByTime(0);
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Online');
+    expect(fake.writes[0].data).not.toContain('Old copy');
+  });
+
+  it('this page’s own marker (its deleting failed, and syncing starts again here): its boards are uploaded, putting them back', () => {
+    const store = createStore(null, (fn) => fn());
+    store.renameBoard('Mine here');
+    const fake = fakeRemote();
+    const onGone = vi.fn();
+    startSync(store, fake.remote, { client: 'me', onReady: vi.fn(), onError: vi.fn(), onGone });
+    fake.send(started('Older', 'me'));
+    expect(onGone).not.toHaveBeenCalled();
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data).toContain('Mine here');
   });
 });
 

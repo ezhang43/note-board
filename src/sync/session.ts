@@ -40,6 +40,8 @@ const client = crypto.randomUUID();
 let deleted = takeDeletedNote();
 /** Deleting the account is under way: signing out part-way shows nothing till the page reloads. */
 let deleting = false;
+/** What Firebase says when a sign-in is asked about after the account was deleted. */
+const GONE_CODES = ['auth/user-token-expired', 'auth/user-not-found', 'auth/user-disabled'];
 /** The account whose boards this page holds (job #145): as loaded, then whoever it was claimed for. */
 let held = (() => {
   try {
@@ -133,12 +135,22 @@ async function start(user: User, quiet = false) {
         listeners.forEach((l) => l());
       },
       onError: (e) => update((e as { code?: string }).code === 'permission-denied' ? 'no-access' : 'error'),
-      // The account was deleted on another device (job #63): this one stops, so nothing is put
-      // back online, and signs out with the note. Its copy on this device is left as it is.
+      // The account was deleted on another page (job #63; review 137-A H5): own-board sync has stopped
+      // or holds its changes, so nothing is put back online. Once Google says the sign-in is gone too,
+      // this page signs out with the note; its copy on this device is left as it is. Still there: another
+      // tab of this browser is about to delete it (signing out here would sign that tab out too; it
+      // signs every tab out by deleting it), or deleting it failed and can be tried again from here.
+      // No connection to ask: it stays as it is.
       onGone: () => {
-        stopAll();
         deleted = true;
-        void signOutUser();
+        user.getIdToken(true).then(
+          () => {},
+          (e: unknown) => {
+            if (!GONE_CODES.includes((e as { code?: string })?.code ?? '')) return;
+            stopAll();
+            void signOutUser();
+          },
+        );
       },
     });
   };
@@ -184,7 +196,7 @@ async function deleteAccount() {
   deleting = true;
   let done: { shareIds: string[] };
   try {
-    done = await deleteAccountData(user.uid, accountRemote(user, backend));
+    done = await deleteAccountData(user.uid, accountRemote(user, backend, client));
   } catch (e) {
     deleting = false;
     if (currentUser()?.uid === user.uid) void start(user, true);

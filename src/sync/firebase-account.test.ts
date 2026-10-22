@@ -35,10 +35,9 @@ vi.mock('firebase/firestore', () => {
     persistentMultipleTabManager: () => ({}),
     doc: (base: unknown, ...parts: string[]) => ref(join(base, parts)),
     collection: (base: unknown, ...parts: string[]) => ref(join(base, parts)),
-    deleteDoc: async (d: { path: string }) => {
-      fs.docs.delete(d.path);
-      fs.deleted.push(d.path);
-    },
+    setDoc: async (d: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) =>
+      void fs.docs.set(d.path, opts?.merge ? { ...fs.docs.get(d.path), ...data } : data),
+    serverTimestamp: () => 'SERVER_TIME',
     getDocsFromServer: async (c: { path: string }) => ({ docs: kids(c.path).map((k) => ({ id: k.split('/').at(-1), ref: ref(k), data: () => fs.docs.get(k) })) }),
     getDocFromServer: async (d: { path: string }) => {
       if (fs.refused.has(d.path)) throw Object.assign(new Error('denied'), { code: 'permission-denied' });
@@ -84,7 +83,7 @@ describe('accountRemote', () => {
     fs.docs.set('shared/s2', { owner: 'bob' });
     fs.docs.set('shared/s3', { owner: 'bob' });
     fs.refused.add('shared/s3');
-    expect(await accountRemote(user, shares).myShares()).toEqual([
+    expect(await accountRemote(user, shares, 'page1').myShares()).toEqual([
       { id: 's1', owner: 'me' },
       { id: 's2', owner: 'bob' },
       { id: 's3', owner: null },
@@ -92,34 +91,34 @@ describe('accountRemote', () => {
     ]);
   });
 
-  it('deletes their boards, every version (list and boards, even one left without its list entry) and their list of shares, and nobody else’s', async () => {
-    fs.docs.set('boards/me', { data: '{}' });
+  it('deletes every version (list and boards, even one left without its list entry) and their list of shares, and nobody else’s; the marker in place of their boards stays', async () => {
+    fs.docs.set('boards/me', { deleting: 'started', client: 'page1' });
     for (let i = 0; i < 450; i++) fs.docs.set(`boards/me/versions/v${i}`, { savedAt: i });
     for (let i = 0; i < 451; i++) fs.docs.set(`boards/me/versionData/v${i}`, { data: '{}' });
     fs.docs.set('boards/me/shared/s9', {});
     fs.docs.set('boards/bob', { data: '{}' });
     fs.docs.set('boards/bob/versions/v1', { savedAt: 1 });
     fs.docs.set('shared/s9', { owner: 'bob' });
-    await accountRemote(user, shares).deleteOwnData();
-    expect([...fs.docs.keys()].sort()).toEqual(['boards/bob', 'boards/bob/versions/v1', 'shared/s9']);
+    await accountRemote(user, shares, 'page1').deleteOwnData();
+    expect([...fs.docs.keys()].sort()).toEqual(['boards/bob', 'boards/bob/versions/v1', 'boards/me', 'shared/s9']);
     // Over 900 deletes: more than one batch (Firestore takes at most 500 at once).
     expect(fs.batches).toBeGreaterThan(2);
     // Running it again is fine.
-    await accountRemote(user, shares).deleteOwnData();
+    await accountRemote(user, shares, 'page1').deleteOwnData();
   });
 
-  it('can delete just their own boards first, so their other devices stop syncing before anything else goes (review 137-A H5)', async () => {
-    fs.docs.set('boards/me', { data: '{}' });
-    fs.docs.set('boards/me/versions/v1', { savedAt: 1 });
+  it('marks their boards as being deleted by this page (the boards stay in it), then replaces them with the marker that it is done (review 137-A H5)', async () => {
+    fs.docs.set('boards/me', { data: '{}', client: 'other', updatedAt: 1 });
     fs.docs.set('boards/bob', { data: '{}' });
-    await accountRemote(user, shares).deleteOwnBoards();
-    expect([...fs.docs.keys()].sort()).toEqual(['boards/bob', 'boards/me/versions/v1']);
-    // Running it again is fine.
-    await accountRemote(user, shares).deleteOwnBoards();
+    await accountRemote(user, shares, 'page1').markDeleting();
+    expect(fs.docs.get('boards/me')).toEqual({ data: '{}', deleting: 'started', client: 'page1', updatedAt: 'SERVER_TIME' });
+    await accountRemote(user, shares, 'page1').markDeleted();
+    expect(fs.docs.get('boards/me')).toEqual({ deleting: 'done', client: 'page1', updatedAt: 'SERVER_TIME' });
+    expect(fs.docs.get('boards/bob')).toEqual({ data: '{}' });
   });
 
   it('the sign-in is deleted with Firebase’s own call', async () => {
-    await accountRemote(user, shares).deleteUser();
+    await accountRemote(user, shares, 'page1').deleteUser();
     expect(fs.deleteUser).toHaveBeenCalledWith(user);
   });
 });

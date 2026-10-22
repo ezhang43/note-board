@@ -104,21 +104,26 @@ export interface AccountBackend {
   deleteShare(id: string): Promise<void>;
   /** A board shared with them: their record on it, and on their list, goes. */
   leave(id: string): Promise<void>;
-  /** Their own boards only (not their version history): their other devices see them gone and stop syncing. */
-  deleteOwnBoards(): Promise<void>;
-  /** Their own boards, version history and list of shares. */
+  /**
+   * Marks their own boards as being deleted by this page ('started', see RemoteDoc.deleting in
+   * sync.ts): from then on the online rules let none of their other pages save boards or versions.
+   */
+  markDeleting(): Promise<void>;
+  /** Replaces their boards with the marker that it is done: nothing can ever be saved there again. */
+  markDeleted(): Promise<void>;
+  /** Their version history and list of shares (the marker stays). */
   deleteOwnData(): Promise<void>;
   /** The sign-in itself. */
   deleteUser(): Promise<void>;
 }
 
 /**
- * Deletes everything person `uid` has online (owner decision, 2026-10-16): their own boards first, so
- * their other devices still open stop syncing before anything else goes (review 137-A H5: one that
- * saw a shared board go first saved its boards and a version again after they were deleted), then
- * the boards they shared (for everyone), their records on boards shared with them, their own boards
- * and version history, and only then the sign-in, so a failure part-way leaves them able to sign in
- * and try again.
+ * Deletes everything person `uid` has online (owner decisions, 2026-10-16 and 2026-10-22): their own
+ * boards are first marked as being deleted, which the online rules hold their other pages to (review
+ * 137-A H5: a page that saw a shared board go saved its boards and a version again after they were
+ * deleted), then the boards they shared (for everyone) and their records on boards shared with them
+ * go, their boards are replaced by the marker that it is done, their version history and list of
+ * shares go, and only then the sign-in, so a failure part-way leaves them able to sign in and try again.
  * Stops at the first failure: rejects with Firebase's `code` and `partial`, whether something may
  * already be deleted (a step that worked, or one made of several saves). Resolves with the shares it
  * dealt with, for clearing the device.
@@ -139,15 +144,13 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
   });
   partial = false;
   const plan = planShares(uid, shares);
-  await step(() => backend.deleteOwnBoards());
-  // Not "part-way" yet: if a later step fails, syncing starts again and puts them back from this device.
+  await step(() => backend.markDeleting());
+  // Not "part-way" yet: if a later step fails, syncing starts again and puts the boards back from this page.
   partial = false;
   for (const id of plan.deleteForEveryone) await step(() => backend.deleteShare(id));
   for (const id of plan.leave) await step(() => backend.leave(id));
-  await step(() => backend.deleteOwnData(), true);
-  // simple: once more, for a version another device saved as it saw a shared board go (in the same
-  // moment it saw its boards gone) and that landed just after. One saved later still would stay
-  // online; that needs the rules to refuse it (not done: it changes the online rules).
+  // Done before the version history goes, so a version another page saved just before it is deleted too.
+  await step(() => backend.markDeleted());
   await step(() => backend.deleteOwnData(), true);
   await step(() => backend.deleteUser());
   return { shareIds: shares.map((s) => s.id) };

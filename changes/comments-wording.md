@@ -1,0 +1,1 @@
+- The Privacy page, the Delete account page and the Delete account panel now say that deleting your account removes your comments on shared boards you're still on; comments on a board you already left stay until its owner deletes them.

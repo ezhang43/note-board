@@ -15,7 +15,7 @@ import { ShareButton } from './SharePanel';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState } from '../store/appStore';
-import { activeVersionStore, restoreFromBackup } from '../store/versions';
+import { activeVersionStore, historyFull, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { account, useAccountRemover } from '../sync/account';
 import { feedback, useFeedbackSender } from '../sync/feedback';
@@ -176,10 +176,11 @@ export function FileMenu() {
           const { ui, boards } = appStore.getState();
           if (!ui.sharesKnown) return void collab.setNotice(keptNotice('loading', appStore.boardName));
           if (!appStore.isFullBackup(text) && !boardRights(ui.shares, boards.open, boards.home).restore) return void collab.setNotice('Only the person who shared this board can restore it.');
+          const full = historyFull(appStore);
           const yes = await ask(
             appStore.isFullBackup(text)
-              ? { title: 'Replace all your boards with the backup?', body: 'Your boards as they are now are kept in Version history.', action: 'Replace all boards' }
-              : { title: 'Replace this board with the backup?', body: 'This board is kept in Version history first, and Ctrl+Z brings it back.', action: 'Replace board' },
+              ? { title: 'Replace all your boards with the backup?', body: full ? 'Your boards are too big for Version history, so they can’t be kept there first.' : 'Your boards as they are now are kept in Version history.', action: 'Replace all boards' }
+              : { title: 'Replace this board with the backup?', body: full ? 'Your boards are too big for Version history, but Ctrl+Z brings this board back.' : 'This board is kept in Version history first, and Ctrl+Z brings it back.', action: 'Replace board' },
           );
           // Asked about the board open then: if another opened meanwhile (it was deleted elsewhere, say), nothing happens.
           if (!yes || appStore.getState().boards.open !== boards.open) return;

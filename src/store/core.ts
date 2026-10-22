@@ -46,8 +46,11 @@ export interface StoreContext {
   /**
    * Clear up overlaps soon: after the change has been drawn, so real heights are known.
    * Waits while a drag or resize is in progress. Part of the change that caused it, not a separate undo step.
+   * Blocks in the way of a block that grew go straight down; with `placed` (a paste: the blocks keep
+   * their spot) they go to the nearest free spot instead, unless something else asked in the same frame
+   * for the growth rule.
    */
-  requestSettle(anchors?: string[]): void;
+  requestSettle(anchors?: string[], placed?: boolean): void;
   /** Collapse something (`collapse` makes the change), then close the gaps it leaves below. */
   startClosing(collapse: () => void): void;
   /** Last drawn heights of blocks, in board pixels. Not state: nothing re-renders when they change. */
@@ -213,6 +216,13 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   /** Blocks that just moved, grew or were resized: they stay put when overlaps are cleared up. */
   const settleAnchors = new Set<string>();
   let settleQueued = false;
+  /**
+   * Some request since the last tidy-up was for growth (expanding, typing, a container filling up):
+   * then blocks in the way go straight down. Otherwise (pasted blocks, a snap) they take the nearest free spot.
+   */
+  let settleGrowth = false;
+  /** Pasted blocks not drawn yet: the first height they report is no growth. */
+  const placedIds = new Set<string>();
   /** Goes up when another board is opened or arrives from elsewhere (job #148): a tidy-up queued before then is dropped. */
   let swaps = 0;
   /** Board changes made by the app itself (tidying blocks out of each other's way), not by the person (job #148). */
@@ -321,7 +331,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     requestSettle();
   }
 
-  function requestSettle(anchors: string[] = []) {
+  function requestSettle(anchors: string[] = [], placed = false) {
+    if (placed) anchors.forEach((a) => placedIds.add(a));
+    else settleGrowth = true;
     // Re-adding moves a block to the end, so the most recent change is last.
     anchors.forEach((a) => {
       settleAnchors.delete(a);
@@ -339,9 +351,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       // The most recent change wins when two anchored blocks are in each other's way.
       const a = [...settleAnchors].reverse();
       settleAnchors.clear();
+      const growth = settleGrowth;
+      settleGrowth = false;
       // After Expand all, everything grows at once: the higher block wins, so blocks only move down.
       if (Date.now() <= layout.expandAllUntil) a.sort((p, q) => (blockOf(state.board, p)?.y ?? 0) - (blockOf(state.board, q)?.y ?? 0));
-      // Blocks grow here (expanding, typing, columns filling up): what is below them goes straight down.
       let board = state.board;
       // Just after collapsing: blocks below the collapsed ones move straight up (owner request).
       // Only blocks still where the collapse (or this) left them.
@@ -358,7 +371,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         // Expand all compares with where Collapse all left blocks: that now includes this.
         if (layout.collapseAll) layout.collapseAll.after = ca.after;
       }
-      board = settle(board, measured, a, true);
+      board = settle(board, measured, a, growth);
       const exp = layout.expanding;
       if (exp && Date.now() <= exp.until) layout.pushedBy.set(exp.id, recordPushes(layout.pushedBy.get(exp.id), state.board, board));
       if (board !== state.board) tidies++;
@@ -419,6 +432,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   function dropQueuedSettle() {
     swaps++;
     settleQueued = false;
+    settleGrowth = false;
+    placedIds.clear();
     settleAnchors.clear();
   }
 
@@ -642,7 +657,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       heights.set(id, h);
       relayoutImport();
       // A loose block or column that grew may now cover something: move that out of its way.
-      if (state.board.order.includes(id)) requestSettle([id]);
+      if (state.board.order.includes(id)) requestSettle([id], placedIds.delete(id));
     },
     /**
      * Swap in a board that came from elsewhere (the online copy). Not a change the user made here,

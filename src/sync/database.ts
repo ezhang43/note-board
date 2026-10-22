@@ -27,7 +27,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore';
 import type { AccountBackend } from '../store/account';
-import { personFrom, type CollabBackend } from '../store/collab';
+import { personFrom, type CollabBackend, type ShareDoc } from '../store/collab';
 import type { Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 import { app } from './firebase';
@@ -236,15 +236,22 @@ function watchAllowed<S extends { metadata: { fromCache: boolean } }>(listen: (n
 
 /**
  * Shared boards (owner request: editing together). shared/{id} holds the boards (as in
- * serializeShare) with who shared them, the shared board and the link key; shared/{id}/members/{uid}
- * everyone who has it; boards/{uid}/shared/{id} the shares each person has. firestore.rules lets
- * only members read or change a shared board, and someone join only with the current link's key.
+ * serializeShare) with who shared them and the shared board; shared/{id}/private/links the link key
+ * (job 161: only editors can read it; a share from before keeps it in shared/{id} `link` until it
+ * changes); shared/{id}/members/{uid} everyone who has it, with their role; shared/{id}/joins/{uid}
+ * the key each person joined with (read by nobody); boards/{uid}/shared/{id} the shares each person
+ * has. firestore.rules lets only members read a shared board, only editors change it, and someone
+ * join only with a current link's key, with the role of that link.
  */
 export function collabRemote(user: User): CollabBackend {
   const me = personFrom(user);
   const shareRef = (id: string) => doc(db, 'shared', id);
+  const linksRef = (id: string) => doc(db, 'shared', id, 'private', 'links');
   const memberRef = (id: string, uid: string) => doc(db, 'shared', id, 'members', uid);
+  const joinRef = (id: string, uid: string) => doc(db, 'shared', id, 'joins', uid);
   const mineRef = (id: string) => doc(db, 'boards', me.uid, 'shared', id);
+  // simple: every member is an editor until the Share panel offers comment and view links (job 161, PR 2).
+  const myRecord = () => ({ name: me.name, photo: me.photo, role: 'edit', joinedAt: serverTimestamp() });
   const notAllowed = () => Object.assign(new Error('Not allowed'), { code: 'permission-denied' });
   return {
     me,
@@ -258,7 +265,13 @@ export function collabRemote(user: User): CollabBackend {
       );
     },
     watchShare(id, onChange, onError) {
-      return watchAllowed(
+      let last: ShareDoc | null = null;
+      // The key in the private record; null while off, not known yet, or kept in the share (one from before).
+      let key: string | null = null;
+      const send = () => {
+        if (last) onChange({ ...last, link: key ?? last.link });
+      };
+      const stopShare = watchAllowed(
         (next, refused) => onSnapshot(shareRef(id), next, refused),
         (snap: DocumentSnapshot) => {
           if (!snap.exists()) {
@@ -268,10 +281,25 @@ export function collabRemote(user: User): CollabBackend {
           }
           const d = snap.data();
           if (typeof d.data !== 'string' || typeof d.root !== 'string') return;
-          onChange({ owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) });
+          last = { owner: String(d.owner), root: d.root, link: typeof d.link === 'string' ? d.link : null, data: d.data, client: String(d.client ?? ''), rev: Number(d.rev ?? 0) };
+          send();
         },
         onError,
       );
+      // Refused (no longer on it, say) is left to the share's own watch above to report.
+      const stopLinks = watchAllowed(
+        (next, refused) => onSnapshot(linksRef(id), next, refused),
+        (snap: DocumentSnapshot) => {
+          const edit = snap.exists() ? snap.data().edit : null;
+          key = typeof edit === 'string' ? edit : null;
+          send();
+        },
+        () => {},
+      );
+      return () => {
+        stopShare();
+        stopLinks();
+      };
     },
     watchPeople(id, onChange, onError) {
       return watchAllowed(
@@ -301,8 +329,9 @@ export function collabRemote(user: User): CollabBackend {
     },
     async createShare(id, root, link, data, client) {
       const batch = writeBatch(db);
-      batch.set(shareRef(id), { owner: me.uid, root, link, data, client, rev: 1, updatedAt: serverTimestamp() });
-      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key: link, joinedAt: serverTimestamp() });
+      batch.set(shareRef(id), { owner: me.uid, root, link: null, data, client, rev: 1, updatedAt: serverTimestamp() });
+      batch.set(linksRef(id), { edit: link });
+      batch.set(memberRef(id, me.uid), myRecord());
       batch.set(mineRef(id), { joinedAt: serverTimestamp() });
       await batch.commit();
     },
@@ -316,8 +345,10 @@ export function collabRemote(user: User): CollabBackend {
         (snap) => !snap.exists(),
         (e: unknown) => (e as { code?: string }).code === 'permission-denied',
       );
+      // The key goes in a record nobody can read, in the same step (job 161): the rules check it there.
       const batch = writeBatch(db);
-      batch.set(memberRef(id, me.uid), { name: me.name, photo: me.photo, key, joinedAt: serverTimestamp() });
+      batch.set(joinRef(id, me.uid), { key });
+      batch.set(memberRef(id, me.uid), myRecord());
       batch.set(mineRef(id), { joinedAt: serverTimestamp() });
       await batch.commit();
       return added;
@@ -328,26 +359,41 @@ export function collabRemote(user: User): CollabBackend {
       // even once the board is deleted or they were removed (deleting a missing record is fine).
       const batch = writeBatch(db);
       batch.delete(memberRef(id, me.uid));
+      batch.delete(joinRef(id, me.uid));
       batch.delete(mineRef(id));
       await batch.commit();
     },
     removePerson(id, uid, newKey) {
       // One transaction: removed and the link changed together, or neither; whether the link is on
-      // is read online, so a link turned off on another device stays off.
+      // is read online, so a link turned off on another device stays off. A key still in the share
+      // (one from before) moves to the private record.
       return runTransaction(db, async (tx) => {
         const snap = await tx.get(shareRef(id));
         if (!snap.exists()) throw notAllowed();
+        const links = await tx.get(linksRef(id));
         tx.delete(memberRef(id, uid));
-        if (typeof snap.data().link === 'string') tx.update(shareRef(id), { link: newKey });
+        tx.delete(joinRef(id, uid));
+        const old = typeof snap.data().link === 'string';
+        if (old || typeof links.data()?.edit === 'string') tx.set(linksRef(id), { edit: newKey }, { merge: true });
+        if (old) tx.update(shareRef(id), { link: null });
       });
     },
-    setLink: (id, key) => updateDoc(shareRef(id), { link: key }),
+    async setLink(id, key) {
+      const batch = writeBatch(db);
+      batch.set(linksRef(id), { edit: key }, { merge: true });
+      batch.update(shareRef(id), { link: null });
+      await batch.commit();
+    },
     async deleteShare(id) {
-      // Its member records go with it (security review fix), so if its id were ever used again they
-      // wouldn't let anyone into the new one.
+      // Its member, joins and links records go with it (security review fix), so if its id were ever
+      // used again they wouldn't let anyone into the new one.
       const members = await getDocs(collection(db, 'shared', id, 'members'));
       const batch = writeBatch(db);
-      for (const m of members.docs) batch.delete(m.ref);
+      for (const m of members.docs) {
+        batch.delete(m.ref);
+        batch.delete(joinRef(id, m.id));
+      }
+      batch.delete(linksRef(id));
       batch.delete(shareRef(id));
       await batch.commit();
       await deleteDoc(mineRef(id)).catch(() => {});

@@ -303,6 +303,23 @@ describe('removing someone changes every link that is on', () => {
     await assertFails(join(as('bob'), 'bob', VIEW, 'view'));
   });
 
+  it('as removePerson does on a share from before: the key moves out of the share as it changes', async () => {
+    await seed({ 'shared/s1': { ...share, link: 'k' }, 'shared/s1/members/alice': person(), 'shared/s1/members/bob': { name: 'B', photo: null, key: 'k', joinedAt: 1 } });
+    const db = as('alice');
+    await assertSucceeds(
+      runTransaction(db, async (tx) => {
+        await tx.get(doc(db, 'shared/s1'));
+        await tx.get(doc(db, LINKS));
+        tx.delete(doc(db, 'shared/s1/members/bob'));
+        tx.delete(doc(db, 'shared/s1/joins/bob'));
+        tx.set(doc(db, LINKS), { edit: 'new-edit-0123456789' }, { merge: true });
+        tx.update(doc(db, 'shared/s1'), { link: null });
+      }),
+    );
+    await assertFails(oldJoin(as('bob'), 'bob', 'k'));
+    await assertFails(join(as('bob'), 'bob', 'k'));
+  });
+
   it('with every link off, nothing has to change', async () => {
     await seedShare({ bob: 'edit' }, { edit: null });
     await assertSucceeds(deleteDoc(doc(as('alice'), 'shared/s1/members/bob')));

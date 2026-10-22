@@ -53,7 +53,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      # Browser downloads sometimes hang for the whole 30 minutes, so: keep the browsers between runs
+      # (key = the installed @playwright/test version; bump it by upgrading the package), and give the
+      # install 6 minutes per try with one retry. On a cache hit the install only adds the OS packages.
+      - id: playwright
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Playwright browsers
+        timeout-minutes: 14
+        run: timeout 6m npx playwright install --with-deps chromium webkit || timeout 6m npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
       # A failed browser test keeps its trace, screenshot and video; download them from the run's page.
       - uses: actions/upload-artifact@v4

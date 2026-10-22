@@ -22,6 +22,8 @@ async function deleteHabit(page: Page, i: number, name: string) {
 }
 
 async function addHabit(page: Page, name: string) {
+  // With no habits the box isn't shown until "Add a habit" is pressed (job 185).
+  if ((await newHabit(page).count()) === 0) await panel(page).getByRole('button', { name: 'Add a habit' }).click();
   await newHabit(page).fill(name);
   await newHabit(page).press('Enter');
 }
@@ -34,7 +36,6 @@ test('Habits opens a side panel; add a habit, tick today, and there is no streak
   await expect(panel(page)).toBeVisible();
   await expect(habitsButton(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(panel(page)).toContainText('No habits yet');
-  await expect(newHabit(page)).toBeFocused();
   await addHabit(page, 'Walk');
   await expect(habitRows(page)).toHaveCount(1);
   await expect(row(page, 0).getByRole('textbox', { name: 'Habit name' })).toHaveValue('Walk');
@@ -235,8 +236,9 @@ async function enterWeight(page: Page, text: string) {
 test('Weight: type today’s weight, replace it, and see it in a chart; it is not a habit and is kept after a reload', async ({ page }) => {
   await habitsButton(page).click();
   await expect(weightCard(page)).toBeVisible();
-  await expect(weightCard(page)).toContainText('No weight this week');
-  await expect(weightCard(page)).toContainText('Save one and it shows here as a line.');
+  await expect(weightCard(page)).toContainText('None saved this week');
+  await expect(weightCard(page)).not.toContainText('Save one and it shows');
+  await expect(weightCard(page).locator('.weight-ghost, .weight-empty')).toHaveCount(0); // no empty chart box (job 185)
   await expect(weightPoints(page)).toHaveCount(0);
   // The Weight card sits above the habits.
   await addHabit(page, 'Walk');
@@ -246,7 +248,7 @@ test('Weight: type today’s weight, replace it, and see it in a chart; it is no
   await expect(weightCard(page).locator('.weight-num')).toHaveText('72.4 kg');
   await expect(weightCard(page).locator('.weight-when')).toHaveText('Today');
   await expect(weightPoints(page)).toHaveCount(1);
-  await expect(weightCard(page)).not.toContainText('No weight this');
+  await expect(weightCard(page)).not.toContainText('None saved this');
   await expect(weightMsg(page)).toHaveText('Today: saved 72.4 kg');
   // Again for the same day: replaced, with a comma and the Save button.
   await weightBox(page).fill('71,8');
@@ -314,7 +316,7 @@ test('Weight: the chart follows Week, Month and Year and the arrows', async ({ p
     await expect(weightPoints(page)).toHaveCount(1);
     await viewBar(page).getByRole('button', { name: `Previous ${word}` }).click();
     await expect(weightPoints(page)).toHaveCount(0);
-    await expect(weightCard(page)).toContainText(`No weight this ${word}`);
+    await expect(weightCard(page)).toContainText(`None saved this ${word}`);
     await viewBar(page).getByRole('button', { name: 'Today' }).click();
     await expect(weightPoints(page)).toHaveCount(1);
   }
@@ -425,9 +427,12 @@ test('Ledger: the subtitle says how today is going, each habit counts its week, 
   await expect(sub(page)).toHaveText('Wednesday, 21 October');
   await expect(panel(page)).toContainText('No habits yet');
   await expect(panel(page)).toContainText('Add one, then tick each day you do it.');
+  await expect(newHabit(page)).toHaveCount(0); // one way to add: the button, then the box (job 185)
   await panel(page).getByRole('button', { name: 'Add a habit' }).click();
   await expect(newHabit(page)).toBeFocused();
+  await expect(panel(page).getByRole('button', { name: 'Add a habit' })).toHaveCount(0);
   await addHabit(page, 'Walk');
+  await expect(newHabit(page)).toBeFocused(); // the cursor moves with the box to the foot of the list
   await addHabit(page, 'Read');
   await expect(newHabit(page)).toBeFocused(); // the box stays ready for the next one
   await expect(panel(page).getByText('No habits yet')).toHaveCount(0);
@@ -579,7 +584,7 @@ test.describe('on a phone', () => {
     await expect(panel(page)).toBeVisible();
     expect((await panel(page).boundingBox())!.width).toBeGreaterThanOrEqual(389);
     // The keyboard doesn't pop up by itself and cover the day boxes.
-    await expect(newHabit(page)).not.toBeFocused();
+    await expect(newHabit(page)).toHaveCount(0); // (no box until "Add a habit")
     await addHabit(page, 'Walk');
     const box = (await todayBox(page, 0).boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(40);
@@ -777,7 +782,7 @@ test('Weight: removing the only weight leaves the strip and the empty note, and 
   await historyRows(page).first().click();
   await expect(weightBox(page)).toHaveValue('72.4');
   await weightStrip(page).getByRole('button', { name: 'Remove' }).click();
-  await expect(weightCard(page)).toContainText('No weight this week');
+  await expect(weightCard(page)).toContainText('None saved this week');
   await expect(weightStrip(page)).toBeVisible();
   await expect(weightMsg(page)).toHaveText('Today: removed 72.4 kg');
   await weightUndo(page).click();
@@ -857,4 +862,27 @@ test('Weight: clearing part of the date by keyboard is not put back to today whi
   await weightDate(page).focus();
   await page.keyboard.press('Backspace');
   await expect(weightDate(page)).toHaveValue('');
+});
+
+test('first visit: one honey button, Save is plain until a weight is typed, and a new habit shows the box under the list', async ({ page }) => {
+  await habitsButton(page).click();
+  const honey = (el: import('@playwright/test').Locator) => el.evaluate((e) => getComputedStyle(e).backgroundColor);
+  const add = panel(page).getByRole('button', { name: 'Add a habit' });
+  const plain = await honey(weightSave(page));
+  await weightBox(page).fill('72.4');
+  await expect.poll(() => honey(weightSave(page))).not.toBe(plain); // takes the accent color once there is a number
+  await weightBox(page).fill('');
+  await expect.poll(() => honey(weightSave(page))).toBe(plain);
+  expect(await honey(add)).not.toBe(plain);
+  await expect(panel(page).getByText('+ New habit')).toHaveCount(0);
+  await addHabit(page, 'Walk');
+  await expect(newHabit(page)).toBeVisible();
+  expect((await newHabit(page).boundingBox())!.y).toBeGreaterThan((await row(page, 0).boundingBox())!.y);
+  await deleteHabit(page, 0, 'Walk');
+  await expect(add).toBeVisible(); // back to one button, no box
+  await add.click();
+  await newHabit(page).press('Escape'); // changed my mind: the button comes back
+  await expect(add).toBeVisible();
+  await expect(newHabit(page)).toHaveCount(0);
+  await expect(newHabit(page)).toHaveCount(0);
 });

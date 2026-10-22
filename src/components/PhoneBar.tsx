@@ -71,6 +71,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
       )}
       {open === 'more' && (
         <div className="phone-sheet phone-more" role="dialog" aria-label="More">
+          <span className="phone-grab" aria-hidden />
           <div className="phone-tiles">
             <button
               type="button"
@@ -104,10 +105,10 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           </div>
           <section className="phone-arrange" aria-labelledby="phone-arrange">
             <h2 id="phone-arrange" className="phone-label">
-              Arrange
+              Board
             </h2>
             <div className="phone-row">
-              {!viewOnly && <ToolGroup />}
+              {!viewOnly && <ToolGroup labelled />}
               <TextSizeButtons />
             </div>
             {!viewOnly && (

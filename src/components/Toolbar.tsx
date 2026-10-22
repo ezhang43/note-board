@@ -450,7 +450,7 @@ export function CleanUpButton({ labelled = false }: { labelled?: boolean }) {
 }
 
 /** Hand / Select: what dragging empty board does. */
-export function ToolGroup() {
+export function ToolGroup({ labelled = false }: { labelled?: boolean }) {
   const tool = useAppState((s) => s.view.tool);
   const keys = useAppState((s) => s.view.hotkeys);
   return (
@@ -464,6 +464,7 @@ export function ToolGroup() {
         onClick={() => appStore.setTool('hand')}
       >
         <HandIcon />
+        {labelled && 'Hand'}
       </button>
       <button
         type="button"
@@ -474,6 +475,7 @@ export function ToolGroup() {
         onClick={() => appStore.setTool('select')}
       >
         <SelectIcon />
+        {labelled && 'Select'}
       </button>
     </div>
   );

@@ -149,6 +149,13 @@ export function HabitsPanel() {
   const touch = phone || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const root = useRef<HTMLDivElement>(null);
   const newBox = useRef<HTMLInputElement>(null);
+  /** With no habits the sheet shows only "Add a habit"; pressing it swaps in the box (one way to add, job 185). */
+  const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (adding) newBox.current?.focus();
+  }, [adding]);
+  // The first habit moves the box from the empty card to the foot of the list: the cursor goes with it, ready for the next.
+  const keepCursor = useRef(false);
   /** What in the panel had the keyboard last, so it stays in the panel when undo or delete takes that away. */
   const focused = useRef<Element | null>(null);
   useLayoutEffect(() => {
@@ -175,7 +182,11 @@ export function HabitsPanel() {
   }, []);
 
   const add = () => {
-    if (appStore.addHabit(name)) setName('');
+    if (appStore.addHabit(name)) {
+      setName('');
+      if (adding) keepCursor.current = true;
+      setAdding(false);
+    }
   };
   // Escape leaves a text box (a second Escape closes the panel), as on the board.
   const leave = (e: React.KeyboardEvent) => {
@@ -183,6 +194,12 @@ export function HabitsPanel() {
   };
 
   const n = habits.length;
+  useEffect(() => {
+    if (n > 0 && keepCursor.current) {
+      keepCursor.current = false;
+      newBox.current?.focus();
+    }
+  }, [n]);
   const done = doneToday(habits, today);
   const weekday = journalLongDate(today).split(',')[0];
   const newRow = (
@@ -194,7 +211,7 @@ export function HabitsPanel() {
       }}
     >
       <PlusIcon size={16} />
-      <input ref={newBox} type="text" aria-label="New habit" placeholder="New habit" enterKeyHint="done" value={name} onChange={(e) => setName(e.currentTarget.value)} onKeyDown={leave} />
+      <input ref={newBox} type="text" aria-label="New habit" placeholder="New habit" enterKeyHint="done" value={name} onChange={(e) => setName(e.currentTarget.value)} onKeyDown={leave} onBlur={() => !name.trim() && setAdding(false)} />
     </form>
   );
 
@@ -290,9 +307,13 @@ export function HabitsPanel() {
             </span>
             <h3>No habits yet</h3>
             <p>Add one, then tick each day you do it.</p>
-            <button type="button" className="tb-button habits-empty-add" onClick={() => newBox.current?.focus()}>
-              <PlusIcon /> Add a habit
-            </button>
+            {adding ? (
+              newRow
+            ) : (
+              <button type="button" className="tb-button habits-empty-add" onClick={() => setAdding(true)}>
+                <PlusIcon /> Add a habit
+              </button>
+            )}
           </div>
         )}
         {n > 0 && view === 'week' && (
@@ -393,7 +414,7 @@ export function HabitsPanel() {
             );
           })}
         </div>
-        {newRow}
+        {n > 0 && newRow}
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ export function WeightCard({ board, view, shown, today, onShow }: { board: Board
   const [note, setNote] = useState<Note>(null);
   const box = useRef<HTMLInputElement>(null);
   const focusBox = useRef(false);
+  const none = chart.points.length === 0;
   const first = chart.points[0];
   const latest = chart.points[chart.points.length - 1];
   const px = (x: number) => LEFT + x * (RIGHT - LEFT);
@@ -181,7 +182,7 @@ export function WeightCard({ board, view, shown, today, onShow }: { board: Board
           />
           <span aria-hidden>kg</span>
         </label>
-        <button type="submit" className="weight-save" aria-label="Save weight">
+        <button type="submit" className={`weight-save${text.trim() ? ' ready' : ''}`} aria-label="Save weight">
           Save
         </button>
       </div>
@@ -231,24 +232,18 @@ export function WeightCard({ board, view, shown, today, onShow }: { board: Board
     </form>
   );
 
-  // One list of children in either case, so the strip (and the cursor in its box) stays put when the first weight is saved.
-  const none = chart.points.length === 0;
   return (
     <section className="weight" aria-label="Weight">
       <div className="weight-top">
         <div className="weight-title">Weight</div>
+        {none && <div className="weight-change">None saved this {view}</div>}
         {change !== null && (
           <div className="weight-change">
             {change === 0 ? 'No change' : `${change < 0 ? '↓' : '↑'} ${Math.abs(change).toFixed(1)} kg`} this {view}
           </div>
         )}
       </div>
-      {none ? (
-        <div className="weight-empty">
-          <b>No weight this {view}</b>
-          Save one and it shows here as a line.
-        </div>
-      ) : (
+      {!none && (
         <div className="weight-hero">
           <div className="weight-num">
             <b>{latest.kg.toFixed(1)}</b> kg
@@ -256,9 +251,7 @@ export function WeightCard({ board, view, shown, today, onShow }: { board: Board
           <div className="weight-when">{latest.day === today ? 'Today' : dayLabel(latest.day)}</div>
         </div>
       )}
-      {none ? (
-        <div className="weight-ghost" aria-hidden />
-      ) : (
+      {!none && (
         <svg
           className="weight-chart"
           viewBox={`0 0 ${W} ${H}`}

@@ -1,0 +1,7 @@
+## Habits first visit, the phone ⋯ sheet and the website's feature points (2026-10-22)
+
+- Habits, first visit: one main button. With no weight yet the Weight card is one line ("Weight", "None saved this week") plus the entry strip, with no empty chart box. Save is a plain button until you type a weight, then it takes the accent color. With no habits there is a single "Add a habit" button; pressing it swaps in the box for the first habit (the cursor goes with it to the list when the habit is added). The Ledger design and the Weight card layout are unchanged otherwise.
+- The Completed panel's empty text now explains the two meanings of "Completed": "Ticked items stay in their list. Press Clean up (in a list or the toolbar) to move them here, grouped by day."
+- Phone ⋯ sheet: the eight panel tiles sit four across in two full rows (no empty tile), "Arrange" is now "Board", Hand and Select show their words, the Focus timer tile says "Timer", and a small grab handle marks it as a sheet. Its scrolling no longer drags the page behind it.
+- Website: "Your boards are safe" and "Works well on a phone" are now a ticked done list in two columns (one on a phone), with thin lines instead of boxes with a honey stripe.
+- Boards already saved are unchanged: nothing here touches how boards are saved, synced, undone or deleted. The About page's demo video still shows the older toolbar; it is to be re-recorded after the checklist-row work.

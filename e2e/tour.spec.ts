@@ -186,7 +186,6 @@ test('keys pressed during the tour change nothing behind it, and Ctrl+F leaves t
   await expect(tour(page)).toBeVisible();
   await expect(cards(page)).toHaveCount(1);
   await expect(page.getByRole('search')).toHaveCount(0);
-  await expect(page.getByTestId('canvas')).toHaveClass(/tool-hand/);
   // Enter on the focused Next button still works.
   expect(await page.evaluate(() => document.activeElement?.closest('.tour-card') !== null)).toBe(true);
   await page.keyboard.press('Enter');

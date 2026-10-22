@@ -22,7 +22,6 @@ test('the board area never scrolls, so the selection box starts right at the poi
   expect(await canvas.evaluate((el) => [el.scrollTop, el.scrollLeft])).toEqual([0, 0]);
 
   await page.keyboard.press('Escape');
-  await page.keyboard.press('v');
   const from = { x: c.x + 100, y: c.y + 100 };
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();

@@ -229,7 +229,7 @@ export interface AppState {
   board: Board;
   /** The other boards, and which board is open (saved with the open board, undo is per board). */
   boards: Boards;
-  /** Pan / zoom / tool: pan and zoom are saved shortly after they stop changing. */
+  /** Pan / zoom: pan and zoom are saved shortly after they stop changing. */
   view: View;
   ui: Ui;
 }

@@ -26,7 +26,6 @@ test('Delete, Backspace, Ctrl+D and the tool keys on a Focus timer button leave 
   for (const key of ['Delete', 'Backspace', 'Control+d', 'v', 'Control+a']) await page.keyboard.press(key);
   await expect(cards(page)).toHaveCount(1);
   await expect(page.locator('.card.selected')).toHaveCount(1);
-  await expect(page.getByTestId('canvas')).toHaveClass(/tool-hand/);
   await expect(page.getByLabel('Note text')).toHaveValue('keep me');
 });
 

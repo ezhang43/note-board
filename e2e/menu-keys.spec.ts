@@ -32,7 +32,6 @@ async function pressBoardKeys(page: Page, keys = ['ArrowDown', 'ArrowDown', 'Arr
   expect(after.y).toBe(before.y);
   expect(after.x).toBe(before.x);
   await expect(page.locator('.card.selected')).toHaveCount(1);
-  await expect(page.getByTestId('canvas')).toHaveClass(/tool-hand/); // V would switch to the Select tool
 }
 
 test('keys on an item in the File menu leave the selected note alone', async ({ page }) => {

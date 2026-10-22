@@ -87,7 +87,6 @@ test('a viewer sees the badge and a one-time note, no editing buttons, and canâ€
   for (const name of ['Undo (Ctrl+Z)', 'Redo (Ctrl+Y)', 'Note', 'Checklist', 'New container', 'Color of selected cards and containers', 'Arrange']) {
     await expect(toolbar(bob).getByRole('button', { name, exact: true })).toHaveCount(0);
   }
-  await expect(toolbar(bob).getByRole('group', { name: 'Board tool' })).toHaveCount(0);
   await expect(toolbar(bob).getByRole('button', { name: 'Share' })).toBeVisible();
   await expect(boardName(bob)).toHaveAttribute('readonly', '');
 
@@ -186,7 +185,6 @@ test('on a phone, a viewer has the badge and no Undo, Redo or Add in the bottom 
   await bar.getByRole('button', { name: 'More' }).click();
   const more = bob.getByRole('dialog', { name: 'More' });
   await expect(more.getByRole('button', { name: 'Search' })).toBeVisible();
-  await expect(more.getByRole('group', { name: 'Board tool' })).toHaveCount(0);
   await expect(more.getByRole('button', { name: 'Snap to grid' })).toHaveCount(0);
   expect((await box(more.getByRole('button', { name: 'Search' }))).height).toBeGreaterThanOrEqual(44);
   expect(await bob.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

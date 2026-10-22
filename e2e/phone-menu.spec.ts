@@ -62,13 +62,12 @@ test('signed in, the top is eight tiles in a 4 x 2 grid (no empty ninth tile), e
   for (let i = 0; i < 8; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
 });
 
-test('the sheet has a grab handle, the group over the tools is "Board", the tools say Hand and Select, and the sheet keeps its scroll', async ({ page }) => {
+test('the sheet has a grab handle, the group over the text size is "Board" (no Hand / Select tools), and the sheet keeps its scroll', async ({ page }) => {
   await openSignedIn(page);
   await expect(menu(page).locator('.phone-grab')).toBeVisible();
   await expect(arrange(page).getByRole('heading', { name: 'Board' })).toBeVisible();
   await expect(arrange(page).getByRole('heading', { name: 'Arrange' })).toHaveCount(0);
-  await expect(arrange(page).getByRole('button', { name: 'Hand (H)' })).toContainText('Hand');
-  await expect(arrange(page).getByRole('button', { name: 'Select (V)' })).toContainText('Select');
+  await expect(arrange(page).getByRole('button', { name: /^Hand|^Select \(/ })).toHaveCount(0);
   expect(await menu(page).evaluate((el) => getComputedStyle(el).overscrollBehaviorY)).toBe('contain');
   // Phone-sized: nothing sticks out sideways.
   expect(await menu(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -83,10 +82,10 @@ test('signed out and not published: no Share, Calendar, Feedback or Sign out', a
   await expect(menu(page).getByRole('button', { name: 'Google Calendar' })).toHaveCount(0);
 });
 
-test('the Arrange group: tool, text size, Snap to grid, Color, then Collapse all · Same width · Clean up in one row', async ({ page }) => {
+test('the Board group: text size, Snap to grid, Color, then Collapse all · Same width · Clean up in one row', async ({ page }) => {
   await openSignedIn(page);
   const a = arrange(page);
-  for (const name of ['Hand (H)', 'Select (V)', 'Smaller text', 'Larger text', 'Snap to grid', 'Color of selected cards and containers'])
+  for (const name of ['Smaller text', 'Larger text', 'Snap to grid', 'Color of selected cards and containers'])
     await expect(a.getByRole('button', { name, exact: true })).toBeVisible();
   const three = await Promise.all(['Collapse all', 'Same width', 'Clean up'].map((name) => box(a.getByRole('button', { name, exact: true }))));
   expect(three[1].y).toBe(three[0].y);
@@ -94,9 +93,9 @@ test('the Arrange group: tool, text size, Snap to grid, Color, then Collapse all
   expect(three[0].x).toBeLessThan(three[1].x);
   expect(three[1].x).toBeLessThan(three[2].x);
   for (const x of three) expect(x.height).toBeGreaterThanOrEqual(44);
-  // The tool and text-size buttons are tap-sized too.
-  for (const name of ['Hand (H)', 'Select (V)', 'Smaller text', 'Larger text']) expect((await box(a.getByRole('button', { name, exact: true }))).height).toBeGreaterThanOrEqual(44);
-  // Snap to grid is first below the tool row; the one row of three is last.
+  // The text-size buttons are tap-sized too, and share their row evenly.
+  for (const name of ['Smaller text', 'Larger text']) expect((await box(a.getByRole('button', { name, exact: true }))).height).toBeGreaterThanOrEqual(44);
+  // Snap to grid is first below the text-size row; the one row of three is last.
   const snap = await box(a.getByRole('button', { name: 'Snap to grid' }));
   const colour = await box(a.getByRole('button', { name: 'Color of selected cards and containers' }));
   expect(snap.y).toBeLessThan(colour.y);
@@ -183,10 +182,6 @@ test('Arrange controls work: text size, Collapse all, Color menu with Auto-color
   const a = arrange(page);
   await a.getByRole('button', { name: 'Larger text' }).tap();
   await a.getByRole('button', { name: 'Smaller text' }).tap();
-  await a.getByRole('button', { name: 'Select (V)' }).tap();
-  await expect(a.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'true');
-  await a.getByRole('button', { name: 'Hand (H)' }).tap();
-  await expect(a.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
   await a.getByRole('button', { name: 'Color of selected cards and containers' }).tap();
   await expect(a.getByRole('group', { name: 'Colors' }).getByRole('button', { name: 'Auto-color' })).toBeVisible();
   await rest(page).getByRole('button', { name: 'File' }).tap();

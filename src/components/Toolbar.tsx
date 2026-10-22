@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { anyExpanded } from '../model/board';
 import { hasTickedItems } from '../model/completed';
-import { labelOf } from '../model/hotkeys';
 import { COLOR_KEYS, type ColorKey } from '../model/palette';
 import { boardRights, keptNotice } from '../model/sharing';
 import { COLOR_THEMES, swatchFor } from '../model/theme';
@@ -24,7 +23,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
 import { arrowThroughMenu } from './menuArrows';
-import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
+import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -451,38 +450,6 @@ export function CleanUpButton({ labelled = false }: { labelled?: boolean }) {
   );
 }
 
-/** Hand / Select: what dragging empty board does. */
-export function ToolGroup({ labelled = false }: { labelled?: boolean }) {
-  const tool = useAppState((s) => s.view.tool);
-  const keys = useAppState((s) => s.view.hotkeys);
-  return (
-    <div className="tool-group" role="group" aria-label="Board tool">
-      <button
-        type="button"
-        className="tool-button"
-        aria-label={`Hand (${labelOf(keys.hand)})`}
-        title={`Hand (${labelOf(keys.hand)}): drag empty space to move the board`}
-        aria-pressed={tool === 'hand'}
-        onClick={() => appStore.setTool('hand')}
-      >
-        <HandIcon />
-        {labelled && 'Hand'}
-      </button>
-      <button
-        type="button"
-        className="tool-button"
-        aria-label={`Select (${labelOf(keys.select)})`}
-        title={`Select (${labelOf(keys.select)}): drag a rectangle to select several cards and containers`}
-        aria-pressed={tool === 'select'}
-        onClick={() => appStore.setTool('select')}
-      >
-        <SelectIcon />
-        {labelled && 'Select'}
-      </button>
-    </div>
-  );
-}
-
 /**
  * Arrange menu (owner decision 2026-10-16): Snap to grid, Collapse all, Same width and Clean up in
  * one small popover. Clicks inside keep it open (Snap shows its new state); a click elsewhere closes it.
@@ -609,8 +576,6 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
 
       {!viewOnly && (
         <>
-          <ToolGroup />
-
           {/* Faded when there is nothing to undo or redo. */}
           <button
             type="button"

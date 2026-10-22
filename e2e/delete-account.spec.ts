@@ -184,7 +184,7 @@ test('if deleting fails, nothing is deleted on the device and the panel says to 
 
 test('board keys don’t act behind the panel: after a failed delete, or after clicking its text', async ({ browser }) => {
   const alice = await person(browser, `Alice${tag()}`);
-  const select = alice.getByRole('button', { name: 'Select (V)' });
+  const shortcuts = alice.getByRole('dialog', { name: 'Keyboard shortcuts' });
   // A shared board, so deleting has to reach the (blocked) server and fails.
   await shareNewBoard(alice, 'Trip');
   await alice.route('**/__collab/call', (route) => route.abort());
@@ -195,11 +195,11 @@ test('board keys don’t act behind the panel: after a failed delete, or after c
   // Focus goes back to the DELETE box, to try again.
   await expect(panel(alice).getByLabel('Type DELETE to confirm')).toBeFocused();
   await alice.locator('body').focus();
-  await alice.keyboard.press('v');
-  await expect(select).toHaveAttribute('aria-pressed', 'false');
+  await alice.keyboard.press('?'); // would open the shortcuts list on the board
+  await expect(shortcuts).toHaveCount(0);
   await panel(alice).getByText('Version history').click();
-  await alice.keyboard.press('v');
-  await expect(select).toHaveAttribute('aria-pressed', 'false');
+  await alice.keyboard.press('?');
+  await expect(shortcuts).toHaveCount(0);
   await expect(panel(alice)).toBeVisible();
   // Tab, from the page itself, only reaches the panel (the board behind is inert).
   for (let i = 0; i < 10; i++) {

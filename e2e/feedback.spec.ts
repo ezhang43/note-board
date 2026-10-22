@@ -134,11 +134,10 @@ test('board keys don’t act behind the open box', async ({ page }) => {
   await openPanel(page);
   await box(page).fill('Hi');
   await send(page).click();
-  // Focus is on Close now, not a text field: V would pick the Select tool on the board.
+  // Focus is on Close now, not a text field: ? would open the shortcuts list on the board.
   await expect(panel(page).getByRole('button', { name: 'Close', exact: true }).last()).toBeFocused();
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
-  await page.keyboard.press('v');
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('?');
+  await expect(page.getByRole('dialog', { name: /shortcuts/i })).toHaveCount(0);
 });
 
 test('after a failed send the typing goes back to the box, and board keys still don’t act', async ({ page }) => {
@@ -149,10 +148,10 @@ test('after a failed send the typing goes back to the box, and board keys still 
   await send(page).click();
   await expect(panel(page).getByRole('alert')).toBeVisible();
   await expect(box(page)).toBeFocused();
-  // Clicking the panel's plain text moves focus off the box: V still leaves the board alone.
+  // Clicking the panel's plain text moves focus off the box: ? still leaves the board alone.
   await panel(page).getByText('Sent with your email address').click();
-  await page.keyboard.press('v');
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('?');
+  await expect(page.getByRole('dialog', { name: /shortcuts/i })).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
 });
 

@@ -37,7 +37,7 @@ test('Honey is the default and looks as it always has', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'honey');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(248, 245, 238)');
   await expect(toolbar(page)).toHaveCSS('background-color', 'rgb(255, 253, 248)');
-  await expect(toolbar(page).getByRole('button', { name: 'Hand (H)' })).toHaveCSS('background-color', 'rgb(242, 182, 43)');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--honey').trim().toLowerCase())).toBe('#f2b62b');
 });
 
 test('picking Ocean tints the board and changes the accent, but cards stay white', async ({ page }) => {
@@ -50,8 +50,8 @@ test('picking Ocean tints the board and changes the accent, but cards stay white
   await expect(themes(page).getByRole('button', { name: 'Ocean' })).toHaveAttribute('aria-pressed', 'true');
   await expect(themes(page).getByRole('button', { name: 'Honey' })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(241, 246, 249)');
-  // The pressed tool takes the theme's accent (it was honey).
-  await expect(toolbar(page).getByRole('button', { name: 'Hand (H)' })).toHaveCSS('background-color', 'rgb(98, 182, 232)');
+  // The Share button takes the theme's accent (it was honey).
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--honey').trim().toLowerCase())).toBe('#62b6e8');
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', /^#FAFDFF$/i);
 });

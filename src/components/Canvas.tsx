@@ -14,6 +14,7 @@ import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { EmptyStart } from './TemplatePicker';
 import { HOLD_MS } from './touchHold';
+import { usePanButtons } from './usePanButtons';
 import { usePhone } from './usePhone';
 
 const NO_GUIDES: never[] = [];
@@ -147,13 +148,15 @@ export function Canvas() {
     };
   }, [phone]);
 
-  // Hand tool: drag empty space to pan. (The Select tool's rectangle comes in step 4.)
+  // Dragging empty space draws the selection box; a finger, or a read-only board, pans instead.
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
   // A finger on the empty board, for the zoom taps: double tap zooms in, a long tap zooms out.
   const press = useRef<{ id: number; down: Touch; moved: boolean } | null>(null);
   const lastTap = useRef<Touch | null>(null);
-  // Shows the closed glove while the Hand tool drags the board.
+  // Shows the closed glove while the board is dragged with the middle button, or the left and right together.
   const [panning, setPanning] = useState(false);
+  // The middle button, or the left and right together, drag the board (owner request, job 188).
+  usePanButtons(ref, setPanning);
   // The selection box keeps moving the board at the screen edge (owner request).
   const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
@@ -198,7 +201,6 @@ export function Canvas() {
       drag.current = null;
       press.current = null;
       lastTap.current = null;
-      setPanning(false);
       for (const id of fingers.keys()) if (id !== e.pointerId) window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: id, pointerType: 'touch' }));
     };
     const onMove = (e: PointerEvent) => {
@@ -235,28 +237,36 @@ export function Canvas() {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const at = clientToCanvas(e.clientX, e.clientY);
-    // A read-only board (job 161) has no tools: dragging always moves it.
-    const mode = appStore.getState().view.tool === 'hand' || appStore.viewOnly() ? 'pan' : 'marquee';
-    drag.current = { id: e.pointerId, mode, x: e.clientX, y: e.clientY, start: at };
-    press.current = e.pointerType === 'touch' ? { id: e.pointerId, down: { x: e.clientX, y: e.clientY, t: Date.now() }, moved: false } : null;
-    if (mode === 'pan') setPanning(true);
-    // Select tool: drag a box; everything it touches is selected (Ctrl adds to the selection).
-    if (mode === 'marquee') {
-      appStore.startMarquee(at, keep);
-      edges.current = followEdges((p, moved) => {
-        const d = drag.current;
-        if (!d) return;
-        // The box's starting corner stays on the same spot of the board as the board moves.
-        d.start = { x: d.start.x + moved.dx, y: d.start.y + moved.dy };
-        appStore.updateMarquee(d.start, clientToCanvas(p.clientX, p.clientY));
-      });
-    }
+    // By finger or pen the board moves (a finger resting first, then moving, draws the box instead); a read-only
+    // board (job 161) has no selection box either.
+    const finger = e.pointerType === 'touch';
+    drag.current = { id: e.pointerId, mode: e.pointerType !== 'mouse' || appStore.viewOnly() ? 'pan' : 'marquee', x: e.clientX, y: e.clientY, start: at };
+    press.current = finger ? { id: e.pointerId, down: { x: e.clientX, y: e.clientY, t: Date.now() }, moved: false } : null;
+    if (drag.current.mode === 'marquee') startBox(keep);
+  }
+
+  // Drag a box; everything it touches is selected (Ctrl adds to the selection).
+  function startBox(keep: boolean) {
+    const d = drag.current!;
+    appStore.startMarquee(d.start, keep);
+    edges.current = followEdges((p, moved) => {
+      // The box's starting corner stays on the same spot of the board as the board moves.
+      d.start = { x: d.start.x + moved.dx, y: d.start.y + moved.dy };
+      appStore.updateMarquee(d.start, clientToCanvas(p.clientX, p.clientY));
+    });
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const p = press.current;
-    if (p?.id === e.pointerId && Math.hypot(e.clientX - p.down.x, e.clientY - p.down.y) >= DRAG_THRESHOLD) p.moved = true;
     const d = drag.current;
+    if (p?.id === e.pointerId && !p.moved && Math.hypot(e.clientX - p.down.x, e.clientY - p.down.y) >= DRAG_THRESHOLD) {
+      p.moved = true;
+      // A finger that rested first, then moves, draws the selection box (owner decision, job 188: there is no Select tool to pick).
+      if (d?.id === e.pointerId && d.mode === 'pan' && !appStore.viewOnly() && Date.now() - p.down.t >= HOLD_MS) {
+        d.mode = 'marquee';
+        startBox(false);
+      }
+    }
     if (!d || d.id !== e.pointerId) return;
     if (d.mode === 'marquee') {
       edges.current?.track(e);
@@ -289,7 +299,6 @@ export function Canvas() {
     edges.current?.stop();
     edges.current = null;
     drag.current = null;
-    setPanning(false);
   }
 
   const grid = gridStyle(view);
@@ -298,7 +307,7 @@ export function Canvas() {
   return (
     <div
       ref={ref}
-      className={`canvas tool-${view.tool}${panning ? ' panning' : ''}`}
+      className={`canvas${panning ? ' panning' : ''}`}
       data-testid="canvas"
       role="main"
       aria-label="Board"

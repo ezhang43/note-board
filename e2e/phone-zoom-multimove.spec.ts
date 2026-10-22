@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded, holdAndDrag, lerp, touch, type Pt, type TouchStep as Step } from './helpers';
+import { fontsLoaded, holdAndDrag, holdAndMoveSteps, lerp, touch, type Pt, type TouchStep as Step } from './helpers';
 
 // Phone zoom taps and moving several selected blocks by finger (owner requests, 2026-10-18).
 // Everything runs on a 390x844 touch screen, with real touch events.
@@ -18,10 +18,6 @@ const bar = (page: Page) => page.getByRole('toolbar', { name: 'Board actions' })
 const addMenu = async (page: Page, item: 'Note' | 'Container') => {
   await bar(page).getByRole('button', { name: 'Add', exact: true }).tap();
   await page.getByRole('menuitem', { name: item }).tap();
-};
-const chooseTool = async (page: Page, tool: 'Hand (H)' | 'Select (V)') => {
-  await bar(page).getByRole('button', { name: 'More', exact: true }).tap();
-  await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: tool, exact: true }).tap();
 };
 const STEP = 1.2;
 const EMPTY = { x: 300, y: 300 };
@@ -86,27 +82,31 @@ test.describe('zoom taps on the empty board', () => {
     expect(local.x - p1.x).toBeCloseTo(boardPoint.x * (await zoom(page)), 1);
   });
 
-  test('a long tap starts no selection box with the Select tool, and a rest then a move still draws it', async ({ page }) => {
-    await chooseTool(page, 'Select (V)');
-    await page.mouse.click(200, 70); // the menu stays open and covers the board; this closes it
+  test('a long tap starts no selection box, and a rest then a move draws it without panning or zooming', async ({ page }) => {
     await emptyArea(page);
     const z0 = await zoom(page);
     await touch(page, [{ type: 'touchStart', p: EMPTY }, { type: 'touchEnd', wait: 700 }]);
     await expect.poll(() => zoom(page)).toBeCloseTo(z0 / STEP, 3);
     await expect(page.getByTestId('marquee')).toHaveCount(0);
-    // A rest and then a move draws the box, as before, and does not zoom.
+    // A rest and then a move draws the box (job 188: there is no Select tool to pick), and neither pans nor zooms.
     const z1 = await zoom(page);
-    await holdAndDrag(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
+    const p1 = await pan(page);
+    await touch(page, holdAndMoveSteps(EMPTY, { x: EMPTY.x - 60, y: EMPTY.y + 80 })); // (away from the screen edge, where a box moves the board)
+    await expect(page.getByTestId('marquee')).toBeVisible();
+    await touch(page, [{ type: 'touchEnd' }]);
+    await expect(page.getByTestId('marquee')).toHaveCount(0);
     expect(await zoom(page)).toBe(z1);
+    expect(await pan(page)).toEqual(p1);
   });
 
-  test('with the Hand tool (the default), a rest then a swipe still pans and does not zoom', async ({ page }) => {
+  test('a swipe straight away pans the board and does not zoom or draw a box', async ({ page }) => {
     await emptyArea(page);
     const z0 = await zoom(page);
     const p0 = await pan(page);
-    await holdAndDrag(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
+    await swipe(page, EMPTY, { x: EMPTY.x + 60, y: EMPTY.y + 80 });
     expect(await zoom(page)).toBe(z0);
     expect((await pan(page)).x).toBeGreaterThan(p0.x + 40);
+    await expect(page.getByTestId('marquee')).toHaveCount(0);
   });
 
   test('two quick swipes in the same place pan and never zoom', async ({ page }) => {
@@ -180,14 +180,12 @@ test.describe('on a container, nothing changes', () => {
 });
 
 test.describe('several selected blocks move together by finger', () => {
-  /** Two notes and a container, then the Select tool and a finger box around all of them. */
+  /** Two notes and a container, then a finger box (rest, then move) around all of them. */
   async function selectSeveral(page: Page) {
     for (const item of ['Note', 'Note', 'Container'] as const) {
       await addMenu(page, item);
       await page.mouse.click(200, 70); // done typing / close
     }
-    await chooseTool(page, 'Select (V)');
-    await page.mouse.click(200, 70); // closes the menu
     // New cards are screen-wide (job 113), so the three no longer fit one screen: zoom out to see them all.
     await page.keyboard.press('Control+Minus');
     await page.keyboard.press('Control+Minus');
@@ -195,7 +193,7 @@ test.describe('several selected blocks move together by finger', () => {
     expect(rects.length).toBe(3);
     const from = { x: Math.max(2, Math.min(...rects.map((r) => r.l)) - 6), y: Math.max(60, Math.min(...rects.map((r) => r.t)) - 6) };
     const to = { x: Math.min(388, Math.max(...rects.map((r) => r.r)) + 6), y: Math.min(740, Math.max(...rects.map((r) => r.b)) + 6) };
-    await touch(page, [{ type: 'touchStart', p: from }, ...Array.from({ length: 10 }, (_, i): Step => ({ type: 'touchMove', p: lerp(from, to, (i + 1) / 10) })), { type: 'touchEnd' }]);
+    await touch(page, [{ type: 'touchStart', p: from }, ...Array.from({ length: 10 }, (_, i): Step => ({ type: 'touchMove', p: lerp(from, to, (i + 1) / 10), wait: i === 0 ? 700 : 0 })), { type: 'touchEnd' }]);
     await expect(page.locator('.card.selected, .column.selected, [data-col-id].selected')).toHaveCount(3);
   }
   const positions = (page: Page) =>

@@ -104,9 +104,8 @@ test('Ctrl+Shift+Down / Up move an item past its neighbor, keeping the cursor in
   await expect(l.getByLabel('Item text').first()).toBeFocused();
 });
 
-test('wording: placeholders, empty hint, Select tool tip, Color label', async ({ page }) => {
+test('wording: placeholders, empty hint, Color label', async ({ page }) => {
   await expect(page.getByText('Add a note, a checklist or a container from the toolbar, or drag one onto the board. Press ? for keyboard shortcuts.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('title', 'Select (V): drag a rectangle to select several cards and containers');
   await expect(page.getByRole('button', { name: 'Color of selected cards and containers' })).toHaveCount(1);
   const l = await list(page, '', []);
   await expect(l.getByLabel('Item text').first()).toHaveAttribute('placeholder', 'Add an item');

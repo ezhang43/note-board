@@ -130,7 +130,7 @@ export function useShortcuts() {
         return;
       }
 
-      // The tools and block shortcuts use the keys this device chose (hotkeys.ts); the defaults are the usual ones.
+      // The block shortcuts use the keys this device chose (hotkeys.ts); the defaults are the usual ones.
       const hk = state.view.hotkeys;
       if (matches(hk.selectAll, e)) return run(e, appStore.selectAll);
       if (matches(hk.copy, e) && appStore.copySelection()) {
@@ -141,8 +141,6 @@ export function useShortcuts() {
       // simple: a paste key the person re-mapped can't see the clipboard, so it always pastes the copied blocks.
       if (matches(hk.paste, e) && !matches(DEFAULT_HOTKEYS.paste, e) && appStore.paste()) return e.preventDefault();
       if (matches(hk.duplicate, e)) return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
-      if (matches(hk.hand, e)) return run(e, () => appStore.setTool('hand'));
-      if (matches(hk.select, e)) return run(e, () => appStore.setTool('select'));
       if (matches(hk.delete, e) || (!mod && key === 'backspace')) {
         if (appStore.deleteSelection()) e.preventDefault();
       } else if (!mod && key === 'escape') appStore.clearSelection();

@@ -28,6 +28,7 @@ import {
   type QuerySnapshot,
   type Transaction,
 } from 'firebase/firestore';
+import type { Comment } from '../model/comments';
 import type { AccountBackend } from '../store/account';
 import { above, lowers, NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
 import { ONLINE_LIMIT, type Remote } from '../store/sync';
@@ -502,6 +503,35 @@ export function collabRemote(user: User): CollabBackend {
       batch.delete(shareRef(id));
       await batch.commit();
       await deleteDoc(mineRef(id)).catch(() => {});
+    },
+    watchComments(id, onChange, onError) {
+      // Comments on its cards (job 161, PR 4): shared/{id}/comments, read by everyone on it.
+      const ms = (x: unknown) => (x as { toMillis?: () => number } | null)?.toMillis?.() ?? null;
+      return watchAllowed(
+        (next, refused) => onSnapshot(collection(db, 'shared', id, 'comments'), next, refused),
+        (snap: QuerySnapshot) => {
+          const list: Comment[] = [];
+          for (const d of snap.docs) {
+            // A comment still on its way has no server time yet: this device's estimate stands in.
+            const c = d.data({ serverTimestamps: 'estimate' });
+            if (typeof c.card !== 'string' || typeof c.text !== 'string' || typeof c.author !== 'string' || typeof c.name !== 'string') continue;
+            const photo = typeof c.photo === 'string' && c.photo.startsWith('https://') ? c.photo : null;
+            list.push({ id: d.id, card: c.card, text: c.text, author: c.author, name: c.name, photo, at: ms(c.at) ?? Date.now(), resolved: c.resolved === true, resolvedAt: ms(c.resolvedAt) });
+          }
+          onChange(list);
+        },
+        onError,
+      );
+    },
+    async addComment(id, c) {
+      // Offline, kept on this device and sent once back (it shows here at once).
+      await setDoc(doc(db, 'shared', id, 'comments', c.id), { card: c.card, text: c.text, author: me.uid, name: c.name, photo: c.photo, at: serverTimestamp(), resolved: false });
+    },
+    async resolveComment(id, commentId, resolved) {
+      await updateDoc(doc(db, 'shared', id, 'comments', commentId), { resolved, resolvedAt: serverTimestamp() });
+    },
+    async deleteComment(id, commentId) {
+      await deleteDoc(doc(db, 'shared', id, 'comments', commentId));
     },
   };
 }

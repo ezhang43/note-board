@@ -61,6 +61,10 @@ export function demoBackend(person: Person) {
     linksOff: async (_who, ...args) => void (await call('linksOff', ...args)),
     setRole: async (_who, ...args) => void (await call('setRole', ...args)),
     deleteShare: async (_who, ...args) => void (await call('deleteShare', ...args)),
+    watchComments: (_who, id, onChange, onError) => watch('comments', id, onChange, onError),
+    addComment: async (_who, ...args) => void (await call('addComment', ...args)),
+    resolveComment: async (_who, ...args) => void (await call('resolveComment', ...args)),
+    deleteComment: async (_who, ...args) => void (await call('deleteComment', ...args)),
   };
   return serverBackend(server, person);
 }

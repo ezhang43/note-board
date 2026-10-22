@@ -1,3 +1,5 @@
+import { commentable, commentText, type Comment } from '../model/comments';
+
 // Where shared boards live online (Firestore on the published site; a pretend server in tests and
 // in `npm run dev` with ?demo-user=). Each person talks to it through a CollabBackend.
 
@@ -59,6 +61,16 @@ export interface ShareDoc {
   rev: number;
 }
 
+/** A new comment as the app sends it (job 161, PR 4): the server adds who wrote it and when. */
+export interface NewComment {
+  id: string;
+  card: string;
+  text: string;
+  /** As on the author's member record (the rules check it). */
+  name: string;
+  photo: string | null;
+}
+
 /** A thing that was refused because the person isn't allowed to (not a member, not the owner, wrong link). */
 class NotAllowed extends Error {
   code = 'permission-denied';
@@ -109,6 +121,14 @@ export interface CollabBackend {
   setRole(id: string, uid: string, role: Role, keys: NewKeys): Promise<void>;
   /** Owner only. */
   deleteShare(id: string): Promise<void>;
+  /** Its comments as they change (everyone on it; job 161, PR 4). */
+  watchComments(id: string, onChange: (comments: Comment[]) => void, onError: (e: unknown) => void): () => void;
+  /** Editors and commenters: a comment as this person. */
+  addComment(id: string, comment: NewComment): Promise<void>;
+  /** Resolves or reopens the thread kept on comment `commentId` (editors; commenters on their own). */
+  resolveComment(id: string, commentId: string, resolved: boolean): Promise<void>;
+  /** Its author, or the person who shared the board. */
+  deleteComment(id: string, commentId: string): Promise<void>;
 }
 
 /**
@@ -130,6 +150,10 @@ export interface CollabServer {
   linksOff(who: Person, id: string): Promise<void>;
   setRole(who: Person, id: string, uid: string, role: Role, keys: NewKeys): Promise<void>;
   deleteShare(who: Person, id: string): Promise<void>;
+  watchComments(who: Person, id: string, onChange: (comments: Comment[]) => void, onError: (e: unknown) => void): () => void;
+  addComment(who: Person, id: string, comment: NewComment): Promise<void>;
+  resolveComment(who: Person, id: string, commentId: string, resolved: boolean): Promise<void>;
+  deleteComment(who: Person, id: string, commentId: string): Promise<void>;
 }
 
 /** A CollabBackend for `me` on top of a CollabServer. */
@@ -156,12 +180,17 @@ export function serverBackend(server: CollabServer, me: Person): CollabBackend {
     linksOff: (id) => server.linksOff(me, id),
     setRole: (id, uid, role, keys) => server.setRole(me, id, uid, role, keys),
     deleteShare: (id) => server.deleteShare(me, id),
+    watchComments: (id, onChange, onError) => server.watchComments(me, id, onChange, onError),
+    addComment: (id, comment) => server.addComment(me, id, comment),
+    resolveComment: (id, commentId, resolved) => server.resolveComment(me, id, commentId, resolved),
+    deleteComment: (id, commentId) => server.deleteComment(me, id, commentId),
   };
 }
 
 interface Stored extends Omit<ShareDoc, 'links'> {
   links: Links;
   people: Member[];
+  comments: Comment[];
 }
 
 /**
@@ -264,7 +293,7 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     },
     async createShare(who, id, root, link, data, client) {
       check(!shares.has(id));
-      shares.set(id, { owner: who.uid, root, links: { ...NO_LINKS, edit: link }, data, client, rev: 1, people: [{ ...who, role: 'edit' }] });
+      shares.set(id, { owner: who.uid, root, links: { ...NO_LINKS, edit: link }, data, client, rev: 1, people: [{ ...who, role: 'edit' }], comments: [] });
       addMine(who.uid, id);
       notify();
     },
@@ -323,8 +352,42 @@ export function memoryServer(deliver: (fn: () => void) => void = (fn) => setTime
     async deleteShare(who, id) {
       const s = shares.get(id);
       check(Boolean(s && s.owner === who.uid));
-      shares.delete(id);
+      shares.delete(id); // its comments with it
       dropMine(who.uid, id);
+      notify();
+    },
+    watchComments(who, id, onChange) {
+      let last = '';
+      return watch(() => {
+        const s = shares.get(id);
+        if (!s || !member(who, s)) return;
+        const json = JSON.stringify(s.comments);
+        if (json !== last) onChange(s.comments.map((c) => ({ ...c })));
+        last = json;
+      });
+    },
+    async addComment(who, id, c) {
+      const s = shares.get(id);
+      const role = roleIn(who, s);
+      const me = s?.people.find((p) => p.uid === who.uid);
+      // As firestore.rules: editors and commenters, as themselves (name and photo as on People), 1 to 1,000 characters, a safe card id.
+      check((role === 'edit' || role === 'comment') && commentText(c.text) === c.text && commentable(c.card) && me?.name === c.name && me.photo === c.photo && !s!.comments.some((x) => x.id === c.id));
+      s!.comments = [...s!.comments, { id: c.id, card: c.card, text: c.text, author: who.uid, name: c.name, photo: c.photo, at: Date.now(), resolved: false, resolvedAt: null }];
+      notify();
+    },
+    async resolveComment(who, id, commentId, resolved) {
+      const s = shares.get(id);
+      const role = roleIn(who, s);
+      const c = s?.comments.find((x) => x.id === commentId);
+      check(Boolean(c) && (role === 'edit' || (role === 'comment' && c!.author === who.uid)));
+      s!.comments = s!.comments.map((x) => (x === c ? { ...x, resolved, resolvedAt: Date.now() } : x));
+      notify();
+    },
+    async deleteComment(who, id, commentId) {
+      const s = shares.get(id);
+      const c = s?.comments.find((x) => x.id === commentId);
+      check(Boolean(c) && (c!.author === who.uid || s!.owner === who.uid));
+      s!.comments = s!.comments.filter((x) => x !== c);
       notify();
     },
   };

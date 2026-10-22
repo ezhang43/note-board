@@ -6,7 +6,7 @@ import { memoryServer, type CollabServer, type Person } from '../store/collab';
 // can be tried and tested without Firebase: open the app with ?demo-user=Alice in one window and
 // ?demo-user=Bob in another. Everything is kept in memory until the dev server stops.
 //   POST /__collab/call   { who, method, args } → { ok } or { error: { code, message } }
-//   GET  /__collab/watch?who=…&what=shares|share|people&id=…   (server-sent events)
+//   GET  /__collab/watch?who=…&what=shares|share|people|comments&id=…   (server-sent events)
 //   POST /__collab/feedback   { text, uid } → {}   (a demo person's feedback, dropped)
 
 export function devCollabPlugin(): Plugin {
@@ -40,7 +40,7 @@ async function call(server: CollabServer, req: IncomingMessage, res: ServerRespo
   res.setHeader('Content-Type', 'application/json');
   try {
     const { who, method, args } = JSON.parse(await readBody(req)) as { who: Person; method: string; args: unknown[] };
-    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare'];
+    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare', 'addComment', 'resolveComment', 'deleteComment'];
     if (!allowed.includes(method)) throw new Error('Unknown call');
     const fn = (server as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method];
     const ok = await fn(who, ...args);
@@ -65,6 +65,8 @@ function watch(server: CollabServer, req: IncomingMessage, res: ServerResponse) 
       ? server.watchMyShares(who, onChange, onError)
       : what === 'share'
         ? server.watchShare(who, id, onChange, onError)
-        : server.watchPeople(who, id, onChange, onError);
+        : what === 'comments'
+          ? server.watchComments(who, id, onChange, onError)
+          : server.watchPeople(who, id, onChange, onError);
   req.on('close', stop);
 }

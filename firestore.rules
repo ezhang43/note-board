@@ -183,7 +183,10 @@ service cloud.firestore {
             && (!('joinedAt' in d) || d.joinedAt is timestamp)
             && d.name is string && d.name.size() <= 200
             && photoOk(d.photo)
-            && (!('role' in d) || d.role in ['edit', 'comment', 'view']);
+            && (!('role' in d) || d.role in ['edit', 'comment', 'view'])
+            // Everyone on it reads every member record, so once roles are in use none takes a new key
+            // (an app from before roles writes the key someone opened, the owner's own included).
+            && (!('key' in d) || !rolesIn(linksAfter()) || (resource != null && d.key == resource.data.get('key', null)));
         }
         function newRole() {
           return roleOf(request.resource.data);
@@ -275,8 +278,9 @@ service cloud.firestore {
             && d.author == request.auth.uid
             && d.card is string && d.card.matches('[A-Za-z0-9_-]{1,100}')
             && d.text is string && d.text.size() >= 1 && d.text.size() <= 1000
-            && d.name is string && d.name.size() <= 200
-            && photoOk(d.photo)
+            // Their name and photo as on their member record, so no one posts as someone else.
+            && d.name == get(memberPath(request.auth.uid)).data.name
+            && d.photo == get(memberPath(request.auth.uid)).data.photo
             && d.at == request.time
             && d.resolved == false;
         }

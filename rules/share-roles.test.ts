@@ -308,6 +308,14 @@ describe('the first comment or view link changes the edit link (D1)', () => {
     await assertFails(oldJoin(as('bob'), 'bob', EDIT));
   });
 
+  // Security check: everyone on the board can read every member record.
+  it('once roles are in use, no member record can take a new key (not even the owner’s, from an old app)', async () => {
+    await seedShare({ bob: 'edit' }, { edit: EDIT, comment: null, view: VIEW });
+    await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/alice'), { ...record(), key: EDIT }));
+    await assertFails(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...record('edit'), key: EDIT }));
+    await assertSucceeds(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('edit')));
+  });
+
   it('a brand new share can have all three links from the start', async () => {
     await assertSucceeds(createShare(as('alice'), { edit: EDIT, comment: COMMENT, view: VIEW }));
   });
@@ -419,7 +427,8 @@ describe('the app before this change (today’s live app and older cached copies
 });
 
 describe('comments (shared/{sid}/comments)', () => {
-  const comment = (author = 'bob', over: object = {}) => ({ card: 'c_1a2b3c4d', text: 'Looks good', author, name: 'B', photo: null, at: serverTimestamp(), resolved: false, ...over });
+  // The name and photo as on their member record (seedShare gives everyone 'A' and no photo).
+  const comment = (author = 'bob', over: object = {}) => ({ card: 'c_1a2b3c4d', text: 'Looks good', author, name: 'A', photo: null, at: serverTimestamp(), resolved: false, ...over });
   const add = (db: Firestore, id: string, c: object) => setDoc(doc(db, `shared/s1/comments/${id}`), c);
   const stored = (author: string) => ({ card: 'c_1', text: 'hi', author, name: 'X', photo: null, at: 1, resolved: false });
 
@@ -433,10 +442,13 @@ describe('comments (shared/{sid}/comments)', () => {
     await assertFails(add(as('bob'), 'k6', comment('carol')));
   });
 
-  it('checks every field: known fields only, text 1 to 1,000 characters, a safe card id, the server’s time, not resolved, an https photo', async () => {
+  it('checks every field: known fields only, text 1 to 1,000 characters, a safe card id, the server’s time, not resolved, their own name and photo', async () => {
     await seedShare({ bob: 'comment' });
     const db = as('bob');
-    await assertSucceeds(add(db, 'ok', comment('bob', { text: 'x'.repeat(1000), photo: 'https://lh3.example/p.png', name: 'x'.repeat(200) })));
+    await assertSucceeds(add(db, 'ok', comment('bob', { text: 'x'.repeat(1000) })));
+    // As someone else: a name or photo other than on their member record.
+    await assertFails(add(db, 'n1', comment('bob', { name: 'Alice' })));
+    await assertFails(add(db, 'n2', comment('bob', { photo: 'https://lh3.example/p.png' })));
     await assertFails(add(db, 'k1', comment('bob', { text: '' })));
     await assertFails(add(db, 'k2', comment('bob', { text: 'x'.repeat(1001) })));
     await assertFails(add(db, 'k3', comment('bob', { text: 5 })));

@@ -16,7 +16,12 @@ export interface Workspace {
 export const OPEN_BOARD_KEY = 'note-board:open';
 /** The id the home board gets when an older single board is read. */
 export const HOME_ID = 'home';
-/** Saved shape of a workspace: { version: 3, home, boards } (each board as in version 2). */
+/**
+ * Saved shape of a workspace: { version: 3, home, boards } (each board as in version 2). Raised by one
+ * whenever the saved shape changes, even by one field (review 137-A M1): an older copy of the app
+ * still open then refuses the boards instead of dropping what it doesn't know and saving that loss.
+ * A test (persist-roundtrip) fails until it is raised. Every version from 3 up to it is read.
+ */
 export const WORKSPACE_VERSION = 3;
 
 export function serializeWorkspace(ws: Workspace): string {
@@ -39,7 +44,7 @@ export function readWorkspace(raw: string | null): { ws: Workspace; legacy: bool
   } catch {
     return null;
   }
-  if (!isObject(data) || data.version !== WORKSPACE_VERSION || !isObject(data.boards)) return null;
+  if (!isObject(data) || typeof data.version !== 'number' || data.version < 3 || data.version > WORKSPACE_VERSION || !isObject(data.boards)) return null;
   const boards: Record<string, Board> = {};
   for (const [id, b] of Object.entries(data.boards)) {
     const board = readBoardData(BOARD_VERSION, b);

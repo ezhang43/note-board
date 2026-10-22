@@ -20,7 +20,7 @@ async function threeNotes(page: Page) {
   return ids.map((id) => page.locator(`[data-card-id="${id}"]`)) as [Locator, Locator, Locator];
 }
 
-const header = { position: { x: 30, y: 18 } };
+const header = { position: { x: 8, y: 18 } };
 
 test('Ctrl + click and Shift + click add and remove blocks; Color recolors all selected columns and tints card headers', async ({ page }) => {
   const [a, b, c] = await threeNotes(page);

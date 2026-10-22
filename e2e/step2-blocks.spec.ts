@@ -35,7 +35,7 @@ async function box(l: Locator) {
 async function grabPoint(block: Locator) {
   const b = await box(block);
   const isColumn = (await block.getAttribute('data-col-id')) !== null;
-  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 30, y: b.y + 18 };
+  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 }; // a card's title shares its header row: grab the padding left of it
 }
 
 async function dragTo(page: Page, block: Locator, to: { x: number; y: number }) {
@@ -125,7 +125,7 @@ test('adding with a column selected puts the card at the end; with a card in a c
   await col.locator('[data-card-id]').nth(1).getByLabel('Note text').fill('last');
 
   // Select the first card, then add: it goes directly below the first card.
-  await col.locator('[data-card-id]').first().click({ position: { x: 30, y: 18 } });
+  await col.locator('[data-card-id]').first().click({ position: { x: 8, y: 18 } });
   await add(page, 'Checklist');
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
   await expect(col.locator('[data-card-id]').nth(1)).toHaveAttribute('data-kind', 'todo');
@@ -317,7 +317,7 @@ test('clicking empty space or pressing Escape clears the selection', async ({ pa
   await expect(note).toHaveClass(/selected/);
   await clickEmpty(page);
   await expect(note).not.toHaveClass(/selected/);
-  await note.click({ position: { x: 30, y: 18 } });
+  await note.click({ position: { x: 8, y: 18 } });
   await expect(note).toHaveClass(/selected/);
   await page.keyboard.press('Escape');
   await expect(note).not.toHaveClass(/selected/);

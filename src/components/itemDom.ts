@@ -10,6 +10,7 @@ import { followEdges } from './edgeFollow';
 /** The checklist row under the pointer, if it belongs to `cardId`. */
 export function rowUnder(clientX: number, clientY: number, cardId: string): string | null {
   for (const el of document.elementsFromPoint(clientX, clientY)) {
+    if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
     const row = el.closest<HTMLElement>('[data-item-id]');
     if (!row) continue;
     return row.closest<HTMLElement>('[data-card-id]')?.dataset.cardId === cardId ? row.dataset.itemId! : null;
@@ -20,6 +21,7 @@ export function rowUnder(clientX: number, clientY: number, cardId: string): stri
 /** The checklist row under the pointer in any list, if any. */
 export function rowAt(clientX: number, clientY: number): { cardId: string; itemId: string } | null {
   for (const el of document.elementsFromPoint(clientX, clientY)) {
+    if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
     const row = el.closest<HTMLElement>('[data-item-id]');
     const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
     if (row && cardId) return { cardId, itemId: row.dataset.itemId! };
@@ -41,6 +43,7 @@ export function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemH
   const slid = d.slide && rowWithoutSlide(clientX, clientY);
   if (slid) return hintOnRow(slid.row, slid.rect, clientX, clientY, d);
   for (const el of document.elementsFromPoint(clientX, clientY)) {
+    if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
     const row = el.closest<HTMLElement>('[data-item-id]');
     if (row && !d.slide) return hintOnRow(row, row.getBoundingClientRect(), clientX, clientY, d);
     const list = el.closest<HTMLElement>('[data-todo-of]');

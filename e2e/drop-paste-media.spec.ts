@@ -115,7 +115,7 @@ test('pasting a web address while typing in a text field stays plain text', asyn
 async function selectOnlyCard(page: Page) {
   await add(page, 'Note');
   await page.keyboard.press('Escape');
-  await page.locator('[data-card-id]').first().click({ position: { x: 20, y: 10 } });
+  await page.locator('[data-card-id]').first().click({ position: { x: 8, y: 18 } });
 }
 
 // The newest copy wins: cards copied in the app, or an address copied after them (real keys and the real clipboard).

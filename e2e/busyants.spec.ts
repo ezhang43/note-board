@@ -91,7 +91,7 @@ test('Same width makes the selected blocks as wide as the first one selected', a
   await page.keyboard.press('Escape');
   const note = page.locator('.card.loose').first();
   const col = columns(page).first();
-  await note.click({ position: { x: 30, y: 10 } });
+  await note.click({ position: { x: 8, y: 18 } });
   await col.click({ position: { x: 20, y: 20 }, modifiers: ['Control'] });
   await arrange(page);
   await expect(sameWidth).not.toHaveAttribute('aria-disabled', 'true');
@@ -361,7 +361,7 @@ test('with cards selected, Collapse all / Expand all act on just those', async (
   }
   const [a, b] = [page.locator('.card.loose').nth(0), page.locator('.card.loose').nth(1)];
   await page.keyboard.press('Escape');
-  await a.click({ position: { x: 30, y: 10 } });
+  await a.click({ position: { x: 8, y: 18 } });
   const toggle = page.locator('header.toolbar').getByRole('button', { name: /^(Collapse|Expand) all$/ });
   await arrange(page);
   await expect(toggle).toHaveAttribute('title', 'Collapse the selected cards and containers');

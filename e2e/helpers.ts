@@ -86,11 +86,14 @@ export async function box(l: Locator) {
   return b;
 }
 
-/** A blank spot in a block's header, safe to grab for dragging. */
+/**
+ * A blank spot in a block's header, safe to grab for dragging. A card's title shares its header row (job 186), so a
+ * card is grabbed in the 12px of padding left of its title, which is header all the way down.
+ */
 export async function grabPoint(block: Locator) {
   const b = await box(block);
   const isColumn = (await block.getAttribute('data-col-id')) !== null;
-  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 30, y: b.y + 18 };
+  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 };
 }
 
 /** Drag from `from` to `to` in small steps. */

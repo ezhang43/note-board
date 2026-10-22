@@ -56,7 +56,7 @@ export function columnUnder(clientX: number, clientY: number): string | null {
 }
 
 /**
- * The loose checklist whose body (title and items, not the header strip) is under the pointer, other
+ * The loose checklist whose title row or items are under the pointer (its header counts as part of it since the title moved onto the button row, job 186), other
  * than `dragId`, for pouring a dragged list into. Tested where each list sits when not pushed aside
  * by the drag, so a list doesn't move away from under the pointer.
  */

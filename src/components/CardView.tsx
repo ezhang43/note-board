@@ -14,7 +14,7 @@ import { GrowTextarea } from './GrowTextarea';
 import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon, ExternalIcon, ResizeIcon, TrashIcon } from './icons';
-import { TodoBody } from './TodoList';
+import { TodoBody, TodoTitle } from './TodoList';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
@@ -100,7 +100,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
           minH={card.collapsed ? COLLAPSED_MIN_H : undefined}
         />
       )}
-      <div className="card-header">
+      {/* A (not collapsed) list's title row counts as part of the list when items or a whole list are dropped on it (data-todo-of), as its title did when it sat in the body. */}
+      <div className="card-header" data-todo-of={card.kind === 'todo' && !card.collapsed ? id : undefined}>
         <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
         <CommentChip id={id} />
         <button
@@ -125,6 +126,8 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
             <TrashIcon />
           </button>
         )}
+        {/* Last in the page order, so Tab still goes buttons, title, items as before; drawn first (see .card-header > .card-title). */}
+        {!card.collapsed && <CardTitle card={card} boardName={boardName} />}
       </div>
       {!card.collapsed && <CardBody card={card} />}
       {/* A collapsed card can still be resized: wider or narrower from its right edge, or taller from its corner. */}
@@ -144,6 +147,20 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
     </article>
   );
 });
+
+/** A list's, link's or board's title, on the card's button row (a note has none; a collapsed card shows its preview there instead). */
+function CardTitle({ card, boardName }: { card: Card; boardName: string }) {
+  switch (card.kind) {
+    case 'todo':
+      return <TodoTitle card={card} />;
+    case 'link':
+      return <LinkTitle card={card} />;
+    case 'board':
+      return <span className="card-title board-title">{shownName(boardName)}</span>;
+    default:
+      return null;
+  }
+}
 
 function CardBody({ card }: { card: Card }) {
   switch (card.kind) {
@@ -178,9 +195,6 @@ function BoardBody({ card }: { card: BoardCard }) {
   const open = () => count >= 0 && appStore.openBoard(card.boardId);
   return (
     <div className="board-body" onDoubleClick={open}>
-      <span className="board-card-name">
-        <BoardCardName boardId={card.boardId} />
-      </span>
       <span className="board-card-count">{count < 0 ? 'This board was deleted' : `${count} card${count === 1 ? '' : 's'}`}</span>
       <button type="button" className="tb-button board-open" aria-disabled={count < 0 ? true : undefined} onClick={open}>
         Open board
@@ -248,25 +262,31 @@ function MediaElement({ media, alt, onFail }: { media: Media; alt: string; onFai
   );
 }
 
+/** A link card's title, on the card's button row. */
+function LinkTitle({ card }: { card: LinkCard }) {
+  const title = useRef<HTMLInputElement>(null);
+  useTakeFocus(card.id, title);
+  return (
+    <AutoSizeInput
+      ref={title}
+      className="card-title"
+      aria-label="Link title"
+      {...boxProps({ cardId: card.id }, card.style)}
+      find={`title:${card.id}`}
+      placeholder="Title"
+      value={card.title}
+      onChange={(title) => appStore.setCardTitle(card.id, title)}
+    />
+  );
+}
+
 function LinkBody({ card }: { card: LinkCard }) {
   const href = hrefOf(card.url);
   // The address box is a plain field: a search match there rings the whole box.
   const findCurrent = useAppState((s) => s.ui.find?.current?.key === `url:${card.id}`);
   const readOnly = use(BoardReadOnly);
-  const title = useRef<HTMLInputElement>(null);
-  useTakeFocus(card.id, title);
   return (
     <div className="link-body">
-      <AutoSizeInput
-        ref={title}
-        className="card-title"
-        aria-label="Link title"
-        {...boxProps({ cardId: card.id }, card.style)}
-        find={`title:${card.id}`}
-        placeholder="Title"
-        value={card.title}
-        onChange={(title) => appStore.setCardTitle(card.id, title)}
-      />
       <LinkMedia card={card} />
       <input
         className={findCurrent ? 'link-url find-current' : 'link-url'}

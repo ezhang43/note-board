@@ -21,7 +21,7 @@ export function escapeIsForPanel(e: KeyboardEvent, textBoxToo = false): boolean 
   if (e.key !== 'Escape' || (!textBoxToo && isTextField(e.target)) || panelCovers()) return false;
   const { shortcutsOpen, confirm, deleteCompleted, colourMenuOpen } = appStore.getState().ui;
   if (shortcutsOpen || confirm || deleteCompleted || colourMenuOpen) return false;
-  if (e.target instanceof Element && e.target.closest('[role="alertdialog"], .find-bar')) return false; // the search bar answers its own Escape
+  if (e.target instanceof Element && e.target.closest('[role="alertdialog"], .find-bar, .format-bar')) return false; // the search bar and the format bar answer their own Escape
   return !document.querySelector('.cal-card, header.toolbar [aria-expanded="true"], [aria-haspopup][aria-expanded="true"]');
 }
 

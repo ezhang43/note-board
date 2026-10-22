@@ -10,6 +10,9 @@ import type { FormatAsk } from '../store/actions/format';
 import { focusedBox } from './textBox';
 import { isTextField, panelCovers } from './textField';
 
+/** Where keys never act on the board behind (C-M1): panels, popover menus and the Undo message. */
+const NOT_THE_BOARD = '.side-panel, .history-panel, .format-bar, .share-panel, .file-menu, .boards-menu, .toolbar-more, .colour-menu, .phone-sheet, .undo-toast';
+
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */
 export function useShortcuts() {
   useEffect(() => {
@@ -24,8 +27,10 @@ export function useShortcuts() {
       // In the Journal or Habits panel they step that board's own history, leaving the open board as it is.
       const panel = appStore.getState().ui.sidePanel;
       const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
-      // Any side panel, Version history too, and the format bar: a button or tick box in it is not a text field, but its keys aren't the board's.
-      const inAnyPanel = e.target instanceof Element && e.target.closest('.side-panel, .history-panel, .format-bar') !== null;
+      // Any side panel, Version history too, the format bar, the toolbar's menus (File, Boards, Arrange, Color, ⋯), the Share
+      // panel and the Undo message: a button or tick box in them is not a text field, but its keys aren't the board's.
+      // The path is read from the event, not the target: Escape closes a menu before this runs and takes its button out of the page.
+      const inAnyPanel = e.composedPath().some((el) => el instanceof Element && el.matches(NOT_THE_BOARD));
       const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
       // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.

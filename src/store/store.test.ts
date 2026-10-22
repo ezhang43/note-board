@@ -51,22 +51,13 @@ describe('store', () => {
     expect(JSON.parse(storage.data[VIEW_KEY]).panX).toBe(5);
   });
 
-  it('does not save when only the tool changes', () => {
-    const storage = memoryStorage();
-    const s = createStore(storage);
-    s.setTool('select');
-    vi.advanceTimersByTime(VIEW_SAVE_DELAY * 4);
-    expect(storage.data).toEqual({});
-  });
-
   it('tells listeners about changes, and not about non-changes', () => {
     const s = createStore(memoryStorage());
     const listener = vi.fn();
     s.subscribe(listener);
-    s.setTool('hand');
     s.renameBoard(s.getState().board.name);
     expect(listener).not.toHaveBeenCalled();
-    s.setTool('select');
+    s.panBy(5, 0);
     expect(listener).toHaveBeenCalledTimes(1);
   });
 

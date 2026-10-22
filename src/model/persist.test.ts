@@ -84,9 +84,10 @@ describe('saving the board', () => {
 });
 
 describe('saving the view', () => {
-  it('remembers pan and zoom but always starts with the Hand tool', () => {
-    const v = { panX: -120, panY: 45.5, zoom: 1.44, tool: 'select' as const, theme: 'light' as const, colorTheme: 'honey' as const, fontSize: 'normal' as const, hotkeys: DEFAULT_HOTKEYS };
-    expect(parseView(serializeView(v))).toEqual({ ...v, tool: 'hand' });
+  it('remembers pan and zoom, and reads a view saved when it also held the old Hand / Select tool', () => {
+    const v = { panX: -120, panY: 45.5, zoom: 1.44, theme: 'light' as const, colorTheme: 'honey' as const, fontSize: 'normal' as const, hotkeys: DEFAULT_HOTKEYS };
+    expect(parseView(serializeView(v))).toEqual(v);
+    expect(parseView('{"panX":-120,"panY":45.5,"zoom":1.44,"tool":"select"}')).toEqual(v);
   });
 
   it('falls back to defaults on damaged data and keeps zoom in range', () => {

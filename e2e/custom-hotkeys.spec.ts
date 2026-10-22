@@ -1,14 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { add, cards, clickEmpty, freshBoardEachTest } from './helpers';
 
-// Custom hotkeys (job 118): the tools and the block shortcuts can be re-mapped in the Keyboard shortcuts
+// Custom hotkeys (job 118): the block shortcuts can be re-mapped in the Keyboard shortcuts
 // panel (click a key, press the new one; Escape cancels; Reset). Kept on this device only.
 
 freshBoardEachTest();
 
 const panel = (page: Page) => page.getByRole('dialog', { name: 'Keyboard shortcuts' });
-const hand = (page: Page) => page.getByRole('button', { name: /^Hand \(/ });
-const select = (page: Page) => page.getByRole('button', { name: /^Select \(/ });
 const keyRow = (page: Page, name: string) => panel(page).getByRole('button', { name: new RegExp(`^${name}:`) });
 
 async function openPanel(page: Page) {
@@ -16,73 +14,68 @@ async function openPanel(page: Page) {
   await expect(panel(page)).toBeVisible();
 }
 
-test('the panel shows the keys as they are, and clicking one records a new key for the Hand tool', async ({ page }) => {
+test('the panel shows the keys as they are, and clicking one records a new key for it', async ({ page }) => {
   await openPanel(page);
-  await expect(keyRow(page, 'Hand tool')).toHaveText('H');
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
   await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+D');
-  await keyRow(page, 'Hand tool').click();
-  await expect(keyRow(page, 'Hand tool')).toHaveText('Press a key…');
+  // The Hand and Select tools are gone (job 188), so their keys are too.
+  await expect(panel(page).getByText('Hand tool')).toHaveCount(0);
+  await expect(panel(page).getByText('Select tool')).toHaveCount(0);
+  await keyRow(page, 'Delete selection').click();
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Press a key…');
   await page.keyboard.press('g');
-  await expect(keyRow(page, 'Hand tool')).toHaveText('G');
-  // The tooltips and names follow, and the panel is still open (the pressed key did nothing else).
+  await expect(keyRow(page, 'Delete selection')).toHaveText('G');
+  // The panel is still open (the pressed key did nothing else), and Escape closes it.
   await expect(panel(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hand (G)' })).toHaveAttribute('title', /^Hand \(G\)/);
   await page.keyboard.press('Escape');
   await expect(panel(page)).toBeHidden();
-  // G now picks the Hand tool; H no longer does.
-  await select(page).click();
-  await expect(select(page)).toHaveAttribute('aria-pressed', 'true');
-  await page.keyboard.press('h');
-  await expect(select(page)).toHaveAttribute('aria-pressed', 'true');
-  await page.keyboard.press('g');
-  await expect(hand(page)).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('the new key is kept for next time, on this device only, and Reset puts the usual keys back', async ({ page }) => {
   await openPanel(page);
-  await keyRow(page, 'Select tool').click();
+  await keyRow(page, 'Duplicate').click();
   await page.keyboard.press('Control+k');
-  await expect(keyRow(page, 'Select tool')).toHaveText('Ctrl+K');
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+K');
+  await page.keyboard.press('Escape');
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Select (Ctrl+K)' })).toBeVisible();
-  await page.keyboard.press('Control+k');
-  await expect(select(page)).toHaveAttribute('aria-pressed', 'true');
+  await openPanel(page);
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+K');
   // Not part of the board: the board's own saved data has no hotkeys.
   const stored = await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
   expect(stored['note-board:v1'] ?? '').not.toContain('hotkeys');
   expect(stored['note-board:hotkeys']).toContain('"k"');
-  await openPanel(page);
   await panel(page).getByRole('button', { name: 'Reset to defaults' }).click();
-  await expect(keyRow(page, 'Select tool')).toHaveText('V');
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toBeVisible();
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+D');
+  await page.keyboard.press('Escape');
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toBeVisible();
+  await openPanel(page);
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+D');
 });
 
 test('a key that something else uses is refused with a short message naming it', async ({ page }) => {
   await openPanel(page);
-  await keyRow(page, 'Hand tool').click();
+  await keyRow(page, 'Delete selection').click();
   await page.keyboard.press('Control+d');
   await expect(panel(page).getByRole('status')).toHaveText('Ctrl+D is already used by Duplicate.');
-  await expect(keyRow(page, 'Hand tool')).toHaveText('H');
-  await keyRow(page, 'Hand tool').click();
-  await page.keyboard.press('v');
-  await expect(panel(page).getByRole('status')).toHaveText('V is already used by Select tool.');
-  await keyRow(page, 'Hand tool').click();
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
+  await keyRow(page, 'Delete selection').click();
+  await page.keyboard.press('Control+a');
+  await expect(panel(page).getByRole('status')).toHaveText('Ctrl+A is already used by Select all.');
+  await keyRow(page, 'Delete selection').click();
   await page.keyboard.press('Control+z');
   await expect(panel(page).getByRole('status')).toHaveText('Ctrl+Z is already used by the app.');
-  await keyRow(page, 'Hand tool').click();
+  await keyRow(page, 'Delete selection').click();
   await page.keyboard.press('ArrowLeft');
   await expect(panel(page).getByRole('status')).toHaveText('That key is used for something else.');
   // Nothing changed.
-  await expect(page.getByRole('button', { name: 'Hand (H)' })).toBeVisible();
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
 });
 
 test('Escape while recording cancels it and leaves the panel open', async ({ page }) => {
   await openPanel(page);
-  await keyRow(page, 'Hand tool').click();
+  await keyRow(page, 'Delete selection').click();
   await page.keyboard.press('Escape');
-  await expect(keyRow(page, 'Hand tool')).toHaveText('H');
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
   await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel(page)).toBeHidden();
@@ -107,18 +100,26 @@ test('Duplicate and Select all follow their new keys on the board, and the old o
 });
 
 test('a broken saved value falls back to the usual keys', async ({ page }) => {
-  await page.evaluate(() => localStorage.setItem('note-board:hotkeys', '{"hand":{"key":"v","mod":false,"shift":false},"select":"x"'));
+  await page.evaluate(() => localStorage.setItem('note-board:hotkeys', '{"duplicate":{"key":"k","mod":true,"shift":false},"delete":"x"'));
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Hand (H)' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select (V)' })).toBeVisible();
-  await page.evaluate(() => localStorage.setItem('note-board:hotkeys', JSON.stringify({ hand: { key: 'v', mod: false, shift: false } })));
+  await openPanel(page);
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+D');
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
+});
+
+test('keys saved when there were tool keys are still read: the tool keys are ignored, the rest kept', async ({ page }) => {
+  await page.evaluate(() =>
+    localStorage.setItem('note-board:hotkeys', JSON.stringify({ hand: { key: 'g', mod: false, shift: false }, select: { key: 'h', mod: false, shift: false }, duplicate: { key: 'k', mod: true, shift: false } })),
+  );
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Hand (H)' })).toBeVisible(); // V is Select's: the whole saved set is dropped
+  await openPanel(page);
+  await expect(keyRow(page, 'Duplicate')).toHaveText('Ctrl+K');
+  await expect(keyRow(page, 'Delete selection')).toHaveText('Delete');
 });
 
 test('keys still do nothing while typing in a text field, and undo still works there', async ({ page }) => {
   await openPanel(page);
-  await keyRow(page, 'Hand tool').click();
+  await keyRow(page, 'Delete selection').click();
   await page.keyboard.press('g');
   await page.keyboard.press('Escape');
   await add(page, 'Note');

@@ -15,8 +15,6 @@ const b = (key: string, mod = false, shift = false): Binding => ({ key, mod, shi
 describe('the default hotkeys', () => {
   it('are today’s keys', () => {
     expect(DEFAULT_HOTKEYS).toEqual({
-      hand: b('h'),
-      select: b('v'),
       selectAll: b('a', true),
       copy: b('c', true),
       paste: b('v', true),
@@ -28,27 +26,27 @@ describe('the default hotkeys', () => {
 
 describe('startingHotkeys (what this device saved)', () => {
   it('is the defaults with nothing saved, with garbage, and with the wrong kind of value', () => {
-    for (const saved of [null, '', 'garbage', '[]', '5', 'null', '{"hand":5}']) expect(startingHotkeys(saved)).toEqual(DEFAULT_HOTKEYS);
+    for (const saved of [null, '', 'garbage', '[]', '5', 'null', '{"copy":5}']) expect(startingHotkeys(saved)).toEqual(DEFAULT_HOTKEYS);
   });
 
   it('keeps a good choice and fills the rest with defaults', () => {
-    const got = startingHotkeys(JSON.stringify({ hand: b('g'), duplicate: b('k', true, true) }));
-    expect(got).toEqual({ ...DEFAULT_HOTKEYS, hand: b('g'), duplicate: b('k', true, true) });
+    const got = startingHotkeys(JSON.stringify({ delete: b('x'), duplicate: b('k', true, true) }));
+    expect(got).toEqual({ ...DEFAULT_HOTKEYS, delete: b('x'), duplicate: b('k', true, true) });
   });
 
   it('ignores unknown actions and a damaged entry, keeping the others', () => {
-    const got = startingHotkeys(JSON.stringify({ hand: b('g'), select: { key: 'ab', mod: false, shift: false }, nonsense: b('q'), paste: 'x' }));
-    expect(got).toEqual({ ...DEFAULT_HOTKEYS, hand: b('g') });
+    const got = startingHotkeys(JSON.stringify({ delete: b('g'), selectAll: { key: 'ab', mod: true, shift: false }, nonsense: b('q'), paste: 'x' }));
+    expect(got).toEqual({ ...DEFAULT_HOTKEYS, delete: b('g') });
   });
 
   it('ignores a key the app keeps for something else', () => {
-    expect(startingHotkeys(JSON.stringify({ hand: b('z', true) }))).toEqual(DEFAULT_HOTKEYS);
-    expect(startingHotkeys(JSON.stringify({ hand: b('t', true) }))).toEqual(DEFAULT_HOTKEYS);
+    expect(startingHotkeys(JSON.stringify({ delete: b('z', true) }))).toEqual(DEFAULT_HOTKEYS);
+    expect(startingHotkeys(JSON.stringify({ delete: b('t', true) }))).toEqual(DEFAULT_HOTKEYS);
   });
 
   it('goes back to every default when two actions share a key', () => {
-    expect(startingHotkeys(JSON.stringify({ hand: b('g'), select: b('g') }))).toEqual(DEFAULT_HOTKEYS);
-    expect(startingHotkeys(JSON.stringify({ hand: b('v') }))).toEqual(DEFAULT_HOTKEYS); // Select still has V
+    expect(startingHotkeys(JSON.stringify({ delete: b('g'), duplicate: b('g') }))).toEqual(DEFAULT_HOTKEYS);
+    expect(startingHotkeys(JSON.stringify({ delete: b('d', true) }))).toEqual(DEFAULT_HOTKEYS); // Duplicate still has Ctrl+D
   });
 });
 
@@ -112,32 +110,32 @@ describe('hotkeyFromEvent (a key pressed to record)', () => {
 
 describe('problemWith (a key someone wants for an action)', () => {
   it('is fine for a free key, and for the action’s own key', () => {
-    expect(problemWith(DEFAULT_HOTKEYS, 'hand', b('g'))).toBeNull();
-    expect(problemWith(DEFAULT_HOTKEYS, 'hand', b('h'))).toBeNull();
+    expect(problemWith(DEFAULT_HOTKEYS, 'delete', b('g'))).toBeNull();
+    expect(problemWith(DEFAULT_HOTKEYS, 'delete', b('delete'))).toBeNull();
     expect(problemWith(DEFAULT_HOTKEYS, 'copy', b('c', true))).toBeNull(); // checklists share these three
   });
 
   it('names the action that already has the key', () => {
-    expect(problemWith(DEFAULT_HOTKEYS, 'hand', b('v'))).toBe('V is already used by Select tool.');
-    expect(problemWith(DEFAULT_HOTKEYS, 'hand', b('d', true))).toBe('Ctrl+D is already used by Duplicate.');
-    expect(problemWith(DEFAULT_HOTKEYS, 'select', b('delete'))).toBe('Delete is already used by Delete selection.');
+    expect(problemWith(DEFAULT_HOTKEYS, 'delete', b('a', true))).toMatch(/Ctrl\+A is already used by Select all/);
+    expect(problemWith(DEFAULT_HOTKEYS, 'delete', b('d', true))).toBe('Ctrl+D is already used by Duplicate.');
+    expect(problemWith(DEFAULT_HOTKEYS, 'copy', b('delete'))).toBe('Delete is already used by Delete selection.');
   });
 
   it('refuses the keys the app keeps: undo, redo, zoom, formatting, find, the lists and the shortcuts list', () => {
     for (const k of [b('z', true), b('z', true, true), b('y', true), b('=', true), b('-', true), b('0', true), b('b', true), b('i', true), b('f', true), b('x', true), b('?', false, true), b('?'), b('!', false, true)]) {
-      expect(problemWith(DEFAULT_HOTKEYS, 'hand', k)).toMatch(/already used by the app/);
+      expect(problemWith(DEFAULT_HOTKEYS, 'delete', k)).toMatch(/already used by the app/);
     }
   });
 
   it('keeps the checklist’s Ctrl+A, Ctrl+C and Ctrl+V for their own actions', () => {
-    expect(problemWith(DEFAULT_HOTKEYS, 'hand', b('c', true))).toMatch(/already used by Copy/);
+    expect(problemWith(DEFAULT_HOTKEYS, 'delete', b('c', true))).toMatch(/already used by Copy/);
     expect(problemWith({ ...DEFAULT_HOTKEYS, copy: b('k', true) }, 'duplicate', b('c', true))).toMatch(/checklist/);
     expect(problemWith({ ...DEFAULT_HOTKEYS, copy: b('k', true) }, 'copy', b('c', true))).toBeNull();
   });
 
   it('refuses the keys the browser keeps', () => {
     for (const k of [b('t', true), b('w', true), b('n', true), b('q', true), b('r', true), b('l', true), b('p', true), b('s', true), b('1', true), b('9', true), b('t', true, true)]) {
-      expect(problemWith(DEFAULT_HOTKEYS, 'hand', k)).toMatch(/kept by the browser/);
+      expect(problemWith(DEFAULT_HOTKEYS, 'delete', k)).toMatch(/kept by the browser/);
     }
   });
 });

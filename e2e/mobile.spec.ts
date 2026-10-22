@@ -112,7 +112,7 @@ test.describe('on a phone-sized screen', () => {
     const bar = page.getByRole('toolbar', { name: 'Board actions' });
     await bar.getByRole('button', { name: 'More', exact: true }).tap();
     const menu = page.getByRole('dialog', { name: 'More' });
-    for (const name of ['Snap to grid', 'Collapse all', 'Same width', 'Clean up', 'File', 'Larger text', 'Smaller text', 'Hand (H)', 'Select (V)'])
+    for (const name of ['Snap to grid', 'Collapse all', 'Same width', 'Clean up', 'File', 'Larger text', 'Smaller text'])
       await expect(menu.getByRole('button', { name, exact: true })).toBeVisible();
     const m = (await menu.boundingBox())!;
     expect(m.x).toBeGreaterThanOrEqual(0);

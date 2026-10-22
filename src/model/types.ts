@@ -135,8 +135,6 @@ export interface Board {
   order: string[];
 }
 
-export type Tool = 'hand' | 'select';
-
 /**
  * How the board is being looked at. Not board data: never undoable.
  * panX / panY are the screen offset (in screen pixels) of the board's 0,0 point
@@ -146,7 +144,6 @@ export interface View {
   panX: number;
   panY: number;
   zoom: number;
-  tool: Tool;
   /** Light or dark look: remembered per device under its own key, never undone or synced. */
   theme: Theme;
   /** Color theme (accent and board tint): per device, like the theme. */

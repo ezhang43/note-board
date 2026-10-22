@@ -11,7 +11,6 @@ import {
   FileMenu,
   SameWidthButton,
   SnapButton,
-  ToolGroup,
 } from './Toolbar';
 import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
@@ -108,7 +107,6 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
               Board
             </h2>
             <div className="phone-row">
-              {!viewOnly && <ToolGroup labelled />}
               <TextSizeButtons />
             </div>
             {!viewOnly && (

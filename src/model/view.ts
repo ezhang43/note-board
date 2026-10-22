@@ -3,7 +3,7 @@ import { FIND_MIN_ZOOM, CARD_MAX_W, CARD_MIN_W, GRID, MAX_ZOOM, MIN_ZOOM, PHONE_
 import type { Point, Rect, Size, View } from './types';
 
 export function createView(): View {
-  return { panX: 0, panY: 0, zoom: 1, tool: 'hand', theme: 'light', colorTheme: 'honey', fontSize: 'normal', hotkeys: DEFAULT_HOTKEYS };
+  return { panX: 0, panY: 0, zoom: 1, theme: 'light', colorTheme: 'honey', fontSize: 'normal', hotkeys: DEFAULT_HOTKEYS };
 }
 
 export function clampZoom(zoom: number): number {

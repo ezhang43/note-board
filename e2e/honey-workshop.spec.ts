@@ -147,8 +147,8 @@ test('the panel buttons at the bottom right are labelled; the ? and zoom stay', 
 test('the Honey Workshop colours, light and dark', async ({ page }) => {
   await expect(toolbar(page)).toHaveCSS('background-color', 'rgb(255, 253, 248)');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(248, 245, 238)');
-  // The pressed tool is honey.
-  await expect(toolbar(page).getByRole('button', { name: 'Hand (H)' })).toHaveCSS('background-color', 'rgb(242, 182, 43)');
+  // The Share button's colour (honey) is the theme's own.
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--honey').trim().toLowerCase())).toBe('#f2b62b');
   await toggleDark(page);
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(27, 26, 23)');
   await expect(toolbar(page)).toHaveCSS('background-color', 'rgb(36, 34, 30)');

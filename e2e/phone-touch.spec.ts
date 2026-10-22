@@ -352,11 +352,8 @@ test.describe('6. 44px touch targets in menus and panels', () => {
     await expect(colors.getByRole('button', { name: 'Auto-color' })).toBeInViewport();
   });
 
-  test('More: Hand / Select and A− / A+ are 44px and at least 8px apart', async ({ page }) => {
+  test('More: A− / A+ are 44px and at least 8px apart', async ({ page }) => {
     const menu = await more(page);
-    const tools = menu.locator('.tool-button');
-    for (const b of await tools.all()) atLeast(await rect(b));
-    expect(await smallestGap(tools)).toBeGreaterThanOrEqual(8);
     const sizes = menu.locator('.phone-row .zoom-control button');
     expect(await sizes.count()).toBe(2);
     for (const b of await sizes.all()) atLeast(await rect(b));

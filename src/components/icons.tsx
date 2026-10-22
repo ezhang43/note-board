@@ -8,26 +8,6 @@ const common = {
   'aria-hidden': true,
 } as const;
 
-export function HandIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
-      <path d="M18 11V6a2 2 0 0 0-4 0v5" />
-      <path d="M14 10V4a2 2 0 0 0-4 0v6" />
-      <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
-      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-    </svg>
-  );
-}
-
-export function SelectIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.7" {...common}>
-      <path d="M4 8V5a1 1 0 0 1 1-1h3M12 4h2M18 4h1a1 1 0 0 1 1 1v1M4 12v2M4 18v1a1 1 0 0 0 1 1h1M12 20h-1" />
-      <path d="M13 13l7.5 2.5-3.2 1.3-1.3 3.2z" />
-    </svg>
-  );
-}
-
 export function UndoIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" strokeWidth="1.6" {...common}>

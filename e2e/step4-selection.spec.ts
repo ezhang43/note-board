@@ -51,9 +51,8 @@ test('Ctrl + click and Shift + click add and remove blocks; Color recolors all s
   await expect(a.locator('.card-header')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // its header is tinted
 });
 
-test('Select tool: dragging a box selects everything it touches, live; Ctrl adds to the selection', async ({ page }) => {
+test('dragging a box selects everything it touches, live; Ctrl adds to the selection', async ({ page }) => {
   const [a, b, c] = await threeNotes(page);
-  await page.keyboard.press('v');
   const ra = await box(a);
   const rb = await box(b);
   const start = await emptySpot(page);
@@ -78,7 +77,7 @@ test('Select tool: dragging a box selects everything it touches, live; Ctrl adds
   await expect(a).toHaveClass(/selected/);
   await expect(b).toHaveClass(/selected/);
 
-  // With the Select tool, dragging empty space doesn't pan.
+  // Dragging empty space doesn't pan.
   expect(await page.getByTestId('canvas').getAttribute('data-pan-x')).toBe('0');
   void c;
 });

@@ -21,17 +21,17 @@ describe('custom hotkeys', () => {
   it('changing one switches it, saves it on this device and keeps it for next time', () => {
     const storage = memoryStorage();
     const s = createStore(storage);
-    expect(s.setHotkey('hand', { key: 'g', mod: false, shift: false })).toBeNull();
-    expect(s.getState().view.hotkeys.hand.key).toBe('g');
-    expect(s.getState().view.hotkeys.select).toEqual(DEFAULT_HOTKEYS.select);
-    expect(createStore(storage).getState().view.hotkeys.hand.key).toBe('g');
+    expect(s.setHotkey('delete', { key: 'g', mod: false, shift: false })).toBeNull();
+    expect(s.getState().view.hotkeys.delete.key).toBe('g');
+    expect(s.getState().view.hotkeys.duplicate).toEqual(DEFAULT_HOTKEYS.duplicate);
+    expect(createStore(storage).getState().view.hotkeys.delete.key).toBe('g');
   });
 
   it('refuses a key another action has, naming it, and changes nothing', () => {
     const storage = memoryStorage();
     const s = createStore(storage);
-    expect(s.setHotkey('hand', { key: 'v', mod: false, shift: false })).toBe('V is already used by Select tool.');
-    expect(s.setHotkey('hand', { key: 'z', mod: true, shift: false })).toMatch(/already used by the app/);
+    expect(s.setHotkey('delete', { key: 'd', mod: true, shift: false })).toBe('Ctrl+D is already used by Duplicate.');
+    expect(s.setHotkey('delete', { key: 'z', mod: true, shift: false })).toMatch(/already used by the app/);
     expect(s.getState().view.hotkeys).toEqual(DEFAULT_HOTKEYS);
     expect(storage.data.has(HOTKEYS_KEY)).toBe(false);
   });
@@ -39,9 +39,9 @@ describe('custom hotkeys', () => {
   it('can swap two keys by moving one out of the way first, and reset puts every default back', () => {
     const storage = memoryStorage();
     const s = createStore(storage);
-    s.setHotkey('hand', { key: 'g', mod: false, shift: false });
-    s.setHotkey('select', { key: 'h', mod: false, shift: false });
-    expect(s.getState().view.hotkeys.select.key).toBe('h');
+    s.setHotkey('delete', { key: 'g', mod: false, shift: false });
+    s.setHotkey('selectAll', { key: 'h', mod: false, shift: false });
+    expect(s.getState().view.hotkeys.selectAll.key).toBe('h');
     s.resetHotkeys();
     expect(s.getState().view.hotkeys).toEqual(DEFAULT_HOTKEYS);
     expect(createStore(storage).getState().view.hotkeys).toEqual(DEFAULT_HOTKEYS);

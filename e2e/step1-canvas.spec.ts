@@ -41,8 +41,6 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
   expect(labels).toEqual([
     'Boards',
     'Board name',
-    'Hand (H)',
-    'Select (V)',
     'Undo (Ctrl+Z)',
     'Redo (Ctrl+Y)',
     'Note',
@@ -55,7 +53,6 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'File to import',
     'Appearance',
   ]);
-  await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
   await arrange(page); // Snap to grid, Collapse all, Same width and Clean up are in the Arrange menu
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Undo (Ctrl+Z)' })).toHaveAttribute('aria-disabled', 'true');
@@ -141,49 +138,14 @@ test('Ctrl + scroll zooms around the cursor', async ({ page }) => {
 });
 
 // (the mouse is kept off the middle of the empty board, where the template picks are)
-test('scrolling pans the board with either tool, at half the scroll distance', async ({ page }) => {
+test('scrolling pans the board, at half the scroll distance', async ({ page }) => {
   const box = await canvasBox(page);
   await page.mouse.move(box.x + 100, box.y + 300);
   await page.mouse.wheel(120, 80);
   await expect.poll(async () => view(page)).toEqual({ panX: -60, panY: -40, zoom: 1 });
 
-  await page.keyboard.press('v');
   await page.mouse.wheel(0, -30);
   await expect.poll(async () => (await view(page)).panY).toBe(-25);
-});
-
-test('Hand tool drags the board; Select tool does not', async ({ page }) => {
-  const box = await canvasBox(page);
-  await page.mouse.move(box.x + 100, box.y + 300);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 160, box.y + 340, { steps: 5 });
-  await page.mouse.up();
-  expect(await view(page)).toEqual({ panX: 60, panY: 40, zoom: 1 });
-
-  await page.getByRole('button', { name: 'Select (V)' }).click();
-  await page.mouse.move(box.x + 100, box.y + 300);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 200, box.y + 400, { steps: 5 });
-  await page.mouse.up();
-  expect(await view(page)).toEqual({ panX: 60, panY: 40, zoom: 1 });
-});
-
-test('H and V switch tools, but not while typing the board name', async ({ page }) => {
-  const hand = page.getByRole('button', { name: 'Hand (H)' });
-  const select = page.getByRole('button', { name: 'Select (V)' });
-
-  await page.getByTestId('canvas').click();
-  await page.keyboard.press('v');
-  await expect(select).toHaveAttribute('aria-pressed', 'true');
-  await expect(hand).toHaveAttribute('aria-pressed', 'false');
-  await page.keyboard.press('h');
-  await expect(hand).toHaveAttribute('aria-pressed', 'true');
-
-  const name = page.getByLabel('Board name');
-  await name.fill('');
-  await name.pressSequentially('vh');
-  await expect(name).toHaveValue('vh');
-  await expect(hand).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('snap toggle fades the grid dots', async ({ page }) => {

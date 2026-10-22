@@ -14,7 +14,7 @@ import { boardRights, restorable, VIEW_ONLY_NOTE } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
 import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
-import type { Board, CardKind, Point, Tool, View } from '../../model/types';
+import type { Board, CardKind, Point, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
@@ -122,7 +122,6 @@ export function blockActions(ctx: StoreContext) {
     },
 
     // ---------- view ----------
-    setTool: (tool: Tool) => updateView((v) => (v.tool === tool ? v : { ...v, tool })),
     /** Light / dark toggle: switches the look and remembers the choice on this device. */
     toggleTheme() {
       const theme = ctx.state.view.theme === 'dark' ? 'light' : 'dark';
@@ -270,7 +269,7 @@ export function blockActions(ctx: StoreContext) {
     autoColour: () => commit((b) => B.autoColour(b)),
     recolourSelection: (color: ColorKey | null) => commit((b) => B.recolour(b, ctx.state.ui.selection, color)),
 
-    // ---------- selection box (Select tool) ----------
+    // ---------- selection box ----------
     /** Start a selection box. With `keep` (Ctrl held) the current selection is added to. */
     startMarquee(at: Point, keep: boolean) {
       marqueeBase = keep ? ctx.state.ui.selection : [];

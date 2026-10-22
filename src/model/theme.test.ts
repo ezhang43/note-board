@@ -158,7 +158,7 @@ describe('colour themes', () => {
     expect(new Set(others.map((t) => vars(t.key, false)['--accent'])).size).toBe(others.length);
   });
 
-  it("the dot shown for each theme is its own honey colour (the pressed tool and Share button)", () => {
+  it("the dot shown for each theme is its own honey colour (the Share button)", () => {
     for (const t of COLOR_THEMES) expect(t.dot.toLowerCase()).toBe(vars(t.key === 'honey' ? 'base' : t.key, false)['--honey'].toLowerCase());
   });
 
@@ -173,7 +173,7 @@ describe('colour themes', () => {
           expect(contrast(v['--accent'], bg), `${where} accent on ${bg}`).toBeGreaterThanOrEqual(4.5);
         }
         expect(contrast(v['--on-accent'], v['--accent']), `${where} New container button`).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(v['--honey-ink'], v['--honey']), `${where} pressed tool and Share`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(v['--honey-ink'], v['--honey']), `${where} Share button`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(v['--accent-ink'], v['--accent-soft']), `${where} pressed switches`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(v['--accent-ink'], v['--drop-bg']), `${where} drop highlight`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(v['--accent-ink'], v['--surface']), `${where} accent text on a panel`).toBeGreaterThanOrEqual(4.5);

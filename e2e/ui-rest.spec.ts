@@ -123,13 +123,6 @@ test('Tab reaches every button with a focus ring, and no text field shows one', 
   }
 });
 
-test('the tool goes back to Hand after a reload', async ({ page }) => {
-  await page.keyboard.press('v');
-  await expect(page.getByTestId('canvas')).toHaveClass(/tool-select/);
-  await page.reload();
-  await expect(page.getByTestId('canvas')).toHaveClass(/tool-hand/);
-});
-
 test.describe('tablet', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 800, height: 900 } });
 

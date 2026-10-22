@@ -71,16 +71,12 @@ test('A+ goes on up to 175% and stops there (A+ fades), and that is remembered',
   await expect(plus).not.toHaveAttribute('aria-disabled', 'true');
 });
 
-test('the Hand tool shows a glove over empty board, and the normal arrow over cards', async ({ page }) => {
+test('the cursor is the normal arrow over the board and over cards (the glove shows only while dragging the board)', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Note');
   const canvas = page.getByTestId('canvas');
-  expect(await css(canvas, 'cursor')).toContain('url(');
-  expect(await css(page.locator('.card').first(), 'cursor')).toBe('default');
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('v'); // Select tool
   expect(await css(canvas, 'cursor')).toBe('default');
+  expect(await css(page.locator('.card').first(), 'cursor')).toBe('default');
 });
 
 test('Same width makes the selected blocks as wide as the first one selected', async ({ page }) => {
@@ -206,7 +202,6 @@ test('dragging a card to the edge of the screen keeps moving the board', async (
 });
 
 test('a selection box at the bottom edge keeps moving the board and selecting', async ({ page }) => {
-  await page.getByRole('button', { name: 'Select (V)' }).click();
   const canvas = (await page.getByTestId('canvas').boundingBox())!;
   const start = await panOf(page);
   await page.mouse.move(canvas.x + 40, canvas.y + 40);

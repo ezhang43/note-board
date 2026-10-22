@@ -37,7 +37,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     // By finger the board moves instead, unless the finger rests first (blockHoldPointerDown).
     if (additive || e.pointerType === 'touch') return;
-    // On a read-only board (job 161) dragging a block moves the board, as the Hand tool does.
+    // On a read-only board (job 161) dragging a block moves the board.
     if (appStore.viewOnly()) return trackPan({ x: e.clientX, y: e.clientY });
 
     trackDrag(kind, id, e.currentTarget, { x: e.clientX, y: e.clientY });

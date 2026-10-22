@@ -1,7 +1,7 @@
 import { shortcutKey } from './keys';
 
 /**
- * Custom hotkeys (job 118): the keys for the two tools and the block shortcuts can be changed in the
+ * Custom hotkeys (job 118): the keys for the block shortcuts can be changed in the
  * Keyboard shortcuts panel. A per-device view setting like the theme: kept under its own key, never
  * in board data, never synced, never undone. Undo, redo, zoom, the arrows and the rest stay fixed.
  */
@@ -9,8 +9,6 @@ export const HOTKEYS_KEY = 'note-board:hotkeys';
 
 /** What a person can re-map, in the order the panel lists them, with the name used in messages. */
 export const HOTKEY_NAMES = {
-  hand: 'Hand tool',
-  select: 'Select tool',
   selectAll: 'Select all',
   copy: 'Copy',
   paste: 'Paste',
@@ -31,8 +29,6 @@ export interface Binding {
 export type Hotkeys = Record<HotkeyAction, Binding>;
 
 export const DEFAULT_HOTKEYS: Hotkeys = {
-  hand: { key: 'h', mod: false, shift: false },
-  select: { key: 'v', mod: false, shift: false },
   selectAll: { key: 'a', mod: true, shift: false },
   copy: { key: 'c', mod: true, shift: false },
   paste: { key: 'v', mod: true, shift: false },

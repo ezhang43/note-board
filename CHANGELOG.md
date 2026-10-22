@@ -1,5 +1,24 @@
 # Changelog
 
+## View-only and comment links, part 2: roles in the Share panel (2026-10-22)
+
+- The Share panel has one link per role: **Can edit**, **Can comment** or **Can view**, picked in a small menu beside "Anyone with this link", each with Copy link. A link that isn't there yet has a button to make it ("Make a comment link").
+- Making the first comment or view link changes the edit link once (the panel says so before the click); people already on the board aren't affected.
+- **Turn links off** turns all three off; "Make an edit link" (or any other) turns one on again with a new address.
+- Opening a link gives its role. Opening a lower-role link never lowers anyone; a viewer who opens the edit link becomes an editor.
+- People shows everyone's role. The person who shared the board can change anyone's role from the menu beside their name, where Remove now is too. Lowering someone asks first, since the links above their new role change.
+- Removing someone changes every link that is on (edit, comment and view).
+- Viewers and commenters can't yet be stopped from editing on their own screen (next step); their changes are refused online and never reach anyone else.
+
+## View-only and comment links, part 3: read-only boards (2026-10-22)
+
+- Someone a board is shared with as **Can view** or **Can comment** can't change it any more, on their own screen either: typing, adding, deleting, ticking, moving, resizing, colors, formatting, paste, keys, undo, Clean up and importing are all refused, and nothing they do is sent. Their own boards are untouched.
+- Beside the board's name a badge says **View only** (an eye) or **Can comment** (a speech bubble). The first time, a note says "You can view this board. Ask Sam if you need to change something." until closed.
+- The buttons that change a board are gone there: tools, Undo, Redo, Add, Color, Arrange, a card's collapse and trash buttons, resize handles and item grips (and Undo, Redo and + on a phone). Text can still be selected and copied; tick boxes show their state. Dragging a card moves the board instead.
+- A change of role takes effect at once, both ways.
+- Someone lowered to viewer while typing: their last change isn't sent again and again. It is put back as the others have it, kept in Version history first, and they're told plainly: "Your last change to “Trip” wasn’t saved: you can only view it now."
+- Comments on cards come in the next step.
+
 ## Bigger buttons at the top right of each card (2026-10-22)
 
 - **The collapse arrow and trash can on every card and container are bigger:** 32px buttons (were 28px) with a 16px icon (were 12 and 14px), a little more space between them, on a computer and on a phone.

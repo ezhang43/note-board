@@ -1,0 +1,5 @@
+## Saving fixes from the review: old tabs, deleted shares, big boards (2026-10-22)
+
+- **A board that comes back from a deleted shared board keeps the changes made on your other device.** If you deleted a shared board on one device and then wrote on a board that was inside it, another device that still had its old copy could upload that old copy over your new work when it opened. Now it takes the newer online copy, unless you changed the board on that device after the newer copy arrived.
+- **Version history says when your boards are too big for it.** Once all your boards together (shared ones included) passed about 900,000 characters, versions silently stopped saving, Restore always said "Try again", and deleting a board kept no copy. Now a note says so and how to make room, and Restore explains why it can't go ahead.
+- **Behind the scenes:** a new test makes sure the saved version number goes up whenever what is saved changes, so an older copy of the app left open in a tab refuses newer boards instead of quietly dropping what it doesn't know.

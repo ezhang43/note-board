@@ -66,6 +66,9 @@ function stopAll() {
   versions = null;
   sharing?.stop();
   sharing = null;
+  // Nothing is being saved now, so no "Couldn't save online" from before shows to whoever is next (job 172).
+  saveState = shareSaveState = 'saved';
+  listeners.forEach((l) => l());
 }
 
 /** Goes up on every sign-in, sign-out or change of person, so a start still waiting for the database code can tell it is out of date. */

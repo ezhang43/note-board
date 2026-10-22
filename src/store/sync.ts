@@ -193,13 +193,14 @@ export function startSync(
     synced(key);
     remote.write({ data: ownData(ws), client: opts.client }).then(
       () => {
-        // Saved, unless a newer change has started waiting since.
-        if (lastSynced !== key || timer) return;
+        // Saved, unless a newer change has started waiting since, or syncing stopped meanwhile (job 172).
+        if (stopped || lastSynced !== key || timer) return;
         failed = false;
         opts.onSaveState?.('saved');
       },
       () => {
         // Not saved online: the next change tries again.
+        if (stopped) return;
         if (lastSynced === key) lastSynced = null;
         failed = true;
         opts.onSaveState?.('failed');
@@ -343,6 +344,7 @@ export function startSync(
       if (ready && !stopped && ownKey(store.workspace()) !== lastSynced) schedule();
     },
     stop() {
+      stopped = true;
       if (timer) clearTimeout(timer);
       timer = null;
       unsubscribe();

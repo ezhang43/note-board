@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   collabRemote: vi.fn((user: { uid: string }) => ({ me: { uid: user.uid, name: '', photo: null } })),
   startSharing: vi.fn(() => ({ stop: vi.fn(), flush: vi.fn(), retry: vi.fn(), isShared: () => false, ownCopy: vi.fn() })),
   claimDevice: vi.fn(),
+  startSync: vi.fn((..._args: unknown[]) => ({ stop: vi.fn(), flush: vi.fn(), sharedChanged: vi.fn() })),
 }));
 
 vi.mock('./firebase', () => ({
@@ -33,7 +34,7 @@ vi.mock('../store/sharing', () => ({
   ownBoardsGuard: () => ({ remote: {}, isShared: () => false, known: vi.fn() }),
   startSharing: m.startSharing,
 }));
-vi.mock('../store/sync', () => ({ startSync: vi.fn(() => ({ stop: vi.fn(), flush: vi.fn(), sharedChanged: vi.fn() })) }));
+vi.mock('../store/sync', () => ({ startSync: m.startSync }));
 vi.mock('../store/versions', () => ({ activeVersionStore: () => null, startVersions: vi.fn() }));
 vi.mock('../store/account', () => ({ claimDevice: m.claimDevice, deleteAccountData: vi.fn(), OWNER_KEY: 'owner' }));
 vi.mock('./account', () => ({ account: { setRemover: vi.fn() }, finishDeletion: vi.fn(), takeDeletedNote: () => false }));
@@ -74,6 +75,7 @@ beforeEach(() => {
   m.collabRemote.mockClear();
   m.startSharing.mockClear();
   m.claimDevice.mockClear();
+  m.startSync.mockClear();
 });
 
 describe('the database code loads only after sign-in (job 169)', () => {
@@ -135,4 +137,29 @@ describe('the database code loads only after sign-in (job 169)', () => {
     expect(session.getStatus()).toBe('error');
     expect(m.startSharing).not.toHaveBeenCalled();
   });
+});
+
+/** The save-state reporters handed to the most recent shared-board and own-board syncs. */
+function reporters() {
+  type Opts = { onSaveState: (state: 'saved' | 'saving' | 'failed') => void; onReady: () => void };
+  const shared = (m.startSharing.mock.calls.at(-1) as unknown as [unknown, unknown, Opts])[2];
+  shared.onReady(); // the shared boards are known, so the own boards start syncing too
+  const own = (m.startSync.mock.calls.at(-1) as unknown as [unknown, unknown, Opts])[2];
+  return { shared: shared.onSaveState, own: own.onSaveState };
+}
+
+describe('"Couldn’t save online" belongs to the account it happened to (job 172)', () => {
+  for (const [which, signsOut] of [['shared', true], ['own', true], ['shared', false], ['own', false]] as const) {
+    it(`a refused save of ${which} boards isn't shown to the next person who signs in${signsOut ? '' : ' (no sign-out between)'}`, async () => {
+      const session = await openPage();
+      m.onUser!({ uid: 'ann' });
+      await arrive();
+      reporters()[which]('failed');
+      expect(session.getSaveFailed()).toBe(true);
+      if (signsOut) m.onUser!(null);
+      m.onUser!({ uid: 'bob' });
+      expect(session.getSaveFailed()).toBe(false);
+      expect(session.getSaveNote()).toBe('Saved');
+    });
+  }
 });

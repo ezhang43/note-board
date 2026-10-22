@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { shownName } from '../model/board';
+import { UPDATED_NOTICE } from '../model/updated';
 import { above, lowers, ROLES, type Person, type Role } from '../store/collab';
 import { appStore, useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
@@ -346,6 +347,11 @@ export function NoticeBanner() {
   return (
     <p className="notice-banner" role="status">
       {notice}
+      {notice === UPDATED_NOTICE && (
+        <button type="button" className="tb-button" onClick={() => location.reload()}>
+          Reload
+        </button>
+      )}
       <button type="button" className="icon-button" aria-label="Dismiss" onClick={() => collab.setNotice(null)}>
         <CloseIcon />
       </button>

@@ -4,7 +4,7 @@ import { boardRights, keptNotice } from '../model/sharing';
 import { readWorkspace } from '../model/workspace';
 import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../model/versions';
 import { appStore, useAppState } from '../store/appStore';
-import { activeVersionStore, restoreVersion } from '../store/versions';
+import { activeVersionStore, restoreVersion, TooBigError } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { CloseIcon } from './icons';
 import { escapeIsForPanel } from './textField';
@@ -138,17 +138,17 @@ export function PreviewBar() {
   const preview = useAppState((s) => s.ui.preview);
   const canRestore = useAppState((s) => boardRights(s.ui.shares, s.boards.open, s.boards.home).restore);
   const [busy, setBusy] = useState(false);
-  // Which version a restore failed on: the message belongs to it, not to the next one looked at.
-  const [failedOn, setFailedOn] = useState('');
+  // Which version a restore failed on, and why: the message belongs to it, not to the next one looked at.
+  const [failed, setFailed] = useState({ on: '', why: '' });
   const shown = preview?.meta.id;
-  useEffect(() => setFailedOn(''), [shown]);
+  useEffect(() => setFailed({ on: '', why: '' }), [shown]);
   if (!preview) return null;
   const { meta } = preview;
   const restore = async () => {
     const store = activeVersionStore();
     if (!store || busy) return;
     setBusy(true);
-    setFailedOn('');
+    setFailed({ on: '', why: '' });
     try {
       // Offline, the boards from before are saved once back online; if that fails, say so.
       const kept = await restoreVersion(appStore, store, meta.id, Date.now, () =>
@@ -156,8 +156,8 @@ export function PreviewBar() {
       );
       const notice = keptNotice(kept, appStore.boardName);
       if (notice) collab.setNotice(notice);
-    } catch {
-      setFailedOn(meta.id);
+    } catch (e) {
+      setFailed({ on: meta.id, why: e instanceof TooBigError ? e.message : 'Couldn’t restore it. Try again.' });
     } finally {
       setBusy(false);
     }
@@ -169,7 +169,7 @@ export function PreviewBar() {
           {dayLabel(meta.savedAt, Date.now())}, {timeOf(meta.savedAt)}
         </strong>{' '}
         · {describeVersion(meta)}
-        {failedOn === meta.id && <span className="preview-error"> · Couldn’t restore it. Try again.</span>}
+        {failed.on === meta.id && <span className="preview-error"> · {failed.why}</span>}
       </p>
       <div className="preview-actions">
         <button type="button" className="tb-button" onClick={back}>

@@ -4,7 +4,7 @@ import { shownName } from '../model/board';
 import { boardRights } from '../model/sharing';
 import { boardTree } from '../model/workspace';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
-import { activeVersionStore, deleteBoardSafely } from '../store/versions';
+import { activeVersionStore, deleteBoardSafely, historyFull } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { ask } from './ConfirmDialog';
 import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
@@ -58,10 +58,11 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
     const forEveryone = () => boardRights(appStore.getState().ui.shares, id, home).deleteForEveryone && !!collab.sharing();
     const everyone = forEveryone();
     // Deleting a board isn't on Ctrl+Z (only Version history brings it back), so it always asks.
+    const back = historyFull(appStore) ? 'Your boards are too big for Version history, so it can’t be brought back.' : 'You can bring it back from Version history.';
     const yes = await ask(
       everyone
-        ? { title: `Delete “${name}” for everyone?`, body: 'It goes for everyone it’s shared with. Boards inside it are kept on your boards. You can bring it back from Version history.', action: 'Delete board', cancel: 'Keep board', danger: true }
-        : { title: `Delete “${name}”?`, body: 'Everything on it goes. Boards inside it are kept. You can bring it back from Version history.', action: 'Delete board', cancel: 'Keep board', danger: true },
+        ? { title: `Delete “${name}” for everyone?`, body: `It goes for everyone it’s shared with. Boards inside it are kept on your boards. ${back}`, action: 'Delete board', cancel: 'Keep board', danger: true }
+        : { title: `Delete “${name}”?`, body: `Everything on it goes. Boards inside it are kept. ${back}`, action: 'Delete board', cancel: 'Keep board', danger: true },
     );
     // Only what was asked: not if the board went, or started or stopped being shared, meanwhile.
     if (!yes || !appStore.workspace().boards[id] || forEveryone() !== everyone) return;

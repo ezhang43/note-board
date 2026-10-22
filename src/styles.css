@@ -834,8 +834,19 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   z-index: 10;
 }
 
+.card, .column {
+  /* The header buttons' size step, the same one the item buttons use (see .todo-item): they grow with A+ and never go under today's size. */
+  --bs: max(1, var(--fs, 1));
+  --btn: calc(32px * var(--bs));
+}
+/* On a phone they keep their size, like the item buttons. */
+.app.phone :is(.card, .column) { --bs: 1; }
+/* A card's and a container's header buttons (owner request, 2026-10-22): 32px with a 16px icon, up from 28px and 12-14px. */
+:is(.card-header, .column-actions) > .icon-button { width: var(--btn); height: var(--btn); }
+:is(.card-header, .column-actions) > .icon-button svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
+:is(.card-header, .column-actions) .collapse-arrow { stroke-width: 1.4; }
 .card-header {
-  height: 36px;
+  height: max(36px, calc(var(--btn) + 4px));
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -852,9 +863,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   text-overflow: ellipsis;
 }
 .card.collapsed .card-meta { font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
-/* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right. */
-.card.loose.collapsed .card-meta { padding-left: 58px; text-align: center; }
-.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: 26px; }
+/* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right (never more than 30%, so big buttons at A+ don't push past a narrow card). */
+.card.loose.collapsed .card-meta { padding-left: min(calc(2 * var(--btn) + 2px), 30%); text-align: center; }
+.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: min(calc(var(--btn) - 2px), 30%); }
 
 .note-text { font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: 1.55; }
 .note-text > textarea { min-height: 104px; }
@@ -984,7 +995,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .column.drop-target { background: var(--drop-bg); border: 1.5px dashed var(--accent); }
 
 .column-header {
-  height: 52px;
+  height: max(52px, calc(var(--btn) + 20px));
   padding: 8px 8px 6px;
   display: grid;
   /* Title and count on the left, the two buttons on the right. */
@@ -993,7 +1004,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   align-items: center;
 }
 .column-heading { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.column-actions { display: flex; justify-content: flex-end; gap: 2px; }
+.column-actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 4px; /* clear of the top-right corner's resize grip */ }
 .column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
 .column-count {
   flex-shrink: 0;
@@ -1745,11 +1756,11 @@ html[data-input='keys'] .column {
 @media (pointer: coarse) {
   .icon-button { position: relative; }
   .icon-button::before { content: ''; position: absolute; inset: -6px; }
-  .card-header > .icon-button::before { top: -12px; bottom: -4px; }
+  .card-header > .icon-button::before { top: -12px; bottom: -2px; }
   .card-header > .icon-button:first-of-type::before { left: -12px; right: -4px; }
   .card-header > .block-trash::before { left: 0; right: -16px; }
-  .column-actions > .icon-button::before { top: -8px; bottom: -8px; }
-  .column-actions > .icon-button:first-of-type::before { left: -14px; right: -2px; }
+  .column-actions > .icon-button::before { top: -8px; bottom: -6px; }
+  .column-actions > .icon-button:first-of-type::before { left: -14px; right: -4px; }
   .column-actions > .block-trash::before { left: 0; right: -16px; }
   /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
   .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }

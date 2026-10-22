@@ -48,6 +48,9 @@ export const SYNC_DELAY = 800;
  */
 export const ONLINE_LIMIT = 900_000;
 
+/** Whether `data` is longer than `limit` counted as the rules count it: in characters, so an emoji is one (`.length` is never below that count, so most text skips the count). */
+export const overLimit = (data: string, limit = ONLINE_LIMIT) => data.length > limit && [...data].length > limit;
+
 /**
  * How long another page's 'started' marker holds this page's uploads back: after it, that page is
  * taken to have closed part-way and the boards go online again. The online rules allow that 10 minutes
@@ -152,6 +155,59 @@ export function startSync(
    * sharing that answers isShared may not be set up yet, and no change counts as made here).
    */
   let sharedBefore = new Set<string>();
+  /**
+   * The online copy of the person's own boards as last received from another page (all its boards,
+   * the ones shared here too) or sent from here, and its key as `lastSynced` had it then (review
+   * 137-A M3). `editedHere`: boards the person changed on this page since.
+   */
+  let online: { ws: Workspace; key: string } | null = null;
+  const editedHere = new Set<string>();
+  let seenEdits = store.edits();
+  const sawOnline = (ws: Workspace, key: string) => {
+    online = { ws, key };
+    editedHere.clear();
+  };
+  /**
+   * Notes which boards are shared now; returns true if it will take some from the online copy. A
+   * board that stopped being shared here and stays (a share deleted on another device, found out only
+   * now) is one of the person's own again: if the online copy holds it, the other device made it its
+   * own and may have changed it since, so that copy is taken, unless the person changed the board
+   * here after it came (the most recent change wins). Waits for a drag to end (its drop is such a
+   * change). A board that became shared here is never taken back (the online copy's is from before).
+   * simple: a page that uploaded its own boards after that copy came no longer has it to take (the
+   * upload left the board out, as it was shared), so its own copy goes up, as before.
+   */
+  const takeOnline = () => {
+    if (busy()) return false;
+    const { boards } = store.workspace();
+    const was = sharedBefore;
+    sharedBefore = new Set(Object.keys(boards).filter(isShared));
+    if (!online) return false;
+    const seen = online;
+    const newly = [...sharedBefore].filter((id) => !was.has(id) && seen.ws.boards[id]);
+    if (newly.length) seen.ws = { home: seen.ws.home, boards: Object.fromEntries(Object.entries(seen.ws.boards).filter(([id]) => !newly.includes(id))) };
+    const from = seen.ws.boards;
+    const back = [...was].filter((id) => boards[id] && from[id] && !isShared(id) && !editedHere.has(id));
+    if (!back.length) return false;
+    // Not inside the store change that said so: the store's other listeners would see this one first.
+    queueMicrotask(() => {
+      if (stopped) return;
+      const now = store.workspace().boards;
+      const take = back.filter((id) => now[id] === boards[id] && !isShared(id) && JSON.stringify(now[id]) !== JSON.stringify(from[id]));
+      if (take.length) {
+        applying = true;
+        try {
+          store.replaceBoards(Object.fromEntries(take.map((id) => [id, from[id]])));
+        } finally {
+          applying = false;
+        }
+      }
+      // Nothing was sent or received since that copy: what is online counts these boards too.
+      if (lastSynced === seen.key) lastSynced = seen.key = ownKey(seen.ws);
+      if (ownKey(store.workspace()) !== lastSynced) schedule();
+    });
+    return true;
+  };
   let sharesSeen = store.getState().ui.shares;
   const sharedKey = () => JSON.stringify(store.getState().ui.shares.map((s) => s.boards));
   let lastShared = sharedKey();
@@ -165,10 +221,12 @@ export function startSync(
     const before = lastBoards;
     lastBoards = boards;
     const ids = boards === before ? [] : [...new Set([...Object.keys(boards), ...Object.keys(before)])].filter((id) => boards[id] !== before[id]);
+    if (store.edits() !== seenEdits) ids.forEach((id) => editedHere.add(id));
+    seenEdits = store.edits();
     // A board that went counts as it was then: a share that ended takes its board away without it being one of theirs.
     const own = (id: string) => id === home || (id in boards ? !isShared(id) : !sharedBefore.has(id));
     const result = ready && ids.some(own) ? 'own' : 'other';
-    if (ready) sharedBefore = new Set(Object.keys(boards).filter(isShared));
+    if (ready) takeOnline();
     if (ids.length) return result;
     // Which boards are shared changed: the person's own boards to upload change with it (a board
     // just shared leaves them straight away). Only the boards count: a new list of people or a
@@ -218,6 +276,7 @@ export function startSync(
       return;
     }
     synced(key);
+    sawOnline(own(ws), key);
     remote.write({ data: ownData(ws), client: opts.client }).then(
       () => {
         // Saved, unless syncing stopped meanwhile (job 172) or a newer version was sent since. The
@@ -359,13 +418,14 @@ export function startSync(
       if (!ws) return;
       ready = true;
       synced(ownKey(ws));
+      sawOnline(ws, ownKey(ws));
+      sharedBefore = new Set(Object.keys(store.workspace().boards).filter(isShared));
       show(ws);
       // Opened from saves not on the server yet (job 92): "Saving…" until they are.
       unconfirmed = Boolean(doc.pending);
       // Over the online limit they will be refused (job 94): shown as a refused upload straight away,
-      // kept here, and the next change tries again. Counted in characters as the rules count them.
-      // (`.length` is never below that count, so most boards skip the count.)
-      if (unconfirmed && doc.data.length > ONLINE_LIMIT && [...doc.data].length > ONLINE_LIMIT) {
+      // kept here, and the next change tries again.
+      if (unconfirmed && overLimit(doc.data)) {
         if (timer) clearTimeout(timer);
         timer = null;
         synced(null);
@@ -391,6 +451,7 @@ export function startSync(
     const ws = read(doc.data);
     if (!ws) return;
     const data = ownKey(ws);
+    sawOnline(ws, data);
     if (data === lastSynced) {
       if (wasUnconfirmed && !timer) opts.onSaveState?.('saved');
       return sendTidying();
@@ -417,7 +478,8 @@ export function startSync(
     },
     /** Which boards are shared changed without the store showing it: upload the person's own boards if they now differ. */
     sharedChanged() {
-      if (ready && !stopped && ownKey(store.workspace()) !== lastSynced) schedule();
+      if (!ready || stopped || takeOnline()) return;
+      if (ownKey(store.workspace()) !== lastSynced) schedule();
     },
     stop() {
       stopped = true;

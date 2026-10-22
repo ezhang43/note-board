@@ -30,7 +30,7 @@ import {
 } from 'firebase/firestore';
 import type { AccountBackend } from '../store/account';
 import { above, lowers, NO_LINKS, personFrom, ROLES, type CollabBackend, type Links, type NewKeys, type Role, type ShareDoc } from '../store/collab';
-import type { Remote } from '../store/sync';
+import { ONLINE_LIMIT, type Remote } from '../store/sync';
 import type { VersionStore } from '../store/versions';
 import { app } from './firebase';
 
@@ -169,6 +169,7 @@ export function versionsRemote(uid: string): VersionStore {
   const metas = collection(db, 'boards', uid, 'versions');
   const datas = collection(db, 'boards', uid, 'versionData');
   return {
+    limit: ONLINE_LIMIT,
     async list() {
       const snap = await getDocs(query(metas, orderBy('savedAt', 'desc')));
       return snap.docs.map((d) => {

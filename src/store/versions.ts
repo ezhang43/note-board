@@ -2,7 +2,9 @@ import type { StorageLike } from '../model/persist';
 import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, VERSION_GAP_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
 import { readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { boardRights } from '../model/sharing';
+import { collab } from '../sync/collabSession';
 import type { Sharing } from './sharing';
+import { overLimit } from './sync';
 import type { Store } from './store';
 
 // Version history (owner request, like Google Docs). When editing starts after a quiet spell, every
@@ -19,7 +21,26 @@ export interface VersionStore {
   remove(id: string): Promise<void>;
   /** How many versions to keep (default KEEP_VERSIONS). */
   keep?: number;
+  /** The most characters one version may hold (online, the rules' limit); none on this device. */
+  limit?: number;
 }
+
+// Review 137-A M6: a version holds every board, shared ones too, so it can pass the online limit
+// when the person's own boards don't. Such a version isn't sent (it would only be refused); the
+// note says why. simple: shared boards' versions saved apart, so they don't count, is a later job.
+export const TOO_BIG_NOTE = 'Your boards are now too big for Version history, so new versions (and copies of deleted boards) aren’t being saved. Removing boards or long notes you don’t need makes room.';
+export const TOO_BIG_RESTORE = 'Couldn’t restore it. Your boards are too big for Version history, so they couldn’t be saved first.';
+const tooBig = (versions: VersionStore, data: string) => versions.limit !== undefined && overLimit(data, versions.limit);
+/** The note, unless another is showing (it may say something more urgent, such as changes not being saved). */
+const tellTooBig = () => void (collab.notice() || collab.setNotice(TOO_BIG_NOTE));
+/** A restore refused because the boards as they are are too big to keep first. */
+export class TooBigError extends Error {
+  constructor() {
+    super(TOO_BIG_RESTORE);
+  }
+}
+/** Whether every board as it is now is too big for the version history in use (the delete and backup questions say so). */
+export const historyFull = (store: Store) => current !== null && tooBig(current, serializeWorkspace(store.workspace()));
 
 export const LIST_KEY = 'note-board:versions:v1';
 /**
@@ -40,6 +61,10 @@ export async function saveSafetyVersion(store: Store, versions: VersionStore, no
   const version = versionOf(store.workspace(), now());
   if (!version) return true;
   const { meta, data } = version;
+  if (tooBig(versions, data)) {
+    tellTooBig();
+    return false;
+  }
   const saving = (async () => versions.save(meta, data))(); // called now; a throw becomes a failed save
   let timer: ReturnType<typeof setTimeout> | undefined;
   const waited = new Promise<null>((done) => (timer = setTimeout(() => done(null), VERSION_SAVE_WAIT_MS)));
@@ -187,7 +212,8 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       if (!version) return;
       const keptBefore = lastKeptAt;
       unkept = false;
-      lastKeptAt = at;
+      lastKeptAt = at; // also when too big: the note comes back at most once in 10 minutes
+      if (tooBig(versions, version.data)) return tellTooBig();
       (async () => versions.save(version.meta, version.data))().then(
         () => tidyAfter(versions, version.meta, version.data).catch(() => {}),
         (e) => {
@@ -219,6 +245,11 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
       const data = owed?.data ?? serializeWorkspace(before);
       const savedBefore = lastSavedAt;
       lastSavedAt = at; // so edits made meanwhile don't start saves of their own
+      // Not sent, and not tried again until the next version is due (the note would come back at every edit).
+      if (tooBig(versions, data)) {
+        owed = null;
+        return tellTooBig();
+      }
       try {
         await saveVersion(versions, data, at, list ?? undefined);
         owed = null;
@@ -247,6 +278,8 @@ export function startVersions(store: Store, versions: VersionStore, opts: { now?
 export async function restoreVersion(store: Store, versions: VersionStore, id: string, now: () => number = Date.now, onLateFailure?: () => void) {
   // Shared boards not known yet (job #33): nothing is saved or opened for a restore that won't happen.
   if (!store.getState().ui.sharesKnown) return 'loading';
+  // Too big to save first (review 137-A M6): nothing is restored, and the bar says why.
+  if (tooBig(versions, serializeWorkspace(store.workspace()))) throw new TooBigError();
   const pressed = store.getState();
   // The safety version's save starts first, at the press, so it is queued on this device even while
   // reading the chosen version waits (just offline). Saving may wait too: the restore goes ahead after

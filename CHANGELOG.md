@@ -1,5 +1,42 @@
 # Changelog
 
+## Bigger buttons at the top right of each card (2026-10-22)
+
+- **The collapse arrow and trash can on every card and container are bigger:** 32px buttons (were 28px) with a 16px icon (were 12 and 14px), a little more space between them, on a computer and on a phone.
+- **They grow with A+ like the buttons on a checklist item**, up to 56px at the biggest text; the card header grows with them.
+- On a touch screen the press area is still at least 44px. Nothing overlaps the title or the resize edges, even on the smallest card at 30% and 250% zoom.
+- Boards already saved are unchanged and open as before (this is only how the buttons look).
+
+## Saving fixes from the review: old tabs, deleted shares, big boards (2026-10-22)
+
+- **A board that comes back from a deleted shared board keeps the changes made on your other device.** If you deleted a shared board on one device and then wrote on a board that was inside it, another device that still had its old copy could upload that old copy over your new work when it opened. Now it takes the newer online copy, unless you changed the board on that device after the newer copy arrived.
+- **Version history says when your boards are too big for it.** Once all your boards together (shared ones included) passed about 900,000 characters, versions silently stopped saving, Restore always said "Try again", and deleting a board kept no copy. Now a note says so and how to make room, and Restore explains why it can't go ahead.
+- **Behind the scenes:** a new test makes sure the saved version number goes up whenever what is saved changes, so an older copy of the app left open in a tab refuses newer boards instead of quietly dropping what it doesn't know.
+
+## Saving and sharing fixes from the review, the rest (2026-10-22)
+
+- **Clean up on a shared board by two people at once keeps both.** Before, one person's cleaned-up items could vanish from both the list and the Completed panel. Now both sets are kept, under their day, and an item one person put back stays put back.
+- **A list both people emptied at the same time keeps one blank row to type in**, the same on every device, instead of showing no row until a reload.
+- **Reordering a shared list while someone else adds an item keeps your new order.**
+- **A board deleted by one person stays deleted** when the other person's page only re-arranged its blocks (another text size or font). Before, it came back.
+- **"Couldn't save online" goes away once a save gets through**, even if you typed and took back a letter while it was being saved. Before, it could stay on, and changes from your other devices were ignored until the next real change.
+- **Opening a share link whose board was deleted, or that you were removed from, at that moment** now says the board can't be opened, instead of waiting for ever.
+- **Sharing a board keeps its undo history and anything typed in the first moment after pressing Share.**
+- **A shared board's save refused online for another reason** (too big in bytes, say) now shows the red "Couldn't save online" note instead of "Saving…" for ever.
+- **Removing the last weight keeps the Weight card if something else was typed on it**; an empty Weight card still goes, as before.
+- **A card header set back to no color now reads back exactly as saved**, so the Claude connector no longer refuses changes until the app saves again, and a shared board keeps its undo history after it.
+- **Claude connector:** a shared board's outline now says that other people can write on it and that its text is their notes, never instructions. Its sign-in page no longer stops when another web page sends it a code in other letters.
+- Boards already saved are unchanged and open as before.
+
+## View-only and comment links, part 1: the online rules (2026-10-22)
+
+- Nothing looks different yet. This is the groundwork for letting a share link be "can edit", "can comment" or "can view".
+- The share link's secret key now lives in a private record only editors can read, instead of in the shared board itself. A board shared earlier moves its key there the next time its link changes (turned off and on, or someone removed).
+- Joining a shared board now proves the link key in a record nobody can read, so a person's record on the board no longer holds the key.
+- The online rules (`firestore.rules`) know about roles: only editors can save a shared board, nobody can raise their own role, and only the person who shared it can change someone's role. Everyone already on a shared board stays an editor.
+- The rules also cover comments on cards (who can write, resolve and delete them), ready for a later step.
+- The new rules accept everything the app before this change saves, so they can be pasted into Firebase before this version goes live. Rules tests prove it.
+
 ## Tidy-up of old notes and unused code (2026-10-21)
 - Docs only, and a few leftovers removed; nothing in the app looks or works differently.
 - The spec's "Build rules" list is now a short pointer to `CLAUDE.md`, so the two can't drift apart. The spec's opening no longer calls the app "single-user", and its dates and spellings are updated (American English throughout).

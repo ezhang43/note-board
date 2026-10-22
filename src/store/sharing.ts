@@ -119,6 +119,10 @@ interface Share {
   people: Member[];
   /** This person's role on it (job 161): from People, else as kept on this device; null while not known. Use roleOf. */
   role: Role | null;
+  /** People has answered (or failed) at least once: a join waits for the role only until then. */
+  heard: boolean;
+  /** Lowered to Can comment or Can view on this page: a change of theirs put back is told about (once). */
+  lowered: boolean;
   /** The boards as last agreed with the server (null: never downloaded here). */
   base: Record<string, Board> | null;
   baseRev: number;
@@ -390,11 +394,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (s.timer) clearTimeout(s.timer);
     s.timer = null;
     if (!s.ready || !s.root || !s.base || s.deleting || stopped || !shares.has(s.id)) return report();
-    if (readOnly(s)) return putBack(s);
     if (s.uploading) {
       s.again = true;
       return;
     }
+    // After one on its way has landed (so what it saved isn't taken back here).
+    if (readOnly(s)) return putBack(s);
     const root = s.root;
     const base = s.base;
     const sent = boardsOf(s);
@@ -471,7 +476,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       applyBoards(now, s.base);
       s.seen = boardsOf(s);
       const can = roleOf(s) === 'comment' ? 'comment on' : 'view';
-      opts.onNotice?.(`Your last change to “${name}” wasn’t saved: you can only ${can} it now.${versions ? ' It’s kept in Version history.' : ''}`);
+      if (s.lowered) opts.onNotice?.(`Your last change to “${name}” wasn’t saved: you can only ${can} it now.${versions ? ' It’s kept in Version history.' : ''}`);
+      s.lowered = false;
     }
     report();
   }
@@ -590,6 +596,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       links: start?.links ?? NO_LINKS,
       people: start ? [{ ...backend.me, role: 'edit' }] : [],
       role,
+      heard: false,
+      lowered: false,
       base: saved?.boards ?? null,
       baseRev: saved?.rev ?? 0,
       ready: Boolean(saved),
@@ -621,16 +629,21 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         id,
         (people) => {
           s.people = people;
+          s.heard = true;
           const was = roleOf(s);
           s.role = people.find((p) => p.uid === backend.me.uid)?.role ?? s.role;
           if (roleOf(s) !== was) remember();
           // Lowered to Can comment or Can view (job 161): changes not sent yet are put back now
           // (one on its way is dealt with when the server answers).
-          if (readOnly(s) && s.ready && !s.uploading) putBack(s);
+          if (readOnly(s) && (was === 'edit' || s.failed)) s.lowered = true;
+          if (readOnly(s) && s.ready && !s.uploading && (s.lowered || s.failed)) putBack(s);
           publish();
           s.arrived.splice(0).forEach((fn) => fn()); // a join waiting for the role
         },
-        () => s.arrived.splice(0).forEach((fn) => fn()),
+        () => {
+          s.heard = true;
+          s.arrived.splice(0).forEach((fn) => fn());
+        },
       ),
     );
     publish();
@@ -764,7 +777,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // (People arriving wake it too: it waits on until the board has, or the share has gone.)
       while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
       // Just joined: their role first (job 161), so a board they may only view never shows as editable.
-      if (added && !roleOf(s) && s.root && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
+      if (added && !roleOf(s) && !s.heard && s.root && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
       if (!s.root || !shares.has(id)) {
         // Can't be used here (see refuse): off this person's list again, only if this join added them
         // (owner decision, 2026-10-18: someone already on it, on a new device whose shared-boards list

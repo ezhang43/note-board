@@ -290,7 +290,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     // A board this person may only view or comment on (job 161): every change to it stops here,
     // whatever asked for it (a button, a key, a paste, a drop); screen-only changes still apply.
     if (board !== before && locked()) {
-      announce('This board is view only.');
+      announce('You can’t change this board.');
       return refuse({ ...opts.ui, ...ui });
     }
     if (board !== before) {

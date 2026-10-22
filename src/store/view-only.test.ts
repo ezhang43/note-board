@@ -97,6 +97,22 @@ describe('the store refuses changes to a read-only board', () => {
     expect(s.getState().board).toBe(before);
   });
 
+  it('no delete questions are asked there, and Clean up says nothing moved (code review)', () => {
+    const { s, list, item } = setup(undefined);
+    if (item) s.toggleItem(list, item); // ticked while still an editor
+    vi.runAllTimers();
+    s.addColumn();
+    const col = s.getState().ui.selection[0];
+    s.setShares(s.getState().ui.shares.map((x) => ({ ...x, role: 'view' })), true);
+    s.askDeleteCompleted();
+    expect(s.getState().ui.deleteCompleted).toBeNull();
+    s.select(col);
+    s.deleteSelection();
+    s.askDeleteColumn(col);
+    expect(s.getState().ui.confirm).toBeNull();
+    expect(s.cleanUp()).toBe(0);
+  });
+
   it('dragging or resizing a block doesn’t start, and Undo / Redo do nothing', () => {
     const { s, note } = setup(undefined);
     s.setNoteText(note, 'Tent and stove'); // made while still an editor
@@ -170,15 +186,18 @@ async function settle() {
   for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(1000);
 }
 
-function device(server: ReturnType<typeof memoryServer>, uid: string, storage = memoryStorage()) {
+function device(server: ReturnType<typeof memoryServer>, uid: string, storage = memoryStorage(), slow = false) {
   const store = createStore(storage, (fn) => fn());
+  const real = server.backendFor(person(uid));
+  // `slow`: the server's answer to each save takes 3 seconds to come back, so one can be on its way while more is typed.
+  const backend = slow ? { ...real, updateShare: (...a: Parameters<typeof real.updateShare>) => real.updateShare(...a).then((v) => new Promise<typeof v>((r) => setTimeout(() => r(v), 3000))) } : real;
   const states: string[] = [];
   const notices: string[] = [];
-  const sharing = startSharing(store, server.backendFor(person(uid)), { client: `${uid}-page`, storage, onSaveState: (x) => states.push(x), onNotice: (t) => notices.push(t) });
-  return { store, sharing, states, notices, storage };
+  const sharing = startSharing(store, backend, { client: `${uid}-page`, storage, onSaveState: (x) => states.push(x), onNotice: (t) => notices.push(t) });
+  return { store, sharing, states, notices, storage, server };
 }
 
-async function shared(role: Role, deliver?: (fn: () => void) => void) {
+async function shared(role: Role, deliver?: (fn: () => void) => void, slow = false) {
   const server = memoryServer(deliver);
   const alice = device(server, 'alice');
   await settle();
@@ -192,13 +211,22 @@ async function shared(role: Role, deliver?: (fn: () => void) => void) {
   await alice.sharing.makeLink(shareId, role);
   await settle();
   const key = new URL(alice.sharing.link(shareId, 'https://x.test/', role)!).searchParams.get('join')!.split('.')[1];
-  const bob = device(server, 'bob');
+  const bob = device(server, 'bob', undefined, slow);
   await settle();
   const joined = bob.sharing.join(shareId, key);
   await settle();
   await joined;
   bob.store.openBoard(trip);
   return { server, alice, bob, trip, note, shareId };
+}
+
+async function joinAs(alice: ReturnType<typeof device>, shareId: string, uid: string) {
+  const key = new URL(alice.sharing.link(shareId, 'https://x.test/', 'view')!).searchParams.get('join')!.split('.')[1];
+  const who = device(alice.server, uid);
+  const joined = who.sharing.join(shareId, key);
+  await settle();
+  await joined;
+  return who;
 }
 
 describe('sharing with a read-only role', () => {
@@ -232,6 +260,7 @@ describe('sharing with a read-only role', () => {
     expect(bob.store.getState().board.name).toBe('Trip');
     expect(bob.store.getState().board.cards[note]).toMatchObject({ text: 'Tent' });
     expect(bob.states.at(-1)).toBe('saved');
+    expect(bob.notices).toEqual([]); // he was never an editor: nothing of his to tell him about
   });
 
   it('an editor lowered to viewer mid-edit: the unsent change is put back once, not retried, and they are told plainly', async () => {
@@ -268,6 +297,29 @@ describe('sharing with a read-only role', () => {
     expect(bob.store.getState().board.cards[note]).toMatchObject({ text: 'Tent' });
     expect(bob.notices).toHaveLength(1);
     expect(bob.states.at(-1)).toBe('saved');
+  });
+
+  it('lowered while a save is on its way and more is typed: the save that went through stays, only what came after is put back (code review)', async () => {
+    const { alice, bob, server, shareId, note } = await shared('edit', undefined, true);
+    bob.store.setNoteText(note, 'Tent and stove');
+    // Let the first save start, then type more, and lower Bob before anything lands.
+    await vi.advanceTimersByTimeAsync(1000);
+    bob.store.setNoteText(note, 'Tent and stove and pegs');
+    await alice.sharing.setRole(shareId, 'bob', 'view');
+    for (let i = 0; i < 5; i++) await settle();
+    const online = server.shares.get(shareId)!.data;
+    expect(online).toContain('Tent and stove');
+    expect(online).not.toContain('pegs');
+    // Bob's page shows what the others have, not the board from before the save that went through.
+    expect(bob.store.getState().board.cards[note]).toMatchObject({ text: 'Tent and stove' });
+    expect(bob.notices).toHaveLength(1);
+  });
+
+  it('a viewer who never changed anything is never told their change wasn’t saved (code review)', async () => {
+    const { alice, bob, shareId } = await shared('view');
+    await joinAs(alice, shareId, 'cat');
+    await settle();
+    expect(bob.notices).toEqual([]);
   });
 
   it('raised from viewer to editor while open: their changes are sent', async () => {

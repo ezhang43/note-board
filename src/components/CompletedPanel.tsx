@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { completedCardOf, dayLabel } from '../model/completed';
 import { styleCss } from '../model/textStyle';
 import type { CompletedEntry, TodoItem } from '../model/types';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { FindMarks } from './FindMarks';
 import { CompletedIcon } from './icons';
 
@@ -57,6 +57,7 @@ export function CompletedPanel() {
 
 /** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
 function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string }) {
+  const readOnly = useViewOnly(); // nothing goes back on a read-only board (job 161)
   return (
     <div className="completed-entry" data-entry-id={entry.item.id}>
       <div className="completed-row">
@@ -66,6 +67,7 @@ function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string
             aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
             title="Untick to send it back to its list"
             checked
+            disabled={readOnly}
             onChange={() => appStore.restoreCompleted(entry.item.id)}
           />
         </label>

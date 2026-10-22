@@ -295,7 +295,7 @@ export function checklistActions(ctx: StoreContext) {
     uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */
     askDeleteCompleted() {
-      if (ctx.state.ui.preview) return; // an old version is being looked at: nothing can be changed
+      if (ctx.state.ui.preview || ctx.viewOnly()) return; // an old version, or a read-only board (job 161): nothing can be changed
       ctx.flushPendingTick(); // an item still on its way to Completed counts
       updateUi({ deleteCompleted: completedSectionCount(ctx.state.board) ? 'ask' : 'none' });
     },

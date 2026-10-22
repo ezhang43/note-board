@@ -20,6 +20,8 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
 /** A to-do list's body: title, open items, and the "Completed" section. */
 export function TodoBody({ card }: { card: TodoCard }) {
   const { open, done } = sections(card.items);
+  // A read-only board's Completed section stays as it was left (opening it would change the board, job 161).
+  const readOnly = use(BoardReadOnly);
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
 
@@ -52,6 +54,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
               type="button"
               className="completed-toggle"
               aria-expanded={card.completedOpen}
+              disabled={readOnly}
               onClick={() => appStore.toggleCompletedSection(card.id)}
             >
               <ChevronIcon collapsed={!card.completedOpen} />

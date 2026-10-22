@@ -1360,8 +1360,10 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   cursor: pointer;
   align-self: flex-start;
 }
+/* On a read-only board (job 161) it stays as it was left, in its usual color. */
+.completed-toggle:disabled { color: inherit; cursor: default; }
 @media (hover: hover) {
-  .completed-toggle:hover { background: var(--hover); }
+  .completed-toggle:hover:not(:disabled) { background: var(--hover); }
 }
 /* Clean up and Uncheck all (owner requests): on the same line as "Completed", at the right
    (on a card too narrow for all three, they go on the line below, still at the right). */
@@ -2241,8 +2243,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
 /* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
 .app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrow, .item-trash, .item-grip, .completed-actions) { display: none; }
-/* Its Completed section shows as it was left; opening or closing it would change the board. */
-.app.view-only .completed-toggle { pointer-events: none; }
 .avatar {
   display: inline-flex;
   align-items: center;

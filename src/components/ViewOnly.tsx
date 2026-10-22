@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { viewOnly } from '../model/sharing';
 import { useAppState } from '../store/appStore';
 import type { ShareInfo } from '../store/store';
 import { useNotice } from '../sync/collabSession';
@@ -9,7 +10,7 @@ import { CloseIcon, CommentIcon, EyeIcon } from './icons';
 
 /** The open board's share, when this person may only view or comment on it. */
 function useReadOnlyShare(): ShareInfo | null {
-  return useAppState((s) => s.ui.shares.find((x) => (x.role === 'view' || x.role === 'comment') && x.boards.includes(s.boards.open)) ?? null);
+  return useAppState((s) => s.ui.shares.find((x) => viewOnly([x], s.boards.open)) ?? null);
 }
 
 const ownerName = (share: ShareInfo) => share.people.find((p) => p.uid === share.ownerUid)?.name ?? 'the person who shared it';

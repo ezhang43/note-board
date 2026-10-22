@@ -77,12 +77,13 @@ export function blockActions(ctx: StoreContext) {
    */
   function cleanUpLists(now: Date, onlyCardId?: string): number {
     let moved = 0;
-    commit((b) => {
+    const done = commit((b) => {
       const result = cleanUp(b, dayKey(now), { type: 'loose', x: 0, y: 0 }, undefined, onlyCardId);
       if (!result.count) return null;
       moved = result.count;
       return { board: result.board, ui: { selection: onlyCardId ? [onlyCardId] : [], itemSel: null, confirm: null } };
     });
+    if (!done) return 0; // refused (an old version, a read-only board)
     if (moved) announce(`${count(moved, 'item')} moved to the Completed panel`);
     return moved;
   }
@@ -456,6 +457,7 @@ export function blockActions(ctx: StoreContext) {
     },
     /** A container's trash can: asks first when it has cards; an empty one goes at once, with Undo (owner, 2026-10-22). */
     askDeleteColumn(id: string) {
+      if (ctx.viewOnly()) return; // nothing is deleted on a read-only board (job 161), so nothing is asked
       if (hasCards(ctx.state.board, id)) updateUi({ confirm: { columnId: id, ids: [id] } });
       else deleteBlocks([id], { confirm: null, colourMenuOpen: false });
     },
@@ -474,6 +476,7 @@ export function blockActions(ctx: StoreContext) {
       if (ui.drag || ui.resize) return true;
       const ids = liveSelection(board);
       if (!ids.length) return false;
+      if (ctx.viewOnly()) return true; // nothing is deleted on a read-only board (job 161), so nothing is asked
       const firstColumn = ids.find((id) => hasCards(board, id));
       if (firstColumn) {
         updateUi({ confirm: { columnId: firstColumn, ids } });

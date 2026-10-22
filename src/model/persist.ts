@@ -88,8 +88,9 @@ function parseCard(id: string, c: unknown): Card | null {
     y: num(c.y, 0),
     w: size(c.w),
     h: size(c.h),
-    ...(isColorKey(c.titleColor) ? { titleColor: c.titleColor } : {}),
-    ...(size(c.collapsedH) ? { collapsedH: size(c.collapsedH) } : {}),
+    // `null` (set back to none) is kept as saved, so a board reads back exactly as it was (review 137-A L2).
+    ...(c.titleColor === null || isColorKey(c.titleColor) ? { titleColor: c.titleColor } : {}),
+    ...(c.collapsedH === null ? { collapsedH: null } : size(c.collapsedH) ? { collapsedH: size(c.collapsedH) } : {}),
     ...styleField(c.style),
   };
   if (kind === 'note') {

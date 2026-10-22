@@ -47,10 +47,49 @@ export function demoBackend(person: Person) {
     };
     return () => events.close();
   }
+  /**
+   * A shared board's people and comments come down one stream (job 161, PR 4): a browser opens at
+   * most six connections to the dev server at once, and with a stream each, two shared boards used
+   * them all, so saves waited.
+   */
+  type Part = 'people' | 'comments';
+  interface Stream {
+    last: Partial<Record<Part, never>>;
+    fns: Set<{ part: Part; onChange: (v: never) => void; onError: (e: unknown) => void }>;
+    stop: () => void;
+  }
+  const both = new Map<string, Stream>();
+  function watchBoth(id: string, part: Part, onChange: (v: never) => void, onError: (e: unknown) => void) {
+    let s = both.get(id);
+    if (!s) {
+      const made: Stream = { last: {}, fns: new Set(), stop: () => {} };
+      made.stop = watch(
+        'people',
+        id,
+        (msg: { part: Part; value: never }) => {
+          made.last[msg.part] = msg.value;
+          made.fns.forEach((f) => f.part === msg.part && f.onChange(msg.value));
+        },
+        (e) => made.fns.forEach((f) => f.onError(e)),
+      );
+      both.set(id, made);
+      s = made;
+    }
+    const me = { part, onChange, onError };
+    s.fns.add(me);
+    if (s.last[part] !== undefined) onChange(s.last[part]!);
+    const held = s;
+    return () => {
+      held.fns.delete(me);
+      if (held.fns.size) return;
+      held.stop();
+      both.delete(id);
+    };
+  }
   const server: CollabServer = {
     watchMyShares: (_who, onChange, onError) => watch('shares', '', onChange, onError),
     watchShare: (_who, id, onChange, onError) => watch('share', id, onChange, onError),
-    watchPeople: (_who, id, onChange, onError) => watch('people', id, onChange, onError),
+    watchPeople: (_who, id, onChange, onError) => watchBoth(id, 'people', onChange, onError),
     read: (_who, id) => call('read', id) as Promise<{ data: string; rev: number }>,
     write: (_who, id, data, client, rev) => call('write', id, data, client, rev) as Promise<boolean>,
     createShare: async (_who, ...args) => void (await call('createShare', ...args)),
@@ -61,6 +100,11 @@ export function demoBackend(person: Person) {
     linksOff: async (_who, ...args) => void (await call('linksOff', ...args)),
     setRole: async (_who, ...args) => void (await call('setRole', ...args)),
     deleteShare: async (_who, ...args) => void (await call('deleteShare', ...args)),
+    watchComments: (_who, id, onChange, onError) => watchBoth(id, 'comments', onChange, onError),
+    addComment: async (_who, ...args) => void (await call('addComment', ...args)),
+    resolveComment: async (_who, ...args) => void (await call('resolveComment', ...args)),
+    deleteComment: async (_who, ...args) => void (await call('deleteComment', ...args)),
+    deleteMyComments: async (_who, ...args) => void (await call('deleteMyComments', ...args)),
   };
   return serverBackend(server, person);
 }
@@ -105,7 +149,7 @@ export async function startDemo(person: Person) {
     sharing.stop();
     let done: { shareIds: string[] };
     try {
-      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: backend.leave, markDeleting: async () => {}, unmarkDeleting: () => {}, deleteOwnData: async () => {}, markDeleted: async () => {}, deleteUser: async () => {} });
+      done = await deleteAccountData(person.uid, { myShares: async () => shares, deleteShare: backend.deleteShare, leave: async (id) => (await backend.deleteMyComments(id), await backend.leave(id)), markDeleting: async () => {}, unmarkDeleting: () => {}, deleteOwnData: async () => {}, markDeleted: async () => {}, deleteUser: async () => {} });
     } catch (e) {
       sharing = start();
       throw e;

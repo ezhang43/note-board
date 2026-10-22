@@ -9,6 +9,7 @@ import { swatchFor } from '../model/theme';
 import type { BoardCard, Card, LinkCard, NoteCard } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
+import { CommentChip } from './Comments';
 import { GrowTextarea } from './GrowTextarea';
 import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
@@ -101,6 +102,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       )}
       <div className="card-header">
         <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
+        <CommentChip id={id} />
         <button
           type="button"
           className="icon-button"

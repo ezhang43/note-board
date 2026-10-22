@@ -2,7 +2,7 @@ import { planShares, type ShareOwner } from '../model/account';
 import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
 import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { ACCESS_KEY } from '../model/calendar';
-import { baseKey, ownBoardsKey, sharesKey } from './sharing';
+import { baseKey, commentsSeenKey, ownBoardsKey, sharesKey } from './sharing';
 import type { Store } from './store';
 import { dataKey, LIST_KEY } from './versions';
 
@@ -179,7 +179,7 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
  */
 export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = ''): string[] {
   const keptIds = listedShares(kept);
-  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), sharesKey(uid), ownBoardsKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
+  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), sharesKey(uid), ownBoardsKey(uid), commentsSeenKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
   return keys.filter((key) => {
     if (key === ACCESS_KEY) return true;
     if (!key.startsWith(prefix)) return false;

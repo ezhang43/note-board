@@ -557,3 +557,51 @@ describe('version history online (G20)', () => {
     expect(fs.state.deletes.sort()).toEqual(['boards/u1/versionData/v1', 'boards/u1/versions/v1']);
   });
 });
+
+describe('comments on cards (job 161, PR 4)', () => {
+  it('a new comment: the fields the rules allow, the server’s time, not resolved, as this person', async () => {
+    const { setDoc } = await import('firebase/firestore');
+    vi.mocked(setDoc).mockClear();
+    await collabRemote(user).addComment('s1', { id: 'm1', card: 'k_1', text: 'Looks good', name: 'Eric', photo: null });
+    expect(vi.mocked(setDoc).mock.calls).toEqual([['shared/s1/comments/m1', { card: 'k_1', text: 'Looks good', author: 'u1', name: 'Eric', photo: null, at: 'SERVER_TIME', resolved: false }]]);
+  });
+
+  it('resolving or reopening changes only resolved and its time', async () => {
+    const { updateDoc } = await import('firebase/firestore');
+    vi.mocked(updateDoc).mockClear();
+    await collabRemote(user).resolveComment('s1', 'm1', true);
+    await collabRemote(user).resolveComment('s1', 'm1', false);
+    expect(vi.mocked(updateDoc).mock.calls).toEqual([
+      ['shared/s1/comments/m1', { resolved: true, resolvedAt: 'SERVER_TIME' }],
+      ['shared/s1/comments/m1', { resolved: false, resolvedAt: 'SERVER_TIME' }],
+    ]);
+  });
+
+  it('deleting one deletes its record', async () => {
+    fs.docs.set('shared/s1/comments/m1', { text: 'x' });
+    await collabRemote(user).deleteComment('s1', 'm1');
+    expect(fs.state.deletes).toEqual(['shared/s1/comments/m1']);
+  });
+
+  it('watching: times as milliseconds (a comment on its way gets an estimate), records that aren’t right are skipped, only secure photos', () => {
+    const got: unknown[] = [];
+    collabRemote(user).watchComments('s1', (c) => got.push(c), () => {});
+    const at = (ms: number) => ({ toMillis: () => ms });
+    const d = (id: string, data: Data) => ({ id, data: () => data });
+    listener('shared/s1/comments').next({
+      metadata: { fromCache: false },
+      docs: [
+        d('m1', { card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://x/p.png', at: at(5), resolved: true, resolvedAt: at(9) }),
+        d('m2', { card: 'k_1', text: 'yo', author: 'u3', name: 'Ann', photo: 'http://x/p.png', at: null, resolved: false }),
+        d('m3', { card: 5, text: 'bad', author: 'u3', name: 'Ann', photo: null, at: at(1), resolved: false }),
+        d('m4', { card: 'k_1', text: { x: 1 }, author: 'u3', name: 'Ann', photo: null, at: at(1), resolved: false }),
+      ],
+    });
+    expect(got).toHaveLength(1);
+    const list = got[0] as { id: string; photo: string | null; at: number; resolvedAt: number | null }[];
+    expect(list).toHaveLength(2);
+    expect(list[0]).toEqual({ id: 'm1', card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://x/p.png', at: 5, resolved: true, resolvedAt: 9 });
+    expect(list[1]).toMatchObject({ id: 'm2', photo: null, resolved: false, resolvedAt: null });
+    expect(list[1].at).toEqual(expect.any(Number));
+  });
+});

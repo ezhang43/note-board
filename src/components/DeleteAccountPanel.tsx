@@ -100,7 +100,7 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
               {counts.sharedWithMe === 1 ? 'You leave 1 board someone shared with you; they keep it' : `You leave ${counts.sharedWithMe} boards others shared with you; they keep them`}
             </li>
           )}
-          <li>Your name and photo on shared boards</li>
+          <li>Your name, photo and comments on shared boards you’re still on</li>
           <li>Your sign-in to BusyAnts (your Google account itself stays)</li>
         </ul>
         <p className="delete-account-note">Feedback you sent isn’t deleted with your account: email ezhang43@gmail.com to have it removed.</p>

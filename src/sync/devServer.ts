@@ -6,7 +6,8 @@ import { memoryServer, type CollabServer, type Person } from '../store/collab';
 // can be tried and tested without Firebase: open the app with ?demo-user=Alice in one window and
 // ?demo-user=Bob in another. Everything is kept in memory until the dev server stops.
 //   POST /__collab/call   { who, method, args } → { ok } or { error: { code, message } }
-//   GET  /__collab/watch?who=…&what=shares|share|people&id=…   (server-sent events)
+//   GET  /__collab/watch?who=…&what=shares|share|people&id=…   (server-sent events; people also
+//        carries the board's comments: { value: { part: 'people' | 'comments', value } })
 //   POST /__collab/feedback   { text, uid } → {}   (a demo person's feedback, dropped)
 
 export function devCollabPlugin(): Plugin {
@@ -40,7 +41,7 @@ async function call(server: CollabServer, req: IncomingMessage, res: ServerRespo
   res.setHeader('Content-Type', 'application/json');
   try {
     const { who, method, args } = JSON.parse(await readBody(req)) as { who: Person; method: string; args: unknown[] };
-    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare'];
+    const allowed = ['read', 'write', 'createShare', 'join', 'leave', 'removePerson', 'makeLink', 'linksOff', 'setRole', 'deleteShare', 'addComment', 'resolveComment', 'deleteComment', 'deleteMyComments'];
     if (!allowed.includes(method)) throw new Error('Unknown call');
     const fn = (server as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method];
     const ok = await fn(who, ...args);
@@ -60,11 +61,12 @@ function watch(server: CollabServer, req: IncomingMessage, res: ServerResponse) 
   const onChange = (value: unknown) => send({ value });
   const onError = (e: unknown) => send({ error: { code: (e as { code?: string }).code ?? 'unknown' } });
   const what = q.get('what');
-  const stop =
+  // A shared board's people and its comments share one stream (a browser opens only six connections at once).
+  const stops =
     what === 'shares'
-      ? server.watchMyShares(who, onChange, onError)
+      ? [server.watchMyShares(who, onChange, onError)]
       : what === 'share'
-        ? server.watchShare(who, id, onChange, onError)
-        : server.watchPeople(who, id, onChange, onError);
-  req.on('close', stop);
+        ? [server.watchShare(who, id, onChange, onError)]
+        : [server.watchPeople(who, id, (value) => send({ value: { part: 'people', value } }), onError), server.watchComments(who, id, (value) => send({ value: { part: 'comments', value } }), onError)];
+  req.on('close', () => stops.forEach((stop) => stop()));
 }

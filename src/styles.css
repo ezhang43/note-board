@@ -1758,6 +1758,10 @@ html[data-input='keys'] .column {
   .icon-button::before { content: ''; position: absolute; inset: -6px; }
   .card-header > .icon-button::before { top: -12px; bottom: -2px; }
   .card-header > .icon-button:first-of-type::before { left: -12px; right: -4px; }
+  /* A comment chip before them keeps its own press area (job 161, PR 4). */
+  .comment-slot + .icon-button::before { left: -4px; }
+  .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
+  .canvas .card:not(.selected, :focus-within) .comment-chip.add { visibility: hidden; }
   .card-header > .block-trash::before { left: 0; right: -16px; }
   .column-actions > .icon-button::before { top: -8px; bottom: -6px; }
   .column-actions > .icon-button:first-of-type::before { left: -14px; right: -4px; }
@@ -2254,6 +2258,114 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
 /* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
 .app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrow, .item-trash, .item-grip, .completed-actions) { display: none; }
+
+/*
+ * Comments on cards (job 161, PR 4). The chip on a card's header, in the accent tint (smaller than the
+ * 32px header buttons, with room before them); a dot when a comment arrived since this device last
+ * opened the thread. With no open thread, "Add comment" shows like the header's other buttons.
+ */
+.comment-slot { display: flex; flex-shrink: 0; margin-right: 4px; }
+.comment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 100ms var(--ease-out);
+}
+.comment-chip svg { width: 14px; height: 14px; }
+.comment-chip:active { transform: scale(0.97); }
+.comment-chip.add { width: 28px; padding: 0; justify-content: center; background: transparent; color: var(--ink-faint); }
+@media (hover: hover) {
+  .comment-chip.add:hover { background: var(--hover); color: var(--ink-soft); }
+  .comment-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header .comment-chip.add { opacity: 1; }
+}
+.comment-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-ink); box-shadow: 0 0 0 2px var(--card-bg); }
+
+/* The thread: beside the card, over the board; on a phone, a sheet from the bottom over a light scrim. */
+.comment-thread {
+  position: fixed;
+  z-index: 6;
+  width: 330px;
+  max-width: calc(100vw - 16px);
+  max-height: min(560px, calc(100vh - var(--toolbar-height) - 24px));
+  max-height: min(560px, calc(100dvh - var(--toolbar-height) - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.16);
+  color: var(--ink);
+  font-size: 14px;
+  transform-origin: top left;
+}
+.comment-thread:focus { outline: none; }
+.comment-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line); }
+.comment-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comment-resolve.tb-button { height: 32px; padding: 0 8px; border-color: transparent; background: transparent; font-size: 13px; }
+.comment-resolve svg { width: 14px; height: 14px; }
+.comment-resolved { margin: 8px 14px 0; align-self: flex-start; padding: 4px 0; border: none; background: none; color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.comment-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px 14px; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.comment { display: flex; gap: 10px; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-by { display: flex; align-items: center; gap: 6px; min-height: 24px; font-size: 13px; }
+.comment-by strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-by span { color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
+.comment-by .icon-button { margin-left: auto; width: 28px; height: 28px; }
+.comment-by .icon-button svg { width: 14px; height: 14px; }
+.comment-text { margin: 2px 0 0; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-text a { color: var(--accent-ink); }
+.comment-empty, .comment-error { margin: 0; padding: 12px 14px 4px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.comment-error { color: var(--danger); }
+.comment-write { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
+.comment-write textarea {
+  min-height: 52px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+}
+.comment-write textarea:focus { outline: none; border-color: var(--accent); }
+.comment-send { display: flex; align-items: center; gap: 10px; }
+.comment-send span { flex: 1; color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
+.comment-send button { height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+.comment-send button:disabled { opacity: 0.45; cursor: default; }
+.comment-scrim { position: fixed; inset: 0; z-index: 6; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.app.phone .comment-thread {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: 75vh;
+  max-height: 75dvh;
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  transform-origin: bottom center;
+  z-index: 7;
+}
+/* 16px so a phone doesn't zoom in on the box; 44px buttons. */
+.app.phone .comment-write textarea { font-size: 16px; }
+.app.phone .comment-send button { height: 44px; padding: 0 18px; }
+.app.phone .comment-head .icon-button, .app.phone .comment-by .icon-button { width: 44px; height: 44px; }
+.app.phone .comment-resolve.tb-button { height: 44px; }
 .avatar {
   display: inline-flex;
   align-items: center;
@@ -3067,11 +3179,11 @@ a.cal-open { align-self: flex-start; }
   html[data-input='keys'] .collapse-arrow { transition: none; }
 
   /* Menus, panels and the phone sheet. */
-  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast) {
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast, .comment-thread) {
     transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
   @starting-style {
-    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
+    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel, .comment-thread) { opacity: 0; transform: scale(0.96); }
     /* The Color menu only fades: the board is moved aside by where its box is the moment it opens. */
     html:not([data-input='keys']) :is(.colour-menu, .shortcuts-backdrop) { opacity: 0; }
     html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }

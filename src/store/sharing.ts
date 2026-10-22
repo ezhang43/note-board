@@ -1,3 +1,4 @@
+import { commentable, commentText, lastAt, threadOf, type Comment } from '../model/comments';
 import { deepEqual, mergeBoardSets } from '../model/merge';
 import { shownName } from '../model/board';
 import type { StorageLike } from '../model/persist';
@@ -24,6 +25,8 @@ import { saveSafetyVersion, type VersionStore } from './versions';
 export const baseKey = (id: string) => `note-board:share-base:${id}`;
 /** Which shares this device had for person `uid`, so they are known as shared before the server answers. */
 export const sharesKey = (uid: string) => `note-board:shares:${uid}`;
+/** Up to when person `uid` has seen each card's comments on this device ({"share/card": time}): the chip's "new" dot (D2). */
+export const commentsSeenKey = (uid: string) => `note-board:comments-seen:${uid}`;
 /** Boards this device has seen as person `uid`'s own (see `own` in startSharing). */
 export const ownBoardsKey = (uid: string) => `note-board:own-boards:${uid}`;
 
@@ -117,6 +120,8 @@ interface Share {
   ownerUid: string;
   links: Links;
   people: Member[];
+  /** Its comments (job 161, PR 4), as last heard. */
+  comments: Comment[];
   /** This person's role on it (job 161): from People, else as kept on this device; null while not known. Use roleOf. */
   role: Role | null;
   /** People has answered (or failed) at least once: a join waits for the role only until then. */
@@ -176,6 +181,32 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    */
   const own = new Set<string>(readOwn());
   let noting = false;
+  /** Up to when each card's comments were seen here (see commentsSeenKey). */
+  const seen: Record<string, number> = readSeen();
+
+  function readSeen(): Record<string, number> {
+    try {
+      const got = JSON.parse(opts.storage?.getItem(commentsSeenKey(backend.me.uid)) ?? '{}') as unknown;
+      if (!got || typeof got !== 'object' || Array.isArray(got)) return {};
+      return Object.fromEntries(Object.entries(got).filter(([, v]) => typeof v === 'number'));
+    } catch {
+      return {};
+    }
+  }
+
+  /** Kept on the device, along with what another tab of this person's noted meanwhile (the later of the two). */
+  function saveSeen(drop?: string) {
+    for (const [k, at] of Object.entries(readSeen())) if (!(seen[k] >= at)) seen[k] = at;
+    if (drop) for (const k of Object.keys(seen)) if (k.startsWith(`${drop}/`)) delete seen[k];
+    try {
+      opts.storage?.setItem(commentsSeenKey(backend.me.uid), JSON.stringify(seen));
+    } catch {
+      // Storage full: seen on this page only.
+    }
+  }
+
+  /** Share `id`'s cards as seen here: {card: time}. */
+  const seenIn = (id: string) => Object.fromEntries(Object.entries(seen).flatMap(([k, at]) => (k.startsWith(`${id}/`) ? [[k.slice(id.length + 1), at]] : [])));
 
   function readOwn(): string[] {
     try {
@@ -362,7 +393,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       .filter((s) => s.root && s.ready)
       .map((s) => {
         const role = roleOf(s);
-        return { id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links, ...(role ? { role } : {}) };
+        return { id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links, ...(role ? { role } : {}), comments: s.comments, seen: seenIn(s.id) };
       });
     const known = said && [...shares.values()].every((s) => s.ready);
     const ui = store.getState().ui;
@@ -472,11 +503,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (s.root && s.base?.[s.root] && !deepEqual(now, s.base)) {
       const name = shownName(s.base[s.root].name);
       const versions = opts.versions?.();
-      if (versions) void saveSafetyVersion(store, versions, Date.now);
+      // The boards are read for the version at once, before they are put back. The notice says it is
+      // kept only once it was (not over Version history's size limit, not refused).
+      const saving = versions ? saveSafetyVersion(store, versions, Date.now) : Promise.resolve(false);
       applyBoards(now, s.base);
       s.seen = boardsOf(s);
       const can = roleOf(s) === 'comment' ? 'comment on' : 'view';
-      if (s.lowered) opts.onNotice?.(`Your last change to “${name}” wasn’t saved: you can only ${can} it now.${versions ? ' It’s kept in Version history.' : ''}`);
+      if (s.lowered) void saving.then((kept) => !stopped && opts.onNotice?.(`Your last change to “${name}” wasn’t saved: you can only ${can} it now.${kept ? ' It’s kept in Version history.' : ''}`));
       s.lowered = false;
     }
     report();
@@ -540,6 +573,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const versions = opts.versions?.();
     if (versions && ids.length) void saveSafetyVersion(store, versions, Date.now);
     close(s);
+    saveSeen(s.id);
     try {
       opts.storage?.setItem(baseKey(s.id), '');
     } catch {
@@ -595,6 +629,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       ownerUid: start ? backend.me.uid : ownerUid,
       links: start?.links ?? NO_LINKS,
       people: start ? [{ ...backend.me, role: 'edit' }] : [],
+      comments: [],
       role,
       heard: false,
       lowered: false,
@@ -643,6 +678,16 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         () => {
           s.heard = true;
           s.arrived.splice(0).forEach((fn) => fn());
+        },
+      ),
+      backend.watchComments(
+        id,
+        (comments) => {
+          s.comments = comments;
+          publish();
+        },
+        () => {
+          // Refused (not on it any more, or the rules not pasted yet): losing the board is the share's own watch's to report.
         },
       ),
     );
@@ -721,6 +766,16 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (!s) throw new Error('Not a shared board');
     return s;
   };
+
+  /** Share `id`, where this person may comment on card `card` (job 161, PR 4): refused otherwise. */
+  function commentsOn(id: string, card: string) {
+    const s = need(id);
+    const role = roleOf(s);
+    if (role !== 'edit' && role !== 'comment') throw new Error('You can’t comment on this board');
+    const ws = store.workspace();
+    if (!commentable(card) || !idsOf(s).some((b) => ws.boards[b]?.cards[card])) throw new Error('That card isn’t on this shared board');
+    return s;
+  }
 
   return {
     /** Whether board `id` is shared (it then syncs with its share, not with its owner's other boards). */
@@ -825,6 +880,37 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         throw e;
       }
       gone(s, 'deleted');
+    },
+    /** Card `card`'s thread on share `id` (job 161, PR 4). */
+    thread: (id: string, card: string) => threadOf(shares.get(id)?.comments ?? [], card),
+    /** Comments on a card as this person (editors and commenters): plain text, 1 to 1,000 characters. */
+    async addComment(id: string, card: string, raw: string) {
+      const s = commentsOn(id, card);
+      const text = commentText(raw);
+      if (!text) throw new Error('A comment is 1 to 1,000 characters');
+      // Their name and photo as on their member record (the rules check it).
+      const me = s.people.find((p) => p.uid === backend.me.uid) ?? backend.me;
+      await backend.addComment(id, { id: `m${randomKey(19)}`, card, text, name: me.name, photo: me.photo });
+    },
+    /** Resolves or reopens card `card`'s thread (kept on its first comment). */
+    async resolve(id: string, card: string, resolved: boolean) {
+      const s = commentsOn(id, card);
+      const first = threadOf(s.comments, card).first;
+      if (!first) throw new Error('No comments on that card');
+      await backend.resolveComment(id, first.id, resolved);
+    },
+    /** Its author, or the person who shared it (checked online). */
+    deleteComment: (id: string, commentId: string) => backend.deleteComment(id, commentId),
+    /** Card `card`'s thread was looked at: its comments so far are no longer new on this device. */
+    markSeen(id: string, card: string) {
+      // Only others' comments count (the dot is for them): this person's own may still carry this device's guess of the time.
+      const t = threadOf(shares.get(id)?.comments ?? [], card);
+      const at = lastAt({ ...t, comments: t.comments.filter((c) => c.author !== backend.me.uid) });
+      const key = `${id}/${card}`;
+      if (!at || seen[key] === at) return;
+      seen[key] = at;
+      saveSeen();
+      publish();
     },
     /** The connection is back: send what is waiting now. */
     retry() {

@@ -1,3 +1,4 @@
+import type { Comment } from '../model/comments';
 import type { Match } from '../model/search';
 import type { VersionMeta } from '../model/versions';
 import type { Guide } from '../model/align';
@@ -207,6 +208,10 @@ export interface ShareInfo {
    * while not known yet (a share joined before roles, on a device that hasn't heard yet).
    */
   role?: Role;
+  /** Its comments on cards (job 161, PR 4); left out where comments aren't known. */
+  comments?: Comment[];
+  /** Up to when each card's comments were seen on this device ({card: time}), for the "new" dot. */
+  seen?: Record<string, number>;
 }
 
 /**

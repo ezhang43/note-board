@@ -24,8 +24,8 @@ export function useShortcuts() {
       // In the Journal or Habits panel they step that board's own history, leaving the open board as it is.
       const panel = appStore.getState().ui.sidePanel;
       const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
-      // Any side panel, Version history too: a button or tick box in it is not a text field, but its keys aren't the board's.
-      const inAnyPanel = e.target instanceof Element && e.target.closest('.side-panel, .history-panel') !== null;
+      // Any side panel, Version history too, and the format bar: a button or tick box in it is not a text field, but its keys aren't the board's.
+      const inAnyPanel = e.target instanceof Element && e.target.closest('.side-panel, .history-panel, .format-bar') !== null;
       const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
       // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
@@ -84,9 +84,8 @@ export function useShortcuts() {
       if (isTextField(e.target) || e.altKey) return;
 
       const state = appStore.getState();
-      // ? opens the keyboard shortcuts panel; Escape closes it.
+      // ? opens the keyboard shortcuts panel (it closes itself on ? or Escape: it covers the board).
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
-      if (key === 'escape' && state.ui.shortcutsOpen) return appStore.closeShortcuts();
       // Ctrl+Shift+Backspace: delete every item in the board's Completed sections, after asking.
       // The Control key on a Mac too: there ⌘+Shift+Backspace is the browser's Clear browsing data.
       if (e.ctrlKey && !e.metaKey && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);

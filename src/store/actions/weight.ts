@@ -34,7 +34,10 @@ export function weightActions(ctx: StoreContext, habitsBoard: () => string | nul
       });
       return kg;
     },
-    /** Remove one day's weight, as one change on the Habits board's undo; the last one takes the Weight card with it. */
+    /**
+     * Remove one day's weight, as one change on the Habits board's undo; the last one takes the Weight
+     * card with it, unless something else was typed on it (review 137-A L4).
+     */
     removeWeight(day: string) {
       const id = habitsBoard();
       if (!id) return;
@@ -42,7 +45,8 @@ export function weightActions(ctx: StoreContext, habitsBoard: () => string | nul
         const card = weightCard(b);
         if (!card || !weightEntries(card).some((e) => e.day === day)) return b;
         const left = withoutWeight(card, day);
-        return weightEntries(left).length ? B.updateCard(b, card.id, () => left) : B.deleteBlocks(b, [card.id]);
+        const empty = !weightEntries(left).length && left.items.every((i) => !i.text.trim() && !i.children.length);
+        return empty ? B.deleteBlocks(b, [card.id]) : B.updateCard(b, card.id, () => left);
       });
     },
   };

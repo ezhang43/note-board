@@ -49,6 +49,14 @@ describe('the sign-in helper page', () => {
     expect(saved).toHaveLength(1);
   });
 
+  it('a code as long as the real one but in other letters (more bytes) is refused, and the page keeps working (review 137-A L5)', async () => {
+    const { origin, nonce } = await start();
+    const wide = 'é'.repeat(nonce.length);
+    expect((await fetch(`${origin}/?n=${encodeURIComponent(wide)}`)).status).toBe(404);
+    expect((await post(origin, good(wide))).status).toBe(403);
+    expect((await fetch(`${origin}/?n=${nonce}`)).status).toBe(200);
+  });
+
   it('refuses a wrong code, another site, or bad data', async () => {
     const { origin, nonce, saved } = await start();
     expect((await post(origin, good('nope'))).status).toBe(403);

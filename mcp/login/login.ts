@@ -30,7 +30,11 @@ function readBody(req: IncomingMessage): Promise<string | null> {
   });
 }
 
-const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+/** Compared in bytes: timingSafeEqual throws on buffers of different byte lengths (review 137-A L5). */
+const same = (a: string, b: string) => {
+  const [x, y] = [Buffer.from(a), Buffer.from(b)];
+  return x.length === y.length && timingSafeEqual(x, y);
+};
 
 export async function startLogin(opts: { apiKey: string; save: (t: TokenFile) => Promise<void>; timeoutMs?: number }) {
   if (!API_KEY_SHAPE.test(opts.apiKey)) throw new Error('That doesn’t look like a Google API key.');

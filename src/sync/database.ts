@@ -117,7 +117,8 @@ export async function clearOfflineCopy() {
     await terminate(db);
     await clearIndexedDbPersistence(db);
   } catch {
-    // Another tab still has it open: it goes with that tab's next sign-in or the browser's data.
+    // Another tab still has it open: it stays until the browser's data is cleared (review 181-A L4,
+    // still open). Nothing in the app reads it.
   }
 }
 

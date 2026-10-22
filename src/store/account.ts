@@ -1,15 +1,19 @@
 import { planShares, type ShareOwner } from '../model/account';
-import { BOARD_KEY, UNREADABLE_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
+import { BOARD_KEY, OWNER_KEY, UNREADABLE_KEY, VIEW_KEY, type StorageLike } from '../model/persist';
 import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { ACCESS_KEY } from '../model/calendar';
 import { baseKey, commentsSeenKey, ownBoardsKey, sharesKey } from './sharing';
 import type { Store } from './store';
 import { dataKey, LIST_KEY } from './versions';
 
-/** Which account the boards kept on this device (BOARD_KEY) belong to (job #145). */
-export const OWNER_KEY = 'note-board:owner-uid';
+export { OWNER_KEY };
 /** Where account `uid`'s boards wait on this device while another account uses it (job #145). */
 export const parkedKey = (uid: string) => `note-board:parked:${uid}`;
+/**
+ * Account `uid`'s own-board changes held back while another page deleted the account (review 181-A
+ * H1): a fingerprint of the online boards they were made on (see startSync's heldBase).
+ */
+export const heldKey = (uid: string) => `note-board:held-edits:${uid}`;
 /** The last agreed version of each of account `uid`'s shares, kept aside with its boards (see baseKey). */
 export const parkedBasesKey = (uid: string) => `note-board:parked-bases:${uid}`;
 
@@ -67,6 +71,7 @@ export function claimDevice(store: Store, storage: StorageLike & { removeItem(ke
     }
     store.endPreview();
     store.replaceWorkspace(back);
+    store.holdBoardsOf(uid);
   } else {
     if (!owner) {
       try {
@@ -80,6 +85,7 @@ export function claimDevice(store: Store, storage: StorageLike & { removeItem(ke
       store.endPreview();
       store.replaceWorkspace(parseWorkspace(storage.getItem(BOARD_KEY)));
     }
+    store.holdBoardsOf(uid);
   }
 }
 
@@ -172,14 +178,14 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
  * The keys in this device's storage (`keys`, all of them) that hold person `uid`'s data once their
  * account is deleted: the boards, which board is open and where it was looked at, version history
  * kept on the device, copies kept of a save that couldn't be read (job #160), their list of shares (`kept`: its saved text) and each share's last agreed
- * version, their own-boards list, and their boards kept aside (job #145; which account the device's boards belong to stays, so they are never taken for the next account's). Never another account's, nor this device's settings (dark
+ * version, their own-boards list, the note of changes held back (181-A H1), and their boards kept aside (job #145; which account the device's boards belong to stays, so they are never taken for the next account's). Never another account's, nor this device's settings (dark
  * mode, text size, the tour, the focus timer, the calendar's width). The Google Calendar access kept
  * on the device (job 107) goes too: it isn't a setting (one per device, so a demo person's has no prefix).
  * `prefix`: a demo person's keys start with it.
  */
 export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = ''): string[] {
   const keptIds = listedShares(kept);
-  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), sharesKey(uid), ownBoardsKey(uid), commentsSeenKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
+  const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), heldKey(uid), sharesKey(uid), ownBoardsKey(uid), commentsSeenKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
   return keys.filter((key) => {
     if (key === ACCESS_KEY) return true;
     if (!key.startsWith(prefix)) return false;

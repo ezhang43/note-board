@@ -82,8 +82,10 @@ describe('who can use BusyAnts', () => {
     expect(rules).toContain('keyFor(getAfter(joinPath()).data.key, newRole())');
     expect(rules).toContain('request.resource.data.rev == resource.data.rev + 1');
     expect(rules).toContain('allow delete: if signedIn() && resource.data.owner == request.auth.uid;');
-    // A member's photo is only ever a secure web address (review fix).
-    expect(rules).toContain("photo.matches('https://.*')");
+    // A member's photo is only ever from Google's photo server, and their name and photo the ones Google
+    // gives them (review 181-A M1, M2; rules/identity.test.ts).
+    expect(rules).toContain("photo.matches('https://lh[0-9]+[.]googleusercontent[.]com/.*')");
+    expect(rules).toContain('ownName(d.name)');
   });
 
   it('after deleting an account, the sign-in screen says so (job #63)', () => {

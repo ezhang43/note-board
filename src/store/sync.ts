@@ -1,3 +1,4 @@
+import { contentHash } from '../model/versions';
 import { HOME_ID, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import type { Store } from './store';
 
@@ -35,8 +36,11 @@ export interface Remote {
   write(doc: RemoteDoc): Promise<void>;
 }
 
-/** How saving online is going (see startSync's onSaveState). */
-export type SaveState = 'saving' | 'saved' | 'failed';
+/**
+ * How saving online is going (see startSync's onSaveState). 'held': changes made here wait while
+ * another page deletes the account (review 181-A H1).
+ */
+export type SaveState = 'saving' | 'saved' | 'failed' | 'held';
 
 /** Wait this long after the last board change before uploading, so typing isn't sent on every key. */
 export const SYNC_DELAY = 800;
@@ -91,6 +95,15 @@ export function startSync(
      * syncing has stopped, so they are never put back from here.
      */
     onGone?: () => void;
+    /**
+     * Review 181-A H1: changes made here wait while another page deletes the account. They are noted
+     * on the device with a fingerprint of the online boards they were made on (null once they are
+     * online, or when the boards online changed since), so a page that opens on those same boards
+     * later keeps this device's copy and sends it, instead of throwing it away. `heldBase`: that note
+     * as this page opened.
+     */
+    heldBase?: string | null;
+    onHeld?: (base: string | null) => void;
   },
 ) {
   const isShared = opts.isShared ?? (() => false);
@@ -245,6 +258,22 @@ export function startSync(
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   /** The marker said it is done, and opts.onGone was told. */
   let toldGone = false;
+  /** A fingerprint of the boards in the marker holding this page back (null when there are none). */
+  let heldOn: string | null = null;
+  /** The note on the device of changes held back (see opts.heldBase). */
+  let heldBase = opts.heldBase ?? null;
+  const noteHeld = (base: string | null) => {
+    if (base === heldBase) return;
+    heldBase = base;
+    opts.onHeld?.(base);
+  };
+  /** A change made here waits while the account is being deleted elsewhere: said so, and noted on the device. */
+  const holdChange = () => {
+    if (!failed) opts.onSaveState?.('held');
+    if (heldOn) noteHeld(heldOn);
+  };
+  /** Opened on this device's offline copy with changes held back noted: the server's copy decides (see the watch). */
+  let checkHeld = false;
   const release = () => {
     held = false;
     toldGone = false;
@@ -284,6 +313,7 @@ export function startSync(
         // typed and taken back left "failed" on for good); "Saved" waits for that change.
         if (stopped || lastSynced !== key) return;
         failed = false;
+        noteHeld(null);
         opts.onSaveState?.(timer ? 'saving' : 'saved');
       },
       () => {
@@ -299,7 +329,7 @@ export function startSync(
   function schedule() {
     if (!ready || stopped) return;
     if (held) {
-      if (!failed) opts.onSaveState?.('saving');
+      if (madeHere && ownKey(store.workspace()) !== lastSynced) holdChange();
       return;
     }
     // Opened from the offline copy: tidying alone waits for the server's copy, which may be newer.
@@ -364,8 +394,11 @@ export function startSync(
         // changes wait, and it isn't signed out, since the deleting may yet fail.
         if (timer) clearTimeout(timer);
         timer = null;
-        if (madeHere && !failed && !held) opts.onSaveState?.('saving');
+        const inIt = marker.deleting === 'started' && marker.data ? readWorkspace(marker.data)?.ws : null;
+        heldOn = inIt ? contentHash(ownKey(inIt)) : null;
         held = true;
+        const waitsHere = ready && madeHere && ownKey(store.workspace()) !== lastSynced;
+        if (waitsHere) holdChange();
         if (marker.deleting === 'done' || !marker.data) {
           if (holdTimer) clearTimeout(holdTimer);
           holdTimer = null;
@@ -386,7 +419,7 @@ export function startSync(
             upload();
           }, DELETING_WAIT_MS);
         // The boards in it are shown as any version arriving, unless a change made here waits to go (it is newer).
-        if (ready && madeHere && ownKey(store.workspace()) !== lastSynced) return;
+        if (waitsHere) return;
       }
     } else if (held && doc) {
       // The deleting failed and the boards are back: a change made here meanwhile is the newest.
@@ -395,6 +428,29 @@ export function startSync(
         lastSynced = null;
         return upload();
       }
+      if (!failed) opts.onSaveState?.('saved');
+    }
+    // Changes held back on this device (opts.heldBase), and it opened on its offline copy: the
+    // server's copy says whether they were made on the boards still online (review 181-A H1).
+    if (checkHeld && doc?.data && !doc.cached && !doc.pending) {
+      checkHeld = false;
+      fresh = seen = true;
+      const ws = read(doc.data);
+      if (!ws) return;
+      const key = ownKey(ws);
+      const same = contentHash(key) === heldBase;
+      if (!same) noteHeld(null);
+      if (same || madeHere) {
+        // This device's copy is newer: it goes as soon as it may.
+        synced(key);
+        madeHere = true;
+        if (held) holdChange();
+        else schedule();
+        return;
+      }
+      synced(key);
+      sawOnline(ws, key);
+      return show(ws);
     }
     const nowFresh = !fresh && !doc?.cached;
     if (nowFresh) fresh = true;
@@ -417,9 +473,25 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       ready = true;
-      synced(ownKey(ws));
-      sawOnline(ws, ownKey(ws));
+      const key = ownKey(ws);
+      synced(key);
       sharedBefore = new Set(Object.keys(store.workspace().boards).filter(isShared));
+      // Changes a page here made while the account was being deleted elsewhere (review 181-A H1).
+      // Only this device's offline copy so far: this device's boards stay until the server's copy decides.
+      if (heldBase !== null && (doc.cached || doc.pending)) {
+        checkHeld = true;
+        return opts.onReady();
+      }
+      // Made on these very boards: this device's copy is newer, and goes online as soon as it may.
+      if (heldBase !== null && heldBase === contentHash(key)) {
+        madeHere = true;
+        if (held) holdChange();
+        else schedule();
+        return opts.onReady();
+      }
+      // Changed online since: they win, as on any open.
+      noteHeld(null);
+      sawOnline(ws, key);
       show(ws);
       // Opened from saves not on the server yet (job 92): "Saving…" until they are.
       unconfirmed = Boolean(doc.pending);

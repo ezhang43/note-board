@@ -139,8 +139,23 @@ service cloud.firestore {
         return (before.get(role, null) == null || linksAfter().get(role, null) != before[role])
           && (role != 'edit' || old == null || !existsAfter(sharePath()) || getAfter(sharePath()).data.get('link', null) != old);
       }
-      function photoOk(photo) {
-        return photo == null || (photo is string && photo.size() <= 2000 && photo.matches('https://.*'));
+      // A photo only from Google's photo server, so no one's photo can be an image on a server that
+      // sees who looks at it (review 181-A M2).
+      function googlePhoto(photo) {
+        return photo == null || (photo is string && photo.size() <= 2000 && photo.matches('https://lh[0-9]+[.]googleusercontent[.]com/.*'));
+      }
+      // The name and photo Google gives the person (their sign-in token), as the app writes them
+      // (personFrom): the name trimmed, or 'Someone' when there is none; the photo, or none. So no one
+      // shows up as someone else, the owner included (review 181-A M1).
+      // simple: a name over 200 characters (which the app cuts) is refused rather than checked as cut,
+      // since these rules can't take part of a text; Google names are far shorter.
+      function ownName(name) {
+        let given = request.auth.token.get('name', '');
+        let trimmed = given is string ? given.trim() : '';
+        return trimmed == '' ? name == 'Someone' : name == trimmed;
+      }
+      function ownPhoto(photo) {
+        return googlePhoto(photo) && (photo == null || photo == request.auth.token.get('picture', null));
       }
       function shareFields() {
         return request.resource.data.keys().hasOnly(['owner', 'root', 'link', 'data', 'client', 'rev', 'updatedAt'])
@@ -180,9 +195,12 @@ service cloud.firestore {
         function record() {
           let d = request.resource.data;
           return d.keys().hasOnly(['name', 'photo', 'key', 'role', 'joinedAt'])
-            && (!('joinedAt' in d) || d.joinedAt is timestamp)
-            && d.name is string && d.name.size() <= 200
-            && photoOk(d.photo)
+            // The server's time when they joined (kept, or set again by an older copy of the app), so
+            // no one sorts ahead of the owner (review 181-A M1).
+            && (!('joinedAt' in d) || (d.joinedAt is timestamp
+              && (d.joinedAt == request.time || (resource != null && d.joinedAt == resource.data.get('joinedAt', null)))))
+            && d.name is string && d.name.size() <= 200 && ownName(d.name)
+            && ownPhoto(d.get('photo', null))
             && (!('role' in d) || d.role in ['edit', 'comment', 'view'])
             // Everyone on it reads every member record, so once roles are in use none takes a new key
             // (an app from before roles writes the key someone opened, the owner's own included).
@@ -281,6 +299,7 @@ service cloud.firestore {
             // Their name and photo as on their member record, so no one posts as someone else.
             && d.name == get(memberPath(request.auth.uid)).data.name
             && d.photo == get(memberPath(request.auth.uid)).data.photo
+            && googlePhoto(d.photo)
             && d.at == request.time
             && d.resolved == false;
         }
@@ -291,7 +310,8 @@ service cloud.firestore {
             && (!changed.hasAny(['resolvedAt']) || request.resource.data.resolvedAt == request.time);
         }
         allow read: if isMember();
-        allow create: if isMember() && myRole() in ['edit', 'comment'] && fresh();
+        // Not while their account is being deleted (review 181-A L3: it would outlive the account).
+        allow create: if isMember() && myRole() in ['edit', 'comment'] && fresh() && !deleting(request.auth.uid);
         allow update: if isMember()
           && (myRole() == 'edit' || (myRole() == 'comment' && resource.data.author == request.auth.uid))
           && resolving();

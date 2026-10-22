@@ -212,7 +212,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                   {p.uid === me?.uid && ' (you)'}
                 </span>
                 {p.uid === share.ownerUid ? (
-                  <span className="share-tag">Shared it</span>
+                  <span className="share-tag">Owner</span>
                 ) : share.owner ? (
                   <RoleMenu
                     label={`${p.name}’s role`}

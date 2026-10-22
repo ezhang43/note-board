@@ -6,7 +6,7 @@
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch, type Firestore } from 'firebase/firestore';
 import { describe, expect, it } from 'vitest';
-import { as, seed, signedOut, useRulesEnv } from './env';
+import { as, nameOf, seed, signedOut, useRulesEnv } from './env';
 
 useRulesEnv();
 
@@ -17,7 +17,7 @@ const VIEW = 'view-key-0123456789';
 /** A share as the new app makes it: no key in the share itself. */
 const share = { owner: 'alice', root: 'b1', link: null, data: '{}', client: 'p', rev: 1, updatedAt: 1 };
 const person = (role?: string) => ({ name: 'A', photo: null, joinedAt: 1, ...(role ? { role } : {}) });
-const record = (role?: string) => ({ name: 'B', photo: null, joinedAt: serverTimestamp(), ...(role ? { role } : {}) });
+const record = (role?: string, uid = 'bob') => ({ name: nameOf(uid), photo: null, joinedAt: serverTimestamp(), ...(role ? { role } : {}) });
 
 /** alice's share s1 with its links, and the people given as uid → role ('' for a member from before roles). */
 function seedShare(people: Record<string, string> = {}, links: object = { edit: EDIT }, over: object = {}) {
@@ -40,7 +40,7 @@ function createShare(db: Firestore, links: object = { edit: EDIT }, s: object = 
 function join(db: Firestore, uid: string, key: string, role = 'edit', extra: object = {}) {
   const b = writeBatch(db);
   b.set(doc(db, `shared/s1/joins/${uid}`), { key });
-  b.set(doc(db, `shared/s1/members/${uid}`), { ...record(role), ...extra });
+  b.set(doc(db, `shared/s1/members/${uid}`), { ...record(role, uid), ...extra });
   b.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
   return b.commit();
 }
@@ -48,7 +48,7 @@ function join(db: Firestore, uid: string, key: string, role = 'edit', extra: obj
 /** Joins as the app before this change does: the key in the member record, no role. */
 function oldJoin(db: Firestore, uid: string, key: string) {
   const b = writeBatch(db);
-  b.set(doc(db, `shared/s1/members/${uid}`), { name: 'B', photo: null, key, joinedAt: serverTimestamp() });
+  b.set(doc(db, `shared/s1/members/${uid}`), { name: nameOf(uid), photo: null, key, joinedAt: serverTimestamp() });
   b.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
   return b.commit();
 }
@@ -191,9 +191,9 @@ describe('joining through joins/{uid}', () => {
 describe('roles: nobody raises their own', () => {
   it('a member can change their own name and photo while the role stays the same', async () => {
     await seedShare({ bob: 'view', carol: '' });
-    await assertSucceeds(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...record('view'), name: 'Bobby' }));
-    await assertSucceeds(setDoc(doc(as('carol'), 'shared/s1/members/carol'), { ...record(), name: 'Caz' }));
-    await assertSucceeds(setDoc(doc(as('carol'), 'shared/s1/members/carol'), { ...record('edit'), name: 'Caz' }));
+    await assertSucceeds(setDoc(doc(as('bob', { name: 'Bobby' }), 'shared/s1/members/bob'), { ...record('view'), name: 'Bobby' }));
+    await assertSucceeds(setDoc(doc(as('carol', { name: 'Caz' }), 'shared/s1/members/carol'), { ...record(), name: 'Caz' }));
+    await assertSucceeds(setDoc(doc(as('carol', { name: 'Caz' }), 'shared/s1/members/carol'), { ...record('edit'), name: 'Caz' }));
   });
 
   it('a viewer or commenter cannot make themselves an editor or commenter, by any shape of record', async () => {
@@ -252,8 +252,8 @@ describe('roles: nobody raises their own', () => {
 
   it('the person who shared it is always an editor', async () => {
     await seedShare();
-    await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('view')));
-    await assertSucceeds(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('edit')));
+    await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('view', 'alice')));
+    await assertSucceeds(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('edit', 'alice')));
   });
 });
 
@@ -311,9 +311,9 @@ describe('the first comment or view link changes the edit link (D1)', () => {
   // Security check: everyone on the board can read every member record.
   it('once roles are in use, no member record can take a new key (not even the owner’s, from an old app)', async () => {
     await seedShare({ bob: 'edit' }, { edit: EDIT, comment: null, view: VIEW });
-    await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/alice'), { ...record(), key: EDIT }));
+    await assertFails(setDoc(doc(as('alice'), 'shared/s1/members/alice'), { ...record(undefined, 'alice'), key: EDIT }));
     await assertFails(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...record('edit'), key: EDIT }));
-    await assertSucceeds(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('edit')));
+    await assertSucceeds(setDoc(doc(as('alice'), 'shared/s1/members/alice'), record('edit', 'alice')));
   });
 
   it('a brand new share can have all three links from the start', async () => {
@@ -520,7 +520,7 @@ describe('the Share panel’s writes (PR 2)', () => {
   function appJoin(db: Firestore, uid: string, key: string, role: string, existing: boolean) {
     return runTransaction(db, async (t) => {
       t.set(doc(db, `shared/s1/joins/${uid}`), { key });
-      t.set(doc(db, `shared/s1/members/${uid}`), existing ? { name: 'B', photo: null, role } : { name: 'B', photo: null, role, joinedAt: serverTimestamp() }, { merge: true });
+      t.set(doc(db, `shared/s1/members/${uid}`), existing ? { name: nameOf(uid), photo: null, role } : { name: nameOf(uid), photo: null, role, joinedAt: serverTimestamp() }, { merge: true });
       t.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
     });
   }

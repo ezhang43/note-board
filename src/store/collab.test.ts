@@ -21,6 +21,13 @@ describe('a person as others see them', () => {
   it('a photo only from a secure web address', () => {
     expect(personFrom({ uid: 'u1', displayName: 'E', photoURL: 'http://tracker.example/p.png' }).photo).toBeNull();
   });
+
+  it('a photo only from Google’s photo server, so no other server sees who looks (review 181-A M2)', () => {
+    const photo = (photoURL: string) => personFrom({ uid: 'u1', displayName: 'E', photoURL }).photo;
+    expect(photo('https://tracker.example/p.png')).toBeNull();
+    expect(photo('https://lh3.googleusercontent.com.evil.example/a')).toBeNull();
+    expect(photo('https://lh5.googleusercontent.com/-abc/photo.jpg')).toBe('https://lh5.googleusercontent.com/-abc/photo.jpg');
+  });
 });
 
 describe('joining a shared board (owner decision, 2026-10-18)', () => {

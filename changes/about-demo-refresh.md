@@ -1,0 +1,3 @@
+## The About page's demo clip and pictures show the app as it is now (2026-10-22)
+- The demo video and the board pictures on the About page were taken before the latest changes. They are recorded again from the current app: no Hand or Select tools, card titles in the button row, the new checklist rows, the folded toolbar. Same story as before: tick an item, fold a container, drag a card, type a new item. File sizes are about the same.
+- Behind the scenes: a browser test that measures the sign-in page's links on a phone now waits for the fonts to load first, so it no longer fails by one pixel now and then.

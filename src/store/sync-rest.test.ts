@@ -56,6 +56,7 @@ describe('"Couldn’t save online" clears once a save gets through (M5)', () => 
     store.renameBoard('BC');
     release(); // "B" is saved online
     await vi.advanceTimersByTimeAsync(10);
+    expect(states.at(-1)).toBe('saving'); // the red note goes as soon as a save gets through
     store.renameBoard('B'); // the boards are what is online again
     await vi.advanceTimersByTimeAsync(SYNC_DELAY + 10);
     expect(states.at(-1)).toBe('saved');
@@ -94,6 +95,21 @@ describe('opening a share link whose share goes before it arrives (M8)', () => {
     await settle();
     expect(outcome).toBe('failed');
   });
+
+  it('signing out while it waits doesn’t take the person off it', async () => {
+    const srv = memoryServer();
+    const mallory = person('mallory');
+    await srv.server.createShare(mallory, 'sx', 'r1', 'k', serializeShare('r1', { r1: { ...B.createBoard(), name: 'Trip' } }), 'm');
+    const real = srv.backendFor(person('bob'));
+    const left: string[] = [];
+    const bob = page({ ...real, watchShare: () => () => {}, leave: (id) => (left.push(id), real.leave(id)) });
+    await settle();
+    const joined = bob.sharing.join('sx', 'k').catch(() => 'failed');
+    await settle();
+    bob.sharing.stop();
+    expect(await joined).toBe('failed');
+    expect(left).toEqual([]);
+  });
 });
 
 describe('sharing a board (L1)', () => {
@@ -115,6 +131,7 @@ describe('sharing a board (L1)', () => {
     await a.sharing.share(a.trip);
     await settle();
     expect(a.store.getState().ui.canUndo).toBe(true);
+    expect(a.store.getState().ui.shares[0]).toMatchObject({ owner: true, people: [{ uid: 'alice' }] });
   });
 
   it('keeps text typed straight after Share, before the share’s first version arrives', async () => {
@@ -155,6 +172,27 @@ describe('a shared board’s save refused for a reason other than permission (L3
     a.store.renameBoard('Trip, renamed');
     await settle();
     expect(a.states.at(-1)).toBe('failed');
+  });
+});
+
+describe('a shared board’s save that clashes too often (L3)', () => {
+  it('tries again quietly, without the red note', async () => {
+    const srv = memoryServer();
+    const inner = srv.backendFor(person('alice'));
+    let clash = false;
+    const backend: CollabBackend = {
+      ...inner,
+      updateShare: (...args) => (clash ? Promise.reject(Object.assign(new Error('base version'), { code: 'failed-precondition' })) : inner.updateShare(...args)),
+    };
+    const a = page(backend);
+    await settle();
+    const trip = a.store.newBoard();
+    await a.sharing.share(trip);
+    await settle();
+    clash = true;
+    a.store.renameBoard('Trip, renamed');
+    await settle();
+    expect(a.states.at(-1)).toBe('saving');
   });
 });
 

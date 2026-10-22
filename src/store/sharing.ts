@@ -428,7 +428,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           // Refused (too big, say, in characters or in bytes: review 137-A L3): the red banner, and the
           // next change tries again (trying the same save again would only be refused again). No
           // connection: it tries again quietly.
-          s.failed = ['permission-denied', 'invalid-argument', 'failed-precondition', 'resource-exhausted'].includes(e?.code ?? '');
+          // (Firestore's failed-precondition and resource-exhausted can pass: saves clashing, a rate limit.)
+          s.failed = e?.code === 'permission-denied' || e?.code === 'invalid-argument';
           // A change made while this one was on its way is a new version: it is tried once.
           if (s.failed && s.again && !s.timer && shares.has(s.id)) schedule(s);
           s.again = false;
@@ -536,9 +537,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     // Opened by the list of shares before `share` got here (Firestore shows a write before it
     // resolves): what was shared is its agreed version, so text typed meanwhile is sent (review 137-A L1).
     if (had && start && !had.root && !had.base) {
-      Object.assign(had, { root: start.root, owner: true, ownerUid: backend.me.uid, link: start.link, ready: true });
+      Object.assign(had, { root: start.root, owner: start.owner, ownerUid: backend.me.uid, link: start.link, people: [backend.me], ready: true });
       agree(had, start.boards, start.rev);
+      remember();
       publish();
+      checkReady();
     }
     if (had || stopped) return had;
     const saved = start ?? readBase(id);
@@ -713,7 +716,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         // (owner decision, 2026-10-18: someone already on it, on a new device whose shared-boards list
         // hasn't loaded, keeps it). Never their own share, and never one saved by a newer version of
         // the app, which an updated app opens (job #91).
-        if (added && !s.owner && !s.unreadable) {
+        // Not after signing out, or once it went (that already took them off).
+        if (added && !s.owner && !s.unreadable && shares.has(id)) {
           await backend.leave(id).catch(() => {});
           gone(s, 'left');
         }

@@ -225,7 +225,7 @@ export function startSync(
         // typed and taken back left "failed" on for good); "Saved" waits for that change.
         if (stopped || lastSynced !== key) return;
         failed = false;
-        if (!timer) opts.onSaveState?.('saved');
+        opts.onSaveState?.(timer ? 'saving' : 'saved');
       },
       () => {
         // Not saved online: the next change tries again.

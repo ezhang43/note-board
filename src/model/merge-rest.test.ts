@@ -50,6 +50,19 @@ describe('Clean up on two pages at once (M4)', () => {
   });
 });
 
+describe('Completed groups nobody changed (M4)', () => {
+  it('keep their order when only something else changed', () => {
+    const done: CompletedCard = {
+      id: 'done', kind: 'completed', color: 'stone', collapsed: false, x: 0, y: 0, w: null, h: null,
+      groups: ['2026-10-22', '2026-10-23'].map((date) => ({ date, entries: [{ item: item(date, true), fromCardId: 'l', fromTitle: 'l', fromParentId: null }] })),
+    };
+    const base = B.addCard(B.addCard(B.createBoard(), done, { type: 'loose', x: 0, y: 0 }), list('l', [item('x')]), { type: 'loose', x: 400, y: 0 });
+    const mine = { ...base, name: 'Renamed' };
+    const theirs = withItems(base, 'l', [item('x'), item('y')]);
+    expect((mergeBoards(base, mine, theirs).cards.done as CompletedCard).groups.map((g) => g.date)).toEqual(['2026-10-22', '2026-10-23']);
+  });
+});
+
 describe('checklists after combining (M7)', () => {
   const base = withItems(B.addCard(B.createBoard(), list('L', []), { type: 'loose', x: 0, y: 0 }), 'L', [item('i1'), item('i2'), item('i3')]);
 
@@ -63,6 +76,13 @@ describe('checklists after combining (M7)', () => {
     expect(b).toEqual(a);
     // What is saved reads back the same (a reload doesn't change it).
     expect(readBoard(serializeBoard(a))).toEqual(a);
+  });
+
+  it('the blank item never takes an id already on the board', () => {
+    const two = withItems(base, 'L', [item('i1'), item('i2')]);
+    const used = { ...B.addCard(two, list('M', [item('L_i0')]), { type: 'loose', x: 400, y: 0 }) };
+    const merged = mergeBoards(used, withItems(used, 'L', [item('i2')]), withItems(used, 'L', [item('i1')]));
+    expect(ids(merged, 'L')).toEqual(['L_i1']);
   });
 
   it('my reorder survives when they only added an item', () => {

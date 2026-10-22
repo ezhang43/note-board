@@ -186,7 +186,8 @@ function orderAll(chosen: Map<string, string>, b: Lists, m: Lists, t: Lists): Ma
 }
 
 /** Positions change when blocks re-arrange themselves, which isn't an edit worth keeping a deleted block for. */
-const edited = <E extends object>(was: E, now: E) => !deepEqual({ ...was, x: 0, y: 0 }, { ...now, x: 0, y: 0 });
+const still = <E extends object>(e: E) => ({ ...e, x: 0, y: 0 });
+const edited = <E extends object>(was: E, now: E) => !deepEqual(still(was), still(now));
 
 /**
  * A note's formatting (`rich`, from the Journal) is only used while it matches the note's text, so
@@ -209,6 +210,8 @@ function richWithText(n: NoteCard, m: NoteCard, t: NoteCard): NoteCard {
  * kept, and an entry put back in its list on one side stays out. Days newest first.
  */
 function mergeGroups(b: CompletedGroup[], m: CompletedGroup[], t: CompletedGroup[]): CompletedGroup[] {
+  if (deepEqual(m, b)) return t;
+  if (deepEqual(t, b)) return m;
   type Dated = { date: string; entry: CompletedEntry };
   const flat = (gs: CompletedGroup[]): [string, Dated][] => gs.flatMap((g) => g.entries.map((entry) => [entry.item.id, { date: g.date, entry }]));
   const [fm, ft] = [flat(m), flat(t)];
@@ -267,9 +270,15 @@ function mergeItems(b: Board, m: Board, t: Board, cards: Record<string, Card>): 
   for (const [id, card] of Object.entries(cards)) {
     if (card.kind !== 'todo') continue;
     // Each side deleted the other's last items (whole-app review M7): one blank item to type in, as a
-    // reload would give it (persist.ts), with the same id on both pages.
+    // reload would give it (persist.ts: `<card id>_i0`), with the same id on both pages, never one in use.
     const built = build(`items:${id}`);
-    out[id] = { ...card, items: built.length ? built : [{ id: `${id}_i0`, text: '', done: false, children: [] }] } as TodoCard;
+    if (built.length) out[id] = { ...card, items: built } as TodoCard;
+    else {
+      const used = JSON.stringify([Object.keys(items), cards]);
+      let n = 0;
+      while (used.includes(`"${id}_i${n}"`)) n++;
+      out[id] = { ...card, items: [{ id: `${id}_i${n}`, text: '', done: false, children: [] }] } as TodoCard;
+    }
   }
   return out;
 }
@@ -335,8 +344,8 @@ export function mergeBoards(base: Board, mineAsIs: Board, theirsAsIs: Board): Bo
 /** A board with every block's position left out (see `edited`). */
 const unplaced = (b: Board) => ({
   ...b,
-  cards: Object.fromEntries(Object.entries(b.cards).map(([id, c]) => [id, { ...c, x: 0, y: 0 }])),
-  columns: Object.fromEntries(Object.entries(b.columns).map(([id, c]) => [id, { ...c, x: 0, y: 0 }])),
+  cards: Object.fromEntries(Object.entries(b.cards).map(([id, c]) => [id, still(c)])),
+  columns: Object.fromEntries(Object.entries(b.columns).map(([id, c]) => [id, still(c)])),
 });
 
 /**

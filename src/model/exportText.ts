@@ -6,7 +6,9 @@ import type { Board, Card, TodoItem } from './types';
 // elsewhere. The full backup (every position, size and colour) is the saved JSON itself.
 
 function items(list: TodoItem[], depth = 0): string[] {
-  return list.flatMap((it) => [`${'    '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text}`, ...items(it.children, depth + 1)]);
+  const pad = '    '.repeat(depth);
+  // The later lines of a multi-line item sit under its text, so they stay in the item.
+  return list.flatMap((it) => [`${pad}- [${it.done ? 'x' : ' '}] ${it.text.replace(/\r?\n/g, `\n${pad}      `)}`, ...items(it.children, depth + 1)]);
 }
 
 /** A board's name by its id (for board cards). */
@@ -21,7 +23,7 @@ function cardText(card: Card, nameOf: BoardNameOf): string[] {
     case 'link': {
       const href = hrefOf(card.url);
       if (!href) return card.title.trim() ? [card.title.trim()] : [];
-      return [card.title.trim() ? `[${card.title.trim()}](${href})` : href];
+      return [card.title.trim() ? `[${card.title.trim().replace(/\s*\n\s*/g, ' ').replace(/[\\[\]]/g, '\\$&')}](${href})` : href];
     }
     case 'todo':
       return [`### ${card.title.trim() || 'List'}`, '', ...items(card.items)];

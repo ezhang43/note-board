@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ONLINE_LIMIT } from '../store/sync';
 
 // Leaving a shared board online (main session check, 2026-10-06): all or nothing. Firebase itself
 // is replaced by a stand-in that records what would be written.
@@ -93,6 +94,10 @@ describe('leaving a shared board online', () => {
 });
 
 describe('saving a version online (job #93)', () => {
+  it('holds at most what the online rules accept (review 137-A M6)', () => {
+    expect(versionsRemote('u1').limit).toBe(ONLINE_LIMIT);
+  });
+
   it('saves its board and its list entry in one go, so offline both wait together (a reload keeps both)', async () => {
     await versionsRemote('u1').save({ id: 'v1', savedAt: 1, cards: 0, columns: 0 }, '{}');
     expect(calls.batches).toHaveLength(1);

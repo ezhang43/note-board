@@ -331,7 +331,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   /** Puts the boards in `next` into the store, removing those of `now` it lacks. */
   function applyBoards(now: Record<string, Board>, next: Record<string, Board>) {
     const changes: Record<string, Board | null> = {};
-    for (const [id, b] of Object.entries(next)) if (b !== now[id] && !deepEqual(b, now[id])) changes[id] = b;
+    // Compared with the store's copy, which a share not yet set up here doesn't count as its own:
+    // the same board isn't replaced, which would clear its undo history (review 137-A L1).
+    const here = store.workspace().boards;
+    for (const [id, b] of Object.entries(next)) if (!deepEqual(b, here[id])) changes[id] = b;
     for (const id of Object.keys(now)) if (!next[id]) changes[id] = null;
     if (!Object.keys(changes).length) return;
     applying = true;
@@ -422,9 +425,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         },
         (e: { code?: string }) => {
           s.uploading = false;
-          // Refused (too big, say): the red banner, and the next change tries again (trying the
-          // same save again would only be refused again). No connection: it tries again quietly.
-          s.failed = e?.code === 'permission-denied';
+          // Refused (too big, say, in characters or in bytes: review 137-A L3): the red banner, and the
+          // next change tries again (trying the same save again would only be refused again). No
+          // connection: it tries again quietly.
+          // (Firestore's failed-precondition and resource-exhausted can pass: saves clashing, a rate limit.)
+          s.failed = e?.code === 'permission-denied' || e?.code === 'invalid-argument';
           // A change made while this one was on its way is a new version: it is tried once.
           if (s.failed && s.again && !s.timer && shares.has(s.id)) schedule(s);
           s.again = false;
@@ -518,6 +523,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   function close(s: Share) {
+    // A join waiting on it fails (review 137-A M8).
+    s.arrived.splice(0).forEach((fn) => fn());
     s.stops.splice(0).forEach((stop) => stop());
     if (s.timer) clearTimeout(s.timer);
     s.timer = null;
@@ -526,7 +533,17 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   function open(id: string, start?: { root: string; boards: Record<string, Board>; rev: number; owner: boolean; link: string }, owner = false, ownerUid = '') {
-    if (shares.has(id) || stopped) return shares.get(id);
+    const had = shares.get(id);
+    // Opened by the list of shares before `share` got here (Firestore shows a write before it
+    // resolves): what was shared is its agreed version, so text typed meanwhile is sent (review 137-A L1).
+    if (had && start && !had.root && !had.base) {
+      Object.assign(had, { root: start.root, owner: start.owner, ownerUid: backend.me.uid, link: start.link, people: [backend.me], ready: true });
+      agree(had, start.boards, start.rev);
+      remember();
+      publish();
+      checkReady();
+    }
+    if (had || stopped) return had;
     const saved = start ?? readBase(id);
     const s: Share = {
       id,
@@ -694,12 +711,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const added = !shares.has(id) && (await backend.join(id, key));
       const s = open(id) ?? need(id);
       if (!s.ready) await new Promise<void>((done) => s.arrived.push(done));
-      if (!s.root) {
+      if (!s.root || !shares.has(id)) {
         // Can't be used here (see refuse): off this person's list again, only if this join added them
         // (owner decision, 2026-10-18: someone already on it, on a new device whose shared-boards list
         // hasn't loaded, keeps it). Never their own share, and never one saved by a newer version of
         // the app, which an updated app opens (job #91).
-        if (added && !s.owner && !s.unreadable) {
+        // Not after signing out, or once it went (that already took them off).
+        if (added && !s.owner && !s.unreadable && shares.has(id)) {
           await backend.leave(id).catch(() => {});
           gone(s, 'left');
         }

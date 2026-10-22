@@ -220,10 +220,12 @@ export function startSync(
     synced(key);
     remote.write({ data: ownData(ws), client: opts.client }).then(
       () => {
-        // Saved, unless a newer change has started waiting since, or syncing stopped meanwhile (job 172).
-        if (stopped || lastSynced !== key || timer) return;
+        // Saved, unless syncing stopped meanwhile (job 172) or a newer version was sent since. The
+        // online copy is this page's again even while a new change waits (review 137-A M5: a change
+        // typed and taken back left "failed" on for good); "Saved" waits for that change.
+        if (stopped || lastSynced !== key) return;
         failed = false;
-        opts.onSaveState?.('saved');
+        opts.onSaveState?.(timer ? 'saving' : 'saved');
       },
       () => {
         // Not saved online: the next change tries again.

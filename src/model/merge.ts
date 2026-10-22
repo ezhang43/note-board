@@ -1,4 +1,4 @@
-import type { Board, Card, Column, NoteCard, TodoCard, TodoItem } from './types';
+import type { Board, Card, Column, CompletedCard, CompletedEntry, CompletedGroup, NoteCard, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits to a board (real-time collaboration, owner request 2026-10-05).
 // `base` is the board both started from, `mine` this page's board, `theirs` the one someone else
@@ -68,12 +68,23 @@ function mergeEntities<E>(
   return out;
 }
 
+/** Whether `t` puts the things it shares with `b` in another order (adding or deleting isn't reordering). */
+function reordered(b: string[], t: string[]): boolean {
+  const inB = new Set(b);
+  const inT = new Set(t);
+  return !deepEqual(
+    t.filter((id) => inB.has(id)),
+    b.filter((id) => inT.has(id)),
+  );
+}
+
 /**
- * The order of one list: theirs if they reordered it, else mine; then anything placed in it that
+ * The order of one list: theirs if they reordered it, else mine (whole-app review M7: an item they
+ * only added doesn't undo my reorder); then anything placed in it that
  * isn't there yet goes just after whatever came before it in mine (or theirs).
  */
 function orderList(b: string[], m: string[], t: string[], members: Set<string>): string[] {
-  const seq = deepEqual(t, b) ? m : t;
+  const seq = reordered(b, t) ? t : m;
   const out: string[] = [];
   for (const id of seq) if (members.has(id) && !out.includes(id)) out.push(id);
   const rest = [...m, ...t, ...members].filter((id, i, all) => members.has(id) && !out.includes(id) && all.indexOf(id) === i);
@@ -175,7 +186,8 @@ function orderAll(chosen: Map<string, string>, b: Lists, m: Lists, t: Lists): Ma
 }
 
 /** Positions change when blocks re-arrange themselves, which isn't an edit worth keeping a deleted block for. */
-const edited = <E extends object>(was: E, now: E) => !deepEqual({ ...was, x: 0, y: 0 }, { ...now, x: 0, y: 0 });
+const still = <E extends object>(e: E) => ({ ...e, x: 0, y: 0 });
+const edited = <E extends object>(was: E, now: E) => !deepEqual(still(was), still(now));
 
 /**
  * A note's formatting (`rich`, from the Journal) is only used while it matches the note's text, so
@@ -193,6 +205,22 @@ function richWithText(n: NoteCard, m: NoteCard, t: NoteCard): NoteCard {
   return rich ? { ...rest, rich } : rest;
 }
 
+/**
+ * The Completed card's day groups, entry by entry (whole-app review M4): both sides' Clean ups are
+ * kept, and an entry put back in its list on one side stays out. Days newest first.
+ */
+function mergeGroups(b: CompletedGroup[], m: CompletedGroup[], t: CompletedGroup[]): CompletedGroup[] {
+  if (deepEqual(m, b)) return t;
+  if (deepEqual(t, b)) return m;
+  type Dated = { date: string; entry: CompletedEntry };
+  const flat = (gs: CompletedGroup[]): [string, Dated][] => gs.flatMap((g) => g.entries.map((entry) => [entry.item.id, { date: g.date, entry }]));
+  const [fm, ft] = [flat(m), flat(t)];
+  const kept = mergeEntities<Dated>(Object.fromEntries(flat(b)), Object.fromEntries(fm), Object.fromEntries(ft), (bx, mx, tx) => pick(bx, mx, tx)!);
+  const order = [...new Set([...fm, ...ft].map(([id]) => id))].filter((id) => kept[id]);
+  const dates = [...new Set(order.map((id) => kept[id].date))].sort().reverse();
+  return dates.map((date) => ({ date, entries: order.filter((id) => kept[id].date === date).map((id) => kept[id].entry) }));
+}
+
 function mergeCards(b: Board, m: Board, t: Board): Record<string, Card> {
   return mergeEntities<Card>(
     b.cards,
@@ -200,7 +228,9 @@ function mergeCards(b: Board, m: Board, t: Board): Record<string, Card> {
     t.cards,
     (bc, mc, tc) => {
       if (mc.kind !== tc.kind || (bc && bc.kind !== mc.kind)) return pick(bc, mc, tc) as Card;
-      const out = mergeFields(bc, mc, tc, ['items']);
+      const out = mergeFields(bc, mc, tc, ['items', 'groups']);
+      if (out.kind === 'completed')
+        return { ...out, groups: mergeGroups((bc as CompletedCard | undefined)?.groups ?? [], (mc as CompletedCard).groups, (tc as CompletedCard).groups) };
       return out.kind === 'note' ? richWithText(out, mc as NoteCard, tc as NoteCard) : out;
     },
     edited,
@@ -237,7 +267,19 @@ function mergeItems(b: Board, m: Board, t: Board, cards: Record<string, Card>): 
   const order = orderAll(chosen, bi, mi, ti);
   const build = (key: string): TodoItem[] => (order.get(key) ?? []).map((id) => ({ ...items[id], children: build(`kids:${id}`) }));
   const out = { ...cards };
-  for (const [id, card] of Object.entries(cards)) if (card.kind === 'todo') out[id] = { ...card, items: build(`items:${id}`) } as TodoCard;
+  for (const [id, card] of Object.entries(cards)) {
+    if (card.kind !== 'todo') continue;
+    // Each side deleted the other's last items (whole-app review M7): one blank item to type in, as a
+    // reload would give it (persist.ts: `<card id>_i0`), with the same id on both pages, never one in use.
+    const built = build(`items:${id}`);
+    if (built.length) out[id] = { ...card, items: built } as TodoCard;
+    else {
+      const used = JSON.stringify([Object.keys(items), cards]);
+      let n = 0;
+      while (used.includes(`"${id}_i${n}"`)) n++;
+      out[id] = { ...card, items: [{ id: `${id}_i${n}`, text: '', done: false, children: [] }] } as TodoCard;
+    }
+  }
   return out;
 }
 
@@ -299,11 +341,21 @@ export function mergeBoards(base: Board, mineAsIs: Board, theirsAsIs: Board): Bo
   return merged;
 }
 
-/** Combines several boards (by id): each one as in mergeBoards; added boards are kept. */
+/** A board with every block's position left out (see `edited`). */
+const unplaced = (b: Board) => ({
+  ...b,
+  cards: Object.fromEntries(Object.entries(b.cards).map(([id, c]) => [id, still(c)])),
+  columns: Object.fromEntries(Object.entries(b.columns).map(([id, c]) => [id, still(c)])),
+});
+
+/**
+ * Combines several boards (by id): each one as in mergeBoards; added boards are kept. A board deleted
+ * on one side whose blocks only re-arranged themselves on the other stays deleted (job 155 U4).
+ */
 export function mergeBoardSets(
   base: Record<string, Board>,
   mine: Record<string, Board>,
   theirs: Record<string, Board>,
 ): Record<string, Board> {
-  return mergeEntities(base, mine, theirs, (b, m, t) => mergeBoards(b ?? t, m, t));
+  return mergeEntities(base, mine, theirs, (b, m, t) => mergeBoards(b ?? t, m, t), (was, now) => !deepEqual(unplaced(was), unplaced(now)));
 }

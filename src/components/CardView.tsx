@@ -1,5 +1,5 @@
-import { boxProps } from './textBox';
-import { memo, useRef, useState, type CSSProperties } from 'react';
+import { BoardReadOnly, boxProps } from './textBox';
+import { memo, use, useRef, useState, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
@@ -250,6 +250,7 @@ function LinkBody({ card }: { card: LinkCard }) {
   const href = hrefOf(card.url);
   // The address box is a plain field: a search match there rings the whole box.
   const findCurrent = useAppState((s) => s.ui.find?.current?.key === `url:${card.id}`);
+  const readOnly = use(BoardReadOnly);
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
   return (
@@ -271,6 +272,7 @@ function LinkBody({ card }: { card: LinkCard }) {
         aria-label="Link address"
         placeholder="Paste a link address"
         spellCheck={false}
+        readOnly={readOnly}
         value={card.url}
         onChange={(e) => appStore.setLinkUrl(card.id, e.target.value)}
       />

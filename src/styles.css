@@ -1371,8 +1371,10 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   cursor: pointer;
   align-self: flex-start;
 }
+/* On a read-only board (job 161) it stays as it was left, in its usual color. */
+.completed-toggle:disabled { color: inherit; cursor: default; }
 @media (hover: hover) {
-  .completed-toggle:hover { background: var(--hover); }
+  .completed-toggle:hover:not(:disabled) { background: var(--hover); }
 }
 /* Clean up and Uncheck all (owner requests): on the same line as "Completed", at the right
    (on a card too narrow for all three, they go on the line below, still at the right). */
@@ -2167,7 +2169,91 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .share-people li { display: flex; align-items: center; gap: 8px; min-height: 32px; }
 .share-person-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-tag { font-size: 12px; color: var(--ink-soft); }
+/* Roles (job 161): which role's link is shown, and each person's role, picked from a small menu. */
+.share-link-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.share-link-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
+.share-link-label svg { flex-shrink: 0; color: var(--ink-soft); }
+.role-wrap { position: relative; flex-shrink: 0; }
+.role-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.role-button.quiet { border-color: transparent; background: transparent; color: var(--ink-soft); }
+.role-button[aria-expanded='true'] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.role-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: 272px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(31, 29, 26, 0.18);
+}
+.role-option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 1px 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.role-option:focus-visible { outline-offset: -2px; }
+.role-option b { font-size: 14px; font-weight: 500; }
+.role-option small { grid-column: 2; font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.role-option svg { width: 16px; height: 16px; margin-top: 2px; color: var(--accent); }
+.role-option[aria-checked='true'] { background: var(--accent-soft); }
+.role-option[aria-checked='true'] b { color: var(--accent-ink); }
+.role-remove { margin-top: 4px; }
+.role-remove b { color: var(--danger); }
+@media (hover: hover) {
+  .role-button.quiet:hover:not(:disabled) { background: var(--hover); }
+  .role-option:hover:not([aria-checked='true']) { background: var(--hover); }
+}
+/* On a phone (the ⋯ sheet): 44px to press, and 16px text so the link box doesn't zoom the page. */
+.share-wrap.phone .role-button, .share-wrap.phone .role-option, .share-wrap.phone .share-link .tb-button { min-height: 44px; }
+.share-wrap.phone .share-link input { height: 44px; font-size: 16px; }
 .share-error { margin: 0; color: var(--danger); }
+/* Read-only boards (job 161): the badge beside the board's name, in the accent tint (follows every theme and dark mode). */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+.toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
+/* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrow, .item-trash, .item-grip, .completed-actions) { display: none; }
 .avatar {
   display: inline-flex;
   align-items: center;
@@ -2953,15 +3039,15 @@ a.cal-open { align-self: flex-start; }
  * are on screen faster than they leave (they leave at once). Only transform and opacity move.
  */
 .file-menu, .boards-menu, .colour-menu, .fb-font-menu { transform-origin: top left; }
-.share-panel, .toolbar-more { transform-origin: top right; }
+.share-panel, .toolbar-more, .role-menu { transform-origin: top right; }
 .phone-sheet, .app.phone .cal-card { transform-origin: bottom center; }
 .cal-card { transform-origin: top right; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day, .habit-seg button, .habit-step, .habit-today) {
+:is(.tb-button, .role-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day, .habit-seg button, .habit-step, .habit-today) {
   transition: transform 100ms var(--ease-out);
 }
-:is(.tb-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
+:is(.tb-button, .role-button, .tool-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
   transform: scale(0.97);
 }
 
@@ -2970,11 +3056,11 @@ a.cal-open { align-self: flex-start; }
   html[data-input='keys'] .collapse-arrow { transition: none; }
 
   /* Menus, panels and the phone sheet. */
-  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast) {
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast) {
     transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
   @starting-style {
-    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
+    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel) { opacity: 0; transform: scale(0.96); }
     /* The Color menu only fades: the board is moved aside by where its box is the moment it opens. */
     html:not([data-input='keys']) :is(.colour-menu, .shortcuts-backdrop) { opacity: 0; }
     html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }

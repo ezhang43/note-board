@@ -17,6 +17,8 @@ const fs = vi.hoisted(() => {
     deletes: [] as string[],
     /** Paths whose single delete is refused. */
     refuseDelete: new Set<string>(),
+    /** A batch commit this says no to is refused, as the rules would (job 161: joining with the wrong role). */
+    refuseBatch: null as null | ((ops: { op: string; path: string; value?: Data }[]) => boolean),
     listeners: [] as { path: string; next: (s: unknown) => void; error: (e: unknown) => void }[],
   };
   const kids = (path: string) => [...docs.keys()].filter((k) => k.startsWith(path + '/') && !k.slice(path.length + 1).includes('/'));
@@ -65,6 +67,7 @@ vi.mock('firebase/firestore', () => ({
       update: (ref: string, value: Data) => void ops.push({ op: 'update', path: ref, value }),
       delete: (ref: string | { path?: string }) => void ops.push({ op: 'delete', path: typeof ref === 'string' ? ref : String(ref) }),
       commit: async () => {
+        if (fs.state.refuseBatch?.(ops)) throw Object.assign(new Error('refused'), { code: 'permission-denied' });
         fs.state.commits.push({ kind: 'batch', ops });
         ops.forEach((o) => fs.apply(o.op, o.path, o.value));
       },
@@ -79,6 +82,7 @@ vi.mock('firebase/firestore', () => ({
       update: (ref: string, value: Data) => void ops.push({ op: 'update', path: ref, value }),
       delete: (ref: string) => void ops.push({ op: 'delete', path: ref }),
     });
+    if (fs.state.refuseBatch?.(ops)) throw Object.assign(new Error('refused'), { code: 'permission-denied' });
     if (ops.length) {
       fs.state.commits.push({ kind: 'transaction', ops });
       ops.forEach((o) => fs.apply(o.op, o.path, o.value));
@@ -101,6 +105,7 @@ beforeEach(() => {
   fs.state.commits = [];
   fs.state.deletes = [];
   fs.state.refuseDelete.clear();
+  fs.state.refuseBatch = null;
   fs.state.listeners = [];
 });
 
@@ -108,15 +113,167 @@ beforeEach(() => {
 const docSnap = (data: Data | undefined, fromCache: boolean, pending = false) => ({ exists: () => data !== undefined, data: () => data!, metadata: { fromCache, hasPendingWrites: pending } });
 const listener = (path: string) => fs.state.listeners.find((l) => l.path === path)!;
 
+const keys = { edit: 'k2', comment: 'c2', view: 'v2' };
+
 function seedShare(link: string | null = 'k', members = ['u1', 'u2'], rev = 3) {
   fs.docs.set('shared/s1', { owner: 'u1', root: 'b1', link, data: 'old', client: 'other', rev });
   members.forEach((m) => fs.docs.set(`shared/s1/members/${m}`, { name: m }));
 }
 
+describe('roles on a shared board (job 161, PR 2)', () => {
+  it('removing someone changes the comment and view links that are on too, and leaves those off alone', async () => {
+    seedShare(null);
+    fs.docs.set('shared/s1/private/links', { edit: 'k', comment: null, view: 'v' });
+    await collabRemote(user).removePerson('s1', 'u2', keys);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'delete', path: 'shared/s1/members/u2' },
+      { op: 'delete', path: 'shared/s1/joins/u2' },
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k2', view: 'v2' } },
+    ]);
+  });
+
+  it('the first comment or view link changes an edit link that is on, in the same step (D1)', async () => {
+    seedShare('old');
+    await collabRemote(user).makeLink('s1', 'comment', keys);
+    expect(fs.state.commits[0]).toEqual({
+      kind: 'transaction',
+      ops: [
+        { op: 'update', path: 'shared/s1/private/links', value: { comment: 'c2', edit: 'k2' } },
+        { op: 'update', path: 'shared/s1', value: { link: null } },
+      ],
+    });
+    // The next one doesn't (roles are in use: the comment field is there).
+    await collabRemote(user).makeLink('s1', 'view', { edit: 'k3', comment: 'c3', view: 'v3' });
+    expect(fs.state.commits[1].ops).toEqual([{ op: 'update', path: 'shared/s1/private/links', value: { view: 'v3' } }]);
+    expect(fs.docs.get('shared/s1/private/links')).toEqual({ comment: 'c2', edit: 'k2', view: 'v3' });
+  });
+
+  it('the first view link while the edit link is off leaves it off; the edit link alone changes nothing else', async () => {
+    seedShare(null);
+    fs.docs.set('shared/s1/private/links', { edit: null });
+    await collabRemote(user).makeLink('s1', 'view', keys);
+    expect(fs.state.commits[0].ops).toEqual([{ op: 'update', path: 'shared/s1/private/links', value: { view: 'v2' } }]);
+    await collabRemote(user).makeLink('s1', 'edit', keys);
+    expect(fs.state.commits[1].ops).toEqual([{ op: 'update', path: 'shared/s1/private/links', value: { edit: 'k2' } }]);
+  });
+
+  it('turning links off empties every link there is (no comment or view field added before roles are in use)', async () => {
+    seedShare('old');
+    await collabRemote(user).linksOff('s1');
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: null } },
+      { op: 'update', path: 'shared/s1', value: { link: null } },
+    ]);
+    fs.docs.set('shared/s1/private/links', { edit: 'k', comment: 'c' });
+    await collabRemote(user).linksOff('s1');
+    expect(fs.state.commits[1].ops).toEqual([{ op: 'update', path: 'shared/s1/private/links', value: { edit: null, comment: null, view: null } }]);
+  });
+
+  it('changing a role writes only the role; lowering changes the links above the new role that are on', async () => {
+    seedShare('old');
+    fs.docs.set('shared/s1/members/u2', { name: 'u2', key: 'old' });
+    fs.docs.set('shared/s1/private/links', { comment: 'c' });
+    await collabRemote(user).setRole('s1', 'u2', 'view', keys);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'update', path: 'shared/s1/members/u2', value: { role: 'view' } },
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k2', comment: 'c2' } },
+      { op: 'update', path: 'shared/s1', value: { link: null } },
+    ]);
+    // Raising changes no link; the same role changes nothing.
+    await collabRemote(user).setRole('s1', 'u2', 'comment', keys);
+    expect(fs.state.commits[1].ops).toEqual([{ op: 'update', path: 'shared/s1/members/u2', value: { role: 'comment' } }]);
+    await collabRemote(user).setRole('s1', 'u2', 'comment', keys);
+    expect(fs.state.commits).toHaveLength(2);
+    // Lowering to comment changes only the edit link.
+    fs.docs.set('shared/s1/members/u2', { name: 'u2', role: 'edit' });
+    await collabRemote(user).setRole('s1', 'u2', 'comment', { edit: 'k9', comment: 'c9', view: 'v9' });
+    expect(fs.state.commits[2].ops).toEqual([
+      { op: 'update', path: 'shared/s1/members/u2', value: { role: 'comment' } },
+      { op: 'update', path: 'shared/s1/private/links', value: { edit: 'k9' } },
+    ]);
+  });
+
+  // Code review (high): otherwise an old app could put the new edit key where the lowered person reads it.
+  it('lowering someone on a share with no comment or view link yet puts roles in use (both fields, empty)', async () => {
+    seedShare(null);
+    fs.docs.set('shared/s1/members/u2', { name: 'u2' });
+    fs.docs.set('shared/s1/private/links', { edit: 'k' });
+    await collabRemote(user).setRole('s1', 'u2', 'view', keys);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'update', path: 'shared/s1/members/u2', value: { role: 'view' } },
+      { op: 'update', path: 'shared/s1/private/links', value: { comment: null, view: null, edit: 'k2' } },
+    ]);
+  });
+
+  // Code review (high): the links watch, refused while they weren't an editor, starts again once they are one.
+  it('someone made an editor gets the links without reloading', async () => {
+    const onChange = vi.fn();
+    collabRemote(user).watchShare('s1', onChange, vi.fn());
+    listener('shared/s1').next(docSnap({ owner: 'u9', root: 'b1', link: null, data: '{}' }, false));
+    const refused = Object.assign(new Error('no'), { code: 'permission-denied' });
+    listener('shared/s1/private/links').error(refused);
+    await new Promise((done) => setTimeout(done, 0));
+    listener('shared/s1/private/links').error(refused);
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: null, comment: null, view: null, roles: false } }));
+    // (This pretend Firestore keeps refused watches on its list: the newest one is the one in use.)
+    const watch = () => fs.state.listeners.filter((l) => l.path === 'shared/s1/private/links').at(-1);
+    const before = watch();
+    listener('shared/s1/members/u1').next(docSnap({ name: 'Eric', role: 'view' }, false));
+    expect(watch()).toBe(before);
+    listener('shared/s1/members/u1').next(docSnap({ name: 'Eric', role: 'edit' }, false));
+    expect(watch()).not.toBe(before);
+    fs.state.listeners.filter((l) => l.path === 'shared/s1/private/links').at(-1)!.next(docSnap({ edit: 'e', comment: null, view: 'v' }, false));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: 'e', comment: null, view: 'v', roles: true } }));
+  });
+
+  it('someone not on it, or a share that is gone: refused as "not allowed", nothing written', async () => {
+    await expect(collabRemote(user).setRole('s1', 'u2', 'view', keys)).rejects.toMatchObject({ code: 'permission-denied' });
+    seedShare('k', ['u1']);
+    await expect(collabRemote(user).setRole('s1', 'u2', 'view', keys)).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(collabRemote(user).makeLink('s9', 'view', keys)).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(fs.state.commits).toEqual([]);
+  });
+
+  /** Refuses a join batch unless its member record has `role`. */
+  const onlyRole = (role: string) => (ops: { path: string; value?: Data }[]) => ops.some((o) => o.path === 'shared/s1/members/u1' && o.value?.role !== role);
+
+  it('joining takes the role the key gives: tried from edit down, the others refused online', async () => {
+    seedShare(null, ['u2']);
+    fs.state.refuseBatch = onlyRole('view');
+    expect(await collabRemote(user).join('s1', 'vkey')).toBe(true);
+    expect(fs.state.commits).toHaveLength(1);
+    expect(fs.state.commits[0].ops).toEqual([
+      { op: 'set', path: 'shared/s1/joins/u1', value: { key: 'vkey' } },
+      { op: 'update', path: 'shared/s1/members/u1', value: { name: 'Eric', photo: null, role: 'view', joinedAt: 'SERVER_TIME' } },
+      { op: 'set', path: 'boards/u1/shared/s1', value: { joinedAt: 'SERVER_TIME' } },
+    ]);
+  });
+
+  it('someone already on it tries only their role and those above it, keeping their place in the list (and an old key)', async () => {
+    seedShare(null, ['u2']);
+    fs.docs.set('shared/s1/members/u1', { name: 'Old name', key: 'old', role: 'comment', joinedAt: 5 });
+    const tried: string[] = [];
+    fs.state.refuseBatch = (ops) => {
+      const role = String(ops.find((o) => o.path === 'shared/s1/members/u1')?.value?.role);
+      tried.push(role);
+      return role !== 'comment';
+    };
+    expect(await collabRemote(user).join('s1', 'vkey')).toBe(false);
+    expect(tried).toEqual(['edit', 'comment']);
+    expect(fs.docs.get('shared/s1/members/u1')).toEqual({ name: 'Eric', photo: null, key: 'old', role: 'comment', joinedAt: 5 });
+  });
+
+  it('a key that gives no role is refused', async () => {
+    seedShare(null, ['u2']);
+    fs.state.refuseBatch = () => true;
+    await expect(collabRemote(user).join('s1', 'bad')).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+});
+
 describe('removing someone from a shared board (G14)', () => {
   it('takes them off and changes the link in one transaction', async () => {
     seedShare('k');
-    await collabRemote(user).removePerson('s1', 'u2', 'k2');
+    await collabRemote(user).removePerson('s1', 'u2', keys);
     expect(fs.state.commits).toHaveLength(1);
     expect(fs.state.commits[0].kind).toBe('transaction');
     // Job 161: the new key goes in the private record, and one still in the share moves out of it.
@@ -135,7 +292,7 @@ describe('removing someone from a shared board (G14)', () => {
   it('changes a key kept in the private record (job 161)', async () => {
     seedShare(null);
     fs.docs.set('shared/s1/private/links', { edit: 'k' });
-    await collabRemote(user).removePerson('s1', 'u2', 'k2');
+    await collabRemote(user).removePerson('s1', 'u2', keys);
     expect(fs.state.commits[0].ops).toEqual([
       { op: 'delete', path: 'shared/s1/members/u2' },
       { op: 'delete', path: 'shared/s1/joins/u2' },
@@ -146,7 +303,7 @@ describe('removing someone from a shared board (G14)', () => {
   it('a link turned off stays off (decided from the online copy, not the caller)', async () => {
     seedShare(null);
     fs.docs.set('shared/s1/private/links', { edit: null });
-    await collabRemote(user).removePerson('s1', 'u2', 'k2');
+    await collabRemote(user).removePerson('s1', 'u2', keys);
     expect(fs.state.commits[0].ops).toEqual([
       { op: 'delete', path: 'shared/s1/members/u2' },
       { op: 'delete', path: 'shared/s1/joins/u2' },
@@ -157,7 +314,7 @@ describe('removing someone from a shared board (G14)', () => {
 
   it('a share that is gone is refused as "not allowed", and nothing is written', async () => {
     fs.docs.set('shared/s1/members/u2', { name: 'u2' });
-    await expect(collabRemote(user).removePerson('s1', 'u2', 'k2')).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(collabRemote(user).removePerson('s1', 'u2', keys)).rejects.toMatchObject({ code: 'permission-denied' });
     expect(fs.state.commits).toEqual([]);
     expect(fs.docs.has('shared/s1/members/u2')).toBe(true);
   });
@@ -259,7 +416,7 @@ describe('watching one shared board (G18)', () => {
     const onChange = vi.fn();
     collabRemote(user).watchShare('s1', onChange, vi.fn());
     listener('shared/s1').next(docSnap(good, false));
-    expect(onChange).toHaveBeenCalledWith({ owner: 'u9', root: 'b1', link: 'k', data: '{}', client: 'c', rev: 4 });
+    expect(onChange).toHaveBeenCalledWith({ owner: 'u9', root: 'b1', links: { edit: 'k', comment: null, view: null, roles: false }, data: '{}', client: 'c', rev: 4 });
   });
 
   it('fills in a missing link, page and save count, and ignores a link that is not text', () => {
@@ -267,9 +424,31 @@ describe('watching one shared board (G18)', () => {
     collabRemote(user).watchShare('s1', onChange, vi.fn());
     listener('shared/s1').next(docSnap({ owner: 'u9', root: 'b1', link: 5, data: '{}' }, false));
     // Job 161: the link isn't known until the private links record has answered (here: there is none).
-    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', link: undefined, data: '{}', client: '', rev: 0 });
+    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', links: undefined, data: '{}', client: '', rev: 0 });
     listener('shared/s1/private/links').next(docSnap(undefined, false));
-    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', link: null, data: '{}', client: '', rev: 0 });
+    expect(onChange).toHaveBeenLastCalledWith({ owner: 'u9', root: 'b1', links: { edit: null, comment: null, view: null, roles: false }, data: '{}', client: '', rev: 0 });
+  });
+
+  it('hands on all three links from the private record, and whether roles are in use (job 161)', () => {
+    const onChange = vi.fn();
+    collabRemote(user).watchShare('s1', onChange, vi.fn());
+    listener('shared/s1').next(docSnap({ ...good, link: null }, false));
+    listener('shared/s1/private/links').next(docSnap({ edit: 'e', comment: null, view: 'v' }, false));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: 'e', comment: null, view: 'v', roles: true } }));
+    listener('shared/s1/private/links').next(docSnap({ edit: 'e', comment: 7 }, false));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ links: { edit: 'e', comment: null, view: null, roles: true } }));
+  });
+
+  it('the People list carries each role (none, or one that isn’t known, is edit)', () => {
+    const onChange = vi.fn();
+    collabRemote(user).watchPeople('s1', onChange, vi.fn());
+    const member = (id: string, data: Data) => ({ id, data: () => data });
+    listener('shared/s1/members').next({ docs: [member('a', { name: 'A', joinedAt: null }), member('b', { name: 'B', role: 'view' }), member('c', { name: 'C', role: 'boss' })], metadata: { fromCache: false } });
+    expect(onChange).toHaveBeenCalledWith([
+      { uid: 'a', name: 'A', photo: null, role: 'edit' },
+      { uid: 'b', name: 'B', photo: null, role: 'view' },
+      { uid: 'c', name: 'C', photo: null, role: 'edit' },
+    ]);
   });
 
   it('ignores a record without text data or without a root', () => {
@@ -327,9 +506,9 @@ describe('who a shared board is shared with (G19)', () => {
       metadata: { fromCache: false },
     });
     expect(onChange.mock.calls[0][0]).toEqual([
-      { uid: 'a', name: 'Name a', photo: 'https://x/p.png' },
-      { uid: 'b', name: 'Name b', photo: null },
-      { uid: 'c', name: 'Name c', photo: null },
+      { uid: 'a', name: 'Name a', photo: 'https://x/p.png', role: 'edit' },
+      { uid: 'b', name: 'Name b', photo: null, role: 'edit' },
+      { uid: 'c', name: 'Name c', photo: null, role: 'edit' },
     ]);
   });
 });

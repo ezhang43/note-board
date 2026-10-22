@@ -1,4 +1,5 @@
-import type { CSSProperties, Ref, TextareaHTMLAttributes } from 'react';
+import { use, type CSSProperties, type Ref, type TextareaHTMLAttributes } from 'react';
+import { BoardReadOnly } from './textBox';
 import { FindMarks } from './FindMarks';
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'className'> & {
@@ -15,10 +16,11 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
 
 /** A text box that grows taller as you type and never scrolls. */
 export function GrowTextarea({ value, onChange, className, ref, box, boxStyle, find, ...rest }: Props) {
+  const readOnly = use(BoardReadOnly) || rest.readOnly;
   return (
     <span className={`grow ${className ?? ''}`} data-value={value} data-box={box} data-find={find} style={boxStyle}>
       {find && <FindMarks find={find} text={value} overlay />}
-      <textarea {...rest} ref={ref} rows={1} value={value} onChange={(e) => onChange(e.target.value)} />
+      <textarea {...rest} readOnly={readOnly} ref={ref} rows={1} value={value} onChange={(e) => onChange(e.target.value)} />
     </span>
   );
 }

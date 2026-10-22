@@ -376,7 +376,7 @@ describe('review fixes: shared boards (2026-10-05)', () => {
     expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).toContain(trip);
     // Shared now: nothing else changes on the person's boards.
     shared.add(trip);
-    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], link: 'k' }], true);
+    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], links: { edit: 'k', comment: null, view: null, roles: false } }], true);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(Object.keys(JSON.parse(fake.writes.at(-1)!.data).boards)).not.toContain(trip);
   });
@@ -393,7 +393,7 @@ describe('code review fixes: shared boards and a drag (2026-10-06)', () => {
     const card = store.getState().board.cards[id];
     store.startDrag('card', id, card.x, card.y);
     fake.send({ data: boardJson('From phone'), client: 'phone' });
-    store.setShares([{ id: 's1', root: 'x', boards: [], owner: true, ownerUid: 'me', people: [], link: 'k' }], true);
+    store.setShares([{ id: 's1', root: 'x', boards: [], owner: true, ownerUid: 'me', people: [], links: { edit: 'k', comment: null, view: null, roles: false } }], true);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(fake.writes.length).toBe(sent);
     store.cancelDrag();
@@ -429,13 +429,13 @@ describe('main session check fixes (2026-10-06)', () => {
   it('a new list of people on a shared board isn’t a change to upload', () => {
     const { store, fake, onSaveState } = setup();
     fake.send({ data: boardJson('Start'), client: 'laptop' });
-    const share = { id: 's1', root: 'x', boards: ['x'], owner: true, ownerUid: 'me', people: [], link: 'k' };
+    const share = { id: 's1', root: 'x', boards: ['x'], owner: true, ownerUid: 'me', people: [], links: { edit: 'k', comment: null, view: null, roles: false } };
     store.setShares([share], true);
     vi.advanceTimersByTime(SYNC_DELAY);
     const writes = fake.writes.length;
     onSaveState.mockClear();
-    store.setShares([{ ...share, people: [{ uid: 'bob', name: 'Bob', photo: null }] }], true);
-    store.setShares([{ ...share, link: null }], true);
+    store.setShares([{ ...share, people: [{ uid: 'bob', name: 'Bob', photo: null, role: 'edit' as const }] }], true);
+    store.setShares([{ ...share, links: { edit: null, comment: null, view: null, roles: false } }], true);
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(onSaveState).not.toHaveBeenCalledWith('saving');
     expect(fake.writes.length).toBe(writes);

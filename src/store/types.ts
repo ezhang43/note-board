@@ -5,7 +5,7 @@ import type { ItemDrop } from '../model/checklist';
 import type { ListSelection } from '../model/multiSelect';
 import type { ResizeDir } from '../model/sizing';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
-import type { Person } from './collab';
+import type { Links, Member, Role } from './collab';
 
 // The shapes of the store's state: board data, view, and what is on screen (ui).
 
@@ -198,10 +198,15 @@ export interface ShareInfo {
   owner: boolean;
   /** Who shared it. */
   ownerUid: string;
-  /** Everyone who has it, the person who shared it first. */
-  people: Person[];
-  /** The current share link's key, or null when the link is turned off. */
-  link: string | null;
+  /** Everyone who has it, with their role, the person who shared it first. */
+  people: Member[];
+  /** Its links' keys (job 161), each null while off; all null for anyone but an editor. */
+  links: Links;
+  /**
+   * This person's own role on it (job 161): Can comment or Can view make it read-only here. Left out
+   * while not known yet (a share joined before roles, on a device that hasn't heard yet).
+   */
+  role?: Role;
 }
 
 /**

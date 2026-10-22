@@ -201,7 +201,8 @@ export function checklistActions(ctx: StoreContext) {
     toggleItem(cardId: string, itemId: string) {
       ctx.flushPendingTick();
       const card = ctx.state.board.cards[cardId];
-      if (card?.kind !== 'todo') return;
+      // Not on a read-only board (job 161): no leaving animation for a tick that can't be made.
+      if (card?.kind !== 'todo' || ctx.viewOnly()) return;
       const item = C.findItem(card.items, itemId)?.item;
       if (!item) return;
       // One of the items selected across several lists: tick (or untick) them all at once.
@@ -294,7 +295,7 @@ export function checklistActions(ctx: StoreContext) {
     uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */
     askDeleteCompleted() {
-      if (ctx.state.ui.preview) return; // an old version is being looked at: nothing can be changed
+      if (ctx.state.ui.preview || ctx.viewOnly()) return; // an old version, or a read-only board (job 161): nothing can be changed
       ctx.flushPendingTick(); // an item still on its way to Completed counts
       updateUi({ deleteCompleted: completedSectionCount(ctx.state.board) ? 'ask' : 'none' });
     },
@@ -345,7 +346,7 @@ export function checklistActions(ctx: StoreContext) {
     /** Start dragging an item by its grip (or every selected item, if it is one of them). */
     startItemDrag(cardId: string, itemId: string, at: Point, measure?: (ids: string[]) => NonNullable<ItemDrag['lift']>) {
       const card = ctx.state.board.cards[cardId];
-      if (card?.kind !== 'todo') return;
+      if (card?.kind !== 'todo' || ctx.viewOnly()) return;
       const loc = C.findItem(card.items, itemId);
       if (!loc || listsIncluding(cardId, itemId)) return; // items in several lists: dragging does nothing (owner, 2026-10-03)
       const selected = selectedItemsIncluding(cardId, itemId);

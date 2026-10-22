@@ -4,7 +4,7 @@
 // comments). The shapes today's live app writes are in firestore-rules.test.ts and the "older app"
 // tests below. Run with `npm run test:rules`.
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
 import { describe, it } from 'vitest';
 import { as, seed, signedOut, useRulesEnv } from './env';
 
@@ -491,5 +491,127 @@ describe('comments (shared/{sid}/comments)', () => {
     await assertFails(deleteDoc(doc(as('carol'), 'shared/s1/comments/c1')));
     await assertSucceeds(deleteDoc(doc(as('bob'), 'shared/s1/comments/c1')));
     await assertSucceeds(deleteDoc(doc(as('alice'), 'shared/s1/comments/c2')));
+  });
+});
+
+// Job 161, PR 2: exactly the writes src/sync/database.ts now makes for the Share panel's roles.
+describe('the Share panel’s writes (PR 2)', () => {
+  /** join as database.ts does: one transaction, their record merged (an existing one keeps its place and old key). */
+  function appJoin(db: Firestore, uid: string, key: string, role: string, existing: boolean) {
+    return runTransaction(db, async (t) => {
+      t.set(doc(db, `shared/s1/joins/${uid}`), { key });
+      t.set(doc(db, `shared/s1/members/${uid}`), existing ? { name: 'B', photo: null, role } : { name: 'B', photo: null, role, joinedAt: serverTimestamp() }, { merge: true });
+      t.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
+    });
+  }
+  /** A transaction that reads the share and its links first, as every one in database.ts does. */
+  const tx = (uid: string, fn: (t: Parameters<Parameters<typeof runTransaction>[1]>[0], db: Firestore) => void) => {
+    const db = as(uid);
+    return runTransaction(db, async (t) => {
+      await t.get(doc(db, 'shared/s1'));
+      await t.get(doc(db, LINKS));
+      fn(t, db);
+    });
+  };
+
+  it('a newcomer with a view key: edit and comment are refused, view works', async () => {
+    await seedShare({}, { edit: EDIT, comment: COMMENT, view: VIEW });
+    await assertFails(appJoin(as('bob'), 'bob', VIEW, 'edit', false));
+    await assertFails(appJoin(as('bob'), 'bob', VIEW, 'comment', false));
+    await assertSucceeds(appJoin(as('bob'), 'bob', VIEW, 'view', false));
+  });
+
+  it('someone already on it opening a lower link keeps their role (a record from before roles, with its old key, too)', async () => {
+    // Real records hold the time they joined (a merged write keeps it, and the rules check it).
+    const at = Timestamp.now();
+    await seedShare({}, { edit: EDIT, comment: COMMENT, view: VIEW });
+    await seed({
+      'shared/s1/members/bob': { name: 'B', photo: null, role: 'comment', joinedAt: at },
+      'shared/s1/members/carol': { name: 'C', photo: null, key: 'old-key-0123456789', joinedAt: at },
+      'shared/s1/members/dan': { name: 'D', photo: null, role: 'view', joinedAt: at },
+    });
+    await assertFails(appJoin(as('bob'), 'bob', VIEW, 'edit', true));
+    await assertSucceeds(appJoin(as('bob'), 'bob', VIEW, 'comment', true));
+    await assertSucceeds(appJoin(as('carol'), 'carol', VIEW, 'edit', true));
+    // …and a viewer opening the edit link becomes an editor.
+    await assertSucceeds(appJoin(as('dan'), 'dan', EDIT, 'edit', true));
+  });
+
+  it('makeLink: the first comment link changes the edit key (moving one out of a share from before); the next one doesn’t', async () => {
+    await seed({ 'shared/s1': { ...share, link: 'k' }, 'shared/s1/members/alice': person() });
+    await assertSucceeds(
+      tx('alice', (t, db) => {
+        t.set(doc(db, LINKS), { comment: COMMENT, edit: EDIT }, { merge: true });
+        t.update(doc(db, 'shared/s1'), { link: null });
+      }),
+    );
+    await assertSucceeds(tx('alice', (t, db) => t.set(doc(db, LINKS), { view: VIEW }, { merge: true })));
+  });
+
+  it('makeLink: the first view link while the edit link is off; the edit link turned on again', async () => {
+    await seedShare({}, { edit: null });
+    await assertSucceeds(tx('alice', (t, db) => t.set(doc(db, LINKS), { view: VIEW }, { merge: true })));
+    await assertSucceeds(tx('alice', (t, db) => t.set(doc(db, LINKS), { edit: EDIT }, { merge: true })));
+  });
+
+  it('linksOff: all three off once roles are in use; only the edit link before', async () => {
+    await seedShare({}, { edit: EDIT, comment: COMMENT });
+    await assertSucceeds(tx('alice', (t, db) => t.set(doc(db, LINKS), { edit: null, comment: null, view: null }, { merge: true })));
+    await assertFails(join(as('bob'), 'bob', COMMENT, 'comment'));
+    await seed({ 'shared/s1': { ...share, link: 'k' }, [LINKS]: { edit: null } });
+    await assertSucceeds(
+      tx('alice', (t, db) => {
+        t.set(doc(db, LINKS), { edit: null }, { merge: true });
+        t.update(doc(db, 'shared/s1'), { link: null });
+      }),
+    );
+  });
+
+  it('setRole: lowering with the links above changed (a key in a share from before moving out); raising with the role alone', async () => {
+    await seed({ 'shared/s1': { ...share, link: 'k' }, 'shared/s1/members/alice': person(), 'shared/s1/members/bob': { name: 'B', photo: null, key: 'k', joinedAt: 1 } });
+    const db = as('alice');
+    await assertSucceeds(
+      runTransaction(db, async (t) => {
+        await t.get(doc(db, 'shared/s1'));
+        await t.get(doc(db, LINKS));
+        await t.get(doc(db, 'shared/s1/members/bob'));
+        t.update(doc(db, 'shared/s1/members/bob'), { role: 'view' });
+        t.set(doc(db, LINKS), { edit: EDIT }, { merge: true });
+        t.update(doc(db, 'shared/s1'), { link: null });
+      }),
+    );
+    await assertSucceeds(
+      runTransaction(db, async (t) => {
+        await t.get(doc(db, 'shared/s1/members/bob'));
+        t.update(doc(db, 'shared/s1/members/bob'), { role: 'comment' });
+      }),
+    );
+  });
+
+  it('setRole: lowering on a share with no comment or view link yet also puts roles in use; then an old app can’t join', async () => {
+    await seedShare({ bob: 'edit' }, { edit: EDIT });
+    const db = as('alice');
+    await assertSucceeds(
+      runTransaction(db, async (t) => {
+        await t.get(doc(db, 'shared/s1'));
+        await t.get(doc(db, LINKS));
+        await t.get(doc(db, 'shared/s1/members/bob'));
+        t.update(doc(db, 'shared/s1/members/bob'), { role: 'view' });
+        t.set(doc(db, LINKS), { comment: null, view: null, edit: 'new-edit-0123456789' }, { merge: true });
+      }),
+    );
+    await assertFails(oldJoin(as('carol'), 'carol', 'new-edit-0123456789'));
+    await assertSucceeds(join(as('carol'), 'carol', 'new-edit-0123456789'));
+  });
+
+  it('removePerson: every link that is on changes, in one transaction', async () => {
+    await seedShare({ bob: 'comment' }, { edit: EDIT, comment: COMMENT, view: null });
+    await assertSucceeds(
+      tx('alice', (t, db) => {
+        t.delete(doc(db, 'shared/s1/members/bob'));
+        t.delete(doc(db, 'shared/s1/joins/bob'));
+        t.set(doc(db, LINKS), { edit: 'new-edit-0123456789', comment: 'new-comment-0123456' }, { merge: true });
+      }),
+    );
   });
 });

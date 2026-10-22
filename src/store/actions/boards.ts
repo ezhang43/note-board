@@ -67,10 +67,11 @@ export function boardActions(ctx: StoreContext) {
       return id;
     },
     /**
-     * Add a board here: a new board inside this one, with a card on this board that opens it.
+     * Add a board here: a new board inside this one, with a card on this board that opens it ('' on a read-only board).
      * The card is placed like a new card (into the selected column, else the middle of the screen).
      */
     addBoardCard(): string {
+      if (ctx.viewOnly()) return ''; // not on a read-only board (job 161), where the card couldn't go
       const id = newId('b');
       setOthers((o) => ({ ...o, [id]: blankBoard() }));
       const card = createBoardCard(id);
@@ -206,7 +207,8 @@ export function boardActions(ctx: StoreContext) {
      */
     deleteBoard(id: string) {
       const ws = ctx.workspace();
-      if (id === ws.home || !ws.boards[id]) return;
+      // A board in a share this person can only view or comment on stays (job 161).
+      if (id === ws.home || !ws.boards[id] || ctx.viewOnly(id)) return;
       if (ctx.state.boards.open === id) {
         const path = pathTo(ws, id);
         openBoard(path.length > 1 ? path[path.length - 2] : ws.home);

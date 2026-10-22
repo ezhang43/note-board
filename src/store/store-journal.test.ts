@@ -175,7 +175,7 @@ describe('Journal panel', () => {
     const shared = s.newBoard();
     s.renameBoard('Journal');
     s.openBoard(home);
-    s.setShares([{ id: 's1', root: shared, boards: [shared], owner: false, ownerUid: 'alice', people: [], link: null }], true);
+    s.setShares([{ id: 's1', root: shared, boards: [shared], owner: false, ownerUid: 'alice', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     s.openJournal();
     expect(s.getState().ui.journalBoard).not.toBe(shared);
     expect(s.workspace().boards[shared].cards).toEqual({});
@@ -218,7 +218,7 @@ describe('Journal panel', () => {
     s.openJournal();
     const id = s.getState().ui.journalBoard!;
     const note = journalNotes(s)[0];
-    s.setShares([{ id: 's1', root: id, boards: [id], owner: true, ownerUid: 'me', people: [], link: null }], true);
+    s.setShares([{ id: 's1', root: id, boards: [id], owner: true, ownerUid: 'me', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     s.undoJournal(); // would take today's note away
     expect(journalNotes(s)).toEqual([note]);
     s.setJournal(note.id, fromPlain('secret'));

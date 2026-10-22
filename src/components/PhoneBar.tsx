@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShareButton } from './SharePanel';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { CoffeeIcon, HistoryIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
 import {
   CleanUpButton,
@@ -28,6 +28,8 @@ import { HabitsButton } from './HabitsPanel';
 export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
   const canUndo = useAppState((s) => s.ui.canUndo);
   const canRedo = useAppState((s) => s.ui.canRedo);
+  // A read-only board (job 161): no Undo, Redo, Add or arranging; text size stays.
+  const viewOnly = useViewOnly();
   const [open, setOpen] = useState<'add' | 'more' | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -51,7 +53,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
 
   return (
     <div ref={root} className="phone-bar-wrap">
-      {open === 'add' && (
+      {open === 'add' && !viewOnly && (
         <div className="phone-sheet phone-add" role="menu" aria-label="Add">
           <button type="button" role="menuitem" onClick={() => add('note')}>
             Note
@@ -105,18 +107,22 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
               Arrange
             </h2>
             <div className="phone-row">
-              <ToolGroup />
+              {!viewOnly && <ToolGroup />}
               <TextSizeButtons />
             </div>
-            <div className="phone-rows">
-              <SnapButton />
-              <ColourControl />
-            </div>
-            <div className="phone-trio">
-              <CollapseAllButton labelled />
-              <SameWidthButton labelled />
-              <CleanUpButton labelled />
-            </div>
+            {!viewOnly && (
+              <>
+                <div className="phone-rows">
+                  <SnapButton />
+                  <ColourControl />
+                </div>
+                <div className="phone-trio">
+                  <CollapseAllButton labelled />
+                  <SameWidthButton labelled />
+                  <CleanUpButton labelled />
+                </div>
+              </>
+            )}
           </section>
           <section className="phone-rest" aria-labelledby="phone-rest">
             <h2 id="phone-rest" className="phone-label">
@@ -145,15 +151,19 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
         </div>
       )}
       <nav className="phone-bar" role="toolbar" aria-label="Board actions">
-        <button type="button" aria-label="Undo" aria-disabled={canUndo ? undefined : true} onClick={appStore.undo}>
-          <UndoIcon />
-        </button>
-        <button type="button" aria-label="Redo" aria-disabled={canRedo ? undefined : true} onClick={appStore.redo}>
-          <RedoIcon />
-        </button>
-        <button type="button" className="phone-add-button" aria-label="Add" aria-haspopup="menu" aria-expanded={open === 'add'} onClick={() => toggle('add')}>
-          <PlusIcon size={22} />
-        </button>
+        {!viewOnly && (
+          <>
+            <button type="button" aria-label="Undo" aria-disabled={canUndo ? undefined : true} onClick={appStore.undo}>
+              <UndoIcon />
+            </button>
+            <button type="button" aria-label="Redo" aria-disabled={canRedo ? undefined : true} onClick={appStore.redo}>
+              <RedoIcon />
+            </button>
+            <button type="button" className="phone-add-button" aria-label="Add" aria-haspopup="menu" aria-expanded={open === 'add'} onClick={() => toggle('add')}>
+              <PlusIcon size={22} />
+            </button>
+          </>
+        )}
         <button type="button" aria-label="More" aria-haspopup="dialog" aria-expanded={open === 'more'} onClick={() => toggle('more')}>
           <MoreIcon />
         </button>

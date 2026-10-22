@@ -68,7 +68,7 @@ describe('startFromTemplate on an empty board', () => {
   it('does not rename a board someone shared with this person (review finding), but fills it', () => {
     const { s } = setup();
     const open = s.getState().boards.open;
-    s.setShares([{ id: 's1', root: open, boards: [open], owner: false, ownerUid: 'a', people: [], link: null }], true);
+    s.setShares([{ id: 's1', root: open, boards: [open], owner: false, ownerUid: 'a', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     expect(s.startFromTemplate(weekly.id)).toBe('filled');
     expect(s.getState().board.name).toBe(DEFAULT_BOARD_NAME);
     expect(s.getState().board.order).toHaveLength(4);

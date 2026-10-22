@@ -901,7 +901,7 @@ describe('changes from another device replacing work done here', () => {
   it('a shared board changed by someone else doesn’t save one (only the person’s own boards count)', async () => {
     const { store, versions, clock } = setup();
     const id = store.newBoard();
-    store.setShares([{ id: 's1', root: id, boards: [id], owner: false, ownerUid: 'bob', people: [], link: null }], true);
+    store.setShares([{ id: 's1', root: id, boards: [id], owner: false, ownerUid: 'bob', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     store.openBoard(store.getState().boards.home);
     store.renameBoard('Work');
     await settled();

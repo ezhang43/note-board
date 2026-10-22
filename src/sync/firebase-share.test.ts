@@ -430,7 +430,7 @@ describe('links in a private record and joining through joins (job 161)', () => 
   it('the link comes from the private record, or from the share itself for one from before', async () => {
     put({ 'shared/s1': oldShare, 'shared/s1/members/u1': { name: 'Eric', photo: null, joinedAt: 0 } });
     const links: (string | null)[] = [];
-    collabRemote(user).watchShare('s1', (d) => links.push(d?.link ?? null), () => {});
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.links?.edit ?? null), () => {});
     await ticks();
     fs.answerWatches();
     await ticks();
@@ -450,16 +450,16 @@ describe('links in a private record and joining through joins (job 161)', () => 
 
   it('turning the link on or off writes the private record and takes the key out of the share', async () => {
     put({ 'shared/s1': oldShare });
-    await arrived(collabRemote(user).setLink('s1', 'k2'));
+    await arrived(collabRemote(user).makeLink('s1', 'edit', { edit: 'k2', comment: 'c2', view: 'v2' }));
     expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: 'k2' });
     expect(fs.server.get('shared/s1')).toMatchObject({ link: null, rev: 1 });
-    await arrived(collabRemote(user).setLink('s1', null));
+    await arrived(collabRemote(user).linksOff('s1'));
     expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: null });
   });
 
   it('removing someone takes their records and changes a link that is on (moved out of a share from before)', async () => {
     put({ 'shared/s1': oldShare, 'shared/s1/members/u2': { name: 'Ann', photo: null, key: 'old-key', joinedAt: 0 }, 'shared/s1/joins/u2': { key: 'old-key' } });
-    await arrived(collabRemote(user).removePerson('s1', 'u2', 'k2'));
+    await arrived(collabRemote(user).removePerson('s1', 'u2', { edit: 'k2', comment: 'c2', view: 'v2' }));
     expect(fs.server.has('shared/s1/members/u2')).toBe(false);
     expect(fs.server.has('shared/s1/joins/u2')).toBe(false);
     expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: 'k2' });
@@ -468,7 +468,7 @@ describe('links in a private record and joining through joins (job 161)', () => 
 
   it('removing someone while the link is off leaves it off', async () => {
     put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/private/links': { edit: null }, 'shared/s1/members/u2': { name: 'Ann', photo: null, role: 'edit', joinedAt: 0 } });
-    await arrived(collabRemote(user).removePerson('s1', 'u2', 'k2'));
+    await arrived(collabRemote(user).removePerson('s1', 'u2', { edit: 'k2', comment: 'c2', view: 'v2' }));
     expect(fs.server.get('shared/s1/private/links')).toEqual({ edit: null });
     expect(fs.server.has('shared/s1/members/u2')).toBe(false);
   });
@@ -513,7 +513,7 @@ describe('links in a private record and joining through joins (job 161)', () => 
     put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/members/u1': { name: 'Eric', photo: null, role: 'edit', joinedAt: 0 } });
     fs.server.set('shared/s1/private/links', { edit: 'k' });
     const links: (string | null | undefined)[] = [];
-    collabRemote(user).watchShare('s1', (d) => links.push(d?.link), () => {});
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.links?.edit), () => {});
     await ticks();
     expect(links.length).toBeGreaterThan(0);
     expect(links).not.toContain(null);
@@ -527,11 +527,13 @@ describe('links in a private record and joining through joins (job 161)', () => 
   it('once the private record is refused (no longer an editor, say), its key isn’t offered any more', async () => {
     put({ 'shared/s1': { ...oldShare, link: null }, 'shared/s1/members/u1': { name: 'Eric', photo: null, role: 'edit', joinedAt: 0 }, 'shared/s1/private/links': { edit: 'k' } });
     const links: (string | null | undefined)[] = [];
-    collabRemote(user).watchShare('s1', (d) => links.push(d?.link), () => {});
+    collabRemote(user).watchShare('s1', (d) => links.push(d?.links?.edit), () => {});
     await ticks();
     fs.answerWatches();
     await ticks();
     expect(links.at(-1)).toBe('k');
+    // Made a viewer (the person who shared it lowered them).
+    for (const m of [fs.server, fs.local]) m.set('shared/s1/members/u1', { name: 'Eric', photo: null, role: 'view', joinedAt: 0 });
     fs.denied.add('shared/s1/private/links');
     fs.answerWatches();
     await ticks();

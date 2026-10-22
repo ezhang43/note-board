@@ -57,7 +57,9 @@ export function demoBackend(person: Person) {
     join: async (_who, ...args) => (await call('join', ...args)) === true,
     leave: async (_who, ...args) => void (await call('leave', ...args)),
     removePerson: async (_who, ...args) => void (await call('removePerson', ...args)),
-    setLink: async (_who, ...args) => void (await call('setLink', ...args)),
+    makeLink: async (_who, ...args) => void (await call('makeLink', ...args)),
+    linksOff: async (_who, ...args) => void (await call('linksOff', ...args)),
+    setRole: async (_who, ...args) => void (await call('setRole', ...args)),
     deleteShare: async (_who, ...args) => void (await call('deleteShare', ...args)),
   };
   return serverBackend(server, person);

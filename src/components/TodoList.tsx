@@ -1,7 +1,7 @@
-import { boxProps } from './textBox';
+import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
-import { memo, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
@@ -20,6 +20,8 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
 /** A to-do list's body: title, open items, and the "Completed" section. */
 export function TodoBody({ card }: { card: TodoCard }) {
   const { open, done } = sections(card.items);
+  // A read-only board's Completed section stays as it was left (opening it would change the board, job 161).
+  const readOnly = use(BoardReadOnly);
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
 
@@ -52,6 +54,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
               type="button"
               className="completed-toggle"
               aria-expanded={card.completedOpen}
+              disabled={readOnly}
               onClick={() => appStore.toggleCompletedSection(card.id)}
             >
               <ChevronIcon collapsed={!card.completedOpen} />
@@ -79,6 +82,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
 
 const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const readOnly = use(BoardReadOnly);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
   const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
   const picked = useAppState((s) => {
@@ -163,7 +167,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       <label className="tick">
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done || leaving} onChange={() => appStore.toggleItem(cardId, item.id)} />
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done || leaving} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} />
       </label>
       <GrowTextarea
         ref={ref}

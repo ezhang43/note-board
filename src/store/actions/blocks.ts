@@ -10,7 +10,7 @@ import { webAddress } from '../../model/media';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
-import { boardRights, restorable } from '../../model/sharing';
+import { boardRights, restorable, VIEW_ONLY_NOTE } from '../../model/sharing';
 import { FONT_KEY, nextFontSize } from '../../model/font';
 import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
 import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
@@ -55,16 +55,18 @@ export function blockActions(ctx: StoreContext) {
   /** A backup of several boards, or any backup while there are several boards here. */
   const replacesEveryBoard = (ws: Workspace) => Object.keys(ws.boards).length > 1 || Object.keys(ctx.state.boards.others).length > 0;
 
-  /** Put newly pasted / duplicated blocks on the board and select them. */
-  function placeCopies(entries: ClipEntry[], times: number) {
+  /** Put newly pasted / duplicated blocks on the board and select them. False where the board can't be changed (an old version, a read-only board). */
+  function placeCopies(entries: ClipEntry[], times: number): boolean {
     let ids: string[] = [];
     const board = commit((b) => {
       const pasted = pasteBlocks(b, entries, times);
       ids = pasted.ids;
       return { board: pasted.board, ui: { selection: ids, confirm: null } };
-    })!;
+    });
+    if (!board) return false;
     // Pasted blocks keep their spot; whatever they would cover moves out of the way.
     requestSettle(ids.map((id) => B.topLevelOf(board, id)));
+    return true;
   }
 
   /**
@@ -75,12 +77,13 @@ export function blockActions(ctx: StoreContext) {
    */
   function cleanUpLists(now: Date, onlyCardId?: string): number {
     let moved = 0;
-    commit((b) => {
+    const done = commit((b) => {
       const result = cleanUp(b, dayKey(now), { type: 'loose', x: 0, y: 0 }, undefined, onlyCardId);
       if (!result.count) return null;
       moved = result.count;
       return { board: result.board, ui: { selection: onlyCardId ? [onlyCardId] : [], itemSel: null, confirm: null } };
     });
+    if (!done) return 0; // refused (an old version, a read-only board)
     if (moved) announce(`${count(moved, 'item')} moved to the Completed panel`);
     return moved;
   }
@@ -328,6 +331,7 @@ export function blockActions(ctx: StoreContext) {
      */
     importFile(text: Parameters<typeof readImport>[1], name = 'board.md'): { added: number; note: string } {
       // The browser's parser only builds a tree: no scripts run and nothing is loaded.
+      if (ctx.viewOnly()) return { added: 0, note: VIEW_ONLY_NOTE };
       const { cards, note } = readImport(name, text, (html) => new DOMParser().parseFromString(html, 'text/html'));
       if (!cards.length) return { added: 0, note };
       const ids = cards.map((c) => c.id);
@@ -453,6 +457,7 @@ export function blockActions(ctx: StoreContext) {
     },
     /** A container's trash can: asks first when it has cards; an empty one goes at once, with Undo (owner, 2026-10-22). */
     askDeleteColumn(id: string) {
+      if (ctx.viewOnly()) return; // nothing is deleted on a read-only board (job 161), so nothing is asked
       if (hasCards(ctx.state.board, id)) updateUi({ confirm: { columnId: id, ids: [id] } });
       else deleteBlocks([id], { confirm: null, colourMenuOpen: false });
     },
@@ -471,6 +476,7 @@ export function blockActions(ctx: StoreContext) {
       if (ui.drag || ui.resize) return true;
       const ids = liveSelection(board);
       if (!ids.length) return false;
+      if (ctx.viewOnly()) return true; // nothing is deleted on a read-only board (job 161), so nothing is asked
       const firstColumn = ids.find((id) => hasCards(board, id));
       if (firstColumn) {
         updateUi({ confirm: { columnId: firstColumn, ids } });
@@ -490,15 +496,13 @@ export function blockActions(ctx: StoreContext) {
     paste(): boolean {
       if (!clipboard) return false;
       clipboard.pastes += 1;
-      placeCopies(clipboard.entries, clipboard.pastes);
-      return true;
+      return placeCopies(clipboard.entries, clipboard.pastes);
     },
     /** Ctrl+D: copies of the selection, 40px down and right. Leaves the clipboard alone. */
     duplicate(): boolean {
       const entries = copyBlocks(ctx.state.board, liveSelection(ctx.state.board));
       if (!entries.length) return false;
-      placeCopies(entries, 1);
-      return true;
+      return placeCopies(entries, 1);
     },
 
     /**

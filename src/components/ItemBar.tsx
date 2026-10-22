@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { appStore, useAppState } from '../store/appStore';
+import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { panToShow } from '../model/view';
 import { canvasRect } from './canvasDom';
 import { caretLine } from './caret';
@@ -33,6 +33,7 @@ export function ItemBar() {
   const [cover, setCover] = useState(0);
   const bar = useRef<HTMLDivElement>(null);
   const canUndo = useAppState((s) => s.ui.canUndo);
+  const viewOnly = useViewOnly();
 
   // Keep the line being typed in on screen (owner request, "audit job B"): below the top bar (or the
   // part of the page the phone has scrolled away), above the keyboard and this bar, and between the
@@ -98,7 +99,7 @@ export function ItemBar() {
     if (typing) keepCaretClear();
   }, [typing, cover]);
 
-  if (!typing?.item) return null;
+  if (!typing?.item || viewOnly) return null; // nothing to do to an item on a read-only board (job 161)
   const { field } = typing;
   const { cardId, itemId } = typing.item;
   const button = (label: string, icon: ReactNode, act: () => void, disabled = false) => (

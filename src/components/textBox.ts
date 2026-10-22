@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { createContext, type CSSProperties } from 'react';
 import { styleCss, type Box } from '../model/textStyle';
 import type { TextStyle } from '../model/types';
 
@@ -26,6 +26,9 @@ export function focusedBox(): { box: Box; field: HTMLInputElement | HTMLTextArea
   const box = key ? boxFromKey(key) : null;
   return box ? { box, field } : null;
 }
+
+/** Every text box on a read-only board is read-only (job 161): the Canvas says which, for all of them. */
+export const BoardReadOnly = createContext(false);
 
 /** Props for a text box: its name and its format. */
 export function boxProps(box: Box, style: TextStyle | undefined): { box: string; boxStyle: CSSProperties } {

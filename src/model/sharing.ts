@@ -58,16 +58,30 @@ export function groupBoardIds(ws: Workspace, root: string, agreed: Record<string
  * What this person may do with board `boardId` (owner request: editing together). A board someone
  * shared with them is renamed and deleted only by whoever shared it, and versions of any board in
  * that share are restored only by them. Deleting a board this person shared deletes it for everyone.
- * The home board is never deleted.
+ * The home board is never deleted. Nothing in a share they can only view or comment on is renamed or
+ * deleted by them (job 161).
  */
-export function boardRights(shares: { root: string; boards: string[]; owner: boolean }[], boardId: string, home: string) {
+export function boardRights(shares: { root: string; boards: string[]; owner: boolean; role?: string }[], boardId: string, home: string) {
   const sharedWithMe = shares.some((s) => s.root === boardId && !s.owner);
+  const readOnly = viewOnly(shares, boardId);
   return {
-    rename: !sharedWithMe,
-    delete: boardId !== home && !sharedWithMe,
+    rename: !sharedWithMe && !readOnly,
+    delete: boardId !== home && !sharedWithMe && !readOnly,
     deleteForEveryone: shares.some((s) => s.root === boardId && s.owner),
     restore: !restorable(shares, [boardId]).kept.length,
   };
+}
+
+/** Said when something can't be put on a read-only board (job 161). */
+export const VIEW_ONLY_NOTE = 'You can only view this board, so nothing was added to it.';
+
+/**
+ * Whether board `boardId` is in a share this person may only view or comment on (job 161): nothing
+ * on it can be changed here. A role not known yet counts as Can edit, as before roles (the server
+ * refuses a change it doesn't allow, and sharing then puts it back).
+ */
+export function viewOnly(shares: { boards: string[]; role?: string }[], boardId: string): boolean {
+  return shares.some((s) => (s.role === 'view' || s.role === 'comment') && s.boards.includes(boardId));
 }
 
 /**

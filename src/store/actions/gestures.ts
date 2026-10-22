@@ -39,7 +39,8 @@ export function gestureActions(ctx: StoreContext) {
 
   return {
     // ---------- dragging a new card or column from the toolbar ----------
-    startNewDrag: (kind: NewDrag['kind']) => updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
+    // Nothing is moved, resized or added on a read-only board (job 161): these gestures don't start there.
+    startNewDrag: (kind: NewDrag['kind']) => !ctx.viewOnly() && updateUi({ newDrag: { kind, at: null, overColumn: null, land: null }, confirm: null }),
     /**
      * The pointer moved: `at` is where it is on the canvas (null when off the board), `boardAt` the
      * same point in board coordinates. On empty board the block would appear with its top edge
@@ -74,6 +75,7 @@ export function gestureActions(ctx: StoreContext) {
 
     // ---------- dragging blocks ----------
     startDrag(kind: Drag['kind'], id: string, x: number, y: number) {
+      if (ctx.viewOnly()) return;
       const { board, ui } = ctx.state;
       const sel = ui.selection;
       const topLevel = board.order.includes(id);
@@ -161,6 +163,7 @@ export function gestureActions(ctx: StoreContext) {
     // ---------- resizing ----------
     /** Show a resize in progress (the board itself only changes when the pointer is released). */
     showResize(resize: Resize) {
+      if (ctx.viewOnly()) return;
       // The first call of a drag still sees the block as it was (its height is not measured again yet).
       const rect = !ctx.state.ui.resize || resizeStart?.id !== resize.id ? blockRect(ctx.state.board, resize.id, measured) : null;
       if (rect) resizeStart = { id: resize.id, rect };

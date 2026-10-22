@@ -64,7 +64,7 @@ describe('a board back from a deleted share (review 137-A M3)', () => {
 
   it('also when the list of shares changing on screen is what says so', async () => {
     const { store, fake, trip, shared, online } = setup();
-    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], link: null }], true);
+    store.setShares([{ id: 's1', root: trip, boards: [trip], owner: true, ownerUid: 'me', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
     fake.send({ data: online, client: 'other-device' });
     shared.delete(trip);
     store.setShares([], true);

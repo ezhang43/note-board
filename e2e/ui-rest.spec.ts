@@ -157,8 +157,8 @@ test('the Share panel says "Copied" only for the link that was copied', async ({
   await share.getByRole('button', { name: 'Copy link' }).click();
   await expect(share.getByRole('button', { name: 'Copied' })).toBeVisible();
   // A new link (turned off, then on again) has not been copied.
-  await share.getByRole('button', { name: 'Turn link off' }).click();
-  await share.getByRole('button', { name: 'Turn link on', exact: true }).click();
+  await share.getByRole('button', { name: 'Turn links off' }).click();
+  await share.getByRole('button', { name: 'Make an edit link' }).click();
   await expect(share.getByRole('button', { name: 'Copy link' })).toBeVisible();
   await expect(share.getByRole('button', { name: 'Copied' })).toHaveCount(0);
   await context.close();

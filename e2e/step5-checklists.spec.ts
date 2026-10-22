@@ -231,8 +231,8 @@ test('drag an item into another list, or onto empty list space to append', async
   expect(await texts(b)).toEqual(['b1', 'a1']);
   expect(await texts(a)).toEqual(['a2']);
 
-  const title = await box(b.getByLabel('List title'));
-  await dragItem(page, rowWithText(a, 'a2'), { x: title.x + title.width - 20, y: title.y + 10 } /* the title band, past the text */, async () => {
+  const blank = await box(b.locator('.card-meta')); // the blank part of the title row, past the text
+  await dragItem(page, rowWithText(a, 'a2'), { x: blank.x + blank.width / 2, y: blank.y + blank.height / 2 }, async () => {
     await expect(b).toHaveClass(/append-target/);
     // The whole card is outlined, top included, so you can tell the item goes into it (owner request).
     const ring = await b.evaluate((el) => { const s = getComputedStyle(el); return [s.outlineStyle, s.outlineWidth]; });
@@ -274,6 +274,24 @@ test('dragging a whole list onto another list pours its items in, and the dragge
   await expect(a).toHaveCount(1);
   expect(await texts(a)).toEqual(['a1', 'a1 sub', 'a2', 'a3']);
   expect(await texts(b)).toEqual(['b1', 'b2']);
+});
+
+test('a whole list dragged over a collapsed list does not pour into it (its title row is not a drop target)', async ({ page }) => {
+  const a = await makeList(page, ['a1']);
+  const b = await makeList(page, ['b1']);
+  await b.getByRole('button', { name: 'Collapse card' }).click();
+  await clickEmpty(page);
+  const target = await box(b);
+  const grab = await grabPoint(a);
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x + 40, target.y + target.height / 2, { steps: 12 });
+  await expect(b).not.toHaveClass(/append-target/);
+  await page.mouse.up();
+  await expect(cards(page)).toHaveCount(2);
+  await b.getByRole('button', { name: 'Expand card' }).click();
+  expect(await texts(b)).toEqual(['b1']);
+  expect(await texts(a)).toEqual(['a1']);
 });
 
 test('items dropped on a collapsed list go into it; it stays collapsed', async ({ page }) => {

@@ -150,7 +150,7 @@ test('the grips are never on top of a button, a tick box, an item grip or a text
   expect(await coveredByGrips(col)).toEqual([]);
   await note.getByRole('button', { name: 'Collapse card' }).click();
   expect(await coveredByGrips(note)).toEqual([]);
-  await list.click({ position: { x: 30, y: 18 } });
+  await list.click({ position: { x: 8, y: 18 } });
   await list.getByRole('button', { name: 'Collapse card' }).click();
   expect(await coveredByGrips(list)).toEqual([]);
 });

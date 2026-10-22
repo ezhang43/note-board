@@ -113,7 +113,7 @@ test('Alt + arrows also work from a selected card, and with nothing selected sta
   await expect(page.locator('.card.selected')).toHaveCount(1);
 
   // From a selected (not edited) card.
-  await first.click({ position: { x: 30, y: 18 } });
+  await first.click({ position: { x: 8, y: 18 } });
   const a = await box(first);
   const b = await box(second);
   const dir = Math.abs(b.y - a.y) > Math.abs(b.x - a.x) ? (b.y > a.y ? 'ArrowDown' : 'ArrowUp') : b.x > a.x ? 'ArrowRight' : 'ArrowLeft';

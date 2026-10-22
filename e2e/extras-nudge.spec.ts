@@ -5,7 +5,7 @@ import { add, box, cards, columns, freshBoardEachTest, looseCards } from './help
 
 freshBoardEachTest();
 
-const cardHeader = { position: { x: 30, y: 15 } };
+const cardHeader = { position: { x: 8, y: 18 } };
 
 test('arrow keys move a selected card one grid step, Shift + arrow five', async ({ page }) => {
   await add(page, 'Note');

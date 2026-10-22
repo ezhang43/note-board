@@ -800,7 +800,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 /*
  * No title band (owner decision 2026-10-16): cards are white with a bold title. A colour picked in
- * the Color menu tints the header (and a list's or link's title under it) lightly; the ink stays usual.
+ * the Color menu tints the header, which holds a list's or link's title, lightly; the ink stays usual.
  */
 .card.tinted .card-header {
   margin: 0 -12px;
@@ -811,17 +811,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* A collapsed card is all header: its color fills the whole card, whatever its height, into the rounded corners (owner request, 2026-10-21). */
 .card.tinted.collapsed { background: var(--tint); }
 .card.tinted.collapsed .card-header { border-radius: 9px; }
-/* The title spans the card, so the tint can reach both edges. */
-.todo-body > .card-title:first-child,
-.link-body > .card-title:first-child {
-  align-self: stretch;
-  max-width: none;
-  margin: 0 -12px 4px;
-  padding: 0 12px 8px;
-}
-.card.tinted :is(.todo-body, .link-body) > .card-title:first-child { background: var(--tint); }
 /* A bold tint is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
-.card.bold-tint :is(.card-header, .todo-body > .card-title:first-child, .link-body > .card-title:first-child) {
+.card.bold-tint .card-header {
   --ink-soft: var(--tint-text);
   --ink-faint: var(--tint-text);
   --placeholder: var(--tint-text);
@@ -853,14 +844,24 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 :is(.card-header, .column-actions) > .icon-button { width: var(--btn); height: var(--btn); }
 :is(.card-header, .column-actions) > .icon-button svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
 :is(.card-header, .column-actions) .collapse-arrow { stroke-width: 1.4; }
+/*
+ * The button row. A list's, link's or board's title shares it (owner pick, 2026-10-22: no empty band above the
+ * title): the title takes what the buttons leave and shrinks before they move; the row grows with a bigger title.
+ */
 .card-header {
-  height: max(36px, calc(var(--btn) + 4px));
+  min-height: max(36px, calc(var(--btn) + 4px));
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
   margin-right: -6px;
 }
+/* Drawn first, but last in the page order: Tab goes collapse, delete, title, items, as it did when the buttons were above the title. */
+.card-header > .card-title { order: -1; flex: 0 1 auto; min-width: 0; align-self: center; }
+/* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
+.card-header + :is(.todo-body, .link-body, .board-body) { padding-top: 8px; }
+/* A board card's name is plain text, so it wraps (a long board name) rather than being cut off. */
+.board-title { padding: 6px 4px; overflow-wrap: anywhere; }
 .card-meta {
   flex-grow: 1;
   min-width: 0;
@@ -1281,11 +1282,12 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 /*
  * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
  * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
+ * Move up / Move down are not in that strip: they float in a small pill over the free end of the row above
+ * (owner pick, 2026-10-22, replacing the 92px strip that held all four and left the text 97px of a 226px card).
  */
-.todo-item { padding-right: calc(72px * var(--bs)); }
+.todo-item { padding-right: calc(40px * var(--bs)); }
 .item-grip,
-.item-trash,
-.item-arrow {
+.item-trash {
   position: absolute;
   z-index: 1;
   flex-shrink: 0;
@@ -1300,54 +1302,82 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 }
 .todo-item:hover .item-grip,
 .todo-item:hover .item-trash,
-.todo-item:hover .item-arrow,
 .item-grip:focus-visible,
-.item-trash:focus-visible,
-.item-arrow:focus-visible { opacity: 1; }
+.item-trash:focus-visible { opacity: 1; }
 /* The buttons' sizes below all multiply by --bs (the text size step, see .todo-item); their height follows the item's first line. */
 .item-grip { top: 3px; right: 0; width: calc(14px * var(--bs)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
 .item-grip svg { width: calc(8px * var(--bs)); height: calc(12px * var(--bs)); }
 .item-trash { top: 2px; right: calc(16px * var(--bs)); width: calc(24px * var(--bs)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
 .item-trash svg { width: calc(14px * var(--bs)); height: calc(14px * var(--bs)); }
-.item-arrow { top: 2px; width: calc(16px * var(--bs)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-arrow svg { width: calc(14px * var(--bs)); height: calc(14px * var(--bs)); }
-.item-up { right: calc(56px * var(--bs)); }
-.item-down { right: calc(40px * var(--bs)); }
-@media (hover: hover) {
-  .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
-}
-/* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
-.todo-item:hover .item-arrow[aria-disabled='true'], .item-arrow[aria-disabled='true']:focus-visible { opacity: 0.3; cursor: default; }
 @media (hover: hover) {
   .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 }
 /*
- * On a computer the controls are bigger (owner request, 2026-10-19): arrows 22px wide, trash 28px, grip 18px,
- * in the same order and flush with each other, so the strip kept free for them grows from 72px to 92px.
- * Touch screens (no hover) keep the sizes above. All of them grow with the text size step (owner request,
- * 2026-10-21), as tall as the item's first line, so at Small and Normal they are as before.
+ * On a computer the controls are bigger (owner request, 2026-10-19): trash 28px, grip 18px, flush with each other, so
+ * the strip kept free for them is 46px. The arrows are 22px wide. All of them grow with the text size step (owner
+ * request, 2026-10-21), as tall as the item's first line, so at Small and Normal they are as before. Touch screens
+ * (no hover) keep the sizes above and have no arrows here.
  */
 @media (hover: hover) {
-  .todo-item { padding-right: calc(92px * var(--bs)); }
-  .item-grip, .item-trash, .item-arrow { top: 0; height: var(--bh); }
+  .todo-item { padding-right: calc(46px * var(--bs)); }
+  .item-grip, .item-trash { top: 0; height: var(--bh); }
   .item-grip { width: calc(18px * var(--bs)); }
   .item-grip svg { width: calc(10px * var(--bs)); height: calc(15px * var(--bs)); }
-  .item-trash { right: calc(20px * var(--bs)); width: calc(28px * var(--bs)); }
+  .item-trash { right: calc(18px * var(--bs)); width: calc(28px * var(--bs)); }
   .item-trash svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
-  .item-arrow { width: calc(22px * var(--bs)); }
+  /*
+   * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
+   * strip the row above keeps free (never over its text; two 22px arrows fit the 46px strip). The first row of a list
+   * or of the Completed section has the card's buttons, or the Clean up links, above it, so its pill is below it.
+   * It stays in the layout, faded and out of the pointer's way, so the keyboard can still reach it and show it.
+   */
+  .item-arrows {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: calc(100% - 2px);
+    display: flex;
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--control-edge), 0 4px 12px rgba(31, 29, 26, 0.12);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms;
+  }
+  .todo-items > .todo-item:first-child .item-arrows,
+  .completed-head + .todo-item .item-arrows { bottom: auto; top: calc(100% - 2px); }
+  .todo-item:hover .item-arrows,
+  .item-arrows:focus-within { opacity: 1; pointer-events: auto; }
+  .item-arrow {
+    flex-shrink: 0;
+    width: calc(22px * var(--bs));
+    height: var(--bh);
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 100ms var(--ease-out);
+  }
   .item-arrow svg { width: calc(18px * var(--bs)); height: calc(18px * var(--bs)); }
-  .item-up { right: calc(70px * var(--bs)); }
-  .item-down { right: calc(48px * var(--bs)); }
+  .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
+  /* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
+  .item-arrow[aria-disabled='true'] { opacity: 0.3; cursor: default; }
 }
 /*
  * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
  * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
  */
 @media (hover: none) {
-  .item-grip, .item-trash, .item-arrow { visibility: hidden; }
+  .item-grip, .item-trash { visibility: hidden; }
   .todo-item:hover .item-grip, .todo-item:hover .item-trash { opacity: 0; }
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
-  /* The phone already has Move up / Move down in the row above the keyboard, so the arrows never show and keep no room. */
+  /* The phone already has Move up / Move down in the row above the keyboard, so the pill never shows and keeps no room. */
+  .item-arrows { display: none; }
   .todo-item { padding-right: calc(40px * var(--bs)); }
 }
 /*
@@ -1766,7 +1796,7 @@ html[data-input='keys'] .column {
   .icon-button { position: relative; }
   .icon-button::before { content: ''; position: absolute; inset: -6px; }
   .card-header > .icon-button::before { top: -12px; bottom: -2px; }
-  .card-header > .icon-button:first-of-type::before { left: -12px; right: -4px; }
+  .card-header > .icon-button:first-of-type::before { left: -10px; right: -4px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
   .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
@@ -1787,7 +1817,7 @@ html[data-input='keys'] .column {
   .resize-edge::before { top: 0; bottom: 0; left: 0; right: -34px; }
 }
 @media (pointer: coarse) and (hover: hover) {
-  /* The Move down arrow sits right beside the trash can, so its press area stops at the trash's own edge. */
+  /* Nothing beside the trash can but the row's text, so its press area stops at its own edge rather than cover words. */
   .item-trash::before { left: 0; }
 }
 
@@ -1958,7 +1988,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
    untouchable (the drawing code sets it fully visible in the picture), and none of the controls
    (resize grips, trash cans, drag handles, guides) are in the picture. */
 .export-clone { position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none; }
-.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .completed-actions, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
+.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .item-arrows, .completed-actions, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
 
 /* ---------- File menu (owner request: backup, restore, import) ---------- */
 
@@ -2131,8 +2161,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   .board-path-link:hover { background: var(--hover); color: var(--ink); }
 }
 .board-path-sep { color: var(--ink-faint); padding: 0 2px; }
-.board-body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 12px 12px; }
-.board-card-name { font-weight: 600; font-size: calc(16px * var(--fs, 1)); overflow-wrap: anywhere; }
+/* A board card: its name is the title on the button row (.board-title); the count and Open board sit under it, in line with the title's text. */
+.board-body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0 4px; }
 .board-card-count { color: var(--ink-faint); font-size: calc(13px * var(--fs, 1)); }
 .board-open { height: 32px; }
 
@@ -2266,7 +2296,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
 /* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
-.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrow, .item-trash, .item-grip, .completed-actions) { display: none; }
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .completed-actions) { display: none; }
 
 /*
  * Comments on cards (job 161, PR 4). The chip on a card's header, in the accent tint (smaller than the

@@ -175,6 +175,11 @@ export function Canvas() {
     };
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
+      // A first finger starts a new gesture: any finger still remembered never lifted as far as we saw (an app switch, a removed target).
+      if (e.isPrimary) {
+        fingers.clear();
+        pinch = null;
+      }
       // A tap on a card or container in between means the next tap on the board is not a double tap.
       if (e.target !== el && (e.target as Element).closest('[data-card-id], [data-col-id]')) lastTap.current = null;
       fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });

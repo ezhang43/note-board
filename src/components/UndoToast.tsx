@@ -28,7 +28,15 @@ function Pill({ toast }: { toast: Toast }) {
   return (
     <div className="undo-toast" onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
       <span>{toast.text}</span>
-      <button type="button" onClick={appStore.undoDelete}>
+      <button
+        type="button"
+        onClick={(e) => {
+          // The message goes with this button; focus moves to Redo (always there, and what comes next) instead of dropping to the top of the page.
+          const kept = document.activeElement === e.currentTarget;
+          appStore.undoDelete();
+          if (kept) document.querySelector<HTMLElement>('button[aria-label^="Redo"]')?.focus({ preventScroll: true });
+        }}
+      >
         Undo
       </button>
     </div>

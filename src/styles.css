@@ -35,6 +35,9 @@
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
   --colour-dot: #efece6;
   --toolbar-height: 64px;
+  /* Layers, lowest first: a side panel, then the toolbar with its menus (File, Appearance, Boards, ⋯) and the Share panel, which open over it. */
+  --z-side-panel: 5;
+  --z-toolbar: 8;
   /* Motion (Emil Kowalski's skills, owner request 2026-10-19): strong curves, defined once. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -197,7 +200,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 .toolbar {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-toolbar);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1799,7 +1802,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   top: var(--toolbar-height);
   right: 0;
   bottom: 0;
-  z-index: 5;
+  z-index: var(--z-side-panel);
   width: var(--side-width);
   overflow-y: auto;
   padding: 8px 10px 16px;
@@ -2346,7 +2349,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .comment-send span { flex: 1; color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
 .comment-send button { height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
 .comment-send button:disabled { opacity: 0.45; cursor: default; }
-.comment-scrim { position: fixed; inset: 0; z-index: 6; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.comment-scrim { position: fixed; inset: 0; z-index: 9; /* over the toolbar, which is above side panels */ background: color-mix(in srgb, var(--ink) 18%, transparent); }
 .app.phone .comment-thread {
   left: 0;
   right: 0;
@@ -2359,7 +2362,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   border-radius: 14px 14px 0 0;
   padding-bottom: env(safe-area-inset-bottom);
   transform-origin: bottom center;
-  z-index: 7;
+  z-index: 9;
 }
 /* 16px so a phone doesn't zoom in on the box; 44px buttons. */
 .app.phone .comment-write textarea { font-size: 16px; }

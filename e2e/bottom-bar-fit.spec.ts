@@ -31,7 +31,7 @@ const OTHERS = ['Keyboard shortcuts', 'Buy me a coffee', 'Smaller text', 'Larger
 /** Every control is inside the window and left of the panel, and nothing sits on top of it. */
 async function expectAllFit(page: Page, panelLeft: number) {
   for (const name of [...PILL, ...OTHERS]) {
-    const el = dock(page).getByRole(name === 'Buy me a coffee' ? 'link' : 'button', { name, exact: true });
+    const el = dock(page).getByRole(name === 'Buy me a coffee' ? 'link' : 'button', name === 'Reset zoom' ? { name: /^Reset zoom \(\d+%\)$/ } : { name, exact: true });
     await expect(el, name).toBeVisible();
     const box = (await el.boundingBox())!;
     expect(box.x, `${name} left edge`).toBeGreaterThanOrEqual(0);

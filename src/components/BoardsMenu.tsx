@@ -7,6 +7,7 @@ import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely, historyFull } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { ask } from './ConfirmDialog';
+import { arrowThroughMenu } from './menuArrows';
 import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
 import { TemplatesDialog } from './TemplatesDialog';
 
@@ -75,6 +76,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
       ref={wrap}
       onKeyDown={(e) => {
         // Escape shuts the menu (and goes no further, so a side panel behind it stays open).
+        if (open && arrowThroughMenu(e)) return;
         if (e.key !== 'Escape' || !open) return;
         e.stopPropagation();
         setOpen(false);

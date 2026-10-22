@@ -23,6 +23,7 @@ import { feedback, useFeedbackSender } from '../sync/feedback';
 import { AutoSizeInput } from './AutoSizeInput';
 import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
+import { arrowThroughMenu } from './menuArrows';
 import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, HandIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SelectIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
@@ -109,6 +110,7 @@ function usePopover() {
     return () => window.removeEventListener('pointerdown', away, true);
   }, [open]);
   const onKeyDown = (e: KeyboardEvent) => {
+    if (open && arrowThroughMenu(e)) return;
     if (e.key !== 'Escape' || !open) return;
     e.stopPropagation();
     setOpen(false);

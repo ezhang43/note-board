@@ -215,6 +215,17 @@ describe('weight', () => {
     expect(weightChart([], 'week', '2026-10-21')).toMatchObject({ points: [], min: null, max: null });
   });
 
+  it('the chart says where today falls across the period, or null when today is not in it (job 179)', () => {
+    expect(weightChart([], 'week', '2026-10-21', '2026-10-21').todayX).toBeCloseTo(2 / 6);
+    expect(weightChart([], 'week', '2026-10-19', '2026-10-19').todayX).toBe(0);
+    expect(weightChart([], 'month', '2026-10-21', '2026-10-31').todayX).toBe(1);
+    expect(weightChart([], 'month', '2026-10-21', '2026-10-21').todayX).toBeCloseTo(20 / 30);
+    expect(weightChart([], 'year', '2026-03-01', '2026-12-31').todayX).toBe(1);
+    expect(weightChart([], 'week', '2026-10-28', '2026-10-21').todayX).toBeNull(); // a week ahead
+    expect(weightChart([], 'week', '2026-10-14', '2026-10-21').todayX).toBeNull(); // a week back
+    expect(weightChart([], 'week', '2026-10-21').todayX).toBeNull(); // no today given
+  });
+
   it('a leap day is a real day, and the chart reaches both ends of a leap year or February (job #156)', () => {
     expect(weightEntries(weight('2028-02-29 70.0', '2027-02-29 71.0'))).toEqual([{ day: '2028-02-29', kg: 70 }]);
     const year = weightChart([{ day: '2028-01-01', kg: 70 }, { day: '2028-12-31', kg: 71 }], 'year', '2028-06-01');

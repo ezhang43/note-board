@@ -19,6 +19,16 @@ async function save(cache, url) {
   }
 }
 
+// Built files have a name per version, so each publish adds a set that the next one never uses. When the
+// app's page has changed (a new build), the saved built files of the old one go; fonts and the page stay.
+// A page that is the same as the saved one (the usual visit) leaves everything, files loaded on demand included.
+async function dropOldBuild(cache, fresh) {
+  const saved = await cache.match(SCOPE, { ignoreVary: true });
+  if (!saved || (await saved.text()) === (await fresh.text())) return;
+  const built = new URL('assets/', SCOPE).href;
+  for (const req of await cache.keys()) if (req.url.startsWith(built)) await cache.delete(req);
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.add(SCOPE)));
   self.skipWaiting();
@@ -50,9 +60,12 @@ self.addEventListener('fetch', (event) => {
     // The newest page when online (and keep it); the saved page when offline.
     event.respondWith(
       fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          if (res.ok) caches.open(CACHE).then((cache) => cache.put(SCOPE, copy));
+        .then(async (res) => {
+          if (!res.ok) return res;
+          // Saved before the page asks for its files, so a new build's page clears the old build's files first.
+          const cache = await caches.open(CACHE);
+          await dropOldBuild(cache, res.clone()).catch(() => {});
+          await cache.put(SCOPE, res.clone());
           return res;
         })
         .catch(() => caches.match(SCOPE, { ignoreVary: true })),

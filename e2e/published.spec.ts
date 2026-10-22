@@ -105,6 +105,31 @@ test('a new version of the offline copy clears out the old one (so new icons sho
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).includes('note-board-v1'))).toBe(false);
 });
 
+test('a new build of the page clears the old build’s saved files, and the site still opens offline (review 181 C-M3)', async ({ page, context, browserName }) => {
+  await page.goto('./');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await expect.poll(() => page.evaluate(async () => (await (await caches.open('busyants-v5')).keys()).length)).toBeGreaterThan(2);
+  // Pretend the saved copy is of an older build: its page differs and it left a built file behind (and a font).
+  await page.evaluate(async () => {
+    const cache = await caches.open('busyants-v5');
+    const base = new URL('./', location.href).href;
+    await cache.put(base, new Response('<html>an older build</html>'));
+    await cache.put(`${base}assets/stale-0old0.js`, new Response('old'));
+    await cache.put('https://fonts.gstatic.com/stale.woff2', new Response('font'));
+  });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  const kept = await page.evaluate(async () => (await (await caches.open('busyants-v5')).keys()).map((r) => r.url));
+  expect(kept.filter((u) => u.includes('stale-0old0'))).toEqual([]);
+  expect(kept).toContain('https://fonts.gstatic.com/stale.woff2');
+  expect(kept.some((u) => /\/assets\//.test(u))).toBe(true); // this build's own files were saved again
+  test.skip(browserName === 'webkit', "Playwright's WebKit can't fake offline past a service worker");
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  await context.setOffline(false);
+});
+
 test('a share link opened before signing in says a board was shared, and keeps the link for after (owner request: editing together)', async ({ page }) => {
   await page.goto('./?join=sabc123.k3y');
   await expect(page.getByText('Sign in to open the board shared with you.')).toBeVisible();

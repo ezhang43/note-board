@@ -177,7 +177,7 @@ export function habitViewRange(view: HabitView, key: DayKey): { from: DayKey; to
  * The chart for a view: the weights inside it, each placed from 0 to 1 across the days shown (x)
  * and from the lowest (0) to the highest (1) weight (y; a lone weight sits at 0.5).
  */
-export function weightChart(entries: { day: DayKey; kg: number }[], view: HabitView, key: DayKey) {
+export function weightChart(entries: { day: DayKey; kg: number }[], view: HabitView, key: DayKey, today?: DayKey) {
   const { from, to } = habitViewRange(view, key);
   const inView = entries.filter((e) => e.day >= from && e.day <= to);
   const kgs = inView.map((e) => e.kg);
@@ -185,7 +185,9 @@ export function weightChart(entries: { day: DayKey; kg: number }[], view: HabitV
   const max = kgs.length ? Math.max(...kgs) : null;
   const span = (a: DayKey, b: DayKey) => Math.round((Date.parse(`${b}T12:00Z`) - Date.parse(`${a}T12:00Z`)) / 86400000);
   const points = inView.map((e) => ({ ...e, x: span(from, e.day) / span(from, to), y: max === min ? 0.5 : (e.kg - min!) / (max! - min!) }));
-  return { from, to, points, min, max };
+  // Where `today` falls across the period (0 to 1), for the chart's Today mark; null when it is not in the period.
+  const todayX = today !== undefined && today >= from && today <= to ? span(from, today) / span(from, to) : null;
+  return { from, to, points, min, max, todayX };
 }
 
 // Habits redesign (owner picks, 2026-10-22, jobs 166 + 167): a color for each habit and the counts the Ledger shows.

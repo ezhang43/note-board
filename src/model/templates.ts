@@ -1,6 +1,6 @@
 import { createBoard } from './board';
 import { createCard, createColumn, createItem, newId } from './cards';
-import { COLUMN_W } from './constants';
+import { COLUMN_W, GRID } from './constants';
 import type { ColorKey } from './palette';
 import type { Board, NoteCard, TodoCard, TodoItem } from './types';
 
@@ -136,7 +136,7 @@ const itemOf = (i: Item): TodoItem => {
 export function templateBoard(t: Template): Board {
   let board: Board = { ...createBoard(), name: t.name };
   t.containers.forEach((c, i) => {
-    const col = { ...createColumn(newId('c')), title: c.title, color: c.color, x: i * (COLUMN_W + 24), y: 0 };
+    const col = { ...createColumn(newId('c')), title: c.title, color: c.color, x: i * (COLUMN_W + GRID), y: 0 };
     const cards = c.cards.map((b) => {
       if ('note' in b) return { ...(createCard('note') as NoteCard), text: b.note };
       return { ...(createCard('todo') as TodoCard), title: b.list, items: b.items.map(itemOf) };

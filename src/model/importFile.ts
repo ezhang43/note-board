@@ -122,6 +122,7 @@ export function htmlToMarkdown(doc: Document): string {
     const whole = words.map((p) => p.text).join('').trim();
     const href = words.length === 1 && words[0].href ? words[0].href : (/^<?(https?:\/\/[^\s<>]+?)>?$/.exec(whole)?.[1] ?? '');
     if (/^https?:\/\/[^)\s]+$/.test(href)) out.push(whole.replace(/^<|>$/g, '') === href ? href : `[${escapeMarkdown(whole)}](${href})`);
+    else if (/^https?:\/\/[^\s<>]+$/.test(href) && whole.replace(/^<|>$/g, '') === href) out.push(`<${href}>`); // a bare address with a ")" in it
     else {
       const text = parts
         .map((p) => (p.href && /^https?:/.test(p.href) && p.text.trim() !== p.href ? `${escapeMarkdown(p.text)} \\(${escapeMarkdown(p.href)}\\)` : escapeMarkdown(p.text)))

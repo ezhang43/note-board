@@ -2,7 +2,7 @@ import * as B from '../../model/board';
 import { createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { dayKey } from '../../model/calendar';
-import { HABITS_NAME, WEIGHT_TITLE, isWeightDay, parseKg, weightCard, weightEntries, withWeight, withoutWeight } from '../../model/habits';
+import { HABITS_NAME, WEIGHT_TITLE, isWeightDay, parseKg, weightCard, weightEntries, weightHolder, withWeight, withoutWeight } from '../../model/habits';
 import { spotForNewBlock } from '../../model/layout';
 import type { TodoCard } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -27,7 +27,7 @@ export function weightActions(ctx: StoreContext, habitsBoard: () => string | nul
         id = made;
       }
       ctx.commitTo(id, (b) => {
-        const card = weightCard(b);
+        const card = weightCard(b) ?? weightHolder(b);
         if (card) return B.updateCard(b, card.id, (c) => withWeight(c as TodoCard, day, kg));
         const fresh = withWeight({ ...(createCard('todo') as TodoCard), title: WEIGHT_TITLE }, day, kg);
         // Placed with guessed heights (the board isn't drawn), and tidied if that board is ever opened.

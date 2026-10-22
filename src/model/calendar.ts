@@ -221,7 +221,7 @@ function readGuest(raw: unknown): Guest | null {
 export function eventsOnDay(events: CalEvent[], key: DayKey): CalEvent[] {
   const next = addDays(key, 1);
   return events
-    .filter((e) => (e.allDay ? e.start <= key && key < e.end : e.start < `${next}T00:00` && e.end > `${key}T00:00`))
+    .filter((e) => (e.allDay ? e.start <= key && key < e.end : e.start < `${next}T00:00` && (e.end > `${key}T00:00` || e.start === `${key}T00:00`)))
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
 }
 

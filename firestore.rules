@@ -90,20 +90,56 @@ service cloud.firestore {
         && (!('joinedAt' in request.resource.data) || request.resource.data.joinedAt is timestamp);
     }
 
-    // A shared board (with the boards inside it): only the people it is shared with can read or
-    // change it. Only the person who shared it can change the link or delete it.
+    // A shared board (with the boards inside it): only the people it is shared with can read it, and
+    // only its editors change it. Only the person who shared it can change its links, change someone's
+    // role, remove people or delete it.
+    //
+    // Roles (job 161): each member record has a role, 'edit', 'comment' or 'view'; one from before
+    // roles has none, which counts as 'edit'. Each role has its own secret link key, kept in
+    // shared/{sid}/private/links ({edit, comment, view}, each a key or null when off), which only
+    // editors can read. A share from before roles keeps its edit key in the share itself (`link`)
+    // until its owner's app moves it. Joining proves the key in shared/{sid}/joins/{uid}, which nobody
+    // can read, and the member record must have the role that matches the key. Once a comment or view
+    // link was ever made, those fields stay in the links record ("roles in use"): from then on the
+    // share holds no key, and a key in a member record (as the app before roles writes it) lets nobody
+    // in, as every member can read those records.
     match /shared/{sid} {
+      function sharePath() {
+        return /databases/$(database)/documents/shared/$(sid);
+      }
       function memberPath(uid) {
         return /databases/$(database)/documents/shared/$(sid)/members/$(uid);
       }
+      function linksPath() {
+        return /databases/$(database)/documents/shared/$(sid)/private/links;
+      }
       function isMember() {
         return signedIn() && exists(memberPath(request.auth.uid));
+      }
+      function roleOf(member) {
+        return member.get('role', 'edit');
+      }
+      function myRole() {
+        return roleOf(get(memberPath(request.auth.uid)).data);
+      }
+      function isEditor() {
+        return isMember() && myRole() == 'edit';
+      }
+      function rolesIn(links) {
+        return 'comment' in links || 'view' in links;
+      }
+      // The links once this request is done ({} for a share from before roles).
+      function linksAfter() {
+        return existsAfter(linksPath()) ? getAfter(linksPath()).data : {};
+      }
+      function photoOk(photo) {
+        return photo == null || (photo is string && photo.size() <= 2000 && photo.matches('https://.*'));
       }
       function shareFields() {
         return request.resource.data.keys().hasOnly(['owner', 'root', 'link', 'data', 'client', 'rev', 'updatedAt'])
           && boardText(request.resource.data.data)
           && request.resource.data.client is string
-          && (request.resource.data.link == null || request.resource.data.link is string);
+          && (request.resource.data.link == null || (request.resource.data.link is string && !rolesIn(linksAfter())));
       }
 
       allow read: if isMember();
@@ -113,7 +149,7 @@ service cloud.firestore {
         && request.resource.data.rev == 1
         && existsAfter(memberPath(request.auth.uid));
       // Every save counts up by one, so a page can't save over a newer version it hasn't seen.
-      allow update: if isMember() && shareFields()
+      allow update: if isEditor() && shareFields()
         && request.resource.data.owner == resource.data.owner
         && request.resource.data.root == resource.data.root
         && (request.resource.data.rev == resource.data.rev + 1
@@ -121,21 +157,136 @@ service cloud.firestore {
         && (request.resource.data.link == resource.data.link || resource.data.owner == request.auth.uid);
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
 
-      // Everyone who has it. Joining needs the current link's key (or being the person who shared it).
+      // Everyone who has it.
       match /members/{uid} {
         function share() {
-          return getAfter(/databases/$(database)/documents/shared/$(sid)).data;
+          return getAfter(sharePath()).data;
+        }
+        function joinPath() {
+          return /databases/$(database)/documents/shared/$(sid)/joins/$(uid);
+        }
+        // `key` is the current key of `role`'s link (the edit key may still be in a share from before).
+        function keyFor(key, role) {
+          return key is string
+            && (key == linksAfter().get(role, null) || (role == 'edit' && key == share().get('link', null)));
+        }
+        function record() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['name', 'photo', 'key', 'role', 'joinedAt'])
+            && (!('joinedAt' in d) || d.joinedAt is timestamp)
+            && d.name is string && d.name.size() <= 200
+            && photoOk(d.photo)
+            && (!('role' in d) || d.role in ['edit', 'comment', 'view']);
+        }
+        function newRole() {
+          return roleOf(request.resource.data);
+        }
+        function linksChanged() {
+          let before = exists(linksPath()) ? get(linksPath()).data : {};
+          let after = linksAfter();
+          return (before.get('edit', null) == null || after.get('edit', null) != before.edit)
+            && (before.get('comment', null) == null || after.get('comment', null) != before.comment)
+            && (before.get('view', null) == null || after.get('view', null) != before.view);
         }
         allow read: if isMember();
-        allow create, update: if signedIn() && request.auth.uid == uid
-          && request.resource.data.keys().hasOnly(['name', 'photo', 'key', 'joinedAt'])
-          && (!('joinedAt' in request.resource.data) || request.resource.data.joinedAt is timestamp)
-          && request.resource.data.name is string && request.resource.data.name.size() <= 200
-          && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 2000
-            && request.resource.data.photo.matches('https://.*')))
-          && (share().owner == uid || (share().link != null && request.resource.data.key == share().link));
+        allow create, update: if signedIn() && request.auth.uid == uid && record()
+          && (
+            // The person who shared it, always an editor.
+            (share().owner == uid && newRole() == 'edit')
+            // Their own name or photo: the same role (and the same old key, if any).
+            || (resource != null && newRole() == roleOf(resource.data)
+              && request.resource.data.get('key', null) == resource.data.get('key', null))
+            // Joining: the key in their joins record gives the role.
+            || (existsAfter(joinPath()) && keyFor(getAfter(joinPath()).data.key, newRole()))
+            // The app before roles: the edit key in the record, only while no comment or view link was made.
+            || ('key' in request.resource.data && newRole() == 'edit' && !rolesIn(linksAfter())
+              && keyFor(request.resource.data.key, 'edit'))
+          );
+        // The person who shared it changes someone else's role, and nothing else.
+        allow update: if signedIn() && request.auth.uid != uid
+          && get(sharePath()).data.owner == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.role in ['edit', 'comment', 'view'];
+        // Leaving, or removed by the person who shared it: then every link that is on changes in the
+        // same step (unless the share goes too), so their copy of a link never lets them back in.
         allow delete: if signedIn()
-          && (request.auth.uid == uid || get(/databases/$(database)/documents/shared/$(sid)).data.owner == request.auth.uid);
+          && (request.auth.uid == uid
+            || (get(sharePath()).data.owner == request.auth.uid && (!existsAfter(sharePath()) || linksChanged())));
+      }
+
+      // The key someone joined with: written by them, read by nobody (only these rules look at it).
+      match /joins/{uid} {
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['key'])
+          && request.resource.data.key is string && request.resource.data.key.size() <= 100;
+        allow delete: if signedIn() && (request.auth.uid == uid || get(sharePath()).data.owner == request.auth.uid);
+      }
+
+      // The links: read by editors, written by the person who shared it, deleted only with the share.
+      match /private/{name} {
+        function keyOk(d, role) {
+          return d.get(role, null) == null || (d[role] is string && d[role].size() >= 16 && d[role].size() <= 100);
+        }
+        function linksOk() {
+          let d = request.resource.data;
+          let e = d.get('edit', null);
+          let c = d.get('comment', null);
+          let v = d.get('view', null);
+          return d.keys().hasOnly(['edit', 'comment', 'view'])
+            && keyOk(d, 'edit') && keyOk(d, 'comment') && keyOk(d, 'view')
+            && (e == null || (e != c && e != v)) && (c == null || c != v);
+        }
+        // D1: making the first comment or view link changes the edit key (every member can read the
+        // member records, which may hold the old one), and the share itself then holds no key.
+        function rolesOk() {
+          let d = request.resource.data;
+          let before = resource == null ? {} : resource.data;
+          return !rolesIn(d)
+            || (getAfter(sharePath()).data.get('link', null) == null
+              && (rolesIn(before)
+                || d.get('edit', null) == null
+                || (d.edit != before.get('edit', null)
+                  && (!exists(sharePath()) || d.edit != get(sharePath()).data.get('link', null)))));
+        }
+        allow read: if name == 'links' && isEditor();
+        allow create, update: if name == 'links' && signedIn()
+          && getAfter(sharePath()).data.owner == request.auth.uid
+          && linksOk()
+          && (resource == null || request.resource.data.keys().hasAll(resource.data.keys()))
+          && rolesOk();
+        allow delete: if name == 'links' && signedIn()
+          && get(sharePath()).data.owner == request.auth.uid && !existsAfter(sharePath());
+      }
+
+      // Comments on its cards (D3: everyone on it reads them; editors and commenters write them).
+      // Only `resolved` (with `resolvedAt`) ever changes: by an editor, or by a commenter on their
+      // own comment (the app keeps a thread's state on its first comment). D5: no editing the text.
+      match /comments/{cid} {
+        function fresh() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['card', 'text', 'author', 'name', 'photo', 'at', 'resolved'])
+            && d.keys().hasAll(['card', 'text', 'author', 'name', 'photo', 'at', 'resolved'])
+            && d.author == request.auth.uid
+            && d.card is string && d.card.matches('[A-Za-z0-9_-]{1,100}')
+            && d.text is string && d.text.size() >= 1 && d.text.size() <= 1000
+            && d.name is string && d.name.size() <= 200
+            && photoOk(d.photo)
+            && d.at == request.time
+            && d.resolved == false;
+        }
+        function resolving() {
+          let changed = request.resource.data.diff(resource.data).affectedKeys();
+          return changed.hasOnly(['resolved', 'resolvedAt'])
+            && request.resource.data.resolved is bool
+            && (!changed.hasAny(['resolvedAt']) || request.resource.data.resolvedAt == request.time);
+        }
+        allow read: if isMember();
+        allow create: if isMember() && myRole() in ['edit', 'comment'] && fresh();
+        allow update: if isMember()
+          && (myRole() == 'edit' || (myRole() == 'comment' && resource.data.author == request.auth.uid))
+          && resolving();
+        allow delete: if signedIn()
+          && (resource.data.author == request.auth.uid || get(sharePath()).data.owner == request.auth.uid);
       }
     }
 

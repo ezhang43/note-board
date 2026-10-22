@@ -343,11 +343,24 @@ describe('the app before this change (today’s live app and older cached copies
     await assertFails(oldJoin(as('carol'), 'carol', 'wrong-key-0123456789'));
   });
 
+  it('the person who shared it can still turn the link off and on (in the share), and delete it, while no comment or view link was made', async () => {
+    await seedShare({ bob: '' });
+    await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1'), { link: null }));
+    await assertSucceeds(updateDoc(doc(as('alice'), 'shared/s1'), { link: 'k2' }));
+    await assertSucceeds(oldJoin(as('carol'), 'carol', 'k2'));
+    const db = as('alice');
+    const members = await getDocs(collection(db, 'shared/s1/members'));
+    const b = writeBatch(db);
+    members.docs.forEach((m) => b.delete(m.ref));
+    b.delete(doc(db, 'shared/s1'));
+    await assertSucceeds(b.commit());
+  });
+
   it('an editor on the old app keeps saving a board that has viewers', async () => {
     await seedShare({ bob: '', erin: 'view' }, { edit: EDIT, comment: null, view: VIEW });
+    const db = as('bob');
     await assertSucceeds(
-      runTransaction(as('bob'), async (tx) => {
-        const db = as('bob');
+      runTransaction(db, async (tx) => {
         const snap = await tx.get(doc(db, 'shared/s1'));
         tx.update(doc(db, 'shared/s1'), { data: '{"b":1}', client: 'q', rev: Number(snap.data()!.rev) + 1, updatedAt: serverTimestamp() });
       }),

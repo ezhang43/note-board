@@ -46,7 +46,7 @@ test('Clean up moves ticked items into the Completed panel under today, and unti
   await done.getByLabel('Send "milk" back to Groceries').click();
   expect(await texts(groceries)).toEqual(['bread', 'eggs', 'milk']);
   await expect(done.locator('.completed-entry')).toHaveCount(0);
-  await expect(done.getByText('Nothing cleaned up yet')).toBeVisible();
+  await expect(done.getByText('Ticked items stay in their list.')).toBeVisible();
 });
 
 test('Clean up is one undo step', async ({ page }) => {

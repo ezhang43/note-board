@@ -19,14 +19,14 @@ import {
 } from 'firebase/firestore';
 import { describe, it } from 'vitest';
 import { ONLINE_LIMIT } from '../src/store/sync';
-import { as, asUnverified, emailOf, seed, signedOut, useRulesEnv } from './env';
+import { as, asUnverified, emailOf, nameOf, seed, signedOut, useRulesEnv } from './env';
 
 useRulesEnv();
 
 const board = (data = '{}') => ({ data, client: 'p', updatedAt: serverTimestamp() });
 const version = { savedAt: 1, cards: 0, columns: 0 };
 const share = { owner: 'alice', root: 'b1', link: 'k', data: '{}', client: 'p', rev: 1, updatedAt: 1 };
-const member = (key: string | null = 'k') => ({ name: 'A', photo: null, key, joinedAt: serverTimestamp() });
+const member = (key: string | null = 'k', uid = 'alice') => ({ name: nameOf(uid), photo: null, key, joinedAt: serverTimestamp() });
 
 /** alice's share s1, with alice (and, if asked, bob) as its people. */
 const seedShare = (more: Record<string, object> = {}) =>
@@ -45,7 +45,7 @@ function createShare(db: Firestore, s: object = share, withMember = true) {
 /** bob joins with a key, as join does. */
 function join(db: Firestore, uid: string, key: string, extra: object = {}) {
   const b = writeBatch(db);
-  b.set(doc(db, `shared/s1/members/${uid}`), { ...member(key), ...extra });
+  b.set(doc(db, `shared/s1/members/${uid}`), { ...member(key, uid), ...extra });
   b.set(doc(db, `boards/${uid}/shared/s1`), { joinedAt: serverTimestamp() });
   return b.commit();
 }
@@ -294,10 +294,12 @@ describe('joining a shared board (shared/{sid}/members/{uid})', () => {
   it('checks the member record: known fields, a name of at most 200 characters, a photo that is https', async () => {
     await seedShare();
     await assertFails(join(as('bob'), 'bob', 'k', { foo: 1 }));
-    await assertFails(join(as('bob'), 'bob', 'k', { name: 'x'.repeat(201) }));
-    await assertFails(join(as('bob'), 'bob', 'k', { photo: 'http://x' }));
-    await assertFails(join(as('bob'), 'bob', 'k', { photo: 'https://' + 'x'.repeat(2000) }));
-    await assertSucceeds(join(as('bob'), 'bob', 'k', { name: 'x'.repeat(200), photo: 'https://lh3.example/p.png' }));
+    await assertFails(join(as('bob', { name: 'x'.repeat(201) }), 'bob', 'k', { name: 'x'.repeat(201) }));
+    await assertFails(join(as('bob', { name: 'B', picture: 'http://x' }), 'bob', 'k', { photo: 'http://x' }));
+    const long = 'https://lh3.googleusercontent.com/' + 'x'.repeat(2000);
+    await assertFails(join(as('bob', { name: 'B', picture: long }), 'bob', 'k', { photo: long }));
+    const photo = 'https://lh3.googleusercontent.com/a/p';
+    await assertSucceeds(join(as('bob', { name: 'x'.repeat(200), picture: photo }), 'bob', 'k', { name: 'x'.repeat(200), photo }));
   });
 
   it('joinedAt on the member record is a time (job 173)', async () => {
@@ -308,8 +310,8 @@ describe('joining a shared board (shared/{sid}/members/{uid})', () => {
 
   it('a member can update their own record while it holds the current key', async () => {
     await seedShare(withBob);
-    await assertSucceeds(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...member('k'), name: 'Bobby' }));
-    await assertFails(setDoc(doc(as('bob'), 'shared/s1/members/bob'), { ...member('old'), name: 'Bobby' }));
+    await assertSucceeds(setDoc(doc(as('bob', { name: 'Bobby' }), 'shared/s1/members/bob'), { ...member('k'), name: 'Bobby' }));
+    await assertFails(setDoc(doc(as('bob', { name: 'Bobby' }), 'shared/s1/members/bob'), { ...member('old'), name: 'Bobby' }));
   });
 
   it('the person who shared it can rejoin without the key, even with the link off', async () => {

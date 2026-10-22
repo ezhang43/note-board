@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { fontsLoaded } from './helpers';
 
 // The phone ⋯ menu as tiles (owner approved job 74, option B, 2026-10-16): the things that open
-// (Search, Share, History, Completed, Focus timer, Calendar, Journal) are tiles three across; then an Arrange
+// (Search, Share, History, Completed, Focus timer, Calendar, Journal) are tiles three across; then a Board
 // group (tool, text size, Snap to grid, Color, Collapse all · Same width · Clean up); then a More
 // group (File, Appearance, Feedback, About, Buy me a coffee, Sign out).
 
@@ -33,11 +33,12 @@ const box = async (l: Locator) => (await l.boundingBox())!;
 /** The visible labels of the direct children, in order (accessible names for icon-only ones). */
 const names = (l: Locator) => l.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || (e.textContent ?? '').trim()));
 
-test('signed in, the top is eight tiles, three across, each at least 44px tall', async ({ page }) => {
+test('signed in, the top is eight tiles in a 4 x 2 grid (no empty ninth tile), each at least 44px', async ({ page }) => {
   await openSignedIn(page);
   const t = tiles(page).locator('button');
   expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits']);
   await expect(t.nth(2)).toHaveText('History');
+  await expect(t.nth(4)).toHaveText('Timer');
   await expect(t.nth(5)).toHaveText('Calendar');
   await expect(t.nth(6)).toHaveText('Journal');
   const b = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((i) => box(t.nth(i))));
@@ -45,19 +46,32 @@ test('signed in, the top is eight tiles, three across, each at least 44px tall',
     expect(x.height).toBeGreaterThanOrEqual(44);
     expect(x.width).toBeGreaterThanOrEqual(44);
   }
-  expect(b[1].y).toBe(b[0].y);
-  expect(b[2].y).toBe(b[0].y);
-  expect(b[3].y).toBeGreaterThan(b[0].y + b[0].height - 1);
-  expect(b[4].y).toBe(b[3].y);
-  expect(b[5].y).toBe(b[3].y);
-  expect(b[6].y).toBeGreaterThan(b[3].y + b[3].height - 1);
-  expect(b[6].x).toBe(b[0].x);
-  expect(b[7].y).toBe(b[6].y);
+  // Two full rows of four.
+  for (const i of [1, 2, 3]) expect(b[i].y).toBe(b[0].y);
+  for (const i of [5, 6, 7]) expect(b[i].y).toBe(b[4].y);
+  expect(b[4].y).toBeGreaterThan(b[0].y + b[0].height - 1);
+  expect(b[4].x).toBe(b[0].x);
   expect(b[7].x).toBeGreaterThan(b[6].x);
+  expect(b[6].x).toBeGreaterThan(b[5].x);
   expect(b[1].x).toBeGreaterThan(b[0].x);
-  expect(b[2].x).toBeGreaterThan(b[1].x);
+  expect(b[3].x).toBeGreaterThan(b[2].x);
+  // The last tile ends where the sheet's inner edge is: no empty slot after it.
+  const grid = await box(tiles(page));
+  expect(Math.abs(b[7].x + b[7].width - (grid.x + grid.width))).toBeLessThan(1.5);
   // Every tile has an icon and a label.
   for (let i = 0; i < 8; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
+});
+
+test('the sheet has a grab handle, the group over the tools is "Board", the tools say Hand and Select, and the sheet keeps its scroll', async ({ page }) => {
+  await openSignedIn(page);
+  await expect(menu(page).locator('.phone-grab')).toBeVisible();
+  await expect(arrange(page).getByRole('heading', { name: 'Board' })).toBeVisible();
+  await expect(arrange(page).getByRole('heading', { name: 'Arrange' })).toHaveCount(0);
+  await expect(arrange(page).getByRole('button', { name: 'Hand (H)' })).toContainText('Hand');
+  await expect(arrange(page).getByRole('button', { name: 'Select (V)' })).toContainText('Select');
+  expect(await menu(page).evaluate((el) => getComputedStyle(el).overscrollBehaviorY)).toBe('contain');
+  // Phone-sized: nothing sticks out sideways.
+  expect(await menu(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
 
 test('signed out and not published: no Share, Calendar, Feedback or Sign out', async ({ page }) => {

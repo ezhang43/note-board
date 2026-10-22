@@ -23,9 +23,15 @@ export function useRulesEnv() {
 
 const emailOf = (uid: string) => `${uid}@example.com`;
 
-/** A signed-in person with a verified email (what Google sign-in gives), as the app's Firestore. */
-export const as = (uid: string) =>
-  env.authenticatedContext(uid, { email: emailOf(uid), email_verified: true }).firestore() as unknown as Firestore;
+/** The name Google gives `uid` in these tests unless one is asked for: 'A' for alice, 'B' for bob, and so on. */
+export const nameOf = (uid: string) => uid[0].toUpperCase();
+
+/**
+ * A signed-in person with a verified email (what Google sign-in gives), as the app's Firestore.
+ * `profile`: the name and photo in their sign-in token (review 181-A M1), by default nameOf(uid) and no photo.
+ */
+export const as = (uid: string, profile: { name?: string; picture?: string } = { name: nameOf(uid) }) =>
+  env.authenticatedContext(uid, { email: emailOf(uid), email_verified: true, ...profile }).firestore() as unknown as Firestore;
 
 /** A signed-in person whose email isn't verified. */
 export const asUnverified = (uid: string) =>

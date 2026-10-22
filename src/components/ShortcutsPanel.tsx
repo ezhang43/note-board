@@ -105,11 +105,7 @@ function Panel() {
   const backdrop = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   useCoverBoard(backdrop);
-  useEffect(() => {
-    const opener = document.activeElement;
-    panel.current?.focus({ preventScroll: true });
-    return () => opener instanceof HTMLElement && opener.isConnected && opener !== document.body ? opener.focus({ preventScroll: true }) : undefined;
-  }, []);
+  useEffect(() => panel.current?.focus({ preventScroll: true }), []);
   // Escape or ? closes it (the board's keys are off while it covers the board, so it listens itself).
   // While a key is being recorded, that handler (below) takes the keys first.
   useEffect(() => {

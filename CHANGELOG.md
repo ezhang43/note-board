@@ -1,5 +1,67 @@
 # Changelog
 
+## Saving and sharing fixes from review 181, part A (2026-10-22)
+
+- If deleting your account stops part-way on one device (the tab is closed while it says "Deleting…"), your other pages hold their changes for a while. They now say so plainly: "Your account is being deleted on another device; changes here aren’t saved yet" instead of "Saving…".
+- Changes made while held back are no longer lost when you close or reload the page: this device remembers them, and the next time the app opens on the same boards it keeps your copy and saves it as soon as it may. If the boards online were changed since on another device, those win, as before.
+- On a shared board, the person who shared it is marked "Owner" in People (it said "Shared it") and beside each of their comments, so nobody can pass for them.
+- The online rules now accept only your own Google name and photo in your record on a shared board (so nobody can take the owner's name or photo), and a photo only from Google's photo server, which also keeps other servers from seeing who opens a comment thread or the Share panel. The app shows no photo from anywhere else.
+- A comment can't be added from another device while your account is being deleted, so none outlives it.
+- A browser tab still holding the last account's boards after someone else signed in on another tab no longer saves them over the new account's boards on this device.
+- Boards already saved are unchanged. The new rules need pasting into Firebase (see the pull request); until then the app works as before.
+
+## Pasting no longer pushes neighbors straight down (2026-10-22)
+
+- When you paste (or duplicate) blocks and the copy lands on top of another block, that block now moves to the nearest free spot, as the spec always said, instead of being pushed straight down below the copy. Blocks that grow (expanding a card, typing, a container filling up) still push what is below them straight down.
+- Boards already saved are unchanged. Only where a block settles after a paste differs; nothing about saving, sync or undo changed.
+
+## Board-logic fixes from the review (2026-10-22)
+
+- Resizing a card from a top corner no longer throws a taller neighbor beside it up off the board; it slides sideways like the left or right edge does.
+- A board that somehow holds two Completed records (two devices cleaned up before syncing) now shows, searches and restores the items of both; the next Clean up or restore folds them into one.
+- An open item can no longer end up under a ticked one: Tab (one item or several) or a drag that nests it there unticks the items it is under, so Clean up never sweeps away something you never ticked.
+- Tab, Shift+Tab and bold on a thousand selected items are now instant (they took over a second each), and a big pile of blocks tidies itself in a fraction of the time.
+- Turning Snap on moves a block that lands on another to the nearest free spot instead of dropping it a row down, and it is one Ctrl+Z; collapsed heights snap too.
+- Collapsing a block can no longer send two pushed blocks to the same spot.
+- Importing a web page that holds a bare address with brackets in it keeps the address whole.
+- Importing a file while an old version is shown puts the old version away and adds the cards, instead of saying it worked and doing nothing.
+- Clean up or restore into a container that is gone no longer leaves a broken card.
+- The resize label keeps "same height as 2 blocks" after a left or top edge snaps.
+- Removing the last weight from a Weight card that holds other text, then saving a weight, uses that card again instead of making a second one.
+- Template containers sit on the grid, 20px apart instead of 24.
+- An event of zero length at exactly midnight now shows on its day.
+- Download as text keeps a multi-line item inside its item and escapes "[" and "]" in a link title.
+- A card you drag before it has been drawn shows a card-sized landing outline, not a container-sized one.
+- Boards already saved are unchanged. Nothing about how saving, sync or undo work was touched.
+
+## Habits first visit, the phone ⋯ sheet and the website's feature points (2026-10-22)
+
+- Habits, first visit: one main button. With no weight yet the Weight card is one line ("Weight", "None saved this week") plus the entry strip, with no empty chart box. Save is a plain button until you type a weight, then it takes the accent color. With no habits there is a single "Add a habit" button; pressing it swaps in the box for the first habit (the cursor goes with it to the list when the habit is added). The Ledger design and the Weight card layout are unchanged otherwise.
+- The Completed panel's empty text now explains the two meanings of "Completed": "Ticked items stay in their list. Press Clean up (in a list or the toolbar) to move them here, grouped by day."
+- Phone ⋯ sheet: the eight panel tiles sit four across in two full rows (no empty tile), "Arrange" is now "Board", Hand and Select show their words, the Focus timer tile says "Timer", and a small grab handle marks it as a sheet. Its scrolling no longer drags the page behind it.
+- Website: "Your boards are safe" and "Works well on a phone" are now a ticked done list in two columns (one on a phone), with thin lines instead of boxes with a honey stripe.
+- Boards already saved are unchanged: nothing here touches how boards are saved, synced, undone or deleted. The About page's demo video still shows the older toolbar; it is to be re-recorded after the checklist-row work.
+
+- Every Claude Code session on this project, in the cloud or on the owner's computer, now loads the owner's plugins (Impeccable, frontend-design, claude-code-setup, security-guidance) from the project settings.
+
+## Weight card: read first, then one place to write (2026-10-22)
+
+- The Weight card now reads top to bottom: the latest weight (big) with how it changed this week, month or year, then the chart, then one input strip, then a History list.
+- The input strip holds a day button, the weight box (with "kg" inside it) and a clear honey Save button. The day button shows dates the way the rest of the app does ("Today", "Mon 19 Oct") instead of the browser's 10/19/2026; tapping it opens the date picker.
+- History replaces the Entries list. It is read-only (day, weight, and the change from the weight before it, such as −0.2). Tap a day to put it in the strip, then Save to change it, Remove to delete it, or Cancel. Choosing a day that already has a weight in the day button does the same. The "Latest" line and the row of × buttons are gone.
+- After a save or a removal, one line inside the strip says what happened ("Mon 19 Oct: 73.0 → 72.9 kg") with an Undo link, so a phone can take it back too (Ctrl+Z still works). The line never wraps and never moves the number or chart; Undo goes away as soon as anything else changes. Today's first weight now gets a line too.
+- Chart: today is marked with a dotted line and "Today", the weights are labeled on the right so the line starts at the left edge, the dots are smaller, and the latest no longer has a ring cutting the line.
+- With no weight yet, the card says "No weight this week" and "Save one and it shows here as a line."
+- Boards already saved are unchanged: the weights are stored exactly as before.
+
+## Weight for earlier days (2026-10-22)
+
+- The Weight card has a date beside the weight box. It starts at today, goes back to 2000 and never forward, so a day you missed can be entered later.
+- One weight per day: entering a day that already has one replaces it, and a line under the box says so ("Replaced 73.0 kg with 73.5 kg for Mon 19 Oct."). A new weight for an earlier day says "Saved ...". A later day shows "Pick today or an earlier day." and saves nothing.
+- A weight for a day outside the week, month or year shown takes the panel to that period, so you see it on the chart. The chart is in date order whatever order the weights were entered in.
+- A folded "Entries" list under the chart shows the period's weights, newest first. Type over any weight (Enter or leaving the box keeps it, Escape drops it) or press its × to remove it. Each change is one Ctrl+Z.
+- Boards already saved are unchanged: the weights are stored exactly as before.
+
 - The Privacy page, the Delete account page and the Delete account panel now say that deleting your account removes your comments on shared boards you're still on; comments on a board you already left stay until its owner deletes them.
 
 ## Comments on cards (2026-10-22)

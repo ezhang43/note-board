@@ -173,7 +173,7 @@ function BoardCardName({ boardId }: { boardId: string }) {
 function BoardBody({ card }: { card: BoardCard }) {
   const count = useAppState((s) => {
     const b = s.boards.open === card.boardId ? s.board : s.boards.others[card.boardId];
-    return b ? Object.keys(b.cards).length : -1;
+    return b ? Object.values(b.cards).filter((c) => c.kind !== 'completed').length : -1; // the Completed record isn't drawn
   });
   const open = () => count >= 0 && appStore.openBoard(card.boardId);
   return (

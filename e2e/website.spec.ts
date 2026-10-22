@@ -183,13 +183,35 @@ test('the About page leads with four points: free with no limits, boards are saf
   await expect(highlights.nth(2)).toContainText('optional connector you set up yourself');
 });
 
+test('the safety and phone points are a ticked done list: two columns on a computer, one on a phone, hairlines, no boxes or honey stripe', async ({ page }) => {
+  await page.goto('/about/');
+  const items = page.locator('#safe ul.done-list > li');
+  const style = (i: number) => items.nth(i).evaluate((el) => {
+    const s = getComputedStyle(el);
+    const tick = getComputedStyle(el, '::before');
+    return { top: s.borderTopWidth, bottom: s.borderBottomWidth, radius: s.borderTopLeftRadius, bg: s.backgroundColor, tickW: tick.width, tickBg: tick.backgroundColor };
+  });
+  const s = await style(0);
+  expect(s).toMatchObject({ top: '0px', bottom: '1px', radius: '0px', tickW: '24px' });
+  expect(s.bg).toBe('rgba(0, 0, 0, 0)');
+  expect(s.tickBg).not.toBe('rgba(0, 0, 0, 0)');
+  const a = (await items.nth(0).boundingBox())!;
+  const b = (await items.nth(1).boundingBox())!;
+  expect(b.y).toBe(a.y); // two across on a computer
+  expect(b.x).toBeGreaterThan(a.x + a.width - 1);
+  await page.setViewportSize({ width: 390, height: 800 });
+  const c = (await items.nth(1).boundingBox())!;
+  expect(c.y).toBeGreaterThan((await items.nth(0).boundingBox())!.y); // one column on a phone
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('the safety, phone and AI sections say only what the app does', async ({ page }) => {
   await page.goto('/about/');
   await expect(page.locator('#safe h2')).toHaveText('Your boards are safe');
-  await expect(page.locator('#safe ul.tiles h3')).toHaveText(['Undo and redo', 'Version history', 'Backups you can download', 'Works offline', 'Saved in two places', 'Bring your notes in']);
+  await expect(page.locator('#safe ul.done-list h3')).toHaveText(['Undo and redo', 'Version history', 'Backups you can download', 'Works offline', 'Saved in two places', 'Bring your notes in']);
   await expect(page.locator('#safe')).toContainText('newest 100 versions');
   await expect(page.locator('#phone h2')).toHaveText('Works well on a phone');
-  await expect(page.locator('#phone ul.tiles > li')).toHaveCount(3);
+  await expect(page.locator('#phone ul.done-list > li')).toHaveCount(3);
   await expect(page.locator('#ai h2')).toHaveText('No AI pushed on you');
   // Honest about the connector: optional, set up by the person, on their own computer, only when asked.
   const ai = page.locator('#ai');
@@ -585,7 +607,7 @@ test('the About page sections come in this order: demo, Try it, safe, phone, AI,
   expect(await page.locator('main > *').evaluateAll((els) => els.map((e) => `${e.tagName}#${e.id}`))).toEqual(SECTION_IDS.map((id) => `SECTION#${id}`));
   await expect(page.locator('#how h2')).toHaveText('How it works');
   await expect(page.locator('#how ol.steps > li')).toHaveCount(3);
-  expect(await page.locator('#safe ul.tiles > li').count()).toBeGreaterThanOrEqual(6);
+  expect(await page.locator('#safe ul.done-list > li').count()).toBeGreaterThanOrEqual(6);
   await expect(page.locator('#trust h2')).toHaveText('What you can count on');
   await expect(page.locator('#faq h2')).toHaveText('Quick answers');
   await expect(page.locator('#faq h3')).toHaveCount(3);

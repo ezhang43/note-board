@@ -231,19 +231,23 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 .band .steps { margin: 0; }
 .band .steps li { margin: 0; padding: 0 0 28px 50px; }
 .band .steps h3,
-.tiles h3,
+.done-list h3,
 .faq-preview h3 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
 .band .steps p,
-.tiles p,
+.done-list p,
 .faq-preview p { margin: 0; color: var(--ink2); font-size: 16px; }
 @media (min-width: 760px) {
   .band .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
   .band .steps li { padding: 52px 0 0; }
 }
 
-/* Feature tiles: three across on a computer, two on a tablet, one on a phone */
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
-.tiles li { padding: 22px 22px 24px; border: 1px solid var(--hair); border-top: 4px solid var(--honey); border-radius: 12px; background: var(--ground); }
+/* Feature points as a done list (owner pick, 2026-10-22, Impeccable review): each one a ticked item, two columns on a computer, hairlines, no boxes. */
+.done-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); column-gap: clamp(32px, 5vw, 56px); margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--hair); }
+.done-list li { position: relative; padding: 20px 0 22px 40px; border-bottom: 1px solid var(--hair); }
+.done-list li::before, .done-list li::after { content: ''; position: absolute; }
+.done-list li::before { top: 23px; left: 0; width: 24px; height: 24px; border-radius: 6px; background: var(--good); }
+/* The tick is drawn in the page's own ground color, so it reads in light and dark. */
+.done-list li::after { top: 28px; left: 8px; width: 5px; height: 10px; border: solid var(--ground); border-width: 0 2.5px 2.5px 0; transform: rotate(40deg); }
 
 /* No AI pushed on you: two plain paragraphs in the reading column */
 .prose { max-width: var(--column); }

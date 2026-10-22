@@ -43,13 +43,19 @@ export function ShareButton({ phone = false, onOpen }: { phone?: boolean; onOpen
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
+  /** Closes the panel; focus that was inside it goes back to the Share button, not to the top of the page. */
+  const close = () => {
+    const inside = wrap.current?.contains(document.activeElement);
+    setOpen(false);
+    if (inside) wrap.current?.querySelector('button')?.focus();
+  };
   // A click anywhere else, or Escape, closes the panel.
   useEffect(() => {
     if (!open) return;
     // A press in a question the panel asked (Remove, Leave) isn't outside it.
     const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && !(e.target as Element).closest?.('dialog.ask') && setOpen(false);
     // Escape in a role menu closes only that menu.
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && close();
     window.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', key);
     return () => {
@@ -76,7 +82,7 @@ export function ShareButton({ phone = false, onOpen }: { phone?: boolean; onOpen
         <ShareIcon />
         {phone && 'Share'}
       </button>
-      {open && <SharePanel onClose={() => setOpen(false)} />}
+      {open && <SharePanel onClose={close} />}
     </div>
   );
 }
@@ -212,7 +218,7 @@ function SharePanel({ onClose }: { onClose: () => void }) {
                   {p.uid === me?.uid && ' (you)'}
                 </span>
                 {p.uid === share.ownerUid ? (
-                  <span className="share-tag">Shared it</span>
+                  <span className="share-tag">Owner</span>
                 ) : share.owner ? (
                   <RoleMenu
                     label={`${p.name}’s role`}

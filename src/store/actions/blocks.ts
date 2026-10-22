@@ -65,7 +65,7 @@ export function blockActions(ctx: StoreContext) {
     });
     if (!board) return false;
     // Pasted blocks keep their spot; whatever they would cover moves out of the way.
-    requestSettle(ids.map((id) => B.topLevelOf(board, id)));
+    requestSettle(ids.map((id) => B.topLevelOf(board, id)), true);
     return true;
   }
 

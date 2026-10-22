@@ -11,12 +11,19 @@ export interface Person {
 }
 
 /**
+ * A photo address only from Google's photo server, else null (review 181-A M2: a photo elsewhere
+ * would let that server see who looks at a shared board). firestore.rules checks the same.
+ */
+export const googlePhoto = (photo: unknown): string | null =>
+  typeof photo === 'string' && photo.length <= 2000 && /^https:\/\/lh\d+\.googleusercontent\.com\//.test(photo) ? photo : null;
+
+/**
  * Someone as the people a board is shared with see them: their Google name (never their email
- * address, which a share link could show to strangers) and photo (only from a secure address).
+ * address, which a share link could show to strangers) and photo (only from Google's photo server).
+ * firestore.rules accepts only this name and photo in their member record (review 181-A M1).
  */
 export function personFrom(user: { uid: string; displayName?: string | null; photoURL?: string | null; email?: string | null }): Person {
-  const photo = user.photoURL && user.photoURL.startsWith('https://') && user.photoURL.length <= 2000 ? user.photoURL : null;
-  return { uid: user.uid, name: user.displayName?.trim().slice(0, 200) || 'Someone', photo };
+  return { uid: user.uid, name: user.displayName?.trim().slice(0, 200) || 'Someone', photo: googlePhoto(user.photoURL) };
 }
 
 /** What someone may do on a shared board (job 161). */

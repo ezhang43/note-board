@@ -498,15 +498,15 @@ describe('who a shared board is shared with (G19)', () => {
     expect(onChange.mock.calls[0][0].map((p: { uid: string }) => p.uid)).toEqual(['first', 'late', 'new']);
   });
 
-  it('keeps a secure photo address and drops any other', () => {
+  it('keeps a photo from Google’s photo server and drops any other (review 181-A M2)', () => {
     const onChange = vi.fn();
     collabRemote(user).watchPeople('s1', onChange, vi.fn());
     listener('shared/s1/members').next({
-      docs: [member('a', at(1), 'https://x/p.png'), member('b', at(2), 'http://x/p.png'), member('c', at(3), 7)],
+      docs: [member('a', at(1), 'https://lh3.googleusercontent.com/a/p'), member('b', at(2), 'https://x/p.png'), member('c', at(3), 7)],
       metadata: { fromCache: false },
     });
     expect(onChange.mock.calls[0][0]).toEqual([
-      { uid: 'a', name: 'Name a', photo: 'https://x/p.png', role: 'edit' },
+      { uid: 'a', name: 'Name a', photo: 'https://lh3.googleusercontent.com/a/p', role: 'edit' },
       { uid: 'b', name: 'Name b', photo: null, role: 'edit' },
       { uid: 'c', name: 'Name c', photo: null, role: 'edit' },
     ]);
@@ -583,7 +583,7 @@ describe('comments on cards (job 161, PR 4)', () => {
     expect(fs.state.deletes).toEqual(['shared/s1/comments/m1']);
   });
 
-  it('watching: times as milliseconds (a comment on its way gets an estimate), records that aren’t right are skipped, only secure photos', () => {
+  it('watching: times as milliseconds (a comment on its way gets an estimate), records that aren’t right are skipped, only photos from Google’s photo server', () => {
     const got: unknown[] = [];
     collabRemote(user).watchComments('s1', (c) => got.push(c), () => {});
     const at = (ms: number) => ({ toMillis: () => ms });
@@ -591,8 +591,8 @@ describe('comments on cards (job 161, PR 4)', () => {
     listener('shared/s1/comments').next({
       metadata: { fromCache: false },
       docs: [
-        d('m1', { card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://x/p.png', at: at(5), resolved: true, resolvedAt: at(9) }),
-        d('m2', { card: 'k_1', text: 'yo', author: 'u3', name: 'Ann', photo: 'http://x/p.png', at: null, resolved: false }),
+        d('m1', { card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://lh3.googleusercontent.com/a/p', at: at(5), resolved: true, resolvedAt: at(9) }),
+        d('m2', { card: 'k_1', text: 'yo', author: 'u3', name: 'Ann', photo: 'https://x/p.png', at: null, resolved: false }),
         d('m3', { card: 5, text: 'bad', author: 'u3', name: 'Ann', photo: null, at: at(1), resolved: false }),
         d('m4', { card: 'k_1', text: { x: 1 }, author: 'u3', name: 'Ann', photo: null, at: at(1), resolved: false }),
       ],
@@ -600,7 +600,7 @@ describe('comments on cards (job 161, PR 4)', () => {
     expect(got).toHaveLength(1);
     const list = got[0] as { id: string; photo: string | null; at: number; resolvedAt: number | null }[];
     expect(list).toHaveLength(2);
-    expect(list[0]).toEqual({ id: 'm1', card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://x/p.png', at: 5, resolved: true, resolvedAt: 9 });
+    expect(list[0]).toEqual({ id: 'm1', card: 'k_1', text: 'hi', author: 'u2', name: 'Sam', photo: 'https://lh3.googleusercontent.com/a/p', at: 5, resolved: true, resolvedAt: 9 });
     expect(list[1]).toMatchObject({ id: 'm2', photo: null, resolved: false, resolvedAt: null });
     expect(list[1].at).toEqual(expect.any(Number));
   });

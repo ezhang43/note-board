@@ -108,6 +108,17 @@ test('a commenter comments; it reaches the others with a count and a “new” d
   // Bob still has the thread open: it arrives there, and so isn't new for him.
   await expect(thread(bob).getByText('Baixa is flatter.')).toBeVisible({ timeout: 8000 });
   await expect(tentCard(bob).getByRole('button', { name: '2 comments' })).toBeVisible();
+  // The owner's comments, and their row in People, carry an Owner tag, so a member with the same name
+  // and photo can't pass for them (review 181-A M1).
+  const said = (text: string) => thread(bob).locator('.comment').filter({ hasText: text });
+  await expect(said('Baixa is flatter.').getByText('Owner', { exact: true })).toBeVisible();
+  await expect(said('Worth it').getByText('Owner', { exact: true })).toHaveCount(0);
+  await bob.keyboard.press('Escape');
+  await toolbar(bob).getByRole('button', { name: 'Share' }).click();
+  const people = panel(bob).getByRole('list', { name: 'People' }).getByRole('listitem');
+  await expect(people.filter({ hasText: `Alice${t}` }).getByText('Owner', { exact: true })).toBeVisible();
+  await expect(people.filter({ hasText: `Bob${t}` }).getByText('Owner', { exact: true })).toHaveCount(0);
+  await bob.keyboard.press('Escape');
   await alice.keyboard.press('Escape');
   await alice.keyboard.press('Control+z');
   await alice.waitForTimeout(500);

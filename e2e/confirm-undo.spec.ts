@@ -91,6 +91,7 @@ test('deleting a habit shows the Undo message instead of a question; Undo brings
   const seen = noNativePopups(page);
   await page.locator('.corner-controls').getByRole('button', { name: 'Habits', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Habits' });
+  await panel.getByRole('button', { name: 'Add a habit' }).click();
   await panel.getByRole('textbox', { name: 'New habit' }).fill('Walk');
   await panel.getByRole('textbox', { name: 'New habit' }).press('Enter');
   await panel.getByRole('button', { name: 'More for Walk' }).click();

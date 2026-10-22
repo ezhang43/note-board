@@ -42,7 +42,7 @@ vi.mock('../store/sharing', () => ({
 }));
 vi.mock('../store/sync', () => ({ startSync: m.startSync }));
 vi.mock('../store/versions', () => ({ activeVersionStore: () => null, startVersions: vi.fn() }));
-vi.mock('../store/account', () => ({ claimDevice: m.claimDevice, deleteAccountData: m.deleteAccountData, OWNER_KEY: 'owner' }));
+vi.mock('../store/account', () => ({ claimDevice: m.claimDevice, deleteAccountData: m.deleteAccountData, OWNER_KEY: 'owner', heldKey: (uid: string) => `held:${uid}` }));
 vi.mock('./account', () => ({ account: { setRemover: (fn: unknown) => void (m.remover = fn as typeof m.remover) }, finishDeletion: vi.fn(), takeDeletedNote: () => false }));
 vi.mock('./collabSession', () => ({ collab: { set: vi.fn(), setNotice: vi.fn() }, joinFromAddress: vi.fn() }));
 vi.mock('./feedback', () => ({ feedback: { reset: vi.fn(), setSender: vi.fn() } }));

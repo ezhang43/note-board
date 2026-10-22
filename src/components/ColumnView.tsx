@@ -96,7 +96,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
             value={col.title}
             onChange={(title) => appStore.setColumnTitle(id, title)}
           />
-          <span className="column-count" aria-label={cardIds.length === 1 ? '1 card' : `${cardIds.length} cards`}>
+          <span className="column-count" role="img" aria-label={cardIds.length === 1 ? '1 card' : `${cardIds.length} cards`}>
             {cardIds.length}
           </span>
         </div>

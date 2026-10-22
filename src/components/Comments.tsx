@@ -234,6 +234,8 @@ function Thread({ share, cardId, title, opener }: { share: ShareInfo; cardId: st
                         {who.name}
                         {c.author === me ? ' (you)' : ''}
                       </strong>
+                      {/* Marked by who wrote it, which no name or photo can copy (review 181-A M1). */}
+                      {c.author === share.ownerUid && <span className="share-tag">Owner</span>}
                       <span>{sinceLabel(c.at, now)}</span>
                       {canDelete(c, me, share.owner) && (
                         <button type="button" className="icon-button block-trash" aria-label="Delete comment" title="Delete comment" onClick={() => void remove(c)}>

@@ -111,6 +111,23 @@ describe('sharing a board', () => {
   });
 });
 
+describe('after stopping (signed out, another person)', () => {
+  it('a shared-board upload that finishes afterwards isn’t reported (job 172)', async () => {
+    const { alice } = await aliceShares();
+    alice.sharing.stop();
+    const store = alice.store;
+    const onSaveState = vi.fn();
+    const sharing = startSharing(store, server.backendFor(person('alice')), { client: 'alice-again', storage: alice.storage, onSaveState, versions: () => null });
+    await settle();
+    store.renameBoard('Trip, renamed');
+    sharing.flush();
+    onSaveState.mockClear();
+    sharing.stop();
+    await settle();
+    expect(onSaveState).not.toHaveBeenCalled();
+  });
+});
+
 async function together() {
   const shared = await aliceShares();
   const bob = device('bob');

@@ -216,6 +216,19 @@ describe('board sync', () => {
     expect(fake.writes).toEqual([]);
   });
 
+  it('once stopped (signed out, another person), an upload refused afterwards isn’t reported (job 172)', async () => {
+    const { store, fake, onSaveState, sync } = setup();
+    fake.send({ data: boardJson('Start'), client: 'laptop' });
+    fake.control.fail = true;
+    store.renameBoard('Last change');
+    sync.flush();
+    onSaveState.mockClear();
+    sync.stop();
+    await settled();
+    expect(fake.writes).toHaveLength(1);
+    expect(onSaveState).not.toHaveBeenCalled();
+  });
+
   it('reports a failed upload, retries with the next change, and clears the report once saved', async () => {
     const { store, fake, onSaveState } = setup();
     fake.send({ data: boardJson('Start'), client: 'laptop' });

@@ -352,6 +352,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   function report() {
+    // Stopped (signed out, another person): uploads finishing late are no one's to show (job 172).
+    if (stopped) return;
     const all = [...shares.values()];
     opts.onSaveState?.(all.some((s) => s.failed) ? 'failed' : all.some((s) => s.timer || s.uploading) ? 'saving' : 'saved');
   }

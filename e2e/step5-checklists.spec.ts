@@ -360,6 +360,26 @@ test('dropping items on empty board makes a new untitled list', async ({ page })
   expect(await texts(list)).toEqual(['keep']);
 });
 
+test('a list made from dragged-out items is as wide as the list they came from, and as tall as its own items need', async ({ page }) => {
+  const list = await makeList(page, ['keep', 'move me']);
+  await clickEmpty(page);
+  // Make the source list wider and taller by its corner handle.
+  const h = await center(list.getByRole('button', { name: 'Resize card' }));
+  await dragPointer(page, h, { x: h.x + 160, y: h.y + 120 });
+  const width = (l: Locator) => l.evaluate((el) => (el as HTMLElement).offsetWidth);
+  const height = (l: Locator) => l.evaluate((el) => (el as HTMLElement).offsetHeight);
+  await expect.poll(() => width(list)).toBe(400);
+  const sourceHeight = await height(list);
+
+  const canvas = await box(page.getByTestId('canvas'));
+  await dragItem(page, rowWithText(list, 'move me'), { x: canvas.x + 120, y: canvas.y + 120 });
+  await expect(looseCards(page)).toHaveCount(2);
+  const made = page.locator('.card.selected');
+  expect(await texts(made)).toEqual(['move me']);
+  await expect.poll(() => width(made)).toBe(400);
+  expect(await height(made)).toBeLessThan(sourceHeight);
+});
+
 test('press and drag over items selects a range; Shift+click extends; Delete removes them; Escape clears', async ({ page }) => {
   const list = await makeList(page, ['one', 'two', 'three', 'four']);
   await clickEmpty(page);

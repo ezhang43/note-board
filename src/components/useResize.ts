@@ -68,7 +68,7 @@ function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: 
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', finish);
   // A finger lost without its lift-off reaching the page ends the resize as cancelled (job 197).
-  const stopLost = onLostFinger(pointerId, () => finish(new PointerEvent('pointercancel', { pointerId })));
+  const stopLost = onLostFinger(pointerId, finish);
 }
 
 /**

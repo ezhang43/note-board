@@ -60,30 +60,37 @@ export function holdOrPan(
     if (ev.type === 'pointerup' && !panning) onTap?.();
   }
   listen(true);
-  const stopLost = onLostFinger(e.pointerId, () => end(new PointerEvent('pointercancel', { pointerId: e.pointerId })));
+  const stopLost = onLostFinger(e.pointerId, end);
 }
 
 /**
  * A finger can be lost without its lift-off ever reaching the page: on an iPhone, its own text handling can take a
  * touch over (job 197: a lifted item was left floating over the board, hidden from its list, until a reload). A
- * gesture following pointer `pointerId` calls this as it starts; `cancel` runs (so the gesture ends as a cancelled
- * one, and nothing moves) when a new first finger touches the screen or that pointer comes down again, or when the
- * page is hidden. Returns the function that stops watching: call it when the gesture ends. Call it from the gesture's
- * own pointerdown or later: that pointerdown is not counted.
+ * gesture following pointer `pointerId` calls this as it starts; `cancel` gets a `pointercancel` for that pointer (so
+ * the gesture ends as a cancelled one, and nothing moves) when a new first finger touches the screen or that pointer
+ * comes down again, the phone takes every touch over (`touchcancel`), or the page is hidden. Returns the function
+ * that stops watching: call it when the gesture ends. Call it from the gesture's own pointerdown or later: that
+ * pointerdown is not counted.
  * simple: a browser that still counts the lost finger as down makes the next touch a second finger, which doesn't
  * end it (a second finger must not, for a pinch); the page being hidden still does. Upgrade if that is seen on a phone.
  */
-export function onLostFinger(pointerId: number, cancel: () => void) {
+export function onLostFinger(pointerId: number, cancel: (ev: PointerEvent) => void) {
+  const lost = () => cancel(new PointerEvent('pointercancel', { pointerId }));
   const onDown = (ev: PointerEvent) => {
-    if (ev.pointerId === pointerId || ev.isPrimary) cancel();
+    if (ev.pointerId === pointerId || ev.isPrimary) lost();
+  };
+  const onTouchCancel = (ev: TouchEvent) => {
+    if (!ev.touches.length) lost();
   };
   const onHide = () => {
-    if (document.hidden) cancel();
+    if (document.hidden) lost();
   };
   window.addEventListener('pointerdown', onDown, true);
+  window.addEventListener('touchcancel', onTouchCancel, true);
   document.addEventListener('visibilitychange', onHide);
   return () => {
     window.removeEventListener('pointerdown', onDown, true);
+    window.removeEventListener('touchcancel', onTouchCancel, true);
     document.removeEventListener('visibilitychange', onHide);
   };
 }

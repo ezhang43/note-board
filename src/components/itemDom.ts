@@ -143,6 +143,6 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', finish);
   // A finger lost without its lift-off reaching the page ends the drag as cancelled: the items stay where they were (job 197).
-  const stopLost = onLostFinger(pointerId, () => finish(new PointerEvent('pointercancel', { pointerId })));
+  const stopLost = onLostFinger(pointerId, finish);
   if (hold) onMove({ clientX: hold.at.x, clientY: hold.at.y });
 }

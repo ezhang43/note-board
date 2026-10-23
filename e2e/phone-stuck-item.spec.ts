@@ -106,3 +106,15 @@ test('the owner’s flow: type a new item, rest on it, the lift-off is lost, tap
   await fontsLoaded(page);
   expect(await texts(page.locator('[data-card-id]').first())).toEqual(['Milk', 'Eggs', 'Unload dish washer']);
 });
+
+test('the phone taking the touch over before the hold is up (only a touchcancel arrives) lifts nothing', async ({ page }) => {
+  const card = await typeList(page);
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await touch(page, [{ type: 'touchStart', p: await mid(row(card, 1)) }]);
+  await page.evaluate(() => window.dispatchEvent(new TouchEvent('touchcancel')));
+  await page.waitForTimeout(800);
+  await expect(ghost(page)).toHaveCount(0);
+  await touch(page, [{ type: 'touchEnd' }]);
+  expect(await texts(card)).toEqual(['Milk', 'Eggs', 'Unload dish washer']);
+  await expect(row(card, 1)).toHaveCSS('visibility', 'visible');
+});

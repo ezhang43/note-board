@@ -32,7 +32,7 @@ export function rowAt(clientX: number, clientY: number): { cardId: string; itemI
 /**
  * Where dragged items would go if dropped at this point:
  * - on a row: before it (top half), after it (bottom half), or nested under it (bottom half, a bit to the right);
- * - on empty space in a list: at the end of that list;
+ * - anywhere else in a list's box (empty space under its items, title row, collapsed): at the end of that list;
  * - on empty board, a note, a link or a column: a new list there.
  * Null means "nowhere" (e.g. over the dragged items themselves, or off the board): dropping does nothing.
  */
@@ -48,10 +48,11 @@ function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | n
     if (row && !d.slide) return hintOnRow(row, row.getBoundingClientRect(), clientX, clientY, d);
     const list = el.closest<HTMLElement>('[data-todo-of]');
     if (list) return { cardId: list.dataset.todoOf!, drop: { mode: 'append' }, markId: null, markMode: null };
-    // A collapsed list takes the items at its end (owner request); a collapsed column gets a new list at its end.
+    // Anywhere else inside a list's box (the empty space under its items too), or on a collapsed list, the items go in at its end
+    // (owner requests); a collapsed column gets a new list at its end.
     const block = el.closest<HTMLElement>('[data-card-id], [data-col-id]');
     const card = board.cards[block?.dataset.cardId ?? ''];
-    if (card?.kind === 'todo' && card.collapsed) return { cardId: card.id, drop: { mode: 'append' }, markId: null, markMode: null };
+    if (card?.kind === 'todo') return { cardId: card.id, drop: { mode: 'append' }, markId: null, markMode: null };
     const column = board.columns[block?.dataset.colId ?? ''];
     if (block || el.closest('[data-testid="canvas"]')) {
       if (column?.collapsed) columnId = column.id;

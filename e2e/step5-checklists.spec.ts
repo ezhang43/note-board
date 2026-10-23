@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, cards, clickEmpty, freshBoardEachTest, grabPoint, looseCards } from './helpers';
+import { add, box, cards, clickEmpty, dragPointer, freshBoardEachTest, grabPoint, looseCards } from './helpers';
 
 // Step 5: checklists — items, nesting, Completed section, item drag, multi-select and drop-to-board.
 
@@ -244,6 +244,34 @@ test('drag an item into another list, or onto empty list space to append', async
   await page.keyboard.press('Control+z');
   await expect(a).toHaveCount(1);
   expect(await texts(a)).toEqual(['a2']);
+});
+
+test('dropping an item anywhere inside another list, empty space under its items included, adds it at the end (no new list)', async ({ page }) => {
+  const a = await makeList(page, ['a1', 'a2']);
+  const b = await makeList(page, ['b1']);
+  const g = await box(b.locator('[data-grip="s"]'));
+  await dragPointer(page, { x: g.x + g.width / 2, y: g.y + g.height / 2 }, { x: g.x + g.width / 2, y: g.y + g.height / 2 + 160 });
+  await clickEmpty(page);
+  const card = await box(b);
+  const lastRow = await box(rows(b).last());
+  // A point well inside the card but below its last item (the owner's case: a list with a lot of empty space).
+  const below = { x: card.x + card.width / 2, y: card.y + card.height - 12 };
+  expect(below.y).toBeGreaterThan(lastRow.y + lastRow.height + 20);
+  await dragItem(page, rowWithText(a, 'a1'), below, async () => {
+    await expect(b).toHaveClass(/append-target/);
+    await expect(page.getByTestId('item-ghost')).not.toContainText('Drop to make a new list');
+  });
+  await expect(cards(page)).toHaveCount(2);
+  await expect(looseCards(page)).toHaveCount(2);
+  expect(await texts(b)).toEqual(['b1', 'a1']);
+  expect(await texts(a)).toEqual(['a2']);
+
+  // The same list's own empty space: the item goes to its end.
+  await clickEmpty(page);
+  const cardB = await box(b);
+  await dragItem(page, rowWithText(b, 'b1'), { x: cardB.x + cardB.width - 20, y: cardB.y + cardB.height - 12 });
+  await expect(looseCards(page)).toHaveCount(2);
+  expect(await texts(b)).toEqual(['a1', 'b1']);
 });
 
 test('dragging a whole list onto another list pours its items in, and the dragged list goes; one undo', async ({ page }) => {

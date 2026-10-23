@@ -11,7 +11,7 @@ import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
 import { returnPushes } from '../../model/placement';
 import { boardRights, restorable, VIEW_ONLY_NOTE } from '../../model/sharing';
-import { FONT_KEY, nextFontSize } from '../../model/font';
+import { FONT_KEY, nextFontSize, phoneReadableZoom } from '../../model/font';
 import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
 import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
 import type { Board, CardKind, Point, View } from '../../model/types';
@@ -316,7 +316,7 @@ export function blockActions(ctx: StoreContext) {
     /** Phone (owner request): starting to edit in block `id` (a card in a container: the container) fills the screen's width with it, and the top of the tapped block (`top.from`, in canvas pixels) goes to `top.to`. */
     fitBlockWidth(id: string, top: { from: number; to: number }) {
       const rect = blockRect(ctx.state.board, B.topLevelOf(ctx.state.board, id), measured);
-      if (rect) updateView((v) => viewFillingWidth(v, ctx.viewportSize(), rect, top));
+      if (rect) updateView((v) => viewFillingWidth(v, ctx.viewportSize(), rect, top, phoneReadableZoom(v.fontSize)));
     },
     /** Clicking New column. */
     addColumn() {

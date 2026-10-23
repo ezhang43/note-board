@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FONT_SCALE, FONT_SIZES, nextFontSize, startingFontSize } from './font';
+import { FONT_SCALE, FONT_SIZES, nextFontSize, phoneReadableZoom, startingFontSize } from './font';
 
 describe('text size', () => {
   it('has twelve steps, each larger than the last, ending at 400%', () => {
@@ -44,5 +44,18 @@ describe('text size', () => {
     expect(startingFontSize('ultimate')).toBe('ultimate');
     expect(startingFontSize(null)).toBe('normal');
     expect(startingFontSize('gigantic')).toBe('normal');
+  });
+});
+
+describe('phone: the zoom that makes card text readable (job 199)', () => {
+  it('is 100% at Small and Normal, where the text is 16px at least (never under 16px on a phone)', () => {
+    expect(phoneReadableZoom('small')).toBe(1);
+    expect(phoneReadableZoom('normal')).toBe(1);
+  });
+  it('is lower once A+ makes the text bigger than 16px by itself', () => {
+    expect(phoneReadableZoom('huge')).toBeCloseTo(16 / 21, 5); // 14px x 1.5 = 21px
+    expect(phoneReadableZoom('ultimate')).toBeCloseTo(16 / 56, 5);
+    const zooms = FONT_SIZES.map(phoneReadableZoom);
+    expect(zooms).toEqual([...zooms].sort((a, b) => b - a));
   });
 });

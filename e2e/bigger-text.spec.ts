@@ -112,3 +112,27 @@ test('at 400% nothing overlaps or runs off a 200px card or a 240px container, at
     expect(r.x).toBeGreaterThanOrEqual(title.x + title.width - 0.5);
   }
 });
+
+test("the gap from a tick box to its text grows with A+ (6px times the item buttons' step), and the box's edge and corners grow with it", async ({ page }) => {
+  await seed(page);
+  const row = page.locator('[data-card-id="t1"] [data-item-id]').first();
+  const measure = async () => {
+    const fs = Number(await page.getByTestId('canvas').evaluate((el) => getComputedStyle(el).getPropertyValue('--fs')));
+    const cb = row.getByRole('checkbox', { name: /Done/ });
+    const tick = await box(cb);
+    const text = await box(row.getByLabel('Item text'));
+    const cs = await cb.evaluate((el) => ({ border: parseFloat(getComputedStyle(el).borderTopWidth), radius: parseFloat(getComputedStyle(el).borderTopLeftRadius) }));
+    const zoom = (await box(page.locator('[data-card-id="t1"]'))).width / 200; // the card is 200px wide; the board may be zoomed
+    return { fs, gap: (text.x - (tick.x + tick.width)) / zoom, ...cs };
+  };
+  const normal = await measure();
+  expect(normal.fs).toBe(1);
+  expect(normal.gap).toBeCloseTo(6, 0);
+  while ((await measure()).fs < 2) await stepTo(page, 'Larger text', 1);
+  const big = await measure();
+  expect(big.fs).toBe(2);
+  expect(big.gap).toBeCloseTo(6 * 1.9, 0);
+  expect(big.gap).toBeGreaterThan(normal.gap + 4);
+  expect(big.border).toBeCloseTo(3, 1); // 1.5px at Normal (drawn as 1px on a 1x screen), twice that at 200%
+  expect(big.radius).toBeCloseTo(12, 1);
+});

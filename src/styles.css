@@ -26,6 +26,8 @@
   --drop-bg: #fbf0cf;
   --link-url-bg: rgba(255, 255, 255, 0.75);
   --checkbox: #2f7d5b;
+  /* Checklist tick boxes ("Honey well", owner pick 2026-10-23): the border of an unticked box, 3:1 against the card. */
+  --tick-edge: color-mix(in srgb, var(--accent) 75%, var(--card-bg));
   /* Honey (direction A, owner decision 2026-10-16): the Share button. */
   --honey: #f2b62b;
   /* The Undo message's button: honey on the dark pill (light mode), a deep honey on the light pill (dark mode). */
@@ -89,6 +91,7 @@
   --drop-bg: #3a3020;
   --link-url-bg: rgba(0, 0, 0, 0.22);
   --checkbox: #5fb38a;
+  --tick-edge: color-mix(in srgb, var(--accent) 60%, var(--card-bg));
   --honey: #f2c14e;
   --toast-action: #8a5a00;
   --honey-ink: #1b1a17;
@@ -902,7 +905,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   min-height: 30px;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  /* The gap from the tick box to the text grows with A+, by the item buttons' step. */
+  gap: calc(6px * var(--bb));
   border-radius: 4px;
 }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
@@ -913,18 +917,39 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-item input[type='checkbox'] {
   /* The box is 20px at Normal and grows with the A− / A+ step like the item buttons (up to 80px; never under 20px). */
   --box: calc(20px * var(--bs));
+  /* "Honey well" (owner pick, 2026-10-23): the app draws the box (still a real checkbox, so the keyboard and screen readers work); its border and corners grow with the step. */
+  appearance: none;
+  box-sizing: border-box;
   width: var(--box);
   height: var(--box);
   /* Centered on the first line: the text box's 4px of padding, then half a line, less half the box. */
   margin: calc(var(--line) / 2 + 4px - var(--box) / 2) 0 0;
+  /* Then nudged down 5% of the line (1px at Normal, 2px at 200%): the middle of lowercase text, which most items are, sits lower than the middle of capitals. */
+  translate: 0 calc(var(--line) * 0.05);
   flex-shrink: 0;
-  accent-color: var(--checkbox);
+  border: calc(1.5px * var(--bs)) solid var(--tick-edge);
+  border-radius: calc(6px * var(--bs));
+  background: var(--accent-soft) center / 100% no-repeat;
   cursor: pointer;
+  /* Pressing shrinks it a little; ticking has no animation of its own (it happens many times a day). */
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms var(--ease-out);
+}
+@media (hover: hover) { .todo-item input[type='checkbox']:hover { border-color: var(--accent); } }
+.todo-item input[type='checkbox']:active { transform: scale(0.9); }
+.todo-item input[type='checkbox']:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.4l3.3 3.3L15 6.6' fill='none' stroke='%23fff' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* The tick is dark on the lighter amber of dark mode. */
+:root[data-theme='dark'] .todo-item input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.4l3.3 3.3L15 6.6' fill='none' stroke='%23241a08' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 /* The text box may be narrower than one letter (at 400% a narrow card has almost no room beside the tick box and the strip): the grid track gives way instead of pushing the text over the item buttons. */
 .item-text { grid-template-columns: minmax(0, 1fr); flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: var(--line); --pad: 4px; }
-/* A ticked item stays in its place, struck through and faded (owner pick, job 200). */
-.todo-item.done .item-text > textarea { text-decoration: line-through; color: var(--ink-soft); }
+/* Ticked: a softer strike line, and the text faded. */
+.todo-item.done .item-text { opacity: 0.55; }
+.todo-item.done .item-text > textarea { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
 
 .link-url {
   height: calc(30px * var(--bs, 1));

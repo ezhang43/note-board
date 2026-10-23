@@ -42,8 +42,9 @@ test('ticking an item in the middle leaves it where it is, struck through and fa
   expect(await texts(page)).toEqual(['Milk', 'Bread', 'Eggs']);
   const bread = row(page, 'Bread').getByLabel('Item text');
   await expect(bread).toHaveCSS('text-decoration-line', 'line-through');
-  const milkColor = await row(page, 'Milk').getByLabel('Item text').evaluate((el) => getComputedStyle(el).color);
-  expect(await bread.evaluate((el) => getComputedStyle(el).color)).not.toBe(milkColor);
+  const fade = (name: string) => row(page, name).getByLabel('Item text').evaluate((el) => parseFloat(getComputedStyle(el.parentElement!).opacity));
+  expect(await fade('Bread')).toBeLessThan(1);
+  expect(await fade('Milk')).toBe(1);
   await expect(list(page).locator('.completed')).toHaveCount(0);
   await expect(list(page).getByRole('button', { name: 'Uncheck all' })).toHaveCount(0);
   // Unticking leaves it in place too.

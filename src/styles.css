@@ -834,9 +834,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   margin-right: -6px;
 }
 /* Drawn first, but last in the page order: Tab goes collapse, delete, title, items, as it did when the buttons were above the title. */
+/* From 225% up (the canvas has data-big-text) the buttons can be so wide that a 200px card has no room for its title beside them: the title keeps about two and a half letters, and the buttons drop to a line of their own, at the right, instead of covering it. */
+.canvas[data-big-text] .card:not(.collapsed) > .card-header { flex-wrap: wrap; justify-content: flex-end; }
+.canvas[data-big-text] .card-header > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 12px)); }
 .card-header > .card-title { order: -1; flex: 0 1 auto; min-width: 0; align-self: center; }
 /* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
-.card-header + :is(.todo-body, .link-body, .board-body) { padding-top: 8px; }
+.card-header + :is(.todo-body, .link-body, .board-body) { padding-top: calc(8px * min(var(--bs), 1.75)); }
 /* A board card's name is plain text, so it wraps (a long board name) rather than being cut off. */
 .board-title { padding: 6px 4px; overflow-wrap: anywhere; }
 .card-meta {
@@ -850,8 +853,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .card.collapsed .card-meta { font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
 /* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right (never more than 30%, so big buttons at A+ don't push past a narrow card). */
-.card.loose.collapsed .card-meta { padding-left: min(calc(2 * var(--btn) + 2px), 30%); text-align: center; }
-.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: min(calc(var(--btn) - 2px), 30%); }
+.card.loose.collapsed .card-meta { padding-left: min(calc(2 * var(--btn) + 2px), 30%, calc(100% - 2 * var(--btn) - 10px)); text-align: center; }
+.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: min(calc(var(--btn) - 2px), 30%, calc(100% - 2 * var(--btn) - 10px)); }
 
 .note-text { font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: 1.55; }
 .note-text > textarea { min-height: 104px; }
@@ -875,12 +878,14 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
 .app.phone .todo-item { --bs: 1; }
 /* A tick box's pressable area: 4px of padding around the 16px box (24px), taken back by the margin. */
-.tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: 4px; margin: -4px; cursor: pointer; }
+.tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: calc(4px * var(--bs)); margin: calc(-4px * var(--bs)); cursor: pointer; }
 .todo-item input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  /* Centered on the first line: the text box's 4px of padding, then half a line, less half the 16px box. */
-  margin: calc(var(--line) / 2 - 4px) 0 0;
+  /* The box grows with the A− / A+ step like the item buttons (16px up to 40px; never under 16px). */
+  --box: calc(16px * var(--bs));
+  width: var(--box);
+  height: var(--box);
+  /* Centered on the first line: the text box's 4px of padding, then half a line, less half the box. */
+  margin: calc(var(--line) / 2 + 4px - var(--box) / 2) 0 0;
   flex-shrink: 0;
   accent-color: var(--checkbox);
   cursor: pointer;
@@ -889,7 +894,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-item.done .item-text > textarea { text-decoration: line-through; }
 
 .link-url {
-  height: 30px;
+  height: calc(30px * var(--bs, 1));
   padding: 0 10px;
   border: 1px solid var(--edge);
   border-radius: 6px;
@@ -902,7 +907,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .link-media iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
 .media-cover { position: absolute; inset: 0; }
 .link-open {
-  height: 32px;
+  height: calc(32px * var(--bs, 1));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1038,6 +1043,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 .confirm-cancel { border: 1px solid var(--control-edge); background: var(--surface); }
 .confirm-delete { border: none; background: var(--danger); color: var(--on-accent); }
+/* A question inside a card or container (delete it? delete the completed items?) grows with the text size, too. */
+:is(.card, .column) .confirm-title { font-size: calc(14px * var(--fs, 1)); }
+:is(.card, .column) .confirm-actions button { height: max(calc(34px * var(--bs)), calc(2.6 * 13px * var(--fs, 1))); font-size: calc(13px * var(--fs, 1)); }
 
 /*
  * The app's questions (job 170, owner's option 3A): the browser's modal <dialog>, filling the window so
@@ -1374,7 +1382,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   border-top: 1px solid var(--edge);
 }
 .completed-toggle {
-  height: 28px;
+  height: calc(28px * var(--bs, 1));
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1382,11 +1390,16 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   border: none;
   border-radius: 6px;
   background: transparent;
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   font-weight: 600;
   cursor: pointer;
   align-self: flex-start;
+  /* At the biggest text the word can be wider than a 200px card: it gives way (…) before the card's edge. */
+  min-width: 0;
+  max-width: 100%;
 }
+.completed-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.completed-toggle svg { flex-shrink: 0; width: calc(12px * var(--bs, 1)); height: calc(12px * var(--bs, 1)); }
 /* On a read-only board (job 161) it stays as it was left, in its usual color. */
 .completed-toggle:disabled { color: inherit; cursor: default; }
 @media (hover: hover) {
@@ -1395,17 +1408,21 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 /* Clean up and Uncheck all (owner requests): on the same line as "Completed", at the right
    (on a card too narrow for all three, they go on the line below, still at the right). */
 .completed-head { display: flex; flex-wrap: wrap; align-items: center; }
-.completed-actions { display: flex; margin-left: auto; }
+.completed-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; margin-left: auto; }
 .uncheck-all {
-  height: 28px;
+  height: calc(28px * var(--bs, 1));
   padding: 0 6px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--ink-soft);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs, 1));
   font-weight: 500;
   cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (hover: hover) {
   .uncheck-all:hover { background: var(--hover); color: var(--ink); }
@@ -1414,7 +1431,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .item-ghost {
   position: absolute;
   z-index: 4;
-  max-width: 260px;
+  max-width: calc(260px * max(1, var(--fs, 1)));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1423,7 +1440,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   border: 2px solid var(--accent);
   border-radius: 8px;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 10px 24px rgba(31, 29, 26, 0.16);
-  font-size: 13px;
+  font-size: calc(13px * var(--fs, 1));
   pointer-events: none;
 }
 .item-ghost.moving { left: 0; top: 0; }
@@ -1440,7 +1457,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   from { opacity: 0; scale: 0.96; }
 }
 .item-ghost-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-ghost-extra { flex-shrink: 0; font-size: 12px; color: var(--ink-soft); }
+.item-ghost-extra { flex-shrink: 0; font-size: calc(12px * var(--fs, 1)); color: var(--ink-soft); }
 
 /* ---------- smooth movement ---------- */
 
@@ -2141,7 +2158,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 /* A board card: its name is the title on the button row (.board-title); the count and Open board sit under it, in line with the title's text. */
 .board-body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0 4px; }
 .board-card-count { color: var(--ink-faint); font-size: calc(13px * var(--fs, 1)); }
-.board-open { height: 32px; }
+.board-open { height: calc(32px * var(--bs, 1)); font-size: calc(14px * var(--fs, 1)); }
 
 
 /* Sharing a board (owner request: editing together). */
@@ -3270,7 +3287,7 @@ a.cal-open { align-self: flex-start; }
   /* A tick box is pressed from 44px wide (22px to its left, over the card's padding), as tall as its row. */
   .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
   .completed-head, .completed-actions { gap: 8px; }
-  .completed-toggle, .uncheck-all { height: 40px; }
+  .completed-toggle, .uncheck-all { height: max(40px, calc(28px * var(--fs, 1))); }
 
   /*
    * A card's or container's collapse arrow and trash can show only on the selected one (owner request,

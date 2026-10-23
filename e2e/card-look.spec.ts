@@ -16,10 +16,6 @@ async function checklist(page: Page, items: string[]) {
   return page.locator('.card.selected');
 }
 
-const largest = async (page: Page) => {
-  const larger = page.getByRole('button', { name: 'Larger text' });
-  for (let i = 0; i < 12 && (await larger.getAttribute('aria-disabled')) !== 'true'; i++) await larger.click();
-};
 
 /** The tick box's middle and the middle of the item's first line of text (the box's padding, then half a line), in px down the page. */
 async function centers(row: Locator) {
@@ -38,20 +34,50 @@ async function checkTicks(list: Locator) {
   }
 }
 
-test("a tick box is centered on its item's first line at Normal and Largest text, for items and sub-items, light and dark", async ({ page }) => {
+/** Step A− / A+ from the smallest text size to the largest, and run `check` at each (with the step's scale). */
+async function atEveryStep(page: Page, check: (scale: number) => Promise<void>) {
+  const smaller = page.getByRole('button', { name: 'Smaller text' });
+  const larger = page.getByRole('button', { name: 'Larger text' });
+  for (let i = 0; i < 12 && (await smaller.getAttribute('aria-disabled')) !== 'true'; i++) await smaller.click();
+  for (let i = 0; i < 12; i++) {
+    await check(Number(await page.getByTestId('canvas').evaluate((el) => getComputedStyle(el).getPropertyValue('--fs'))));
+    if ((await larger.getAttribute('aria-disabled')) === 'true') break;
+    await larger.click();
+  }
+}
+
+test("a tick box is centered on its item's first line at every text size, for items and sub-items, light and dark", async ({ page }) => {
+  test.slow(); // nine text sizes, light and dark
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap and the bathroom sink', 'sub item', 'Second']);
   await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();
   await page.keyboard.press('Tab'); // 'sub item' nested under the first
   await list.locator('[data-item-id]').nth(2).getByLabel('Item text').click();
   await page.keyboard.press('Control+Shift+Period'); // a bigger per-text size on the last item
   await page.mouse.move(0, 0);
-  await checkTicks(list);
+  await atEveryStep(page, () => checkTicks(list));
   await toggleDark(page);
-  await checkTicks(list);
-  await largest(page);
-  await checkTicks(list);
+  await atEveryStep(page, () => checkTicks(list));
   await toggleDark(page);
-  await checkTicks(list);
+});
+
+test('the tick box grows with the text size, like the item buttons, never below 16px', async ({ page }) => {
+  test.slow();
+  const list = await checklist(page, ['Call the plumber', 'sub item']);
+  await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();
+  await page.keyboard.press('Tab'); // a sub-item, too
+  await page.mouse.move(0, 0);
+  const seen: number[] = [];
+  await atEveryStep(page, async (fs) => {
+    const s = Math.max(1, fs);
+    seen.push(s);
+    for (const n of [0, 1]) {
+      const tick = await box(list.locator('[data-item-id]').nth(n).getByRole('checkbox', { name: 'Done' }));
+      expect(Math.abs(tick.width - 16 * s), `width at ${fs}`).toBeLessThan(0.6);
+      expect(Math.abs(tick.height - 16 * s), `height at ${fs}`).toBeLessThan(0.6);
+    }
+  });
+  expect(seen[0]).toBe(1);
+  expect(seen[seen.length - 1]).toBe(2.5);
 });
 
 test('the item buttons and the strip kept free for them grow with the text size, never below the Small size', async ({ page }) => {
@@ -93,7 +119,7 @@ test('the item buttons and the strip kept free for them grow with the text size,
     await larger.click();
   }
   expect(seen[0]).toBe(1); // Small keeps today's size
-  expect(seen[seen.length - 1]).toBe(1.75);
+  expect(seen[seen.length - 1]).toBe(2.5);
 });
 
 /** The color of one pixel of the page, read back from a screenshot. */

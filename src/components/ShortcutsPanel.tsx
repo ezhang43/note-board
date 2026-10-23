@@ -16,7 +16,8 @@ const GROUPS: { title: string; keys: Row[] }[] = [
     title: 'Board',
     keys: [
       ['Ctrl+Z / Ctrl+Y', 'Undo / redo (also while typing)'],
-      ['Middle button, or left + right buttons together', 'Hold and move to drag the board around, wherever the pointer is on it'],
+      ['Left button on empty board', 'Hold and move to drag the board around'],
+      ['Middle button, or left + right buttons together', 'Hold and move to draw a selection box, wherever the pointer is on the board; add Ctrl or Shift to keep what is already selected (Ctrl or Shift with the left button on empty board does the same)'],
       ['Ctrl+= / Ctrl+− / Ctrl+0', 'Zoom in / out / back to 100%'],
       ['Shift+1', 'Fit to screen: every card and container in view'],
       ['Ctrl+arrows', 'Switch boards: Left / Right the previous / next board in the Boards menu, Up the board above, Down the first board inside (not while typing)'],

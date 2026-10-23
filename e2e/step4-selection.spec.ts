@@ -57,17 +57,17 @@ test('dragging a box selects everything it touches, live; Ctrl adds to the selec
   const rb = await box(b);
   const start = await emptySpot(page);
 
-  // A box from empty space that just clips the first note.
+  // A box (middle button; job 193) from empty space that just clips the first note.
   await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' });
   await page.mouse.move(ra.x + 5, ra.y + 5, { steps: 10 });
   await expect(page.getByTestId('marquee')).toBeVisible();
   await expect(a).toHaveClass(/selected/); // selected while still dragging
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   await expect(page.getByTestId('marquee')).toHaveCount(0);
   await expect(b).not.toHaveClass(/selected/);
 
-  // Ctrl + box around the second adds it.
+  // Ctrl + a left-drag box around the second adds it.
   await page.keyboard.down('Control');
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -77,7 +77,7 @@ test('dragging a box selects everything it touches, live; Ctrl adds to the selec
   await expect(a).toHaveClass(/selected/);
   await expect(b).toHaveClass(/selected/);
 
-  // Dragging empty space doesn't pan.
+  // Drawing a box doesn't pan.
   expect(await page.getByTestId('canvas').getAttribute('data-pan-x')).toBe('0');
   void c;
 });

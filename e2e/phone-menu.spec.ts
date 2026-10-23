@@ -188,15 +188,15 @@ test('Arrange controls work: text size, Collapse all, Color menu with Auto-color
   await expect(menu(page).getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Import file…' })).toBeVisible();
 });
 
-test('text size in the menu goes up to 250% and A+ fades there', async ({ page }) => {
+test('text size in the menu goes up to 400% and A+ fades there', async ({ page }) => {
   await openLocal(page);
   const a = arrange(page);
-  for (let i = 0; i < 7; i++) await a.getByRole('button', { name: 'Larger text' }).tap(); // Normal → Maximum
+  for (let i = 0; i < 10; i++) await a.getByRole('button', { name: 'Larger text' }).tap(); // Normal → Ultimate (400%)
   await expect(a.getByRole('button', { name: 'Larger text' })).toHaveAttribute('aria-disabled', 'true');
-  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('maximum');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('ultimate');
   await a.getByRole('button', { name: 'Smaller text' }).tap();
   await expect(a.getByRole('button', { name: 'Larger text' })).not.toHaveAttribute('aria-disabled', 'true');
-  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('giant');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:font'))).toBe('immense');
 });
 
 test('tapping outside closes it', async ({ page }) => {

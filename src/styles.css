@@ -813,13 +813,15 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card, .column {
   /* The header buttons' size step, the same one the item buttons use (see .todo-item): they grow with A+ and never go under today's size. */
   --bs: max(1, var(--fs, 1));
-  --btn: calc(32px * var(--bs));
+  /* The header buttons stop growing at 250% (80px): two of them must fit a 200px card (at 400% they would be 128px each). */
+  --hb: min(var(--bs), 2.5);
+  --btn: calc(32px * var(--hb));
 }
 /* On a phone they keep their size, like the item buttons. */
 .app.phone :is(.card, .column) { --bs: 1; }
 /* A card's and a container's header buttons (owner request, 2026-10-22): 32px with a 16px icon, up from 28px and 12-14px. */
 :is(.card-header, .column-actions) > .icon-button { width: var(--btn); height: var(--btn); }
-:is(.card-header, .column-actions) > .icon-button svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
+:is(.card-header, .column-actions) > .icon-button svg { width: calc(16px * var(--hb)); height: calc(16px * var(--hb)); }
 :is(.card-header, .column-actions) .collapse-arrow { stroke-width: 1.4; }
 /*
  * The button row. A list's, link's or board's title shares it (owner pick, 2026-10-22: no empty band above the
@@ -869,6 +871,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   --line: calc(20px * var(--fs, 1) * var(--ts, 1));
   --bs: max(1, var(--fs, 1));
   --bh: calc(20px * var(--bs) + 8px);
+  /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
+  --bb: min(var(--bs), 1.9);
   min-height: 30px;
   display: flex;
   align-items: flex-start;
@@ -877,11 +881,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
 .app.phone .todo-item { --bs: 1; }
-/* A tick box's pressable area: 4px of padding around the 16px box (24px), taken back by the margin. */
+.app.phone .todo-item input[type='checkbox'] { --box: 16px; }
+/* A tick box's pressable area: 4px of padding around the 20px box (28px), taken back by the margin. */
 .tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: calc(4px * var(--bs)); margin: calc(-4px * var(--bs)); cursor: pointer; }
 .todo-item input[type='checkbox'] {
-  /* The box grows with the A− / A+ step like the item buttons (16px up to 40px; never under 16px). */
-  --box: calc(16px * var(--bs));
+  /* The box is 20px at Normal and grows with the A− / A+ step like the item buttons (up to 80px; never under 20px). */
+  --box: calc(20px * var(--bs));
   width: var(--box);
   height: var(--box);
   /* Centered on the first line: the text box's 4px of padding, then half a line, less half the box. */
@@ -890,7 +895,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   accent-color: var(--checkbox);
   cursor: pointer;
 }
-.item-text { flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: var(--line); --pad: 4px; }
+/* The text box may be narrower than one letter (at 400% a narrow card has almost no room beside the tick box and the strip): the grid track gives way instead of pushing the text over the item buttons. */
+.item-text { grid-template-columns: minmax(0, 1fr); flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: var(--line); --pad: 4px; }
 .todo-item.done .item-text > textarea { text-decoration: line-through; }
 
 .link-url {
@@ -1270,7 +1276,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  * Move up / Move down are not in that strip: they float in a small pill over the free end of the row above
  * (owner pick, 2026-10-22, replacing the 92px strip that held all four and left the text 97px of a 226px card).
  */
-.todo-item { padding-right: calc(40px * var(--bs)); }
+.todo-item { padding-right: calc(40px * var(--bb)); }
 .item-grip,
 .item-trash {
   position: absolute;
@@ -1289,11 +1295,11 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .todo-item:hover .item-trash,
 .item-grip:focus-visible,
 .item-trash:focus-visible { opacity: 1; }
-/* The buttons' sizes below all multiply by --bs (the text size step, see .todo-item); their height follows the item's first line. */
-.item-grip { top: 3px; right: 0; width: calc(14px * var(--bs)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
-.item-grip svg { width: calc(8px * var(--bs)); height: calc(12px * var(--bs)); }
-.item-trash { top: 2px; right: calc(16px * var(--bs)); width: calc(24px * var(--bs)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-trash svg { width: calc(14px * var(--bs)); height: calc(14px * var(--bs)); }
+/* The buttons' widths and icons below multiply by --bb (the text size step, capped; see .todo-item); their height follows the item's first line. */
+.item-grip { top: 3px; right: 0; width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
+.item-grip svg { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
+.item-trash { top: 2px; right: calc(16px * var(--bb)); width: calc(24px * var(--bb)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-trash svg { width: calc(14px * var(--bb)); height: calc(14px * var(--bb)); }
 @media (hover: hover) {
   .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 }
@@ -1304,12 +1310,12 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  * (no hover) keep the sizes above and have no arrows here.
  */
 @media (hover: hover) {
-  .todo-item { padding-right: calc(46px * var(--bs)); }
+  .todo-item { padding-right: calc(46px * var(--bb)); }
   .item-grip, .item-trash { top: 0; height: var(--bh); }
-  .item-grip { width: calc(18px * var(--bs)); }
-  .item-grip svg { width: calc(10px * var(--bs)); height: calc(15px * var(--bs)); }
-  .item-trash { right: calc(18px * var(--bs)); width: calc(28px * var(--bs)); }
-  .item-trash svg { width: calc(16px * var(--bs)); height: calc(16px * var(--bs)); }
+  .item-grip { width: calc(18px * var(--bb)); }
+  .item-grip svg { width: calc(10px * var(--bb)); height: calc(15px * var(--bb)); }
+  .item-trash { right: calc(18px * var(--bb)); width: calc(28px * var(--bb)); }
+  .item-trash svg { width: calc(16px * var(--bb)); height: calc(16px * var(--bb)); }
   /*
    * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
    * strip the row above keeps free (never over its text; two 22px arrows fit the 46px strip). The first row of a list
@@ -1335,7 +1341,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   .item-arrows:focus-within { opacity: 1; pointer-events: auto; }
   .item-arrow {
     flex-shrink: 0;
-    width: calc(22px * var(--bs));
+    width: calc(22px * var(--bb));
     height: var(--bh);
     padding: 0;
     border: none;
@@ -1348,7 +1354,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
     justify-content: center;
     transition: transform 100ms var(--ease-out);
   }
-  .item-arrow svg { width: calc(18px * var(--bs)); height: calc(18px * var(--bs)); }
+  .item-arrow svg { width: calc(18px * var(--bb)); height: calc(18px * var(--bb)); }
   .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
   /* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
   .item-arrow[aria-disabled='true'] { opacity: 0.3; cursor: default; }
@@ -1363,7 +1369,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
   /* The phone already has Move up / Move down in the row above the keyboard, so the pill never shows and keeps no room. */
   .item-arrows { display: none; }
-  .todo-item { padding-right: calc(40px * var(--bs)); }
+  .todo-item { padding-right: calc(40px * var(--bb)); }
 }
 /*
  * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the

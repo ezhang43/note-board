@@ -11,10 +11,12 @@ type Point = { x: number; y: number };
  * looking around never moves or resizes anything by accident. Resting the finger for a moment
  * first calls `onHold` (with where the finger started and where it is now), which takes over.
  * A quick tap does neither (it calls `onTap`). The long-press copy / paste menu is kept away meanwhile.
+ * Without `onHold` (the finger is on the text being typed in) a rest leaves the finger to the phone's own cursor
+ * and selection: no menu kept away, no tap, no panning after it (job 197).
  */
 export function holdOrPan(
   e: PointerEvent | { clientX: number; clientY: number; pointerId: number },
-  onHold: (start: Point, at: Point, done: () => void) => void,
+  onHold: ((start: Point, at: Point, done: () => void) => void) | null,
   onTap?: () => void,
 ) {
   const start = { x: e.clientX, y: e.clientY };
@@ -22,7 +24,7 @@ export function holdOrPan(
   let panning = false;
   const noMenu = (ev: Event) => ev.preventDefault();
   const allowMenu = () => setTimeout(() => window.removeEventListener('contextmenu', noMenu, true), 300);
-  window.addEventListener('contextmenu', noMenu, true);
+  if (onHold) window.addEventListener('contextmenu', noMenu, true);
 
   const onMove = (ev: PointerEvent) => {
     if (ev.pointerId !== e.pointerId) return;
@@ -42,6 +44,8 @@ export function holdOrPan(
   };
   const timer = setTimeout(() => {
     listen(false);
+    stopLost();
+    if (!onHold) return;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     window.getSelection()?.removeAllRanges();
     navigator.vibrate?.(10);
@@ -51,8 +55,42 @@ export function holdOrPan(
     if (ev.pointerId !== e.pointerId) return;
     clearTimeout(timer);
     listen(false);
+    stopLost();
     allowMenu();
     if (ev.type === 'pointerup' && !panning) onTap?.();
   }
   listen(true);
+  const stopLost = onLostFinger(e.pointerId, end);
+}
+
+/**
+ * A finger can be lost without its lift-off ever reaching the page: on an iPhone, its own text handling can take a
+ * touch over (job 197: a lifted item was left floating over the board, hidden from its list, until a reload). A
+ * gesture following pointer `pointerId` calls this as it starts; `cancel` gets a `pointercancel` for that pointer (so
+ * the gesture ends as a cancelled one, and nothing moves) when a new first finger touches the screen or that pointer
+ * comes down again, the phone takes every touch over (`touchcancel`), or the page is hidden. Returns the function
+ * that stops watching: call it when the gesture ends. Call it from the gesture's own pointerdown or later: that
+ * pointerdown is not counted.
+ * simple: a browser that still counts the lost finger as down makes the next touch a second finger, which doesn't
+ * end it (a second finger must not, for a pinch); the page being hidden still does. Upgrade if that is seen on a phone.
+ */
+export function onLostFinger(pointerId: number, cancel: (ev: PointerEvent) => void) {
+  const lost = () => cancel(new PointerEvent('pointercancel', { pointerId }));
+  const onDown = (ev: PointerEvent) => {
+    if (ev.pointerId === pointerId || ev.isPrimary) lost();
+  };
+  const onTouchCancel = (ev: TouchEvent) => {
+    if (!ev.touches.length) lost();
+  };
+  const onHide = () => {
+    if (document.hidden) lost();
+  };
+  window.addEventListener('pointerdown', onDown, true);
+  window.addEventListener('touchcancel', onTouchCancel, true);
+  document.addEventListener('visibilitychange', onHide);
+  return () => {
+    window.removeEventListener('pointerdown', onDown, true);
+    window.removeEventListener('touchcancel', onTouchCancel, true);
+    document.removeEventListener('visibilitychange', onHide);
+  };
 }

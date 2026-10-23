@@ -9,6 +9,7 @@ freshBoardEachTest();
 const BUTTON = 32;
 const ICON = 16;
 // The text size steps worth checking: the step the buttons never go under, and the biggest.
+// The buttons stop growing at 250% (80px): two of them must fit a 200px card at 400% text.
 const LARGEST = 2.5;
 
 const largest = async (page: Page) => {

@@ -5,7 +5,7 @@ import type { Card } from '../model/types';
 import { resizeFrom, type ResizeDir } from '../model/sizing';
 import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, otherBlockSizes } from './canvasDom';
-import { holdOrPan } from './touchHold';
+import { holdOrPan, onLostFinger } from './touchHold';
 
 /**
  * Pointer handling for a resize handle or edge grip. `dir` says which edge or corner it is: 'e' is a
@@ -19,18 +19,18 @@ export function resizePointerDown(kind: 'card' | 'column', id: string, dir: Resi
     e.preventDefault();
     const block = e.currentTarget.closest<HTMLElement>('[data-card-id], [data-col-id]')!;
     // By finger, moving straight away moves the board; resting a moment first resizes (owner request).
-    if (e.pointerType === 'touch') return holdOrPan(e.nativeEvent, (start, _at, done) => beginResize(kind, id, dir, minH, block, start, done), () => appStore.select(id));
-    beginResize(kind, id, dir, minH, block, { x: e.clientX, y: e.clientY });
+    if (e.pointerType === 'touch') return holdOrPan(e.nativeEvent, (start, _at, done) => beginResize(kind, id, dir, minH, block, start, e.pointerId, done), () => appStore.select(id));
+    beginResize(kind, id, dir, minH, block, { x: e.clientX, y: e.clientY }, e.pointerId);
   };
 }
 
 /** Resize `block` as the pointer moves from `from` (screen point); letting go keeps the new size. */
-function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: number | undefined, block: HTMLElement, from: { x: number; y: number }, done?: () => void) {
+function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: number | undefined, block: HTMLElement, from: { x: number; y: number }, pointerId: number, done?: () => void) {
   appStore.select(id);
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
   const at0 = blockOf(appStore.getState().board, id);
-  if (!at0) return;
+  if (!at0) return done?.();
   // offsetWidth / offsetHeight are in board pixels (they ignore the zoom).
   const startRect = { x: at0.x, y: at0.y, w: block.offsetWidth, h: block.offsetHeight };
   // From the top edge the bottom edge has to stay put, so a card can't be made shorter than its content.
@@ -54,6 +54,7 @@ function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: 
   };
 
   const finish = (ev: PointerEvent) => {
+    stopLost();
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', finish);
     window.removeEventListener('pointercancel', finish);
@@ -66,6 +67,8 @@ function beginResize(kind: 'card' | 'column', id: string, dir: ResizeDir, minH: 
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', finish);
+  // A finger lost without its lift-off reaching the page ends the resize as cancelled (job 197).
+  const stopLost = onLostFinger(pointerId, finish);
 }
 
 /**

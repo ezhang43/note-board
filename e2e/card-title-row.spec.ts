@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { add, box, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard, looseCards } from './helpers';
 
 // The card title shares its line with the card's buttons (owner pick, 2026-10-22, Impeccable review job 180,
@@ -9,11 +9,6 @@ freshBoardEachTest();
 
 const buttons = (card: Locator) => card.locator('.card-header > .icon-button');
 const center = (b: { y: number; height: number }) => b.y + b.height / 2;
-
-const largest = async (page: Page) => {
-  const larger = page.getByRole('button', { name: 'Larger text' });
-  for (let i = 0; i < 12 && (await larger.getAttribute('aria-disabled')) !== 'true'; i++) await larger.click();
-};
 
 /** The title sits on the buttons' line, clear of them, and the content starts right under that line. */
 async function expectTitleOnButtonRow(card: Locator, title: Locator, firstContent: Locator) {
@@ -75,14 +70,14 @@ test('a long title stops before the buttons instead of running under them', asyn
   expect(t.x + t.width).toBeLessThanOrEqual(collapse.x);
 });
 
-test('at the biggest text the title stays on the buttons line and clear of them', async ({ page }) => {
+test('at 250% text the title stays on the buttons line and clear of them (from 300% on, buttons that cannot fit beside it drop under it)', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Checklist', { stayInTitle: true });
   await page.keyboard.type('To book');
   await page.keyboard.press('Enter');
   await page.keyboard.type('One');
   await clickEmpty(page);
-  await largest(page);
+  for (let i = 0; i < 7; i++) await page.getByRole('button', { name: 'Larger text' }).click(); // 250%
   const card = looseCards(page).first();
   await expectTitleOnButtonRow(card, card.getByLabel('List title'), card.getByLabel('Item text').first());
 });

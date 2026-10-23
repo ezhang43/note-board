@@ -11,12 +11,8 @@ type Point = { x: number; y: number };
  * looking around never moves or resizes anything by accident. Resting the finger for a moment
  * first calls `onHold` (with where the finger started and where it is now), which takes over.
  * A quick tap does neither (it calls `onTap`). The long-press copy / paste menu is kept away meanwhile.
- * Without `onHold` (the finger is on the text being typed in) a rest does nothing here: the phone's own cursor and selection have it.
- *
- * A finger can be lost without its lift-off reaching the page: on an iPhone, its own text handling can take a touch
- * over (job 197: a lifted item was left floating over the board, out of its list, until a reload). Until `onHold`'s
- * gesture calls `done`, a new first finger on the screen (or this finger's id coming down again), or the page being
- * hidden or losing focus, ends it the way a cancelled touch does (it sends the missing `pointercancel`), so nothing moves.
+ * Without `onHold` (the finger is on the text being typed in) a rest leaves the finger to the phone's own cursor
+ * and selection: no menu kept away, no tap, no panning after it (job 197).
  */
 export function holdOrPan(
   e: PointerEvent | { clientX: number; clientY: number; pointerId: number },
@@ -28,7 +24,7 @@ export function holdOrPan(
   let panning = false;
   const noMenu = (ev: Event) => ev.preventDefault();
   const allowMenu = () => setTimeout(() => window.removeEventListener('contextmenu', noMenu, true), 300);
-  window.addEventListener('contextmenu', noMenu, true);
+  if (onHold) window.addEventListener('contextmenu', noMenu, true);
 
   const onMove = (ev: PointerEvent) => {
     if (ev.pointerId !== e.pointerId) return;
@@ -46,45 +42,48 @@ export function holdOrPan(
       else window.removeEventListener(type, fn);
     }
   };
-  const timer = onHold
-    ? setTimeout(() => {
-        listen(false);
-        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-        window.getSelection()?.removeAllRanges();
-        navigator.vibrate?.(10);
-        onHold(start, at, () => {
-          lost(false);
-          allowMenu();
-        });
-      }, HOLD_MS)
-    : undefined;
+  const timer = setTimeout(() => {
+    listen(false);
+    stopLost();
+    if (!onHold) return;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.getSelection()?.removeAllRanges();
+    navigator.vibrate?.(10);
+    onHold(start, at, allowMenu);
+  }, HOLD_MS);
   function end(ev: PointerEvent) {
     if (ev.pointerId !== e.pointerId) return;
     clearTimeout(timer);
     listen(false);
-    lost(false);
+    stopLost();
     allowMenu();
     if (ev.type === 'pointerup' && !panning) onTap?.();
   }
-  // Watching for a lost finger. Run in the capture phase on the window, so a new touch's own gesture hasn't started yet.
+  listen(true);
+  const stopLost = onLostFinger(e.pointerId, () => end(new PointerEvent('pointercancel', { pointerId: e.pointerId })));
+}
+
+/**
+ * A finger can be lost without its lift-off ever reaching the page: on an iPhone, its own text handling can take a
+ * touch over (job 197: a lifted item was left floating over the board, hidden from its list, until a reload). A
+ * gesture following pointer `pointerId` calls this as it starts; `cancel` runs (so the gesture ends as a cancelled
+ * one, and nothing moves) when a new first finger touches the screen or that pointer comes down again, or when the
+ * page is hidden. Returns the function that stops watching: call it when the gesture ends. Call it from the gesture's
+ * own pointerdown or later: that pointerdown is not counted.
+ * simple: a browser that still counts the lost finger as down makes the next touch a second finger, which doesn't
+ * end it (a second finger must not, for a pinch); the page being hidden still does. Upgrade if that is seen on a phone.
+ */
+export function onLostFinger(pointerId: number, cancel: () => void) {
   const onDown = (ev: PointerEvent) => {
-    if (ev.pointerId === e.pointerId || ev.isPrimary) cancel();
+    if (ev.pointerId === pointerId || ev.isPrimary) cancel();
   };
   const onHide = () => {
     if (document.hidden) cancel();
   };
-  const cancel = () => window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: e.pointerId, pointerType: 'touch' }));
-  function lost(on: boolean) {
-    if (on) {
-      window.addEventListener('pointerdown', onDown, true);
-      window.addEventListener('blur', cancel);
-      document.addEventListener('visibilitychange', onHide);
-    } else {
-      window.removeEventListener('pointerdown', onDown, true);
-      window.removeEventListener('blur', cancel);
-      document.removeEventListener('visibilitychange', onHide);
-    }
-  }
-  listen(true);
-  lost(true);
+  window.addEventListener('pointerdown', onDown, true);
+  document.addEventListener('visibilitychange', onHide);
+  return () => {
+    window.removeEventListener('pointerdown', onDown, true);
+    document.removeEventListener('visibilitychange', onHide);
+  };
 }

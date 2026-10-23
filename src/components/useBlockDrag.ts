@@ -5,7 +5,8 @@ import { appStore, useAppState } from '../store/appStore';
 import { clientToBoard, columnUnder, dropIndex, listUnder } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { trackItemDrag } from './itemDom';
-import { holdOrPan } from './touchHold';
+import { isTextField } from './textField';
+import { holdOrPan, onLostFinger } from './touchHold';
 import { isPhone } from './usePhone';
 
 const INTERACTIVE = 'input, textarea, button, a, select, label, video';
@@ -40,7 +41,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
     // On a read-only board (job 161) dragging a block moves the board.
     if (appStore.viewOnly()) return trackPan({ x: e.clientX, y: e.clientY });
 
-    trackDrag(kind, id, e.currentTarget, { x: e.clientX, y: e.clientY });
+    trackDrag(kind, id, e.currentTarget, { x: e.clientX, y: e.clientY }, e.pointerId);
   };
 }
 
@@ -61,7 +62,7 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     // Resting on the text being typed in is the phone's own: moving the cursor, selecting. It never lifts or picks
     // anything up (job 197: on an iPhone that took the touch over, and the lifted item was left floating); a swipe still moves the board.
     const active = document.activeElement;
-    const typing = (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || (active instanceof HTMLElement && active.isContentEditable)) && active.contains(target);
+    const typing = isTextField(active) && active!.contains(target);
     const el = e.currentTarget;
     const onText = !!target.closest('input, textarea, select, label');
     // On a phone, resting on a checklist item lifts that item, not the whole card (owner request, job 114).
@@ -75,7 +76,7 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
             if (itemId) return trackItemDrag(id, itemId, start, e.pointerId, { at, done });
             // A block that is part of a bigger selection keeps it, so the whole selection moves.
             appStore.pressBlock(id, false);
-            trackDrag(kind, id, el, start, { at, done });
+            trackDrag(kind, id, el, start, e.pointerId, { at, done });
           },
       () => onText && appStore.select(id),
     );
@@ -103,7 +104,7 @@ function trackPan(start: { x: number; y: number }) {
  * Follow the pointer from `start`: past 5px the block is dragged; letting go drops it. After a
  * long press (`hold`) the block lifts at once, under the finger at `hold.at`.
  */
-function trackDrag(kind: 'card' | 'column', id: string, el: HTMLElement, start: { x: number; y: number }, hold?: { at: { x: number; y: number }; done: () => void }) {
+function trackDrag(kind: 'card' | 'column', id: string, el: HTMLElement, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }) {
   let offset: { x: number; y: number } | null = null;
 
   const onMove = (ev: { clientX: number; clientY: number }) => {
@@ -137,6 +138,7 @@ function trackDrag(kind: 'card' | 'column', id: string, el: HTMLElement, start: 
   };
   const finish = (ev: PointerEvent) => {
     edges.stop();
+    stopLost();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', finish);
     window.removeEventListener('pointercancel', finish);
@@ -154,6 +156,8 @@ function trackDrag(kind: 'card' | 'column', id: string, el: HTMLElement, start: 
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', finish);
+  // A finger lost without its lift-off reaching the page ends the drag as cancelled (job 197).
+  const stopLost = onLostFinger(pointerId, () => finish(new PointerEvent('pointercancel', { pointerId })));
   if (hold) onMove({ clientX: hold.at.x, clientY: hold.at.y });
 }
 

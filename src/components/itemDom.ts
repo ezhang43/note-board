@@ -4,6 +4,7 @@ import type { ItemDrag, ItemHint } from '../store/store';
 import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, isOverCanvas } from './canvasDom';
 import { followEdges } from './edgeFollow';
+import { onLostFinger } from './touchHold';
 
 // Reading checklist rows from the screen while selecting or dragging items.
 
@@ -129,6 +130,7 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
   const finish = (ev: PointerEvent) => {
     if (ev.pointerId !== pointerId) return;
     edges.stop();
+    stopLost();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', finish);
     window.removeEventListener('pointercancel', finish);
@@ -140,5 +142,7 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', finish);
+  // A finger lost without its lift-off reaching the page ends the drag as cancelled: the items stay where they were (job 197).
+  const stopLost = onLostFinger(pointerId, () => finish(new PointerEvent('pointercancel', { pointerId })));
   if (hold) onMove({ clientX: hold.at.x, clientY: hold.at.y });
 }

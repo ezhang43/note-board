@@ -78,12 +78,15 @@ test('a lift whose lift-off never arrives ends at the next touch, with the item 
   await expect(row(card, 2)).toHaveCSS('visibility', 'visible');
 });
 
-test('a lift ends, with the item back in its place, when the page loses focus', async ({ page }) => {
+test('a lift ends, with the item back in its place, when the page is hidden (another app or tab)', async ({ page }) => {
   const card = await typeList(page);
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await touch(page, holdAndMoveSteps(await mid(row(card, 2)), await mid(row(card, 0), 0.25)));
   await expect(ghost(page)).toBeVisible();
-  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
   await expect(ghost(page)).toHaveCount(0);
   await touch(page, [{ type: 'touchEnd' }]);
   expect(await texts(card)).toEqual(['Milk', 'Eggs', 'Unload dish washer']);

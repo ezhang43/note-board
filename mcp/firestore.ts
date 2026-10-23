@@ -182,7 +182,7 @@ export async function readSnapshot(db: FirestoreReader, uid: string): Promise<Sn
     if (!raw || !owner) continue;
     const mine = owner === uid;
     const ownerName = mine ? 'you' : (text(await db.getDoc(`shared/${enc(id)}/members/${enc(owner)}`).catch(() => null), 'name') || 'someone');
-    shares.push({ id, owner, ownerName, mine, raw });
+    shares.push({ id, owner, ownerName, mine, root: text(doc, 'root'), raw });
   }
   return { own, shares };
 }

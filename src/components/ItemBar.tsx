@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { panToShow } from '../model/view';
-import { canvasRect } from './canvasDom';
+import { canvasRect, isGliding } from './canvasDom';
 import { caretLine } from './caret';
 import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon, UndoIcon } from './icons';
 
@@ -39,6 +39,8 @@ export function ItemBar() {
   // part of the page the phone has scrolled away), above the keyboard and this bar, and between the
   // sides. The board moves just enough. The browser's own scrolling can't do it: the board is moved, not scrolled.
   const keepCaretClear = () => {
+    // The board is still sliding to a block's top (tapping into it): positions are not final, so look again next frame.
+    if (isGliding()) return follow();
     const field = typingIn()?.field;
     const canvas = canvasRect();
     if (!field || !canvas) return;

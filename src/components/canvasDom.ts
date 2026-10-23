@@ -98,6 +98,30 @@ export function dropIndex(columnId: string, clientY: number): number {
   return before ?? rest.length;
 }
 
+const GLIDE_MS = 200;
+let glideTimer = 0;
+const root = () => document.documentElement;
+
+/** True while a board move started by `glideBoard` is still sliding (positions on screen are not final yet). */
+export const isGliding = () => 'glide' in root().dataset;
+
+/** Stop a slide where it is going: the board is at its final place at once (a touch on the board, or a new move measuring it). */
+export function finishGlide() {
+  clearTimeout(glideTimer);
+  delete root().dataset.glide;
+}
+
+/**
+ * Run `move` (a pan or zoom of the board) so the board slides there briefly instead of jumping
+ * (the `data-glide` rule in styles.css); at once with reduced motion.
+ */
+export function glideBoard(move: () => void) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return move();
+  root().dataset.glide = '';
+  move();
+  glideTimer = window.setTimeout(finishGlide, GLIDE_MS + 40);
+}
+
 /**
  * Move the board so `el` sits in the middle of what can be seen (above a phone's keyboard),
  * zooming in to 60% first when the board is zoomed out below that to read (search).

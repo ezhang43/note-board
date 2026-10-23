@@ -143,13 +143,13 @@ export function phoneCardWidth(screenW: number, zoom: number): number {
 
 /**
  * Phone (owner request): the view that fills the screen's width with the block `rect` (within the
- * zoom limits), its left edge at the margin (centred when it is narrower even at 250%). The board
- * point at screen point `at` (the line being tapped) stays at the same height, or is brought back
- * on screen when it was off it.
+ * zoom limits), its left edge at the margin (centred when it is narrower even at 250%). The top of
+ * the block being edited (`rect`'s own top, or a card's inside it) is at screen height `top.from`
+ * now and goes to `top.to`, so it shows above the keyboard (owner request, job 198).
  */
-export function viewFillingWidth(view: View, size: Size, rect: Rect, at: Point): View {
-  const zoomed = zoomTo(view, at, (size.width - 2 * PHONE_MARGIN) / rect.w);
+export function viewFillingWidth(view: View, size: Size, rect: Rect, top: { from: number; to: number }): View {
+  // Zooming about the block's top leaves it at `top.from`, so only the move to `top.to` is left.
+  const zoomed = zoomTo(view, { x: 0, y: top.from }, (size.width - 2 * PHONE_MARGIN) / rect.w);
   const left = Math.max(PHONE_MARGIN, (size.width - rect.w * zoomed.zoom) / 2);
-  const top = Math.min(size.height - PHONE_MARGIN, Math.max(PHONE_MARGIN, at.y));
-  return panBy(zoomed, Math.round(left - rect.x * zoomed.zoom) - zoomed.panX, Math.round(top - at.y));
+  return panBy(zoomed, Math.round(left - rect.x * zoomed.zoom) - zoomed.panX, Math.round(top.to - top.from));
 }

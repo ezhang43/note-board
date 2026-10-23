@@ -314,10 +314,10 @@ export function blockActions(ctx: StoreContext) {
       requestSettle([place.type === 'column' ? place.columnId : card.id]);
       return true;
     },
-    /** Phone (owner request): starting to edit in block `id` (a card in a container: the container) fills the screen's width with it; `at` is the tapped line, in canvas pixels. */
-    fitBlockWidth(id: string, at: Point) {
+    /** Phone (owner request): starting to edit in block `id` (a card in a container: the container) fills the screen's width with it, and the top of the tapped block (`top.from`, in canvas pixels) goes to `top.to`. */
+    fitBlockWidth(id: string, top: { from: number; to: number }) {
       const rect = blockRect(ctx.state.board, B.topLevelOf(ctx.state.board, id), measured);
-      if (rect) updateView((v) => viewFillingWidth(v, ctx.viewportSize(), rect, at));
+      if (rect) updateView((v) => viewFillingWidth(v, ctx.viewportSize(), rect, top));
     },
     /** Clicking New column. */
     addColumn() {

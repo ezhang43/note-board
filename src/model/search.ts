@@ -1,4 +1,3 @@
-import { sections } from './checklist';
 import { completedCardOf } from './completed';
 import type { Board, Card, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
@@ -13,8 +12,8 @@ export interface Match {
   start: number;
   end: number;
   /**
-   * The card or column to show when the box itself is out of sight (collapsed, or in a closed
-   * Completed section), or the Completed record's id for matches in the Completed panel.
+   * The card or column to show when the box itself is out of sight (collapsed), or the Completed
+   * record's id for matches in the Completed panel.
    */
   showInstead: string | null;
 }
@@ -56,9 +55,7 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
         break;
       case 'todo': {
         out.push({ key: `title:${card.id}`, text: card.title, showInstead: hidden });
-        const { open, done } = sections(card.items);
-        items(card, open, hidden, 'item');
-        items(card, done, hidden ?? (card.completedOpen ? null : card.id), 'item');
+        items(card, card.items, hidden, 'item');
         break;
       }
       case 'completed':

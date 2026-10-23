@@ -141,9 +141,6 @@ export interface Ui {
   focusOffset: number | null;
   /** A new note, link or column whose first text field should get the cursor. */
   focusBlock: string | null;
-  /** Checklist items on their way to the Completed section (shown ticked, fading) and the ones that just arrived. */
-  completing: string[];
-  arrived: string[];
   colourMenuOpen: boolean;
   /** The keyboard shortcuts panel (? button or ? key). */
   shortcutsOpen: boolean;
@@ -241,8 +238,6 @@ export const emptyUi: Ui = {
   focusItem: null,
   focusOffset: null,
   focusBlock: null,
-  completing: [],
-  arrived: [],
   colourMenuOpen: false,
   shortcutsOpen: false,
   confirm: null,

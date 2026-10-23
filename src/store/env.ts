@@ -13,16 +13,6 @@ export function deviceStorage(): Storage | null {
   }
 }
 
-/** True when the computer is set to reduce motion (or there is no screen, as in unit tests). */
-export function reducedMotion(): boolean {
-  return typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-/** True when the last thing the person did was press a key (see src/main.tsx): keyboard actions are never animated. */
-export function keyboardInitiated(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.dataset.input === 'keys';
-}
-
 /** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). Says whether it got there. */
 export async function copyText(text: string): Promise<boolean> {
   try {

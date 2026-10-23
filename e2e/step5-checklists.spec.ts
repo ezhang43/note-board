@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, box, cards, clickEmpty, dragPointer, freshBoardEachTest, grabPoint, looseCards } from './helpers';
 
-// Step 5: checklists — items, nesting, Completed section, item drag, multi-select and drop-to-board.
+// Step 5: checklists — items, nesting, ticked items in place, item drag, multi-select and drop-to-board.
 
 freshBoardEachTest();
 
@@ -107,44 +107,36 @@ test('arrows move line by line through long text that wraps, before leaving the 
   await expect(rowWithText(list, 'bottom').getByLabel('Item text')).toBeFocused();
 });
 
-test('arrows skip completed items while the Completed section is collapsed', async ({ page }) => {
-  const list = await makeList(page, ['open', 'finished']);
+test('arrows go through ticked items like any other (job 200: they stay in place)', async ({ page }) => {
+  const list = await makeList(page, ['open', 'finished', 'last']);
   await rowWithText(list, 'finished').getByLabel('Done').click();
   const open = rowWithText(list, 'open').getByLabel('Item text');
   await open.focus();
   await page.keyboard.press('ArrowDown');
   await expect(rowWithText(list, 'finished').getByLabel('Item text')).toBeFocused();
-  await list.getByRole('button', { name: 'Completed', exact: true }).click();
-  await open.focus();
   await page.keyboard.press('ArrowDown');
-  await expect(open).toBeFocused();
+  await expect(rowWithText(list, 'last').getByLabel('Item text')).toBeFocused();
 });
 
-test('ticking a top-level item moves it to "Completed"; ticking a sub-item only strikes it', async ({ page }) => {
+test('ticking an item or a sub-item strikes it through where it is (job 200)', async ({ page }) => {
   const list = await makeList(page, ['A', 'A sub', 'A sub 2', 'B']);
   await rows(list).nth(1).getByLabel('Item text').press('Tab');
   await rows(list).nth(2).getByLabel('Item text').press('Tab');
 
   await rowWithText(list, 'A sub').getByLabel('Done').click(); // sub-item (A still has an open one)
-  await expect(list.locator('.completed')).toHaveCount(0);
   await expect(rows(list).nth(1).getByLabel('Item text')).toHaveCSS('text-decoration-line', 'line-through');
 
-  // Click (not check): ticking moves the row, so the test must not re-check whatever row takes its place.
-  await rowWithText(list, 'A').getByLabel('Done').click(); // top-level A (with its sub-items)
-  const completed = list.locator('.completed');
-  await expect(completed.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
-  await expect(completed.locator('[data-item-id]')).toHaveCount(3);
-  expect(await texts(list)).toEqual(['B', 'A', 'A sub', 'A sub 2']);
+  await rowWithText(list, 'A').getByLabel('Done').click(); // top-level A
+  await expect(list.locator('.completed')).toHaveCount(0);
+  expect(await texts(list)).toEqual(['A', 'A sub', 'A sub 2', 'B']);
+  await expect(rows(list).nth(0)).toHaveClass(/done/);
+  await expect(rows(list).nth(0).getByLabel('Item text')).toHaveCSS('text-decoration-line', 'line-through');
   await expect(list.locator('.card-meta')).toHaveText(''); // no "2/3 done" (owner request)
 
-  await completed.getByRole('button', { name: 'Completed', exact: true }).click();
-  await expect(completed.locator('[data-item-id]')).toHaveCount(0);
-  await completed.getByRole('button', { name: 'Completed', exact: true }).click();
-  await expect(completed.locator('[data-item-id]')).toHaveCount(3);
-
-  // Unticking brings it back.
+  // Unticking leaves it in place too.
   await rowWithText(list, 'A').getByLabel('Done').click();
-  await expect(list.locator('.completed')).toHaveCount(0);
+  await expect(rows(list).nth(0)).not.toHaveClass(/done/);
+  expect(await texts(list)).toEqual(['A', 'A sub', 'A sub 2', 'B']);
 });
 
 test('grip and trash show on hover on every item; trash deletes the item with its sub-items', async ({ page }) => {
@@ -278,7 +270,7 @@ test('dragging a whole list onto another list pours its items in, and the dragge
   const a = await makeList(page, ['a1', 'a1 sub', 'a2', 'a3']);
   await rowWithText(a, 'a1 sub').getByLabel('Item text').press('Tab');
   await rowWithText(a, 'a3').getByLabel('Done').click();
-  await expect(a.locator('.completed [data-item-id]')).toHaveCount(1);
+  await expect(rowWithText(a, 'a3').getByLabel('Done')).toBeChecked();
   await a.getByLabel('List title').fill('Trip');
   const b = await makeList(page, ['b1', 'b2']);
   await clickEmpty(page);
@@ -295,7 +287,7 @@ test('dragging a whole list onto another list pours its items in, and the dragge
   await expect(a).toHaveCount(0);
   expect(await texts(b)).toEqual(['b1', 'b2', 'a1', 'a1 sub', 'a2', 'a3']);
   expect(await depthOf(rowWithText(b, 'a1 sub'))).toBe(1);
-  await expect(b.locator('.completed [data-item-id]')).toHaveCount(1);
+  await expect(rowWithText(b, 'a3').getByLabel('Done')).toBeChecked(); // still ticked, in its place
   await expect(b.getByLabel('List title')).toHaveValue('');
 
   await page.keyboard.press('Control+z');
@@ -413,8 +405,8 @@ test('with several items selected, ticking one ticks all, and dragging one moves
 
   await expect(list.locator('.todo-item.picked')).toHaveCount(2);
   await rowWithText(list, 'three').getByLabel('Done').click();
-  await expect(list.locator('.completed [data-item-id]')).toHaveCount(2);
-  await expect(list.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
+  await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(2);
+  expect(await texts(list)).toEqual(['one', 'four', 'two', 'three']); // ticked in place
 });
 
 test('Ctrl+C / Ctrl+V pastes copied items after the selection; Ctrl+X cuts; Ctrl+Z undoes', async ({ page }) => {
@@ -486,53 +478,32 @@ test('Delete at the end of an item pulls the next item up into it (owner request
   expect(await texts(list)).toEqual(['Buy ', 'milk', 'eggs']);
 });
 
-test('ticking every sub-item ticks the item too, moving it to Completed; unticking one brings it back (owner request)', async ({ page }) => {
+test('ticking every sub-item ticks the item too; unticking one unticks it (owner request); nothing moves', async ({ page }) => {
   const list = await makeList(page, ['Pack', 'shoes', 'coat', 'Other']);
   await rowWithText(list, 'shoes').getByLabel('Item text').press('Tab');
   await rowWithText(list, 'coat').getByLabel('Item text').press('Tab');
   await rowWithText(list, 'shoes').getByLabel('Done').click();
-  await expect(list.locator('.completed')).toHaveCount(0); // coat is still open
+  await expect(rowWithText(list, 'Pack').getByLabel('Done')).not.toBeChecked(); // coat is still open
   await rowWithText(list, 'coat').getByLabel('Done').click();
-  await expect(list.locator('.completed [data-item-id]')).toHaveCount(3);
   await expect(rowWithText(list, 'Pack').getByLabel('Done')).toBeChecked();
-  await expect(list.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // no count
+  expect(await texts(list)).toEqual(['Pack', 'shoes', 'coat', 'Other']);
 
   await rowWithText(list, 'coat').getByLabel('Done').click();
-  await expect(list.locator('.completed')).toHaveCount(0);
   await expect(rowWithText(list, 'Pack').getByLabel('Done')).not.toBeChecked();
+  expect(await texts(list)).toEqual(['Pack', 'shoes', 'coat', 'Other']);
 });
 
 test.describe('with motion allowed', () => {
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
 
-  test('a ticked item eases out and into the Completed section, and Ctrl+Z undoes it', async ({ page }) => {
+  test('a tick applies at once and stays in place (job 200: no leaving animation), and Ctrl+Z undoes it', async ({ page }) => {
     const list = await makeList(page, ['first', 'second']);
-    // The page's clock stands still and moves only when told, so a busy computer can't skip past
-    // the 280 ms and 450 ms steps before they are checked.
-    await page.clock.install();
-    await page.clock.pauseAt(Date.now() + 60_000);
     await rowWithText(list, 'first').getByLabel('Done').click();
-    // Still in the list for 280 ms, ticked and fading.
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
-    await expect(list.locator('.todo-item.leaving').getByLabel('Done')).toBeChecked();
-    await page.clock.runFor(279);
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
-    // Then in Completed, arriving, for 450 ms.
-    await page.clock.runFor(1);
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(0);
-    await expect(list.locator('.completed .todo-item.arrived')).toHaveCount(1);
-    expect(await texts(list)).toEqual(['second', 'first']);
-    await page.clock.runFor(450);
-    await expect(list.locator('.todo-item.arrived')).toHaveCount(0);
-
-    await rowWithText(list, 'second').getByLabel('Done').click();
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(1);
-    await page.keyboard.press('Control+z'); // while it is still leaving
-    await page.clock.runFor(1000); // nothing is left to land later
-    await expect(list.locator('.completed [data-item-id]')).toHaveCount(1);
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(0);
-    await expect(rowWithText(list, 'second').getByLabel('Done')).not.toBeChecked();
-    expect(await texts(list)).toEqual(['second', 'first']);
+    await expect(rows(list).nth(0)).toHaveClass(/done/);
+    expect(await texts(list)).toEqual(['first', 'second']);
+    await page.keyboard.press('Control+z');
+    await expect(rowWithText(list, 'first').getByLabel('Done')).not.toBeChecked();
+    expect(await texts(list)).toEqual(['first', 'second']);
   });
 });
 
@@ -585,20 +556,4 @@ test('copying copies exactly the highlighted items, keeping their levels; cut le
   await expect.poll(copied).toBe('one\ntwo\n  two a');
   expect(await texts(list)).toEqual(['two b', 'three']); // "two b" stays, moved up a level
   expect(await depthOf(rowWithText(list, 'two b'))).toBe(0);
-});
-
-test('Uncheck all, beside Completed, unticks every item in the list so it can be used again (owner request)', async ({ page }) => {
-  await add(page, 'Checklist');
-  const card = cards(page).first();
-  const items = card.getByLabel('Item text');
-  await items.first().fill('Bread');
-  await page.keyboard.press('Enter');
-  await page.keyboard.type('Milk');
-  await card.getByRole('checkbox', { name: 'Done' }).first().check();
-  await card.getByRole('checkbox', { name: 'Done' }).first().check();
-  await expect(card.getByRole('button', { name: 'Uncheck all' })).toBeVisible();
-  await card.getByRole('button', { name: 'Uncheck all' }).click();
-  await expect(card.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(0);
-  await expect(card.getByRole('button', { name: 'Completed', exact: true })).toHaveCount(0);
-  await expect(items).toHaveText(['Bread', 'Milk']);
 });

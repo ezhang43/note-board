@@ -1,5 +1,5 @@
 import { newId, type MakeId } from './cards';
-import { deleteItems, displayOrder, editItems, findItem, flatIds, sections, setItemsDone } from './checklist';
+import { deleteItems, editItems, findItem, flatIds, setItemsDone } from './checklist';
 import type { Board, TodoCard } from './types';
 
 // Checklist items selected in several lists at once (owner request): by Ctrl+A pressed again and
@@ -12,10 +12,10 @@ export interface ListSelection {
   ids: string[];
 }
 
-/** The items of a list you can see: none if the card is collapsed; not the Completed section while it is closed. */
+/** The items of a list you can see: none if the card is collapsed. */
 export function visibleItems(card: TodoCard): string[] {
   if (card.collapsed) return [];
-  return card.completedOpen ? displayOrder(card.items) : flatIds(sections(card.items).open);
+  return flatIds(card.items);
 }
 
 function listsOf(board: Board, cardIds: string[]): ListSelection[] {

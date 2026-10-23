@@ -3,7 +3,7 @@ import { completedCardOf } from '../model/completed';
 import type { TodoCard } from '../model/types';
 import { createStore } from './store';
 
-// Clean up on one list (owner request, 2026-10-05): the button beside Uncheck all.
+// Clean up on one list (owner request, 2026-10-05): the button in its title row since job 200.
 
 beforeEach(() => vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) }));
 afterEach(() => vi.unstubAllGlobals());

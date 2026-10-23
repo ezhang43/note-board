@@ -1,5 +1,5 @@
 // What a screen reader is told about changes that are otherwise only seen: a delete, an undo, an item
-// moving to Completed. The store says it with `announce`; the page's one polite live region
+// several items ticked at once. The store says it with `announce`; the page's one polite live region
 // (components/LiveRegion.tsx) shows it. Pure: no DOM here.
 
 let text = '';

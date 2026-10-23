@@ -435,8 +435,7 @@ export function AppearanceMenu({ labelled = false }: { labelled?: boolean }) {
 
 /** Clean up: moves every ticked item into the Completed panel. Faded when nothing is ticked. */
 export function CleanUpButton({ labelled = false }: { labelled?: boolean }) {
-  // An item still easing out to Completed counts as ticked (Clean up applies it first).
-  const any = useAppState((s) => hasTickedItems(s.board) || s.ui.completing.length > 0);
+  const any = useAppState((s) => hasTickedItems(s.board));
   return (
     <button
       type="button"

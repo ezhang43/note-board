@@ -2,13 +2,13 @@ import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { canMoveItem, ITEM_INDENT, sections } from '../model/checklist';
+import { canMoveItem, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
-import { ArrowIcon, ChevronIcon, GripIcon, TrashIcon } from './icons';
+import { ArrowIcon, GripIcon, TrashIcon } from './icons';
 import { rowAt, rowUnder, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
@@ -40,48 +40,15 @@ export function TodoTitle({ card }: { card: TodoCard }) {
   );
 }
 
-/** A to-do list's body: open items, and the "Completed" section. */
+/** A to-do list's body: its items in order, ticked ones in place (job 200). */
 export function TodoBody({ card }: { card: TodoCard }) {
-  const { open, done } = sections(card.items);
-  // A read-only board's Completed section stays as it was left (opening it would change the board, job 161).
-  const readOnly = use(BoardReadOnly);
-
   return (
     <div className="todo-body" data-todo-of={card.id}>
       <div className="todo-items">
-        {flatten(open).map(({ item, depth }) => (
+        {flatten(card.items).map(({ item, depth }) => (
           <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />
         ))}
       </div>
-      {done.length > 0 && (
-        <div className="completed">
-          <div className="completed-head">
-            <button
-              type="button"
-              className="completed-toggle"
-              aria-expanded={card.completedOpen}
-              disabled={readOnly}
-              onClick={() => appStore.toggleCompletedSection(card.id)}
-            >
-              <ChevronIcon collapsed={!card.completedOpen} />
-              <span>Completed</span>
-            </button>
-            {/* Only while the Completed row is open (owner decision 2026-10-16). */}
-            {card.completedOpen && (
-            <div className="completed-actions">
-              <button type="button" className="uncheck-all" title="Move this list's ticked items into the Completed panel, under today's date" onClick={() => appStore.cleanUpList(card.id)}>
-                Clean up
-              </button>
-              <button type="button" className="uncheck-all" title="Untick every item, to use this list again" onClick={() => appStore.uncheckAll(card.id)}>
-                Uncheck all
-              </button>
-            </div>
-            )}
-          </div>
-          {card.completedOpen &&
-            flatten(done).map(({ item, depth }) => <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />)}
-        </div>
-      )}
     </div>
   );
 }
@@ -105,9 +72,6 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   // Lifted by press-and-hold (phone): the rows slide aside by this many px (0: back in place).
   const lifting = useAppState((s) => !!s.ui.itemDrag?.lift);
   const slide = useAppState((s) => s.ui.itemDrag?.slide?.[item.id] ?? 0);
-  // Just ticked and about to move to Completed, or just arrived there (a short animation).
-  const leaving = useAppState((s) => s.ui.completing.includes(item.id));
-  const arrived = useAppState((s) => s.ui.arrived.includes(item.id));
   // Whether the hover arrows have anywhere to go: 1 = up, 2 = down (a number, so the selector stays cheap to compare).
   // simple: this walks the card's items for every row on each change; fine for lists of a few hundred items, cache per card if lists grow far larger.
   const moves = useAppState((s) => {
@@ -155,13 +119,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
 
   const classes = [
     'todo-item',
-    (item.done || leaving) && 'done',
+    item.done && 'done',
     picked && 'picked',
     mark && `mark-${mark}`,
     dimmed && 'dimmed',
     lifting && 'lifting',
-    leaving && 'leaving',
-    arrived && 'arrived',
   ];
   return (
     <div
@@ -173,7 +135,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       <label className="tick">
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done || leaving} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} />
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} />
       </label>
       <GrowTextarea
         ref={ref}

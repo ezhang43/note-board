@@ -57,7 +57,10 @@ export interface TodoCard extends CardBase {
   kind: 'todo';
   title: string;
   items: TodoItem[];
-  /** Whether the "Completed" section is expanded. */
+  /**
+   * Unused since ticked items stay in place (job 200, 2026-10-23: there is no Completed section in a
+   * list any more). Still saved, so the saved format is unchanged and older copies of the app open new boards.
+   */
   completedOpen: boolean;
 }
 

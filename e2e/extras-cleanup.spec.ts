@@ -58,5 +58,5 @@ test('Clean up is one undo step', async ({ page }) => {
   await clickEmpty(page);
   await page.keyboard.press('Control+z');
   await expect(completedPanel(page).locator('.completed-entry')).toHaveCount(0);
-  await expect(list.locator('.completed')).toHaveCount(1); // "a" is back in the list's Completed section
+  await expect(list.getByRole('checkbox', { name: 'Done: a' })).toBeChecked(); // "a" is back in the list, ticked, in its place
 });

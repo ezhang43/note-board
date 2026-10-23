@@ -186,7 +186,6 @@ export function blockActions(ctx: StoreContext) {
       updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null }),
     /** Show an old version on the board, read-only (the real board is untouched); a drag, resize or box-select in progress ends. */
     previewVersion(meta: VersionMeta, board: Board) {
-      ctx.flushPendingTick(); // a tick still animating would be refused while a version is shown
       updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null });
     },
     endPreview: () => updateUi({ preview: null }),
@@ -359,7 +358,7 @@ export function blockActions(ctx: StoreContext) {
     },
 
     /**
-     * Clean up one list (its button beside Uncheck all): only its ticked items move into the
+     * Clean up one list (the Clean up button in its title row, job 200): only its ticked items move into the
      * Completed card. The list stays selected. One undo step. Returns how many items moved.
      */
     cleanUpList(cardId: string, now: Date = new Date()): number {

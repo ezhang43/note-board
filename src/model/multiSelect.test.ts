@@ -37,10 +37,10 @@ function board(): Board {
 }
 
 describe('items you can see', () => {
-  it('skips collapsed cards and a closed Completed section', () => {
+  it('skips collapsed cards; ticked items count wherever they are (job 200)', () => {
     const b = board();
     expect(visibleItems(b.cards.B as TodoCard)).toEqual(['b1', 'b2']);
-    expect(visibleItems({ ...(b.cards.B as TodoCard), completedOpen: false })).toEqual(['b1']);
+    expect(visibleItems({ ...(b.cards.B as TodoCard), completedOpen: false })).toEqual(['b1', 'b2']);
     expect(visibleItems({ ...(b.cards.A as TodoCard), collapsed: true })).toEqual([]);
   });
 });

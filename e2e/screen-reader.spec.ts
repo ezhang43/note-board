@@ -72,10 +72,10 @@ test('the same message twice in a row is spoken twice (the text changes undernea
   await expect(announcer(page)).toHaveText('Undid the last change');
 });
 
-test('deleting a checklist item and ticking one into Completed are announced', async ({ page }) => {
+test('deleting a checklist item and Clean up are announced; one tick is said by its own box (job 200)', async ({ page }) => {
   const list = await groceries(page, ['bread', 'milk', 'eggs']);
   await list.getByRole('checkbox', { name: 'Done: milk', exact: true }).check();
-  await expect(announcer(page)).toHaveText('Moved to Completed: milk');
+  await expect(announcer(page)).toHaveText('');
 
   await list.getByLabel('Item text').first().click();
   await list.getByRole('button', { name: 'Delete item' }).first().click();

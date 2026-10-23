@@ -18,7 +18,6 @@ import { later, type Schedule } from './env';
 
 export type * from './types';
 export { BOARD_SAVE_DELAY, VIEW_SAVE_DELAY } from './core';
-export { COMPLETE_LEAVE_MS } from './actions/checklist';
 
 export type Store = ReturnType<typeof createStore>;
 

@@ -1,6 +1,6 @@
 import { addCard, type Placement } from './board';
 import { newId, type MakeId } from './cards';
-import { MAX_DEPTH, editItems, findItem, flatIds, refill, sections, setItemsDone, subtreeHeight } from './checklist';
+import { MAX_DEPTH, editItems, findItem, hasTicked, refill, setItemsDone, subtreeHeight, subtreeIds } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, CompletedGroup, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
@@ -65,37 +65,39 @@ function listsInOrder(board: Board): string[] {
 
 /** True if any to-do list has a ticked item (at any level), so Clean up has something to do. */
 export function hasTickedItems(board: Board): boolean {
-  const any = (items: TodoItem[]): boolean => items.some((it) => it.done || any(it.children));
   return listsInOrder(board).some((id) => {
     const c = board.cards[id];
-    return c.kind === 'todo' && any(c.items);
+    return c.kind === 'todo' && hasTicked(c.items);
   });
 }
 
-/** How many items are in the lists' Completed sections (ticked top-level items), sub-items included. */
-export function completedSectionCount(board: Board): number {
+/** How many ticked items the board's lists hold, with everything nested under them. */
+export function tickedCount(board: Board): number {
   return listsInOrder(board).reduce((n, id) => {
     const c = board.cards[id];
-    return n + (c.kind === 'todo' ? flatIds(sections(c.items).done).length : 0);
+    return n + (c.kind === 'todo' ? takeTicked(c.items, null).taken.flatMap((t) => subtreeIds(t.item)).length : 0);
   }, 0);
 }
 
 /**
- * Delete completed items (Ctrl+Shift+Backspace): every list on the board loses the items in its
- * Completed section, with their sub-items. Ticked sub-items under open items stay, and so does the
- * Completed card. Lists left empty get one blank item. Returns the same board when there is nothing to delete.
+ * Delete completed items (Ctrl+Shift+Backspace): every list on the board loses its ticked items, with
+ * what is nested under them (owner request, 2026-10-23, job 200: there is no Completed section any
+ * more). The Completed card is left alone. Lists left empty get one blank item. Returns the same
+ * board when there is nothing to delete.
  */
-export function deleteCompletedSections(board: Board, makeId: MakeId = newId): Board {
+export function deleteTicked(board: Board, makeId: MakeId = newId): Board {
   let b = board;
   for (const id of listsInOrder(board)) {
     const card = board.cards[id];
-    if (card.kind === 'todo' && sections(card.items).done.length) b = editItems(b, id, (items) => refill(sections(items).open, makeId));
+    if (card.kind !== 'todo') continue;
+    const { rest, taken } = takeTicked(card.items, null);
+    if (taken.length) b = editItems(b, id, () => refill(rest, makeId));
   }
   return b;
 }
 
 /**
- * Takes every ticked item out of a list: ticked top-level items (the Completed section) and ticked
+ * Takes every ticked item out of a list: ticked top-level items and ticked
  * sub-items under open items, each with everything under it. Returns what is left and what was taken.
  */
 function takeTicked(items: TodoItem[], parentId: string | null): { rest: TodoItem[]; taken: { item: TodoItem; parentId: string | null }[] } {
@@ -117,7 +119,7 @@ function takeTicked(items: TodoItem[], parentId: string | null): { rest: TodoIte
  * Clean up: moves every ticked item into the Completed card, under the group for `day` (newest
  * group first; a second Clean up on the same day adds to that day's group). Makes the Completed card
  * at `place` if the board doesn't have one yet. Lists left empty get one blank item.
- * With `onlyCardId`, only that list is cleaned up (the Clean up button beside its Uncheck all).
+ * With `onlyCardId`, only that list is cleaned up (the Clean up button in its title row).
  * Returns the same board (and count 0) when nothing is ticked.
  */
 export function cleanUp(

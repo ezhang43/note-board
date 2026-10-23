@@ -122,6 +122,26 @@ test.describe('card buttons show only on the selected card', () => {
     await expect(trash(page).nth(1)).toBeHidden();
   });
 
+  test('a list’s Clean up shows only while it is selected; a tap there on another list only selects it (job 200)', async ({ page }) => {
+    await addMenu(page, 'Checklist');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('milk');
+    const first = page.locator('[data-card-id]').nth(0);
+    await first.getByLabel('Done: milk').tap();
+    await expect(first.locator('.list-clean-up')).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // the keyboard goes, the bottom bar is back
+    await addMenu(page, 'Checklist');
+    await expect(page.locator('[data-card-id]')).toHaveCount(2);
+    await expect(first.locator('.list-clean-up')).toBeHidden();
+    await page.getByTestId('canvas').evaluate((el) => el.dispatchEvent(new WheelEvent('wheel', { deltaY: -600, bubbles: true, cancelable: true })));
+    await page.waitForTimeout(300);
+    const at = (await first.locator('.list-clean-up').boundingBox())!;
+    await page.touchscreen.tap(at.x + at.width / 2, at.y + at.height / 2);
+    await expect(first).toHaveClass(/selected/);
+    await expect(first.getByLabel('Done: milk')).toBeChecked(); // still in its list, not cleaned up
+    await expect(first.locator('.list-clean-up')).toBeVisible();
+  });
+
   test('the selected card’s trash can still deletes it, and its collapse arrow still folds it', async ({ page }) => {
     await addMenu(page, 'Note');
     await addMenu(page, 'Note');

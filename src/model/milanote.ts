@@ -239,8 +239,7 @@ export function estimateHeight(card: Card): number {
     case 'todo': {
       const rows = (items: TodoItem[], depth: number): number =>
         items.reduce((n, it) => n + 30 + (lines(it.text, Math.max(10, 24 - depth * 3)) - 1) * 20 + rows(it.children, depth + 1), 0);
-      const done = card.items.some((it) => it.done) ? 36 : 0;
-      return snapToGrid(64 + rows(card.items, 0) + done + GRID / 2);
+      return snapToGrid(64 + rows(card.items, 0) + GRID / 2);
     }
   }
 }

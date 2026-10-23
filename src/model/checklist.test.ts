@@ -267,6 +267,35 @@ describe('dragging items', () => {
     expect(fromRose.cards.R.color).toBe('rose');
   });
 
+  it('the new list takes the width of the loose list the items came from, not its height (owner request, job 203)', () => {
+    let b = B.updateCard(twoLists(), 'L1', (c) => ({ ...c, w: 380, h: 500 }));
+    b = C.moveItems(b, 'L1', ['b'], { newList: { id: 'N', x: 800, y: 40 } });
+    expect(b.cards.N).toMatchObject({ w: 380, h: null });
+    // A source at the default width gives a new list at the default width.
+    const plain = C.moveItems(twoLists(), 'L1', ['b'], { newList: { id: 'N', x: 800, y: 40 } });
+    expect(plain.cards.N.w).toBeNull();
+  });
+
+  it('a list inside a column has no width of its own, so the new list gets the default width', () => {
+    let b = B.addColumn(twoLists(), { id: 'K', title: '', x: 0, y: 300, w: 300, h: null, color: null, collapsed: false, cardIds: [] });
+    b = B.moveCard(B.updateCard(b, 'L1', (c) => ({ ...c, w: 380 })), 'L1', { type: 'column', columnId: 'K', index: 0 });
+    b = C.moveItems(b, 'L1', ['b'], { newList: { id: 'N', x: 800, y: 40 } });
+    expect(b.cards.N.w).toBeNull();
+  });
+
+  it('a new list dropped at the end of a column keeps no width of its own (the column sets it)', () => {
+    let b = B.addColumn(twoLists(), { id: 'K', title: '', x: 0, y: 300, w: 300, h: null, color: null, collapsed: false, cardIds: [] });
+    b = B.updateCard(b, 'L1', (c) => ({ ...c, w: 380 }));
+    b = C.moveItems(b, 'L1', ['b'], { newList: { id: 'N', x: 0, y: 0, columnId: 'K' } });
+    expect(b.cards.N.w).toBeNull();
+  });
+
+  it('items dropped onto an existing list leave that list\'s width alone', () => {
+    let b = B.updateCard(twoLists(), 'L1', (c) => ({ ...c, w: 380 }));
+    b = C.moveItems(b, 'L1', ['b'], { cardId: 'L2', drop: { mode: 'append' } });
+    expect(b.cards.L2.w).toBeNull();
+  });
+
   it('reorders within the same list', () => {
     const b = C.moveItems(twoLists(), 'L1', ['b'], { cardId: 'L1', drop: { mode: 'nest', targetId: 'a2' } });
     expect(ids(itemsOf(b, 'L1'))).toBe('a(a1 a2(b)) c(c1)');

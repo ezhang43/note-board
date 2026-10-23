@@ -518,7 +518,7 @@ export type ItemDestination = { cardId: string; drop: ItemDrop } | { newList: { 
 
 /**
  * Moves items (with their sub-items) from one list to a drop position, possibly in another list,
- * or as a new untitled list in the source list's colour. A list emptied this way is removed, title
+ * or as a new untitled list in the source list's colour and width. A list emptied this way is removed, title
  * or not (owner request, 2026-10-06). Returns the same board if the move isn't allowed.
  */
 export function moveItems(board: Board, fromCardId: string, rootIds: string[], to: ItemDestination): Board {
@@ -535,7 +535,11 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
   if ('newList' in to) {
     const { id, x, y, columnId } = to.newList;
     if (columnId && !board.columns[columnId]) return board; // the column went meanwhile: nothing moves
-    const card: TodoCard = { id, kind: 'todo', color: src.color, collapsed: false, x, y, w: null, h: null, title: '', items: moving, completedOpen: true };
+    // Width only (owner request, job 203): as wide as the loose list they came from; its height fits the items.
+    // A list in a column has no width of its own (the column sets it), so then, and into a column, the default.
+    // simple: the default stands in for a column's width; upgrade if the owner wants that carried over too.
+    const w = columnId || !board.order.includes(fromCardId) ? null : src.w;
+    const card: TodoCard = { id, kind: 'todo', color: src.color, collapsed: false, x, y, w, h: null, title: '', items: moving, completedOpen: true };
     // Into a column: at its end (addCard opens a collapsed column, as dropping a card into one does).
     const place = columnId ? { type: 'column' as const, columnId, index: Infinity } : { type: 'loose' as const, x, y };
     return addCard(leftBehind(board), card, place);

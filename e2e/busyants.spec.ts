@@ -54,19 +54,19 @@ test('A+ / A− change the text size on cards and columns (not the toolbar), and
   await expect(page.getByRole('button', { name: 'Smaller text' })).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('A+ goes on up to 250% and stops there (A+ fades), and that is remembered', async ({ page }) => {
+test('A+ goes on up to 400% and stops there (A+ fades), and that is remembered', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Checklist');
   await page.keyboard.type('milk');
   const item = page.getByLabel('Item text').first();
   const plus = page.getByRole('button', { name: 'Larger text' });
   const normal = parseFloat(await css(item, 'font-size'));
-  for (let i = 0; i < 7; i++) await plus.click(); // Normal → Large → Larger → Huge → Largest → Enormous → Giant → Maximum
+  for (let i = 0; i < 10; i++) await plus.click(); // Normal → Large → Larger → Huge → Largest → Enormous → Giant → Maximum → Colossal → Immense → Ultimate
   await expect(plus).toHaveAttribute('aria-disabled', 'true');
-  await expect.poll(async () => parseFloat(await css(item, 'font-size'))).toBeCloseTo(normal * 2.5, 1);
+  await expect.poll(async () => parseFloat(await css(item, 'font-size'))).toBeCloseTo(normal * 4, 1);
   await page.reload();
   await expect(plus).toHaveAttribute('aria-disabled', 'true');
-  await expect.poll(async () => parseFloat(await css(page.getByLabel('Item text').first(), 'font-size'))).toBeCloseTo(normal * 2.5, 1);
+  await expect.poll(async () => parseFloat(await css(page.getByLabel('Item text').first(), 'font-size'))).toBeCloseTo(normal * 4, 1);
   await page.getByRole('button', { name: 'Smaller text' }).click();
   await expect(plus).not.toHaveAttribute('aria-disabled', 'true');
 });

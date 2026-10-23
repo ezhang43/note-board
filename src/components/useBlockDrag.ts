@@ -46,7 +46,7 @@ export function blockPointerDown(kind: 'card' | 'column', id: string) {
 
 /**
  * Touch screens: one finger moving straight away moves the board around; resting it on a card or
- * column for a moment, then moving, drags it (owner requests). Works on text too, since a card is
+ * column for a moment, then moving, drags it (owner requests). Works on text too (not the text being typed in), since a card is
  * mostly text boxes; a quick tap still types. Grip, tick boxes and buttons keep their own meaning.
  * On a phone, resting on a checklist item lifts the item instead (the rest of the card still drags the card).
  * A capture handler, so checklist rows can't swallow the press; a column leaves presses on its
@@ -58,23 +58,25 @@ export function blockHoldPointerDown(kind: 'card' | 'column', id: string) {
     const target = e.target as Element;
     if (target.closest('button, .tick, input[type="checkbox"], a')) return;
     if (kind === 'column' && target.closest('[data-card-id]')) return;
-    // Resting on the text being typed in is the phone's own: moving the cursor, selecting. It never lifts or
-    // picks anything up (job 197: on an iPhone that took the touch over, and the lifted item was left floating).
-    const typing = document.activeElement;
-    if (typing?.matches('input, textarea, [contenteditable="true"]') && typing.contains(target)) return;
+    // Resting on the text being typed in is the phone's own: moving the cursor, selecting. It never lifts or picks
+    // anything up (job 197: on an iPhone that took the touch over, and the lifted item was left floating); a swipe still moves the board.
+    const active = document.activeElement;
+    const typing = (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || (active instanceof HTMLElement && active.isContentEditable)) && active.contains(target);
     const el = e.currentTarget;
     const onText = !!target.closest('input, textarea, select, label');
     // On a phone, resting on a checklist item lifts that item, not the whole card (owner request, job 114).
     const itemId = kind === 'card' && isPhone() ? target.closest<HTMLElement>('[data-item-id]')?.dataset.itemId : undefined;
     holdOrPan(
       e.nativeEvent,
-      (start, at, done) => {
-        if (appStore.viewOnly()) return done(); // nothing to lift on a read-only board (job 161)
-        if (itemId) return trackItemDrag(id, itemId, start, e.pointerId, { at, done });
-        // A block that is part of a bigger selection keeps it, so the whole selection moves.
-        appStore.pressBlock(id, false);
-        trackDrag(kind, id, el, start, { at, done });
-      },
+      typing
+        ? null
+        : (start, at, done) => {
+            if (appStore.viewOnly()) return done(); // nothing to lift on a read-only board (job 161)
+            if (itemId) return trackItemDrag(id, itemId, start, e.pointerId, { at, done });
+            // A block that is part of a bigger selection keeps it, so the whole selection moves.
+            appStore.pressBlock(id, false);
+            trackDrag(kind, id, el, start, { at, done });
+          },
       () => onText && appStore.select(id),
     );
   };

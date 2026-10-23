@@ -90,8 +90,12 @@ test('a lift ends, with the item back in its place, when the page loses focus', 
   await expect(row(card, 2)).toHaveCSS('visibility', 'visible');
 });
 
-test('the phone add-item flow: a new item typed and put away stays in its list', async ({ page }) => {
+test('the owner’s flow: type a new item, rest on it, the lift-off is lost, tap away: it stays in its list', async ({ page }) => {
   const card = await typeList(page);
+  await swallowNextLiftOff(page);
+  await touch(page, [{ type: 'touchStart', p: await mid(row(card, 2)) }, { type: 'touchEnd', wait: 800 }]);
+  await expect(ghost(page)).toHaveCount(0);
+  await expect(row(card, 2)).toHaveCSS('visibility', 'visible');
   await page.getByTestId('canvas').tap({ position: { x: 200, y: 650 } });
   await expect(ghost(page)).toHaveCount(0);
   expect(await texts(card)).toEqual(['Milk', 'Eggs', 'Unload dish washer']);

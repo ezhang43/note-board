@@ -29,7 +29,7 @@ class CallError extends Error {
 }
 
 /** Talks to the pretend server in the dev server. */
-export function demoBackend(person: Person) {
+function demoBackend(person: Person) {
   const base = `${import.meta.env.BASE_URL}__collab`;
   async function call(method: string, ...args: unknown[]) {
     const res = await fetch(`${base}/call`, { method: 'POST', body: JSON.stringify({ who: person, method, args }) });

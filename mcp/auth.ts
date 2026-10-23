@@ -17,11 +17,12 @@ export interface TokenFile {
   apiKey?: string;
 }
 
-export const LOGIN_AGAIN = 'To sign in again, ask Claude to sign in to BusyAnts (its sign_in tool), or run npm run mcp:login.';
+const LOGIN_AGAIN = 'To sign in again, ask Claude to sign in to BusyAnts (its sign_in tool), or run npm run mcp:login.';
 
 /**
- * %APPDATA%\busyants-mcp\token.json: outside the project, in the Windows account's own folder.
- * simple: protected only by Windows file permissions; move it to Windows Credential Manager if the
+ * %APPDATA%\busyants-mcp\token.json (~/.config/busyants-mcp on a Mac): outside the project, in the
+ * account's own folder.
+ * simple: protected only by file permissions; move it to Windows Credential Manager if the
  * computer is ever shared.
  */
 export function tokenPath(env: Record<string, string | undefined> = process.env): string {

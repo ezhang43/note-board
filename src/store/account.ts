@@ -15,7 +15,7 @@ export const parkedKey = (uid: string) => `note-board:parked:${uid}`;
  */
 export const heldKey = (uid: string) => `note-board:held-edits:${uid}`;
 /** The last agreed version of each of account `uid`'s shares, kept aside with its boards (see baseKey). */
-export const parkedBasesKey = (uid: string) => `note-board:parked-bases:${uid}`;
+const parkedBasesKey = (uid: string) => `note-board:parked-bases:${uid}`;
 
 /**
  * Makes the boards on this device account `uid`'s before its sync starts (job #145, review 137-A

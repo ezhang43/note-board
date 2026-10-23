@@ -82,7 +82,8 @@ describe('a tick still animating is never lost', () => {
     s.toggleItem(cardId, first);
     const remote = structuredClone(s.getState().board);
     findItem((remote.cards[cardId] as TodoCard).items, second)!.item.text = 'from phone';
-    s.replaceBoard(remote);
+    const ws = s.workspace();
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [s.getState().boards.open]: remote } });
     vi.advanceTimersByTime(COMPLETE_LEAVE_MS + 50);
     expect(findItem(list().items, second)?.item.text).toBe('from phone');
     expect(done(first)).toBe(true);

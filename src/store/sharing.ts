@@ -110,7 +110,7 @@ export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: s
 }
 
 /** A save that failed (no connection, say) is tried again after this long. */
-export const RETRY_MS = 5000;
+const RETRY_MS = 5000;
 
 interface Share {
   id: string;

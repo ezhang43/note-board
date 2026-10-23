@@ -519,7 +519,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   user-select: none;
   touch-action: none;
 }
-/* Dragging the board with the middle button, or the left and right together (owner request, job 188): a closed glove, over cards and text too. */
+/* Dragging the board with the left button from empty space (owner request, job 193, swapping job 188): a closed glove. */
 .canvas.panning, .canvas.panning * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grabbing !important; }
 
 .world {

@@ -24,10 +24,10 @@ test('the board area never scrolls, so the selection box starts right at the poi
   await page.keyboard.press('Escape');
   const from = { x: c.x + 100, y: c.y + 100 };
   await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'middle' }); // the middle button draws the box (job 193)
   await page.mouse.move(from.x + 150, from.y + 120, { steps: 3 });
   const box = (await page.getByTestId('marquee').boundingBox())!;
-  await page.mouse.up();
+  await page.mouse.up({ button: 'middle' });
   expect(box.x).toBeCloseTo(from.x, 0);
   expect(box.y).toBeCloseTo(from.y, 0);
 });

@@ -120,6 +120,20 @@ test('a viewer sees the badge and a one-time note, no editing buttons, and canâ€
   const after = await box(card);
   expect(Math.round(after.x - before.x)).toBe(120);
 
+  // The middle button, or left and right together, draw no box on a read-only board (there is none), and
+  // the left-drag that was panning carries on when the right button joins.
+  const at = { x: after.x + after.width / 2, y: after.y + 8 };
+  await bob.mouse.move(at.x, at.y);
+  await bob.mouse.down();
+  await bob.mouse.move(at.x + 30, at.y + 10, { steps: 3 });
+  const mid = await bob.getByTestId('canvas').getAttribute('data-pan-x');
+  await bob.mouse.down({ button: 'right' });
+  await bob.mouse.move(at.x + 80, at.y + 20, { steps: 4 });
+  await expect(bob.getByTestId('marquee')).toHaveCount(0);
+  await expect(bob.getByTestId('canvas')).not.toHaveAttribute('data-pan-x', mid!);
+  await bob.mouse.up({ button: 'right' });
+  await bob.mouse.up();
+
   // Nothing went to the server, and Alice's board is as it was.
   await bob.waitForTimeout(1500);
   expect(sent.saves).toBe(0);

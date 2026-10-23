@@ -14,7 +14,7 @@ import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { EmptyStart } from './TemplatePicker';
 import { HOLD_MS } from './touchHold';
-import { usePanButtons } from './usePanButtons';
+import { useBoxButtons } from './useBoxButtons';
 import { usePhone } from './usePhone';
 
 const NO_GUIDES: never[] = [];
@@ -148,15 +148,14 @@ export function Canvas() {
     };
   }, [phone]);
 
-  // Dragging empty space draws the selection box; a finger, or a read-only board, pans instead.
+  // Dragging empty space pans the board; holding Ctrl or Shift, or a finger that rested first, draws the selection box
+  // (the middle button, or left and right together, always do: useBoxButtons).
   const drag = useRef<{ id: number; mode: 'pan' | 'marquee'; x: number; y: number; start: Point } | null>(null);
   // A finger on the empty board, for the zoom taps: double tap zooms in, a long tap zooms out.
   const press = useRef<{ id: number; down: Touch; moved: boolean } | null>(null);
   const lastTap = useRef<Touch | null>(null);
-  // Shows the closed glove while the board is dragged with the middle button, or the left and right together.
+  // Shows the closed glove while the board is dragged with the mouse.
   const [panning, setPanning] = useState(false);
-  // The middle button, or the left and right together, drag the board (owner request, job 188).
-  usePanButtons(ref, setPanning);
   // The selection box keeps moving the board at the screen edge (owner request).
   const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
@@ -237,10 +236,10 @@ export function Canvas() {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const at = clientToCanvas(e.clientX, e.clientY);
-    // By finger or pen the board moves (a finger resting first, then moving, draws the box instead); a read-only
-    // board (job 161) has no selection box either.
+    // The board moves (a finger resting first, then moving, draws the box instead; so does a mouse with Ctrl or
+    // Shift held, adding to the selection); a read-only board (job 161) has no selection box either.
     const finger = e.pointerType === 'touch';
-    drag.current = { id: e.pointerId, mode: e.pointerType !== 'mouse' || appStore.viewOnly() ? 'pan' : 'marquee', x: e.clientX, y: e.clientY, start: at };
+    drag.current = { id: e.pointerId, mode: keep && e.pointerType === 'mouse' && !appStore.viewOnly() ? 'marquee' : 'pan', x: e.clientX, y: e.clientY, start: at };
     press.current = finger ? { id: e.pointerId, down: { x: e.clientX, y: e.clientY, t: Date.now() }, moved: false } : null;
     if (drag.current.mode === 'marquee') startBox(keep);
   }
@@ -272,6 +271,7 @@ export function Canvas() {
       edges.current?.track(e);
       return appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
     }
+    if (e.pointerType === 'mouse') setPanning(true); // the closed glove, from the first move
     appStore.panBy(e.clientX - d.x, e.clientY - d.y);
     d.x = e.clientX;
     d.y = e.clientY;
@@ -294,12 +294,36 @@ export function Canvas() {
   }
 
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
-    if (drag.current?.id !== e.pointerId) return;
-    if (drag.current.mode === 'marquee') appStore.endMarquee();
+    if (drag.current?.id === e.pointerId) finishDrag();
+  }
+
+  function finishDrag() {
+    if (drag.current?.mode === 'marquee') appStore.endMarquee();
     edges.current?.stop();
     edges.current = null;
     drag.current = null;
+    setPanning(false);
   }
+
+  // The middle button, or the left and right together, draw the box from anywhere on the board, over blocks too
+  // (owner request, job 193). Its drag has no pointer id of its own (-1).
+  useBoxButtons(ref, {
+    begin(x, y, keep) {
+      if (!keep) appStore.clearSelection();
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      drag.current = { id: -1, mode: 'marquee', x, y, start: clientToCanvas(x, y) };
+      startBox(keep);
+    },
+    move(e) {
+      const d = drag.current;
+      if (d?.id !== -1) return;
+      edges.current?.track(e);
+      appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
+    },
+    end() {
+      if (drag.current?.id === -1) finishDrag();
+    },
+  });
 
   const grid = gridStyle(view);
   const dot = snap ? 'var(--grid-dot)' : 'var(--grid-dot-faint)';

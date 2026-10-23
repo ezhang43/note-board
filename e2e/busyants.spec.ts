@@ -201,9 +201,10 @@ test('dragging a card to the edge of the screen keeps moving the board', async (
   await page.mouse.up();
 });
 
-test('a selection box at the bottom edge keeps moving the board and selecting', async ({ page }) => {
+test('a selection box (Ctrl + left drag) at the bottom edge keeps moving the board and selecting', async ({ page }) => {
   const canvas = (await page.getByTestId('canvas').boundingBox())!;
   const start = await panOf(page);
+  await page.keyboard.down('Control');
   await page.mouse.move(canvas.x + 40, canvas.y + 40);
   await page.mouse.down();
   await page.mouse.move(canvas.x + 300, canvas.y + canvas.height - 3, { steps: 10 });

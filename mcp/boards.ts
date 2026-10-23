@@ -13,7 +13,8 @@ import { boardTree, pathTo, readWorkspace, serializeWorkspace, type Workspace } 
 export interface Snapshot {
   /** boards/{uid}.data, or null when nothing is saved online yet. */
   own: string | null;
-  shares: { id: string; owner: string; ownerName: string; mine: boolean; raw: string }[];
+  /** `root`: the share's starting board, as its document's `root` field says (nobody can change it; null if missing). */
+  shares: { id: string; owner: string; ownerName: string; mine: boolean; root: string | null; raw: string }[];
 }
 
 export interface BoardEntry {

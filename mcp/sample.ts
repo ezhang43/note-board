@@ -55,6 +55,6 @@ export const ownRaw = () => serializeWorkspace({ home: 'home', boards: { home: h
 export function sampleSnapshot(): Snapshot {
   return {
     own: ownRaw(),
-    shares: [{ id: 'shareTrip', owner: 'u2', ownerName: 'Erika', mine: false, raw: serializeShare('trip', tripBoards()) }],
+    shares: [{ id: 'shareTrip', owner: 'u2', ownerName: 'Erika', mine: false, root: 'trip', raw: serializeShare('trip', tripBoards()) }],
   };
 }

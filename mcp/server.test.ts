@@ -7,7 +7,7 @@ import type { Snapshot } from './boards';
 import { fakeFirestore } from './fakeFirestore';
 import { ownDb } from './firestore';
 import { serializeShare } from '../src/model/sharing';
-import { ownRaw, sampleSnapshot, workBoard } from './sample';
+import { homeBoard, ownRaw, sampleSnapshot, tripBoards, workBoard } from './sample';
 import { saveChange } from './save';
 import { createServer, type Write } from './server';
 
@@ -66,11 +66,11 @@ describe('the connector’s tools', () => {
 
 // ---------- changing boards (job B) ----------
 
-function connectWithWrites(deleteAllowed?: () => Promise<boolean>) {
+function connectWithWrites(deleteAllowed?: () => Promise<boolean>, extra: Snapshot['shares'] = []) {
   const fs = fakeFirestore('me');
   fs.setOwn(ownRaw());
   const deps = { db: ownDb(async () => 'ID', 'me', fs.fetch), client: 'mcp-test', now: () => Date.UTC(2026, 9, 6, 12), wait: async () => {}, log: () => {}, memory: { lastEditAt: null } };
-  const load = async () => ({ ...sampleSnapshot(), own: fs.own() });
+  const load = async () => ({ ...sampleSnapshot(), own: fs.own(), shares: [...sampleSnapshot().shares, ...extra] });
   return { fs, client: connect(load, (edit, opts) => saveChange(deps, edit, opts), deleteAllowed) };
 }
 
@@ -132,11 +132,64 @@ describe('the connector’s write tools', () => {
     fs.setOwn(ownRaw());
     const snap = sampleSnapshot();
     // The owner just shared "Work": the share holds it, the own boards still have the old copy.
-    const shared = { id: 'shareWork', owner: 'me', ownerName: 'you', mine: true, raw: serializeShare('work', { work: workBoard() }) };
+    const shared = { id: 'shareWork', owner: 'me', ownerName: 'you', mine: true, root: 'work', raw: serializeShare('work', { work: workBoard() }) };
     const client = await connect(async () => ({ ...snap, own: fs.own(), shares: [...snap.shares, shared] }), noSaving);
     const r = await client.callTool({ name: 'add_items', arguments: { board: 'work', list: 'Tasks', items: [{ text: 'x' }] } });
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/shared.*read-only/);
+  });
+
+  describe('a share holding a board with one of the owner’s own ids doesn’t make it read-only (as the app, ownCopy)', () => {
+    const connectWithShares = (extra: Snapshot['shares']) => connectWithWrites(async () => true, extra);
+    const add = (board: string, list: string) => ({ name: 'add_items', arguments: { board, list, items: [{ text: 'x' }] } });
+
+    it('someone else’s share carrying a board keyed "home"', async () => {
+      const boards = { ...tripBoards(), home: { ...workBoard(), name: 'Fake' } };
+      const { fs, client } = connectWithShares([{ id: 'sX', owner: 'u3', ownerName: 'Mallory', mine: false, root: 'trip', raw: serializeShare('trip', boards) }]);
+      const r = await (await client).callTool(add('home', 'Groceries'));
+      expect(r.isError).toBeFalsy();
+      expect(saves(fs)).toBe(1);
+    });
+
+    it('someone else’s share whose starting board has one of the owner’s ids', async () => {
+      const { fs, client } = connectWithShares([{ id: 'sX', owner: 'u3', ownerName: 'Mallory', mine: false, root: 'work', raw: serializeShare('work', { work: workBoard() }) }]);
+      const r = await (await client).callTool(add('work', 'Tasks'));
+      expect(r.isError).toBeFalsy();
+      expect(saves(fs)).toBe(1);
+    });
+
+    it('the owner’s own share carrying "home" (Home is never shared)', async () => {
+      const { fs, client } = connectWithShares([{ id: 'sW', owner: 'me', ownerName: 'you', mine: true, root: 'work', raw: serializeShare('work', { work: workBoard(), home: homeBoard() }) }]);
+      const c = await client;
+      const r = await c.callTool(add('home', 'Groceries'));
+      expect(r.isError).toBeFalsy();
+      expect(saves(fs)).toBe(1);
+      // The board the owner did share stays read-only.
+      expect(text(await c.callTool(add('work', 'Tasks')))).toMatch(/shared.*read-only/);
+    });
+
+    it('the trip boards really shared with the owner stay read-only', async () => {
+      const { client } = connectWithShares([{ id: 'sX', owner: 'u3', ownerName: 'Mallory', mine: false, root: 'trip', raw: serializeShare('trip', { ...tripBoards(), home: workBoard() }) }]);
+      expect(text(await (await client).callTool(add('Trip', 'Bookings')))).toMatch(/shared.*read-only/);
+    });
+
+    it('an editor rewriting the owner’s share to start at "home" doesn’t free the shared board', async () => {
+      const raw = serializeShare('home', { home: homeBoard(), work: workBoard() });
+      const { client } = connectWithShares([{ id: 'sW', owner: 'me', ownerName: 'you', mine: true, root: 'work', raw }]);
+      expect(text(await (await client).callTool(add('work', 'Tasks')))).toMatch(/shared.*read-only/);
+    });
+
+    it('deleting follows the same rule', async () => {
+      const others = { id: 'sX', owner: 'u3', ownerName: 'Mallory', mine: false, root: 'work', raw: serializeShare('work', { work: workBoard() }) };
+      const { fs, client } = connectWithShares([others]);
+      const c = await client;
+      const p = await c.callTool({ name: 'preview_delete', arguments: { board: 'work', things: ['listWork'] } });
+      expect(p.isError).toBeFalsy();
+      expect(text(await c.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } }))).toMatch(/^Saved:/);
+      expect(readWorkspace(fs.own())!.ws.boards.work.cards.listWork).toBeUndefined();
+      const mine = connectWithShares([{ id: 'sW', owner: 'me', ownerName: 'you', mine: true, root: 'work', raw: serializeShare('work', { work: workBoard() }) }]);
+      expect(text(await (await mine.client).callTool({ name: 'preview_delete', arguments: { board: 'work', things: ['listWork'] } }))).toMatch(/shared.*read-only/);
+    });
   });
 
   it('at most 50 changes in one call, and 5,000 characters per text', async () => {
@@ -362,7 +415,7 @@ describe('guards (job 156)', () => {
     const { fs, client, extra } = await connectChanging();
     const p = await client.callTool({ name: 'preview_delete', arguments: { board: 'work', things: ['listWork'] } });
     expect(p.isError).toBeFalsy();
-    extra.push({ id: 'sW', owner: 'me', ownerName: 'you', mine: true, raw: serializeShare('work', { work: workBoard() }) });
+    extra.push({ id: 'sW', owner: 'me', ownerName: 'you', mine: true, root: 'work', raw: serializeShare('work', { work: workBoard() }) });
     const refused = await client.callTool({ name: 'confirm_delete', arguments: { preview: previewId(p) } });
     expect(refused.isError).toBe(true);
     expect(text(refused)).toMatch(/shared boards are read-only/);

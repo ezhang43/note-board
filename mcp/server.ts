@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { newId } from '../src/model/cards';
-import { readShare } from '../src/model/sharing';
+import { boardsToShare, clashingBoards, readShare } from '../src/model/sharing';
 import { readWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit, type Snapshot } from './boards';
 import { addChecklist, addItems, addNote, deleteThings, editItems, moveItems, newBoard, newColumn, planDelete, setItemsDone, type Edit } from './edits';
@@ -27,8 +27,25 @@ export const MAX_DELETE = 20;
 
 const DELETE_OFF = 'Deleting is switched off for this connector, so nothing was deleted. Only the owner can switch it on, on their computer: ask the owner.';
 
-/** Every board in any share (the person's own shared boards too): read-only for the connector. */
-const sharedIds = (snap: Snapshot) => new Set(snap.shares.flatMap((s) => Object.keys(readShare(s.raw)?.boards ?? {})));
+/**
+ * The boards the connector treats as shared (read-only). The owner's own boards win, as in the app
+ * (Sharing.ownCopy): a share never takes one of the owner's boards (anyone it is shared with can save
+ * anything in its data), except, in a share of their own, the board they shared (the share's `root`,
+ * which nobody can change) and the boards inside it: a just-shared board's old copy is still in the
+ * own boards, and the app shows the share's copy. A share whose starting board is one of the owner's
+ * holds nothing.
+ */
+const sharedIds = (snap: Snapshot) => {
+  const ws = snap.own == null ? null : (readWorkspace(snap.own)?.ws ?? null);
+  return new Set(
+    snap.shares.flatMap((s) => {
+      const boards = readShare(s.raw)?.boards ?? {};
+      if (!ws) return Object.keys(boards);
+      const clash = clashingBoards(ws, boards, s.mine && s.root ? boardsToShare(ws, s.root, new Set()) : []);
+      return s.root && clash.includes(s.root) ? [] : Object.keys(boards).filter((id) => !clash.includes(id));
+    }),
+  );
+};
 
 interface Preview {
   boardId: string;
@@ -76,8 +93,8 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
     const snap = await load();
     const found = findBoard(collectBoards(snap).entries, board);
     if ('error' in found) return { error: found.error };
-    // A board in any share counts as shared, even while an old copy is still in the own boards
-    // (just shared): the app shows the share's copy, so a change to the old one would be lost.
+    // Shared: as the app decides (see sharedIds), so a board the owner just shared counts even while
+    // its old copy is still in the own boards, and someone else's share never takes an own board.
     const shared = sharedIds(snap);
     if (found.entry.sharedBy || shared.has(found.entry.id)) return { error: `${found.entry.name} is a shared board: shared boards are read-only for this connector. Nothing was changed.` };
     return { snap, id: found.entry.id, shared };

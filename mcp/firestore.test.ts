@@ -67,8 +67,8 @@ describe('reading everything for one person', () => {
     const snap = await readSnapshot(firestoreReader(async () => 't', fn), 'me');
     expect(snap.own).toBe(ownRaw());
     expect(snap.shares).toEqual([
-      { id: 's1', owner: 'u2', ownerName: 'Erika', mine: false, raw: tripRaw },
-      { id: 's3', owner: 'me', ownerName: 'you', mine: true, raw: tripRaw },
+      { id: 's1', owner: 'u2', ownerName: 'Erika', mine: false, root: 'trip', raw: tripRaw },
+      { id: 's3', owner: 'me', ownerName: 'you', mine: true, root: 'trip', raw: tripRaw },
     ]);
   });
 

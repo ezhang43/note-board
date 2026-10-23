@@ -176,13 +176,14 @@ async function checkControls(row: Locator, first: boolean) {
   const [up, down, trash, grip] = boxes;
   // The sizes grow with the text step (never under the Small size), and as tall as the item's first line.
   const fs = Number(await row.evaluate((el) => getComputedStyle(el).getPropertyValue('--fs')));
-  const s = Math.max(1, fs);
+  const s = Math.max(1, fs); // the first line's step: the buttons are as tall as it
+  const sw = Math.min(s, 1.9); // their widths, icons and the strip stop growing at 190% (so the tick box and the strip fit a 200px card at 400%)
   const near = (got: number, want: number) => expect(Math.abs(got - want)).toBeLessThan(0.6);
-  [up.width, down.width, trash.width, grip.width].forEach((w, i) => near(w, [22, 22, 28, 18][i] * s));
+  [up.width, down.width, trash.width, grip.width].forEach((w, i) => near(w, [22, 22, 28, 18][i] * sw));
   for (const b of boxes) near(b.height, 20 * s + 8);
   const icons = await Promise.all(buttons.map(iconSize));
-  [18, 18, 16, 10].forEach((w, i) => near(icons[i].w, w * s));
-  near(icons[3].h, 15 * s);
+  [18, 18, 16, 10].forEach((w, i) => near(icons[i].w, w * sw));
+  near(icons[3].h, 15 * sw);
   const r = await box(row);
   // The trash can and the grip: one line, flush, the grip flush with the row's right end, inside the row.
   expect(trash.y).toBe(grip.y);
@@ -195,7 +196,7 @@ async function checkControls(row: Locator, first: boolean) {
   expect(up.y).toBe(down.y);
   near(up.x + up.width, down.x);
   expect(down.x + down.width).toBeLessThanOrEqual(r.x + r.width + 0.5);
-  expect(up.x).toBeGreaterThanOrEqual(r.x + r.width - 46 * s - 0.5);
+  expect(up.x).toBeGreaterThanOrEqual(r.x + r.width - 46 * sw - 0.5);
   if (first) expect(up.y).toBeGreaterThanOrEqual(r.y + r.height - 3);
   else expect(up.y + up.height).toBeLessThanOrEqual(r.y + 3);
   // The text stops before the trash can and does not move on hover.
@@ -223,7 +224,7 @@ test('on a computer the hover controls are bigger, trash and grip in a line, the
   await page.keyboard.press('Tab'); // 'sub item' nested under the first
   await row(list, 2).getByLabel('Item text').click();
   await page.keyboard.press('Tab'); // and 'sub two' beside it, so each can move
-  // A new card is narrow; at the biggest text the strip kept free for the buttons (81px) would leave a sub-item little room, so widen it.
+  // A new card is narrow; at the biggest text the strip kept free for the buttons (87px) would leave a sub-item little room, so widen it.
   const corner = await box(list.getByRole('button', { name: 'Resize card' }));
   const from = { x: corner.x + corner.width / 2, y: corner.y + corner.height / 2 };
   await dragPointer(page, from, { x: from.x + 260, y: from.y });

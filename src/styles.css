@@ -842,6 +842,32 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* From 225% up (the canvas has data-big-text) the buttons can be so wide that a 200px card has no room for its title beside them: the title keeps about two and a half letters, and the buttons drop to a line of their own, at the right, instead of covering it. */
 .canvas[data-big-text] .card:not(.collapsed) > .card-header { flex-wrap: wrap; justify-content: flex-end; }
 .canvas[data-big-text] .card-header > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 12px)); }
+/*
+ * A list's Clean up button (job 200): left of the collapse arrow while something in the list is ticked. It
+ * grows with the other header buttons (up to 250%) and has a set width, so the title keeps room beside the
+ * three buttons, and they drop to a line of their own, at the right, when even about two and a half letters won't fit.
+ */
+.list-clean-up {
+  position: relative;
+  flex-shrink: 0;
+  width: calc(60px * var(--hb));
+  height: var(--btn);
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: calc(12px * var(--hb));
+  font-weight: 500;
+  /* No overflow clipping: it would clip the touch press area (::before). The label fits its width at every text step. */
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .list-clean-up:hover { background: var(--hover); color: var(--ink); }
+}
+.card-header:has(> .list-clean-up) { flex-wrap: wrap; justify-content: flex-end; }
+.card-header:has(> .list-clean-up) > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 60px * var(--hb) - 16px)); }
 .card-header > .card-title { order: -1; flex: 0 1 auto; min-width: 0; align-self: center; }
 /* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
 .card-header + :is(.todo-body, .link-body, .board-body) { padding-top: calc(8px * min(var(--bs), 1.75)); }
@@ -1285,17 +1311,6 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  */
 .todo-item.dimmed.lifting { visibility: hidden; }
 
-/* Ticked items ease out of the list and into the Completed section (only with motion allowed). */
-.todo-item.leaving { animation: item-leave 280ms var(--ease-out) forwards; pointer-events: none; }
-.todo-item.arrived { animation: item-arrive 450ms var(--ease-out); }
-@keyframes item-leave {
-  to { opacity: 0; transform: translateY(8px); }
-}
-@keyframes item-arrive {
-  from { opacity: 0; transform: translateY(-8px); background: var(--accent-soft); }
-  to { opacity: 1; transform: none; background: transparent; }
-}
-
 /*
  * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
  * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
@@ -1345,7 +1360,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   /*
    * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
    * strip the row above keeps free (never over its text; two 22px arrows fit the 46px strip). The first row of a list
-   * or of the Completed section has the card's buttons, or the Clean up links, above it, so its pill is below it.
+   * has the card's buttons above it, so its pill is below it.
    * It stays in the layout, faded and out of the pointer's way, so the keyboard can still reach it and show it.
    */
   .item-arrows {
@@ -1361,8 +1376,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
     pointer-events: none;
     transition: opacity 120ms;
   }
-  .todo-items > .todo-item:first-child .item-arrows,
-  .completed-head + .todo-item .item-arrows { bottom: auto; top: calc(100% - 2px); }
+  .todo-items > .todo-item:first-child .item-arrows { bottom: auto; top: calc(100% - 2px); }
   .todo-item:hover .item-arrows,
   .item-arrows:focus-within { opacity: 1; pointer-events: auto; }
   .item-arrow {
@@ -1405,59 +1419,6 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 @media (hover: none) {
   .app.phone .item-trash { display: none; }
   .app.phone .todo-item { padding-right: 24px; }
-}
-
-.completed {
-  display: flex;
-  flex-direction: column;
-  padding-top: 4px;
-  border-top: 1px solid var(--edge);
-}
-.completed-toggle {
-  height: calc(28px * var(--bs, 1));
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 4px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  font-size: calc(12px * var(--fs, 1));
-  font-weight: 600;
-  cursor: pointer;
-  align-self: flex-start;
-  /* At the biggest text the word can be wider than a 200px card: it gives way (…) before the card's edge. */
-  min-width: 0;
-  max-width: 100%;
-}
-.completed-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.completed-toggle svg { flex-shrink: 0; width: calc(12px * var(--bs, 1)); height: calc(12px * var(--bs, 1)); }
-/* On a read-only board (job 161) it stays as it was left, in its usual color. */
-.completed-toggle:disabled { color: inherit; cursor: default; }
-@media (hover: hover) {
-  .completed-toggle:hover:not(:disabled) { background: var(--hover); }
-}
-/* Clean up and Uncheck all (owner requests): on the same line as "Completed", at the right
-   (on a card too narrow for all three, they go on the line below, still at the right). */
-.completed-head { display: flex; flex-wrap: wrap; align-items: center; }
-.completed-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; margin-left: auto; }
-.uncheck-all {
-  height: calc(28px * var(--bs, 1));
-  padding: 0 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-soft);
-  font-size: calc(12px * var(--fs, 1));
-  font-weight: 500;
-  cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@media (hover: hover) {
-  .uncheck-all:hover { background: var(--hover); color: var(--ink); }
 }
 
 .item-ghost {
@@ -1831,6 +1792,10 @@ html[data-glide] .world {
   .card-header > .icon-button:first-of-type::before { left: -10px; right: -4px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
+  /* Clean up before the collapse arrow (job 200): its press area reaches up like theirs, and collapse's stops at the gap. */
+  .list-clean-up::before { content: ''; position: absolute; top: -12px; bottom: -2px; left: -10px; right: -2px; }
+  .list-clean-up + .icon-button::before { left: -2px; right: -4px; }
+  .comment-slot + .list-clean-up::before { left: -4px; }
   .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
   .canvas .card:not(.selected, :focus-within) .comment-chip.add { visibility: hidden; }
   .card-header > .block-trash::before { left: 0; right: -16px; }
@@ -2020,7 +1985,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
    untouchable (the drawing code sets it fully visible in the picture), and none of the controls
    (resize grips, trash cans, drag handles, guides) are in the picture. */
 .export-clone { position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none; }
-.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .item-arrows, .completed-actions, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
+.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .item-arrows, .list-clean-up, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
 
 /* ---------- File menu (owner request: backup, restore, import) ---------- */
 
@@ -2328,7 +2293,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
 /* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
-.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .completed-actions) { display: none; }
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .list-clean-up) { display: none; }
 
 /*
  * Comments on cards (job 161, PR 4). The chip on a card's header, in the accent tint (smaller than the
@@ -3274,10 +3239,10 @@ a.cal-open { align-self: flex-start; }
 .cal-card { transform-origin: top right; }
 
 /* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
-:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .habit-day, .habit-seg button, .habit-step, .habit-today) {
+:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .list-clean-up, .habit-day, .habit-seg button, .habit-step, .habit-today) {
   transition: transform 100ms var(--ease-out);
 }
-:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .completed-toggle, .uncheck-all, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
+:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .list-clean-up, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
   transform: scale(0.97);
 }
 
@@ -3324,15 +3289,13 @@ a.cal-open { align-self: flex-start; }
 
   /* A tick box is pressed from 44px wide (22px to its left, over the card's padding), as tall as its row. */
   .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
-  .completed-head, .completed-actions { gap: 8px; }
-  .completed-toggle, .uncheck-all { height: max(40px, calc(28px * var(--fs, 1))); }
 
   /*
    * A card's or container's collapse arrow and trash can show only on the selected one (owner request,
    * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
    * around them take no taps: a tap on another card selects it, never deletes it.
    */
-  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .card:not(.selected, :focus-within) > .card-header > :is(.icon-button, .list-clean-up),
   .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
 
   /* The welcome tour. */

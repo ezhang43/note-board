@@ -8,7 +8,7 @@ function item(id: string, children: TodoItem[] = [], done = false): TodoItem {
 
 // Press-and-hold on a phone lifts an item; the other rows slide to make room (job 114).
 // The list shows: a, a1, a2, b, c, c1
-const order = C.displayOrder([item('a', [item('a1'), item('a2')]), item('b'), item('c', [item('c1')], true)]);
+const order = C.flatIds([item('a', [item('a1'), item('a2')]), item('b'), item('c', [item('c1')], true)]);
 
 describe('making room for a lifted item', () => {
   it('the gap opens before the row for a "before" mark, and after the marked row otherwise', () => {

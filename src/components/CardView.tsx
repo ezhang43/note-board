@@ -2,6 +2,7 @@ import { BoardReadOnly, boxProps } from './textBox';
 import { memo, use, useRef, useState, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
+import { hasTicked } from '../model/checklist';
 import { CARD_W, COLLAPSED_MIN_H } from '../model/constants';
 import { mediaOf, type Media } from '../model/media';
 import { isBold } from '../model/palette';
@@ -104,6 +105,12 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       <div className="card-header" data-todo-of={card.kind === 'todo' && !card.collapsed ? id : undefined}>
         <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
         <CommentChip id={id} />
+        {/* While something in the list is ticked (job 200): moves the ticked items into the Completed panel. */}
+        {card.kind === 'todo' && !card.collapsed && hasTicked(card.items) && (
+          <button type="button" className="list-clean-up" title="Move this list's ticked items into the Completed panel, under today's date" onClick={() => appStore.cleanUpList(id)}>
+            Clean up
+          </button>
+        )}
         <button
           type="button"
           className="icon-button"

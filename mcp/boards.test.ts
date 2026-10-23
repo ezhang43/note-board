@@ -91,12 +91,13 @@ describe('read_board outline', () => {
     expect(at('Link')).toBeLessThan(at('Completed card'));
   });
 
-  it('checklists show ticks, nesting and ids, with a Completed section', () => {
+  it('checklists show ticks, nesting and ids, ticked items in place', () => {
     const text = outline('home');
     expect(text).toContain('### Checklist: Groceries (id: listGroceries)');
     expect(text).toContain('- [ ] Milk (id: iMilk)\n  - [x] Semi-skimmed (id: iSkim)');
     expect(text).toContain('- [ ] Eggs (id: iEggs)\n  - [ ] Free range (id: iFree)\n    - [ ] Box of 12 (id: iBox)');
-    expect(text).toContain('Completed:\n- [x] Bread (id: iBread)');
+    expect(text).toContain('    - [ ] Box of 12 (id: iBox)\n- [x] Bread (id: iBread)'); // ticked items in place: no Completed section (job 200)
+    expect(text).not.toContain('Completed:');
   });
 
   it('notes, links, board cards and the Completed card', () => {

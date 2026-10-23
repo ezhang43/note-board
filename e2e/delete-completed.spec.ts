@@ -2,11 +2,11 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, clickEmpty, freshBoardEachTest } from './helpers';
 
 // Delete completed items (owner request, 2026-10-06): Ctrl+Shift+Backspace (the Control key on a
-// Mac too) asks first, then removes every item in the Completed sections on the open board.
+// Mac too) asks first, then removes every ticked item on the open board (job 200: ticked items stay in place).
 
 freshBoardEachTest();
 
-/** A checklist with the given items, the first `ticked` of them ticked (so they go to Completed). */
+/** A checklist with the given items, the first `ticked` of them ticked (they stay in place). */
 async function checklist(page: Page, title: string, items: string[], ticked: number) {
   await clickEmpty(page);
   await add(page, 'Checklist', { stayInTitle: true });
@@ -37,8 +37,8 @@ test('Ctrl+Shift+Backspace asks, Delete removes every completed item, Ctrl+Z bri
   expect(await texts(chores)).toEqual(['dust']);
 
   await page.keyboard.press('Control+z');
-  expect(await texts(groceries)).toEqual(['eggs', 'bread', 'milk']);
-  expect(await texts(chores)).toEqual(['dust', 'sweep']);
+  expect(await texts(groceries)).toEqual(['bread', 'milk', 'eggs']);
+  expect(await texts(chores)).toEqual(['sweep', 'dust']);
 });
 
 test('Keep (or Escape) cancels and deletes nothing; one item says "1 completed item"', async ({ page }) => {
@@ -49,13 +49,13 @@ test('Keep (or Escape) cancels and deletes nothing; one item says "1 completed i
   await expect(dialog(page)).toContainText('Delete 1 completed item?');
   await dialog(page).getByRole('button', { name: 'Keep' }).click();
   await expect(dialog(page)).toHaveCount(0);
-  expect(await texts(groceries)).toEqual(['milk', 'bread']);
+  expect(await texts(groceries)).toEqual(['bread', 'milk']);
 
   await page.keyboard.press('Control+Shift+Backspace');
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog(page)).toHaveCount(0);
-  expect(await texts(groceries)).toEqual(['milk', 'bread']);
+  expect(await texts(groceries)).toEqual(['bread', 'milk']);
 });
 
 test('⌘+Shift+Backspace (the browser’s Clear browsing data on a Mac) does not ask; other keys wait while it asks', async ({ page }) => {
@@ -77,10 +77,11 @@ test('⌘+Shift+Backspace (the browser’s Clear browsing data on a Mac) does no
 
 test('does not fire while typing in a text field', async ({ page }) => {
   const groceries = await checklist(page, 'Groceries', ['bread', 'milk'], 1);
-  await groceries.getByLabel('Item text').first().click();
+  await groceries.getByLabel('Item text').nth(1).click(); // milk, the open item
   await page.keyboard.press('Control+Shift+Backspace');
   await expect(dialog(page)).toHaveCount(0);
-  expect((await texts(groceries))[1]).toBe('bread');
+  // The browser's own word delete may change "milk"; the ticked "bread" is not deleted.
+  expect((await texts(groceries))[0]).toBe('bread');
 });
 
 test('with no completed items it says so and deletes nothing', async ({ page }) => {

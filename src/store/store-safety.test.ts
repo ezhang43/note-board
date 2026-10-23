@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { findItem } from '../model/checklist';
 import type { TodoCard } from '../model/types';
-import { COMPLETE_LEAVE_MS, createStore } from './store';
+import { createStore } from './store';
 
 // These tests run with motion allowed, so a tick waits for its leaving animation.
 beforeEach(() => {
@@ -84,7 +84,7 @@ describe('a tick still animating is never lost', () => {
     findItem((remote.cards[cardId] as TodoCard).items, second)!.item.text = 'from phone';
     const ws = s.workspace();
     s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [s.getState().boards.open]: remote } });
-    vi.advanceTimersByTime(COMPLETE_LEAVE_MS + 50);
+    vi.advanceTimersByTime(330); // how long the leaving animation took before job 200 (ticks apply at once now)
     expect(findItem(list().items, second)?.item.text).toBe('from phone');
     expect(done(first)).toBe(true);
   });

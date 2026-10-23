@@ -103,7 +103,7 @@ test.describe('with motion allowed', () => {
     expect(await style(note, 'transition-duration')).toMatch(/^0\.16s/);
   });
 
-  test('Ctrl+Enter ticks at once, with no fade-out; the Done box still fades out', async ({ page }) => {
+  test('Ctrl+Enter and the Done box both tick at once, in place, with no fade-out (job 200)', async ({ page }) => {
     await clickEmpty(page);
     await add(page, 'Checklist');
     await page.keyboard.type('first');
@@ -114,13 +114,10 @@ test.describe('with motion allowed', () => {
     await page.clock.install();
     await page.clock.pauseAt(Date.now() + 60_000);
     await page.keyboard.press('Control+Enter');
-    await expect(list.locator('.completed [data-item-id]')).toHaveCount(1);
-    await expect(list.locator('.todo-item.leaving')).toHaveCount(0);
-    // The Done box (a pointer action) keeps its 280 ms fade, which now eases out instead of in.
-    await list.getByLabel('Done').first().click();
-    const leaving = list.locator('.todo-item.leaving');
-    await expect(leaving).toHaveCount(1);
-    expect(await style(leaving, 'animation-timing-function')).toBe('cubic-bezier(0.23, 1, 0.32, 1)');
+    await expect(list.getByLabel('Done: first')).toBeChecked();
+    await list.getByLabel('Done: second').click();
+    await expect(list.getByLabel('Done: second')).toBeChecked(); // with the clock paused: nothing waits on a timer
+    await expect(list.locator('.todo-item.done')).toHaveCount(2);
   });
 
   test('the collapse arrow turns smoothly, but not when the keyboard did it', async ({ page }) => {

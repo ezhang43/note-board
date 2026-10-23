@@ -1,7 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { shownName } from '../src/model/board';
 import { hrefOf } from '../src/model/cards';
-import { sections } from '../src/model/checklist';
 import { readShare } from '../src/model/sharing';
 import type { Board, Card, TodoItem } from '../src/model/types';
 import { boardTree, pathTo, readWorkspace, serializeWorkspace, type Workspace } from '../src/model/workspace';
@@ -122,8 +121,7 @@ function itemLines(items: TodoItem[], depth = 0): string[] {
 function cardLines(card: Card, nameOf: (boardId: string) => string | null): string[] {
   switch (card.kind) {
     case 'todo': {
-      const { open, done } = sections(card.items);
-      return [`### Checklist: ${card.title.trim() || 'Untitled list'} (id: ${card.id})`, ...itemLines(open), ...(done.length ? ['Completed:', ...itemLines(done)] : [])];
+      return [`### Checklist: ${card.title.trim() || 'Untitled list'} (id: ${card.id})`, ...itemLines(card.items)];
     }
     case 'note':
       return [`### Note (id: ${card.id})`, ...(card.text.trim() ? card.text.split('\n').map((l) => `> ${l}`) : ['(empty)'])];

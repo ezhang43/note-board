@@ -251,18 +251,17 @@ test('inside a container the hover controls have the same sizes and stay clear o
   });
 });
 
-test('in Completed, an arrow moves past ticked neighbours only', async ({ page }) => {
+test('ticked items stay in place, and an arrow moves past ticked and open neighbors alike (job 200)', async ({ page }) => {
   const list = await checklist(page, ['one', 'two', 'three']);
   await list.getByRole('checkbox', { name: 'Done' }).nth(0).click();
-  await list.getByRole('checkbox', { name: 'Done' }).nth(0).click();
-  const toggle = list.getByRole('button', { name: /Completed/ });
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await expect.poll(() => texts(list)).toEqual(['three', 'one', 'two']);
-  await row(list, 0).hover();
-  await expect(row(list, 0).getByRole('button', { name: 'Move down' })).toHaveCount(0); // an open item stays out of Completed, and it is alone: nothing to move
-  await row(list, 2).hover();
-  await row(list, 2).getByRole('button', { name: 'Move up' }).click();
-  await expect.poll(() => texts(list)).toEqual(['three', 'two', 'one']);
+  await expect.poll(() => texts(list)).toEqual(['one', 'two', 'three']);
+  await row(list, 1).hover();
+  await row(list, 1).getByRole('button', { name: 'Move up' }).click();
+  await expect.poll(() => texts(list)).toEqual(['two', 'one', 'three']);
+  await row(list, 1).hover();
+  await row(list, 1).getByRole('button', { name: 'Move down' }).click();
+  await expect.poll(() => texts(list)).toEqual(['two', 'three', 'one']);
+  await expect(row(list, 2).getByRole('checkbox', { name: 'Done' })).toBeChecked();
 });
 
 test.describe('touch screen', () => {

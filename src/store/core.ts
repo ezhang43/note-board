@@ -62,10 +62,6 @@ export interface StoreContext {
   viewportSize(): Size;
   /** The selection, minus blocks that no longer exist (or are listed in `gone`). */
   liveSelection(board: Board, gone?: string[]): string[];
-  /** Apply a tick that is still waiting for its animation. */
-  flushPendingTick(): void;
-  /** A tick waiting for its leaving animation to finish before it is applied. */
-  pending: { tick: { timer: ReturnType<typeof setTimeout>; apply: () => void } | null };
   /**
    * Layout memory that is not board data (forgotten on reload): blocks pushed aside by each expanded
    * block, the block just expanded (while its growth may still push others), and just-imported cards
@@ -129,8 +125,6 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   itemSel: null,
   itemDrag: null,
   newDrag: null,
-  completing: [],
-  arrived: [],
   focusItem: null,
   focusOffset: null,
   focusBlock: null,
@@ -237,7 +231,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     }
     return wsCache.ws;
   }
-  const pending: StoreContext['pending'] = { tick: null };
   const layout: StoreContext['layout'] = { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, closing: null, expandAllUntil: 0 };
   const measured: MeasuredHeight = (id) => heights.get(id);
 
@@ -281,12 +274,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return (Object.keys(full) as (keyof Ui)[]).every((k) => ui[k] === full[k]) ? ui : { ...ui, ...full };
   }
 
-  function flushPendingTick() {
-    if (!pending.tick) return;
-    clearTimeout(pending.tick.timer);
-    pending.tick.apply();
-  }
-
   /** Whether board `id` can only be viewed or commented on here (job 161). */
   const locked = (id = state.boards.open) => viewOnly(state.ui.shares, id);
 
@@ -300,7 +287,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   const commit: StoreContext['commit'] = (fn, opts = {}) => {
     // Looking at an old version: nothing can be changed (the board shown isn't the real one).
     if (state.ui.preview) return refuse(opts.ui);
-    flushPendingTick();
     const before = state.board;
     const result = fn(before);
     if (!result) return null;
@@ -421,8 +407,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         marquee: null,
         itemSel: null,
         itemDrag: null,
-        completing: [],
-        arrived: [],
       }),
     });
     if (tidy) requestSettle();
@@ -439,7 +423,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
 
   /** Forget what belongs to the board shown until now (drawn heights, layout memory). */
   function forgetShownBoard() {
-    flushPendingTick();
     heights.clear();
     dropQueuedSettle();
     layout.pushedBy.clear();
@@ -538,10 +521,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (others !== state.boards.others) set({ ...state, boards: { ...state.boards, others } });
   }
 
-  // A tick still animating is applied first, so Ctrl+Z right after ticking undoes that tick.
   function stepOpen(which: 'undo' | 'redo') {
     if (state.ui.preview || locked()) return;
-    flushPendingTick();
     const step = (which === 'undo' ? undoStep : redoStep)(history, state.board);
     if (step && step.board !== state.board) edits++; // counted before it shows, for version history
     restore(step);
@@ -572,7 +553,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   }
 
   function deleting(text: string, run: () => unknown, board = state.boards.open) {
-    flushPendingTick(); // a tick still animating is its own change, not part of the delete
     const before = edits;
     run();
     if (edits === before) return false;
@@ -602,8 +582,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     screenCentre: () => screenToBoard(state.view, centreOf(viewportSize)),
     viewportSize: () => viewportSize,
     liveSelection,
-    flushPendingTick,
-    pending,
     layout,
     write,
     workspace,

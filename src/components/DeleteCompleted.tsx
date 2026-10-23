@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { completedSectionCount } from '../model/completed';
+import { tickedCount } from '../model/completed';
 import { appStore, useAppState } from '../store/appStore';
 
 /** How long "No completed items on this board" shows (ms). */
@@ -11,7 +11,7 @@ const NONE_MS = 2500;
  */
 export function DeleteCompleted() {
   const mode = useAppState((s) => s.ui.deleteCompleted);
-  const count = useAppState((s) => (s.ui.deleteCompleted === 'ask' ? completedSectionCount(s.board) : 0));
+  const count = useAppState((s) => (s.ui.deleteCompleted === 'ask' ? tickedCount(s.board) : 0));
   // Also when the items went while asking (deleted on another device, say).
   const none = mode === 'none' || (mode === 'ask' && !count);
   useEffect(() => {

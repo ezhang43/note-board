@@ -28,7 +28,7 @@ test('importing a Milanote export adds its cards to the board, selected and not 
   await expect(titles.nth(0)).toHaveValue('Follow Up');
   await expect(titles.nth(1)).toHaveValue('Groceries');
   const groceries = cards(page).filter({ has: page.locator('input[value="Groceries"]') });
-  await expect(groceries.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
+  await expect(groceries.getByRole('checkbox', { name: /^Done/, checked: true }).first()).toBeVisible();
   await expect(groceries.locator('textarea')).toHaveCount(5);
   await expect(page.getByLabel('Note text').nth(1)).toHaveValue(/^Dear \[Name\],\n\nThis is important/);
   await expect(page.getByLabel('Link title')).toHaveValue('Reading');
@@ -100,7 +100,7 @@ test('imports an HTML file without running its scripts: headings, nested lists w
   await expect(cards(page)).toHaveCount(2);
   await expect(page.locator('.card.selected')).toHaveCount(2);
   const trip = cards(page).filter({ has: page.locator('input[value="Trip"]') });
-  await expect(trip.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Passport was ticked
+  await expect(trip.getByRole('checkbox', { name: /^Done/, checked: true }).first()).toBeVisible(); // Passport was ticked
   await expect(page.getByLabel('Note text')).toHaveValue('Hotel by the sea');
   await page.waitForTimeout(200);
   expect(dialogs).toEqual([]);
@@ -141,7 +141,7 @@ test('imports a Trello board export and a Google Keep note; other JSON adds noth
   await importFile(page, 'Groceries.json', JSON.stringify({ isTrashed: false, title: 'Groceries', listContent: [{ text: 'Milk', isChecked: false }, { text: 'Eggs', isChecked: true }] }));
   await expect(cards(page)).toHaveCount(1);
   await expect(page.getByLabel('List title')).toHaveValue('Groceries');
-  await expect(cards(page).getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // Eggs was ticked
+  await expect(cards(page).getByRole('checkbox', { name: /^Done/, checked: true }).first()).toBeVisible(); // Eggs was ticked
 
   await importFile(page, 'other.json', '{"hello": "world"}');
   await expect(banner(page)).toHaveText('BusyAnts can only import JSON files from Trello or Google Keep.');
@@ -172,7 +172,7 @@ test('imports a PDF: headings, lists (ticked ones too) and text become cards, se
   const packing = cards(page).filter({ has: page.locator('input[value="Packing"]') });
   await expect(packing.locator('textarea')).toHaveCount(3);
   const bookings = cards(page).filter({ has: page.locator('input[value="Bookings"]') });
-  await expect(bookings.getByRole('button', { name: 'Completed', exact: true })).toBeVisible(); // "[x] Train tickets"
+  await expect(bookings.getByRole('checkbox', { name: /^Done/, checked: true }).first()).toBeVisible(); // "[x] Train tickets"
   await expect(page.getByLabel('Note text').nth(0)).toHaveValue('Weekend trip\nWe leave on Friday after work and come back on Sunday evening.');
   await expect(page.getByLabel('Note text').nth(1)).toHaveValue('Notes\nAsk Sam to feed the cat. Water the plants on Saturday.');
   expect(asked.some((u) => /pdf\.worker/.test(u))).toBe(true);

@@ -3,7 +3,7 @@ import type { TodoCard } from '../model/types';
 import { createStore } from './store';
 
 // Delete completed items (owner request, 2026-10-06): Ctrl+Shift+Backspace asks
-// "Delete 2 completed items?"; Delete empties every Completed section on the open board, one undo step.
+// "Delete 2 completed items?"; Delete removes every ticked item on the open board (job 200), one undo step.
 
 beforeEach(() => vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) }));
 afterEach(() => vi.unstubAllGlobals());

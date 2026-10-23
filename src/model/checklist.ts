@@ -3,8 +3,8 @@ import { createItem, newId, type MakeId } from './cards';
 import type { Board, TodoCard, TodoItem } from './types';
 
 // Checklist rules. Every function returns new data and never changes what it is given.
-// Items form a tree up to 6 levels deep (depth 0 to 5). Finished top-level items are shown in the
-// "Completed" section, but they stay in the same list: the section is just a view of them.
+// Items form a tree up to 6 levels deep (depth 0 to 5). A ticked item stays where it is (owner
+// request, 2026-10-23, job 200) until Clean up moves it into the board's Completed panel.
 
 /** Deepest level an item can be at (0 = top level), so 6 levels in all. */
 export const MAX_DEPTH = 5;
@@ -51,15 +51,9 @@ export function flatIds(items: TodoItem[]): string[] {
   return items.flatMap(subtreeIds);
 }
 
-/** Top-level items split into the open list and the Completed section. */
-export function sections(items: TodoItem[]) {
-  return { open: items.filter((it) => !it.done), done: items.filter((it) => it.done) };
-}
-
-/** Every item in the order shown: open items, then the Completed section. */
-export function displayOrder(items: TodoItem[]): string[] {
-  const { open, done } = sections(items);
-  return [...flatIds(open), ...flatIds(done)];
+/** True if any item, at any level, is ticked. */
+export function hasTicked(items: TodoItem[]): boolean {
+  return items.some((it) => it.done || hasTicked(it.children));
 }
 
 /**
@@ -67,15 +61,15 @@ export function displayOrder(items: TodoItem[]): string[] {
  * the cursor moves to: the nearest one that was below it, else the nearest above, else null.
  */
 export function nextOpenItem(before: TodoItem[], after: TodoItem[], id: string): string | null {
-  const stillOpen = new Set(flatIds(sections(after).open).filter((x) => !findItem(after, x)!.item.done));
-  const order = flatIds(sections(before).open);
+  const stillOpen = new Set(flatIds(after).filter((x) => !findItem(after, x)!.item.done));
+  const order = flatIds(before);
   const i = order.indexOf(id);
   return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0)).reverse()].find((x) => stillOpen.has(x)) ?? null;
 }
 
-/** Items shown from `a` to `b` inclusive (either way round), across open and completed items. */
+/** Items shown from `a` to `b` inclusive (either way round), ticked ones included. */
 export function itemRange(items: TodoItem[], a: string, b: string): string[] {
-  const order = displayOrder(items);
+  const order = flatIds(items);
   const i = order.indexOf(a);
   const j = order.indexOf(b);
   if (i === -1 || j === -1) return [];
@@ -90,7 +84,7 @@ export function rootsOf(items: TodoItem[], ids: string[]): string[] {
     const loc = findItem(items, id);
     if (loc) loc.item.children.flatMap(subtreeIds).forEach((c) => covered.add(c));
   }
-  return displayOrder(items).filter((id) => picked.has(id) && !covered.has(id));
+  return flatIds(items).filter((id) => picked.has(id) && !covered.has(id));
 }
 
 function cloned(items: TodoItem[]): TodoItem[] {
@@ -140,7 +134,6 @@ export function enterItem(
 
 /**
  * Tab: nest an item (and its sub-items) under the item above it at the same level.
- * A top-level item only nests under one in the same section (open or completed).
  * Nothing happens if there is no item above or the result would be more than 6 levels deep.
  */
 export function indentItem(items: TodoItem[], id: string): TodoItem[] | null {
@@ -152,13 +145,7 @@ export function indentItem(items: TodoItem[], id: string): TodoItem[] | null {
 function indentIn(items: TodoItem[], id: string): boolean {
   const loc = findItem(items, id);
   if (!loc || loc.depth + 1 + subtreeHeight(loc.item) > MAX_DEPTH) return false;
-  let above: TodoItem | null = null;
-  for (let i = loc.index - 1; i >= 0; i--) {
-    if (loc.parent || loc.list[i].done === loc.item.done) {
-      above = loc.list[i];
-      break;
-    }
-  }
+  const above = loc.list[loc.index - 1];
   if (!above) return false;
   loc.list.splice(loc.index, 1);
   above.children.push(loc.item);
@@ -207,20 +194,23 @@ export function outdentItems(items: TodoItem[], ids: string[]): TodoItem[] | nul
 /**
  * Delete at the very end of an item: the item shown below it is pulled up into it. Its text is added
  * to the end of this item's text, and its sub-items move up one level into its place (as when a
- * blank item is deleted). Nothing happens at the end of the list, or from the last open item into
- * the Completed section. Returns the new items and where the cursor goes (the join point).
+ * blank item is deleted). Nothing happens at the end of the list. Returns the new items and where
+ * the cursor goes (the join point).
  */
 export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[]; caret: number } | null {
-  const { open, done } = sections(items);
-  const section = [flatIds(open), flatIds(done)].find((ids) => ids.includes(id));
-  const nextId = section?.[section.indexOf(id) + 1];
+  const order = flatIds(items);
+  const at = order.indexOf(id);
+  const nextId = at < 0 ? undefined : order[at + 1];
   if (!nextId) return null;
   const next = cloned(items);
   const cur = findItem(next, id)!.item;
   const below = findItem(next, nextId)!;
   const caret = cur.text.length;
   cur.text += below.item.text;
+  // Ticked only if both were (job 200: they can now be side by side), and never open under a ticked item (job 183).
+  cur.done = cur.done && below.item.done;
   below.list.splice(below.index, 1, ...below.item.children);
+  for (const it of [cur, ...below.item.children]) reopenAbove(next, it);
   return { items: next, caret };
 }
 
@@ -247,7 +237,7 @@ function removeItemInPlace(items: TodoItem[], id: string, keepChildren = true) {
  * Backspace in an empty item deletes it, and the cursor goes to the item shown above it.
  * Its sub-items stay (moving up a level) if any of them has text; otherwise they go too.
  * Never empties the list: a list's last item, or its last open one, can't be deleted this way (the
- * cursor would have nowhere to go but a ticked item, which may be hidden in a closed Completed section).
+ * cursor always has an open item to go to).
  */
 export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoItem[]; focus: string | null } | null {
   const loc = findItem(items, id);
@@ -255,13 +245,13 @@ export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoIte
   const next = cloned(items);
   removeItemInPlace(next, id);
   if (!next.some((it) => !it.done)) return null;
-  return { items: next, focus: focusAfterRemoving(displayOrder(items), next, [id]) };
+  return { items: next, focus: focusAfterRemoving(flatIds(items), next, [id]) };
 }
 
 /**
  * Where the cursor goes after `gone` were removed: the nearest item above the first of them that is
  * still there, else the nearest one below. Only items in `shown` (the ids on screen, top to bottom,
- * before the change) count, so the cursor never lands in a closed Completed section. A list emptied
+ * before the change) count, so the cursor never lands in a collapsed card. A list emptied
  * by the delete has a new blank item, which takes the cursor.
  */
 export function focusAfterRemoving(shown: string[], after: TodoItem[], gone: string[]): string | null {
@@ -306,10 +296,9 @@ function reopenAbove(items: TodoItem[], item: TodoItem): void {
 }
 
 /**
- * Tick or untick items. A ticked top-level item moves (with its sub-items) to the Completed section.
- * Owner's rule: when ticking leaves every sub-item of an item ticked, that item is ticked too (and so
- * on upwards), so a list item whose sub-items are all done moves to Completed. Unticking a sub-item
- * unticks the items it is nested in.
+ * Tick or untick items; they stay where they are. Owner's rule: when ticking leaves every sub-item of
+ * an item ticked, that item is ticked too (and so on upwards). Unticking a sub-item unticks the items
+ * it is nested in.
  */
 export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): TodoItem[] {
   const next = cloned(items);
@@ -355,7 +344,7 @@ export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId =
  */
 export function selectionAsText(items: TodoItem[], ids: string[]): string {
   const picked = new Set(ids);
-  const rows = displayOrder(items)
+  const rows = flatIds(items)
     .filter((id) => picked.has(id))
     .map((id) => findItem(items, id)!);
   const top = Math.min(...rows.map((r) => r.depth));
@@ -449,8 +438,7 @@ export function slideOffsets(order: string[], lifted: Record<string, number>, be
 
 /**
  * Ctrl+Shift+Up / Down: move an item (with its sub-items) past the item above (`dir` -1) or below
- * (1) at the same level. At the top level it only passes items in the same section (open or
- * Completed). Null when there is nothing to pass.
+ * (1) at the same level, ticked or not. Null when there is nothing to pass.
  */
 export function moveItemBy(items: TodoItem[], id: string, dir: -1 | 1): TodoItem[] | null {
   const next = cloned(items);
@@ -471,10 +459,9 @@ export function canMoveItem(items: TodoItem[], id: string, dir: -1 | 1): boolean
   return !!loc && passTarget(loc, dir) !== null;
 }
 
-/** The index of the neighbour an item would pass (top-level items skip the other section), or null. */
-function passTarget({ list, index, parent, item }: ItemLocation, dir: -1 | 1): number | null {
-  let j = index + dir;
-  while (j >= 0 && j < list.length && !parent && list[j].done !== item.done) j += dir;
+/** The index of the neighbour an item would pass, or null. */
+function passTarget({ list, index }: ItemLocation, dir: -1 | 1): number | null {
+  const j = index + dir;
   return j < 0 || j >= list.length ? null : j;
 }
 
@@ -523,10 +510,6 @@ export function editItems(board: Board, cardId: string, change: (items: TodoItem
   });
 }
 
-export function toggleCompletedSection(board: Board, cardId: string): Board {
-  return updateCard(board, cardId, (c) => (c.kind === 'todo' ? { ...c, completedOpen: !c.completedOpen } : c));
-}
-
 /**
  * Where dragged items are dropped: into a list, or as a new list: loose on the board, or at the end
  * of a column (items dropped on a collapsed column).
@@ -567,7 +550,7 @@ export function moveItems(board: Board, fromCardId: string, rootIds: string[], t
 
 /**
  * A whole list dropped onto another (owner request, 2026-10-06): its items, with their sub-items and
- * ticks, go to the end of the target (open ones after its open items, ticked ones into Completed),
+ * ticks, go to the end of the target in their own order,
  * leaving out blank items; the dropped list and its title are gone. Only between two checklists.
  */
 export function pourList(board: Board, fromCardId: string, toCardId: string): Board {
@@ -576,16 +559,4 @@ export function pourList(board: Board, fromCardId: string, toCardId: string): Bo
   if (fromCardId === toCardId || src?.kind !== 'todo' || dst?.kind !== 'todo') return board;
   const moving = src.items.filter((it) => !isBlank(it) || anyText(it.children));
   return deleteCard(editItems(board, toCardId, (items) => [...items, ...structuredClone(moving)]), fromCardId);
-}
-
-/** Uncheck all (owner request, to reuse a list): every item and sub-item unticked; null if none was ticked. */
-export function uncheckAll(items: TodoItem[]): TodoItem[] | null {
-  let changed = false;
-  const untick = (list: TodoItem[]): TodoItem[] =>
-    list.map((it) => {
-      if (it.done) changed = true;
-      return { ...it, done: false, children: untick(it.children) };
-    });
-  const result = untick(items);
-  return changed ? result : null;
 }

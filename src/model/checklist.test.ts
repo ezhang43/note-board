@@ -24,9 +24,9 @@ const makeId = (p: string) => `${p}${++n}`;
 const sample = () => [item('a', [item('a1'), item('a2')]), item('b'), item('c', [item('c1')], true)];
 
 describe('reading a list', () => {
-  it('shows open items first, then completed ones', () => {
-    expect(C.displayOrder([item('x', [], true), item('y')])).toEqual(['y', 'x']);
-    expect(C.displayOrder(sample())).toEqual(['a', 'a1', 'a2', 'b', 'c', 'c1']);
+  it('shows items in their order, ticked ones in place (job 200)', () => {
+    expect(C.flatIds([item('x', [], true), item('y')])).toEqual(['x', 'y']);
+    expect(C.flatIds(sample())).toEqual(['a', 'a1', 'a2', 'b', 'c', 'c1']);
   });
 
   it('a range runs across open and completed items, either direction', () => {
@@ -50,9 +50,11 @@ describe('Enter, Tab, Shift+Tab, Backspace', () => {
     expect(C.indentItem(sample(), 'a1')).toBeNull();
   });
 
-  it('a top-level item only nests under one in the same section', () => {
+  it('a top-level item nests under the item right above it, a ticked one too, which is unticked (job 200)', () => {
     const list = [item('open1'), item('done1', [], true), item('open2')];
-    expect(ids(C.indentItem(list, 'open2')!)).toBe('open1(open2) done1');
+    const out = C.indentItem(list, 'open2')!;
+    expect(ids(out)).toBe('open1 done1(open2)');
+    expect(C.findItem(out, 'done1')!.item.done).toBe(false);
   });
 
   it('never nests deeper than 6 levels', () => {
@@ -100,7 +102,7 @@ describe('Enter, Tab, Shift+Tab, Backspace', () => {
 
 describe('where the cursor goes after items are deleted (phone item bar)', () => {
   const after = (list: TodoItem[], gone: string[]) => C.deleteItems(list, gone, makeId);
-  const order = (list: TodoItem[]) => C.displayOrder(list);
+  const order = (list: TodoItem[]) => C.flatIds(list);
 
   it('goes to the item above', () => {
     const list = [item('a'), item('b'), item('c')];
@@ -126,7 +128,7 @@ describe('where the cursor goes after items are deleted (phone item bar)', () =>
   it('with several gone, goes above the first of them; only shown items count', () => {
     const list = [item('a'), item('b'), item('c'), item('d')];
     expect(C.focusAfterRemoving(order(list), after(list, ['b', 'c']), ['b', 'c'])).toBe('a');
-    // The Completed section is closed: its items are not in `shown`, so the cursor never lands in one.
+    // Items not in `shown` (out of sight) are never landed in.
     const withDone = [item('a'), item('x', [], true)];
     expect(C.focusAfterRemoving(['a'], after(withDone, ['a']), ['a'])).toBeNull();
   });
@@ -186,16 +188,19 @@ describe('deleting a blank item that has sub-items (owner rule)', () => {
 });
 
 describe('ticking and deleting', () => {
-  it('ticking a top-level item moves it (with sub-items) to Completed; a sub-item is only struck through', () => {
+  it('ticking an item (with its sub-items) or a sub-item leaves it in place (job 200)', () => {
     const ticked = C.setItemsDone(sample(), ['a'], true);
-    expect(C.sections(ticked).done.map((i) => i.id)).toEqual(['a', 'c']);
+    expect(ids(ticked)).toBe('a(a1 a2) b c(c1)');
+    expect(C.findItem(ticked, 'a')!.item.done).toBe(true);
     const sub = C.setItemsDone(sample(), ['a1'], true);
-    expect(C.sections(sub).open.map((i) => i.id)).toEqual(['a', 'b']);
+    expect(ids(sub)).toBe('a(a1 a2) b c(c1)');
     expect(C.findItem(sub, 'a1')!.item.done).toBe(true);
   });
 
-  it('unticking a completed item brings it back', () => {
-    expect(C.sections(C.setItemsDone(sample(), ['c'], false)).done).toEqual([]);
+  it('unticking a ticked item leaves it in place too', () => {
+    const out = C.setItemsDone(sample(), ['c'], false);
+    expect(ids(out)).toBe('a(a1 a2) b c(c1)');
+    expect(C.findItem(out, 'c')!.item.done).toBe(false);
   });
 
   it('trash deletes an item and everything under it', () => {
@@ -267,11 +272,6 @@ describe('dragging items', () => {
     expect(ids(itemsOf(b, 'L1'))).toBe('a(a1 a2(b)) c(c1)');
   });
 
-  it('the Completed section can be collapsed and expanded', () => {
-    let b = twoLists();
-    b = C.toggleCompletedSection(b, 'L1');
-    expect((b.cards.L1 as TodoCard).completedOpen).toBe(false);
-  });
 });
 
 describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
@@ -286,7 +286,7 @@ describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
     return b;
   }
   const itemsOf = (b: Board, id: string) => (b.cards[id] as TodoCard).items;
-  const shown = (b: Board, id: string) => C.displayOrder(itemsOf(b, id));
+  const shown = (b: Board, id: string) => C.flatIds(itemsOf(b, id));
   const column = (collapsed: boolean) => ({ id: 'K', title: '', x: 800, y: 0, w: 300, h: null, color: null, collapsed, cardIds: [] });
 
   describe('a whole list dropped onto another', () => {
@@ -294,8 +294,8 @@ describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
       const b = C.pourList(lists(), 'L1', 'L2');
       expect(b.cards.L1).toBeUndefined();
       expect(b.order).not.toContain('L1');
-      // Open items go to the end of the open items, ticked ones into Completed.
-      expect(shown(b, 'L2')).toEqual(['x', 'a', 'a1', 'a2', 'b', 'y', 'c', 'c1']);
+      // Every item goes to the end, ticked ones in their place among them (job 200).
+      expect(shown(b, 'L2')).toEqual(['x', 'y', 'a', 'a1', 'a2', 'b', 'c', 'c1']);
       expect(ids(itemsOf(b, 'L2'))).toBe('x y a(a1 a2) b c(c1)');
       expect(C.findItem(itemsOf(b, 'L2'), 'c')!.item.done).toBe(true);
       expect(B.problems(b)).toEqual([]);
@@ -336,7 +336,7 @@ describe('pouring lists into each other (owner requests, 2026-10-06)', () => {
       const b = C.moveItems(lists(), 'L1', ['a', 'b', 'c'], { cardId: 'L2', drop: { mode: 'append' } });
       expect(b.cards.L1).toBeUndefined();
       expect(b.order).not.toContain('L1');
-      expect(shown(b, 'L2')).toEqual(['x', 'a', 'a1', 'a2', 'b', 'y', 'c', 'c1']);
+      expect(shown(b, 'L2')).toEqual(['x', 'y', 'a', 'a1', 'a2', 'b', 'c', 'c1']);
       expect(B.problems(b)).toEqual([]);
     });
 
@@ -426,9 +426,9 @@ describe('Delete at the end of an item (owner request)', () => {
     expect(r.items[0].text).toBe('Aone');
   });
 
-  it('does nothing at the end of the list, or from the last open item into Completed', () => {
+  it('does nothing at the end of the list; joins a ticked item below like any other (job 200)', () => {
     expect(C.mergeNextItem([t('a', 'A'), t('b', 'B')], 'b')).toBeNull();
-    expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true)], 'a')).toBeNull();
+    expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true)], 'a')!.items.map((i) => i.text)).toEqual(['AD']);
     expect(C.mergeNextItem([t('a', 'A'), t('d', 'D', [], true), t('e', 'E', [], true)], 'd')!.items.map((i) => i.text)).toEqual(['A', 'DE']);
   });
 });
@@ -437,11 +437,11 @@ describe('sub-items all ticked tick their item (owner request)', () => {
   const t = (id: string, done = false, children: TodoItem[] = []): TodoItem => ({ id, text: id, done, children });
   const doneIds = (items: TodoItem[]): string[] => items.flatMap((i) => [...(i.done ? [i.id] : []), ...doneIds(i.children)]);
 
-  it('ticking the last open sub-item ticks the item (and upwards), so it moves to Completed', () => {
+  it('ticking the last open sub-item ticks the item (and upwards), which stays in place', () => {
     const items = [t('a', false, [t('a1', true), t('a2', false, [t('x', true), t('y')])]), t('b')];
     const out = C.setItemsDone(items, ['y'], true);
     expect(doneIds(out)).toEqual(['a', 'a1', 'a2', 'x', 'y']);
-    expect(C.sections(out).done.map((i) => i.id)).toEqual(['a']);
+    expect(out.map((i) => i.id)).toEqual(['a', 'b']);
   });
 
   it('stops where an item still has open sub-items', () => {
@@ -589,11 +589,11 @@ describe('Ctrl+Shift+Up / Down: moving an item past its neighbour', () => {
     expect(C.moveItemBy(sample(), 'a2', 1)).toBeNull();
   });
 
-  it('never moves an open item into the Completed section, or the other way', () => {
-    expect(C.moveItemBy(sample(), 'b', 1)).toBeNull();
-    expect(C.moveItemBy(sample(), 'c', -1)).toBeNull();
+  it('moves past ticked items like any other (job 200: they stay in place)', () => {
+    expect(ids(C.moveItemBy(sample(), 'b', 1)!)).toBe('a(a1 a2) c(c1) b');
+    expect(ids(C.moveItemBy(sample(), 'c', -1)!)).toBe('a(a1 a2) c(c1) b');
     const mixed = [item('x'), item('d', [], true), item('y')];
-    expect(ids(C.moveItemBy(mixed, 'x', 1)!)).toBe('d y x'); // past the hidden-in-Completed one, onto y's far side
+    expect(ids(C.moveItemBy(mixed, 'x', 1)!)).toBe('d x y');
   });
 });
 
@@ -610,22 +610,6 @@ describe('canMoveItem: whether the hover arrows can move an item (owner request,
   });
 });
 
-describe('Uncheck all (owner request, to reuse a list)', () => {
-  it('unticks every item and sub-item, keeping their order and nesting', () => {
-    const items = [
-      { id: 'a', text: 'Bread', done: false, children: [{ id: 'a1', text: 'Rye', done: true, children: [] }] },
-      { id: 'b', text: 'Milk', done: true, children: [{ id: 'b1', text: 'Oat', done: true, children: [] }] },
-    ];
-    expect(C.uncheckAll(items)).toEqual([
-      { id: 'a', text: 'Bread', done: false, children: [{ id: 'a1', text: 'Rye', done: false, children: [] }] },
-      { id: 'b', text: 'Milk', done: false, children: [{ id: 'b1', text: 'Oat', done: false, children: [] }] },
-    ]);
-  });
-  it('does nothing (no undo step) when nothing is ticked', () => {
-    expect(C.uncheckAll([{ id: 'a', text: 'Bread', done: false, children: [] }])).toBeNull();
-  });
-});
-
 describe('Ctrl+Enter: where the cursor goes after a tick (owner request, 2026-10-15)', () => {
   const t = (id: string, done = false, children: TodoItem[] = []): TodoItem => ({ id, text: id, done, children });
   const after = (items: TodoItem[], ids: string[]) => C.nextOpenItem(items, C.setItemsDone(items, ids, true), ids[0]);
@@ -636,9 +620,9 @@ describe('Ctrl+Enter: where the cursor goes after a tick (owner request, 2026-10
   it('with nothing open below, the nearest open item above', () => {
     expect(after([t('a'), t('b'), t('c', true)], ['b'])).toBe('a');
   });
-  it('skips ticked sub-items and everything that went to Completed with the item', () => {
+  it('skips ticked items; an open sub-item under the ticked item is next (job 200: it stays in sight)', () => {
     expect(after([t('a', false, [t('a1'), t('a2', true)]), t('b', false, [t('b1', true), t('b2')])], ['a1'])).toBe('b');
-    expect(after([t('a', false, [t('a1')]), t('b')], ['a'])).toBe('b');
+    expect(after([t('a', false, [t('a1')]), t('b')], ['a'])).toBe('a1');
   });
   it('a ticked last sub-item that also ticks its item moves on past it', () => {
     expect(after([t('a', false, [t('a1')]), t('b')], ['a1'])).toBe('b');

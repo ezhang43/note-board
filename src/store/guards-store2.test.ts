@@ -4,7 +4,7 @@ import type { StorageLike } from '../model/persist';
 import { readWorkspace } from '../model/workspace';
 import { BOARD_KEY } from '../model/persist';
 import type { TodoCard } from '../model/types';
-import { BOARD_SAVE_DELAY, COMPLETE_LEAVE_MS, createStore } from './store';
+import { BOARD_SAVE_DELAY, createStore } from './store';
 
 // More store guards (review pass, job 156): a tick still animating when another board opens, and
 // deleting a board that cards on other boards open. Every test passes today. They run with motion
@@ -43,7 +43,7 @@ describe('a tick still animating when another board opens (G2)', () => {
     s.toggleItem(cardId, first);
     s.newBoard();
     s.renameBoard('Other');
-    vi.advanceTimersByTime(COMPLETE_LEAVE_MS + 50);
+    vi.advanceTimersByTime(330); // how long the leaving animation took before job 200 (ticks apply at once now)
     expect(isDone(list(), first)).toBe(true);
     expect(Object.keys(s.getState().board.cards)).toHaveLength(0);
     // Back on Home it stands, and Ctrl+Z there takes the tick back (it was an undo step on Home).

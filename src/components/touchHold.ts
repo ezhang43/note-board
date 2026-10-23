@@ -56,3 +56,34 @@ export function holdOrPan(
   }
   listen(true);
 }
+
+/**
+ * A finger can be lost without its lift-off ever reaching the page: on an iPhone, its own text handling can take a
+ * touch over (job 197: a new item was left floating over the board, out of its list, until the page was reloaded).
+ * Every gesture that follows a finger (a lift, a card drag, a resize, a hold still waiting) ends on `pointercancel`,
+ * so one is sent for each finger still thought to be down when it can't be: a new touch starts with no other finger
+ * on the screen, or the page is hidden or loses focus. A cancelled gesture changes nothing: the item, card or size stays as it was.
+ */
+function endLostFingers() {
+  const down = new Map<number, number>(); // finger (pointer id) → when it touched
+  const cancel = (ids: number[]) => {
+    for (const pointerId of ids) window.dispatchEvent(new PointerEvent('pointercancel', { pointerId, pointerType: 'touch' }));
+  };
+  window.addEventListener('pointerdown', (e) => e.pointerType === 'touch' && down.set(e.pointerId, e.timeStamp), true);
+  const lifted = (e: PointerEvent) => down.delete(e.pointerId);
+  window.addEventListener('pointerup', lifted, true);
+  window.addEventListener('pointercancel', lifted, true);
+  // Every finger on the screen is new: any finger from an earlier touch is gone (the new one's own pointerdown,
+  // just before or after this, is not touched).
+  window.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.touches.length !== e.changedTouches.length) return;
+      cancel([...down].filter(([, t]) => t < e.timeStamp - 100).map(([id]) => id));
+    },
+    true,
+  );
+  window.addEventListener('blur', () => cancel([...down.keys()]));
+  document.addEventListener('visibilitychange', () => document.hidden && cancel([...down.keys()]));
+}
+if (typeof window !== 'undefined') endLostFingers();

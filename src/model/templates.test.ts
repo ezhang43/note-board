@@ -57,7 +57,7 @@ describe('the template list', () => {
     }
   });
 
-  it('the example shows ticked items so the Completed section can be seen; templates have only a few', () => {
+  it('the example shows ticked items so ticking can be seen; templates have only a few', () => {
     const ticked = (t: Template) => Object.values(templateBoard(t).cards).flatMap((c) => (c.kind === 'todo' ? itemsOf(c.items).filter((i) => i.done) : []));
     expect(ticked(EXAMPLE).length).toBeGreaterThanOrEqual(3);
     for (const t of TEMPLATES) expect(ticked(t).length).toBeLessThanOrEqual(2);

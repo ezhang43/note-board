@@ -57,13 +57,11 @@ describe('L1: Collapse all ignores the hidden Completed record', () => {
 });
 
 describe('L2: Backspace in the last open blank item', () => {
-  it('is refused, so the cursor is not sent to a hidden ticked item', () => {
+  it('is refused, so the list keeps an open item to type in (kept after job 200: ticked items stay in place)', () => {
     const s = store();
     const id = list(s, ['+milk', 'x']);
     const open = card(s, id).items.find((i) => !i.done)!;
     s.setItemText(id, open.id, '');
-    s.toggleCompletedSection(id);
-    expect(card(s, id).completedOpen).toBeFalsy();
     const before = s.getState().board;
     expect(s.itemBackspace(id, open.id)).toBe(false);
     expect(s.getState().board).toBe(before);
@@ -110,8 +108,8 @@ describe('L3: Expand all gives back the layout whatever order the blocks were pi
   });
 });
 
-describe('L4: a tick still animating when an old version is opened', () => {
-  it('is applied first, not lost', () => {
+describe('L4: a tick just before an old version is opened', () => {
+  it('is applied at once (job 200: no animation), not lost', () => {
     vi.unstubAllGlobals();
     vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
     vi.useFakeTimers();
@@ -121,7 +119,7 @@ describe('L4: a tick still animating when an old version is opened', () => {
       const id = list(s, ['a', 'b']);
       const first = card(s, id).items[0].id;
       s.toggleItem(id, first);
-      expect(card(s, id).items[0].done).toBe(false); // waiting for its animation
+      expect(card(s, id).items[0].done).toBe(true); // applied at once
       s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
       vi.runAllTimers();
       s.endPreview();

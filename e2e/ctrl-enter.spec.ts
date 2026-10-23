@@ -27,11 +27,14 @@ test('Ctrl+Enter ticks the item, the cursor moves to the next one, and Ctrl+Z br
   await list.getByLabel('Item text').nth(1).click();
   await page.keyboard.press('Control+Enter');
   await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(1);
-  await expect.poll(() => texts(list)).toEqual(['bread', 'eggs', 'milk']);
+  await expect(list.getByRole('checkbox', { name: 'Done: milk' })).toBeChecked(); // ticked in its place (job 200)
+  expect(await texts(list)).toEqual(['bread', 'milk', 'eggs']);
   expect(await focused(page)).toBe('eggs');
+  // A screen reader hears which item was ticked, since the cursor left its box.
+  await expect(page.getByTestId('announcer')).toHaveText('Ticked: milk');
   // Typing goes on in the next item; nothing was split or added.
   await page.keyboard.type('!');
-  await expect.poll(() => texts(list)).toEqual(['bread', 'eggs!', 'milk']);
+  await expect.poll(() => texts(list)).toEqual(['bread', 'milk', 'eggs!']);
 
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
@@ -42,8 +45,9 @@ test('Ctrl+Enter ticks the item, the cursor moves to the next one, and Ctrl+Z br
 test('Ctrl+Enter on a ticked item unticks it and keeps the cursor in it', async ({ page }) => {
   const list = await checklist(page, ['bread', 'milk']);
   await list.getByRole('checkbox', { name: 'Done' }).first().click();
-  await expect.poll(() => texts(list)).toEqual(['milk', 'bread']);
-  await list.getByLabel('Item text').nth(1).click();
+  await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
+  expect(await texts(list)).toEqual(['bread', 'milk']); // in place (job 200)
+  await list.getByLabel('Item text').nth(0).click();
   await page.keyboard.press('Control+Enter');
   await expect.poll(() => texts(list)).toEqual(['bread', 'milk']);
   await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(0);

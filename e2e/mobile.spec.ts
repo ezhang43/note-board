@@ -171,9 +171,9 @@ test.describe('on a phone-sized screen', () => {
 
     await list.getByLabel('Item text').nth(0).tap();
     await items.getByRole('button', { name: 'Tick' }).tap();
-    // Ticked, it moves down into the Completed section.
-    await expect(list.getByRole('button', { name: /Completed/ })).toBeVisible();
-    await expect(list.getByLabel('Item text').first()).toHaveValue('three');
+    // Ticked, it stays in its place, struck through (job 200).
+    await expect(list.getByRole('checkbox', { name: 'Done: one' })).toBeChecked();
+    expect(await texts()).toEqual(['one', 'three']);
 
     // Gone once nothing is being typed in.
     await page.mouse.click(200, 70);

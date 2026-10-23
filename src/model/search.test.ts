@@ -56,9 +56,9 @@ describe('finding text on the board', () => {
     ]);
   });
 
-  it('a match that is out of sight says what to show instead: the collapsed card or column, or the list whose Completed section is closed', () => {
+  it('a match that is out of sight says what to show instead: the collapsed card or column (a ticked item is in sight, job 200)', () => {
     let b = sample();
-    expect(findMatches(b, 'eggs').map((m) => m.showInstead)).toEqual([null, null, 't1', null, null]);
+    expect(findMatches(b, 'eggs').map((m) => m.showInstead)).toEqual([null, null, null, null, null]);
     b = { ...b, columns: { ...b.columns, c1: { ...b.columns.c1, collapsed: true } } };
     expect(findMatches(b, 'eggs')[0].showInstead).toBe('c1');
     expect(findMatches(b, 'shop')[0].showInstead).toBe(null);

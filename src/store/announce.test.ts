@@ -108,11 +108,10 @@ describe('announcements from the board', () => {
     expect(spoken()).toBe('');
   });
 
-  it('ticking an item says it moved to Completed; unticking says nothing', () => {
+  it('ticking or unticking one item says nothing: it stays in place and its box says it (job 200)', () => {
     const { s, cardId, id } = setup(['a', 'b']);
     s.toggleItem(cardId, id('a'));
-    expect(spoken()).toBe('Moved to Completed: a');
-    announce('');
+    expect(spoken()).toBe('');
     s.toggleItem(cardId, id('a'));
     expect(spoken()).toBe('');
   });
@@ -121,7 +120,10 @@ describe('announcements from the board', () => {
     const { s, cardId, id } = setup(['a', 'b', 'c']);
     s.selectItemRange(cardId, id('a'), id('b'));
     s.toggleItem(cardId, id('a'));
-    expect(spoken()).toBe('Moved to Completed: 2 items');
+    expect(spoken()).toBe('Ticked: 2 items');
+    announce('');
+    s.toggleItem(cardId, id('a'));
+    expect(spoken()).toBe('Unticked: 2 items');
   });
 
   it('Clean up says how many items went to the Completed panel', () => {
@@ -147,7 +149,7 @@ describe('announcements from the board', () => {
 
   it('deleting every completed item says so', () => {
     const { s, cardId, id } = setup(['a', 'b']);
-    s.toggleItem(cardId, id('a')); // into the list's Completed section (Clean up would move it out of the list)
+    s.toggleItem(cardId, id('a')); // ticked in place (Clean up would move it out of the list)
     announce('');
     s.askDeleteCompleted();
     s.confirmDeleteCompleted();

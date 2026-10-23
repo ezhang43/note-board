@@ -58,26 +58,19 @@ test('a button in the Arrange menu lights up when pointed at', async ({ page }) 
   await expect.poll(() => collapseAll.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
 });
 
-test('a list shows Clean up and Uncheck all only while its Completed row is open', async ({ page }) => {
+test('a list shows Clean up in its title row only while something in it is ticked (job 200); there is no Uncheck all', async ({ page }) => {
   await clickEmpty(page);
   await add(page, 'Checklist');
   await page.keyboard.type('Pack');
   const list = page.locator('.card.selected');
+  const clean = list.locator('.card-header').getByRole('button', { name: 'Clean up' });
+  await expect(clean).toHaveCount(0);
   await list.getByRole('checkbox').first().check();
-  const toggle = list.getByRole('button', { name: 'Completed' });
-  // A new list starts with the row open, so its buttons show.
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(list.getByRole('button', { name: 'Clean up' })).toBeVisible();
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(list.getByRole('button', { name: 'Clean up' })).toHaveCount(0);
+  await expect(clean).toBeVisible();
   await expect(list.getByRole('button', { name: 'Uncheck all' })).toHaveCount(0);
-
-  await toggle.click();
-  await expect(list.getByRole('button', { name: 'Clean up' })).toBeVisible();
-  await list.getByRole('button', { name: 'Uncheck all' }).click();
-  await expect(list.getByRole('checkbox').first()).not.toBeChecked();
+  await expect(list.getByRole('button', { name: 'Completed' })).toHaveCount(0);
+  await list.getByRole('checkbox').first().uncheck();
+  await expect(clean).toHaveCount(0);
 });
 
 test("a card's and a container's buttons show only while pointing at it, or while it is selected", async ({ page }) => {

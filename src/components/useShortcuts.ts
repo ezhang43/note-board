@@ -91,7 +91,7 @@ export function useShortcuts() {
       const state = appStore.getState();
       // ? opens the keyboard shortcuts panel (it closes itself on ? or Escape: it covers the board).
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
-      // Ctrl+Shift+Backspace: delete every item in the board's Completed sections, after asking.
+      // Ctrl+Shift+Backspace: delete every ticked item on the board, after asking.
       // The Control key on a Mac too: there ⌘+Shift+Backspace is the browser's Clear browsing data.
       if (e.ctrlKey && !e.metaKey && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);
       if (key === 'escape' && state.ui.deleteCompleted) return appStore.cancelDeleteCompleted();

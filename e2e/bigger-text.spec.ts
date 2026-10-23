@@ -3,8 +3,8 @@ import { box, fontsLoaded, freshBoardEachTest } from './helpers';
 
 // Bigger text steps (owner requests, 2026-10-23: "increase the font size ++ capability to be even greater", then
 // "the font text size can still be increased"; picked "A+ up to 400%"): A+ goes on to 200%, 225%, 250%, 300%, 350%
-// and 400%, and everything on a card or container grows with it, the Completed header and Clean up links
-// included, without anything overlapping at the smallest card width.
+// and 400%, and everything on a card or container grows with it, the Clean up button in a list's title row
+// included (it grows like the other header buttons, up to 250%, job 200), without anything overlapping at the smallest card width.
 
 freshBoardEachTest();
 
@@ -39,15 +39,12 @@ async function stepTo(page: Page, name: 'Larger text' | 'Smaller text', times: n
   for (let i = 0; i < times; i++) await page.getByRole('button', { name }).click();
 }
 
-test('A+ goes up to 400% and the Completed header and Clean up links grow with it', async ({ page }) => {
+test('A+ goes up to 400% and the Clean up button grows with it, like the other header buttons', async ({ page }) => {
   test.slow();
   await seed(page);
   const card = page.locator('[data-card-id="t1"]');
-  const toggle = card.locator('.completed-toggle');
-  const clean = card.getByRole('button', { name: 'Clean up' });
+  const clean = card.locator('.card-header').getByRole('button', { name: 'Clean up' });
   const measure = async () => ({
-    toggleFont: await px(toggle, 'font-size'),
-    toggleH: (await box(toggle)).height,
     cleanFont: await px(clean, 'font-size'),
     cleanH: (await box(clean)).height,
     count: await px(card.locator('.item-text').first(), 'font-size'),
@@ -56,11 +53,10 @@ test('A+ goes up to 400% and the Completed header and Clean up links grow with i
   await stepTo(page, 'Larger text', 10); // Normal → Large → Larger → Huge → Largest → 200% → 225% → 250% → 300% → 350% → 400%
   await expect(page.getByRole('button', { name: 'Larger text' })).toHaveAttribute('aria-disabled', 'true');
   const top = await measure();
-  expect(top.toggleFont / normal.toggleFont).toBeCloseTo(4, 1);
-  expect(top.cleanFont / normal.cleanFont).toBeCloseTo(4, 1);
   expect(top.count / normal.count).toBeCloseTo(4, 1);
-  expect(top.toggleH / normal.toggleH).toBeCloseTo(4, 1);
-  expect(top.cleanH / normal.cleanH).toBeCloseTo(4, 1);
+  // The header buttons stop growing at 250%, so two of them and Clean up still fit a 200px card.
+  expect(top.cleanFont / normal.cleanFont).toBeCloseTo(2.5, 1);
+  expect(top.cleanH / normal.cleanH).toBeCloseTo(2.5, 1);
 });
 
 test('at 400% nothing overlaps or runs off a 200px card or a 240px container, at 100% zoom', async ({ page }) => {
@@ -72,7 +68,7 @@ test('at 400% nothing overlaps or runs off a 200px card or a 240px container, at
     await card.hover();
     const c = await box(card);
     // Every button and text field inside stays inside the card, and no two overlap.
-    const parts = await card.locator('.card-header > .icon-button, .card-title, .completed-toggle, .uncheck-all, .todo-item input[type="checkbox"], .item-text, .link-url, .link-open').all();
+    const parts = await card.locator('.card-header > .icon-button, .card-title, .list-clean-up, .todo-item input[type="checkbox"], .item-text, .link-url, .link-open').all();
     const boxes: { name: string; r: { x: number; y: number; width: number; height: number } }[] = [];
     for (const p of parts) {
       if (!(await p.isVisible())) continue;

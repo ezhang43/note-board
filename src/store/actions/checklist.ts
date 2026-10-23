@@ -2,19 +2,15 @@ import { createItem, newId } from '../../model/cards';
 import { announce, count } from '../announce';
 import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
-import { completedSectionCount, deleteCompletedSections } from '../../model/completed';
+import { deleteTicked, tickedCount } from '../../model/completed';
 import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDoneAcross, visibleItems, type ListSelection } from '../../model/multiSelect';
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
-import { copyText, keyboardInitiated, reducedMotion } from '../env';
+import { copyText } from '../env';
 import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
-
-/** How long a ticked item takes to leave for the Completed section, and to settle in there (ms). */
-export const COMPLETE_LEAVE_MS = 280;
-const COMPLETE_ARRIVE_MS = 450;
 
 export function checklistActions(ctx: StoreContext) {
   const { commit, updateUi, requestSettle } = ctx;
@@ -31,7 +27,7 @@ export function checklistActions(ctx: StoreContext) {
     const gap = Object.values(heights).reduce((sum, h) => sum + h, 0);
     const itemsOf = (cardId: string) => {
       const card = ctx.state.board.cards[cardId];
-      return card?.kind === 'todo' ? C.displayOrder(card.items) : [];
+      return card?.kind === 'todo' ? C.flatIds(card.items) : [];
     };
     const mark = hint && 'markMode' in hint && hint.markMode && hint.markId ? { markId: hint.markId, markMode: hint.markMode } : null;
     const target = mark && hint && 'cardId' in hint ? hint.cardId : null;
@@ -153,7 +149,7 @@ export function checklistActions(ctx: StoreContext) {
     focusFirstItem(cardId: string) {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo') return;
-      const first = C.displayOrder(card.items)[0];
+      const first = C.flatIds(card.items)[0];
       if (first) updateUi({ focusItem: first, focusOffset: null });
     },
     /**
@@ -197,44 +193,29 @@ export function checklistActions(ctx: StoreContext) {
         return { board: C.editItems(b, cardId, () => result.items), ui: { focusItem: result.focus } };
       });
     },
-    /** Tick / untick. With several items selected, ticking any one ticks (or unticks) them all. */
-    toggleItem(cardId: string, itemId: string) {
-      ctx.flushPendingTick();
+    /**
+     * Tick / untick. With several items selected, ticking any one ticks (or unticks) them all. Says
+     * whether it changed anything. `sayOne`: say a single tick aloud too (from the keyboard, where no box is focused).
+     */
+    toggleItem(cardId: string, itemId: string, sayOne = false): boolean {
       const card = ctx.state.board.cards[cardId];
-      // Not on a read-only board (job 161): no leaving animation for a tick that can't be made.
-      if (card?.kind !== 'todo' || ctx.viewOnly()) return;
+      if (card?.kind !== 'todo') return false;
       const item = C.findItem(card.items, itemId)?.item;
-      if (!item) return;
+      if (!item) return false;
+      const word = item.done ? 'Unticked' : 'Ticked';
       // One of the items selected across several lists: tick (or untick) them all at once.
       const lists = listsIncluding(cardId, itemId);
       if (lists) {
-        // simple: the count includes selected sub-items, which tick but don't move; fine to say aloud.
-        if (commit((b) => setDoneAcross(b, lists, !item.done)) && !item.done) announce(`Moved to Completed: ${count(itemsIn(lists), 'item')}`);
-        return;
+        const done = !!commit((b) => setDoneAcross(b, lists, !item.done));
+        if (done) announce(`${word}: ${count(itemsIn(lists), 'item')}`);
+        return done;
       }
+      // Ticked items stay where they are (job 200): a clicked box tells a screen reader itself, so one item is only said from the keyboard.
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      const next = C.setItemsDone(card.items, ids, !item.done);
-      // Top-level items this tick sends to the Completed section (said to screen readers once they are there).
-      const moved = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done);
-      // Applied to the list as it is then (another device's change may have arrived meanwhile).
-      const apply = () => {
-        const done = commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
-        if (done && moved.length) announce(`Moved to Completed: ${moved.length === 1 ? moved[0].text.trim() || 'item' : count(moved.length, 'item')}`);
-      };
-      // Top-level items this tick sends to the Completed section get a short leaving animation first (not when a key did it).
-      const leaving = next.filter((it) => it.done && !card.items.find((o) => o.id === it.id)?.done).flatMap(C.subtreeIds);
-      if (!leaving.length || reducedMotion() || keyboardInitiated()) return void apply();
-      updateUi({ completing: leaving });
-      const finish = () => {
-        ctx.pending.tick = null;
-        apply();
-        updateUi({ completing: [], arrived: leaving });
-        setTimeout(() => {
-          const arrived = ctx.state.ui.arrived;
-          if (arrived === leaving || arrived.every((x) => leaving.includes(x))) updateUi({ arrived: [] });
-        }, COMPLETE_ARRIVE_MS);
-      };
-      ctx.pending.tick = { timer: setTimeout(finish, COMPLETE_LEAVE_MS), apply: finish };
+      const done = !!commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+      if (done && ids.length > 1) announce(`${word}: ${count(ids.length, 'item')}`);
+      else if (done && sayOne) announce(`${word}: ${item.text.trim() || 'item'}`);
+      return done;
     },
     /**
      * Ctrl+Enter while typing in an item (owner request, 2026-10-15; also the phone item bar's Tick,
@@ -243,13 +224,12 @@ export function checklistActions(ctx: StoreContext) {
      * `caret`. Returns false when no open item is left: the field should let go, the list stays selected.
      */
     tickFromKeyboard(cardId: string, itemId: string, caret: number): boolean {
-      ctx.flushPendingTick();
       const card = ctx.state.board.cards[cardId];
       const item = card?.kind === 'todo' ? C.findItem(card.items, itemId)?.item : null;
       if (card?.kind !== 'todo' || !item) return false;
       const ticking = !item.done;
       const ids = listsIncluding(cardId, itemId)?.find((l) => l.cardId === cardId)?.ids ?? selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      actions.toggleItem(cardId, itemId);
+      if (!actions.toggleItem(cardId, itemId, true)) return true; // refused (read-only, an old version): the cursor stays
       const focus = ticking ? C.nextOpenItem(card.items, C.setItemsDone(card.items, ids, true), itemId) : itemId;
       updateUi({ focusItem: focus, focusOffset: ticking ? null : caret, ...(focus ? {} : { selection: [cardId] }) });
       return !!focus;
@@ -290,19 +270,15 @@ export function checklistActions(ctx: StoreContext) {
       const focus = C.findItem(after.items, itemId) ? itemId : C.focusAfterRemoving(shown, after.items, [itemId]);
       if (focus) updateUi({ focusItem: focus, focusOffset: focus === itemId ? caret : null });
     },
-    toggleCompletedSection: (cardId: string) => commit((b) => C.toggleCompletedSection(b, cardId)),
-    /** Uncheck all (owner request): every item in the list unticked, to use it again. One undo step. */
-    uncheckAll: (cardId: string) => commit((b) => C.editItems(b, cardId, C.uncheckAll)),
-    /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?", or say there are none. */
+    /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?" (every ticked item on the board, job 200), or say there are none. */
     askDeleteCompleted() {
       if (ctx.state.ui.preview || ctx.viewOnly()) return; // an old version, or a read-only board (job 161): nothing can be changed
-      ctx.flushPendingTick(); // an item still on its way to Completed counts
-      updateUi({ deleteCompleted: completedSectionCount(ctx.state.board) ? 'ask' : 'none' });
+      updateUi({ deleteCompleted: tickedCount(ctx.state.board) ? 'ask' : 'none' });
     },
     cancelDeleteCompleted: () => updateUi({ deleteCompleted: null }),
-    /** Delete every item in the open board's Completed sections. One undo step. */
+    /** Delete every ticked item on the open board. One undo step. */
     confirmDeleteCompleted() {
-      ctx.deleting('Deleted the completed items', () => commit((b) => deleteCompletedSections(b), { ui: { deleteCompleted: null, itemSel: null } }));
+      ctx.deleting('Deleted the completed items', () => commit((b) => deleteTicked(b), { ui: { deleteCompleted: null, itemSel: null } }));
       updateUi({ deleteCompleted: null });
     },
 
@@ -334,7 +310,7 @@ export function checklistActions(ctx: StoreContext) {
       const sel = ctx.state.ui.itemSel;
       const card = sel && ctx.state.board.cards[sel.cardId];
       if (!sel || sel.lists || card?.kind !== 'todo' || !itemClipboard?.length) return false;
-      const order = C.displayOrder(card.items).filter((id) => sel.ids.includes(id));
+      const order = C.flatIds(card.items).filter((id) => sel.ids.includes(id));
       const fresh = C.freshCopies(itemClipboard);
       commit((b) => C.editItems(b, sel.cardId, (items) => C.pasteItemsAfter(items, order[order.length - 1], fresh)), {
         ui: { itemSel: { cardId: sel.cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },

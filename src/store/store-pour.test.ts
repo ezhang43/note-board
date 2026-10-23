@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { displayOrder, findItem } from '../model/checklist';
+import { flatIds, findItem } from '../model/checklist';
 import type { TodoCard } from '../model/types';
 import { createStore } from './store';
 
@@ -30,7 +30,7 @@ function setup() {
   const a = makeList(['a1', 'a2']);
   const b = makeList(['b1']);
   const card = (id: string) => s.getState().board.cards[id] as TodoCard | undefined;
-  const texts = (id: string) => displayOrder(card(id)!.items).map((x) => findItem(card(id)!.items, x)!.item.text);
+  const texts = (id: string) => flatIds(card(id)!.items).map((x) => findItem(card(id)!.items, x)!.item.text);
   return { s, a, b, card, texts };
 }
 
@@ -130,7 +130,7 @@ describe('dragging items between lists', () => {
     s.dropItems();
     const made = s.getState().board.columns[col].cardIds;
     expect(made).toHaveLength(1);
-    expect(displayOrder(card(made[0])!.items)).toHaveLength(1);
+    expect(flatIds(card(made[0])!.items)).toHaveLength(1);
     expect(s.getState().board.order).not.toContain(made[0]);
   });
 });

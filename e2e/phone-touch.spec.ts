@@ -193,7 +193,7 @@ test('3b. a line typed in the middle of a long note is also kept in view', async
   await expect.poll(async () => (await rect(field)).y + (await rect(field)).height).toBeLessThanOrEqual((await rect(items)).y);
 });
 
-test('4. a checklist tick box has a 44px wide tap area, and Completed buttons are 40px tall with 8px gaps', async ({ page }) => {
+test('4. a checklist tick box has a 44px wide tap area, and the Clean up button a 44px press area', async ({ page }) => {
   await addMenu(page, 'Checklist');
   await page.keyboard.press('Enter');
   for (const [i, t] of ['one', 'two', 'three'].entries()) {
@@ -212,20 +212,15 @@ test('4. a checklist tick box has a 44px wide tap area, and Completed buttons ar
   // A press 12px left of the box ticks it.
   const row = await rect(page.locator('.todo-item input[type=checkbox]').nth(1));
   await page.touchscreen.tap(row.x - 12, row.y + 8);
-  await expect(page.locator('.completed [type=checkbox]')).toHaveCount(1);
-  // The Completed section's buttons.
-  const buttons = page.locator('.completed-toggle, .uncheck-all');
-  await expect(buttons).toHaveCount(3);
-  const boxes = await buttons.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((b) => ({ x: b.x, y: b.y, w: b.width, h: b.height })));
-  for (const b of boxes) expect(b.h).toBeGreaterThanOrEqual(40);
-  for (let i = 0; i < boxes.length; i++)
-    for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i];
-      const c = boxes[j];
-      const gapX = Math.max(a.x - (c.x + c.w), c.x - (a.x + a.w));
-      const gapY = Math.max(a.y - (c.y + c.h), c.y - (a.y + a.h));
-      expect(Math.max(gapX, gapY)).toBeGreaterThanOrEqual(8);
-    }
+  // It stays in its place, ticked (job 200).
+  await expect(page.locator('.todo-item input[type=checkbox]').nth(1)).toBeChecked();
+  await expect(page.locator('.todo-item').nth(1)).toHaveClass(/done/);
+  // The Clean up button in the title row can be pressed from 44px each way.
+  const clean = page.locator('.card-header .list-clean-up');
+  await expect(clean).toBeVisible();
+  const c = await reach(clean);
+  expect(c.w).toBeGreaterThanOrEqual(44);
+  expect(c.h).toBeGreaterThanOrEqual(44);
 });
 
 test('5. the empty-board hint points at the Add button on a phone', async ({ page }) => {

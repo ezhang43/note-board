@@ -47,7 +47,7 @@ async function atEveryStep(page: Page, check: (scale: number) => Promise<void>) 
 }
 
 test("a tick box is centered on its item's first line at every text size, for items and sub-items, light and dark", async ({ page }) => {
-  test.slow(); // nine text sizes, light and dark
+  test.slow(); // twelve text sizes, light and dark
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap and the bathroom sink', 'sub item', 'Second']);
   await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();
   await page.keyboard.press('Tab'); // 'sub item' nested under the first
@@ -60,7 +60,7 @@ test("a tick box is centered on its item's first line at every text size, for it
   await toggleDark(page);
 });
 
-test('the tick box grows with the text size, like the item buttons, never below 16px', async ({ page }) => {
+test('the tick box is 20px at Normal and grows with the text size, like the item buttons, never below 20px', async ({ page }) => {
   test.slow();
   const list = await checklist(page, ['Call the plumber', 'sub item']);
   await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();
@@ -72,12 +72,12 @@ test('the tick box grows with the text size, like the item buttons, never below 
     seen.push(s);
     for (const n of [0, 1]) {
       const tick = await box(list.locator('[data-item-id]').nth(n).getByRole('checkbox', { name: 'Done' }));
-      expect(Math.abs(tick.width - 16 * s), `width at ${fs}`).toBeLessThan(0.6);
-      expect(Math.abs(tick.height - 16 * s), `height at ${fs}`).toBeLessThan(0.6);
+      expect(Math.abs(tick.width - 20 * s), `width at ${fs}`).toBeLessThan(0.6);
+      expect(Math.abs(tick.height - 20 * s), `height at ${fs}`).toBeLessThan(0.6);
     }
   });
   expect(seen[0]).toBe(1);
-  expect(seen[seen.length - 1]).toBe(2.5);
+  expect(seen[seen.length - 1]).toBe(4);
 });
 
 test('the item buttons and the strip kept free for them grow with the text size, never below the Small size', async ({ page }) => {
@@ -91,8 +91,9 @@ test('the item buttons and the strip kept free for them grow with the text size,
   const seen: number[] = [];
   for (let i = 0; i < 12; i++) {
     const fs = Number(await row.evaluate((el) => getComputedStyle(el).getPropertyValue('--fs')));
-    const s = Math.max(1, fs);
-    seen.push(s);
+    const line = Math.max(1, fs); // the first line's step (the height of the buttons)
+    const s = Math.min(line, 1.9); // their widths, icons and the strip stop growing at 190%, so the 80px tick box and the strip fit a 200px card at 400%
+    seen.push(line);
     await row.hover();
     const sizeOf = async (name: string) => {
       const b = row.getByRole('button', { name });
@@ -105,12 +106,12 @@ test('the item buttons and the strip kept free for them grow with the text size,
     near(down.b.width, 22 * s);
     near(trash.b.width, 28 * s);
     near(grip.b.width, 18 * s);
-    for (const x of [up, down, trash, grip]) near(x.b.height, 20 * s + 8); // the item's first line
+    for (const x of [up, down, trash, grip]) near(x.b.height, 20 * line + 8); // the item's first line
     near(up.icon.w, 18 * s);
     near(trash.icon.w, 16 * s);
     near(grip.icon.w, 10 * s);
     near(grip.icon.h, 15 * s);
-    // The strip kept free (for the trash can and the grip; the arrows float in a pill) is 46px at Normal and Small, bigger from Large up.
+    // The strip kept free (for the trash can and the grip; the arrows float in a pill) is 46px at Normal and Small, bigger from Large up (to 190%).
     expect(await row.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight))).toBeCloseTo(46 * s, 0);
     // The press area is at least 24 x 24 at every size.
     for (const x of [up, down, trash, grip]) expect(Math.min(x.b.width, x.b.height)).toBeGreaterThanOrEqual(18);
@@ -119,7 +120,7 @@ test('the item buttons and the strip kept free for them grow with the text size,
     await larger.click();
   }
   expect(seen[0]).toBe(1); // Small keeps today's size
-  expect(seen[seen.length - 1]).toBe(2.5);
+  expect(seen[seen.length - 1]).toBe(4);
 });
 
 /** The color of one pixel of the page, read back from a screenshot. */

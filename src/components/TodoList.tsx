@@ -64,7 +64,7 @@ export function TodoBody({ card }: { card: TodoCard }) {
               onClick={() => appStore.toggleCompletedSection(card.id)}
             >
               <ChevronIcon collapsed={!card.completedOpen} />
-              Completed
+              <span>Completed</span>
             </button>
             {/* Only while the Completed row is open (owner decision 2026-10-16). */}
             {card.completedOpen && (

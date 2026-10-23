@@ -9,7 +9,7 @@ freshBoardEachTest();
 const BUTTON = 32;
 const ICON = 16;
 // The text size steps worth checking: the step the buttons never go under, and the biggest.
-const LARGEST = 1.75;
+const LARGEST = 2.5;
 
 const largest = async (page: Page) => {
   const larger = page.getByRole('button', { name: 'Larger text' });

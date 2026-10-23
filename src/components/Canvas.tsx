@@ -332,6 +332,7 @@ export function Canvas() {
     <div
       ref={ref}
       className={`canvas${panning ? ' panning' : ''}`}
+      data-big-text={FONT_SCALE[view.fontSize] >= 2.25 ? '' : undefined}
       data-testid="canvas"
       role="main"
       aria-label="Board"

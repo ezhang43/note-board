@@ -29,8 +29,11 @@ async function centers(row: Locator) {
 
 async function checkTicks(list: Locator) {
   for (const n of [0, 1, 2]) {
-    const { tick, line } = await centers(list.locator('[data-item-id]').nth(n));
-    expect(Math.abs(tick - line), `item ${n}`).toBeLessThanOrEqual(1);
+    const row = list.locator('[data-item-id]').nth(n);
+    const { tick, line } = await centers(row);
+    // The box sits 5% of the line below the middle of the first line (1px at Normal, 2px at 200%): the middle of lowercase text is lower than that of capitals (owner request, 2026-10-23).
+    const nudge = (await row.getByLabel('Item text').evaluate((el) => parseFloat(getComputedStyle(el).lineHeight))) * 0.05;
+    expect(Math.abs(tick - line - nudge), `item ${n}`).toBeLessThanOrEqual(0.75);
   }
 }
 
@@ -46,7 +49,7 @@ async function atEveryStep(page: Page, check: (scale: number) => Promise<void>) 
   }
 }
 
-test("a tick box is centered on its item's first line at every text size, for items and sub-items, light and dark", async ({ page }) => {
+test("a tick box is centered on its item's first line (nudged down 5% of the line) at every text size, for items and sub-items, light and dark", async ({ page }) => {
   test.slow(); // twelve text sizes, light and dark
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap and the bathroom sink', 'sub item', 'Second']);
   await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();
@@ -174,3 +177,98 @@ for (const dark of [false, true]) {
     }
   });
 }
+
+// Honey well tick boxes (owner request, 2026-10-23: "the checkboxes look a bit clunky"; picked "C. Honey well"): drawn by the app, a honey
+// square with an amber border, amber and a thin tick when ticked, that grow with the text step.
+
+async function seedTicks(page: Page) {
+  await page.evaluate(() => {
+    const item = (id: string, text: string, done: boolean) => ({ id, text, done, children: [] as never[] });
+    const board = {
+      name: 'T',
+      snap: true,
+      cards: { t1: { id: 't1', kind: 'todo', title: 'Errands', color: null, collapsed: false, h: null, completedOpen: true, x: 100, y: 100, w: 300, items: [item('a', 'Buy milk', false), item('b', 'Return books', true)] } },
+      columns: {},
+      order: ['t1'],
+    };
+    localStorage.setItem('note-board:v1', JSON.stringify({ version: 2, board }));
+  });
+  await page.reload();
+  await page.mouse.move(0, 0);
+}
+
+/** Resolves any CSS color (a variable, color-mix...) to [r, g, b] in the page. */
+function rgbOf(page: Page, css: string) {
+  return page.evaluate((c) => {
+    const g = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+    g.fillStyle = c;
+    g.fillRect(0, 0, 1, 1);
+    return Array.from(g.getImageData(0, 0, 1, 1).data.slice(0, 3));
+  }, css);
+}
+const luminance = (c: number[]) => {
+  const [r, g, b] = c.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a: number[], b: number[]) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+const cssVar = (page: Page, name: string) => page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+
+for (const dark of [false, true]) {
+  test(`tick boxes are honey wells: honey square, amber border, amber when ticked, softer struck-through text (${dark ? 'dark' : 'light'})`, async ({ page }) => {
+    await seedTicks(page);
+    if (dark) await toggleDark(page);
+    const open = page.locator('[data-item-id="a"]');
+    const done = page.locator('[data-item-id="b"]');
+    const style = (l: Locator) =>
+      l.getByRole('checkbox').evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { appearance: cs.appearance, border: parseFloat(cs.borderTopWidth), radius: parseFloat(cs.borderTopLeftRadius), bg: cs.backgroundColor, edge: cs.borderTopColor, image: cs.backgroundImage };
+      });
+    const accent = await rgbOf(page, await cssVar(page, '--accent'));
+    const soft = await rgbOf(page, await cssVar(page, '--accent-soft'));
+    const card = await rgbOf(page, await cssVar(page, '--card-bg'));
+    const a = await style(open);
+    expect(a.appearance).toBe('none');
+    expect(a.border).toBeGreaterThanOrEqual(1); // 1.5px, drawn as 1px on a 1x screen
+    expect(a.radius).toBeCloseTo(6, 1);
+    expect(await rgbOf(page, a.bg)).toEqual(soft);
+    expect(a.image).toBe('none');
+    // The border is a control's edge: 3:1 against the card, in light and dark.
+    expect(contrast(await rgbOf(page, a.edge), card)).toBeGreaterThanOrEqual(3);
+    const t = await style(done);
+    expect(await rgbOf(page, t.bg)).toEqual(accent);
+    expect(await rgbOf(page, t.edge)).toEqual(accent);
+    expect(contrast(accent, card)).toBeGreaterThanOrEqual(3);
+    expect(t.image).toContain('svg');
+    // Ticked text: a softer strike line (not the full text color) and faded.
+    const text = await done.getByLabel('Item text').evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { line: cs.textDecorationLine, lineColor: cs.textDecorationColor, color: cs.color, fade: parseFloat(getComputedStyle(el.parentElement!).opacity) };
+    });
+    expect(text.line).toBe('line-through');
+    expect(text.lineColor).not.toBe(text.color);
+    expect(text.fade).toBeLessThan(1);
+    expect(text.fade).toBeGreaterThan(0.4);
+    expect(await open.getByLabel('Item text').evaluate((el) => parseFloat(getComputedStyle(el.parentElement!).opacity))).toBe(1);
+  });
+}
+
+test('pressing a tick box shrinks it for 120ms; there is no tick animation; the keyboard focus ring stays', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); // the suite turns motion off; this test is about it
+  await seedTicks(page);
+  const cb = page.locator('[data-item-id="a"]').getByRole('checkbox');
+  expect(await cb.evaluate((el) => getComputedStyle(el).transitionDuration)).toContain('0.12s');
+  const b = await box(cb);
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(250);
+  const scale = await cb.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
+  expect(scale).toBeCloseTo(0.9, 2);
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await page.locator('[data-item-id="a"]').getByLabel('Item text').click();
+  await page.keyboard.press('Shift'); // the last input was the keyboard, so focus shows the ring
+  await cb.focus();
+  await expect(cb).toBeFocused();
+  expect(await cb.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+});

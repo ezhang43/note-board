@@ -1,2 +1,0 @@
-## The offline copy stops growing (2026-10-22)
-- The saved offline copy of the site used to keep every built file of every version it had seen, adding about 1 MB with each publish. When a new version of the page loads online, the old version's built files are now removed (fonts and the page itself stay), so storage on the device no longer fills up over time. Opening the site without internet works as before.

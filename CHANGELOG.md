@@ -1,5 +1,62 @@
 # Changelog
 
+## The About page's demo clip and pictures show the app as it is now (2026-10-22)
+- The demo video and the board pictures on the About page were taken before the latest changes. They are recorded again from the current app: no Hand or Select tools, card titles in the button row, the new checklist rows, the folded toolbar. Same story as before: tick an item, fold a container, drag a card, type a new item. File sizes are about the same.
+- Behind the scenes: a browser test that measures the sign-in page's links on a phone now waits for the fonts to load first, so it no longer fails by one pixel now and then.
+
+## Steadier automatic tests on GitHub (2026-10-22)
+
+- Fixed the automatic tests getting stuck for half an hour while installing the test browsers' system packages (the download mirror is sometimes very slow), which cancelled the run and held back the automatic publish. The browsers and those packages are now kept between runs, a stalled download gives up and retries quickly, and each install try is capped at 6 minutes with a second try.
+
+## Tidy-up in the saving, sync and connector code (2026-10-23)
+
+- The Claude connector's "permission denied" message no longer mentions an invite list (there isn't one: any Google account can sign in). It now asks whether this is the Google account that has these boards; a refused save also says nothing was changed.
+- Small wording fixes in the connector's instructions (`mcp/README.md`): "authorized", this project keeps Claude Code out of the sign-in folder on Windows and Mac alike (with the setting to add elsewhere for both), and two files it didn't list.
+- Removed a store function only tests used (`replaceBoard`); those four tests now go through the path the app really takes when the online copy arrives. Removed names that were shared between files but only used inside their own, and a stale comment about the Hand tool.
+- Nothing changes in how the app works or saves.
+
+## The Claude connector no longer lets a share lock your own boards (2026-10-23)
+
+- Someone you share with could add a board carrying one of your own boards' ids (for example your Home) to a shared board, and Claude would then refuse to change that board of yours ("Home is a shared board"). Now your own boards win, the same way the app already decides, so Claude can change them as before.
+- Boards really shared with you, and the boards you shared yourself, stay read-only to Claude.
+
+## The offline copy stops growing (2026-10-22)
+- The saved offline copy of the site used to keep every built file of every version it had seen, adding about 1 MB with each publish. When a new version of the page loads online, the old version's built files are now removed (fonts and the page itself stay), so storage on the device no longer fills up over time. Opening the site without internet works as before.
+
+## Interface review fixes (2026-10-22)
+- Keys pressed in the File, Boards, Arrange, Appearance, Color or ⋯ menus, the Share panel or on the Undo message no longer move, delete or deselect the card behind them.
+- Escape in the text format bar goes back to the text and no longer closes the Focus timer, Version history or another side panel.
+- The File, Appearance and Boards menus and the Share panel now open on top of an open side panel instead of underneath it.
+- The File and Boards menus work with the arrow keys (up, down, Home, End).
+- Pressing Undo on the Undo message from the keyboard moves focus to Redo instead of back to the top of the page; closing the Share panel, Send feedback or the shortcuts list gives focus back to the button that opened it.
+- A board card no longer counts the hidden Completed record in its "N cards".
+- A question left open when the app goes away (signed out in another tab) is answered "no" rather than asked again after signing in.
+- A lost finger on a phone can no longer leave the board ignoring touches until reload.
+- Screen readers: the container card count, the zoom button ("Reset zoom (100%)") and the checklist item grip are named or skipped properly.
+
+## Roomier checklists and shorter cards (2026-10-22)
+- A checklist item's text now gets almost the whole row. Only the trash can and the drag grip keep a small strip at the right end (46px, down from 92px), so "Book the flights" stays on one line on a new card.
+- Move up and Move down moved into a small pill that appears over the right end of the row above when you point at an item (or tab to one). It never covers any words. The first item of a list gets its pill just below it.
+- The title of a checklist, link card or board card now shares its line with the card's buttons. The empty band above every title is gone, so these cards are about 30px shorter. Colored cards tint that one line, into the rounded corners, as before.
+- Notes keep their button row (they have no title); containers already had their title beside their buttons.
+- The buttons still grow with the A− / A+ text size, and phones and touch screens work as before.
+
+## Drag the board with the mouse buttons (2026-10-22)
+- The Hand and Select choice is gone, from the toolbar, the phone ⋯ sheet and the keyboard (H and V). The board always works as Select: dragging empty space with the left button draws a selection box.
+- To move the board, hold the middle mouse button, or the left and right buttons together (either one first), and move. It works anywhere on the board, over cards, containers, links and pictures too, and never opens a link or a menu.
+- The cursor is the normal arrow, and a closed glove only while the board is being dragged this way.
+- Scrolling, trackpad swiping and moving the board by finger work as before. On a phone, a finger that rests for a moment and then moves now draws a selection box (a plain swipe still moves the board).
+- The Keyboard shortcuts list explains the new way to move the board, and no longer lists the tool keys. Saved custom keys from before are still read.
+
+## The Google Play screenshots show the app as it is now (2026-10-23)
+- The Play Store pictures in `docs/play-store/screenshots/` are retaken from the current app: no Hand or Select tools, card titles on the button row, the new checklist rows, and the Weekend in Lisbon example opened from the template tiles.
+- New pictures: a comment thread on a phone, the Habits panel with the Weight card, the habits ledger, the template tiles, and the Habits panel on both tablet sizes. There are now 8 phone pictures (the most Play allows) and 3 for each tablet size. Sizes and the old file names are unchanged.
+- The script that takes them (`scripts/play-screenshots.mjs`) now uses the real app instead of a hand-made board, and `PLAY_ONLY=name` retakes just some of them.
+
+## Reload prompts after an update, and a Try again button (2026-10-22)
+- If BusyAnts was updated while a page was open, saving the board as a picture or PDF, or importing a PDF, now says "BusyAnts was updated. Reload the page to use this." with a Reload button, instead of "Couldn’t make the picture" or "can’t read that file".
+- The "Your board couldn’t be loaded" screen has a Try again button that reloads the page.
+
 ## Saving and sharing fixes from review 181, part A (2026-10-22)
 
 - If deleting your account stops part-way on one device (the tab is closed while it says "Deleting…"), your other pages hold their changes for a while. They now say so plainly: "Your account is being deleted on another device; changes here aren’t saved yet" instead of "Saving…".

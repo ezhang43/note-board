@@ -1482,6 +1482,11 @@ html[data-input='keys'] .column {
   transition: none;
 }
 
+/* Tapping into a card on a phone slides the board to put the card's top under the top bar (glideBoard, canvasDom.ts). */
+html[data-glide] .world {
+  transition: transform 200ms var(--ease-out);
+}
+
 /* The landing outline slides between grid spots instead of jumping. */
 .landing-spot {
   transition:
@@ -1492,7 +1497,8 @@ html[data-input='keys'] .column {
 @media (prefers-reduced-motion: reduce) {
   .card.loose,
   .column,
-  .landing-spot {
+  .landing-spot,
+  html[data-glide] .world {
     transition: none;
   }
 }

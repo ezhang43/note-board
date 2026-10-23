@@ -8,7 +8,7 @@ import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { BoardReadOnly } from './textBox';
 import type { Point, View } from '../model/types';
 import type { ItemDrag } from '../store/store';
-import { canvasRect, clientToCanvas, setCanvasElement } from './canvasDom';
+import { canvasRect, clientToCanvas, finishGlide, glideBoard, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
@@ -124,14 +124,22 @@ export function Canvas() {
       if (!block) return;
       const top = block.closest<HTMLElement>('[data-col-id]') ?? block;
       if (e.relatedTarget instanceof Node && top.contains(e.relatedTarget)) return;
-      const r = field.getBoundingClientRect();
-      appStore.fitBlockWidth((block.dataset.cardId ?? block.dataset.colId)!, clientToCanvas(r.left + r.width / 2, r.top + r.height / 2));
+      // The top of the tapped block goes just under the top bar (12px to spare), so it shows above the keyboard.
+      // A tall block's cursor line is kept clear of the keyboard afterwards (ItemBar), which wins.
+      finishGlide(); // an earlier slide is over: measure where the block really is
+      const c = el.getBoundingClientRect();
+      const from = block.getBoundingClientRect().top - c.top;
+      const to = Math.max(0, (window.visualViewport?.offsetTop ?? 0) - c.top) + 12;
+      glideBoard(() => appStore.fitBlockWidth((block.dataset.cardId ?? block.dataset.colId)!, { from, to }));
     };
     // A tap near another card's (hidden) buttons selects that card, and the buttons then appear under
     // the finger: the browser aims the click at them. After a finger press, a click on a header button
     // counts only when the press began on that button (keyboard clicks, with no press, still do).
     let down: PointerEvent | null = null;
-    const onDown = (e: PointerEvent) => (down = e);
+    const onDown = (e: PointerEvent) => {
+      down = e;
+      finishGlide(); // a touch on the board is never held back by a slide
+    };
     const onClick = (e: MouseEvent) => {
       const press = down;
       down = null;

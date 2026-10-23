@@ -45,23 +45,34 @@ describe('starting to edit a list on a phone', () => {
     const s = phone();
     s.addColumn();
     const col = s.getState().board.columns[s.getState().ui.selection[0]];
-    s.fitBlockWidth(col.id, { x: 100, y: 200 });
+    s.fitBlockWidth(col.id, { from: 200, to: 12 });
     const { zoom, panX } = s.getState().view;
     expect(zoom).toBeCloseTo((390 - 2 * PHONE_MARGIN) / col.w, 5);
     expect(col.x * zoom + panX).toBeCloseTo(PHONE_MARGIN, 0);
+  });
+  it('and brings the top of the tapped block to the top of the screen (owner request, job 198)', () => {
+    const s = phone();
+    s.addCard('todo', true);
+    const card = only(s);
+    s.panBy(0, 300); // the card is now lower on the screen
+    const before = s.getState().view;
+    const from = card.y * before.zoom + before.panY;
+    s.fitBlockWidth(card.id, { from, to: 12 });
+    const { zoom, panY } = s.getState().view;
+    expect(card.y * zoom + panY).toBeCloseTo(12, 0);
   });
   it('for a card inside a container fits the container', () => {
     const s = phone();
     s.addColumn();
     const col = s.getState().board.columns[s.getState().ui.selection[0]];
     s.addCard('note');
-    s.fitBlockWidth(only(s).id, { x: 100, y: 200 });
+    s.fitBlockWidth(only(s).id, { from: 200, to: 12 });
     expect(s.getState().view.zoom).toBeCloseTo((390 - 2 * PHONE_MARGIN) / col.w, 5);
   });
   it('ignores an unknown id', () => {
     const s = phone();
     const before = s.getState().view;
-    s.fitBlockWidth('nope', { x: 0, y: 0 });
+    s.fitBlockWidth('nope', { from: 0, to: 12 });
     expect(s.getState().view).toEqual(before);
   });
 });

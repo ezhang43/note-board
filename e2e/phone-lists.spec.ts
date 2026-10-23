@@ -51,8 +51,8 @@ test.describe('a new card fills the screen width', () => {
 test.describe('starting to edit fills the screen width', () => {
   test('after zooming in, tapping into the list brings it back to the screen width, its edge at the margin', async ({ page }) => {
     await addMenu(page, 'Checklist');
-    // Tap the empty board (blurs the title) and double tap to zoom in one step.
-    const empty = { x: 195, y: 130 };
+    // Tap the empty board (blurs the title) and double tap to zoom in one step. (A new card sits at the top, so the empty board is lower.)
+    const empty = { x: 195, y: 230 };
     await page.touchscreen.tap(empty.x, empty.y);
     await page.waitForTimeout(400);
     await page.touchscreen.tap(empty.x, empty.y);
@@ -68,12 +68,12 @@ test.describe('starting to edit fills the screen width', () => {
 
   test('a list zoomed out far enough is zoomed in until it fills the width', async ({ page }) => {
     await addMenu(page, 'Note');
-    await page.touchscreen.tap(195, 130);
+    await page.touchscreen.tap(195, 700); // empty board: a new card sits at the top
     await page.waitForTimeout(400);
     // A long tap zooms out one step (rest the finger about half a second).
     const cdp = await page.context().newCDPSession(page);
     for (let i = 0; i < 2; i++) {
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 130, id: 1 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 700, id: 1 }] });
       await page.waitForTimeout(700);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await page.waitForTimeout(100);
@@ -111,6 +111,9 @@ test.describe('card buttons show only on the selected card', () => {
   test('tapping where the other card’s trash can would be only selects that card', async ({ page }) => {
     await addMenu(page, 'Note');
     await addMenu(page, 'Note');
+    // Each new card goes to the top of the screen (job 198), leaving the first above it: slide the board down to see both.
+    await page.getByTestId('canvas').evaluate((el) => el.dispatchEvent(new WheelEvent('wheel', { deltaY: -600, bubbles: true, cancelable: true })));
+    await page.waitForTimeout(300);
     const hidden = (await trash(page).nth(0).boundingBox())!;
     await page.touchscreen.tap(hidden.x + hidden.width / 2, hidden.y + hidden.height / 2);
     await expect(page.locator('[data-card-id]')).toHaveCount(2);

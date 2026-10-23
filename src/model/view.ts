@@ -146,10 +146,14 @@ export function phoneCardWidth(screenW: number, zoom: number): number {
  * zoom limits), its left edge at the margin (centred when it is narrower even at 250%). The top of
  * the block being edited (`rect`'s own top, or a card's inside it) is at screen height `top.from`
  * now and goes to `top.to`, so it shows above the keyboard (owner request, job 198).
+ * A block too wide to fill the width at the `readable` zoom (where its text shows 16px, job 199) is
+ * zoomed to that instead (or kept at the person's own zoom when that is bigger), so the text can be
+ * read; it then runs past the right edge of the screen, and the keyboard rule keeps the cursor's line in view.
  */
-export function viewFillingWidth(view: View, size: Size, rect: Rect, top: { from: number; to: number }): View {
+export function viewFillingWidth(view: View, size: Size, rect: Rect, top: { from: number; to: number }, readable: number): View {
+  const fit = (size.width - 2 * PHONE_MARGIN) / rect.w;
   // Zooming about the block's top leaves it at `top.from`, so only the move to `top.to` is left.
-  const zoomed = zoomTo(view, { x: 0, y: top.from }, (size.width - 2 * PHONE_MARGIN) / rect.w);
+  const zoomed = zoomTo(view, { x: 0, y: top.from }, fit >= readable ? fit : Math.max(readable, view.zoom));
   const left = Math.max(PHONE_MARGIN, (size.width - rect.w * zoomed.zoom) / 2);
   return panBy(zoomed, Math.round(left - rect.x * zoomed.zoom) - zoomed.panX, Math.round(top.to - top.from));
 }

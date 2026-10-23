@@ -21,3 +21,15 @@ export function nextFontSize(current: FontSize, step: 1 | -1): FontSize {
 export function startingFontSize(saved: string | null): FontSize {
   return FONT_SIZES.includes(saved as FontSize) ? (saved as FontSize) : 'normal';
 }
+
+/** The text size (px) a phone's card text never goes below, so iOS does not zoom the page in (see styles.css). */
+export const PHONE_MIN_TEXT = 16;
+
+/**
+ * Phone: the board zoom at which a card's text shows at least `PHONE_MIN_TEXT` px on the screen
+ * (owner request, job 199). The base text is 14px times the A− / A+ step, and never under 16px on a phone;
+ * a per-text size (Small, Large) inside a card is ignored.
+ */
+export function phoneReadableZoom(size: FontSize): number {
+  return PHONE_MIN_TEXT / Math.max(PHONE_MIN_TEXT, 14 * FONT_SCALE[size]);
+}

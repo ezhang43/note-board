@@ -42,7 +42,7 @@ export function workBoard(): Board {
 }
 
 /** A board someone shared: "Trip", with "Packing" inside it. */
-export function tripBoards(): Record<string, Board> {
+function tripBoards(): Record<string, Board> {
   let trip: Board = { ...createBoard(), name: 'Trip' };
   trip = addCard(trip, { ...(createCard('todo', 'listTrip') as TodoCard), title: 'Bookings', items: [item('iHotel', 'Hotel')] }, { type: 'loose', x: 40, y: 40 });
   trip = addCard(trip, createBoardCard('packing', 'cardPacking'), { type: 'loose', x: 40, y: 400 });

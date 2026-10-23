@@ -58,7 +58,8 @@ describe('saving versions', () => {
 
   it("a change from another device doesn't save a version (that device saves its own)", async () => {
     const { store, versions } = setup();
-    store.replaceBoard({ ...store.getState().board, name: 'From the phone' });
+    const ws = store.workspace();
+    store.replaceWorkspace({ ...ws, boards: { ...ws.boards, [store.getState().boards.open]: { ...store.getState().board, name: 'From the phone' } } });
     await settled();
     expect(await versions.list()).toHaveLength(0);
   });

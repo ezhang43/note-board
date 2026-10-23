@@ -245,7 +245,8 @@ describe('a board from another device is not re-arranged with this device\'s old
     theirs.cards[a].collapsed = true;
     theirs.cards[b].collapsed = true;
     theirs.cards[b].y = 60;
-    s.replaceBoard(theirs);
+    const ws = s.workspace();
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [s.getState().boards.open]: theirs } });
     vi.runAllTimers();
     expect(pos(s, b)).toEqual({ x: 0, y: 60 }); // not pushed back below a's old 300px height
     // Once drawn here at their real heights, still nothing moves.

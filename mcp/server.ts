@@ -19,11 +19,11 @@ const reply = (text: string, isError = false) => ({ content: [{ type: 'text' as 
 export type Write = (edit: Edit, opts?: { deleting?: boolean }) => Promise<{ text: string; isError?: boolean }>;
 
 /** At most this many changes in one call (each call is one save). */
-export const MAX_CHANGES = 50;
+const MAX_CHANGES = 50;
 /** At most this many characters in one item's or note's text. */
-export const MAX_TEXT = 5000;
+const MAX_TEXT = 5000;
 /** At most this many things deleted in one call. */
-export const MAX_DELETE = 20;
+const MAX_DELETE = 20;
 
 const DELETE_OFF = 'Deleting is switched off for this connector, so nothing was deleted. Only the owner can switch it on, on their computer: ask the owner.';
 

@@ -7,7 +7,7 @@ import type { Snapshot } from './boards';
 
 const DOCS = 'https://firestore.googleapis.com/v1/projects/note-board-a672a/databases/(default)/documents/';
 
-export interface FirestoreDoc {
+interface FirestoreDoc {
   /** Plain values: strings, timestamps (as text) and numbers. */
   fields: Record<string, string | number | boolean>;
   updateTime: string;
@@ -18,7 +18,7 @@ export interface FirestoreReader {
   listIds(collection: string): Promise<string[]>;
 }
 
-export class FirestoreError extends Error {
+class FirestoreError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -40,7 +40,7 @@ export function firestoreReader(idToken: () => Promise<string>, fetchFn: typeof 
   async function get(pathAndQuery: string): Promise<Record<string, unknown> | null> {
     const res = await fetchFn(DOCS + pathAndQuery, { headers: { authorization: `Bearer ${await idToken()}` } });
     if (res.status === 404) return null;
-    if (res.status === 403) throw new FirestoreError('Firestore refused (permission denied). Is this Google account on the invite list in firestore.rules?', 403);
+    if (res.status === 403) throw new FirestoreError('Firestore refused (permission denied). Is this the Google account that has these boards? Ask Claude to sign in again with the right account.', 403);
     if (!res.ok) throw new FirestoreError(`Firestore didn’t answer properly (status ${res.status}). Try again in a moment.`, res.status);
     return (await res.json()) as Record<string, unknown>;
   }
@@ -74,7 +74,7 @@ const ROOT = DOCS.slice(0, -1);
 const NAME = DOCS.slice(DOCS.indexOf('projects/'));
 
 /** The person's own boards as saved: the text and Firestore's time of that save. */
-export interface OwnDoc {
+interface OwnDoc {
   raw: string | null;
   updateTime: string;
 }
@@ -114,7 +114,7 @@ export function ownDb(idToken: () => Promise<string>, uid: string, fetchFn: type
   }
   const failed = (status: number) =>
     new FirestoreError(
-      status === 403 ? 'Firestore refused (permission denied). Is this Google account on the invite list in firestore.rules?' : `Firestore didn’t save it (status ${status}). Nothing was changed; try again in a moment.`,
+      status === 403 ? `Firestore refused (permission denied). Nothing was changed. If this isn't the Google account that has these boards, ask Claude to sign in again with the right account.` : `Firestore didn’t save it (status ${status}). Nothing was changed; try again in a moment.`,
       status,
     );
 

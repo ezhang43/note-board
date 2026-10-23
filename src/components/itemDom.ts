@@ -36,7 +36,7 @@ export function rowAt(clientX: number, clientY: number): { cardId: string; itemI
  * - on empty board, a note, a link or a column: a new list there.
  * Null means "nowhere" (e.g. over the dragged items themselves, or off the board): dropping does nothing.
  */
-export function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | null {
+function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | null {
   const { board } = appStore.getState();
   let columnId: string | undefined;
   // A lifted item (phone) has the rows slid aside: use the row where it sits without the slide, or the gap would move the hint and back.

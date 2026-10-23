@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firestoreReader, readSnapshot } from './firestore';
+import { firestoreReader, ownDb, readSnapshot } from './firestore';
 import { ownRaw } from './sample';
 
 const BASE = 'https://firestore.googleapis.com/v1/projects/note-board-a672a/databases/(default)/documents/';
@@ -48,9 +48,14 @@ describe('Firestore REST reading', () => {
     expect(await firestoreReader(async () => 't', fn).listIds('boards/me/shared')).toEqual([]);
   });
 
-  it('a refusal says the account may not be on the invite list', async () => {
+  it('a refusal asks whether it is the right Google account', async () => {
     const { fn } = fakeFetch({ 'boards/me': { status: 403, body: { error: { code: 403, status: 'PERMISSION_DENIED', message: 'Missing or insufficient permissions.' } } } });
-    await expect(firestoreReader(async () => 't', fn).getDoc('boards/me')).rejects.toThrow(/invite list/);
+    await expect(firestoreReader(async () => 't', fn).getDoc('boards/me')).rejects.toThrow(/right account/);
+  });
+
+  it('a refused save says nothing was changed and names the account as one possible cause', async () => {
+    const { fn } = fakeFetch({ [`${BASE.slice(0, -1)}:commit`]: { status: 403, body: { error: { code: 403, status: 'PERMISSION_DENIED', message: 'no' } } } });
+    await expect(ownDb(async () => 't', 'me', fn).write('{}', 'c1', 'x')).rejects.toThrow(/Nothing was changed\. If this isn't the Google account/);
   });
 });
 

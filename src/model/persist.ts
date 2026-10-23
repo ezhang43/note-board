@@ -205,7 +205,7 @@ export function parseBoard(raw: string | null): Board {
   return readBoard(raw) ?? createBoard();
 }
 
-/** Only pan and zoom are remembered; the tool always starts as Hand. */
+/** Only pan and zoom are remembered. */
 export function serializeView(view: View): string {
   return JSON.stringify({ panX: view.panX, panY: view.panY, zoom: view.zoom });
 }

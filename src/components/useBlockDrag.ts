@@ -164,7 +164,7 @@ export function useDragPosition(id: string, own: { x: number; y: number }): { x:
 }
 
 /** How far this block is being moved as part of a group drag (0, 0 when it isn't). */
-export function useGroupOffset(id: string): [number, number] {
+function useGroupOffset(id: string): [number, number] {
   const dx = useAppState((s) => (s.ui.drag?.group.includes(id) ? s.ui.drag.x - s.ui.drag.startX : 0));
   const dy = useAppState((s) => (s.ui.drag?.group.includes(id) ? s.ui.drag.y - s.ui.drag.startY : 0));
   return [dx, dy];

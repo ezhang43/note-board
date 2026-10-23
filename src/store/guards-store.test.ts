@@ -121,7 +121,8 @@ describe('opening', () => {
     expect(s.takeCentreOnArrival()).toBe(true);
     expect(s.takeCentreOnArrival()).toBe(false);
     const arriving = B.addCard(B.createBoard(), createCard('note', 'n'), { type: 'loose', x: 0, y: 0 });
-    s.replaceBoard(arriving);
+    const ws = s.workspace();
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [s.getState().boards.open]: arriving } }); // the online copy fills the empty board on screen
     expect(s.takeCentreOnArrival()).toBe(true);
     s.replaceWorkspace(s.workspace()); // the open board now has a card
     expect(s.takeCentreOnArrival()).toBe(false);

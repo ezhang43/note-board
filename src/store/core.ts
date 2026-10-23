@@ -27,7 +27,7 @@ const CLOSING_MS = 1500;
 const GESTURE_UI = new Set(['drag', 'newDrag', 'itemDrag', 'resize', 'marquee']);
 
 /** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
-export type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
+type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
 
 export interface StoreContext {
   /** The current state (read it again after any change). */
@@ -659,23 +659,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       // A loose block or column that grew may now cover something: move that out of its way.
       if (state.board.order.includes(id)) requestSettle([id], placedIds.delete(id));
     },
-    /**
-     * Swap in a board that came from elsewhere (the online copy). Not a change the user made here,
-     * so undo history starts over rather than undoing into the old board.
-     */
     workspace,
     replaceWorkspace,
     replaceBoards,
     /** The shared boards' details, as the screen shows them (not saved, not undone). */
     setShares(shares: Ui['shares'], sharesKnown: boolean) {
       set({ ...state, ui: uiWith({ shares, sharesKnown }) });
-    },
-    replaceBoard(board: Board) {
-      // The first board to arrive on an empty screen (e.g. the online copy) is brought into view.
-      if (!state.board.order.length && board.order.length) centreOnArrival = true;
-      outsideChanges++;
-      history = emptyHistory;
-      restore({ history, board }, false);
     },
     undo: () => stepOpen('undo'),
     redo: () => stepOpen('redo'),

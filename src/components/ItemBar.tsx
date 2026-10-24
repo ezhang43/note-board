@@ -17,7 +17,7 @@ function typingIn(): Typing | null {
 }
 
 /** How much of the bottom of the window the on-screen keyboard covers (0 with no keyboard up). */
-function keyboardCover() {
+export function keyboardCover() {
   const v = window.visualViewport;
   return v ? Math.max(0, Math.round(window.innerHeight - v.height - v.offsetTop)) : 0;
 }

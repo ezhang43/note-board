@@ -3171,6 +3171,18 @@ a.cal-open { align-self: flex-start; }
   border-radius: 14px 14px 0 0;
   padding-bottom: calc(14px + env(safe-area-inset-bottom));
 }
+/* The form for a new event or a change is an overlay like the card (job 211): a title row with the ×, then quick-add's few fields, or the full form. */
+.cal-form { width: 340px; gap: 8px; }
+.cal-card-head { display: flex; align-items: center; gap: 6px; margin-right: -6px; color: var(--ink-soft); }
+.cal-card-head .cal-detail-title { flex: 1; min-width: 0; margin: 4px 2px 0; color: var(--ink); }
+.cal-form:not(.more) .cal-field input { height: 38px; font-size: 15px; }
+.cal-times { align-items: center; color: var(--ink-soft); }
+.cal-times input { flex: 1; min-width: 0; }
+.app.phone .cal-form { width: auto; }
+/* Phone: 16px fields (the page doesn't zoom in when one is tapped) and 44px touch targets. */
+.app.phone .cal-form input:not([type='checkbox']) { height: 44px; font-size: 16px; }
+.app.phone .cal-form .tb-button { height: 44px; }
+.app.phone .cal-form .cal-check { min-height: 44px; }
 
 /* The side panels' drag strip (owner request, 2026-10-16 for the calendar, 2026-10-20 for all): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
@@ -3315,7 +3327,7 @@ a.cal-open { align-self: flex-start; }
   .tour-actions button { height: 44px; }
 
   /* Version history and the side panels. */
-  .history-head .icon-button, .cal-card-tools .icon-button { width: 44px; height: 44px; }
+  .history-head .icon-button, .cal-card-tools .icon-button, .cal-card-head .icon-button { width: 44px; height: 44px; }
   .pomodoro-actions .tb-button { height: 44px; }
 
   /* Search: the box takes what the buttons leave; the count takes no room until there is one. */

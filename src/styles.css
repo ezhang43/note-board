@@ -902,7 +902,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   --bh: calc(20px * var(--bs) + 8px);
   /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
   --bb: min(var(--bs), 1.9);
-  min-height: 30px;
+  /* The space under every row, so rows sit 2px further apart at Normal (owner request 2026-10-24), growing with the text step. It is part of the row, so a drop there still lands on this row; the tick box and the buttons are placed from the row's top and do not move. */
+  --row-gap: calc(2px * var(--fs, 1));
+  padding-bottom: var(--row-gap);
+  min-height: calc(30px + var(--row-gap));
   display: flex;
   align-items: flex-start;
   /* The gap from the tick box to the text grows with A+, by the item buttons' step. */

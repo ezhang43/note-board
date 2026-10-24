@@ -793,7 +793,7 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
 
 // Job #131 (owner requests 2026-10-21): full names in the Month view, a click on the picked day adds an event,
 // and a click on an event whose card is open edits it.
-test('the month grid shows each event’s full name, wrapped over as many lines as it needs', async ({ page }) => {
+test('the month grid cuts a long name at two lines with …; the full name is in the hover text and the day’s list', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   const now = new Date();
@@ -806,19 +806,57 @@ test('the month grid shows each event’s full name, wrapped over as many lines 
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
   const cell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
   const chip = cell.locator('.cal-chip').filter({ hasText: long });
-  const title = chip.locator('.cal-chip-title');
-  await expect(title).toHaveText(long);
-  // Not cut: the text fits inside its box, and the box is taller than one 16px line.
-  const fits = await title.evaluate((el) => ({ cut: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1, height: el.clientHeight, ellipsis: getComputedStyle(el).textOverflow }));
-  expect(fits.cut).toBe(false);
-  expect(fits.height).toBeGreaterThan(20);
-  expect(fits.ellipsis).not.toBe('ellipsis');
-  // The day's row grows to fit; the chip stays inside its cell.
+  // At most two 16px lines (job #207 replaces job #131's "never cut"), cut with … (line-clamp), the rest hidden.
+  await expect(chip).toHaveCSS('-webkit-line-clamp', '2');
+  expect((await chip.boundingBox())!.height).toBeLessThanOrEqual(34);
+  await expect(chip).toHaveAttribute('title', new RegExp(`${long}$`));
   const [cellBox, chipBox] = [(await cell.boundingBox())!, (await chip.boundingBox())!];
-  expect(cellBox.height).toBeGreaterThan(77);
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(cellBox.y + cellBox.height);
-  // The picked day's list under the grid shows the full name too (no two-line cut).
+  // The picked day's list under the grid shows the full name (no two-line cut).
   await expect(day(page, now).locator('.cal-title').filter({ hasText: long })).toHaveCSS('-webkit-line-clamp', 'none');
+  expect(errors).toEqual([]);
+});
+
+// Job #207 (owner complaint 2026-10-24): the name read as a thin ragged column beside the time, broken mid-word.
+// Now the time and the name are one run of text: the name continues after the time and wraps under it, at spaces,
+// and an event shows at most two lines, then …
+test('Month: a long name continues after the time, wraps under it in two lines at most, and no word is split', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const now = new Date();
+  const long = 'Product Marketing Manager, Business Accounts Interview with Airwallex';
+  await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
+  await page.keyboard.type(long);
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  expect((await panel(page).boundingBox())!.width).toBeCloseTo(720, 0);
+  const chip = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) }).locator('.cal-chip').filter({ hasText: long });
+  const m = await chip.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const time = el.querySelector('.cal-chip-time')!.getBoundingClientRect();
+    const text = el.querySelector('.cal-chip-title')!.firstChild as Text;
+    const words: { word: string; rects: { left: number; top: number; bottom: number }[] }[] = [];
+    for (const w of text.data.matchAll(/\S+/g)) {
+      const r = document.createRange();
+      r.setStart(text, w.index!);
+      r.setEnd(text, w.index! + w[0].length);
+      words.push({ word: w[0], rects: [...r.getClientRects()].map((q) => ({ left: q.left, top: q.top, bottom: q.bottom })) });
+    }
+    return { box: { top: box.top, bottom: box.bottom }, time: { left: time.left, top: time.top }, words };
+  });
+  // At most two lines (16px each), and the name is long enough to be cut.
+  expect(m.box.bottom - m.box.top).toBeLessThanOrEqual(34);
+  const visible = m.words.filter((w) => w.rects.length && w.rects[0].bottom <= m.box.bottom + 1);
+  expect(visible.length).toBeGreaterThanOrEqual(2);
+  expect(visible.length).toBeLessThan(m.words.length);
+  // No visible word is split across lines.
+  for (const w of visible) expect(new Set(w.rects.map((q) => Math.round(q.top))).size, `“${w.word}” on one line`).toBe(1);
+  // The name starts on the time's line and the second line starts under the time, not in a column beside it.
+  const tops = visible.map((w) => w.rects[0].top);
+  expect(Math.abs(tops[0] - m.time.top)).toBeLessThan(4);
+  const second = visible.filter((w) => w.rects[0].top > tops[0] + 8);
+  expect(second.length).toBeGreaterThan(0);
+  expect(Math.min(...second.map((w) => w.rects[0].left))).toBeLessThanOrEqual(m.time.left + 1);
   expect(errors).toEqual([]);
 });
 

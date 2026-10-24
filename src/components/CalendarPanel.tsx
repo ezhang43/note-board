@@ -279,8 +279,10 @@ function MonthGrid({
                       }}
                     >
                       {!e.allDay && <span className="cal-chip-dot" aria-hidden="true" />}
-                      {time && <span className="cal-chip-time">{time}</span>}
-                      <span className="cal-chip-title">{e.title}</span>
+                      <span>
+                        {time && <span className="cal-chip-time">{time}</span>}
+                        <span className="cal-chip-title">{e.title}</span>
+                      </span>
                     </button>
                   );
                 })}

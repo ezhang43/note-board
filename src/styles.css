@@ -3049,11 +3049,15 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .cal-cell.today .cal-date { font-weight: 600; color: var(--accent-ink); }
 .cal-chip {
-  display: flex;
-  align-items: flex-start;
-  gap: 3px;
+  position: relative;
+  display: -webkit-box; /* the one child, the line of text, is cut at two lines with … (owner pick 2026-10-24, job #207) */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   min-width: 0;
   padding: 0 3px;
+  overflow-wrap: break-word; /* words break only at spaces; one longer than the line still breaks, so nothing leaves the cell (job #207) */
   border: none;
   border-radius: 3px;
   background: transparent;
@@ -3072,10 +3076,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (hover: hover) {
   .cal-chip.all-day:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 }
-.cal-chip-dot { flex-shrink: 0; width: 5px; height: 5px; margin-top: 5px; border-radius: 50%; background: var(--accent); }
-.cal-chip-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-/* A name wraps onto as many lines as it needs, so the day's row grows (job #131). */
-.cal-chip-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cal-chip:not(.all-day) { padding-left: 11px; }
+.cal-chip-dot { position: absolute; left: 3px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+/* The time and the name are one run of text: the name follows the time and wraps under it, two lines at most (jobs #131, #207). */
+.cal-chip-time { margin-right: 3px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
 .cal-month.narrow .cal-chip-time, .cal-month.narrow .cal-chip-dot { display: none; }
 .cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
 .cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }

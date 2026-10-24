@@ -2983,6 +2983,11 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .cal-day.today h3 { color: var(--accent-ink); }
 .cal-today { margin-left: 4px; font-weight: 500; }
 .cal-add { margin-left: auto; width: 24px; height: 24px; color: var(--ink-soft); }
+/* Week list (job 210): the date and its + on the left, the events in a column to its right, the first level with the date and the rest below it; nothing sits under the date. */
+.cal-day.columns { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 6px; align-items: start; }
+.cal-day.columns h3 { grid-column: 1; grid-row: 1; height: 24px; }
+.cal-day.columns .cal-event { grid-column: 2; }
+.cal-day.columns.today h3 { font-weight: 700; }
 .cal-event {
   display: flex;
   align-items: baseline;
@@ -3044,11 +3049,15 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .cal-cell.today .cal-date { font-weight: 600; color: var(--accent-ink); }
 .cal-chip {
-  display: flex;
-  align-items: flex-start;
-  gap: 3px;
+  position: relative;
+  display: -webkit-box; /* the one child, the line of text, is cut at two lines with … (owner pick 2026-10-24, job #207) */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   min-width: 0;
   padding: 0 3px;
+  overflow-wrap: break-word; /* words break only at spaces; one longer than the line still breaks, so nothing leaves the cell (job #207) */
   border: none;
   border-radius: 3px;
   background: transparent;
@@ -3067,10 +3076,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (hover: hover) {
   .cal-chip.all-day:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 }
-.cal-chip-dot { flex-shrink: 0; width: 5px; height: 5px; margin-top: 5px; border-radius: 50%; background: var(--accent); }
-.cal-chip-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-/* A name wraps onto as many lines as it needs, so the day's row grows (job #131). */
-.cal-chip-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cal-chip:not(.all-day) { padding-left: 11px; }
+.cal-chip-dot { position: absolute; left: 3px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+/* The time and the name are one run of text: the name follows the time and wraps under it, two lines at most (jobs #131, #207). */
+.cal-chip-time { margin-right: 3px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
 .cal-month.narrow .cal-chip-time, .cal-month.narrow .cal-chip-dot { display: none; }
 .cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
 .cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }
@@ -3122,8 +3131,8 @@ a.cal-open { align-self: flex-start; }
 .cal-confirm .confirm-actions { flex-wrap: wrap; }
 /* A series' delete question (job #209): its two answers the same width, side by side, or one above
    the other at full width when the longer label doesn't fit in half. */
-/* simple: 11.5em is the width "All events in the series" needs (158px at 14px); a longer label needs a wider column. */
-.cal-confirm .confirm-actions.cal-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5em, 1fr)); }
+/* simple: 12.5em is the width "All events in the series" needs (158px at 14px), with room for a wider fallback font; a longer label needs a wider column. */
+.cal-confirm .confirm-actions.cal-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5em, 1fr)); }
 .cal-pair button { white-space: nowrap; }
 .cal-confirm .history-note { margin: 0; }
 .cal-fields { display: contents; }
@@ -3167,6 +3176,18 @@ a.cal-open { align-self: flex-start; }
   border-radius: 14px 14px 0 0;
   padding-bottom: calc(14px + env(safe-area-inset-bottom));
 }
+/* The form for a new event or a change is an overlay like the card (job 211): a title row with the ×, then quick-add's few fields, or the full form. */
+.cal-form { width: 340px; gap: 8px; }
+.cal-card-head { display: flex; align-items: center; gap: 6px; margin-right: -6px; color: var(--ink-soft); }
+.cal-card-head .cal-detail-title { flex: 1; min-width: 0; margin: 4px 2px 0; color: var(--ink); }
+.cal-form:not(.more) .cal-field input { height: 38px; font-size: 15px; }
+.cal-times { align-items: center; color: var(--ink-soft); }
+.cal-times input { flex: 1; min-width: 0; }
+.app.phone .cal-form { width: auto; }
+/* Phone: 16px fields (the page doesn't zoom in when one is tapped) and 44px touch targets. */
+.app.phone .cal-form input:not([type='checkbox']) { height: 44px; font-size: 16px; }
+.app.phone .cal-form .tb-button { height: 44px; }
+.app.phone .cal-form .cal-check { min-height: 44px; }
 
 /* The side panels' drag strip (owner request, 2026-10-16 for the calendar, 2026-10-20 for all): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
@@ -3311,7 +3332,7 @@ a.cal-open { align-self: flex-start; }
   .tour-actions button { height: 44px; }
 
   /* Version history and the side panels. */
-  .history-head .icon-button, .cal-card-tools .icon-button { width: 44px; height: 44px; }
+  .history-head .icon-button, .cal-card-tools .icon-button, .cal-card-head .icon-button { width: 44px; height: 44px; }
   .pomodoro-actions .tb-button { height: 44px; }
 
   /* Search: the box takes what the buttons leave; the count takes no room until there is one. */

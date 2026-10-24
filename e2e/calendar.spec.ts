@@ -137,23 +137,20 @@ test('a timed event can be made all-day, and back', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('delete asks first (Keep / Delete); Escape keeps the panel open; Ctrl+Z doesn’t bring it back', async ({ page }) => {
+// A one-off event is deleted at once, with no question (owner request, 2026-10-24, job #209).
+test('the form’s Delete deletes a one-off event at once, with no question; Ctrl+Z doesn’t bring it back', async ({ page }) => {
   const errors = await openAs(page);
+  const sent = changesSent(page);
   await button(page).click();
   const today = day(page, new Date());
   await edit(page, today.getByRole('button', { name: /Dentist/ }));
   await form(page).getByRole('button', { name: 'Delete' }).click();
-  const ask = panel(page).getByRole('alertdialog', { name: 'Delete “Dentist”?' });
-  await expect(ask).toBeVisible();
-  await expect(ask.getByRole('button', { name: 'Keep' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(ask).toHaveCount(0);
-  await expect(panel(page)).toBeVisible();
-  await ask.getByRole('button', { name: 'Keep' }).waitFor({ state: 'detached' });
-
-  await form(page).getByRole('button', { name: 'Delete' }).click();
-  await ask.getByRole('button', { name: 'Delete' }).click();
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('alertdialog')).toHaveCount(0);
+  await expect(form(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatch(/^DELETE /);
   // Calendar events aren't board data: undo doesn't touch them.
   await page.locator('.canvas').click({ position: { x: 300, y: 300 } });
   await page.keyboard.press('Control+z');
@@ -168,6 +165,19 @@ const WHICH = 'Save changes to which events?';
 const EMAILS = 'Send update emails to guests?';
 /** The changes sent to the calendar (adds, changes, deletes) as "METHOD url", in order. */
 const ONLY_THIS = 'Moving it to another day, or to or from all day, changes only this event.';
+
+/** The series' delete question (job #209): exactly "Only this event" (focused) and "All events in the series", the same width, labels on one line. */
+async function expectSeriesButtons(ask: Locator) {
+  const buttons = ask.getByRole('button');
+  await expect(buttons).toHaveText(['Only this event', 'All events in the series']);
+  await expect(ask.getByRole('button', { name: 'Only this event' })).toBeFocused();
+  const boxes = await buttons.evaluateAll((els) =>
+    els.map((b) => ({ width: b.getBoundingClientRect().width, height: b.getBoundingClientRect().height, overflow: b.scrollWidth > b.clientWidth })),
+  );
+  expect(Math.abs(boxes[0].width - boxes[1].width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(boxes[0].height - boxes[1].height)).toBeLessThanOrEqual(1);
+  for (const b of boxes) expect(b.overflow).toBe(false);
+}
 
 function changesSent(page: Page) {
   const urls: string[] = [];
@@ -229,11 +239,15 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await expect(form(page)).toBeVisible();
   await form(page).getByRole('button', { name: 'Cancel' }).click();
 
-  // Deleting: only this one, then the whole series.
+  // Deleting: two buttons of the same width, no Keep (job #209); Escape keeps the event; only this one, then the whole series.
   await edit(page, standUp(5));
   await form(page).getByRole('button', { name: 'Delete' }).click();
   const del = asked(page, 'Delete “Team stand-up”?');
-  await expect(del.getByRole('button', { name: 'Keep' })).toBeFocused();
+  await expectSeriesButtons(del);
+  await page.keyboard.press('Escape');
+  await expect(del).toHaveCount(0);
+  await expect(form(page)).toBeVisible();
+  await form(page).getByRole('button', { name: 'Delete' }).click();
   await del.getByRole('button', { name: 'Only this event' }).click();
   await expect(standUp(5)).toHaveCount(0);
   await expect(standUp(4)).toHaveCount(1);
@@ -362,9 +376,10 @@ test('guests can be added and removed; “Send update emails to guests?” is as
   await expect(form(page)).toBeVisible();
   expect(sent.length).toBe(before);
 
-  // Deleting an event with guests asks too.
+  // Deleting an event with guests asks only about the emails (job #209).
   await form(page).getByRole('button', { name: 'Delete' }).click();
-  await asked(page, 'Delete “Dentist visit”?').getByRole('button', { name: 'Delete' }).click();
+  await expect(asked(page, EMAILS)).toBeVisible();
+  await expect(panel(page).getByRole('alertdialog')).toHaveCount(1);
   await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
   expect(sent.at(-1)).toMatch(/^DELETE .*sendUpdates=none/);
@@ -418,39 +433,55 @@ test('an event opens a small card beside it: title, when, guests; ×, Escape and
   expect(errors).toEqual([]);
 });
 
-test('the card’s trash asks first, the same as the form’s Delete, with the guest-email question too', async ({ page }) => {
+test('the card’s trash deletes a one-off event at once; with guests it asks only the guest-email question; a series asks which', async ({ page }) => {
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
   const today = day(page, new Date());
   await today.getByRole('button', { name: /Dentist/ }).click();
   await card(page).getByRole('button', { name: 'Delete event' }).click();
-  const ask = asked(page, 'Delete “Dentist”?');
-  await expect(ask.getByRole('button', { name: 'Keep' })).toBeFocused();
-  // Escape on the question keeps the event and the card.
-  await page.keyboard.press('Escape');
-  await expect(ask).toHaveCount(0);
-  await expect(card(page)).toBeVisible();
-  expect(sent).toEqual([]);
-  await card(page).getByRole('button', { name: 'Delete event' }).click();
-  await ask.getByRole('button', { name: 'Delete' }).click();
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('alertdialog')).toHaveCount(0);
   await expect(card(page)).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
   // The event's button is gone, so the keyboard goes to the panel rather than being lost.
   await expect(panel(page)).toBeFocused();
   expect(sent.at(-1)).toMatch(/^DELETE /);
 
-  await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();
+  // With guests: only the email question; Escape keeps the event and the card.
+  const lunch = day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ });
+  await lunch.click();
   await card(page).getByRole('button', { name: 'Delete event' }).click();
-  await asked(page, 'Delete “Lunch with Sam”?').getByRole('button', { name: 'Delete' }).click();
+  await expect(asked(page, EMAILS)).toBeVisible();
+  await expect(panel(page).getByRole('alertdialog')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(asked(page, EMAILS)).toHaveCount(0);
+  await expect(card(page)).toBeVisible();
+  expect(sent).toHaveLength(1);
+  await card(page).getByRole('button', { name: 'Delete event' }).click();
   await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
-  await expect(day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ })).toHaveCount(0);
+  await expect(lunch).toHaveCount(0);
   expect(sent.at(-1)).toMatch(/^DELETE .*sendUpdates=none/);
+
+  // A series: the two answers, the same width, no Keep; Escape keeps it.
+  const standUp = today.getByRole('button', { name: /Team stand-up/ });
+  await standUp.click();
+  await card(page).getByRole('button', { name: 'Delete event' }).click();
+  const which = asked(page, 'Delete “Team stand-up”?');
+  await expectSeriesButtons(which);
+  await page.keyboard.press('Escape');
+  await expect(which).toHaveCount(0);
+  await expect(card(page)).toBeVisible();
+  await expect(standUp).toBeVisible();
+  expect(sent).toHaveLength(2);
+  await card(page).getByRole('button', { name: 'Delete event' }).click();
+  await which.getByRole('button', { name: 'Only this event' }).click();
+  await expect(standUp).toHaveCount(0);
+  await expect(day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('Delete or Backspace with the card open asks to delete the event, never the selected board note behind it', async ({ page }) => {
+test('Delete or Backspace with the card open deletes a one-off event at once, never the selected board note behind it', async ({ page }) => {
   const errors = await openAs(page);
   const sent = changesSent(page);
   await add(page, 'Note');
@@ -461,17 +492,12 @@ test('Delete or Backspace with the card open asks to delete the event, never the
   const dentist = today.getByRole('button', { name: /Dentist/ });
 
   await dentist.click();
-  await page.keyboard.press('Delete');
-  const ask = asked(page, 'Delete “Dentist”?');
-  await expect(ask).toBeVisible();
-  await expect(cards(page)).toHaveCount(1);
-  await page.keyboard.press('Escape');
-  await expect(ask).toHaveCount(0);
   await page.keyboard.press('Backspace');
-  await ask.getByRole('button', { name: 'Delete' }).click();
   await expect(dentist).toHaveCount(0);
+  await expect(panel(page).getByRole('alertdialog')).toHaveCount(0);
   await expect(cards(page)).toHaveCount(1);
-  expect(sent.at(-1)).toMatch(/^DELETE /);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatch(/^DELETE /);
 
   // On a read-only event the key does nothing, to the event or the board.
   const count = sent.length;
@@ -492,47 +518,41 @@ test('Delete or Backspace with the card open asks to delete the event, never the
   expect(errors).toEqual([]);
 });
 
-// Pressing Delete again answers the question (owner request, 2026-10-21, job #132).
-test('a second fresh Delete or Backspace answers the delete question: Delete, or All events for a series; never the guest-email question', async ({ page }) => {
+// Pressing Delete again answers the question (owner request, 2026-10-21, job #132); a one-off goes at once (job #209).
+test('only a fresh Delete or Backspace deletes; a held key never deletes the board note behind; a second press answers a series with All events, never the guest-email question', async ({ page }) => {
   const errors = await openAs(page);
   const sent = changesSent(page);
   await add(page, 'Note');
   await page.keyboard.press('Escape');
+  await expect(page.locator('.card.selected')).toHaveCount(1);
   await button(page).click();
   const today = day(page, new Date());
   const dentist = today.getByRole('button', { name: /Dentist/ });
-  const ask = asked(page, 'Delete “Dentist”?');
 
-  // Escape still keeps it.
+  // An auto-repeated key (held down from before) never deletes it.
   await dentist.click();
-  await page.keyboard.press('Delete');
-  await expect(ask).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(ask).toHaveCount(0);
+  await page.evaluate(() => {
+    for (const key of ['Delete', 'Backspace']) (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key, repeat: true, bubbles: true, cancelable: true }));
+  });
   await expect(card(page)).toBeVisible();
+  await expect(dentist).toBeVisible();
+  await expect(cards(page)).toHaveCount(1);
   expect(sent).toEqual([]);
 
-  // Holding the key down: its auto-repeat never answers the question.
+  // A fresh press deletes it; holding the key down after that doesn't go on to the board note behind.
   await page.keyboard.down('Delete');
-  await expect(ask).toBeVisible();
+  await expect(dentist).toHaveCount(0);
+  await expect(card(page)).toHaveCount(0);
   await page.keyboard.down('Delete');
   await page.keyboard.down('Delete');
   await page.keyboard.up('Delete');
-  await expect(ask).toBeVisible();
-  expect(sent).toEqual([]);
-
-  // A one-off event: a fresh press after letting go deletes it.
-  await page.keyboard.press('Delete');
-  await expect(dentist).toHaveCount(0);
-  await expect(card(page)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(1);
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatch(/^DELETE /);
 
-  // An event with guests: the second press answers "Delete?", but the guest-email question needs a click or Enter.
+  // An event with guests: only the guest-email question, which the key never answers.
   const lunch = day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ });
   await lunch.click();
-  await page.keyboard.press('Backspace');
   await page.keyboard.press('Backspace');
   const emails = asked(page, EMAILS);
   await expect(emails).toBeVisible();
@@ -545,10 +565,14 @@ test('a second fresh Delete or Backspace answers the delete question: Delete, or
   await expect(lunch).toBeVisible();
   expect(sent).toHaveLength(1);
 
-  // A repeating event: Backspace, then Backspace again, deletes the whole series.
+  // A repeating event: Backspace asks which; held, it doesn't answer; Backspace again deletes the whole series.
   await today.getByRole('button', { name: /Team stand-up/ }).click();
-  await page.keyboard.press('Backspace');
+  await page.keyboard.down('Backspace');
   await expect(asked(page, 'Delete “Team stand-up”?')).toBeVisible();
+  await page.keyboard.down('Backspace');
+  await page.keyboard.up('Backspace');
+  await expect(asked(page, 'Delete “Team stand-up”?')).toBeVisible();
+  expect(sent).toHaveLength(1);
   await page.keyboard.press('Backspace');
   await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
   await panel(page).getByRole('button', { name: 'Next week' }).click();
@@ -571,9 +595,8 @@ test('while a delete is on its way the card stays open, so a refusal is shown; c
   );
   const dentist = day(page, new Date()).getByRole('button', { name: /Dentist/ });
   await dentist.click();
-  await page.keyboard.press('Delete');
   const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
-  await asked(page, 'Delete “Dentist”?').getByRole('button', { name: 'Delete' }).click();
+  await page.keyboard.press('Delete');
   await deleting;
   // A click outside and Escape wait for Google's answer.
   await page.locator('.canvas').click({ position: { x: 200, y: 300 } });
@@ -604,9 +627,8 @@ test('while a delete is on its way, clicking another event waits, so Google’s 
       : route.continue(),
   );
   await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
-  await page.keyboard.press('Delete');
   const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
-  await asked(page, 'Delete “Dentist”?').getByRole('button', { name: 'Delete' }).click();
+  await page.keyboard.press('Delete');
   await deleting;
   await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();
   await panel(page).getByRole('button', { name: 'Next week' }).click();

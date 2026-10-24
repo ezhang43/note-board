@@ -2983,6 +2983,11 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .cal-day.today h3 { color: var(--accent-ink); }
 .cal-today { margin-left: 4px; font-weight: 500; }
 .cal-add { margin-left: auto; width: 24px; height: 24px; color: var(--ink-soft); }
+/* Week list (job 210): the date and its + on the left, the events in a column to its right, the first level with the date and the rest below it; nothing sits under the date. */
+.cal-day.columns { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 6px; align-items: start; }
+.cal-day.columns h3 { grid-column: 1; grid-row: 1; height: 24px; }
+.cal-day.columns .cal-event { grid-column: 2; }
+.cal-day.columns.today h3 { font-weight: 700; }
 .cal-event {
   display: flex;
   align-items: baseline;

@@ -90,7 +90,9 @@ export function CalendarPanel() {
     else if (event.editable) edit(event);
   };
   const add = (day: DayKey) => setEditing({ event: null, draft: newDraft(day) });
-  const dayList = (day: DayKey) => <DayEvents key={day} day={day} today={day === today} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={() => add(day)} />;
+  const dayList = (day: DayKey, columns = false) => (
+    <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={() => add(day)} />
+  );
 
   return (
     <div className="cal">
@@ -133,7 +135,7 @@ export function CalendarPanel() {
 
       {s.events !== null &&
         (s.view === 'week' ? (
-          weekDays(s.day).map(dayList)
+          weekDays(s.day).map((d) => dayList(d, true))
         ) : (
           <>
             <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onAdd={add} />
@@ -156,6 +158,7 @@ export function CalendarPanel() {
 function DayEvents({
   day,
   today,
+  columns,
   events,
   reveal,
   onPick,
@@ -163,6 +166,8 @@ function DayEvents({
 }: {
   day: DayKey;
   today: boolean;
+  /** The Week list: the date on the left, the events in a column to its right (owner request 2026-10-24, job 210). */
+  columns: boolean;
   events: CalEvent[];
   reveal: RefObject<boolean>;
   onPick: (e: CalEvent, opener: HTMLElement) => void;
@@ -178,10 +183,11 @@ function DayEvents({
     section.current?.scrollIntoView({ block: 'nearest' });
   });
   return (
-    <section ref={section} className={`cal-day${today ? ' today' : ''}`} aria-label={label}>
+    <section ref={section} className={`cal-day${today ? ' today' : ''}${columns ? ' columns' : ''}`} aria-label={label} aria-current={today && columns ? 'date' : undefined}>
       <h3>
-        {label}
-        {today && <span className="cal-today">· Today</span>}
+        {/* The column is narrow: "Thu 15", the month is in the range above (a section's own name keeps "Thu 15 Oct"). */}
+        {columns ? label.slice(0, label.lastIndexOf(' ')) : label}
+        {today && !columns && <span className="cal-today">· Today</span>}
         <button type="button" className="icon-button cal-add" aria-label={`Add event on ${label}`} title="Add an event" onClick={onAdd}>
           <PlusIcon />
         </button>

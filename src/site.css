@@ -188,7 +188,7 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 .compare-section,
 .band { max-width: calc(var(--wide) + 2 * var(--gutter)); padding-top: clamp(64px, 9vw, 112px); }
 
-/* Try it: the three highlights as a to-do list. Ticked rows move under "Completed" (CSS only: flex order). */
+/* Try it: the three highlights as a to-do list. Ticked rows stay in place, struck through and faded, as in the app. */
 .highlights { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--hair); }
 .highlights li {
   display: grid;
@@ -215,17 +215,8 @@ h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; margin: 0 0 20px; }
 .highlights h3 { grid-column: 2; margin: 0; font-size: 20px; font-weight: 600; }
 .highlights label { cursor: pointer; }
 .highlights p { grid-column: 2; margin: 0; color: var(--ink2); font-size: 16px; }
-.highlights li:has(input:checked) { order: 2; }
-.highlights li:has(input:checked) h3 { text-decoration: line-through 2px; color: var(--ink2); }
-.highlights:has(input:checked)::before {
-  content: 'Completed' / ''; /* on screen only: each checkbox already says ticked or not */
-  order: 1;
-  padding: 28px 0 6px;
-  border-top: 1px solid var(--hair);
-  color: var(--ink2);
-  font-size: 14px;
-  font-weight: 600;
-}
+.highlights li:has(input:checked) h3 { text-decoration: line-through 2px; color: var(--ink2); opacity: 0.7; }
+.highlights li:has(input:checked) p { opacity: 0.7; }
 
 /* How it works: the delete-account step badges again, three across on a computer */
 .band .steps { margin: 0; }

@@ -157,11 +157,11 @@ test('"Try it: tick one off" folds as a whole section: starts open, folds and un
   await fold.locator('summary').focus();
   await page.keyboard.press('Enter');
   await expect(fold).toHaveAttribute('open', '');
-  // Ticking inside it still strikes the item through and moves it under Completed.
+  // Ticking inside it still strikes the item through, and it stays where it was.
   const safe = page.getByRole('checkbox', { name: 'Your boards are safe' });
   const phone = page.getByRole('checkbox', { name: 'Works well on a phone' });
   await safe.check();
-  expect((await safe.boundingBox())!.y).toBeGreaterThan((await phone.boundingBox())!.y);
+  expect((await safe.boundingBox())!.y).toBeLessThan((await phone.boundingBox())!.y);
   // Printing shows it open even when it is folded.
   await fold.locator('summary').click();
   await expect(list).toBeHidden();
@@ -262,7 +262,7 @@ test('the demo video is big, under the start button, framed so it stands out in 
   }
 });
 
-test('the four points are a small to-do list you can really tick: ticked ones move under Completed', async ({ page }) => {
+test('the four points are a small to-do list you can really tick: ticked ones stay in place, struck through and faded', async ({ page }) => {
   await page.goto('/about/');
   await expect(page.getByRole('heading', { level: 2, name: 'Try it: tick one off' })).toBeVisible();
   const box = (name: string) => page.getByRole('checkbox', { name });
@@ -273,13 +273,19 @@ test('the four points are a small to-do list you can really tick: ticked ones mo
   await expect(safe).not.toBeChecked();
   await expect(ai).not.toBeChecked();
   const y = async (l: ReturnType<Page['locator']>) => (await l.boundingBox())!.y;
-  expect(await y(safe)).toBeLessThan(await y(free));
+  // Ticked items stay where they are: the ticked one is still first, and there is no "Completed" heading.
+  expect(await y(free)).toBeLessThan(await y(safe));
+  await expect(page.locator('ul.highlights')).not.toContainText('Completed');
+  expect(await page.locator('ul.highlights').evaluate((el) => getComputedStyle(el, '::before').content)).toMatch(/^(none|normal)$/);
+  const gapBefore = (await y(ai)) - (await y(safe)); // measured between rows, since the page may scroll
   await safe.check();
   await expect(safe).toBeChecked();
-  // Ticked: it moves below the ones still to do, and its title is struck through.
-  expect(await y(safe)).toBeGreaterThan(await y(ai));
+  // Ticked: it stays in place, its title is struck through and faded, and the open ones keep their order.
+  expect((await y(ai)) - (await y(safe))).toBe(gapBefore);
+  expect(await y(safe)).toBeLessThan(await y(ai));
   const title = page.locator('ul.highlights h3').nth(1);
   expect(await title.evaluate((el) => getComputedStyle(el).textDecorationLine)).toContain('line-through');
+  expect(Number(await page.locator('ul.highlights li').nth(1).evaluate((el) => getComputedStyle(el.querySelector('h3')!).opacity))).toBeLessThan(1);
   // The keyboard works too.
   await free.focus();
   await page.keyboard.press('Space');
@@ -624,6 +630,9 @@ test('the demo video is silent, loops, plays by itself and has the board picture
   await expect(video).toHaveAttribute('width', '960');
   await expect(video).toHaveAttribute('height', '600');
   await expect(video).toHaveAttribute('poster', /board.*\.webp/);
+  // The clip shows a ticked item staying in place (the app's behavior since job 200), so the description must not say it moves.
+  await expect(video).toHaveAttribute('aria-label', /ticking an item that stays in place, struck through/);
+  expect((await video.getAttribute('aria-label'))!).not.toMatch(/Completed/);
   expect(await video.evaluate((v: HTMLVideoElement) => v.muted && v.loop)).toBe(true);
   expect(await video.evaluate((v: HTMLVideoElement) => v.poster)).toMatch(/board.*\.webp$/);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);

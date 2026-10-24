@@ -1,0 +1,4 @@
+- 2026-10-24 (call, recommended) The About demo keeps its length (about 14.5 s, under the 15 s the tests allow) and size (each clip under 200 KB): the new Clean up step is paid for with slightly shorter pauses elsewhere. Why: the website tests cap clips at 300 KB and 10-15 s.
+- 2026-10-24 (call, recommended) The demo's lists are 300 wide instead of 240, and no item starts ticked in the Packing list. Why: Clean up in the title row cut the list titles short at the old width ("To bo", "Packi"), and Packing needs an untouched list so the clip shows Clean up appearing on the tick.
+- 2026-10-24 (call, recommended) "Try it: tick one off" ticks in place too, with its text at 70% (not the app's 55%). Why: it is a web page, where gray text at 55% would be too faint to read.
+- 2026-10-24 `node scripts/about-demo.mjs` now also retakes the two poster pictures (double density, 1920x1200, lossless WebP), so the pictures and the clip can't drift apart.

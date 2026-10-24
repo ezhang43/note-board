@@ -1081,6 +1081,50 @@ test('in the Week view an event’s name wraps onto a second line instead of bei
   expect(errors).toEqual([]);
 });
 
+/** Week view (owner request 2026-10-24, job 210): the date on the left, its events in a column to its right. */
+async function expectDateThenEvents(page: Page) {
+  const section = day(page, new Date());
+  const date = section.getByRole('heading').first();
+  const events = section.locator('.cal-event');
+  expect(await events.count()).toBeGreaterThanOrEqual(2); // Dentist and the stand-up
+  const d = (await date.boundingBox())!;
+  const first = (await events.first().boundingBox())!;
+  // The first event is level with the date, and each event starts to the right of it.
+  expect(Math.abs(first.y - d.y)).toBeLessThanOrEqual(3);
+  const panelBox = (await panel(page).boundingBox())!;
+  for (const box of await events.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()))) {
+    expect(box.x).toBeGreaterThanOrEqual(d.x + d.width);
+    expect(box.x + box.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+  }
+  // The rest cascade downwards, one under the other.
+  const second = (await events.nth(1).boundingBox())!;
+  expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+  // Nothing in the day sits under the date: everything but the date's own row starts to its right.
+  const others = await section.locator(':scope > :not(h3)').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
+  for (const box of others) expect(box.x).toBeGreaterThanOrEqual(d.x + d.width);
+  // The + is in the date's row, and nothing makes the panel scroll sideways.
+  const add = (await section.getByRole('button', { name: /^Add event on/ }).boundingBox())!;
+  expect(add.y + add.height).toBeLessThanOrEqual(d.y + d.height + 1);
+  expect(await panel(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+}
+
+test('in the Week view each day is a date on the left with its events in a column to its right', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await expect(day(page, new Date()).locator('.cal-event')).toHaveCount(2);
+  await expectDateThenEvents(page);
+  expect(errors).toEqual([]);
+});
+
+test('the date column also fits the panel at its narrowest (300px)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('note-board:calendar-width', '{"week":300,"month":720}'));
+  const errors = await openAs(page);
+  await button(page).click();
+  await expect.poll(() => width(page)).toBe(300);
+  await expectDateThenEvents(page);
+  expect(errors).toEqual([]);
+});
+
 test('when Google Calendar can’t be reached, one plain note shows and nothing breaks', async ({ page }) => {
   const errors = await openAs(page);
   await page.route('**/__calendar/**', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403,"message":"accessNotConfigured"}}' }));
@@ -1260,6 +1304,14 @@ test.describe('on a phone-sized screen', () => {
     await expect(panel(page)).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
     await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  });
+
+  test('the week list is a date column with the events to its right', async ({ page }) => {
+    await openAs(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
+    await expect(day(page, new Date()).locator('.cal-event')).toHaveCount(2);
+    await expectDateThenEvents(page);
   });
 
   test('an event opens its card as a sheet from the bottom', async ({ page }) => {

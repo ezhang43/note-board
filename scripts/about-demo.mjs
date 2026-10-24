@@ -2,10 +2,13 @@
 //
 //   node scripts/about-demo.mjs          (needs ffmpeg on the PATH)
 //
+// It also retakes the two poster pictures (about/board.webp, board-dark.webp): the board at rest, shot at double
+// density and resized to 1920x1200, lossless WebP.
+//
 // It starts the app itself (vite, on this folder's test port), fills it with the small "Weekend in Lisbon" demo board
 // (made up, no personal data), skips the welcome tour, and records a silent clip in a real browser: tick
-// an item so it moves to Completed, fold a container and open it again, drag a card out with snapping on,
-// type a new item. The recorder draws a small arrow so the pointer shows. The same steps run in light and
+// an item (it stays in place, struck through and faded) and clean it up, fold a container and open it again,
+// drag a card out with snapping on, type a new item. The recorder draws a small arrow so the pointer shows. The same steps run in light and
 // in dark, then ffmpeg cuts and shrinks each recording to 960x600 and writes a WebM and an MP4.
 // Not part of `npm test` or `npm run test:e2e`. Retake it when the app's look changes much.
 // If the installed Chromium is a different version from Playwright's, set PW_CHROMIUM=/path/to/chromium.
@@ -26,7 +29,7 @@ const work = mkdtempSync(join(tmpdir(), 'about-demo-'));
 const item = (id, text, done = false, children = []) => ({ id, text, done, children });
 const todo = (title, items) => ({ kind: 'todo', color: 'butter', title, items, completedOpen: true, collapsed: false, x: 0, y: 0, w: null, h: null });
 const note = (text) => ({ kind: 'note', color: 'butter', text, collapsed: false, x: 0, y: 0, w: null, h: null });
-const col = (id, title, x, color, cardIds) => ({ id, title, x, y: 0, w: 240, h: null, color, collapsed: false, cardIds });
+const col = (id, title, x, color, cardIds) => ({ id, title, x, y: 0, w: 300, h: null, color, collapsed: false, cardIds });
 
 const board = {
   name: 'Weekend in Lisbon',
@@ -38,7 +41,7 @@ const board = {
       item('b3', 'Renew passport', true),
       item('b4', 'Buy travel adapter', true),
     ]),
-    pack: todo('Packing', [item('p1', 'Walking shoes'), item('p2', 'Sunscreen'), item('p3', 'Light jacket'), item('p4', 'Camera charger', true)]),
+    pack: todo('Packing', [item('p1', 'Walking shoes'), item('p2', 'Sunscreen'), item('p3', 'Light jacket'), item('p4', 'Camera charger')]),
     eat: todo('Places to eat', [item('e1', 'Pastéis de nata in Belém'), item('e2', 'Time Out Market'), item('e3', 'Seafood in Cais do Sodré'), item('e4', 'Sunset drinks at the Miradouro', true)]),
     tram: note('Take tram 28 early, before the crowds.'),
     trip: todo('Day trip', [item('t1', 'Sintra palaces'), item('t2', 'Cascais beach'), item('t3', 'Train back by 6', true)]),
@@ -47,13 +50,13 @@ const board = {
   },
   columns: {
     c1: col('c1', 'Before we go', 0, 'periwinkle', ['book', 'pack']),
-    c2: col('c2', 'Saturday', 270, 'sunflower', ['eat', 'tram']),
-    c3: col('c3', 'Sunday', 540, 'mint', ['trip']),
-    c4: col('c4', 'Ideas', 810, 'peach', ['maybe', 'host']),
+    c2: col('c2', 'Saturday', 330, 'sunflower', ['eat', 'tram']),
+    c3: col('c3', 'Sunday', 660, 'mint', ['trip']),
+    c4: col('c4', 'Ideas', 990, 'peach', ['maybe', 'host']),
   },
   order: ['c1', 'c2', 'c3', 'c4'],
 };
-const view = { panX: 270, panY: 70, zoom: 0.86 };
+const view = { panX: 130, panY: 70, zoom: 0.86 };
 
 // --- the pointer the recording draws (a recording shows no mouse) ---
 // It glides by a CSS transition, so the browser does the animating even on a busy computer; real mouse
@@ -81,12 +84,12 @@ const base = `http://localhost:${PORT}/`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const ease = (t) => t * t * (3 - 2 * t);
 
-async function record(theme) {
+async function record(theme, poster = false) {
   const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     colorScheme: theme,
-    recordVideo: { dir: join(work, theme), size: { width: 960, height: 600 } },
+    ...(poster ? { deviceScaleFactor: 2 } : { recordVideo: { dir: join(work, theme), size: { width: 960, height: 600 } } }),
   });
   await context.addInitScript(
     ({ board, view, theme }) => {
@@ -103,6 +106,12 @@ async function record(theme) {
   await page.goto(base);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await wait(600);
+  if (poster) {
+    const file = join(work, `poster-${theme}.png`);
+    await page.screenshot({ path: file });
+    await browser.close();
+    return { file };
+  }
   const start = (Date.now() - pageCreated) / 1000; // where the clip begins in the recording
 
   let at = { x: 1000, y: 760 };
@@ -135,12 +144,19 @@ async function record(theme) {
 
   await wait(600);
 
-  // 1. Tick an item: it moves down to Completed.
+  // 1. Tick an item: it stays where it is, struck through and faded, and Clean up appears in the list's title row.
+  //    Then Clean up sends it to the Completed panel.
   await glide(await centre(item('p3').getByRole('checkbox')));
   await wait(250);
   await page.mouse.down();
   await page.mouse.up();
-  await wait(1200);
+  await wait(1100);
+  const cleanUp = page.locator('[data-card-id="pack"]').getByRole('button', { name: 'Clean up' });
+  await glide(await centre(cleanUp), 600);
+  await wait(200);
+  await page.mouse.down();
+  await page.mouse.up();
+  await wait(900);
 
   // 2. Fold a container, then open it again.
   const folding = page.locator('[data-col-id="c1"]');
@@ -151,10 +167,10 @@ async function record(theme) {
   await glide(await centre(toggle), 450);
   await page.mouse.down();
   await page.mouse.up();
-  await wait(1100);
+  await wait(900);
   await page.mouse.down();
   await page.mouse.up();
-  await wait(1000);
+  await wait(800);
 
   // 3. Drag a card out of its container onto the open board; it snaps to the grid.
   const card = page.locator('[data-card-id="host"]');
@@ -164,10 +180,10 @@ async function record(theme) {
   await page.mouse.down();
   await wait(150);
   const target = { x: (await page.locator('[data-col-id="c3"]').boundingBox()).x + 52, y: 560 };
-  await drag(target, 1100);
-  await wait(500);
+  await drag(target, 1000);
+  await wait(400);
   await page.mouse.up();
-  await wait(900);
+  await wait(700);
 
   // 4. Type a new item.
   const sunscreen = item('p2').locator('textarea');
@@ -177,8 +193,8 @@ async function record(theme) {
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await wait(300);
-  await page.keyboard.type('Rain poncho', { delay: 85 });
-  await wait(1200);
+  await page.keyboard.type('Rain poncho', { delay: 80 });
+  await wait(1000);
 
   const length = (Date.now() - pageCreated) / 1000 - start;
   await context.close(); // finishes the recording file
@@ -197,8 +213,12 @@ try {
   }
   mkdirSync(out, { recursive: true });
   for (const theme of process.env.DEMO_ONLY ? [process.env.DEMO_ONLY] : ['light', 'dark']) {
-    const { file, start, length } = await record(theme);
     const name = theme === 'dark' ? 'demo-dark' : 'demo';
+    const shot = await record(theme, true);
+    const picture = theme === 'dark' ? 'board-dark' : 'board';
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', shot.file, '-vf', 'scale=1920:1200:flags=lanczos', '-lossless', '1', '-q:v', '100', `${out}${picture}.webp`]);
+    console.log(`saved about/${picture}.webp`, Math.round(statSync(`${out}${picture}.webp`).size / 1024), 'KB');
+    const { file, start, length } = await record(theme);
     console.log(`${theme}: clip starts at ${start.toFixed(2)} s and runs ${length.toFixed(1)} s`);
     const input = ['-y', '-loglevel', 'error', '-ss', start.toFixed(2), '-t', length.toFixed(2), '-i', file, '-an', '-vf', 'scale=960:600:flags=lanczos,fps=24'];
     execFileSync('ffmpeg', [...input, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '34', '-deadline', 'good', '-cpu-used', '2', '-row-mt', '1', '-pix_fmt', 'yuv420p', `${out}${name}.webm`]);

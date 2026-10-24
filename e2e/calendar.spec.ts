@@ -674,6 +674,8 @@ test('a guest still typed in when Save is clicked is added, or stops the save if
   const today = new Date();
   await day(page, today).getByRole('button', { name: `Add event on ${label(today)}` }).click();
   await page.keyboard.type('Coffee');
+  // Guests are in the full form, behind "More options".
+  await form(page).getByRole('button', { name: 'More options' }).click();
   await form(page).getByLabel('Guest email').fill('kim@');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(form(page).getByText('That doesn’t look like an email address.')).toBeVisible();
@@ -875,15 +877,20 @@ test('Month: a click on the day that is already picked opens the new-event form 
   const box = (await cell(other).boundingBox())!;
   await cell(other).click({ position: { x: box.width - 4, y: box.height - 4 } });
   await expect(form(page)).toBeVisible();
+  // An overlay beside the panel: the month grid is still in view under it.
+  await expect(panel(page).getByRole('grid')).toBeVisible();
   await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
   await expect(form(page).getByLabel('Start time')).toHaveValue('09:00');
   await expect(form(page).getByLabel('End time')).toHaveValue('10:00');
-  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // Escape closes it and the keyboard goes back to the cell's date button (the cell itself can't take focus).
+  await page.keyboard.press('Escape');
+  await expect(form(page)).toHaveCount(0);
+  await expect(cell(other).locator('.cal-date')).toBeFocused();
   // The picked day's date button (the keyboard's way in) does the same; an event's chip does not.
   await cell(other).locator('.cal-date').press('Enter');
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
-  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  await form(page).getByRole('button', { name: 'Close' }).click();
   await cell(now).locator('.cal-date').click();
   await expect(form(page)).toHaveCount(0);
   await cell(now).getByRole('button', { name: /Dentist/ }).click();
@@ -1326,5 +1333,172 @@ test.describe('on a phone-sized screen', () => {
     expect(Math.round(box.y + box.height)).toBe(800);
     await card(page).getByRole('button', { name: 'Edit event' }).tap();
     await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  });
+});
+
+// The add / change form is an overlay like the event card, not a screen that replaces the list
+// (owner request, 2026-10-24, job 211): adding opens a small quick-add, "More options" the full form.
+const plus = (page: Page, d: Date) => day(page, d).getByRole('button', { name: `Add event on ${label(d)}` });
+const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(1);
+
+test('+ opens a quick-add beside the panel, with the Week list still in view', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  const dentist = day(page, today).getByRole('button', { name: '10 – 11am Dentist' });
+  await plus(page, today).click();
+  await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
+  await expect(form(page).getByLabel('Title')).toBeFocused();
+  // Just left of the panel, 8px from it, its top level with the + it came from.
+  const [overlay, side, from] = await Promise.all([form(page).boundingBox(), panel(page).boundingBox(), plus(page, today).boundingBox()]);
+  near(overlay!.x + overlay!.width, side!.x - 8);
+  near(overlay!.y, from!.y);
+  // The list is not replaced: the day's events and the panel's own buttons are still there.
+  await expect(dentist).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: 'Today' })).toBeVisible();
+  // Quick: title, date, 9:00 - 10:00, All day, Save and More options; nothing else yet.
+  await expect(form(page).getByLabel('Start date')).toHaveValue(key(today));
+  await expect(form(page).getByLabel('Start time')).toHaveValue('09:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('10:00');
+  await expect(form(page).getByLabel('All day')).not.toBeChecked();
+  await expect(form(page).getByRole('button', { name: 'Save' })).toBeVisible();
+  await expect(form(page).getByRole('button', { name: 'More options' })).toBeVisible();
+  await expect(form(page).getByLabel('Guest email')).toHaveCount(0);
+  await expect(form(page).getByLabel('End date')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('quick-add: a title and Enter saves it, the list shows it and the overlay is gone', async ({ page }) => {
+  const errors = await openAs(page);
+  const sent = changesSent(page);
+  await button(page).click();
+  const today = new Date();
+  await plus(page, today).click();
+  await page.keyboard.type('Swim');
+  await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(form(page)).toHaveCount(0);
+  await expect(day(page, today).getByRole('button', { name: '9 – 10am Swim' })).toBeVisible();
+  expect(sent).toHaveLength(1);
+  // All day, without times, from the quick-add too.
+  await plus(page, today).click();
+  await form(page).getByLabel('All day').check();
+  await expect(form(page).getByLabel('Start time')).toHaveCount(0);
+  await form(page).getByLabel('Title').fill('Birthday');
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await expect(day(page, today).getByRole('button', { name: 'All day Birthday' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('More options opens the full form in the same overlay, keeping what was typed', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  await plus(page, today).click();
+  await page.keyboard.type('Planning');
+  await form(page).getByLabel('End time').fill('11:30');
+  const before = (await form(page).boundingBox())!;
+  await form(page).getByRole('button', { name: 'More options' }).click();
+  await expect(form(page).getByLabel('Guest email')).toBeVisible();
+  await expect(form(page).getByLabel('End date')).toHaveValue(key(today));
+  await expect(form(page).getByRole('button', { name: 'More options' })).toHaveCount(0);
+  await expect(form(page).getByLabel('Title')).toHaveValue('Planning');
+  await expect(form(page).getByLabel('End time')).toHaveValue('11:30');
+  await expect(form(page).getByLabel('Title')).toBeFocused();
+  // Same overlay: still just left of the panel, and the list is still there.
+  const [after, side] = await Promise.all([form(page).boundingBox(), panel(page).boundingBox()]);
+  near(after!.x + after!.width, side!.x - 8);
+  expect(after!.x).toBeLessThanOrEqual(before.x + 1);
+  await expect(day(page, today).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  // It still saves, with its guest.
+  await form(page).getByLabel('Guest email').fill('kim@example.com');
+  await form(page).getByRole('button', { name: 'Add guest' }).click();
+  await form(page).getByRole('button', { name: 'Save' }).click();
+  await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
+  await expect(form(page)).toHaveCount(0);
+  await expect(day(page, today).getByRole('button', { name: '9 – 11:30am Planning' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the pencil opens the full form in the overlay, level with the event, the list still in view', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  const dentist = day(page, today).getByRole('button', { name: '10 – 11am Dentist' });
+  await dentist.click();
+  await card(page).getByRole('button', { name: 'Edit event' }).click();
+  await expect(card(page)).toHaveCount(0);
+  await expect(form(page).getByRole('heading', { name: 'Change event' })).toBeVisible();
+  await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+  await expect(form(page).getByLabel('Guest email')).toBeVisible();
+  await expect(form(page).getByRole('button', { name: 'Delete' })).toBeVisible();
+  await expect(form(page).getByRole('button', { name: 'More options' })).toHaveCount(0);
+  const [overlay, side, from] = await Promise.all([form(page).boundingBox(), panel(page).boundingBox(), dentist.boundingBox()]);
+  near(overlay!.x + overlay!.width, side!.x - 8);
+  near(overlay!.y, Math.min(from!.y, 900 - overlay!.height - 8));
+  await expect(dentist).toBeVisible();
+  // Clicking the event again goes back to its card.
+  await dentist.click();
+  await expect(form(page)).toHaveCount(0);
+  await expect(card(page)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('Escape, the × and a click outside close the overlay without saving', async ({ page }) => {
+  const errors = await openAs(page);
+  const sent = changesSent(page);
+  await button(page).click();
+  const today = new Date();
+  const plusToday = plus(page, today);
+  await plusToday.click();
+  await page.keyboard.type('Never saved');
+  await page.keyboard.press('Escape');
+  await expect(form(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await expect(plusToday).toBeFocused();
+  await expect(day(page, today).getByRole('button', { name: /Never saved/ })).toHaveCount(0);
+  await plusToday.click();
+  await form(page).getByRole('button', { name: 'Close' }).click();
+  await expect(form(page)).toHaveCount(0);
+  await plusToday.click();
+  await page.keyboard.type('Never saved');
+  await page.locator('.canvas').click({ position: { x: 200, y: 300 } });
+  await expect(form(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  // The next Escape closes the panel, as with the card.
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toHaveCount(0);
+  expect(sent).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test.describe('the overlay on a phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+
+  test('is a sheet from the bottom, with 16px fields so the page does not zoom', async ({ page }) => {
+    await openAs(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
+    const today = new Date();
+    await plus(page, today).tap();
+    await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
+    const sheet = async () => (await form(page).boundingBox())!;
+    let box = await sheet();
+    expect(box.x).toBe(0);
+    expect(box.width).toBe(390);
+    expect(Math.round(box.y + box.height)).toBe(800);
+    for (const field of ['Title', 'Start date', 'Start time', 'End time']) {
+      expect(await form(page).getByLabel(field).evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
+    }
+    // The list is still behind it.
+    await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toBeAttached();
+    await form(page).getByRole('button', { name: 'More options' }).tap();
+    await expect(form(page).getByLabel('Guest email')).toBeVisible();
+    expect(await form(page).getByLabel('Guest email').evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
+    box = await sheet();
+    expect(Math.round(box.y + box.height)).toBe(800);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    await form(page).getByRole('button', { name: 'Close' }).tap();
+    await expect(form(page)).toHaveCount(0);
   });
 });

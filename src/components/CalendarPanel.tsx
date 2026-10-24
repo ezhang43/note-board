@@ -744,18 +744,27 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
   const seriesOk = canChangeSeries(event, draft);
   const title = ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;
   const pick = (all: boolean) => () => next(ask.action, draft, { all }, 'which');
+  // A series' delete question takes the keyboard itself, not a delete button, so a held Enter's auto-repeat
+  // (from the trash or the form's Delete) can't delete "Only this event" (job #209). Tab reaches the buttons.
+  const pair = ask.step === 'which' && ask.action === 'delete';
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pair) box.current?.focus();
+  }, [pair]);
   return (
     <div
+      ref={box}
       className="confirm cal-confirm"
       role="alertdialog"
       aria-label={title}
+      tabIndex={pair ? -1 : undefined}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onCancel();
       }}
     >
       <div className="confirm-title">{title}</div>
       {ask.step === 'which' && ask.action === 'save' && !seriesOk && <p className="history-note">Moving it to another day, or to or from all day, changes only this event.</p>}
-      <div className={ask.step === 'which' && ask.action === 'delete' ? 'confirm-actions cal-pair' : 'confirm-actions'}>
+      <div className={pair ? 'confirm-actions cal-pair' : 'confirm-actions'}>
         {ask.step === 'emails' ? (
           <>
             <button type="button" className="confirm-cancel" onClick={() => next(ask.action, draft, { all: ask.all, notify: false }, 'emails')}>
@@ -773,7 +782,7 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
                 Cancel
               </button>
             )}
-            <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus onClick={pick(false)}>
+            <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={!pair} onClick={pick(false)}>
               Only this event
             </button>
             {(ask.action === 'delete' || seriesOk) && (

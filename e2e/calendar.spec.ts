@@ -166,11 +166,12 @@ const EMAILS = 'Send update emails to guests?';
 /** The changes sent to the calendar (adds, changes, deletes) as "METHOD url", in order. */
 const ONLY_THIS = 'Moving it to another day, or to or from all day, changes only this event.';
 
-/** The series' delete question (job #209): exactly "Only this event" (focused) and "All events in the series", the same width, labels on one line. */
+/** The series' delete question (job #209): exactly "Only this event" and "All events in the series", the same width, labels on one line.
+    The keyboard is on the question itself, not on a delete button (so a held Enter can't delete); Tab reaches the buttons. */
 async function expectSeriesButtons(ask: Locator) {
   const buttons = ask.getByRole('button');
   await expect(buttons).toHaveText(['Only this event', 'All events in the series']);
-  await expect(ask.getByRole('button', { name: 'Only this event' })).toBeFocused();
+  await expect(ask).toBeFocused();
   const boxes = await buttons.evaluateAll((els) =>
     els.map((b) => ({ width: b.getBoundingClientRect().width, height: b.getBoundingClientRect().height, overflow: b.scrollWidth > b.clientWidth })),
   );
@@ -478,6 +479,38 @@ test('the card’s trash deletes a one-off event at once; with guests it asks on
   await which.getByRole('button', { name: 'Only this event' }).click();
   await expect(standUp).toHaveCount(0);
   await expect(day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a held Enter on a repeating event’s trash or the form’s Delete never deletes it; Tab reaches the answers', async ({ page }) => {
+  const errors = await openAs(page);
+  const sent = changesSent(page);
+  await button(page).click();
+  const standUp = day(page, new Date()).getByRole('button', { name: /Team stand-up/ });
+  const which = asked(page, 'Delete “Team stand-up”?');
+  // The card's trash, held: the first press asks, the auto-repeats land on the question, not on a delete button.
+  await standUp.click();
+  await card(page).getByRole('button', { name: 'Delete event' }).focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect(which).toBeVisible();
+  await expect(which).toBeFocused();
+  await expect(standUp).toBeVisible();
+  expect(sent).toEqual([]);
+  await page.keyboard.press('Tab');
+  await expect(which.getByRole('button', { name: 'Only this event' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(which.getByRole('button', { name: 'All events in the series' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(which).toHaveCount(0);
+  // The form's Delete, held (the card is still open, so its pencil opens the form).
+  await card(page).getByRole('button', { name: 'Edit event' }).click();
+  await form(page).getByRole('button', { name: 'Delete' }).focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect(which).toBeFocused();
+  await expect(form(page)).toBeVisible();
+  expect(sent).toEqual([]);
   expect(errors).toEqual([]);
 });
 

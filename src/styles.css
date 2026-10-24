@@ -3128,6 +3128,8 @@ a.cal-open { align-self: flex-start; }
 .tb-button.cal-save, .tb-button.cal-connect { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .tb-button.cal-delete { margin-left: auto; color: var(--danger); }
 .confirm.cal-confirm { margin: 4px 0 0; }
+/* A series' delete question holds the keyboard itself (job #209); like the side panel, no ring on the box, its buttons keep theirs. */
+.cal-confirm:focus { outline: none; }
 .cal-confirm .confirm-actions { flex-wrap: wrap; }
 /* A series' delete question (job #209): its two answers the same width, side by side, or one above
    the other at full width when the longer label doesn't fit in half. */

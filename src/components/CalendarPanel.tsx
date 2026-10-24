@@ -339,8 +339,9 @@ function useCardPlace(ref: RefObject<HTMLElement | null>, opener: HTMLElement, c
 /**
  * The small card a clicked event opens, as in Google Calendar (owner request, 2026-10-19, job #108):
  * beside the event with the list still in view (a sheet from the bottom on a phone). The pencil opens
- * the change form, the trash deletes (asking first, as the form's Delete does), and so do Delete and
- * Backspace; pressed again, they answer that question. Others' events, and Google's special kinds, show without pencil and trash.
+ * the change form, the trash deletes (as the form's Delete does: a one-off at once, a series after
+ * asking which, job #209), and so do Delete and Backspace; pressed again, they answer a series' question
+ * with all of it. Others' events, and Google's special kinds, show without pencil and trash.
  */
 function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -388,10 +389,11 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         e.stopImmediatePropagation();
+        // Only a fresh press: a held key's auto-repeat never deletes or answers.
         if (!event.editable || busy || e.repeat) return;
         if (!ask) remove();
-        // A fresh second press answers "Delete?" (job #132): Delete, or all of a series. Never the guest-email question.
-        else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: !!event.series }, 'which');
+        // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
+        else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
       }
     };
     window.addEventListener('keydown', key, true);
@@ -469,7 +471,8 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
 
 /**
  * The questions asked before saving or deleting (job #85): "which events?" for one of a repeating
- * series (and "Delete?" for any event), then "Send update emails to guests?" when there are guests.
+ * series, then "Send update emails to guests?" when there are guests. A one-off event is deleted
+ * without asking (owner request, 2026-10-24, job #209), though calendar events have no undo.
  */
 type Ask = { action: 'save' | 'delete'; step: 'which' | 'emails'; all?: boolean };
 type Next = (action: Ask['action'], d: Draft, choice: Choice, step: 'start' | Ask['step']) => void;
@@ -490,7 +493,7 @@ function useChange(event: CalEvent | null, onDone: () => void) {
 
   /** Asks the next question, or saves / deletes with the answers given. */
   const next: Next = (action, d, choice, step) => {
-    if (step === 'start' && (action === 'delete' || event?.series)) return setAsk({ action, step: 'which' });
+    if (step === 'start' && event?.series) return setAsk({ action, step: 'which' });
     if (step !== 'emails' && emailGuests(event, action === 'save' ? d : null)) return setAsk({ action, step: 'emails', all: choice.all });
     setAsk(null);
     void run(() => (action === 'save' ? calendar.save(event, d, choice) : calendar.remove(event!.id, choice)));
@@ -500,9 +503,9 @@ function useChange(event: CalEvent | null, onDone: () => void) {
 }
 
 /**
- * Adding (`event` null) or changing one of the person's own events; Delete asks first. An overlay like
- * the event card (owner request, 2026-10-24, job 211), opened from `opener`, with the list still in
- * view: adding starts as a small quick-add (title, day, times, All day), "More options" opens the
+ * Adding (`event` null) or changing one of the person's own events; Delete asks only for a series or
+ * guests (job #209). An overlay like the event card (owner request, 2026-10-24, job 211), opened from
+ * `opener`, with the list still in view: adding starts as a small quick-add (title, day, times, All day), "More options" opens the
  * full form with what was typed kept; changing opens the full form straight away. Escape, × or a
  * click outside close it without saving; saving or deleting closes it.
  */
@@ -741,18 +744,27 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
   const seriesOk = canChangeSeries(event, draft);
   const title = ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;
   const pick = (all: boolean) => () => next(ask.action, draft, { all }, 'which');
+  // A series' delete question takes the keyboard itself, not a delete button, so a held Enter's auto-repeat
+  // (from the trash or the form's Delete) can't delete "Only this event" (job #209). Tab reaches the buttons.
+  const pair = ask.step === 'which' && ask.action === 'delete';
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pair) box.current?.focus();
+  }, [pair]);
   return (
     <div
+      ref={box}
       className="confirm cal-confirm"
       role="alertdialog"
       aria-label={title}
+      tabIndex={pair ? -1 : undefined}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onCancel();
       }}
     >
       <div className="confirm-title">{title}</div>
       {ask.step === 'which' && ask.action === 'save' && !seriesOk && <p className="history-note">Moving it to another day, or to or from all day, changes only this event.</p>}
-      <div className="confirm-actions">
+      <div className={pair ? 'confirm-actions cal-pair' : 'confirm-actions'}>
         {ask.step === 'emails' ? (
           <>
             <button type="button" className="confirm-cancel" onClick={() => next(ask.action, draft, { all: ask.all, notify: false }, 'emails')}>
@@ -763,25 +775,20 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
             </button>
           </>
         ) : (
+          // Only a series is asked which (job #209). Deleting has no Keep: Escape, × or a click outside keep it.
           <>
-            <button type="button" className="confirm-cancel" autoFocus={ask.action === 'delete'} onClick={onCancel}>
-              {ask.action === 'delete' ? 'Keep' : 'Cancel'}
-            </button>
-            {!event?.series ? (
-              <button type="button" className="confirm-delete" onClick={pick(false)}>
-                Delete
+            {ask.action === 'save' && (
+              <button type="button" className="confirm-cancel" onClick={onCancel}>
+                Cancel
               </button>
-            ) : (
-              <>
-                <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={ask.action === 'save'} onClick={pick(false)}>
-                  Only this event
-                </button>
-                {(ask.action === 'delete' || seriesOk) && (
-                  <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} onClick={pick(true)}>
-                    All events in the series
-                  </button>
-                )}
-              </>
+            )}
+            <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={!pair} onClick={pick(false)}>
+              Only this event
+            </button>
+            {(ask.action === 'delete' || seriesOk) && (
+              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} onClick={pick(true)}>
+                All events in the series
+              </button>
             )}
           </>
         )}

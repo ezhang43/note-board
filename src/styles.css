@@ -1811,9 +1811,8 @@ html[data-glide] .world {
   .card-header > .icon-button:first-of-type::before { left: -10px; right: -4px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
-  /* Clean up before the collapse arrow (job 200): its press area reaches up like theirs, and collapse's stops at the gap. */
+  /* Clean up (job 200): its press area reaches up like theirs. It comes later in the page order than the arrow and the comment chip, so where the areas overlap it wins and its drawn box is never taken by a neighbor. */
   .list-clean-up::before { content: ''; position: absolute; top: -12px; bottom: -2px; left: -10px; right: -2px; }
-  .title-cell:has(> .list-clean-up) + .icon-button::before { left: -2px; right: -4px; }
   .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
   .canvas .card:not(.selected, :focus-within) .comment-chip.add { visibility: hidden; }
   .card-header > .block-trash::before { left: 0; right: -16px; }

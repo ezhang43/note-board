@@ -107,6 +107,25 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
+/** How far down the card a part's middle is, in the card's own pixels (the board may be zoomed differently). */
+const fromTop = (r: Awaited<ReturnType<typeof rects>>, part: 'collapse' | 'trash' | 'title', w: number) => (((r[part].top + r[part].height / 2) - r.card.top) / r.card.width) * w;
+
+test('ticking an item does not move the collapse arrow or trash can, and nothing else takes a press on Clean up', async ({ page }) => {
+  for (const w of [240, 420]) {
+    await seed(page, { w, title: 'Packing list', ticked: false });
+    const without = await rects(page);
+    await seed(page, { w, title: 'Packing list', ticked: true });
+    const withIt = await rects(page);
+    expect(Math.abs(fromTop(withIt, 'collapse', w) - fromTop(without, 'collapse', w)), `${w}px: the arrow jumped`).toBeLessThan(1.5);
+    expect(Math.abs(fromTop(withIt, 'trash', w) - fromTop(without, 'trash', w)), `${w}px: the trash can jumped`).toBeLessThan(1.5);
+    expect(Math.abs(fromTop(withIt, 'title', w) - fromTop(without, 'title', w)), `${w}px: the title jumped`).toBeLessThan(1.5);
+    // Right at Clean up's edges, a press lands on Clean up (the arrow and comment chip beside it don't reach over it).
+    const c = withIt.clean!;
+    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.textContent, [c.right - 1, midY(c)]);
+    expect(hit, `${w}px: a press at Clean up's right edge`).toBe('Clean up');
+  }
+});
+
 test('a collapsed list has no Clean up and keeps its preview text', async ({ page }) => {
   await seed(page, { w: 240, title: 'Packing list', ticked: true, collapsed: true });
   await expect(cleanUp(page)).toHaveCount(0);

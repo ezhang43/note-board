@@ -143,7 +143,7 @@ export function Canvas() {
     const onClick = (e: MouseEvent) => {
       const press = down;
       down = null;
-      const button = e.target instanceof Element ? e.target.closest('.card-header > .icon-button, .card-header > .list-clean-up, .column-actions > .icon-button') : null;
+      const button = e.target instanceof Element ? e.target.closest('.card-header > .icon-button, .card-header > .title-cell > .list-clean-up, .column-actions > .icon-button') : null;
       if (button && e.detail > 0 && press?.pointerType === 'touch' && !(press.target instanceof Node && button.contains(press.target))) e.stopPropagation();
     };
     el.addEventListener('focusin', onFocus);

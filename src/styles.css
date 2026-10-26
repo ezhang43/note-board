@@ -918,8 +918,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   --bh: calc(20px * var(--bs) + 8px);
   /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
   --bb: min(var(--bs), 1.9);
-  /* The space under every row, so rows sit 1px further apart at Normal (owner request 2026-10-24; 2px was "a bit too large"), growing with the text step. It is part of the row, so a drop there still lands on this row; the tick box and the buttons are placed from the row's top and do not move. */
-  --row-gap: calc(1px * var(--fs, 1));
+  /* The space under every row, so rows sit 1.5px further apart at Normal (owner request 2026-10-24; 2px was "a bit too large", 1px then went to 1.5px on 2026-10-26), growing with the text step. It is part of the row, so a drop there still lands on this row; the tick box and the buttons are placed from the row's top and do not move. */
+  --row-gap: calc(1.5px * var(--fs, 1));
   padding-bottom: var(--row-gap);
   min-height: calc(30px + var(--row-gap));
   display: flex;

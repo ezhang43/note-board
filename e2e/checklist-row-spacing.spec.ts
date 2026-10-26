@@ -3,8 +3,9 @@ import { fontsLoaded } from './helpers';
 import { FONT_KEY, FONT_SCALE, type FontSize } from '../src/model/font';
 
 // Checklist row spacing (owner request 2026-10-24: "the spacing between checklist items feels just slightly too close").
-// Owner feedback on the first version (2px): "the spacing is a bit too large now", so it is 1px.
-// The space between two rows' text boxes is 1px more than it was, times the A- / A+ step (1px at Normal), for top-level
+// Owner feedback on the first version (2px): "the spacing is a bit too large now", so it went to 1px; on 2026-10-26 the owner
+// picked halfway between the two, 1.5px.
+// The space between two rows' text boxes is 1.5px more than it was, times the A- / A+ step (1.5px at Normal), for top-level
 // items and sub-items alike. A row was at least 30px tall, so before this the space was 30px less the text box's height (2px
 // at Normal on a computer, none from Large up).
 
@@ -42,7 +43,7 @@ const SIZES: FontSize[] = ['normal', 'large', 'huge', 'ultimate'];
 
 function check(layout: 'desktop' | 'phone') {
   for (const size of SIZES) {
-    test(`rows are 1px x step further apart, sub-items too (${size}, ${layout})`, async ({ page }) => {
+    test(`rows are 1.5px x step further apart, sub-items too (${size}, ${layout})`, async ({ page }) => {
       await page.goto('/');
       await fontsLoaded(page);
       await seed(page, size);
@@ -52,7 +53,7 @@ function check(layout: 'desktop' | 'phone') {
       for (const [i, r] of rows.entries()) {
         // What was there before: a row is at least 30px tall.
         const before = Math.max(0, 30 - r.boxH);
-        expect(r.gap, `${size}, ${layout}, row ${i + 1} to ${i + 2}`).toBeCloseTo(before + 1 * fs, 1);
+        expect(r.gap, `${size}, ${layout}, row ${i + 1} to ${i + 2}`).toBeCloseTo(before + 1.5 * fs, 1);
         // No dead gap between rows: the space belongs to a row (a drop there lands on the row above), so rows touch.
         expect(Math.abs(r.rowGap), `${size}, ${layout}, rows touch`).toBeLessThan(0.05);
       }

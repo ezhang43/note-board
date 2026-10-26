@@ -57,7 +57,7 @@ async function checklist(page: Page, title: string, items: string[], ticked: num
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
 
 test('Clean up in a list’s title row moves only that list’s ticked items into the Completed panel', async ({ page }) => {
-  const groceries = await checklist(page, 'Groceries', ['bread', 'milk', 'eggs'], 2);
+  const groceries = await checklist(page, 'Food', ['bread', 'milk', 'eggs'], 2);
   const chores = await checklist(page, 'Chores', ['sweep', 'dust'], 1);
   const cleanUp = groceries.getByRole('button', { name: 'Clean up', exact: true });
   await expect(cleanUp).toBeVisible();

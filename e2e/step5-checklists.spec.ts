@@ -223,8 +223,8 @@ test('drag an item into another list, or onto empty list space to append', async
   expect(await texts(b)).toEqual(['b1', 'a1']);
   expect(await texts(a)).toEqual(['a2']);
 
-  const blank = await box(b.locator('.card-meta')); // the blank part of the title row, past the text
-  await dragItem(page, rowWithText(a, 'a2'), { x: blank.x + blank.width / 2, y: blank.y + blank.height / 2 }, async () => {
+  const blank = await box(b.locator('.title-cell')); // the title row's cell; its right end is blank, past the title's text
+  await dragItem(page, rowWithText(a, 'a2'), { x: blank.x + blank.width - 8, y: blank.y + blank.height / 2 }, async () => {
     await expect(b).toHaveClass(/append-target/);
     // The whole card is outlined, top included, so you can tell the item goes into it (owner request).
     const ring = await b.evaluate((el) => { const s = getComputedStyle(el); return [s.outlineStyle, s.outlineWidth]; });

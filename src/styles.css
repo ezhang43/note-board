@@ -842,10 +842,10 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* From 225% up (the canvas has data-big-text) the buttons can be so wide that a 200px card has no room for its title beside them: the title keeps about two and a half letters, and the buttons drop to a line of their own, at the right, instead of covering it. */
 .canvas[data-big-text] .card:not(.collapsed) > .card-header { flex-wrap: wrap; justify-content: flex-end; }
 .canvas[data-big-text] .card-header > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 12px)); }
+.canvas[data-big-text] .card-header > .title-cell { min-width: calc(2.5 * 15px * var(--fs, 1)); }
 /*
- * A list's Clean up button (job 200): left of the collapse arrow while something in the list is ticked. It
- * grows with the other header buttons (up to 250%) and has a set width, so the title keeps room beside the
- * three buttons, and they drop to a line of their own, at the right, when even about two and a half letters won't fit.
+ * A list's Clean up button (job 200): in the title row while something in the list is ticked. It grows with
+ * the other header buttons (up to 250%) and has a set width; where it sits is set by the title cell below.
  */
 .list-clean-up {
   position: relative;
@@ -866,9 +866,25 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 @media (hover: hover) {
   .list-clean-up:hover { background: var(--hover); color: var(--ink); }
 }
-.card-header:has(> .list-clean-up) { flex-wrap: wrap; justify-content: flex-end; }
-.card-header:has(> .list-clean-up) > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 60px * var(--hb) - 16px)); }
 .card-header > .card-title { order: -1; flex: 0 1 auto; min-width: 0; align-self: center; }
+/*
+ * A list's title and its Clean up share a cell (owner request 2026-10-24, job 208: Clean up never squeezes the title). The cell
+ * wraps: when the title and Clean up fit beside the arrow and trash can they sit on one line; when they don't, Clean up drops to
+ * a short line of its own under the title, at the right, and the title keeps the width it has without Clean up. The arrow and
+ * trash can stay on the title's line (a row of the header's height, so they line up with the title, not with the whole cell).
+ */
+.card-header > .title-cell { order: -1; flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; }
+/* Above Clean up's touch press area, which reaches up 12px: when Clean up is on its own line the title's lower edge keeps its taps. */
+.title-cell > .card-title { align-self: center; position: relative; z-index: 1; }
+.title-cell > .list-clean-up { margin-left: auto; }
+/* Empty on an open card: it would only take a few pixels of the title's room. */
+.card-header:has(> .title-cell) > .card-meta { display: none; }
+.card-header:has(> .title-cell > .list-clean-up) { align-items: flex-start; --row: max(36px, calc(var(--btn) + 4px)); flex-wrap: wrap; justify-content: flex-end; }
+/* The cell is never narrower than Clean up, so the arrow and trash can drop to a line of their own, at the right, when the two won't fit side by side (as they did before). */
+.card .card-header > .title-cell:has(> .list-clean-up) { min-width: calc(60px * var(--hb)); }
+.card-header:has(> .title-cell > .list-clean-up) > .icon-button { margin-top: calc((var(--row) - var(--btn)) / 2); }
+.card-header:has(> .title-cell > .list-clean-up) > .comment-slot { height: var(--row); align-items: center; }
+.card-header:has(> .title-cell > .list-clean-up) .title-cell > .card-title { min-height: var(--row); align-content: center; }
 /* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
 .card-header + :is(.todo-body, .link-body, .board-body) { padding-top: calc(8px * min(var(--bs), 1.75)); }
 /* A board card's name is plain text, so it wraps (a long board name) rather than being cut off. */
@@ -1795,10 +1811,8 @@ html[data-glide] .world {
   .card-header > .icon-button:first-of-type::before { left: -10px; right: -4px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
-  /* Clean up before the collapse arrow (job 200): its press area reaches up like theirs, and collapse's stops at the gap. */
+  /* Clean up (job 200): its press area reaches up like theirs. It comes later in the page order than the arrow and the comment chip, so where the areas overlap it wins and its drawn box is never taken by a neighbor. */
   .list-clean-up::before { content: ''; position: absolute; top: -12px; bottom: -2px; left: -10px; right: -2px; }
-  .list-clean-up + .icon-button::before { left: -2px; right: -4px; }
-  .comment-slot + .list-clean-up::before { left: -4px; }
   .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
   .canvas .card:not(.selected, :focus-within) .comment-chip.add { visibility: hidden; }
   .card-header > .block-trash::before { left: 0; right: -16px; }
@@ -3326,7 +3340,8 @@ a.cal-open { align-self: flex-start; }
    * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
    * around them take no taps: a tap on another card selects it, never deletes it.
    */
-  .canvas .card:not(.selected, :focus-within) > .card-header > :is(.icon-button, .list-clean-up),
+  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .card:not(.selected, :focus-within) > .card-header > .title-cell > .list-clean-up,
   .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
 
   /* The welcome tour. */

@@ -77,7 +77,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
   {
     title: 'Google Calendar',
     keys: [
-      ['Delete / Backspace', 'Delete the event whose card is open (asks first, press again to confirm; read-only events can’t be deleted)'],
+      ['Delete / Backspace', 'Delete the event whose card is open (a series asks which, press again for all; read-only events can’t be deleted)'],
       ['Escape', 'Close the event’s card, then the panel'],
     ],
   },

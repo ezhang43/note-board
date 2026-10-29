@@ -1,0 +1,1 @@
+- CLAUDE.md is shorter: cut the parts Claude does by default, gets elsewhere (skill list, package.json, GitHub, hooks) or can look up, keeping the owner's own decisions.

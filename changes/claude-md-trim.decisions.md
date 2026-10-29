@@ -1,0 +1,1 @@
+- 2026-10-29 (owner: cut the CLAUDE.md rules Claude would follow anyway; picked all four groups): removed the duplicate skill descriptions (kept the plugins rule), the generic parts of rule 11, rules already enforced by GitHub or hooks, and look-up facts (fonts, stack versions, everyday npm commands).

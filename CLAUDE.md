@@ -8,11 +8,8 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Stack (decided)
 
-- TypeScript (strict), React 19, Vite. npm as package manager.
 - No state library. Board data is changed only by pure functions in `src/model/`; React reads it through one small store.
-- Saving: `localStorage`, key `note-board:v1`, as versioned JSON. Loaded on start, written after every change (debounced slightly). Bad or missing data falls back to a fresh board rather than crashing.
-- Tests: Vitest for logic (`*.test.ts` in `src/`, `mcp/` and `scripts/`), Playwright for browser flows (`e2e/`; Chromium, plus a phone Chrome and an iPhone Safari (WebKit) run of the published site's offline tests).
-- Fonts: IBM Plex Sans 400/500/600 from Google Fonts; the text-formatting typefaces (IBM Plex Mono, Lora, Nunito, Caveat) also come from there, and the website's headlines use Familjen Grotesk.
+- Saving: versioned JSON in `localStorage`. Bad or missing data falls back to a fresh board rather than crashing.
 
 ## Code layout
 
@@ -34,15 +31,14 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 7. **Keyboard.** Block shortcuts don't fire while typing in a text field; undo/redo always do.
 8. **Spec stays current.** Whenever the owner asks for a new feature or change, or a decision is recorded in `docs/decisions.md`, update `SPEC.md` in the same commit so it always describes the app as built. No need to ask first.
 9. **One way onto the live branch.** Work lands on `build/v1`; the published site is built from `main`, which is moved up to `build/v1` (`git push origin build/v1:main`, a fast-forward) when the owner says "publish", or automatically for low-risk pull requests (below). Only the **crew coordinator** pushes straight to `build/v1` or `main`: the session named in the Crew Board's `meta/crew`, either on the owner's Windows computer in `C:\Users\ezhan\Projects\note-board` or a Claude Code cloud session the owner is talking to (the `/crew` skill says how it takes over). Every other session (a worker, a worktree, another chat) works on its own branch named for the job (for example `phone-layout`), never pushes to `build/v1`, and finishes by opening a pull request into `build/v1` and giving the owner its link. Pushing a branch or opening a pull request does not change the live site; merging a low-risk one into `build/v1` does, once its tests pass (auto-publish, below).
-   - Every pull request into `build/v1` is tested automatically on GitHub (`.github/workflows/checks.yml`, check "All tests": typecheck, unit tests, browser tests). It can't be merged until that passes.
-   - Low-risk pull requests are merged by the session that opened them, without asking: it watches the pull request, fixes it if "All tests" fails, and merges it (merge commit) once "All tests" passes. It may turn on GitHub's auto-merge instead, but GitHub often refuses that while the tests are still running, so merging itself is the usual way. GitHub won't merge anything with failing tests. If the session can't merge, say so and give the owner the link.
+   - Every pull request into `build/v1` is tested automatically on GitHub (`.github/workflows/checks.yml`, check "All tests": typecheck, unit tests, browser tests).
+   - Low-risk pull requests are merged by the session that opened them, without asking: it watches the pull request, fixes it if "All tests" fails, and merges it (merge commit) once "All tests" passes. It may turn on GitHub's auto-merge instead, but GitHub often refuses that while the tests are still running, so merging itself is the usual way. If the session can't merge, say so and give the owner the link.
    - **Auto-publish:** after "All tests" passes on a push to `build/v1`, the Publish job in `checks.yml` fast-forwards `main` and starts the Pages deploy, but only when every change `main` lacks is a merged pull request into `build/v1` that isn't labeled `high-risk` and changes no saving / sync / undo / deleting file (the list is in `scripts/publish-rules.mjs`; test files don't count). A commit pushed straight to `build/v1`, or any risky pull request, holds everything after it back until the owner says "publish".
    - The session that opens a pull request touching saving, sync, undo or deleting (the `high` review level in rule 10) adds the `high-risk` label when opening it (`gh pr create --label high-risk`; in a cloud session, where `gh pr` is blocked, use the GitHub MCP tools or `gh api` as in the crew skill's "GitHub in a cloud session"). Such pull requests do not get auto-merge. They wait for the owner. The crew coordinator checks each one as soon as it is ready, without being asked (owner decision, 2026-10-06), using `/check-pr`: fetch it, combine it with the latest `build/v1`, run `npm run typecheck`, `npm test` and `npm run test:e2e` on the result, and report in plain words what it changes, whether it clashes with anything, and whether it is safe to merge, then asks the owner. Merge only when the owner says so.
-   - The crew coordinator fetches before it starts work and before it pushes, so it never builds on or overwrites an out-of-date copy.
 10. **Code review before it goes live.** Once a change passes both test suites, run the `code-review` skill on it before pushing (or before reporting a pull request as ready). Fix what it confirms, tests first as in rule 3, and run the tests again. In the report, say what the review found and what was fixed or left alone, and why. Match the review to the change, to keep token use down: a tiny fix (a style tweak or one small behavior) gets a light review (`low`) or none; a normal feature gets a standard one (`medium`); anything touching saving, sync, undo or deleting gets a thorough one (`high`), since bugs there can lose the owner's data. Changes to wording or documents alone skip it. Say in the report which level ran. When checking another session's pull request (rule 9), review it the same way, and report its findings instead of fixing them unless the owner says so.
-11. **Simplest code that works** (owner request, 2026-10-06, adapted from the "ponytail" ruleset). Read the code the change touches and trace the real flow first, then stop at the first step that holds: (a) already in this codebase: reuse it; (b) the browser, TypeScript or React already does it: use that (a native `<input>`, CSS over JS); (c) an installed package does it: use it, and add no new package for what a few lines can do; (d) one line; (e) only then the least code that works. No layers, options, helpers or "for later" code nobody asked for: no interface with one use, no setting for a value that never changes. Fewest files, shortest working diff, deleting over adding, boring over clever. A bug fix goes where every caller routes through, not only in the path the report names. A deliberate shortcut with a known limit gets a `// simple:` comment saying the limit and when to upgrade. This never cuts what the spec asks for, the tests in rule 3, checks on loaded or imported data, anything that guards against losing the owner's boards, security, or accessibility.
+11. **Simplest code that works** (owner request, 2026-10-06, adapted from the "ponytail" ruleset). Prefer what the browser, React or an installed package already does (a native `<input>`, CSS over JS), and add no new package for what a few lines can do. A bug fix goes where every caller routes through, not only in the path the report names. A deliberate shortcut with a known limit gets a `// simple:` comment saying the limit and when to upgrade. This never cuts what the spec asks for, the tests in rule 3, checks on loaded or imported data, anything that guards against losing the owner's boards, security, or accessibility.
 
-12. **Design and motion** (owner request, 2026-10-19; skills by Emil Kowalski, MIT, in `.claude/skills/`). Used continuously on all future UI work, on the desktop layout and the phone layout. Any UI, motion or interaction work follows the `emil-design-eng` skill; use `review-animations`, `improve-animations` and `animation-performance` when adding or reviewing animation, and `mobile-native` for anything on a phone or touch screen. (The skills' "Initial Response" greeting is for a bare invocation; skip it when working on a task.)
+12. **Design and motion** (owner request, 2026-10-19; skills by Emil Kowalski, MIT, in `.claude/skills/`). Used continuously on all future UI work, on the desktop layout and the phone layout. Any UI, motion or interaction work follows the `emil-design-eng` skill; use `review-animations`, `improve-animations` and `animation-performance` when adding or reviewing animation, and `mobile-native` for anything on a phone or touch screen.
     - They work together with Impeccable (the owner's plugin, used for the design reviews in `docs/decisions.md`, 2026-10-02). Impeccable leads on visual design: layout, type, color, hierarchy, redesign critiques. Emil's skills lead on motion, interaction feel and phone-native feel.
     - Where they disagree the order is: `SPEC.md` and the owner's decisions in `docs/decisions.md` first, then Impeccable for the look, then Emil for motion and feel.
     - Rule 6 stays: the cursor rule, no focus rectangles on text fields, and the focus ring on buttons.
@@ -50,25 +46,16 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Commands
 
-- `npm install` then `npx playwright install chromium webkit` (once)
-- `npm run dev` — run the app at http://localhost:5173
-- `npm test` — unit tests
-- `npm run test:e2e` — browser tests
-- `npm run test:rules` — Firestore rules tests on the local emulator (needs Java; part of "All tests")
-- `npm run typecheck` / `npm run build`
+The usual ones are in `package.json` scripts. Beyond those:
+
+- `npx playwright install chromium webkit` — once, after `npm install`
+- `npm run test:rules` needs Java (part of "All tests")
 - `node scripts/fold-changes.mjs` — the crew coordinator's publish step: folds `changes/*.md` into `CHANGELOG.md` and `docs/decisions.md` (rule 5)
 - `node scripts/claude-hooks.mjs level` — does the current change touch a risky file (picks the review level)
 
-## Claude helpers
+## Plugins
 
-- `/finish-step` — the end-of-step routine (rules 3, 5, 8, 9, 10, a security check for sign-in, sync, sharing, imports and links, and the report), in order. Use it to finish every step.
-- `/check-pr <number>` — rule 9's check of another session's pull request. The crew coordinator runs it by itself when a high-risk pull request is ready; the owner can also type it. Reports; never merges.
-- `/crew [request | status]` — the coordinator: the crew coordinator session takes the owner's requests, splits them into jobs, starts a background worker in its own worktree for each (at most 4 at a time), tracks every job's stage on the Crew Board (a private claude.ai page, not in git) and reports one status. Each worktree runs browser tests on its own ports (`scripts/test-ports.mjs`).
-- `emil-design-eng`, `review-animations`, `improve-animations`, `animation-performance`, `mobile-native` — Emil Kowalski's design, motion and phone-feel skills (rule 12), working with Impeccable. `/finish-step` runs a light `emil-design-eng` check on UI changes, and a `mobile-native` check on phone and touch changes.
-- `/grill-with-docs` and `/improve-codebase-architecture` (the owner types them) and `codebase-design` — Matt Pocock's feature-interview and architecture skills, adapted so answers go into `SPEC.md` and `docs/decisions.md`.
-- `spec-check` skill and `spec-checker` subagent (same checklist) — compare a change with `SPEC.md` and `docs/decisions.md`; `/finish-step` runs the skill, which a background worker can run itself.
-- Plugins (owner request, 2026-10-22): `.claude/settings.json` lists the owner's plugins (`enabledPlugins`, with their marketplaces in `extraKnownMarketplaces`) so every session on this project, cloud or local, loads them: Impeccable, frontend-design, claude-code-setup and security-guidance. Add a new plugin there, not only on one computer.
-- Hooks in `.claude/settings.json` (code in `scripts/claude-hooks.mjs`): a reminder before editing a risky file, a type check after editing a `.ts`/`.tsx` file, and a guard before every Bash command that refuses `pkill`/`killall`, any force push to `main` or `build/v1`, and any push onto `main` or `build/v1` unless the session was started with `CREW_COORDINATOR=1` (the crew coordinator, rule 9). `.gitattributes` merges `CHANGELOG.md` and `docs/decisions.md` as "union" (keeps both sides), so parallel pull requests don't conflict there.
+`.claude/settings.json` lists the owner's plugins (`enabledPlugins`, with their marketplaces in `extraKnownMarketplaces`) so every session on this project, cloud or local, loads them (owner request, 2026-10-22). Add a new plugin there, not only on one computer.
 
 ## Decisions
 

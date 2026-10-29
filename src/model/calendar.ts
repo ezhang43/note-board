@@ -67,6 +67,8 @@ const CALENDAR_HOME = 'https://calendar.google.com/';
 const UNTITLED = '(No title)';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+/** Minutes since midnight of an "HH:MM" time. */
+const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
 
 export function dayKey(d: Date): DayKey {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -306,11 +308,9 @@ export function guestChanges(e: CalEvent | null, d: Draft, onto: CalEvent | null
  */
 export function seriesDraft(d: Draft, was: Draft, series: Draft): Draft {
   // Start and length in minutes from the start day (an all-day draft's times are fixed, so unchanged).
-  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   const length = (x: Draft) => Math.round((toDate(x.endDate).getTime() - toDate(x.startDate).getTime()) / 60_000) + mins(x.endTime) - mins(x.startTime);
   const start = d.startTime !== was.startTime ? d.startTime : series.startTime;
   const end = mins(start) + (d.startTime !== was.startTime || length(d) !== length(was) ? length(d) : length(series));
-  const pad = (n: number) => String(n).padStart(2, '0');
   return {
     ...series,
     title: d.title.trim() !== was.title.trim() ? d.title : series.title,
@@ -353,6 +353,25 @@ export function moveDraftStart(d: Draft, startDate: string): Draft {
   if (!isDay(d.startDate) || !isDay(d.endDate)) return { ...d, startDate };
   const shift = Math.round((toDate(startDate).getTime() - toDate(d.startDate).getTime()) / 86_400_000);
   return { ...d, startDate, endDate: addDays(d.endDate, shift) };
+}
+
+/**
+ * A new start time moves the end time by as much, so the event keeps its length, as in Google
+ * Calendar (job 216). A one-day event whose end would pass midnight ends at 23:59 instead (the
+ * quick-add shows no end date); an event over several days carries its end across midnight.
+ */
+export function moveDraftStartTime(d: Draft, startTime: string): Draft {
+  if (d.allDay || !isTime(startTime) || !isTime(d.startTime) || !isTime(d.endTime) || !isDay(d.startDate) || !isDay(d.endDate)) return { ...d, startTime };
+  const days = Math.round((toDate(d.endDate).getTime() - toDate(d.startDate).getTime()) / 86_400_000);
+  let end = mins(startTime) + days * 1440 + mins(d.endTime) - mins(d.startTime);
+  // simple: one-day events are held to their day (23:59 at most), so a start moved past 22:59 and back shortens the length (no length is stored); upgrade by keeping the length apart from the end.
+  if (days === 0) end = Math.min(Math.max(end, 0), 1439);
+  return {
+    ...d,
+    startTime,
+    endTime: `${pad(Math.floor((((end % 1440) + 1440) % 1440) / 60))}:${pad(((end % 60) + 60) % 60)}`,
+    endDate: addDays(d.startDate, Math.floor(end / 1440)),
+  };
 }
 
 /** What Google takes for a draft, or null when its dates don't make sense (end not after start). */

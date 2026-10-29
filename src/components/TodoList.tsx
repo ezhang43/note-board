@@ -9,7 +9,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ArrowIcon, GripIcon, TrashIcon } from './icons';
-import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, trackItemDrag } from './itemDom';
+import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 
@@ -139,9 +139,9 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
-      {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card (job 218). */}
-      <label className="tick">
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={(e) => e.currentTarget.focus({ preventScroll: true })} />
+      {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
+      <label className="tick" {...tickBoxPress}>
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={tickBoxClick} />
       </label>
       <GrowTextarea
         ref={ref}

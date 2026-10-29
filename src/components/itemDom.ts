@@ -37,6 +37,20 @@ export function itemOf(el: EventTarget | null): { cardId: string; itemId: string
 }
 
 /**
+ * A tick box press (job 218). A mouse click gives the box the keyboard (Safari and Firefox on a Mac
+ * don't), so Delete then removes its item, not the card; no focus ring for a click. A tap (finger or
+ * pen) leaves the focus, and so a phone's on-screen keyboard, where it was.
+ */
+let tapped = false;
+export const tickBoxPress = {
+  onPointerDown: (e: { pointerType: string }) => void (tapped = e.pointerType !== 'mouse'),
+  onMouseDown: (e: { preventDefault(): void }) => tapped && e.preventDefault(),
+};
+export function tickBoxClick(e: { currentTarget: HTMLElement }) {
+  if (!tapped) e.currentTarget.focus({ preventScroll: true, focusVisible: false });
+}
+
+/**
  * Delete or Backspace removed a checklist item (job 218): until a fresh press, the held key's
  * repeats do nothing in the item the cursor moved to, so they can't join or remove more items.
  */

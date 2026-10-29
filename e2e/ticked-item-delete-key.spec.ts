@@ -189,3 +189,49 @@ test('the shortcuts list says what Delete does in a ticked item', async ({ page 
   await page.keyboard.press('?');
   await expect(page.getByText('Delete it, like its trash can')).toBeVisible();
 });
+
+// Checker finding (job 218, round 2, "fix iPhone first"): on a touch screen, tapping a tick box while
+// typing in an item keeps the cursor (and so the phone's keyboard) in the text, as before this change.
+test.describe('on a touch screen', () => {
+  test.use({ hasTouch: true });
+
+  test('a tapped tick box ticks the item and the cursor stays in the item being typed in', async ({ page }) => {
+    const list = await checklist(page, ['bread', 'milk', 'eggs']);
+    await list.getByLabel('Item text').nth(1).tap();
+    await list.getByRole('checkbox', { name: 'Done: eggs' }).tap();
+    await expect(list.getByRole('checkbox', { name: 'Done: eggs' })).toBeChecked();
+    expect(await focused(page)).toBe('milk');
+    await list.getByRole('checkbox', { name: 'Done: milk' }).tap();
+    await expect(list.getByRole('checkbox', { name: 'Done: milk' })).toBeChecked();
+    expect(await focused(page)).toBe('milk');
+    // The edge of the box's wider pressable area (its label) too.
+    await list.locator('label.tick').first().tap({ position: { x: 1, y: 1 } });
+    await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
+    expect(await focused(page)).toBe('milk');
+  });
+});
+
+test.describe('on a phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test('a tapped tick box keeps the cursor in the item being typed in', async ({ page }) => {
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Checklist' }).tap();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('bread');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('milk');
+    const list = page.locator('[data-card-id]').first();
+    await list.getByRole('checkbox', { name: 'Done: bread' }).tap();
+    await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
+    expect(await focused(page)).toBe('milk');
+  });
+});
+
+test('a clicked tick box takes the keyboard without showing a focus ring', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk']);
+  const box = list.getByRole('checkbox', { name: 'Done: milk' });
+  await box.click();
+  await expect(box).toBeFocused();
+  expect(await box.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+});

@@ -181,7 +181,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         </span>
       )}
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
-      {/* Pressing it leaves the cursor in the item: on a touch screen the trash only shows while the item has it. */}
+      {/* A press leaves the cursor in the item (on a touch screen the trash only shows while the item has it); once the item is gone the cursor goes to the item above, else below (job 222). */}
       <button
         type="button"
         className="item-trash"

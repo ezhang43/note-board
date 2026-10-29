@@ -236,22 +236,20 @@ export function checklistActions(ctx: StoreContext) {
     },
     /**
      * Trash can: deletes the item and everything under it (or every selected item, if it is one of them).
-     * `keepTyping` (the phone's item bar): the cursor moves to the item above (else below), so the keyboard stays up.
+     * The cursor moves to the item above in its list (else below), so the focus is never left nowhere, where
+     * the next Delete would delete the card (job 222); on a phone the keyboard stays up.
      */
-    trashItem(cardId: string, itemId: string, keepTyping = false) {
-      const lists = listsIncluding(cardId, itemId);
-      if (lists) {
-        ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () => commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } }));
-        return;
-      }
-      const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      ctx.deleting(`Deleted ${count(ids.length, 'item')}`, () =>
+    trashItem(cardId: string, itemId: string) {
+      const lists = listsIncluding(cardId, itemId) ?? [{ cardId, ids: selectedItemsIncluding(cardId, itemId) ?? [itemId] }];
+      const gone = lists.find((l) => l.cardId === cardId)!.ids;
+      ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () =>
         commit((b) => {
           const card = b.cards[cardId];
           if (card?.kind !== 'todo') return null;
-          const items = C.deleteItems(card.items, ids);
-          const focus = keepTyping ? C.focusAfterRemoving(visibleItems(card), items, ids) : null;
-          return { board: C.editItems(b, cardId, () => items), ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
+          const board = deleteAcross(b, lists);
+          const after = board.cards[cardId];
+          const focus = after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
+          return { board, ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
         }),
       );
     },
@@ -262,7 +260,7 @@ export function checklistActions(ctx: StoreContext) {
     deleteTickedItem(cardId: string, itemId: string): boolean {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo' || !C.findItem(card.items, itemId)?.item.done) return false;
-      actions.trashItem(cardId, itemId, true);
+      actions.trashItem(cardId, itemId);
       return true;
     },
     /**

@@ -86,6 +86,19 @@ describe('items selected in several lists', () => {
     expect(picked(s)).toEqual([1, 1]);
   });
 
+  it("an item's trash can removes the items from every list and puts the cursor in its own list (job 222)", () => {
+    const { s, col, a, b, items } = setup();
+    const one = items(a)[0].id;
+    s.selectAcross(col, { cardId: a, itemId: items(a)[1].id }, { cardId: b, itemId: items(b)[0].id });
+    s.trashItem(a, items(a)[1].id);
+    expect(items(a).map((i) => i.text)).toEqual(['one']);
+    expect(items(b).map((i) => i.text)).toEqual(['']);
+    expect(s.getState().ui.focusItem).toBe(one);
+    s.undo();
+    expect(items(a).map((i) => i.text)).toEqual(['one', 'two']);
+    expect(items(b).map((i) => i.text)).toEqual(['three']);
+  });
+
   it('Tab does nothing across several lists', () => {
     const { s, a, items } = setup();
     s.selectWholeList(a);

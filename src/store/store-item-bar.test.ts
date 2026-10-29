@@ -31,7 +31,7 @@ function setup(names: string[]) {
 describe('Delete in the phone item bar', () => {
   it('moves the cursor to the item above, in one undo step', () => {
     const { s, cardId, id, texts } = setup(['a', 'b', 'c']);
-    s.trashItem(cardId, id('b'), true);
+    s.trashItem(cardId, id('b'));
     expect(texts()).toBe('a c');
     expect(s.getState().ui.focusItem).toBe(id('a'));
     expect(s.getState().ui.focusOffset).toBeNull(); // at the end of its text
@@ -41,22 +41,22 @@ describe('Delete in the phone item bar', () => {
 
   it('from the first item, the cursor goes to the one below', () => {
     const { s, cardId, id } = setup(['a', 'b']);
-    s.trashItem(cardId, id('a'), true);
+    s.trashItem(cardId, id('a'));
     expect(s.getState().ui.focusItem).toBe(id('b'));
   });
 
   it('deleting the only item leaves a blank one with the cursor in it', () => {
     const { s, cardId, list } = setup(['a']);
-    s.trashItem(cardId, list().items[0].id, true);
+    s.trashItem(cardId, list().items[0].id);
     expect(list().items).toHaveLength(1);
     expect(s.getState().ui.focusItem).toBe(list().items[0].id);
   });
 
-  it('the trash can on a computer is unchanged: no cursor is moved', () => {
+  it("an item's own trash can on a computer moves the cursor the same way (job 222)", () => {
     const { s, cardId, id, texts } = setup(['a', 'b']);
     s.trashItem(cardId, id('b'));
     expect(texts()).toBe('a');
-    expect(s.getState().ui.focusItem).toBeNull();
+    expect(s.getState().ui.focusItem).toBe(id('a'));
   });
 });
 

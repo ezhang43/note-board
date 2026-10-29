@@ -159,7 +159,7 @@ export function useShortcuts() {
       const at = itemOf(e.target);
       if (at && state.ui.selection.every((id) => id === at.cardId) && (matches(hk.delete, e) || (!mod && (key === 'delete' || key === 'backspace')))) {
         return removeItemByKey(e, () => {
-          appStore.trashItem(at.cardId, at.itemId, true);
+          appStore.trashItem(at.cardId, at.itemId);
           return true;
         });
       }

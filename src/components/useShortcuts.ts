@@ -6,6 +6,7 @@ import { shortcutKey } from '../model/keys';
 import { appStore } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { handleArrowKey } from './keyboardNav';
+import { isPhone } from './usePhone';
 import type { FormatAsk } from '../store/actions/format';
 import { itemOf, removeItemByKey } from './itemDom';
 import { focusedBox } from './textBox';
@@ -13,6 +14,12 @@ import { isTextField, panelCovers } from './textField';
 
 /** Where keys never act on the board behind (C-M1): panels, popover menus and the Undo message. */
 const NOT_THE_BOARD = '.side-panel, .history-panel, .format-bar, .share-panel, .file-menu, .boards-menu, .toolbar-more, .colour-menu, .phone-sheet, .undo-toast';
+
+/** Where arrows belong to the thing itself, so they never pan the board: resize handles, drop-down lists, dialogs and menus. */
+const ARROWS_THEIRS = '.resize-edge, .resize-corner, select, [role="dialog"], [role="alertdialog"], [role="menu"]';
+
+/** Screen pixels the board pans per arrow press (Shift: five times that). */
+const PAN_STEP = 80;
 
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */
 export function useShortcuts() {
@@ -123,11 +130,16 @@ export function useShortcuts() {
         if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();
       }
 
-      // Arrows move the selected blocks one grid step (Shift: five).
+      // Arrows move the selected blocks one grid step (Shift: five). With nothing selected they pan the board
+      // like scrolling (owner request 2026-10-29): a view change only, and not on a phone-sized window.
       const step = NUDGE[e.key];
       if (step && !mod && !state.ui.itemSel) {
         const n = e.shiftKey ? 5 : 1;
         if (appStore.nudgeSelection(step[0] * n, step[1] * n)) e.preventDefault();
+        else if (!e.isComposing && !isPhone() && !e.composedPath().some((el) => el instanceof Element && el.matches(ARROWS_THEIRS))) {
+          e.preventDefault();
+          appStore.panBy(-step[0] * n * PAN_STEP, -step[1] * n * PAN_STEP);
+        }
         return;
       }
 

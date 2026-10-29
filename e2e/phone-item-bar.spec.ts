@@ -70,7 +70,7 @@ test('Undo undoes one action at a time and keeps the cursor in the item', async 
   // An indent that moves the item to another place in the list is undone with the cursor still in it.
   await card.getByLabel('Item text').nth(1).tap();
   await items(page).getByRole('button', { name: 'Indent' }).tap();
-  const depth = () => card.locator('[data-item-id]').nth(1).evaluate((el) => parseFloat((el as HTMLElement).style.paddingLeft) || 0);
+  const depth = () => card.locator('[data-item-id]').nth(1).evaluate((el) => parseFloat(getComputedStyle(el as HTMLElement).paddingLeft) || 0);
   expect(await depth()).toBeGreaterThan(0);
   await undo.tap();
   expect(await depth()).toBe(0);

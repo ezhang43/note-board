@@ -927,6 +927,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   /* The gap from the tick box to the text grows with A+, by the item buttons' step. */
   gap: calc(6px * var(--bb));
   border-radius: 4px;
+  /* Each level is indented 32px (--indent, set by the row: 32px times its level), but in a narrow list the deepest levels stop short so the text keeps 32px: the row's width less the tick box, the gap and the buttons' strip (the widest, 46px). */
+  padding-left: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - 20px * var(--bs) - 32px));
 }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
 .app.phone .todo-item { --bs: 1; }

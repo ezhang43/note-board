@@ -543,10 +543,21 @@ describe('dropping dragged items on a row', () => {
   });
 
   it('bottom half, far enough right: nested under the row', () => {
-    const nestFrom = C.ITEM_INDENT * 0 + C.NEST_ZONE;
+    const nestFrom = C.NEST_ZONE;
     expect(C.dropOnRow(sample(), 'b', at(nestFrom + 1, true), dragging(['x']))).toEqual({ drop: { mode: 'nest', targetId: 'b' }, markId: 'b', markMode: 'nest' });
     // a1 is one level in, so its nest zone starts one indent further right.
     expect(C.dropOnRow(sample(), 'a1', at(nestFrom + 1, true), dragging(['x']))?.drop.mode).toBe('after');
+    expect(C.dropOnRow(sample(), 'a1', at(C.ITEM_INDENT + nestFrom + 1, true), dragging(['x']))?.drop.mode).toBe('nest');
+  });
+
+  it('uses the drawn indent of a row cut short in a narrow list', () => {
+    // a1 would start its nest zone at 32 + 56 = 88; drawn at 10 it starts at 66.
+    expect(C.dropOnRow(sample(), 'a1', { xInRow: 70, lowerHalf: true, indent: 10 }, dragging(['x']))?.drop.mode).toBe('nest');
+    expect(C.dropOnRow(sample(), 'a1', { xInRow: 70, lowerHalf: true }, dragging(['x']))?.drop.mode).toBe('after');
+  });
+
+  it('each level of sub-items is indented 32px', () => {
+    expect(C.ITEM_INDENT).toBe(32);
   });
 
   it('after an item with sub-items, the mark shows under its last sub-item', () => {

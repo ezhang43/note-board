@@ -1,0 +1,1 @@
+- Spec wording: General notes typed on two devices before they sync follow the last save, like a day's note; the other device's text may be brought back from Version history.

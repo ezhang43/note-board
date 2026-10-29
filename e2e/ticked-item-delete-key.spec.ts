@@ -209,6 +209,29 @@ test.describe('on a touch screen', () => {
     await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
     expect(await focused(page)).toBe('milk');
   });
+
+  test('a tap with no text being typed in gives the box the keyboard, so a keyboard Delete removes the item, not the card', async ({ page }) => {
+    const list = await checklist(page, ['bread', 'milk', 'eggs']);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    const box = list.getByRole('checkbox', { name: 'Done: milk' });
+    await box.tap();
+    await expect(box).toBeChecked();
+    await expect(box).toBeFocused();
+    await page.keyboard.press('Delete');
+    await expect.poll(() => texts(list)).toEqual(['bread', 'eggs']);
+    await expect(cards(page)).toHaveCount(1);
+  });
+
+  test('a tap on a box in another card, while typing in a note, moves the focus to the box', async ({ page }) => {
+    const list = await checklist(page, ['bread', 'milk']);
+    await clickEmpty(page);
+    await add(page, 'Note');
+    await page.keyboard.type('hello');
+    const box = list.getByRole('checkbox', { name: 'Done: milk' });
+    await box.tap();
+    await expect(box).toBeChecked();
+    await expect(box).toBeFocused();
+  });
 });
 
 test.describe('on a phone', () => {

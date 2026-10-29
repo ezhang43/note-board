@@ -256,6 +256,16 @@ export function checklistActions(ctx: StoreContext) {
       );
     },
     /**
+     * Delete with the cursor in a ticked item (owner request 2026-10-29, job 218): removes it like its trash
+     * can, the cursor going to the item above (else below). Returns false, changing nothing, for an open item.
+     */
+    deleteTickedItem(cardId: string, itemId: string): boolean {
+      const card = ctx.state.board.cards[cardId];
+      if (card?.kind !== 'todo' || !C.findItem(card.items, itemId)?.item.done) return false;
+      actions.trashItem(cardId, itemId, true);
+      return true;
+    },
+    /**
      * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so
      * the cursor goes back into it at `caret` (else the item next to it) and the keyboard stays up.
      */

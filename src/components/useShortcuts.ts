@@ -8,6 +8,7 @@ import { collab } from '../sync/collabSession';
 import { handleArrowKey } from './keyboardNav';
 import { isPhone } from './usePhone';
 import type { FormatAsk } from '../store/actions/format';
+import { itemOf, removeItemByKey } from './itemDom';
 import { focusedBox } from './textBox';
 import { isTextField, panelCovers } from './textField';
 
@@ -153,6 +154,15 @@ export function useShortcuts() {
       // simple: a paste key the person re-mapped can't see the clipboard, so it always pastes the copied blocks.
       if (matches(hk.paste, e) && !matches(DEFAULT_HOTKEYS.paste, e) && appStore.paste()) return e.preventDefault();
       if (matches(hk.duplicate, e)) return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
+      // Focus on a checklist item's tick box (or another of its buttons), with no other block selected: Delete, Backspace
+      // or the board's delete key removes that item like its trash can, never the whole card (owner report, job 218).
+      const at = itemOf(e.target);
+      if (at && state.ui.selection.every((id) => id === at.cardId) && (matches(hk.delete, e) || (!mod && (key === 'delete' || key === 'backspace')))) {
+        return removeItemByKey(e, () => {
+          appStore.trashItem(at.cardId, at.itemId, true);
+          return true;
+        });
+      }
       if (matches(hk.delete, e) || (!mod && key === 'backspace')) {
         if (appStore.deleteSelection()) e.preventDefault();
       } else if (!mod && key === 'escape') appStore.clearSelection();

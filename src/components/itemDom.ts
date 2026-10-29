@@ -4,6 +4,7 @@ import type { ItemDrag, ItemHint } from '../store/store';
 import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, isOverCanvas } from './canvasDom';
 import { followEdges } from './edgeFollow';
+import { isTextField } from './textField';
 import { onLostFinger } from './touchHold';
 
 // Reading checklist rows from the screen while selecting or dragging items.
@@ -23,11 +24,61 @@ export function rowUnder(clientX: number, clientY: number, cardId: string): stri
 export function rowAt(clientX: number, clientY: number): { cardId: string; itemId: string } | null {
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
-    const row = el.closest<HTMLElement>('[data-item-id]');
-    const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
-    if (row && cardId) return { cardId, itemId: row.dataset.itemId! };
+    const at = itemOf(el);
+    if (at) return at;
   }
   return null;
+}
+
+/** The checklist row this element is in (its text, tick box or a button), with its list. */
+export function itemOf(el: EventTarget | null): { cardId: string; itemId: string } | null {
+  const row = el instanceof Element ? el.closest<HTMLElement>('[data-item-id]') : null;
+  const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
+  return row && cardId ? { cardId, itemId: row.dataset.itemId! } : null;
+}
+
+/**
+ * A tick box press (job 218). The box takes the keyboard (Safari and Firefox on a Mac don't do it
+ * for a click), so Delete then removes its item, not the card; no focus ring for a click. But a tap
+ * (finger or pen) while typing in a text box of the same card leaves the cursor there, so a phone's
+ * on-screen keyboard stays up.
+ */
+let keepFor: Element | null = null; // the tick box label whose press keeps the focus where it is
+const typingIn = (box: Element) => isTextField(document.activeElement) && document.activeElement!.closest('[data-card-id]') === box.closest('[data-card-id]');
+export const tickBoxPress = {
+  onPointerDown(e: { pointerType: string; currentTarget: Element; preventDefault(): void }) {
+    keepFor = e.pointerType !== 'mouse' && typingIn(e.currentTarget) ? e.currentTarget : null;
+    if (keepFor) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+  },
+  onClick(e: { target: EventTarget; currentTarget: Element; preventDefault(): void }) {
+    // A tap on the label around the box: the label would focus the box, so tick it through the box instead.
+    if (keepFor === e.currentTarget && e.target === e.currentTarget) {
+      e.preventDefault();
+      e.currentTarget.querySelector('input')?.click(); // a click from the page doesn't move the focus
+    }
+  },
+};
+export function tickBoxClick(e: { currentTarget: HTMLElement }) {
+  const box = e.currentTarget;
+  if (document.activeElement === box || (keepFor === box.parentElement && typingIn(box))) return;
+  box.focus({ preventScroll: true, focusVisible: false });
+}
+
+/**
+ * Delete or Backspace removed a checklist item (job 218): until a fresh press, the held key's
+ * repeats do nothing in the item the cursor moved to, so they can't join or remove more items.
+ */
+let removedByKey = false;
+type Key = { repeat: boolean; preventDefault(): void };
+/** Removes an item for this key press (`remove` says whether it did); a repeat does nothing. */
+export function removeItemByKey(e: Key, remove: () => boolean) {
+  e.preventDefault();
+  if (!e.repeat) removedByKey = remove();
+}
+/** A repeat of the key that just removed an item (asked on every Delete / Backspace in an item). */
+export function heldAfterRemoving(e: Key): boolean {
+  if (!e.repeat) removedByKey = false;
+  return removedByKey;
 }
 
 /**

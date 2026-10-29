@@ -13,12 +13,9 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Code layout
 
-- `src/model/` — types, constants (grid 20, zoom 30–250%, palette) and pure functions: no React, no DOM. Most logic tests live here; the store's are in `src/store/*.test.ts`.
-- `src/store/` — the single board state object, the change function, saving and loading. `core.ts` holds state, saving, undo, `commit` and the settle queue; actions live in `actions/` (blocks, boards, checklist, format, gestures, weight) and get the core through a `StoreContext`; `store.ts` puts them together.
-- `src/components/` — React components. They display state and call store actions; no geometry or rules logic inside them.
-- `src/sync/` — sign-in, Firebase sync and sharing, the demo people and the pretend servers for `npm run dev`. `src/calendar/` — Google Calendar.
-- `mcp/` — the Claude connector (see `mcp/README.md`). `scripts/` — publish rules, Claude hooks, test ports and scripts run by hand. `about/`, `faq/`, `terms/`, `privacy/`, `delete-account/` with `src/site.ts` and `src/site.css` — the website.
-- `e2e/` — Playwright tests of real flows in a browser.
+- `src/model/` is pure: no React, no DOM. Most logic tests live here; the store's are in `src/store/*.test.ts`.
+- Store actions (`src/store/actions/`) get the core (`core.ts`) through a `StoreContext`.
+- Components (`src/components/`) display state and call store actions; no geometry or rules logic inside them.
 
 ## Build rules
 
@@ -48,7 +45,8 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 The usual ones are in `package.json` scripts. Beyond those:
 
-- `npx playwright install chromium webkit` — once, after `npm install`
+- `npm ci` first in a fresh checkout or worktree (`node_modules` is not copied), then `npx playwright install chromium webkit` once
+- The checks rule 3 needs: `npm run typecheck`, `npm test`, `npm run test:e2e`. One file: `npx vitest run src/model/x.test.ts`, `npx playwright test e2e/x.spec.ts`
 - `npm run test:rules` needs Java (part of "All tests")
 - `node scripts/fold-changes.mjs` — the crew coordinator's publish step: folds `changes/*.md` into `CHANGELOG.md` and `docs/decisions.md` (rule 5)
 - `node scripts/claude-hooks.mjs level` — does the current change touch a risky file (picks the review level)
@@ -56,6 +54,14 @@ The usual ones are in `package.json` scripts. Beyond those:
 ## Plugins
 
 `.claude/settings.json` lists the owner's plugins (`enabledPlugins`, with their marketplaces in `extraKnownMarketplaces`) so every session on this project, cloud or local, loads them (owner request, 2026-10-22). Add a new plugin there, not only on one computer.
+
+## Claude Code setup
+
+`docs/claude-best-practices.md` lists the Anthropic Claude Code pages this setup follows, when they were last checked, and what we do about each (owner request, 2026-10-29). A daily check compares it with the live pages. When a page changes, apply the safe changes that day and update that file. Anything touching saving, sync, sharing, security, permissions or pushing, or an owner rule above, goes to the owner as a question with a recommended answer.
+
+## When compacting
+
+Keep the branch and job, the tests run and their results, the files changed, and the push limits in rule 9.
 
 ## Decisions
 

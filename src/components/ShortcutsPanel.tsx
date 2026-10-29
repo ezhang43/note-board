@@ -57,6 +57,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Tab / Shift+Tab', 'Nest under the item above / move out a level'],
       ['Backspace in an empty item', 'Delete it'],
       ['Delete at the end', 'Join the next item into this one'],
+      ['Delete in a ticked item', 'Delete it, like its trash can'],
       ['Up / Down', 'Move between items and cards'],
       ['Ctrl+Shift+Up / Down', 'Move the item up / down past its neighbor'],
       ['Shift+click, or press and drag', 'Select several items (drag on into the next cards of a container)'],

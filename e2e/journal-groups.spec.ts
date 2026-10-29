@@ -17,7 +17,7 @@ const TODAY = 'Wed 14 Oct 2026';
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' });
 const group = (page: Page, name: string) => panel(page).getByRole('button', { name, exact: true });
 /** Each day's date line, top to bottom (a day's heading is named by it; today's page comes first). */
-const dates = (page: Page) => panel(page).getByRole('heading', { level: 3 }).evaluateAll((els) => els.map((e) => e.querySelector('.sr-only')?.textContent));
+const dates = (page: Page) => panel(page).locator('.journal-entry h3').evaluateAll((els) => els.map((e) => e.querySelector('.sr-only')?.textContent));
 /** The group headers that are shut, top to bottom (a group's name is its first words; counts and days are left out). */
 const shutGroups = (page: Page) => panel(page).locator('.jg-head[aria-expanded="false"]:not(.jg-day)').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent));
 const openDay = (page: Page, date: string) => panel(page).getByRole('button', { name: new RegExp(`^${date}`) }).click();
@@ -62,7 +62,7 @@ test('opens with the current year, month and week open, today visible, and every
   for (const name of ['5–11 Oct', '1–4 Oct', 'September', 'January', '2025']) await expect(group(page, name)).toHaveAttribute('aria-expanded', 'false');
   // Only this week's days are on show: today (with the cursor) and Tuesday.
   expect(await dates(page)).toEqual([TODAY, 'Tue 13 Oct 2026']);
-  await expect(panel(page).getByRole('textbox').first()).toBeFocused();
+  await expect(panel(page).getByRole('textbox', { name: /^Journal, / }).first()).toBeFocused();
   // A shut group's days are not in the panel at all.
   await expect(group(page, 'September')).toBeVisible();
   await expect(group(page, '28–30 Sep')).toHaveCount(0);
@@ -83,7 +83,7 @@ test('a group opens and shuts when its button is clicked or pressed with the key
   await group(page, '28–30 Sep').click();
   await expect.poll(() => dates(page)).toEqual([TODAY, 'Tue 13 Oct 2026', 'Fri 9 Oct 2026', 'Sun 4 Oct 2026', 'Tue 29 Sep 2026']);
   await openDay(page, 'Tue 29 Sep 2026'); // earlier days start folded
-  await expect(panel(page).getByRole('textbox').nth(1)).toHaveText('wrote Tue 29 Sep 2026');
+  await expect(panel(page).getByRole('textbox', { name: /^Journal, / }).nth(1)).toHaveText('wrote Tue 29 Sep 2026');
   // The keyboard works, and the button shows a focus ring.
   await page.keyboard.press('Shift'); // the keyboard was used last, so the ring shows
   await group(page, 'January').focus();
@@ -128,7 +128,7 @@ test('what is open or shut is kept after a reload, on this device only', async (
   await expect(group(page, 'January')).toHaveAttribute('aria-expanded', 'false');
   // The panel opens with today's note, so the week holding today is open again (the cursor is in it).
   await expect(group(page, '12–18 Oct')).toHaveAttribute('aria-expanded', 'true');
-  await expect(panel(page).getByRole('textbox').first()).toBeFocused();
+  await expect(panel(page).getByRole('textbox', { name: /^Journal, / }).first()).toBeFocused();
   // It is kept in its own place, not in the board's saved data.
   const kept = await page.evaluate((key) => ({ choices: localStorage.getItem(key), board: localStorage.getItem('note-board:v1') }), OPEN_KEY);
   expect(JSON.parse(kept.choices!)).toMatchObject({ '2026-09': true, '2025': true });

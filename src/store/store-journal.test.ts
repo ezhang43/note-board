@@ -373,3 +373,90 @@ describe('Journal formatting (owner request, 2026-10-19)', () => {
     expect(saved.text.split('\n')).toHaveLength(20003);
   });
 });
+
+// General notes (owner request, 2026-10-29): one note on the Journal board for notes not tied to a day.
+describe('Journal general notes', () => {
+  const general = (s: Store) => journalNotes(s).filter((n) => n.text.startsWith('General notes'));
+
+  it('opening the panel adds nothing for them; the first typing adds one note, which is never a day', () => {
+    const s = setup();
+    s.openJournal();
+    expect(general(s)).toEqual([]);
+    s.setJournalNotes(fromPlain('')); // nothing typed: still nothing
+    expect(general(s)).toEqual([]);
+    const edits = s.edits();
+    s.setJournalNotes(fromPlain('Call the plumber'));
+    expect(general(s).map((n) => n.text)).toEqual(['General notes\n\nCall the plumber']);
+    expect(s.edits()).toBeGreaterThan(edits);
+    s.setJournalNotes(fromPlain('Call the plumber\nBuy stamps'));
+    expect(general(s).map((n) => n.text)).toEqual(['General notes\n\nCall the plumber\nBuy stamps']);
+    expect(journalNotes(s)).toHaveLength(2); // today's note and the general notes
+  });
+
+  it('typing in them does nothing (and does not crash) once the Journal board is gone', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    const ws = s.workspace();
+    const boards = { ...ws.boards };
+    delete boards[id];
+    s.replaceWorkspace({ ...ws, boards });
+    expect(() => s.setJournalNotes(fromPlain('lost?'))).not.toThrow();
+    expect(s.workspace().boards[id]).toBeUndefined();
+  });
+
+  it('keeps the Journal board hidden, and sits clear of today’s note', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    s.setJournalNotes(fromPlain('list'));
+    expect(s.hiddenBoards()).toEqual([id]);
+    const [g] = general(s);
+    const day = journalNotes(s).find((n) => n.text.startsWith(today))!;
+    expect(g.x).toBeGreaterThan(day.x);
+  });
+
+  it('saves its formatting like a day does', () => {
+    const s = setup();
+    s.openJournal();
+    const rich: Rich = [{ type: 'p', runs: [{ text: 'bold', b: true }] }];
+    s.setJournalNotes(rich, false);
+    expect(general(s)[0].rich).toEqual(rich);
+    expect(general(s)[0].text).toBe('General notes\n\nbold');
+  });
+
+  it('undo in the panel takes the typing and the note away in one step, and redo brings them back', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('a'));
+    s.setJournalNotes(fromPlain('ab'));
+    s.undoJournal();
+    expect(general(s)).toEqual([]);
+    expect(journalNotes(s)).toHaveLength(1); // today's note stays
+    s.redoJournal();
+    expect(general(s).map((n) => n.text)).toEqual(['General notes\n\nab']);
+  });
+
+  it('is kept after a reload, and the next day leaves it as it is', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    s.setJournalNotes(fromPlain('kept'));
+    s.flush();
+    const again = createStore(storage, later);
+    vi.setSystemTime(new Date(2026, 9, 19, 9, 0));
+    again.openJournal();
+    expect(general(again).map((n) => n.text)).toEqual(['General notes\n\nkept']);
+    again.setJournalNotes(fromPlain('kept, more'));
+    expect(general(again)).toHaveLength(1);
+  });
+
+  it('writes nothing once a share holds the Journal board', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    s.setShares([{ id: 's1', root: id, boards: [id], owner: true, ownerUid: 'me', people: [], links: { edit: null, comment: null, view: null, roles: false } }], true);
+    s.setJournalNotes(fromPlain('secret'));
+    expect(general(s)).toEqual([]);
+  });
+});

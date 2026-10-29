@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { findJournalBoard, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { JOURNAL_NOTES, findJournalBoard, generalNote, generalSpot, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { dayKey as calendarDayKey } from './calendar';
 import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
@@ -373,5 +373,77 @@ describe('journal page heading', () => {
     expect(journalWords('')).toBe(0);
     expect(journalWords('  \n ')).toBe(0);
     expect(journalWords('Quiet start.\n\n• Sam’s soup\n1.  Ten  quiet minutes')).toBe(7);
+  });
+});
+
+// General notes (owner request, 2026-10-29): one note on the Journal board, first line "General notes", never a day.
+
+describe('generalNote', () => {
+  it('is the note whose first line is exactly "General notes"', () => {
+    let b = createBoard();
+    ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\nhi', 0, 0));
+    expect(generalNote(b)).toBeNull();
+    const g = noteAt(b, `${JOURNAL_NOTES}\n\nmy list`, 300, 0);
+    expect(generalNote(g.board)).toBe(g.id);
+    expect(generalNote(noteAt(b, 'General notes\r\n\nx', 300, 0).board)).not.toBeNull();
+    // Anything else on the first line is an ordinary note.
+    expect(generalNote(noteAt(b, 'General notes about cats', 300, 0).board)).toBeNull();
+    expect(generalNote(noteAt(b, 'general notes', 300, 0).board)).toBeNull();
+    expect(generalNote(addCard(b, { ...createCard('todo'), title: JOURNAL_NOTES } as Card, { type: 'loose', x: 300, y: 0 }))).toBeNull();
+  });
+
+  it('is never a day, and a day is never it', () => {
+    const g = noteAt(createBoard(), `${JOURNAL_NOTES}\n\nSun 18 Oct 2026`, 0, 0);
+    expect(journalEntries(g.board)).toEqual([]);
+    expect(groupJournal(journalEntries(g.board), '2026-10-18')).toEqual([]);
+    const d = noteAt(createBoard(), 'Sun 18 Oct 2026\n\nGeneral notes', 0, 0);
+    expect(generalNote(d.board)).toBeNull();
+  });
+
+  it('with two (two devices, or a copy), the same one everywhere: the smaller id', () => {
+    let b = createBoard();
+    b = addCard(b, { ...createCard('note', 'k-b'), text: `${JOURNAL_NOTES}\n\nb` } as Card, { type: 'loose', x: 0, y: 0 });
+    b = addCard(b, { ...createCard('note', 'k-a'), text: `${JOURNAL_NOTES}\n\na` } as Card, { type: 'loose', x: 0, y: 300 });
+    expect(generalNote(b)).toBe('k-a');
+  });
+});
+
+describe('the general notes and the Journal board', () => {
+  const journal = (extra: (b: Board) => Board = (b) => b): Workspace => {
+    const j = noteAt({ ...createBoard(), name: 'Journal' }, 'Sun 18 Oct 2026\n\nhi', 0, 0).board;
+    return { home: 'home', boards: { home: createBoard(), j: extra(j) } };
+  };
+
+  it('keeps the Journal board hidden', () => {
+    expect(hiddenJournal(journal((b) => noteAt(b, `${JOURNAL_NOTES}\n\nlist`, 400, 0).board), [])).toBe('j');
+    expect(hiddenJournal({ home: 'home', boards: { home: createBoard(), j: noteAt({ ...createBoard(), name: 'Journal' }, `${JOURNAL_NOTES}\n\n`, 0, 0).board } }, [])).toBe('j');
+  });
+
+  it('a second general notes card is something else on it, so the board is listed (nothing is out of sight)', () => {
+    const two = journal((b) => noteAt(noteAt(b, `${JOURNAL_NOTES}\n\none`, 400, 0).board, `${JOURNAL_NOTES}\n\ntwo`, 400, 300).board);
+    expect(hiddenJournal(two, [])).toBeNull();
+  });
+
+  it("today's note still goes straight above the dated notes, level with the leftmost, wherever the general notes are", () => {
+    const none = () => undefined;
+    let b = createBoard();
+    ({ board: b } = noteAt(b, 'Sat 17 Oct 2026\n\nx', 100, 200));
+    ({ board: b } = noteAt(b, `${JOURNAL_NOTES}\n\nlist`, -400, -600));
+    const spot = journalSpot(b, none, { x: 0, y: 0 });
+    expect(spot.x).toBe(100);
+    expect(spot.y).toBeLessThan(200 - NEW_BLOCK_H.note);
+    expect(spot.y).toBeGreaterThan(-200);
+  });
+
+  it('goes to the right of everything, level with the top, clear of all of it', () => {
+    const none = () => undefined;
+    let b = createBoard();
+    ({ board: b } = noteAt(b, 'Sat 17 Oct 2026\n\nx', 100, 200));
+    ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\ny', 100, 40));
+    const spot = generalSpot(b, none, { x: 0, y: 0 });
+    expect(spot.x).toBeGreaterThan(100 + CARD_W);
+    expect(spot.y).toBe(40);
+    const rect = { ...spot, w: CARD_W, h: NEW_BLOCK_H.note };
+    for (const c of Object.values(b.cards)) expect(overlaps(rect, { x: c.x, y: c.y, w: CARD_W, h: NEW_BLOCK_H.note }, 10)).toBe(false);
   });
 });

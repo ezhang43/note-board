@@ -8,7 +8,7 @@ import { cards, freshBoardEachTest } from './helpers';
 freshBoardEachTest();
 
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' });
-const editor = (page: Page) => panel(page).getByRole('textbox').first();
+const editor = (page: Page) => panel(page).getByRole('textbox', { name: /^Journal, / }).first();
 const tools = (page: Page) => panel(page).getByRole('toolbar', { name: 'Formatting' });
 const tool = (page: Page, name: string) => tools(page).getByRole('button', { name, exact: true });
 // Style, size, font and highlight are in one Aa menu (the page-and-timeline design, owner pick 2026-10-22).
@@ -235,7 +235,7 @@ test('plain typing is left to the browser (spelling and phone keyboards keep wor
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+b');
   await page.keyboard.press('End');
-  await page.evaluate(() => ((window as unknown as { kept: Node }).kept = document.querySelector('.rich [data-b]')!.firstChild!));
+  await page.evaluate(() => ((window as unknown as { kept: Node }).kept = document.querySelector('.journal-entry .rich [data-b]')!.firstChild!));
   await page.keyboard.type('er');
   await expect(editor(page).locator('[data-b]')).toHaveText('bolder');
   expect(await page.evaluate(() => (window as unknown as { kept: Node }).kept.isConnected)).toBe(true);
@@ -249,26 +249,26 @@ test('an edit the browser won’t let the app block is read back, not done twice
   // A keyboard (Android) whose Enter can't be cancelled: the app leaves it to the browser.
   const prevented = await page.evaluate(() => {
     const e = new InputEvent('beforeinput', { inputType: 'insertParagraph', cancelable: false, bubbles: true });
-    document.querySelector('.rich')!.dispatchEvent(e);
-    return document.querySelectorAll('.rich > div').length;
+    document.querySelector('.journal-entry .rich')!.dispatchEvent(e);
+    return document.querySelectorAll('.journal-entry .rich > div').length;
   });
   expect(prevented).toBe(1);
   // Something the browser wraps around a bold word still reads as bold.
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+b');
   await page.evaluate(() => {
-    const span = document.querySelector('.rich [data-b]')!;
+    const span = document.querySelector('.journal-entry .rich [data-b]')!;
     const wrap = document.createElement('font');
     wrap.append(...span.childNodes);
     span.append(wrap);
-    document.querySelector('.rich')!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    document.querySelector('.journal-entry .rich')!.dispatchEvent(new InputEvent('input', { bubbles: true }));
   });
   await expect(editor(page).locator('[data-b]')).toHaveText('one');
   await expect(editor(page).locator('font')).toHaveCount(0);
   // Dragging words inside a note can't start (it would copy them, not move them).
   const dragBlocked = await page.evaluate(() => {
     const e = new DragEvent('dragstart', { bubbles: true, cancelable: true });
-    document.querySelector('.rich [data-b]')!.firstChild!.parentElement!.dispatchEvent(e);
+    document.querySelector('.journal-entry .rich [data-b]')!.firstChild!.parentElement!.dispatchEvent(e);
     return e.defaultPrevented;
   });
   expect(dragBlocked).toBe(true);

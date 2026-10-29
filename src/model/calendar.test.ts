@@ -26,6 +26,7 @@ import {
   isEmail,
   monthGrid,
   moveDraftStart,
+  moveDraftStartTime,
   moveView,
   newDraft,
   parseEvent,
@@ -316,6 +317,32 @@ describe('editing an event', () => {
     const d = { title: 'Trip', allDay: true, startDate: '2026-10-08', startTime: '09:00', endDate: '2026-10-09', endTime: '10:00', guests: [] };
     expect(moveDraftStart(d, '2026-10-20')).toMatchObject({ startDate: '2026-10-20', endDate: '2026-10-21' });
     expect(moveDraftStart(d, '')).toBe(d);
+  });
+
+  it('changing the start time moves the end time by as much, keeping the length (job 216)', () => {
+    const d = { title: '', allDay: false, startDate: '2026-10-07', startTime: '10:00', endDate: '2026-10-07', endTime: '11:00', guests: [] };
+    expect(moveDraftStartTime(d, '14:00')).toMatchObject({ startTime: '14:00', endTime: '15:00', endDate: '2026-10-07' });
+    expect(moveDraftStartTime(d, '09:15')).toMatchObject({ startTime: '09:15', endTime: '10:15' });
+    // A length the person set by changing the end is kept on the next start change.
+    const long = { ...d, endTime: '16:00' };
+    expect(moveDraftStartTime(long, '15:00')).toMatchObject({ startTime: '15:00', endTime: '21:00' });
+  });
+
+  it('a one-day event whose end would pass midnight ends at 23:59 instead (job 216)', () => {
+    const d = { title: '', allDay: false, startDate: '2026-10-07', startTime: '10:00', endDate: '2026-10-07', endTime: '11:00', guests: [] };
+    expect(moveDraftStartTime(d, '23:30')).toMatchObject({ startTime: '23:30', endTime: '23:59', endDate: '2026-10-07' });
+  });
+
+  it('an event over several days moves its end across midnight (job 216)', () => {
+    const d = { title: '', allDay: false, startDate: '2026-10-07', startTime: '22:00', endDate: '2026-10-08', endTime: '01:00', guests: [] };
+    expect(moveDraftStartTime(d, '23:00')).toMatchObject({ endTime: '02:00', endDate: '2026-10-08' });
+    expect(moveDraftStartTime(d, '10:00')).toMatchObject({ endTime: '13:00', endDate: '2026-10-07' });
+  });
+
+  it('a time box that is empty or not a time changes only the start (job 216)', () => {
+    const d = { title: '', allDay: false, startDate: '2026-10-07', startTime: '10:00', endDate: '2026-10-07', endTime: '11:00', guests: [] };
+    expect(moveDraftStartTime(d, '')).toEqual({ ...d, startTime: '' });
+    expect(moveDraftStartTime({ ...d, startTime: '' }, '12:00')).toEqual({ ...d, startTime: '12:00' });
   });
 
   it('turns a timed draft into what Google takes, in the person’s time zone', () => {

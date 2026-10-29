@@ -12,6 +12,7 @@ import {
   isEmail,
   monthGrid,
   moveDraftStart,
+  moveDraftStartTime,
   newDraft,
   rangeLabel,
   timeLabel,
@@ -621,7 +622,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
               <span>Starts</span>
               <div className="cal-when">
                 <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
-                {!draft.allDay && <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => change({ startTime: e.currentTarget.value })} />}
+                {!draft.allDay && <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => setDraft(moveDraftStartTime(draft, e.currentTarget.value))} />}
               </div>
             </div>
             <div className="cal-field">
@@ -673,7 +674,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
             {!draft.allDay && (
               <div className="cal-field">
                 <div className="cal-when cal-times">
-                  <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => change({ startTime: e.currentTarget.value })} />
+                  <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => setDraft(moveDraftStartTime(draft, e.currentTarget.value))} />
                   <span aria-hidden="true">–</span>
                   <input type="time" aria-label="End time" value={draft.endTime} onChange={(e) => change({ endTime: e.currentTarget.value })} />
                 </div>

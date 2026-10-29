@@ -35,6 +35,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       { action: 'duplicate', what: 'Duplicate the selection' },
       { action: 'delete', what: 'Delete the selection (Backspace too)' },
       ['Arrows (Shift: 5 steps)', 'Move the selection'],
+      ['Arrows with nothing selected', 'Pan the board (Shift: farther); not on a phone'],
       ['Alt+arrows', 'Jump to the nearest card or container that way'],
       ['Escape', 'Leave a text field (keeps the card selected), then clear the selection'],
     ],

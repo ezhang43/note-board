@@ -1454,6 +1454,50 @@ test('quick-add: a title and Enter saves it, the list shows it and the overlay i
   expect(errors).toEqual([]);
 });
 
+// Changing the start time moves the end time with it, keeping the length, as Google Calendar does (job 216).
+test('quick-add: changing the start moves the end, a new end sets a new length', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  const start = form(page).getByLabel('Start time');
+  const end = form(page).getByLabel('End time');
+  await start.fill('10:00');
+  await expect(end).toHaveValue('11:00');
+  await start.fill('14:00');
+  await expect(end).toHaveValue('15:00');
+  await end.fill('16:00');
+  await expect(start).toHaveValue('14:00');
+  await start.fill('15:00');
+  await expect(end).toHaveValue('17:00');
+  // Past midnight, a one-day event ends at 23:59 instead.
+  await start.fill('23:30');
+  await expect(end).toHaveValue('23:59');
+  expect(errors).toEqual([]);
+});
+
+test('full form: the end follows the start for a new event and for a changed one, and the end date follows the start date', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  await plus(page, today).click();
+  await form(page).getByRole('button', { name: 'More options' }).click();
+  await form(page).getByLabel('Start time').fill('10:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('11:00');
+  await form(page).getByLabel('Start time').fill('14:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('15:00');
+  await form(page).getByLabel('End time').fill('16:00');
+  await form(page).getByLabel('Start time').fill('15:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('17:00');
+  await form(page).getByLabel('Start date').fill(key(daysFromToday(2)));
+  await expect(form(page).getByLabel('End date')).toHaveValue(key(daysFromToday(2)));
+  await form(page).getByRole('button', { name: 'Cancel' }).click();
+  // A changed event (Dentist, 10:00 to 11:00) keeps its length too.
+  await edit(page, day(page, today).getByRole('button', { name: /Dentist/ }));
+  await form(page).getByLabel('Start time').fill('13:30');
+  await expect(form(page).getByLabel('End time')).toHaveValue('14:30');
+  expect(errors).toEqual([]);
+});
+
 test('More options opens the full form in the same overlay, keeping what was typed', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();

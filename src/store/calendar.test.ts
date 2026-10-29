@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, UNDO_FAILED, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
-// Calendar events aren't board data: nothing here is undone, synced with boards or kept in versions.
+// Calendar events aren't board data: not in Ctrl+Z, synced with boards or kept in versions
+// (only the Undo message after a change, job 217).
 
 const ev = (id: string, over: Partial<CalEvent> = {}): CalEvent => ({
   id,
@@ -48,6 +49,11 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
       calls.push(`create ${body.summary}${mail(notify)}`);
       api.bodies.push(body);
       if (api.fail) throw new Error('403');
+      return 'new1';
+    },
+    async restore(id) {
+      calls.push(`restore ${id}`);
+      if (api.fail) throw new Error('403');
     },
     async update(id, body, notify) {
       calls.push(`update ${id} ${body.summary}${mail(notify)}`);
@@ -55,8 +61,11 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
       if (api.fail || id === api.failId) throw new Error('403');
       if (!events.some((e) => e.id === id || e.series === id)) throw new Error('404');
       // Like Google, an event of a series has an id made from its series' time, so changing the
-      // series' times can give its events new ids (simple: any change with a start does here).
-      if (body.start) events = events.map((e) => (e.series === id ? { ...e, id: `${e.id}~` } : e));
+      // series' time gives its events new ids, and putting the time back gives the old ids back.
+      if (body.start) {
+        const back = 'dateTime' in body.start && body.start.dateTime === `${api.series.start ?? '2026-09-01T09:00'}:00`;
+        events = events.map((e) => (e.series === id ? { ...e, id: back ? e.id.split('~')[0] : `${e.id.split('~')[0]}~` } : e));
+      }
       if (body.summary !== undefined) events = events.map((e) => (e.id === id ? { ...e, title: body.summary! } : e));
     },
     async remove(id, notify) {
@@ -249,7 +258,7 @@ describe('changing events', () => {
     expect(api.calls.length).toBe(1);
   });
 
-  it('deletes an event (no undo: it is Google’s, not the board’s)', async () => {
+  it('deletes an event (not in Ctrl+Z: it is Google’s, not the board’s)', async () => {
     const api = fakeApi([ev('a'), ev('b')]);
     const cal = createCalendar(api, today);
     await cal.open();
@@ -493,6 +502,174 @@ describe('repeating events and guests (job #85)', () => {
   });
 });
 
+// After a change, a soft "Event added / saved / deleted · Undo" (owner request, 2026-10-29, job 217).
+// Undo never emails guests (sendUpdates=none).
+describe('Undo after adding, saving or deleting an event (job 217)', () => {
+  const me = { email: 'me@example.com', self: true };
+  const sam = { email: 'sam@example.com', responseStatus: 'accepted' };
+  const swim = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00', guests: [] as string[] };
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const done = (cal: ReturnType<typeof createCalendar>) => cal.get().done?.text ?? null;
+
+  it('adding says “Event added”; Undo deletes the new event without emailing guests, and shows the calendar again', async () => {
+    const api = fakeApi([]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(done(cal)).toBeNull();
+    expect(await cal.save(null, { ...swim, guests: ['pat@example.com'] }, { notify: true })).toBeNull();
+    expect(done(cal)).toBe('Event added');
+    await cal.undo();
+    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(done(cal)).toBeNull();
+  });
+
+  it('saving says “Event saved”; Undo puts the old title, time and guests back without emailing them', async () => {
+    const lunch = ev('lunch', { title: 'Lunch', guests: [me, sam], start: '2026-10-07T12:30', end: '2026-10-07T13:30' });
+    const api = fakeApi([lunch]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const d = { ...swim, title: 'Brunch', startTime: '11:00', endTime: '12:00', guests: [] };
+    expect(await cal.save(at(cal, 'lunch'), d, { notify: true })).toBeNull();
+    expect(done(cal)).toBe('Event saved');
+    await cal.undo();
+    expect(api.calls.at(-2)).toBe('update lunch Lunch (no emails)');
+    expect(api.bodies.at(-1)).toEqual({
+      summary: 'Lunch',
+      start: { dateTime: '2026-10-07T12:30:00', timeZone: zone },
+      end: { dateTime: '2026-10-07T13:30:00', timeZone: zone },
+      attendees: [me, sam],
+    });
+  });
+
+  it('Undo of a save leaves the guests alone when they weren’t changed', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'B' });
+    await cal.undo();
+    expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
+  });
+
+  it('an all-day event’s Undo puts its days back', async () => {
+    const api = fakeApi([ev('h', { allDay: true, start: '2026-10-09', end: '2026-10-10' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(at(cal, 'h'), { ...draftOf('h'), allDay: true, startDate: '2026-10-11', endDate: '2026-10-11' });
+    await cal.undo();
+    expect(api.bodies.at(-1)).toEqual({ summary: 'h', start: { date: '2026-10-09' }, end: { date: '2026-10-10' } });
+  });
+
+  it('“All events in the series”: Undo puts the series back first, then the edited event’s own change', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    // A new time too: the series' change gives the edited event a new id, and putting it back gives the old one back.
+    const d = { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' };
+    expect(await cal.save(at(cal, 'su_1016'), d, { all: true })).toBeNull();
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016~']);
+    expect(done(cal)).toBe('Event saved');
+    const before = api.bodies.length;
+    await cal.undo();
+    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.bodies[before]).toEqual({ summary: 'Stand-up', start: { dateTime: '2026-09-01T09:00:00', timeZone: zone }, end: { dateTime: '2026-09-01T09:15:00', timeZone: zone } });
+    expect(api.bodies[before + 1]).toEqual({ summary: 'Stand-up' });
+  });
+
+  it('deleting says “Event deleted”; Undo restores that event, one event of a series, or the whole series, without emails', async () => {
+    const one = ev('su_1016', { series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15' });
+    const other = ev('su_1017', { series: 'su', start: '2026-10-17T09:00', end: '2026-10-17T09:15' });
+    const api = fakeApi([ev('a'), one, other]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.remove('a')).toBeNull();
+    expect(done(cal)).toBe('Event deleted');
+    await cal.undo();
+    expect(api.calls.slice(-2)).toEqual(['restore a', 'list 2026-10-06 2026-10-13']);
+    await cal.remove('su_1016', { all: false });
+    await cal.undo();
+    expect(api.calls.slice(-2)[0]).toBe('restore su_1016');
+    await cal.remove('su_1017', { all: true });
+    await cal.undo();
+    expect(api.calls.slice(-2)[0]).toBe('restore su');
+  });
+
+  it('when Undo doesn’t reach Google it says so, with nothing more to undo', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.remove('a');
+    api.fail = true;
+    await cal.undo();
+    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+  });
+
+  it('no message when the change itself failed or was refused; a new change replaces the message; dismiss clears it', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save(null, { ...swim, endTime: '06:00' })).toBe(BAD_TIMES);
+    expect(done(cal)).toBeNull();
+    api.fail = true;
+    expect(await cal.remove('a')).toBe(SAVE_FAILED);
+    expect(done(cal)).toBeNull();
+    api.fail = false;
+    await cal.save(at(cal, 'a'), draftOf('a'));
+    const first = cal.get().done!;
+    await cal.remove('b');
+    expect(done(cal)).toBe('Event deleted');
+    expect(cal.get().done!.n).not.toBe(first.n);
+    cal.dismissDone();
+    expect(done(cal)).toBeNull();
+    // Undo with nothing to undo does nothing.
+    const calls = api.calls.length;
+    await cal.undo();
+    expect(api.calls.length).toBe(calls);
+  });
+
+  it('an event whose old times can’t be sent back (an end not after its start) gets no Undo', async () => {
+    const api = fakeApi([ev('z', { start: '2026-10-06T09:00', end: '2026-10-06T09:00' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save(at(cal, 'z'), { ...draftOf('z'), startTime: '09:00', endTime: '09:30' })).toBeNull();
+    expect(cal.get().done).toMatchObject({ text: 'Event saved', undo: null });
+  });
+
+  it('a failed undo doesn’t replace a newer message', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.remove('a');
+    let fail!: () => void;
+    api.restore = () => new Promise((_, no) => (fail = () => no(new Error('offline'))));
+    const undoing = cal.undo();
+    await cal.remove('b');
+    fail();
+    await undoing;
+    expect(cal.get().done?.text).toBe('Event deleted');
+    expect(cal.get().done?.undo).not.toBeNull();
+  });
+
+  it('opening the panel again drops the message (someone else may be signed in now)', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.remove('a');
+    await cal.open();
+    expect(cal.get().done).toBeNull();
+  });
+
+  it('an added event Google gave no id for has no Undo', async () => {
+    const api = fakeApi([]);
+    api.create = async () => null;
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(null, swim);
+    expect(cal.get().done).toMatchObject({ text: 'Event added', undo: null });
+  });
+});
+
 function draftOf(id: string) {
   return { title: id, allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] as string[] };
 }
@@ -562,6 +739,21 @@ describe('talking to the Calendar API', () => {
     await api.update('a', body, false);
     await api.remove('a', true);
     expect(f.calls.map((c) => new URL(c.url).searchParams.get('sendUpdates'))).toEqual([null, 'all', 'none', 'all']);
+  });
+
+  it('adding gives back the new event’s id; restoring a deleted event sets it back to confirmed, never emailing guests (job 217)', async () => {
+    const f = fakeFetch(200, { id: 'new9' });
+    const api = calendarApi(source(), f.fn);
+    expect(await api.create({ summary: 'S', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } })).toBe('new9');
+    await api.restore('a/b');
+    expect(f.calls[1].init.method).toBe('PATCH');
+    expect(f.calls[1].url).toBe('https://api.test/calendar/v3/calendars/primary/events/a%2Fb?sendUpdates=none');
+    expect(JSON.parse(String(f.calls[1].init.body))).toEqual({ status: 'confirmed' });
+    expect(await calendarApi(source(), fakeFetch(200, {}).fn).create({ summary: 'S', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } })).toBeNull();
+    await expect(calendarApi(source(), fakeFetch(410, {}).fn).restore('a')).rejects.toThrow();
+    // An add Google made but whose answer can't be read still counts as added (no Undo), so Save isn't tried twice.
+    const cut = vi.fn(async () => new Response('{"id": "ne', { status: 200 })) as unknown as typeof fetch;
+    expect(await calendarApi(source(), cut).create({ summary: 'S', start: { date: '2026-10-08' }, end: { date: '2026-10-09' } })).toBeNull();
   });
 
   it('reads one event (a repeating event’s series) by its id', async () => {

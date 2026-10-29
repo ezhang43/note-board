@@ -37,7 +37,7 @@ const START_TIMES = startTimeOptions();
 
 // Google Calendar side panel (owner request, 2026-10-06): the signed-in person's primary calendar,
 // a week or a month, beside the board. The person's own events can be added, moved, renamed and
-// deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data: no undo, not in Version history.
+// deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data: not in Ctrl+Z or Version history (a change's Undo message, job 217, is their undo).
 
 /**
  * Opens the panel: a round button by the zoom control (the toolbar is full at 1280px), a tile in ⋯
@@ -478,7 +478,7 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
 /**
  * The questions asked before saving or deleting (job #85): "which events?" for one of a repeating
  * series, then "Send update emails to guests?" when there are guests. A one-off event is deleted
- * without asking (owner request, 2026-10-24, job #209), though calendar events have no undo.
+ * without asking (owner request, 2026-10-24, job #209); its Undo message brings it back (job 217).
  */
 type Ask = { action: 'save' | 'delete'; step: 'which' | 'emails'; all?: boolean };
 type Next = (action: Ask['action'], d: Draft, choice: Choice, step: 'start' | Ask['step']) => void;

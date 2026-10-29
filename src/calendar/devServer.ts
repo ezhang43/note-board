@@ -11,7 +11,10 @@ import { dayKey as dateKey } from '../model/calendar';
 // "Book club" in 2 days 18:00–19:00 (someone else's, the person invited).
 // Only what the panel uses: list (timeMin / timeMax), get, add, change and delete on calendars/primary,
 // for one event of a series or the whole series (its id), with guests and sendUpdates (job #85).
-// Moving a series' time gives its events new ids, as Google can (job #88).
+// Moving a series' time gives its events new ids, as Google can (job #88), made from that time, so
+// moving it back gives the old ids back. Like Google, a deleted event is kept as cancelled and can be
+// restored by setting its status back to confirmed (the Undo message, job 217); a deleted series
+// hides its events until restored.
 
 type Event = Record<string, unknown> & { id: string; start: When; end: When };
 type When = { date?: string; dateTime?: string; timeZone?: string };
@@ -118,6 +121,8 @@ export function devCalendarPlugin(): Plugin {
       const calendars = new Map<string, Event[]>();
       // Events of a series changed on their own ("Only this event"), as "person/id": changing the series leaves them.
       const changedAlone = new Set<string>();
+      // Each series' first time of day, as "person/id": its events' ids are made from the series' time.
+      const firstTime = new Map<string, string>();
       let next = 1;
       vite.middlewares.use('/__calendar', (req, res) => void handle(req, res));
 
@@ -135,13 +140,15 @@ export function devCalendarPlugin(): Plugin {
         if (!url.pathname.startsWith(PATH)) return send(404, { error: { code: 404 } });
         const id = decodeURIComponent(url.pathname.slice(PATH.length + 1));
         const found = events.findIndex((e) => e.id === id);
+        // Deleted (cancelled), or one event of a deleted series.
+        const gone = (e: Event) => e.status === 'cancelled' || events.some((s) => s.id === e.recurringEventId && s.status === 'cancelled');
         const sendUpdates = url.searchParams.get('sendUpdates');
         if (sendUpdates !== null && !['all', 'externalOnly', 'none'].includes(sendUpdates)) return send(400, { error: { code: 400, message: 'Invalid sendUpdates' } });
         try {
           if (req.method === 'GET' && !id) {
             const min = Date.parse(url.searchParams.get('timeMin') ?? '');
             const max = Date.parse(url.searchParams.get('timeMax') ?? '');
-            const items = events.filter((e) => !e.recurrence && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
+            const items = events.filter((e) => !e.recurrence && !gone(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
             return send(200, { kind: 'calendar#events', items });
           }
           if (req.method === 'POST' && !id) {
@@ -161,9 +168,15 @@ export function devCalendarPlugin(): Plugin {
             return send(200, event);
           }
           if (found < 0) return send(id ? 410 : 404, { error: { code: 410, message: 'Resource has been deleted' } });
+          const body = req.method === 'PATCH' ? (JSON.parse(await readBody(req)) as Partial<Event>) : {};
+          if (gone(events[found])) {
+            // Only restoring a deleted event (not one of a deleted series) is allowed.
+            if (req.method !== 'PATCH' || body.status !== 'confirmed' || events[found].status !== 'cancelled') return send(410, { error: { code: 410, message: 'Resource has been deleted' } });
+            events[found] = { ...events[found], status: 'confirmed' };
+            return send(200, events[found]);
+          }
           if (req.method === 'GET') return send(200, events[found]);
           if (req.method === 'PATCH') {
-            const body = JSON.parse(await readBody(req)) as Partial<Event>;
             if (badGuests(body.attendees)) return send(400, { error: { code: 400, message: 'Invalid attendee email.' } });
             // Like Google: a changed start / end is merged into the old one, null clearing a field;
             // one with both a date and a time is refused.
@@ -174,6 +187,8 @@ export function devCalendarPlugin(): Plugin {
             if ((start.date && start.dateTime) || (end.date && end.dateTime)) return send(400, { error: { code: 400, message: 'Invalid start time.' } });
             const fields = { ...(body.summary !== undefined && { summary: body.summary }), ...(body.attendees !== undefined && { attendees: body.attendees }) };
             const newTime = ms(start) !== ms(events[found].start);
+            const clock = (w: When) => new Date(ms(w)).toTimeString().slice(0, 5);
+            if (!firstTime.has(`${who}/${id}`)) firstTime.set(`${who}/${id}`, clock(events[found].start));
             events[found] = { ...events[found], ...fields, start, end };
             if (events[found].recurringEventId) changedAlone.add(`${who}/${id}`);
             // The whole series: its events not changed on their own follow, each on its own day.
@@ -187,7 +202,8 @@ export function devCalendarPlugin(): Plugin {
                 }
                 // Like Google, an event's id comes from its series' time: a new time gives every event a new id (job #88).
                 if (newTime) {
-                  const newId = `${e.id.split('~')[0]}~${next++}`;
+                  const base = e.id.split('~')[0];
+                  const newId = clock(start) === firstTime.get(`${who}/${id}`) ? base : `${base}~${clock(start).replace(':', '')}`;
                   events[i] = { ...events[i], id: newId };
                   if (alone) {
                     changedAlone.delete(`${who}/${e.id}`);
@@ -199,8 +215,8 @@ export function devCalendarPlugin(): Plugin {
             return send(200, events[found]);
           }
           if (req.method === 'DELETE') {
-            // The whole series takes its events with it.
-            calendars.set(who, events.filter((e) => e.id !== id && e.recurringEventId !== id));
+            // Kept as cancelled; a whole series hides its events with it.
+            events[found] = { ...events[found], status: 'cancelled' };
             return send(204);
           }
           send(405, { error: { code: 405 } });

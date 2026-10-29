@@ -1,0 +1,1 @@
+- 2026-10-29 (owner: "Merge + fix wording" for #211): the spec no longer says both devices' General notes survive a sync; the Journal board syncs whole, so the last save wins, as for day notes, and Version history may bring the other back.

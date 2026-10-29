@@ -120,7 +120,7 @@ Related resources.
 | Recommendation | Status | Notes |
 | - | - | - |
 | Hard rules as hooks/deny rules, not prose | Followed | `scripts/claude-hooks.mjs`: refuse `pkill`/`killall`, force pushes and pushes to `main`/`build/v1` (`bash`), type check after edits (`typecheck`, exit 2), a reminder before editing risky files (`risky`). Three hooks only. Credential folders of the connector are in `permissions.deny`. |
-| Only what Claude can't see; short CLAUDE.md | Followed, one open question | 71 lines, no emphasis words, trimmed 2026-10-29 (PR 215). The "Code layout" section is mostly findable in the repo: see question Q1. |
+| Only what Claude can't see; short CLAUDE.md | Followed | 68 lines, no emphasis words, trimmed 2026-10-29 (PR 215); "Code layout" shrunk to the three rules Claude can't see (Q1, answered "Shrink it"). |
 | Exact check commands, and how to run one test file | Gap, fixed here | `CLAUDE.md` Commands now names the three checks and the one-file forms of Vitest and Playwright. |
 | Install command for new worktrees | Gap, fixed here | `CLAUDE.md` Commands: `npm ci` first in a fresh checkout or worktree. |
 | `CLAUDE.local.md` gitignored | Gap, fixed here | Added to `.gitignore`, with `.claude/settings.local.json` (the page says to ignore it yourself when created by hand). |
@@ -168,9 +168,9 @@ edit with `/memory`; Troubleshoot memory issues.
 - `AGENTS.md` is read only when no CLAUDE.md exists (unless configured); auto memory is the model's own
   notes, browsable with `/memory`.
 
-**What we do:** root `CLAUDE.md` of 71 lines in headed sections, concrete rules, no imports, no
+**What we do:** root `CLAUDE.md` of 68 lines in headed sections, concrete rules, no imports, no
 `AGENTS.md`, no auto-memory reliance (project rules live in `CLAUDE.md` and `docs/decisions.md`). Gaps
-fixed here: `CLAUDE.local.md` ignored, compaction note. Open: Q1, Q2, Q9. Not applicable: `CLAUDE.md`
+fixed here: `CLAUDE.local.md` ignored, compaction note. Open: Q2, Q9. Not applicable: `CLAUDE.md`
 doesn't set commit-message rules, so `includeGitInstructions`/`attribution` stay untouched.
 
 ## 3. Extend Claude with skills
@@ -312,13 +312,14 @@ exploration to a subagent.
 
 ## Questions for the owner (not applied; each has a recommendation)
 
-- **Q1. Trim "Code layout" in `CLAUDE.md`?** Page 1 ("What you can stop doing", "Keep CLAUDE.md short")
+- **Q1. Trim "Code layout" in `CLAUDE.md`?** Answered "Shrink it" (2026-10-29): now three rules and
+  no folder list (PR claude-md-layout). Page 1 ("What you can stop doing", "Keep CLAUDE.md short")
   and page 2 (`/doctor` cuts directory layouts) say Claude finds file layout itself. Recommend: shrink
   it to the few non-obvious rules (`src/model/` has no React or DOM; components never hold geometry or
   rules logic; the store is the only way to change board data) and drop the folder list. The owner just
   trimmed `CLAUDE.md` and kept this section, so this is the owner's call.
 - **Q2. Move UI-only rules into `.claude/rules/ui.md` with a `paths:` filter** (rule 6 look, rule 7
-  keyboard, rule 12 design and motion)? Recommend: not yet. `CLAUDE.md` is small (71 lines), and a
+  keyboard, rule 12 design and motion)? Recommend: not yet. `CLAUDE.md` is small (68 lines), and a
   path-scoped rule would not load while planning or reviewing without opening a UI file, which could
   silently skip an owner rule.
 - **Q3. Make `crew` and `check-pr` manual-only (`disable-model-invocation: true`)?** The page does this

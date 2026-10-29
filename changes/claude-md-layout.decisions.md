@@ -1,0 +1,1 @@
+- 2026-10-29 (owner answered Q1 in docs/claude-best-practices.md: "Shrink it"): cut "Code layout" in CLAUDE.md to the rules Claude can't find by looking at the folders, and dropped the folder descriptions. No rule was removed. Q1 is marked answered.

@@ -1,0 +1,1 @@
+- CLAUDE.md's "Code layout" section is now three short rules (the model is pure, store actions get the core through StoreContext, components hold no geometry or rules logic); the plain folder descriptions are gone.

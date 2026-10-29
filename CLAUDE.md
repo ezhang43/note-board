@@ -13,12 +13,9 @@ The owner reads code at a beginner level and does not review it line by line. Ev
 
 ## Code layout
 
-- `src/model/` — types, constants (grid 20, zoom 30–250%, palette) and pure functions: no React, no DOM. Most logic tests live here; the store's are in `src/store/*.test.ts`.
-- `src/store/` — the single board state object, the change function, saving and loading. `core.ts` holds state, saving, undo, `commit` and the settle queue; actions live in `actions/` (blocks, boards, checklist, format, gestures, weight) and get the core through a `StoreContext`; `store.ts` puts them together.
-- `src/components/` — React components. They display state and call store actions; no geometry or rules logic inside them.
-- `src/sync/` — sign-in, Firebase sync and sharing, the demo people and the pretend servers for `npm run dev`. `src/calendar/` — Google Calendar.
-- `mcp/` — the Claude connector (see `mcp/README.md`). `scripts/` — publish rules, Claude hooks, test ports and scripts run by hand. `about/`, `faq/`, `terms/`, `privacy/`, `delete-account/` with `src/site.ts` and `src/site.css` — the website.
-- `e2e/` — Playwright tests of real flows in a browser.
+- `src/model/` is pure: no React, no DOM. Most logic tests live here; the store's are in `src/store/*.test.ts`.
+- Store actions (`src/store/actions/`) get the core (`core.ts`) through a `StoreContext`.
+- Components (`src/components/`) display state and call store actions; no geometry or rules logic inside them.
 
 ## Build rules
 

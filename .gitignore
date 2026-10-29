@@ -9,3 +9,5 @@ docs/mockups/
 PRODUCT.md
 firebase-debug.log
 firestore-debug.log
+CLAUDE.local.md
+.claude/settings.local.json

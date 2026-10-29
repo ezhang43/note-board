@@ -373,8 +373,8 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
 /** Where dragged items go in a list: before / after / nested under an item, or at the end. */
 export type ItemDrop = { mode: 'before' | 'after' | 'nest'; targetId: string } | { mode: 'append' };
 
-/** How far each level of sub-items is indented (board pixels). */
-export const ITEM_INDENT = 22;
+/** How far each level of sub-items is indented (board pixels; 32 since 2026-10-29, owner request: it was 22 and the levels were hard to tell apart). */
+export const ITEM_INDENT = 32;
 /** Dropping this far right of a row's own indent (board pixels) nests under it. */
 export const NEST_ZONE = 56;
 
@@ -383,17 +383,18 @@ export const NEST_ZONE = 56;
  * nested under it (bottom half, far enough right). `xInRow` is how far right of the row's left edge
  * the pointer is. The teal mark shows where they will go: after an item with sub-items, under its
  * last sub-item. Null (dropping does nothing) over the dragged items themselves, or past 6 levels.
+ * `indent` is the row's drawn indent when it is not depth * ITEM_INDENT (the deepest rows of a narrow list stop short).
  */
 export function dropOnRow(
   items: TodoItem[],
   targetId: string,
-  at: { xInRow: number; lowerHalf: boolean },
+  at: { xInRow: number; lowerHalf: boolean; indent?: number },
   dragged: { ids: string[]; height: number },
 ): { drop: ItemDrop; markId: string; markMode: 'before' | 'after' | 'nest' } | null {
   if (dragged.ids.includes(targetId)) return null;
   const t = findItem(items, targetId);
   if (!t) return null;
-  const inNestZone = at.xInRow > t.depth * ITEM_INDENT + NEST_ZONE;
+  const inNestZone = at.xInRow > (at.indent ?? t.depth * ITEM_INDENT) + NEST_ZONE;
   if (at.lowerHalf && inNestZone && t.depth + 1 + dragged.height <= MAX_DEPTH) {
     return { drop: { mode: 'nest', targetId }, markId: targetId, markMode: 'nest' };
   }

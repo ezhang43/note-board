@@ -19,7 +19,7 @@ async function makeList(page: Page, texts: string[]) {
 
 const rows = (list: Locator) => list.locator('[data-item-id]');
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
-const depthOf = (row: Locator) => row.evaluate((el) => parseFloat((el as HTMLElement).style.paddingLeft) / 22);
+const depthOf = (row: Locator) => row.evaluate((el) => parseFloat(getComputedStyle(el as HTMLElement).paddingLeft) / 32);
 const rowWithText = (list: Locator, text: string) =>
   list.locator('[data-item-id]').filter({ has: list.page().locator(`textarea:text-is("${text}")`) });
 

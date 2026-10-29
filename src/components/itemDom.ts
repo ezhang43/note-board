@@ -71,7 +71,7 @@ function hintOnRow(row: HTMLElement, r: { left: number; top: number; height: num
   const cardId = row.closest<HTMLElement>('[data-card-id]')!.dataset.cardId!;
   const card = board.cards[cardId];
   if (card?.kind !== 'todo') return null;
-  const at = { xInRow: (clientX - r.left) / view.zoom, lowerHalf: clientY >= r.top + r.height / 2 };
+  const at = { xInRow: (clientX - r.left) / view.zoom, lowerHalf: clientY >= r.top + r.height / 2, indent: parseFloat(getComputedStyle(row).paddingLeft) };
   const result = dropOnRow(card.items, row.dataset.itemId!, at, { ids: d.allIds, height: d.height });
   return result && { cardId, ...result };
 }

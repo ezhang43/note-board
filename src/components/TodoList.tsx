@@ -130,7 +130,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       className={classes.filter(Boolean).join(' ')}
       data-item-id={item.id}
       // The row knows its text's size too, so the tick box can sit on the middle of the first line.
-      style={{ paddingLeft: depth * ITEM_INDENT, transform: lifting ? `translateY(${slide}px)` : undefined, '--ts': styleCss(item.style)['--ts'] } as CSSProperties}
+      style={{ '--indent': `${depth * ITEM_INDENT}px`, transform: lifting ? `translateY(${slide}px)` : undefined, '--ts': styleCss(item.style)['--ts'] } as CSSProperties}
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}

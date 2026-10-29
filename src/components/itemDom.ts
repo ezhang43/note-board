@@ -23,11 +23,34 @@ export function rowUnder(clientX: number, clientY: number, cardId: string): stri
 export function rowAt(clientX: number, clientY: number): { cardId: string; itemId: string } | null {
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
-    const row = el.closest<HTMLElement>('[data-item-id]');
-    const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
-    if (row && cardId) return { cardId, itemId: row.dataset.itemId! };
+    const at = itemOf(el);
+    if (at) return at;
   }
   return null;
+}
+
+/** The checklist row this element is in (its text, tick box or a button), with its list. */
+export function itemOf(el: EventTarget | null): { cardId: string; itemId: string } | null {
+  const row = el instanceof Element ? el.closest<HTMLElement>('[data-item-id]') : null;
+  const cardId = row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
+  return row && cardId ? { cardId, itemId: row.dataset.itemId! } : null;
+}
+
+/**
+ * Delete or Backspace removed a checklist item (job 218): until a fresh press, the held key's
+ * repeats do nothing in the item the cursor moved to, so they can't join or remove more items.
+ */
+let removedByKey = false;
+type Key = { repeat: boolean; preventDefault(): void };
+/** Removes an item for this key press (`remove` says whether it did); a repeat does nothing. */
+export function removeItemByKey(e: Key, remove: () => boolean) {
+  e.preventDefault();
+  if (!e.repeat) removedByKey = remove();
+}
+/** A repeat of the key that just removed an item (asked on every Delete / Backspace in an item). */
+export function heldAfterRemoving(e: Key): boolean {
+  if (!e.repeat) removedByKey = false;
+  return removedByKey;
 }
 
 /**

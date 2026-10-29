@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, UNDO_FAILED, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: not in Ctrl+Z, synced with boards or kept in versions
@@ -71,7 +71,9 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
     async remove(id, notify) {
       calls.push(`remove ${id}${mail(notify)}`);
       if (api.fail) throw new Error('403');
+      const there = events.some((e) => e.id === id || e.series === id);
       events = events.filter((e) => e.id !== id);
+      return there;
     },
   };
   return api;
@@ -595,6 +597,52 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     expect(api.calls.slice(-2)[0]).toBe('restore su');
   });
 
+  it('an “All events” Undo that only half reaches Google shows the calendar as Google has it and says so', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const d = { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' };
+    await cal.save(at(cal, 'su_1016'), d, { all: true });
+    // The series goes back (its events get their old ids back), then the event's own change fails.
+    api.failId = 'su_1016';
+    await cal.undo();
+    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016']);
+    expect(cal.get().done).toMatchObject({ text: UNDO_PART, undo: null });
+  });
+
+  it('a half-done Undo is said even over a newer message, since Google is left mixed', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const api = fakeApi([moved, ev('b')]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+    let fail!: () => void;
+    api.update = async (id) => {
+      if (id === 'su_1016') await new Promise((_, no) => (fail = () => no(new Error('offline'))));
+    };
+    const undoing = cal.undo();
+    await cal.remove('b');
+    fail();
+    await undoing;
+    expect(cal.get().done?.text).toBe(UNDO_PART);
+  });
+
+  it('deleting an event that was already gone (deleted in Google Calendar) offers no Undo', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    api.remove = async () => false;
+    expect(await cal.remove('a')).toBeNull();
+    expect(cal.get().done).toMatchObject({ text: 'Event deleted', undo: null });
+    // The panel was out of date, so it is fetched again: Google may still have it under a new id (404).
+    expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
+  });
+
   it('when Undo doesn’t reach Google it says so, with nothing more to undo', async () => {
     const api = fakeApi([ev('a')]);
     const cal = createCalendar(api, today);
@@ -765,7 +813,9 @@ describe('talking to the Calendar API', () => {
   });
 
   it('an event already deleted elsewhere counts as deleted', async () => {
-    await expect(calendarApi(source(), fakeFetch(410, {}).fn).remove('a')).resolves.toBeUndefined();
+    await expect(calendarApi(source(), fakeFetch(410, {}).fn).remove('a')).resolves.toBe(false);
+    await expect(calendarApi(source(), fakeFetch(404, {}).fn).remove('a')).resolves.toBe(false);
+    await expect(calendarApi(source(), fakeFetch(204).fn).remove('a')).resolves.toBe(true);
   });
 
   it('a refused call fails, and a refused sign-in token is forgotten so the next try asks again', async () => {

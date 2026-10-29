@@ -1835,6 +1835,25 @@ test.describe('the Undo message after a change (job 217)', () => {
     expect(errors).toEqual([]);
   });
 
+  test('deleting an event Google says is already gone offers no Undo, and shows the calendar as Google has it', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    // Google answers the delete with 410: the event was gone already, so Undo mustn't bring it back.
+    let deletes = 0;
+    await page.route('**/__calendar/**', (route) =>
+      route.request().method() === 'DELETE' ? (deletes++, route.fulfill({ status: 410, contentType: 'application/json', body: '{"error":{"code":410}}' })) : route.fallback(),
+    );
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText('Event deleted');
+    await expect(undo(page)).toHaveCount(0);
+    expect(deletes).toBe(1);
+    // The panel is fetched again: this pretend Google still has it, so it shows (a real 410 would leave it out).
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('a repeating event: Undo brings back one deleted event, the whole deleted series, and a series’ old time', async ({ page }) => {
     const errors = await openAs(page);
     await button(page).click();

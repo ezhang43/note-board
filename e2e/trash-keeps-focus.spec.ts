@@ -99,3 +99,26 @@ test('trashing the only item leaves one blank item with the cursor in it; Delete
   await page.keyboard.press('Backspace');
   await expect(cards(page)).toHaveCount(1);
 });
+
+test('holding Backspace with items selected removes them once; the item above keeps its text', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs', 'jam']);
+  await list.getByLabel('Item text').nth(1).click();
+  await list.getByLabel('Item text').nth(2).click({ modifiers: ['Shift'] });
+  await page.keyboard.down('Backspace');
+  await page.keyboard.down('Backspace'); // repeats
+  await page.keyboard.down('Backspace');
+  await page.keyboard.up('Backspace');
+  await expect.poll(() => texts(list)).toEqual(['bread', 'jam']);
+  await expect.poll(() => focused(page)).toBe('bread');
+});
+
+test('while typing in one list, the trash can in another list leaves the cursor where it was', async ({ page }) => {
+  const other = await checklist(page, ['bread', 'milk']);
+  const typing = await checklist(page, ['tea']);
+  await expect.poll(() => focused(page)).toBe('tea');
+  await other.getByRole('button', { name: 'Delete item' }).nth(1).click();
+  await expect.poll(() => texts(other)).toEqual(['bread']);
+  await expect.poll(() => focused(page)).toBe('tea');
+  await page.keyboard.type('s');
+  await expect.poll(() => texts(typing)).toEqual(['teas']);
+});

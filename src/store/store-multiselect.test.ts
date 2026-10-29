@@ -109,6 +109,39 @@ describe('items selected in several lists', () => {
     expect(s.getState().ui.itemSel).toBeNull();
   });
 
+  it('Delete with items selected in several lists puts the cursor in the list the selection started in (job 222)', () => {
+    const { s, b, items } = setup();
+    s.selectWholeList(b);
+    s.selectAllStep(); // every list in the column
+    expect(s.deleteSelectedItems()).toBe(true);
+    expect(s.getState().ui.focusItem).toBe(items(b)[0].id);
+  });
+
+  it("the trash can says whether it deleted; on something that isn't a checklist nothing is cleared (job 222)", () => {
+    const { s, a, items } = setup();
+    s.selectItemRange(a, items(a)[0].id, items(a)[1].id);
+    const sel = s.getState().ui.itemSel;
+    expect(s.trashItem('no-such-card', 'x')).toBe(false);
+    expect(s.getState().ui.itemSel).toBe(sel);
+    expect(s.trashItem(a, items(a)[1].id)).toBe(true);
+  });
+
+  it('while typing in another list, the trash can leaves the cursor there (job 222)', () => {
+    const { s, a, b, items } = setup();
+    // The cursor is in a text box of list b.
+    vi.stubGlobal('document', { activeElement: { isContentEditable: false, matches: () => true, closest: () => ({ getAttribute: () => b }) } });
+    try {
+      const before = s.getState().ui.focusItem;
+      s.trashItem(a, items(a)[1].id);
+      expect(items(a).map((i) => i.text)).toEqual(['one']);
+      expect(s.getState().ui.focusItem).toBe(before);
+      s.trashItem(b, items(b)[0].id); // in its own list it still moves
+      expect(s.getState().ui.focusItem).toBe(items(b)[0].id);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('Tab does nothing across several lists', () => {
     const { s, a, items } = setup();
     s.selectWholeList(a);

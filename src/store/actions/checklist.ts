@@ -7,7 +7,7 @@ import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDon
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
-import { copyText } from '../env';
+import { copyText, typingOutside } from '../env';
 import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
@@ -69,13 +69,13 @@ export function checklistActions(ctx: StoreContext) {
   /** How many items are selected across these lists (what a screen reader is told). */
   const itemsIn = (lists: ListSelection[]) => lists.reduce((n, l) => n + l.ids.length, 0);
 
-  /** Delete / Backspace with checklist items selected: as the trash on one of them. Returns false when no items are selected. */
+  /**
+   * Delete / Backspace with checklist items selected: as the trash on one of them, in the list the
+   * selection started in (the cursor goes there). Returns false when nothing was deleted.
+   */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
-    if (!sel) return false;
-    const list = sel.lists?.find((l) => l.ids.length) ?? sel;
-    if (list.ids.length) actions.trashItem(list.cardId, list.ids[0]);
-    return true;
+    return !!sel?.ids.length && actions.trashItem(sel.cardId, sel.ids[0]);
   }
 
   /** Tab / Shift+Tab with several items selected: they all move in (or out) one level together. */
@@ -128,8 +128,9 @@ export function checklistActions(ctx: StoreContext) {
         if (all.some((id) => !sel.ids.includes(id))) return selectLists([{ cardId: sel.cardId, ids: all }]);
       }
       const col = sel.level ? null : columnOf(board, sel.cardId);
-      if (col && !col.collapsed) selectLists(columnLists(board, col.id), 'column');
-      else selectLists(boardLists(board), 'board');
+      const from = { cardId: sel.cardId, itemId: sel.anchor }; // stays the list it started in (where Delete puts the cursor)
+      if (col && !col.collapsed) selectLists(columnLists(board, col.id), 'column', from);
+      else selectLists(boardLists(board), 'board', from);
     },
     /** Press-and-drag from an item into another card of the same column: everything between. */
     selectAcross(columnId: string, from: { cardId: string; itemId: string }, to: { cardId: string; itemId: string }) {
@@ -235,14 +236,18 @@ export function checklistActions(ctx: StoreContext) {
      * The cursor moves to the item above in its list (else below), so the focus is never left nowhere, where
      * the next Delete would delete the card (job 222); on a phone the keyboard stays up.
      */
-    trashItem(cardId: string, itemId: string) {
+    trashItem(cardId: string, itemId: string): boolean {
       const lists = listsIncluding(cardId, itemId) ?? [{ cardId, ids: selectedItemsIncluding(cardId, itemId) ?? [itemId] }];
       const gone = lists.find((l) => l.cardId === cardId)!.ids;
-      ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () =>
+      // While typing in another card the cursor stays there (job 222 review).
+      const moveCursor = !typingOutside(cardId);
+      return ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () =>
         commit((b) => {
+          const card = b.cards[cardId];
+          if (card?.kind !== 'todo') return null;
           const board = deleteAcross(b, lists);
-          const [card, after] = [b.cards[cardId], board.cards[cardId]];
-          const focus = card?.kind === 'todo' && after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
+          const after = board.cards[cardId];
+          const focus = moveCursor && after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
           return { board, ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
         }),
       );
@@ -254,8 +259,7 @@ export function checklistActions(ctx: StoreContext) {
     deleteTickedItem(cardId: string, itemId: string): boolean {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo' || !C.findItem(card.items, itemId)?.item.done) return false;
-      actions.trashItem(cardId, itemId);
-      return true;
+      return actions.trashItem(cardId, itemId);
     },
     /**
      * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so

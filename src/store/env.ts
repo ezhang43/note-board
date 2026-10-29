@@ -4,6 +4,13 @@
 export type Schedule = (fn: () => void) => void;
 export const later: Schedule = (fn) => setTimeout(fn, 0);
 
+/** Whether the cursor is in a text box outside this card (false where there is no browser, as in unit tests). */
+export function typingOutside(cardId: string): boolean {
+  const el = globalThis.document?.activeElement as HTMLElement | null | undefined;
+  if (!el || !(el.isContentEditable || el.matches('textarea, input:not([type="checkbox"])'))) return false;
+  return el.closest('[data-card-id]')?.getAttribute('data-card-id') !== cardId;
+}
+
 /** This device's localStorage, or null where it is blocked or missing (as in unit tests). */
 export function deviceStorage(): Storage | null {
   try {

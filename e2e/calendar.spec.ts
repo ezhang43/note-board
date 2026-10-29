@@ -33,6 +33,11 @@ const day = (page: Page, d: Date) => panel(page).getByRole('region', { name: lab
 const form = (page: Page) => panel(page).getByRole('form');
 /** The small card an event opens (job #108). */
 const card = (page: Page) => panel(page).getByRole('dialog');
+/** Types a time (24-hour, "07:00") into a time box and takes it with Enter. */
+async function setTime(box: Locator, hhmm: string) {
+  await box.fill(hhmm);
+  await box.press('Enter');
+}
 /** Clicks an event, then the card's pencil: the change form, as a click alone opened before job #108. */
 async function edit(page: Page, event: Locator) {
   await event.click();
@@ -86,8 +91,8 @@ test('add an event on a day; it is still there after a reload', async ({ page })
   await day(page, today).getByRole('button', { name: `Add event on ${label(today)}` }).click();
   await expect(form(page).getByLabel('Title')).toBeFocused();
   await page.keyboard.type('Swim');
-  await form(page).getByLabel('Start time').fill('07:00');
-  await form(page).getByLabel('End time').fill('07:45');
+  await setTime(form(page).getByLabel('Start time'), '07:00');
+  await setTime(form(page).getByLabel('End time'), '07:45');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(form(page)).toHaveCount(0);
   await expect(day(page, today).getByRole('button', { name: '7 – 7:45am Swim' })).toBeVisible();
@@ -101,7 +106,7 @@ test('an end before the start is refused with a plain note', async ({ page }) =>
   await openAs(page);
   await button(page).click();
   await edit(page, day(page, new Date()).getByRole('button', { name: /Dentist/ }));
-  await form(page).getByLabel('End time').fill('09:00');
+  await setTime(form(page).getByLabel('End time'), '09:00');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(form(page).getByText('The end must be after the start.')).toBeVisible();
 });
@@ -114,8 +119,8 @@ test('rename a simple event and move it to another day', async ({ page }) => {
   await edit(page, day(page, today).getByRole('button', { name: '10 – 11am Dentist' }));
   await form(page).getByLabel('Title').fill('Dentist check-up');
   await form(page).getByLabel('Start date').fill(key(other));
-  await form(page).getByLabel('Start time').fill('14:00');
-  await form(page).getByLabel('End time').fill('15:00');
+  await setTime(form(page).getByLabel('Start time'), '14:00');
+  await setTime(form(page).getByLabel('End time'), '15:00');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(day(page, other).getByRole('button', { name: '2 – 3pm Dentist check-up' })).toBeVisible();
   if (key(other) !== key(today)) await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
@@ -207,8 +212,8 @@ test('a repeating event: “Only this event” changes just that one, “All eve
 
   // All events: tomorrow's is moved to 09:30, and every other one follows, except today's (changed on its own).
   await edit(page, standUp(1));
-  await form(page).getByLabel('Start time').fill('09:30');
-  await form(page).getByLabel('End time').fill('09:45');
+  await setTime(form(page).getByLabel('Start time'), '09:30');
+  await setTime(form(page).getByLabel('End time'), '09:45');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
@@ -266,8 +271,8 @@ test('“All events” after one event was moved on its own changes only what wa
   await button(page).click();
   // Today's stand-up moves to 10:00 on its own.
   await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
-  await form(page).getByLabel('Start time').fill('10:00');
-  await form(page).getByLabel('End time').fill('10:15');
+  await setTime(form(page).getByLabel('Start time'), '10:00');
+  await setTime(form(page).getByLabel('End time'), '10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
   await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' })).toBeVisible();
@@ -288,15 +293,15 @@ test('“All events” with a new time, from an event moved on its own, reaches 
   const errors = await openAs(page);
   await button(page).click();
   await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
-  await form(page).getByLabel('Start time').fill('10:00');
-  await form(page).getByLabel('End time').fill('10:15');
+  await setTime(form(page).getByLabel('Start time'), '10:00');
+  await setTime(form(page).getByLabel('End time'), '10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
   // Now a new title and a new time for all events: the series moves to 10:30, this one keeps 10:00.
   await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Daily sync');
-  await form(page).getByLabel('Start time').fill('10:30');
-  await form(page).getByLabel('End time').fill('10:45');
+  await setTime(form(page).getByLabel('Start time'), '10:30');
+  await setTime(form(page).getByLabel('End time'), '10:45');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
@@ -840,8 +845,8 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   for (const [title, start, end] of [['Swim', '07:00', '07:45'], ['Run', '06:00', '06:30']]) {
     await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
     await page.keyboard.type(title);
-    await form(page).getByLabel('Start time').fill(start);
-    await form(page).getByLabel('End time').fill(end);
+    await setTime(form(page).getByLabel('Start time'), start);
+    await setTime(form(page).getByLabel('End time'), end);
     await form(page).getByRole('button', { name: 'Save' }).click();
   }
   await expect(todayCell.locator('.cal-chip')).toHaveText(['6amRun', '7amSwim']);
@@ -945,8 +950,8 @@ test('Month: a click on the day that is already picked opens the new-event form 
   await expect(panel(page).getByRole('grid')).toBeVisible();
   await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
-  await expect(form(page).getByLabel('Start time')).toHaveValue('09:00');
-  await expect(form(page).getByLabel('End time')).toHaveValue('10:00');
+  await expect(form(page).getByLabel('Start time')).toHaveValue('9:00 AM');
+  await expect(form(page).getByLabel('End time')).toHaveValue('10:00 AM');
   // Escape closes it and the keyboard goes back to the cell's date button (the cell itself can't take focus).
   await page.keyboard.press('Escape');
   await expect(form(page)).toHaveCount(0);
@@ -1357,8 +1362,8 @@ test.describe('on a wide phone-layout screen (month cells 70px or wider)', () =>
     // A third event still fits: three lines, no "+n more".
     await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).tap();
     await page.keyboard.type('Swim');
-    await form(page).getByLabel('Start time').fill('07:00');
-    await form(page).getByLabel('End time').fill('07:45');
+    await setTime(form(page).getByLabel('Start time'), '07:00');
+    await setTime(form(page).getByLabel('End time'), '07:45');
     await form(page).getByRole('button', { name: 'Save' }).tap();
     await expect(todayCell.locator('.cal-chip')).toHaveText(['7amSwim', '9amTeam stand-up', '10amDentist']);
     await expect(todayCell.getByRole('button', { name: /more$/ })).toHaveCount(0);
@@ -1422,8 +1427,8 @@ test('+ opens a quick-add beside the panel, with the Week list still in view', a
   await expect(panel(page).getByRole('button', { name: 'Today' })).toBeVisible();
   // Quick: title, date, 9:00 - 10:00, All day, Save and More options; nothing else yet.
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(today));
-  await expect(form(page).getByLabel('Start time')).toHaveValue('09:00');
-  await expect(form(page).getByLabel('End time')).toHaveValue('10:00');
+  await expect(form(page).getByLabel('Start time')).toHaveValue('9:00 AM');
+  await expect(form(page).getByLabel('End time')).toHaveValue('10:00 AM');
   await expect(form(page).getByLabel('All day')).not.toBeChecked();
   await expect(form(page).getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(form(page).getByRole('button', { name: 'More options' })).toBeVisible();
@@ -1461,17 +1466,17 @@ test('quick-add: changing the start moves the end, a new end sets a new length',
   await plus(page, new Date()).click();
   const start = form(page).getByLabel('Start time');
   const end = form(page).getByLabel('End time');
-  await start.fill('10:00');
-  await expect(end).toHaveValue('11:00');
-  await start.fill('14:00');
-  await expect(end).toHaveValue('15:00');
-  await end.fill('16:00');
-  await expect(start).toHaveValue('14:00');
-  await start.fill('15:00');
-  await expect(end).toHaveValue('17:00');
+  await setTime(start, '10:00');
+  await expect(end).toHaveValue('11:00 AM');
+  await setTime(start, '14:00');
+  await expect(end).toHaveValue('3:00 PM');
+  await setTime(end, '16:00');
+  await expect(start).toHaveValue('2:00 PM');
+  await setTime(start, '15:00');
+  await expect(end).toHaveValue('5:00 PM');
   // Past midnight, a one-day event ends at 23:59 instead.
-  await start.fill('23:30');
-  await expect(end).toHaveValue('23:59');
+  await setTime(start, '23:30');
+  await expect(end).toHaveValue('11:59 PM');
   expect(errors).toEqual([]);
 });
 
@@ -1481,20 +1486,163 @@ test('full form: the end follows the start for a new event and for a changed one
   const today = new Date();
   await plus(page, today).click();
   await form(page).getByRole('button', { name: 'More options' }).click();
-  await form(page).getByLabel('Start time').fill('10:00');
-  await expect(form(page).getByLabel('End time')).toHaveValue('11:00');
-  await form(page).getByLabel('Start time').fill('14:00');
-  await expect(form(page).getByLabel('End time')).toHaveValue('15:00');
-  await form(page).getByLabel('End time').fill('16:00');
-  await form(page).getByLabel('Start time').fill('15:00');
-  await expect(form(page).getByLabel('End time')).toHaveValue('17:00');
+  await setTime(form(page).getByLabel('Start time'), '10:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('11:00 AM');
+  await setTime(form(page).getByLabel('Start time'), '14:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('3:00 PM');
+  await setTime(form(page).getByLabel('End time'), '16:00');
+  await setTime(form(page).getByLabel('Start time'), '15:00');
+  await expect(form(page).getByLabel('End time')).toHaveValue('5:00 PM');
   await form(page).getByLabel('Start date').fill(key(daysFromToday(2)));
   await expect(form(page).getByLabel('End date')).toHaveValue(key(daysFromToday(2)));
   await form(page).getByRole('button', { name: 'Cancel' }).click();
   // A changed event (Dentist, 10:00 to 11:00) keeps its length too.
   await edit(page, day(page, today).getByRole('button', { name: /Dentist/ }));
-  await form(page).getByLabel('Start time').fill('13:30');
-  await expect(form(page).getByLabel('End time')).toHaveValue('14:30');
+  await setTime(form(page).getByLabel('Start time'), '13:30');
+  await expect(form(page).getByLabel('End time')).toHaveValue('2:30 PM');
+  expect(errors).toEqual([]);
+});
+
+// Our own time picker (job 219): a text box with a list of times every 15 minutes, in place of the browser's.
+const timeList = (page: Page, name: 'Start time' | 'End time') => page.getByRole('listbox', { name });
+const timeOption = (page: Page, text: string) => page.getByRole('option', { name: text, exact: true });
+
+test('time picker: pick a start from the list and the end follows; the end list says how long each is', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  const end = form(page).getByRole('combobox', { name: 'End time' });
+  await expect(start).toHaveValue('9:00 AM');
+  await expect(start).toHaveAttribute('aria-expanded', 'false');
+  await start.click();
+  await expect(start).toHaveAttribute('aria-expanded', 'true');
+  await expect(timeList(page, 'Start time')).toBeVisible();
+  // The list opens with the current time in view and marked.
+  await expect(timeOption(page, '9:00 AM')).toHaveAttribute('aria-selected', 'true');
+  await expect(timeOption(page, '9:00 AM')).toBeInViewport();
+  await timeOption(page, '2:00 PM').click();
+  await expect(timeList(page, 'Start time')).toHaveCount(0);
+  await expect(start).toHaveValue('2:00 PM');
+  await expect(end).toHaveValue('3:00 PM');
+  await expect(form(page)).toBeVisible();
+  // The end list starts at the first slot after the start, each with its length.
+  await end.click();
+  await expect(timeList(page, 'End time').getByRole('option').first()).toHaveAccessibleName('2:15 PM (15 mins)');
+  await expect(timeOption(page, '3:00 PM (1 hr)')).toHaveAttribute('aria-selected', 'true');
+  await expect(timeOption(page, '4:30 PM (2.5 hrs)')).toBeAttached();
+  await timeOption(page, '4:00 PM (2 hrs)').click();
+  await expect(end).toHaveValue('4:00 PM');
+  await expect(start).toHaveValue('2:00 PM');
+  expect(errors).toEqual([]);
+});
+
+test('time picker: a typed time is taken on Enter or when the box is left; one that cannot be read goes back', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  const end = form(page).getByRole('combobox', { name: 'End time' });
+  await start.fill('4:10pm');
+  await start.press('Enter');
+  await expect(start).toHaveValue('4:10 PM');
+  await expect(end).toHaveValue('5:10 PM');
+  // Enter took the time; it did not save the event.
+  await expect(form(page)).toBeVisible();
+  await start.fill('14:10');
+  await form(page).getByLabel('Title').click();
+  await expect(start).toHaveValue('2:10 PM');
+  await expect(end).toHaveValue('3:10 PM');
+  await end.fill('9');
+  await end.press('Tab');
+  await expect(end).toHaveValue('9:00 AM');
+  await end.fill('soon');
+  await end.press('Enter');
+  await expect(end).toHaveValue('9:00 AM');
+  await expect(start).toHaveValue('2:10 PM');
+  expect(errors).toEqual([]);
+});
+
+// Review finding: Enter on a list nobody moved must not round an off-grid time to the nearest slot; it saves, as before.
+test('time picker: a time off the 15-minute list is kept when Enter is pressed in the box without choosing', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const today = new Date();
+  await plus(page, today).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  await start.fill('4:10pm');
+  await start.press('Enter');
+  await form(page).getByLabel('Title').click();
+  await start.click();
+  await expect(timeOption(page, '4:15 PM')).toHaveAttribute('aria-selected', 'true');
+  await start.press('Enter');
+  await expect(form(page)).toHaveCount(0);
+  await expect(day(page, today).getByRole('button', { name: '4:10 – 5:10pm (No title)' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+// Review finding: a real click on the box selects its text, so typing replaces it.
+test('time picker: clicking the box selects the time, so typing replaces it', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  await start.click();
+  await page.keyboard.type('11:30am');
+  await page.keyboard.press('Enter');
+  await expect(start).toHaveValue('11:30 AM');
+  expect(errors).toEqual([]);
+});
+
+test('time picker: ↑ ↓ and Enter pick from the list; Escape closes only the list', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  await start.focus();
+  await expect(start).toHaveAttribute('aria-expanded', 'true');
+  await expect(start).toHaveAttribute('aria-activedescendant', (await timeOption(page, '9:00 AM').getAttribute('id')) ?? 'missing');
+  await start.press('ArrowDown');
+  await start.press('ArrowDown');
+  await expect(timeOption(page, '9:30 AM')).toHaveAttribute('aria-selected', 'true');
+  await start.press('ArrowUp');
+  await start.press('Enter');
+  await expect(start).toHaveValue('9:15 AM');
+  await expect(start).toHaveAttribute('aria-expanded', 'false');
+  await expect(form(page).getByRole('combobox', { name: 'End time' })).toHaveValue('10:15 AM');
+  await expect(form(page)).toBeVisible();
+  // Escape closes the list and keeps the value; the next Escape closes the form.
+  await start.press('ArrowDown');
+  await start.press('ArrowDown');
+  await expect(timeList(page, 'Start time')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(timeList(page, 'Start time')).toHaveCount(0);
+  await expect(start).toHaveValue('9:15 AM');
+  await expect(form(page)).toBeVisible();
+  await expect(panel(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(form(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('time picker: a click outside closes the list; the full form has the same boxes, and a later end day lists the whole day', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  await plus(page, new Date()).click();
+  await form(page).getByRole('button', { name: 'More options' }).click();
+  const start = form(page).getByRole('combobox', { name: 'Start time' });
+  await start.click();
+  await expect(timeList(page, 'Start time')).toBeVisible();
+  await form(page).getByRole('heading', { name: 'New event' }).click();
+  await expect(timeList(page, 'Start time')).toHaveCount(0);
+  await expect(form(page)).toBeVisible();
+  await form(page).getByLabel('End date').fill(key(daysFromToday(1)));
+  const end = form(page).getByRole('combobox', { name: 'End time' });
+  await end.click();
+  await expect(timeList(page, 'End time').getByRole('option')).toHaveCount(96);
+  await timeOption(page, '8:30 AM').click();
+  await expect(end).toHaveValue('8:30 AM');
   expect(errors).toEqual([]);
 });
 
@@ -1504,14 +1652,14 @@ test('More options opens the full form in the same overlay, keeping what was typ
   const today = new Date();
   await plus(page, today).click();
   await page.keyboard.type('Planning');
-  await form(page).getByLabel('End time').fill('11:30');
+  await setTime(form(page).getByLabel('End time'), '11:30');
   const before = (await form(page).boundingBox())!;
   await form(page).getByRole('button', { name: 'More options' }).click();
   await expect(form(page).getByLabel('Guest email')).toBeVisible();
   await expect(form(page).getByLabel('End date')).toHaveValue(key(today));
   await expect(form(page).getByRole('button', { name: 'More options' })).toHaveCount(0);
   await expect(form(page).getByLabel('Title')).toHaveValue('Planning');
-  await expect(form(page).getByLabel('End time')).toHaveValue('11:30');
+  await expect(form(page).getByLabel('End time')).toHaveValue('11:30 AM');
   await expect(form(page).getByLabel('Title')).toBeFocused();
   // Same overlay: still just left of the panel, and the list is still there.
   const [after, side] = await Promise.all([form(page).boundingBox(), panel(page).boundingBox()]);
@@ -1598,6 +1746,17 @@ test.describe('the overlay on a phone', () => {
     for (const field of ['Title', 'Start date', 'Start time', 'End time']) {
       expect(await form(page).getByLabel(field).evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
     }
+    // The time list opens over the sheet, with options at least 44px tall, and a tap picks one.
+    await form(page).getByRole('combobox', { name: 'Start time' }).tap();
+    const options = timeList(page, 'Start time').getByRole('option');
+    await expect(options.first()).toBeAttached();
+    expect((await timeOption(page, '9:00 AM').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const list = (await timeList(page, 'Start time').boundingBox())!;
+    expect(list.y).toBeGreaterThanOrEqual(0);
+    expect(list.y + list.height).toBeLessThanOrEqual(800);
+    await timeOption(page, '1:00 PM').tap();
+    await expect(form(page).getByRole('combobox', { name: 'End time' })).toHaveValue('2:00 PM');
+    await expect(form(page)).toBeVisible();
     // The list is still behind it.
     await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toBeAttached();
     await form(page).getByRole('button', { name: 'More options' }).tap();

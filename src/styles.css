@@ -3206,6 +3206,38 @@ a.cal-open { align-self: flex-start; }
 .app.phone .cal-form input:not([type='checkbox']) { height: 44px; font-size: 16px; }
 .app.phone .cal-form .tb-button { height: 44px; }
 .app.phone .cal-form .cal-check { min-height: 44px; }
+/* The time boxes (job 219): a text box that opens a list of times, drawn on the page (not inside the card, which would cut it off), in front of the overlay. */
+.time-box { flex: 1; min-width: 0; }
+.time-list {
+  position: fixed;
+  z-index: 50;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  transform-origin: top left;
+  font-size: 14px;
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.time-option { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; white-space: nowrap; cursor: pointer; }
+.time-hint { margin-left: 0.3em; color: var(--ink-soft); }
+.time-option[aria-selected='true'] { background: var(--hover); }
+.time-option.current { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.time-option.current .time-hint { color: inherit; }
+@media (hover: hover) { .time-option:hover { background: var(--hover); } .time-option.current:hover { background: var(--accent-soft); } }
+/* A finger needs 44px rows, and 16px text so the page doesn't zoom in. */
+@media (max-width: 599px), (pointer: coarse) { .time-list { font-size: 16px; } .time-option { min-height: 44px; } }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .time-list { transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out); }
+  @starting-style { html:not([data-input='keys']) .time-list { opacity: 0; transform: scale(0.98); } }
+}
 
 /* The side panels' drag strip (owner request, 2026-10-16 for the calendar, 2026-10-20 for all): on the panel's left edge, not inside it
    (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */

@@ -8,6 +8,7 @@ import {
   draftBody,
   draftFor,
   emailGuests,
+  endTimeOptions,
   eventsOnDay,
   isEmail,
   monthGrid,
@@ -15,6 +16,7 @@ import {
   moveDraftStartTime,
   newDraft,
   rangeLabel,
+  startTimeOptions,
   timeLabel,
   weekDays,
   withGuest,
@@ -29,6 +31,9 @@ import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, TrashI
 import { isTextField, panelCovers } from './textField';
 import { keyboardCover } from './ItemBar';
 import { usePhone } from './usePhone';
+import { TimePicker, closeTimeList } from './TimePicker';
+
+const START_TIMES = startTimeOptions();
 
 // Google Calendar side panel (owner request, 2026-10-06): the signed-in person's primary calendar,
 // a week or a month, beside the board. The person's own events can be added, moved, renamed and
@@ -525,6 +530,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
   };
   const { note, setNote, busy, ask, setAsk, next } = useChange(event, finish);
   const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const endTimes = endTimeOptions(draft.startTime, draft.endDate === draft.startDate);
   const cancel = () => {
     setAsk(null);
     ref.current?.focus();
@@ -539,7 +545,8 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
       const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
       if (e.key !== 'Escape' || shortcutsOpen || confirm || deleteCompleted || panelCovers()) return;
       e.stopImmediatePropagation();
-      if (busy) return;
+      // An open time list takes this Escape; the form stays.
+      if (closeTimeList() || busy) return;
       if (ask) cancel();
       else finish();
     };
@@ -552,7 +559,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
     const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize'))) onClose();
+      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize, .time-list'))) onClose();
     };
     const click = (e: MouseEvent) => {
       if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
@@ -622,14 +629,14 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
               <span>Starts</span>
               <div className="cal-when">
                 <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
-                {!draft.allDay && <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => setDraft(moveDraftStartTime(draft, e.currentTarget.value))} />}
+                {!draft.allDay && <TimePicker label="Start time" value={draft.startTime} options={START_TIMES} onChange={(t) => setDraft(moveDraftStartTime(draft, t))} />}
               </div>
             </div>
             <div className="cal-field">
               <span>Ends</span>
               <div className="cal-when">
                 <input type="date" aria-label="End date" value={draft.endDate} onChange={(e) => change({ endDate: e.currentTarget.value })} />
-                {!draft.allDay && <input type="time" aria-label="End time" value={draft.endTime} onChange={(e) => change({ endTime: e.currentTarget.value })} />}
+                {!draft.allDay && <TimePicker label="End time" value={draft.endTime} options={endTimes} onChange={(t) => change({ endTime: t })} />}
               </div>
             </div>
             <div className="cal-field">
@@ -674,9 +681,9 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
             {!draft.allDay && (
               <div className="cal-field">
                 <div className="cal-when cal-times">
-                  <input type="time" aria-label="Start time" value={draft.startTime} onChange={(e) => setDraft(moveDraftStartTime(draft, e.currentTarget.value))} />
+                  <TimePicker label="Start time" value={draft.startTime} options={START_TIMES} onChange={(t) => setDraft(moveDraftStartTime(draft, t))} />
                   <span aria-hidden="true">–</span>
-                  <input type="time" aria-label="End time" value={draft.endTime} onChange={(e) => change({ endTime: e.currentTarget.value })} />
+                  <TimePicker label="End time" value={draft.endTime} options={endTimes} onChange={(t) => change({ endTime: t })} />
                 </div>
               </div>
             )}

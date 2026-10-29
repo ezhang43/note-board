@@ -374,6 +374,62 @@ export function moveDraftStartTime(d: Draft, startTime: string): Draft {
   };
 }
 
+/** "2:00 PM", "12:15 AM": a time as the time boxes show it (from 'HH:MM'; nothing for an empty box). */
+export function timeText(hhmm: string): string {
+  if (!isTime(hhmm)) return '';
+  const h = Number(hhmm.slice(0, 2));
+  return `${h % 12 || 12}:${hhmm.slice(3)} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** A time typed in a time box ("2:10pm", "14:10", "9", "930") as 'HH:MM', or null when it can't be read. */
+export function parseTypedTime(typed: string): string | null {
+  const m = /^(\d{1,2})(?:[:.]?([0-5]\d))?\s*(?:([ap])\.?m?\.?)?$/i.exec(typed.trim());
+  if (!m) return null;
+  let h = Number(m[1]);
+  if (m[3]) {
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (m[3].toLowerCase() === 'p' ? 12 : 0);
+  } else if (h > 23) return null;
+  return `${pad(h)}:${m[2] ?? '00'}`;
+}
+
+export type TimeOption = { value: string; text: string; hint?: string };
+
+/** The start list: a time every 15 minutes, all day. */
+export function startTimeOptions(): TimeOption[] {
+  return Array.from({ length: 96 }, (_, i) => {
+    const value = `${pad(Math.floor(i / 4))}:${pad((i % 4) * 15)}`;
+    return { value, text: timeText(value) };
+  });
+}
+
+/** "15 mins", "1 hr", "1.5 hrs", "1 hr 15 mins": how long an event is, as Google's end list says. */
+function lengthText(m: number): string {
+  if (m < 60) return `${m} mins`;
+  if (m % 30 === 0) return `${m / 60} ${m === 60 ? 'hr' : 'hrs'}`;
+  return `${Math.floor(m / 60)} hr${m < 120 ? '' : 's'} ${m % 60} mins`;
+}
+
+/**
+ * The end list: the first slot after the start on, each with the length it makes ("2:15 PM (15 mins)").
+ * An end on a later day than the start (`sameDay` false) has no length to show and can be any time that day.
+ */
+export function endTimeOptions(startTime: string, sameDay: boolean): TimeOption[] {
+  if (!sameDay || !isTime(startTime)) return startTimeOptions();
+  const start = mins(startTime);
+  return startTimeOptions()
+    .filter((o) => mins(o.value) > start)
+    .map((o) => ({ ...o, hint: lengthText(mins(o.value) - start) }));
+}
+
+/** Where in a time list `hhmm` is, or the nearest slot to it (the first for a box with no time); -1 for an empty list. */
+export function nearestTimeOption(options: TimeOption[], hhmm: string): number {
+  if (!options.length) return -1;
+  if (!isTime(hhmm)) return 0;
+  const gap = (o: TimeOption) => Math.abs(mins(o.value) - mins(hhmm));
+  return options.reduce((best, o, i) => (gap(o) < gap(options[best]) ? i : best), 0);
+}
+
 /** What Google takes for a draft, or null when its dates don't make sense (end not after start). */
 export function draftBody(d: Draft, timeZone: string): EventBody | null {
   const summary = d.title.trim();

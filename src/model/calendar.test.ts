@@ -27,6 +27,11 @@ import {
   monthGrid,
   moveDraftStart,
   moveDraftStartTime,
+  endTimeOptions,
+  nearestTimeOption,
+  parseTypedTime,
+  startTimeOptions,
+  timeText,
   moveView,
   newDraft,
   parseEvent,
@@ -627,5 +632,77 @@ describe('calendar access kept for this tab (owner choice, 2026-10-19)', () => {
       expect(readAccess(s, 'u1', now)).toBeNull();
       expect(() => dropAccess(s)).not.toThrow();
     }
+  });
+});
+
+// A time picker like Google Calendar's (job 219): a list every 15 minutes, typed times read as people write them.
+describe('time picker', () => {
+  it('writes a time as 12-hour text, "2:00 PM"', () => {
+    expect(timeText('14:00')).toBe('2:00 PM');
+    expect(timeText('00:15')).toBe('12:15 AM');
+    expect(timeText('12:00')).toBe('12:00 PM');
+    expect(timeText('09:05')).toBe('9:05 AM');
+    expect(timeText('23:59')).toBe('11:59 PM');
+    expect(timeText('')).toBe('');
+  });
+
+  it('reads typed times: 12-hour, 24-hour, a bare hour', () => {
+    for (const [typed, hhmm] of [
+      ['2:10pm', '14:10'], ['2:10 PM', '14:10'], ['2:10p', '14:10'], ['14:10', '14:10'], ['9', '09:00'], ['9am', '09:00'], ['9 pm', '21:00'],
+      ['12am', '00:00'], ['12pm', '12:00'], ['12:30 AM', '00:30'], ['930', '09:30'], ['1410', '14:10'], ['0:05', '00:05'], ['  7:45  ', '07:45'], ['9.30am', '09:30'],
+    ]) {
+      expect(parseTypedTime(typed), typed).toBe(hhmm);
+    }
+  });
+
+  it('refuses what is not a time', () => {
+    for (const typed of ['', 'abc', '25:00', '13pm', '0pm', '9:60', '24:00', '9:5', '2:10 xm', '99']) expect(parseTypedTime(typed), typed).toBeNull();
+  });
+
+  it('the start list has a time every 15 minutes, all day', () => {
+    const list = startTimeOptions();
+    expect(list).toHaveLength(96);
+    expect(list[0]).toEqual({ value: '00:00', text: '12:00 AM' });
+    expect(list[57]).toEqual({ value: '14:15', text: '2:15 PM' });
+    expect(list[95]).toEqual({ value: '23:45', text: '11:45 PM' });
+  });
+
+  it('the end list starts at the first slot after the start, each with its length', () => {
+    const list = endTimeOptions('14:00', true);
+    expect(list.slice(0, 3)).toEqual([
+      { value: '14:15', text: '2:15 PM', hint: '15 mins' },
+      { value: '14:30', text: '2:30 PM', hint: '30 mins' },
+      { value: '14:45', text: '2:45 PM', hint: '45 mins' },
+    ]);
+    expect(list.find((o) => o.value === '15:00')!.hint).toBe('1 hr');
+    expect(list.find((o) => o.value === '15:30')!.hint).toBe('1.5 hrs');
+    expect(list.find((o) => o.value === '16:00')!.hint).toBe('2 hrs');
+    expect(list.find((o) => o.value === '16:30')!.hint).toBe('2.5 hrs');
+    expect(list.find((o) => o.value === '15:15')!.hint).toBe('1 hr 15 mins');
+    expect(list.at(-1)).toEqual({ value: '23:45', text: '11:45 PM', hint: '9 hrs 45 mins' });
+  });
+
+  it('the end list from a start off the 15-minute grid, or late in the day', () => {
+    expect(endTimeOptions('16:10', true)[0]).toEqual({ value: '16:15', text: '4:15 PM', hint: '5 mins' });
+    expect(endTimeOptions('23:45', true)).toEqual([]);
+    expect(endTimeOptions('', true)).toHaveLength(96);
+  });
+
+  it('finds the slot nearest a time, to open the list at', () => {
+    const list = startTimeOptions();
+    expect(nearestTimeOption(list, '14:00')).toBe(56);
+    expect(nearestTimeOption(list, '14:10')).toBe(57);
+    expect(nearestTimeOption(list, '14:06')).toBe(56);
+    expect(nearestTimeOption(list, '14:23')).toBe(58);
+    expect(nearestTimeOption(list, '23:59')).toBe(95);
+    expect(nearestTimeOption(endTimeOptions('14:00', true), '14:00')).toBe(0);
+    expect(nearestTimeOption(list, '')).toBe(0);
+    expect(nearestTimeOption([], '14:00')).toBe(-1);
+  });
+
+  it('the end list on a later day than the start is the whole day, without lengths', () => {
+    const list = endTimeOptions('14:00', false);
+    expect(list).toHaveLength(96);
+    expect(list[0]).toEqual({ value: '00:00', text: '12:00 AM' });
   });
 });

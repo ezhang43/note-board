@@ -192,7 +192,9 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onPointerDown={(e) => e.preventDefault()}
         onClick={() => appStore.trashItem(cardId, item.id)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) removeItemByKey(e, () => appStore.trashItem(cardId, item.id));
+          if (e.key !== 'Enter') return;
+          if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) e.preventDefault(); // does nothing (the browser would press it)
+          else removeItemByKey(e, () => appStore.trashItem(cardId, item.id));
         }}
       >
         <TrashIcon />

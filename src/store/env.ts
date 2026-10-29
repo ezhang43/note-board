@@ -4,11 +4,16 @@
 export type Schedule = (fn: () => void) => void;
 export const later: Schedule = (fn) => setTimeout(fn, 0);
 
-/** Whether the cursor is in a text box outside this card (false where there is no browser, as in unit tests). */
-export function typingOutside(cardId: string): boolean {
+/**
+ * Where the cursor is being typed: null when it isn't in a text box (or there is no browser, as in unit tests);
+ * else the checklist item whose text box has it (empty ids for any other text box).
+ */
+// simple: the same test as the components' isTextField, without `instanceof`, which the store can't import.
+export function typingAt(): { cardId: string; itemId: string } | null {
   const el = globalThis.document?.activeElement as HTMLElement | null | undefined;
-  if (!el || !(el.isContentEditable || el.matches('textarea, input:not([type="checkbox"])'))) return false;
-  return el.closest('[data-card-id]')?.getAttribute('data-card-id') !== cardId;
+  if (!el || !(el.isContentEditable || el.matches('textarea, input:not([type="checkbox"])'))) return null;
+  const row = el.closest<HTMLElement>('[data-item-id]');
+  return { cardId: row?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId ?? '', itemId: row?.dataset.itemId ?? '' };
 }
 
 /** This device's localStorage, or null where it is blocked or missing (as in unit tests). */

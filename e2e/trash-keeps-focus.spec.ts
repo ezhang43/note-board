@@ -122,3 +122,20 @@ test('while typing in one list, the trash can in another list leaves the cursor 
   await page.keyboard.type('s');
   await expect.poll(() => texts(typing)).toEqual(['teas']);
 });
+
+test('while typing in one item, the trash can of another item in the same list leaves the cursor where it was', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await expect.poll(() => focused(page)).toBe('eggs');
+  await list.getByRole('button', { name: 'Delete item' }).nth(1).click();
+  await expect.poll(() => texts(list)).toEqual(['bread', 'eggs']);
+  await expect.poll(() => focused(page)).toBe('eggs');
+});
+
+test('Enter with Ctrl or Shift on a focused trash can does nothing', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk']);
+  const trash = list.getByRole('button', { name: 'Delete item' }).nth(1);
+  await trash.focus();
+  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Shift+Enter');
+  await expect.poll(() => texts(list)).toEqual(['bread', 'milk']);
+});

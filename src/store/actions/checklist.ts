@@ -7,7 +7,7 @@ import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDon
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
-import { copyText, typingOutside } from '../env';
+import { copyText, typingAt } from '../env';
 import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
@@ -62,7 +62,7 @@ export function checklistActions(ctx: StoreContext) {
   function selectLists(lists: ListSelection[], level?: 'column' | 'board', anchor?: { cardId: string; itemId: string }) {
     if (!lists.length) return;
     const first = anchor ? (lists.find((l) => l.cardId === anchor.cardId) ?? lists[0]) : lists[0];
-    const sel = { cardId: first.cardId, anchor: anchor?.itemId ?? first.ids[0], ids: first.ids };
+    const sel = { cardId: first.cardId, anchor: anchor?.cardId === first.cardId ? anchor.itemId : first.ids[0], ids: first.ids };
     updateUi({ itemSel: lists.length > 1 || level ? { ...sel, lists, level } : sel, selection: [first.cardId] });
   }
 
@@ -233,21 +233,24 @@ export function checklistActions(ctx: StoreContext) {
     },
     /**
      * Trash can: deletes the item and everything under it (or every selected item, if it is one of them).
-     * The cursor moves to the item above in its list (else below), so the focus is never left nowhere, where
-     * the next Delete would delete the card (job 222); on a phone the keyboard stays up.
+     * Unless a text box that stays is being typed in, the cursor moves to the item above in its list (else
+     * below), so the focus is never left nowhere, where the next Delete would delete the card (job 222); on a
+     * phone the keyboard stays up. Says whether anything was deleted.
      */
     trashItem(cardId: string, itemId: string): boolean {
       const lists = listsIncluding(cardId, itemId) ?? [{ cardId, ids: selectedItemsIncluding(cardId, itemId) ?? [itemId] }];
       const gone = lists.find((l) => l.cardId === cardId)!.ids;
-      // While typing in another card the cursor stays there (job 222 review).
-      const moveCursor = !typingOutside(cardId);
+      const typing = typingAt();
       return ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () =>
         commit((b) => {
-          const card = b.cards[cardId];
-          if (card?.kind !== 'todo') return null;
+          if (!lists.some((l) => b.cards[l.cardId]?.kind === 'todo')) return null; // nothing to delete: nothing is cleared
           const board = deleteAcross(b, lists);
+          const card = b.cards[cardId];
           const after = board.cards[cardId];
-          const focus = moveCursor && after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
+          // The cursor stays in a text box that is still there (job 222 review); it moves when it was in a removed item, or nowhere.
+          const typed = typing && board.cards[typing.cardId];
+          const move = !typing || (typed?.kind === 'todo' && !C.findItem(typed.items, typing.itemId));
+          const focus = move && card?.kind === 'todo' && after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
           return { board, ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
         }),
       );

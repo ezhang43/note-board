@@ -126,17 +126,40 @@ describe('items selected in several lists', () => {
     expect(s.trashItem(a, items(a)[1].id)).toBe(true);
   });
 
-  it('while typing in another list, the trash can leaves the cursor there (job 222)', () => {
+  /** Puts the cursor in the text box of this checklist item, as the browser would. */
+  const typeIn = (cardId: string, itemId: string) => {
+    const row = { dataset: { itemId }, closest: () => ({ dataset: { cardId } }) };
+    vi.stubGlobal('document', { activeElement: { isContentEditable: false, matches: () => true, closest: () => row } });
+  };
+
+  it('while typing in an item that stays, the trash can leaves the cursor there (job 222 review)', () => {
     const { s, a, b, items } = setup();
-    // The cursor is in a text box of list b.
-    vi.stubGlobal('document', { activeElement: { isContentEditable: false, matches: () => true, closest: () => ({ getAttribute: () => b }) } });
     try {
+      typeIn(b, items(b)[0].id); // another list
       const before = s.getState().ui.focusItem;
       s.trashItem(a, items(a)[1].id);
       expect(items(a).map((i) => i.text)).toEqual(['one']);
       expect(s.getState().ui.focusItem).toBe(before);
-      s.trashItem(b, items(b)[0].id); // in its own list it still moves
+      s.undo();
+      typeIn(a, items(a)[0].id); // the same list
+      s.trashItem(a, items(a)[1].id);
+      expect(s.getState().ui.focusItem).toBe(before);
+      s.undo();
+      typeIn(b, items(b)[0].id); // the item being typed in is the one removed: the cursor moves
+      s.trashItem(b, items(b)[0].id);
       expect(s.getState().ui.focusItem).toBe(items(b)[0].id);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('with items selected in several lists, typing in one that goes: the cursor moves to the trash can\'s list (job 222 review)', () => {
+    const { s, col, a, b, items } = setup();
+    try {
+      s.selectAcross(col, { cardId: a, itemId: items(a)[1].id }, { cardId: b, itemId: items(b)[0].id });
+      typeIn(b, items(b)[0].id);
+      s.trashItem(a, items(a)[1].id);
+      expect(s.getState().ui.focusItem).toBe(items(a)[0].id);
     } finally {
       vi.unstubAllGlobals();
     }

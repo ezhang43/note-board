@@ -150,7 +150,7 @@ test.describe('on a phone-sized screen', () => {
     }
     const list = page.locator('[data-card-id]').first();
     const texts = () => list.getByLabel('Item text').evaluateAll((els) => els.map((e) => (e as HTMLTextAreaElement).value));
-    const depth = (n: number) => list.locator('[data-item-id]').nth(n).evaluate((el) => parseFloat((el as HTMLElement).style.paddingLeft) || 0);
+    const depth = (n: number) => list.locator('[data-item-id]').nth(n).evaluate((el) => parseFloat(getComputedStyle(el as HTMLElement).paddingLeft) || 0);
     const items = page.getByRole('toolbar', { name: 'Item actions' });
     await list.getByLabel('Item text').nth(1).tap();
     await expect(items).toBeVisible();

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { ITEM_INDENT } from '../model/checklist';
 import { completedCardOf, dayLabel } from '../model/completed';
 import { styleCss } from '../model/textStyle';
 import type { CompletedEntry, TodoItem } from '../model/types';
@@ -84,7 +85,7 @@ function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string
 function CompletedChildren({ items, depth, cardId }: { items: TodoItem[]; depth: number; cardId: string }) {
   return items.map((it) => (
     <div key={it.id}>
-      <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * 22 }}>
+      <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * ITEM_INDENT }}>
         <input type="checkbox" aria-label={it.text.trim() ? `Done: ${it.text.trim()}` : 'Done'} checked={it.done} disabled />
         <span className="completed-text" data-find={`done:${cardId}:${it.id}`} style={styleCss(it.style) as CSSProperties}>
           <FindMarks find={`done:${cardId}:${it.id}`} text={it.text} />

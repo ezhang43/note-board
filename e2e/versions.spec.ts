@@ -68,7 +68,7 @@ test('restoring a version brings back the Journal panel’s writing too (check o
   await clickEmpty(page);
   await page.clock.fastForward('11:00');
   await journalButton.click();
-  await journal.getByRole('textbox').first().fill('Second words');
+  await journal.getByRole('textbox', { name: /^Journal, / }).first().fill('Second words');
   await journal.getByRole('button', { name: 'Close journal' }).click();
   await page.getByLabel('Note text').first().fill('Home later');
   await clickEmpty(page);
@@ -78,7 +78,7 @@ test('restoring a version brings back the Journal panel’s writing too (check o
   await page.getByRole('region', { name: 'Looking at an earlier version' }).getByRole('button', { name: 'Restore this version' }).click();
   await expect(page.getByLabel('Note text').first()).toHaveValue('Home note');
   await journalButton.click();
-  await expect(journal.getByRole('textbox').first()).toHaveText('First words');
+  await expect(journal.getByRole('textbox', { name: /^Journal, / }).first()).toHaveText('First words');
 });
 
 test('versions are kept after the page is reloaded', async ({ page }) => {

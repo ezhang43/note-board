@@ -2,7 +2,7 @@ import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
-import { JOURNAL_NAME, findJournalBoard, hiddenJournal, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
+import { JOURNAL_NAME, JOURNAL_NOTES, findJournalBoard, generalNote, generalSpot, hiddenJournal, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
 import { hasFormatting, plainOf, withinLimits, type Rich } from '../../model/richText';
 import { spotForNewBlock } from '../../model/layout';
@@ -37,6 +37,29 @@ export function boardActions(ctx: StoreContext) {
   const changeHabit = (cardId: string, change: (c: TodoCard) => TodoCard, merge?: string) => {
     const id = habitsId();
     if (id) ctx.commitTo(id, (b) => B.updateCard(b, cardId, (c) => (isHabit(c) ? change(c) : c)), merge);
+  };
+  /**
+   * Journal note `c` with `rich` written under its first line (the date line, or "General notes"),
+   * which stays. The plain text goes into `text`, which everything else reads, and the formatting
+   * beside it in `rich`, left out when there is none so a plain note keeps the shape it always had.
+   */
+  const writeJournal = (c: NoteCard, rich: Rich): NoteCard => {
+    const body = plainOf(rich);
+    // A note too big for its formatting to load back keeps only its text, now rather than on a reload.
+    const keep = hasFormatting(rich) && withinLimits(rich) ? rich : undefined;
+    const text = journalBody(c.text) === body ? c.text : withJournalBody(c.text, body);
+    if (text === c.text && deepEqual(keep, c.rich)) return c;
+    const { rich: _old, ...rest } = c;
+    return keep ? { ...rest, text, rich: keep } : { ...rest, text };
+  };
+  /**
+   * Typing or formatting in the Journal panel: the body under a note's date line (see writeJournal).
+   * Typing merges into one undo step; each formatting change (`typing` false) is a step of its own.
+   */
+  const setJournal = (noteId: string, rich: Rich, typing = true) => {
+    const id = journalId();
+    if (!id) return;
+    ctx.commitTo(id, (b) => B.updateCard(b, noteId, (c) => (c.kind === 'note' ? writeJournal(c, rich) : c)), typing ? `text:${noteId}` : undefined);
   };
 
   return {
@@ -118,25 +141,27 @@ export function boardActions(ctx: StoreContext) {
       ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false, selection: [], itemSel: null });
       return null;
     },
+    setJournal,
     /**
-     * Typing or formatting in the Journal panel: the body under a note's date line (the date line
-     * stays). The plain text is written into `text`, which everything else reads, and the formatting
-     * beside it in `rich`, left out when there is none so a plain note keeps the shape it always had.
-     * Typing merges into one undo step; each formatting change (`typing` false) is a step of its own.
+     * Typing or formatting in the Journal panel's general notes (owner request, 2026-10-29): written
+     * as setJournal writes a day, into the Journal board's "General notes" note. The note is added on
+     * the first typing, not when the panel opens, so opening it changes nothing; that first typing and
+     * the note's coming are one undo step.
      */
-    setJournal(noteId: string, rich: Rich, typing = true) {
+    setJournalNotes(rich: Rich, typing = true) {
       const id = journalId();
       if (!id) return;
-      const body = plainOf(rich);
-      // A note too big for its formatting to load back keeps only its text, now rather than on a reload.
-      const keep = hasFormatting(rich) && withinLimits(rich) ? rich : undefined;
-      const write = (c: NoteCard): NoteCard => {
-        const text = journalBody(c.text) === body ? c.text : withJournalBody(c.text, body);
-        if (text === c.text && deepEqual(keep, c.rich)) return c;
-        const { rich: _old, ...rest } = c;
-        return keep ? { ...rest, text, rich: keep } : { ...rest, text };
-      };
-      ctx.commitTo(id, (b) => B.updateCard(b, noteId, (c) => (c.kind === 'note' ? write(c) : c)), typing ? `text:${noteId}` : undefined);
+      const existing = generalNote(ctx.workspace().boards[id]);
+      if (existing) return setJournal(existing, rich, typing);
+      if (!plainOf(rich) && !hasFormatting(rich)) return; // nothing written: nothing is added
+      const card = writeJournal({ ...createCard('note'), kind: 'note', text: `${JOURNAL_NOTES}\n\n` }, rich);
+      const open = id === ctx.state.boards.open;
+      ctx.commitTo(
+        id,
+        (b) => (generalNote(b) ? b : B.addCard(b, card, { type: 'loose', ...generalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) })),
+        typing ? `text:${card.id}` : undefined,
+      );
+      if (open && ctx.state.board.cards[card.id]) ctx.requestSettle([card.id]);
     },
     /** Ctrl+Z / Ctrl+Y in the Journal panel: on the Journal board's own history, whichever board is open. */
     undoJournal() {

@@ -2531,12 +2531,12 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 @media (prefers-reduced-motion: no-preference) {
   .jg-head::before { transition: transform 150ms ease-out; }
 }
-.journal-entry h3 { margin: 0; font-size: inherit; font-weight: inherit; }
+.journal-entry h3, .journal-notes h3 { margin: 0; font-size: inherit; font-weight: inherit; }
 /* A day is a header button like the groups above it: the date, then (folded) its first lines, in gray. */
 .jg-day { color: var(--ink-soft); }
 .jg-day::before { display: none; }
 .jg-peek { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; color: var(--ink); font-size: 15px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
-.journal-entry .rich {
+.journal-entry .rich, .journal-notes .rich {
   min-height: 1.6em;
   padding: 0;
   color: var(--ink);
@@ -2546,9 +2546,19 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   overflow-wrap: anywhere;
   outline: none;
 }
-.journal-entry .rich { position: relative; }
+.journal-entry .rich, .journal-notes .rich { position: relative; }
 .rich[data-placeholder]:not(:has(> div + div))::before { content: attr(data-placeholder); position: absolute; left: 0; top: 0; color: var(--placeholder); pointer-events: none; }
-.app.phone .journal-entry .rich { font-size: 16px; }
+.app.phone .journal-entry .rich, .app.phone .journal-notes .rich { font-size: 16px; }
+/* The general notes (owner request, 2026-10-29): a quieter sheet above today's page, its header a fold button with the groups' arrow. */
+.journal-notes { margin: 12px 0 0; padding: 12px 20px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; }
+.journal-notes h3 { margin-bottom: 6px; }
+.journal-notes.shut h3 { margin-bottom: 0; }
+.journal-notes .jg-head { gap: 8px; padding: 0; border-radius: 4px; }
+.journal-notes .jg-head::before { color: var(--ink-soft); }
+.journal-notes .jp-title { flex: none; font-size: 15px; }
+/* Folded, one line of what is written follows the title. */
+.journal-notes .jg-peek { -webkit-line-clamp: 1; line-clamp: 1; color: var(--ink-soft); }
+.journal-notes .rich { min-height: calc(3 * 1.6em); }
 /* Today's page. */
 .journal-page { margin: 12px 0 2px; padding: 18px 20px 12px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
 .journal-page h3 { margin-bottom: 8px; }

@@ -41,12 +41,43 @@ export function todaysNote(board: Board, dateLine: string): string | null {
  * newest sits on top and nothing moves. On an empty board, the middle of the screen (`centre`).
  */
 export function journalSpot(board: Board, measured: MeasuredHeight, centre: Point): Point {
-  const rects = topLevelRects(board, measured);
+  // The general notes are left out, wherever they were moved, so they never shift the days' column.
+  const notes = generalNote(board);
+  const rects = topLevelRects(board, measured, notes ? [notes] : []);
   if (!rects.length) return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, centre, measured);
   const left = Math.min(...rects.map((r) => r.x));
   const top = Math.min(...rects.map((r) => r.y));
   // Clear of the block below even after rounding to the grid.
   return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, { x: left + CARD_W / 2, y: top - GRID - BLOCK_GAP - NEW_BLOCK_H.note / 2 }, measured);
+}
+
+// General notes (owner request, 2026-10-29): one note on the Journal board, not tied to a day, shown
+// at the top of the panel. Like a day, it is known by its first line, so it travels as an ordinary
+// note through sync, backups, export and import, copying and Version history, and needs no new field.
+
+/** The first line of the general notes. A date line never is this, so they are never mistaken for a day. */
+export const JOURNAL_NOTES = 'General notes';
+
+/**
+ * The general notes on `board`: the note whose first line is exactly "General notes", or null. With
+ * more than one (written on two devices before they synced, or a copy), the smallest id, so every
+ * device shows the same one; the others are ordinary notes on the board.
+ */
+export function generalNote(board: Board): string | null {
+  const ids = Object.values(board.cards).flatMap((c) => (c.kind === 'note' && firstLine(c.text) === JOURNAL_NOTES ? [c.id] : []));
+  return ids.sort()[0] ?? null;
+}
+
+/**
+ * Where the general notes go when first written: to the right of everything on the Journal board,
+ * level with its top, so the days' column (today's note straight above it, see journalSpot) is left alone.
+ */
+export function generalSpot(board: Board, measured: MeasuredHeight, centre: Point): Point {
+  const rects = topLevelRects(board, measured);
+  if (!rects.length) return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, centre, measured);
+  const right = Math.max(...rects.map((r) => r.x + r.w));
+  const top = Math.min(...rects.map((r) => r.y));
+  return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, { x: right + GRID + BLOCK_GAP + CARD_W / 2, y: top + NEW_BLOCK_H.note / 2 }, measured);
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -88,14 +119,16 @@ export function journalEntries(board: Board, today = ''): { id: string; date: st
 
 /**
  * The Journal board kept out of the Boards menu: the one the panel uses (see findJournalBoard),
- * when no card opens it and it holds only dated notes, so nothing on it is out of sight. A Journal
+ * when no card opens it and it holds only dated notes and its general notes, so nothing on it is out
+ * of sight (a second "General notes" note isn't in the panel, so it lists the board). A Journal
  * board with a card on Home (as the Journal button used to make) stays listed. Never the home board.
  */
 export function hiddenJournal(ws: Workspace, shared: string[]): string | null {
   const id = findJournalBoard(ws, shared);
   if (!id || id === ws.home) return null;
   const board = ws.boards[id];
-  if (Object.keys(board.columns).length || journalEntries(board).length !== Object.keys(board.cards).length) return null;
+  const shown = journalEntries(board).length + (generalNote(board) ? 1 : 0);
+  if (Object.keys(board.columns).length || shown !== Object.keys(board.cards).length) return null;
   const opened = Object.values(ws.boards).some((b) => Object.values(b.cards).some((c) => c.kind === 'board' && c.boardId === id));
   return opened ? null : id;
 }

@@ -43,21 +43,24 @@ export function itemOf(el: EventTarget | null): { cardId: string; itemId: string
  * (finger or pen) while typing in a text box of the same card leaves the cursor there, so a phone's
  * on-screen keyboard stays up.
  */
+let keepFor: Element | null = null; // the tick box label whose press keeps the focus where it is
 const typingIn = (box: Element) => isTextField(document.activeElement) && document.activeElement!.closest('[data-card-id]') === box.closest('[data-card-id]');
-const tap = (type: string | undefined) => type === 'touch' || type === 'pen';
-// simple: Safari before 18.2 doesn't say what kind of press a click was, so it takes the press's kind from its pointerdown.
-let pressKind: string | undefined;
-export const tickBoxPress = (e: { pointerType: string; currentTarget: Element; preventDefault(): void }) => {
-  pressKind = e.pointerType;
-  if (tap(e.pointerType) && typingIn(e.currentTarget)) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+export const tickBoxPress = {
+  onPointerDown(e: { pointerType: string; currentTarget: Element; preventDefault(): void }) {
+    keepFor = e.pointerType !== 'mouse' && typingIn(e.currentTarget) ? e.currentTarget : null;
+    if (keepFor) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+  },
+  onClick(e: { target: EventTarget; currentTarget: Element; preventDefault(): void }) {
+    // A tap on the label around the box: the label would focus the box, so tick it through the box instead.
+    if (keepFor === e.currentTarget && e.target === e.currentTarget) {
+      e.preventDefault();
+      e.currentTarget.querySelector('input')?.click(); // a click from the page doesn't move the focus
+    }
+  },
 };
-export function tickBoxClick(e: { currentTarget: HTMLElement; nativeEvent: Event }) {
+export function tickBoxClick(e: { currentTarget: HTMLElement }) {
   const box = e.currentTarget;
-  const kind = 'pointerType' in e.nativeEvent ? (e.nativeEvent as PointerEvent).pointerType : pressKind;
-  pressKind = undefined;
-  if (document.activeElement === box || (tap(kind) && typingIn(box))) return;
-  // Blurring first: Safari before 18.4 ignores focusVisible and would carry the text box's ring over to the box.
-  (document.activeElement as HTMLElement | null)?.blur();
+  if (document.activeElement === box || (keepFor === box.parentElement && typingIn(box))) return;
   box.focus({ preventScroll: true, focusVisible: false });
 }
 

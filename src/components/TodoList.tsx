@@ -140,7 +140,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
-      <label className="tick" onPointerDown={tickBoxPress}>
+      <label className="tick" {...tickBoxPress}>
         <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={tickBoxClick} />
       </label>
       <GrowTextarea

@@ -248,6 +248,15 @@ test.describe('on a phone', () => {
     await list.getByRole('checkbox', { name: 'Done: bread' }).tap();
     await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
     expect(await focused(page)).toBe('milk');
+    // The edges of the box's wider pressable area (its label), away from the box itself.
+    const label = list.locator('label.tick', { has: page.getByRole('checkbox', { name: 'Done: bread' }) });
+    const { width, height } = (await label.boundingBox())!;
+    await label.tap({ position: { x: 1, y: 1 } });
+    await expect(list.getByRole('checkbox', { name: 'Done: bread' })).not.toBeChecked();
+    expect(await focused(page)).toBe('milk');
+    await label.tap({ position: { x: width - 1, y: height / 2 } });
+    await expect(list.getByRole('checkbox', { name: 'Done: bread' })).toBeChecked();
+    expect(await focused(page)).toBe('milk');
   });
 });
 
@@ -257,4 +266,11 @@ test('a clicked tick box takes the keyboard without showing a focus ring', async
   await box.click();
   await expect(box).toBeFocused();
   expect(await box.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+  // As in Safari and Firefox on a Mac, where a click leaves the focus in the item's text: the box takes it.
+  await list.getByLabel('Item text').first().click();
+  const bread = list.getByRole('checkbox', { name: 'Done: bread' });
+  await bread.evaluate((el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })));
+  await expect(bread).toBeChecked();
+  await expect(bread).toBeFocused();
+  expect(await bread.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
 });

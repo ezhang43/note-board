@@ -9,7 +9,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
 import { ArrowIcon, GripIcon, TrashIcon } from './icons';
-import { rowAt, rowUnder, trackItemDrag } from './itemDom';
+import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 
@@ -109,6 +109,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     } else if (e.key === 'Tab') {
       e.preventDefault();
       appStore.itemTab(cardId, item.id, e.shiftKey);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && heldAfterRemoving(e)) {
+      e.preventDefault(); // the held key that just removed an item goes no further
+    } else if (e.key === 'Delete' && item.done && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+      // Delete in a ticked item removes it, like its trash can (owner request 2026-10-29, job 218); selected letters are still just deleted.
+      removeItemByKey(e, () => appStore.deleteTickedItem(cardId, item.id));
     } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
       if (appStore.itemBackspace(cardId, item.id)) e.preventDefault();
     } else if (e.key === 'Delete' && !e.shiftKey && atEnd(e.currentTarget)) {
@@ -134,8 +139,9 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       onPointerDown={rowPointerDown(cardId, item.id)}
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
-      <label className="tick">
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} />
+      {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
+      <label className="tick" {...tickBoxPress}>
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={tickBoxClick} />
       </label>
       <GrowTextarea
         ref={ref}

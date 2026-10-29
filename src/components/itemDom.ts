@@ -41,7 +41,7 @@ export function itemOf(el: EventTarget | null): { cardId: string; itemId: string
  * A tick box press (job 218). The box takes the keyboard (Safari and Firefox on a Mac don't do it
  * for a click), so Delete then removes its item, not the card; no focus ring for a click. But a tap
  * (finger or pen) while typing in a text box of the same card leaves the cursor there, so a phone's
- * on-screen keyboard stays up.
+ * on-screen keyboard stays up; that tap ticks the box on its touchend.
  */
 let keepFor: Element | null = null; // the tick box label whose press keeps the focus where it is
 const typingIn = (box: Element) => isTextField(document.activeElement) && document.activeElement!.closest('[data-card-id]') === box.closest('[data-card-id]');
@@ -49,6 +49,16 @@ export const tickBoxPress = {
   onPointerDown(e: { pointerType: string; currentTarget: Element; preventDefault(): void }) {
     keepFor = e.pointerType !== 'mouse' && typingIn(e.currentTarget) ? e.currentTarget : null;
     if (keepFor) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+  },
+  // Safari on an iPhone sends no click after that pointerdown, so a tap ticks here instead: cancelling the touchend
+  // stops the browser's own click (no second tick, no focus change), and a click from the page doesn't move the focus.
+  onTouchEnd(e: { currentTarget: Element; changedTouches: { length: number; 0?: { clientX: number; clientY: number } }; preventDefault(): void }) {
+    const t = e.changedTouches[0];
+    if (keepFor !== e.currentTarget || !t || e.changedTouches.length !== 1) return;
+    e.preventDefault();
+    // A finger that slid off the box (to scroll, say) ticks nothing, as a click wouldn't.
+    if (e.currentTarget.contains(document.elementFromPoint(t.clientX, t.clientY))) e.currentTarget.querySelector('input')?.click();
+    keepFor = null;
   },
   onClick(e: { target: EventTarget; currentTarget: Element; preventDefault(): void }) {
     // A tap on the label around the box: the label would focus the box, so tick it through the box instead.

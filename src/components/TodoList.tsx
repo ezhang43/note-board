@@ -93,6 +93,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Enter') && heldAfterRemoving(e)) {
+      e.preventDefault(); // the held key that just removed an item (Enter on its trash can, job 222) goes no further
+      return;
+    }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       // Ctrl+Enter (⌘+Enter): tick or untick, like the Done box (owner request, 2026-10-15).
       e.preventDefault();
@@ -109,8 +113,6 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     } else if (e.key === 'Tab') {
       e.preventDefault();
       appStore.itemTab(cardId, item.id, e.shiftKey);
-    } else if ((e.key === 'Delete' || e.key === 'Backspace') && heldAfterRemoving(e)) {
-      e.preventDefault(); // the held key that just removed an item goes no further
     } else if (e.key === 'Delete' && item.done && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
       // Delete in a ticked item removes it, like its trash can (owner request 2026-10-29, job 218); selected letters are still just deleted.
       removeItemByKey(e, () => appStore.deleteTickedItem(cardId, item.id));
@@ -181,7 +183,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         </span>
       )}
       {/* Every item has a trash can on hover (owner's request; the spec had it on completed items only). */}
-      {/* A press leaves the cursor in the item (on a touch screen the trash only shows while the item has it); once the item is gone the cursor goes to the item above, else below (job 222). */}
+      {/* A press doesn't take the cursor out of a text box (on a touch screen the trash only shows while the item has it); once the item is gone the cursor goes to the item above, else below (job 222). */}
       <button
         type="button"
         className="item-trash"
@@ -189,6 +191,13 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         title="Delete item"
         onPointerDown={(e) => e.preventDefault()}
         onClick={() => appStore.trashItem(cardId, item.id)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          removeItemByKey(e, () => {
+            appStore.trashItem(cardId, item.id);
+            return true;
+          });
+        }}
       >
         <TrashIcon />
       </button>

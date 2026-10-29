@@ -69,16 +69,12 @@ export function checklistActions(ctx: StoreContext) {
   /** How many items are selected across these lists (what a screen reader is told). */
   const itemsIn = (lists: ListSelection[]) => lists.reduce((n, l) => n + l.ids.length, 0);
 
-  /** Delete / Backspace with checklist items selected. Returns false when no items are selected. */
+  /** Delete / Backspace with checklist items selected: as the trash on one of them. Returns false when no items are selected. */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
     if (!sel) return false;
-    if (sel.lists) {
-      const lists = sel.lists;
-      ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () => commit((b) => deleteAcross(b, lists), { ui: { itemSel: null } }));
-      return true;
-    }
-    ctx.deleting(`Deleted ${count(sel.ids.length, 'item')}`, () => commit((b) => C.editItems(b, sel.cardId, (items) => C.deleteItems(items, sel.ids)), { ui: { itemSel: null } }));
+    const list = sel.lists?.find((l) => l.ids.length) ?? sel;
+    if (list.ids.length) actions.trashItem(list.cardId, list.ids[0]);
     return true;
   }
 
@@ -244,11 +240,9 @@ export function checklistActions(ctx: StoreContext) {
       const gone = lists.find((l) => l.cardId === cardId)!.ids;
       ctx.deleting(`Deleted ${count(itemsIn(lists), 'item')}`, () =>
         commit((b) => {
-          const card = b.cards[cardId];
-          if (card?.kind !== 'todo') return null;
           const board = deleteAcross(b, lists);
-          const after = board.cards[cardId];
-          const focus = after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
+          const [card, after] = [b.cards[cardId], board.cards[cardId]];
+          const focus = card?.kind === 'todo' && after?.kind === 'todo' ? C.focusAfterRemoving(visibleItems(card), after.items, gone) : null;
           return { board, ui: { itemSel: null, ...(focus ? { focusItem: focus, focusOffset: null } : {}) } };
         }),
       );

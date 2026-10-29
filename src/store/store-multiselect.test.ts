@@ -99,6 +99,16 @@ describe('items selected in several lists', () => {
     expect(items(b).map((i) => i.text)).toEqual(['three']);
   });
 
+  it('Delete with items selected puts the cursor in the item above too, so a second Delete never reaches the card (job 222)', () => {
+    const { s, a, items } = setup();
+    const one = items(a)[0].id;
+    s.selectItemRange(a, items(a)[1].id, items(a)[1].id);
+    expect(s.deleteSelectedItems()).toBe(true);
+    expect(items(a).map((i) => i.text)).toEqual(['one']);
+    expect(s.getState().ui.focusItem).toBe(one);
+    expect(s.getState().ui.itemSel).toBeNull();
+  });
+
   it('Tab does nothing across several lists', () => {
     const { s, a, items } = setup();
     s.selectWholeList(a);

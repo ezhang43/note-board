@@ -52,6 +52,40 @@ test('pressing the trash can from the keyboard (Enter) moves the cursor the same
   await expect.poll(() => texts(list)).toEqual(['bread', 'eggs']);
   await expect.poll(() => focused(page)).toBe('bread');
   await page.keyboard.press('Backspace');
+  await expect.poll(() => texts(list)).toEqual(['brea', 'eggs']);
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('holding Enter on the trash can removes one item; its repeats do nothing in the item above', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await list.getByRole('button', { name: 'Delete item' }).nth(1).focus();
+  await page.keyboard.down('Enter');
+  await page.keyboard.down('Enter'); // a repeat
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect.poll(() => texts(list)).toEqual(['bread', 'eggs']);
+  await expect.poll(() => focused(page)).toBe('bread');
+});
+
+test('clicking the trash can with nothing being typed in, then Delete: the card stays', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk']);
+  await page.keyboard.press('Escape'); // leaves the text box; the card stays selected
+  await expect.poll(() => focused(page)).toBeNull();
+  await expect(list).toHaveClass(/selected/);
+  await list.getByRole('button', { name: 'Delete item' }).nth(1).click();
+  await expect.poll(() => texts(list)).toEqual(['bread']);
+  await expect.poll(() => focused(page)).toBe('bread');
+  await page.keyboard.press('Delete');
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('Delete with items selected (Shift+click), then Delete again: the card stays', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await list.getByLabel('Item text').nth(1).click();
+  await list.getByLabel('Item text').nth(2).click({ modifiers: ['Shift'] });
+  await page.keyboard.press('Delete');
+  await expect.poll(() => texts(list)).toEqual(['bread']);
+  await expect.poll(() => focused(page)).toBe('bread');
   await page.keyboard.press('Delete');
   await expect(cards(page)).toHaveCount(1);
 });

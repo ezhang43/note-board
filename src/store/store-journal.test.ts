@@ -393,6 +393,18 @@ describe('Journal general notes', () => {
     expect(journalNotes(s)).toHaveLength(2); // today's note and the general notes
   });
 
+  it('typing in them does nothing (and does not crash) once the Journal board is gone', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.getState().ui.journalBoard!;
+    const ws = s.workspace();
+    const boards = { ...ws.boards };
+    delete boards[id];
+    s.replaceWorkspace({ ...ws, boards });
+    expect(() => s.setJournalNotes(fromPlain('lost?'))).not.toThrow();
+    expect(s.workspace().boards[id]).toBeUndefined();
+  });
+
   it('keeps the Journal board hidden, and sits clear of today’s note', () => {
     const s = setup();
     s.openJournal();

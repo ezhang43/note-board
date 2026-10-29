@@ -64,8 +64,9 @@ export const JOURNAL_NOTES = 'General notes';
  * device shows the same one; the others are ordinary notes on the board.
  */
 export function generalNote(board: Board): string | null {
-  const ids = Object.values(board.cards).flatMap((c) => (c.kind === 'note' && firstLine(c.text) === JOURNAL_NOTES ? [c.id] : []));
-  return ids.sort()[0] ?? null;
+  let id: string | null = null;
+  for (const c of Object.values(board.cards)) if (c.kind === 'note' && firstLine(c.text) === JOURNAL_NOTES && (id === null || c.id < id)) id = c.id;
+  return id;
 }
 
 /**

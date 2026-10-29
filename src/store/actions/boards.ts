@@ -150,8 +150,9 @@ export function boardActions(ctx: StoreContext) {
      */
     setJournalNotes(rich: Rich, typing = true) {
       const id = journalId();
-      if (!id) return;
-      const existing = generalNote(ctx.workspace().boards[id]);
+      const board = id ? ctx.workspace().boards[id] : undefined;
+      if (!id || !board) return; // the Journal board went (sync or a restore) while the panel was open
+      const existing = generalNote(board);
       if (existing) return setJournal(existing, rich, typing);
       if (!plainOf(rich) && !hasFormatting(rich)) return; // nothing written: nothing is added
       const card = writeJournal({ ...createCard('note'), kind: 'note', text: `${JOURNAL_NOTES}\n\n` }, rich);

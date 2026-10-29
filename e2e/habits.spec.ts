@@ -215,7 +215,7 @@ test('a board and a journal saved before Habits existed load unchanged', async (
   expect(await page.evaluate(() => localStorage.getItem('note-board:v1'))).toBe(saved);
   await expect(cards(page)).toContainText('old note');
   await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox').first()).toHaveText('old journal');
+  await expect(page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox', { name: /^Journal, / })).toHaveText('old journal');
 });
 
 // Weight (owner request, 2026-10-21; "weight B", owner pick 2026-10-22, job 179): the card reads first (the latest weight and the

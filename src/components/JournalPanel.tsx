@@ -66,8 +66,9 @@ export function JournalPanel() {
     </button>
   );
   // The general notes (owner request, 2026-10-29): open each time the panel opens (view state, like a day's fold).
-  const notesCard = board ? board.cards[generalNote(board) ?? ''] : undefined;
+  const notesCard = useMemo(() => (board ? board.cards[generalNote(board) ?? ''] : undefined), [board]);
   const notesText = notesCard?.kind === 'note' ? notesCard.text : '';
+  const notesRich = useMemo(() => journalRich(notesText, notesCard?.kind === 'note' ? notesCard.rich : undefined), [notesCard, notesText]);
   const notesPeek = journalPeek(journalBody(notesText));
   const [notesOpen, setNotesOpen] = useState(true);
   // Days whose fold was turned over this visit (view state: not saved, not undoable, gone when the panel closes):
@@ -334,50 +335,53 @@ export function JournalPanel() {
           </div>
         )}
       </div>
-      <section className={`journal-notes${notesOpen ? '' : ' shut'}`}>
-        <h3>
-          <button
-            type="button"
-            className="jg-head jg-notes"
-            aria-expanded={notesOpen}
-            onClick={(ev) => {
-              // Folding them while they hold the cursor takes the cursor to this header, as a day's fold does.
-              if (notesOpen) typing.current = null;
-              ev.currentTarget.focus();
-              setNotesOpen((o) => !o);
-            }}
-          >
-            <span className="jp-title">{JOURNAL_NOTES}</span>
-            {!notesOpen && notesPeek && <span className="jg-peek">{notesPeek}</span>}
-          </button>
-        </h3>
-        {notesOpen && (
-          <RichEditor
-            ref={(h) => {
-              if (h) handles.current.set(JOURNAL_NOTES, h);
-              else handles.current.delete(JOURNAL_NOTES);
-            }}
-            value={journalRich(notesText, notesCard?.kind === 'note' ? notesCard.rich : undefined)}
-            label={JOURNAL_NOTES}
-            placeholder={notesPeek ? undefined : NOTES_PLACEHOLDER}
-            onChange={(rich, typed) => appStore.setJournalNotes(rich, typed)}
-            onLook={(l) => {
-              active.current = handles.current.get(JOURNAL_NOTES) ?? null;
-              setLook((was) => (deepEqual(was, l) ? was : l));
-            }}
-            onFocus={(el) => {
-              typing.current = el;
-              active.current = handles.current.get(JOURNAL_NOTES) ?? null;
-            }}
-            onBlur={(el) => {
-              queueMicrotask(() => {
-                if (el.isConnected && typing.current === el) typing.current = null;
-              });
-            }}
-            onEscape={() => root.current?.focus()}
-          />
-        )}
-      </section>
+      {/* Only with a Journal board to write into, like the days. */}
+      {board && (
+        <section className={`journal-notes${notesOpen ? '' : ' shut'}`}>
+          <h3>
+            <button
+              type="button"
+              className="jg-head jg-notes"
+              aria-expanded={notesOpen}
+              onClick={(ev) => {
+                // Folding them while they hold the cursor takes the cursor to this header, as a day's fold does.
+                if (notesOpen) typing.current = null;
+                ev.currentTarget.focus();
+                setNotesOpen((o) => !o);
+              }}
+            >
+              <span className="jp-title">{JOURNAL_NOTES}</span>
+              {!notesOpen && notesPeek && <span className="jg-peek">{notesPeek}</span>}
+            </button>
+          </h3>
+          {notesOpen && (
+            <RichEditor
+              ref={(h) => {
+                if (h) handles.current.set(JOURNAL_NOTES, h);
+                else handles.current.delete(JOURNAL_NOTES);
+              }}
+              value={notesRich}
+              label={JOURNAL_NOTES}
+              placeholder={notesPeek ? undefined : NOTES_PLACEHOLDER}
+              onChange={(rich, typed) => appStore.setJournalNotes(rich, typed)}
+              onLook={(l) => {
+                active.current = handles.current.get(JOURNAL_NOTES) ?? null;
+                setLook((was) => (deepEqual(was, l) ? was : l));
+              }}
+              onFocus={(el) => {
+                typing.current = el;
+                active.current = handles.current.get(JOURNAL_NOTES) ?? null;
+              }}
+              onBlur={(el) => {
+                queueMicrotask(() => {
+                  if (el.isConnected && typing.current === el) typing.current = null;
+                });
+              }}
+              onEscape={() => root.current?.focus()}
+            />
+          )}
+        </section>
+      )}
       {todayEntry && entry(todayEntry, true)}
       {timeline}
     </div>

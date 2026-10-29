@@ -44,20 +44,27 @@ export function itemOf(el: EventTarget | null): { cardId: string; itemId: string
  * on-screen keyboard stays up; that tap ticks the box on its touchend.
  */
 let keepFor: Element | null = null; // the tick box label whose press keeps the focus where it is
+let press = { x: 0, y: 0, at: 0 }; // where and when that press started
 const typingIn = (box: Element) => isTextField(document.activeElement) && document.activeElement!.closest('[data-card-id]') === box.closest('[data-card-id]');
+type Point = { clientX: number; clientY: number };
 export const tickBoxPress = {
-  onPointerDown(e: { pointerType: string; currentTarget: Element; preventDefault(): void }) {
+  onPointerDown(e: Point & { pointerType: string; currentTarget: Element; preventDefault(): void }) {
     keepFor = e.pointerType !== 'mouse' && typingIn(e.currentTarget) ? e.currentTarget : null;
+    press = { x: e.clientX, y: e.clientY, at: performance.now() };
     if (keepFor) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+  },
+  onPointerCancel() {
+    keepFor = null;
   },
   // Safari on an iPhone sends no click after that pointerdown, so a tap ticks here instead: cancelling the touchend
   // stops the browser's own click (no second tick, no focus change), and a click from the page doesn't move the focus.
-  onTouchEnd(e: { currentTarget: Element; changedTouches: { length: number; 0?: { clientX: number; clientY: number } }; preventDefault(): void }) {
+  onTouchEnd(e: { currentTarget: Element; touches: { length: number }; changedTouches: ArrayLike<Point>; preventDefault(): void }) {
+    if (keepFor !== e.currentTarget) return;
     const t = e.changedTouches[0];
-    if (keepFor !== e.currentTarget || !t || e.changedTouches.length !== 1) return;
+    // Only a tap, as a click would be: one finger, lifted where it pressed, within half a second (not a slide, pinch or long press).
+    const tap = e.touches.length === 0 && e.changedTouches.length === 1 && Math.hypot(t.clientX - press.x, t.clientY - press.y) < 10 && performance.now() - press.at < 500;
     e.preventDefault();
-    // A finger that slid off the box (to scroll, say) ticks nothing, as a click wouldn't.
-    if (e.currentTarget.contains(document.elementFromPoint(t.clientX, t.clientY))) e.currentTarget.querySelector('input')?.click();
+    if (tap) e.currentTarget.querySelector('input')?.click();
     keepFor = null;
   },
   onClick(e: { target: EventTarget; currentTarget: Element; preventDefault(): void }) {

@@ -51,7 +51,7 @@ test.describe('side panels on a computer set to dark mode', () => {
 
   test('a Journal day card is dark too', async ({ page }) => {
     await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-    const field = page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox').first();
+    const field = page.getByRole('complementary', { name: 'Journal' }).getByRole('textbox', { name: /^Journal, / }).first();
     await expect(field).toBeVisible();
     expect(brightness(await field.evaluate((el) => getComputedStyle(el.closest('.journal-day') ?? el).backgroundColor))).toBeLessThan(80);
   });

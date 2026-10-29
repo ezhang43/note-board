@@ -11,7 +11,7 @@ const EMPTY = 'Mon 12 Oct 2026';
 
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Journal' });
 const day = (page: Page, date: string) => panel(page).getByRole('button', { name: new RegExp(`^${date}`) });
-const boxes = (page: Page) => panel(page).getByRole('textbox');
+const boxes = (page: Page) => panel(page).getByRole('textbox', { name: /^Journal, / });
 const openJournal = async (page: Page) => {
   const button = page.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true });
   if (await button.isVisible()) return button.click();

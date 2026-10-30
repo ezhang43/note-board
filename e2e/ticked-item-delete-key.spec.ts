@@ -210,6 +210,26 @@ test.describe('on a touch screen', () => {
     expect(await focused(page)).toBe('milk');
   });
 
+  // Review finding (job 224): the tap ticks on the touchend, so a finger that slides off, or rests on the box, must tick nothing, as no click would.
+  test('a finger that slides off the box, or rests on it, ticks nothing and leaves the cursor in the text', async ({ page }) => {
+    const list = await checklist(page, ['bread', 'milk']);
+    await list.getByLabel('Item text').nth(1).tap();
+    const box = list.getByRole('checkbox', { name: 'Done: bread' });
+    const b = (await box.boundingBox())!;
+    const [x, y] = [b.x + b.width / 2, b.y + b.height / 2];
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', px = x, py = y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: px, y: py }] });
+    await touch('touchStart');
+    await touch('touchMove', x, y + 40);
+    await touch('touchEnd');
+    await touch('touchStart');
+    await page.waitForTimeout(700);
+    await touch('touchEnd');
+    await page.waitForTimeout(300);
+    await expect(box).not.toBeChecked();
+    expect(await focused(page)).toBe('milk');
+  });
+
   test('a tap with no text being typed in gives the box the keyboard, so a keyboard Delete removes the item, not the card', async ({ page }) => {
     const list = await checklist(page, ['bread', 'milk', 'eggs']);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

@@ -1769,3 +1769,149 @@ test.describe('the overlay on a phone', () => {
     await expect(form(page)).toHaveCount(0);
   });
 });
+
+// After adding, saving or deleting an event a soft message says so, with Undo, as Google Calendar does
+// (owner request, 2026-10-29, job 217). Undo never emails guests (sendUpdates=none).
+test.describe('the Undo message after a change (job 217)', () => {
+  const toast = (page: Page) => page.locator('.undo-toast');
+  const undo = (page: Page) => toast(page).getByRole('button', { name: 'Undo' });
+
+  test('adding an event says “Event added”; Undo deletes it without emailing anyone', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await page.keyboard.type('Swim');
+    await setTime(form(page).getByLabel('Start time'), '07:00');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(toast(page)).toHaveText(/Event added\s*Undo/);
+    await expect(today.getByRole('button', { name: '7 – 8am Swim' })).toBeVisible();
+    await undo(page).click();
+    await expect(toast(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: /Swim/ })).toHaveCount(0);
+    expect(sent.at(-1)).toMatch(/^DELETE .*sendUpdates=none/);
+    expect(errors).toEqual([]);
+  });
+
+  test('saving a change says “Event saved”; Undo puts the old title, time and guests back without emailing them', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const tomorrow = day(page, daysFromToday(1));
+    await edit(page, tomorrow.getByRole('button', { name: /Lunch with Sam/ }));
+    await form(page).getByLabel('Title').fill('Brunch');
+    await setTime(form(page).getByLabel('Start time'), '11:00');
+    await form(page).getByRole('button', { name: 'Remove guest sam@example.com' }).click();
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await asked(page, EMAILS).getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    await expect(tomorrow.getByRole('button', { name: '11am – 12pm Brunch' })).toBeVisible();
+    await undo(page).click();
+    await expect(tomorrow.getByRole('button', { name: '12:30 – 1:30pm Lunch with Sam' })).toBeVisible();
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+    await edit(page, tomorrow.getByRole('button', { name: /Lunch with Sam/ }));
+    await expect(form(page).getByRole('listitem')).toHaveText(['sam@example.com']);
+    expect(errors).toEqual([]);
+  });
+
+  test('deleting says “Event deleted”; Undo brings the event back, from the card’s trash too', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await expect(toast(page)).toHaveText(/Event deleted\s*Undo/);
+    await undo(page).click();
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+    // It is the same event, so it can be changed again.
+    await edit(page, today.getByRole('button', { name: /Dentist/ }));
+    await form(page).getByLabel('Title').fill('Dentist visit');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist visit' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('deleting an event Google says is already gone offers no Undo, and shows the calendar as Google has it', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    // Google answers the delete with 410: the event was gone already, so Undo mustn't bring it back.
+    let deletes = 0;
+    await page.route('**/__calendar/**', (route) =>
+      route.request().method() === 'DELETE' ? (deletes++, route.fulfill({ status: 410, contentType: 'application/json', body: '{"error":{"code":410}}' })) : route.fallback(),
+    );
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText('Event deleted');
+    await expect(undo(page)).toHaveCount(0);
+    expect(deletes).toBe(1);
+    // The panel is fetched again: this pretend Google still has it, so it shows (a real 410 would leave it out).
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('a repeating event: Undo brings back one deleted event, the whole deleted series, and a series’ old time', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const standUp = (n: number) => day(page, daysFromToday(n)).getByRole('button', { name: /Team stand-up/ });
+
+    await edit(page, standUp(2));
+    await form(page).getByRole('button', { name: 'Delete' }).click();
+    await asked(page, 'Delete “Team stand-up”?').getByRole('button', { name: 'Only this event' }).click();
+    await expect(standUp(2)).toHaveCount(0);
+    await undo(page).click();
+    await expect(standUp(2)).toHaveAccessibleName('9 – 9:15am Team stand-up');
+
+    await edit(page, standUp(3));
+    await form(page).getByRole('button', { name: 'Delete' }).click();
+    await asked(page, 'Delete “Team stand-up”?').getByRole('button', { name: 'All events in the series' }).click();
+    await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
+    await expect(toast(page)).toHaveText(/Event deleted\s*Undo/);
+    await undo(page).click();
+    for (const n of [0, 3, 6]) await expect(standUp(n)).toHaveAccessibleName('9 – 9:15am Team stand-up');
+
+    // All events moved to 09:30, then Undo: every one is back at 09:00, and can still be changed (same ids).
+    await edit(page, standUp(1));
+    await setTime(form(page).getByLabel('Start time'), '09:30');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+    await expect(standUp(4)).toHaveAccessibleName('9:30 – 9:45am Team stand-up');
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    await undo(page).click();
+    for (const n of [1, 4]) await expect(standUp(n)).toHaveAccessibleName('9 – 9:15am Team stand-up');
+    await edit(page, standUp(4));
+    await form(page).getByLabel('Title').fill('Planning');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
+    await expect(day(page, daysFromToday(4)).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('the message goes after 6 seconds, and a board delete’s message replaces it', async ({ page }) => {
+    await page.clock.install();
+    const errors = await openAs(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await page.clock.runFor(6500);
+    await expect(toast(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+
+    await edit(page, today.getByRole('button', { name: /Team stand-up/ }));
+    await form(page).getByRole('button', { name: 'Delete' }).click();
+    await asked(page, 'Delete “Team stand-up”?').getByRole('button', { name: 'Only this event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    // One message at a time: a board delete's replaces it, and its Undo is the board's.
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Delete');
+    await expect(toast(page)).toHaveText(/Deleted 1 card/);
+    expect(errors).toEqual([]);
+  });
+});

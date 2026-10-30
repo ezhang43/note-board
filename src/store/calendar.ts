@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from 'react';
 import { canChangeSeries, dayKey, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
+import { announce } from './announce';
 import { deviceStorage } from './env';
 import { createWidthStore } from './panelWidths';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
-// events are Google's, not board data, so nothing here is undone, synced with boards or kept in
-// Version history. It talks to the Calendar API (v3) directly with fetch.
+// events are Google's, not board data, so nothing here is in Ctrl+Z, synced with boards or kept in
+// Version history; a change's own Undo message (job 217) is the only undo. It talks to the Calendar API (v3) directly with fetch.
 
 export const NOT_CONNECTED = 'Google Calendar isn’t connected yet. Try again later.';
 /** Without access yet (`needsAccess`), the panel offers Connect Google Calendar instead of Try again. */
@@ -18,6 +19,8 @@ export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
 export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
+export const UNDO_FAILED = 'The undo didn’t reach Google Calendar. Try again later.';
+export const UNDO_PART = 'Only the series was put back: this event’s own change didn’t reach Google Calendar.';
 
 /** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
 export interface CalendarSource {
@@ -34,10 +37,18 @@ export interface CalendarApi {
   list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
   /** One event: a repeating event's series, to find its first day. */
   get(id: string): Promise<CalEvent | null>;
-  create(body: EventBody, notify?: boolean): Promise<void>;
+  /** Resolves to the new event's id (null if Google gave none). */
+  create(body: EventBody, notify?: boolean): Promise<string | null>;
   /** Without a start and end (an event changed on its own getting a new title), its time stays. */
   update(id: string, body: Partial<EventBody>, notify?: boolean): Promise<void>;
-  remove(id: string, notify?: boolean): Promise<void>;
+  /** Resolves to false when it was already gone (deleted in Google Calendar, say). */
+  remove(id: string, notify?: boolean): Promise<boolean>;
+  /**
+   * Brings a deleted event (or one event of a series, or a whole series) back, never emailing guests:
+   * Google keeps a deleted event's details on its organizer's calendar "so that they can be restored
+   * (undeleted)" (the Events reference, `status`), by setting its status back to confirmed (job 217).
+   */
+  restore(id: string): Promise<void>;
 }
 
 /** The person's answers to the questions the form asks before saving or deleting (job #85). */
@@ -86,7 +97,11 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       return parseEvent(await res.json());
     },
     async create(body, notify) {
-      ok(await call(`${events}${updates(notify)}`, { method: 'POST', body: JSON.stringify(body) }));
+      const res = await call(`${events}${updates(notify)}`, { method: 'POST', body: JSON.stringify(body) });
+      ok(res);
+      // Google has made it: an answer that can't be read only means no Undo, never a failed add (a retry would make two).
+      const id = await res.json().then((b: { id?: unknown } | null) => b?.id, () => null);
+      return typeof id === 'string' && id ? id : null;
     },
     async update(id, body, notify) {
       // Google merges a changed start / end with the old one: clear the kind not used now, else a
@@ -98,7 +113,12 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
     async remove(id, notify) {
       const res = await call(one(id, notify), { method: 'DELETE' });
       // Already deleted (in Google Calendar, say): that's what was wanted.
-      if (res.status !== 404 && res.status !== 410) ok(res);
+      if (res.status === 404 || res.status === 410) return false;
+      ok(res);
+      return true;
+    },
+    async restore(id) {
+      ok(await call(one(id, false), { method: 'PATCH', body: JSON.stringify({ status: 'confirmed' }) }));
     },
   };
 }
@@ -115,13 +135,20 @@ export interface CalendarState {
   needsAccess: boolean;
   /** How wide the panel is for each view; kept on this device, never synced (owner request, 2026-10-16). */
   widths: PanelWidths;
+  /**
+   * The soft message after a change (owner request, 2026-10-29, job 217): "Event added", "Event
+   * saved" or "Event deleted", with what its Undo does (null: no Undo, as after a failed undo).
+   * `n` tells one message from the next.
+   */
+  done: { text: string; undo: (() => Promise<unknown>) | null; n: number } | null;
 }
 
 const WIDTH_KEY = 'note-board:calendar-width';
 
 export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null) {
   const widthStore = createWidthStore(WIDTH_KEY, PANEL_DEFAULT, storage);
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get() };
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null };
+  let said = 0;
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
   let asked = 0;
@@ -131,6 +158,21 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   };
   const editable = (id: string) => state.events?.find((e) => e.id === id && e.editable);
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+  /** Shows (and says aloud) the message after a change. */
+  const tell = (text: string, undo: (() => Promise<unknown>) | null) => {
+    set({ done: { text, undo, n: ++said } });
+    announce(text);
+  };
+  /**
+   * What puts an event back as it was (Undo after a save): its old title and time, and its old
+   * guests (as Google gave them) when the change sent guests. Never emails them.
+   * simple: the time is written in this device's time zone (the same moment), as saving does.
+   */
+  const putBack = (id: string, was: CalEvent, guests: boolean) => {
+    const body = draftBody(draftFor(was), timeZone());
+    // Old times Google allows but the form doesn't (an end not after its start): no Undo.
+    return body && (() => api!.update(id, guests ? { ...body, attendees: was.guests } : body, false));
+  };
 
   async function load() {
     if (!api) return;
@@ -157,7 +199,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     },
     /** The panel opened: today's week or month, fetched afresh (whoever is signed in now). */
     open() {
-      set({ day: today(), events: null });
+      set({ day: today(), events: null, done: null });
       return load();
     },
     /** Try again (or Connect Google Calendar) after a note. */
@@ -208,9 +250,10 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       let attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
       let own: Partial<EventBody> | null = null;
+      let series: CalEvent | null = null;
       try {
         if (all && event?.series) {
-          const series = await api.get(event.series);
+          series = await api.get(event.series);
           if (!series) return SAVE_FAILED;
           // simple: the series' times are written in this device's time zone, so one kept in
           // another zone (which its repeat rule follows) is left to Google Calendar.
@@ -229,8 +272,27 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       } catch {
         return SAVE_FAILED;
       }
+      let undo: (() => Promise<unknown>) | null;
       try {
-        await (event === null ? api.create(body, notify) : api.update(all && event.series ? event.series : event.id, body, notify));
+        if (event === null) {
+          const id = await api.create(body, notify);
+          undo = id ? () => api.remove(id, false) : null;
+        } else if (series && event.series) {
+          await api.update(event.series, body, notify);
+          // The series first, which also gives its events back their old ids, then the edited event's own change.
+          const seriesBack = putBack(event.series, series, attendees !== null);
+          const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
+          undo =
+            seriesBack &&
+            (async () => {
+              await seriesBack();
+              // Half undone: the series is back but this event isn't, so the calendar is shown as Google has it.
+              if (ownBack) await api.update(event.id, ownBack, false).catch(() => Promise.reject(new Error(UNDO_PART)));
+            });
+        } else {
+          await api.update(event.id, body, notify);
+          undo = putBack(event.id, event, body.attendees !== undefined);
+        }
       } catch {
         if (!own) return SAVE_FAILED;
         // Only this event changed: show the calendar as it now is, and say so.
@@ -238,20 +300,46 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return SERIES_FAILED;
       }
       await load();
+      tell(event === null ? 'Event added' : 'Event saved', undo);
       return null;
     },
-    /** Deletes an event, or its whole series (after the panel asked). No undo: it's Google's, not the board's. */
+    /** Deletes an event, or its whole series (after the panel asked); its Undo brings it back (job 217). */
     async remove(id: string, choice: Choice = {}): Promise<string | null> {
       const event = editable(id);
       if (!api || !event) return SAVE_FAILED;
       const series = choice.all === true ? event.series : null;
+      let deleted: boolean;
       try {
-        await api.remove(series ?? id, emailGuests(event, null) ? choice.notify === true : undefined);
+        deleted = await api.remove(series ?? id, emailGuests(event, null) ? choice.notify === true : undefined);
       } catch {
         return SAVE_FAILED;
       }
       set({ events: state.events?.filter((e) => e.id !== id && (series === null || e.series !== series)) ?? null });
+      // Already gone (someone deleted it on purpose): no Undo to bring it back.
+      tell('Event deleted', deleted ? () => api.restore(series ?? id) : null);
+      // The panel was out of date: show the calendar as Google has it (a 404 may be an event with a new id).
+      if (!deleted) await load();
       return null;
+    },
+    /** The message's Undo: the change is undone at Google, then the calendar is shown again. */
+    async undo() {
+      const undo = state.done?.undo;
+      if (!undo) return;
+      set({ done: null });
+      try {
+        await undo();
+      } catch (e) {
+        const part = e instanceof Error && e.message === UNDO_PART;
+        // Unless a newer change has its own message by now; a half-done undo is said anyway, as Google is left mixed.
+        if (state.done === null || part) tell(part ? UNDO_PART : UNDO_FAILED, null);
+        if (part) await load();
+        return;
+      }
+      announce('Undid the last change');
+      await load();
+    },
+    dismissDone() {
+      set({ done: null });
     },
   };
 }

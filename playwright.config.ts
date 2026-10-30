@@ -37,7 +37,7 @@ export default defineConfig({
     // The published build (sign-in, offline copy), served as GitHub Pages serves it.
     { name: 'published', use: { ...desktop, storageState: tourDone(ports.preview), baseURL: `http://localhost:${ports.preview}/note-board/` }, testMatch: /published/ },
     // The offline tests again on a phone (Chrome on Android) and in Safari's engine (iPhone), so the
-    // offline copy is checked there too; the rest of the suite runs on desktop Chrome only.
+    // offline copy is checked there too; the rest of the suite runs on desktop Chrome (and the iphone project below).
     ...[
       { name: 'published-phone', use: devices['Pixel 7'] },
       { name: 'published-iphone', use: devices['iPhone 14'] },
@@ -47,6 +47,10 @@ export default defineConfig({
       testMatch: /published/,
       grep: /offline|without internet/,
     })),
+    // The tick box touch tests (job 223, no iPhone to check by hand): a tap on a checklist tick box, or the label
+    // around it, while typing in the same card keeps the cursor in the text, in Safari's engine on an iPhone.
+    // Emulated WebKit, not a real iPhone keyboard. Reuses the "on a phone" test of e2e/ticked-item-delete-key.spec.ts (the "on a touch screen" ones use the desktop toolbar).
+    { name: 'iphone', use: { ...devices['iPhone 14'], storageState: tourDone(ports.dev) }, testMatch: /ticked-item-delete-key/, grep: /on a phone/ },
   ],
   webServer: [
     {

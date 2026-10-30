@@ -136,7 +136,7 @@ export function ItemBar() {
       {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, caret()))}
       {/* The cursor moves to the next open item; with none left it lets go, as Ctrl+Enter does. */}
       {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()) || field.blur())}
-      {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId, true))}
+      {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
       {button('Done typing', 'Done', () => field.blur())}
     </div>
   );

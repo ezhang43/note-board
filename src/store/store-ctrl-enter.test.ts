@@ -43,17 +43,31 @@ describe('Ctrl+Enter in a checklist item', () => {
     expect(s.getState().ui.focusItem).toBe(id('a'));
   });
 
-  it('with no open item left, the cursor leaves and the list stays selected', () => {
+  it('with no open item left, the cursor stays in the item just ticked, so a Delete never reaches the list', () => {
+    const { s, cardId, id, texts } = setup(['a', 'b']);
+    s.toggleItem(cardId, id('a'));
+    s.tickFromKeyboard(cardId, id('b'), 1);
+    expect(texts()).toBe('+a +b');
+    expect(s.getState().ui.focusItem).toBe(id('b'));
+    expect(s.getState().ui.focusOffset).toBe(1);
+    expect(s.getState().ui.selection).toEqual([cardId]);
+    // The next Delete removes just that ticked item (the card stays).
+    s.deleteTickedItem(cardId, id('b'));
+    expect(texts()).toBe('+a');
+    expect(s.getState().board.cards[cardId]).toBeDefined();
+  });
+
+  it('a list of one item: ticking it keeps the cursor in it', () => {
     const { s, cardId, id } = setup(['a']);
-    expect(s.tickFromKeyboard(cardId, id('a'), 0)).toBe(false);
-    expect(s.getState().ui.focusItem).toBeNull();
+    s.tickFromKeyboard(cardId, id('a'), 0);
+    expect(s.getState().ui.focusItem).toBe(id('a'));
     expect(s.getState().ui.selection).toEqual([cardId]);
   });
 
   it('on a ticked item it unticks it and the cursor stays in it, where it was', () => {
     const { s, cardId, id, texts } = setup(['a', 'b']);
     s.toggleItem(cardId, id('a'));
-    expect(s.tickFromKeyboard(cardId, id('a'), 1)).toBe(true);
+    s.tickFromKeyboard(cardId, id('a'), 1);
     expect(texts()).toBe('a b');
     expect(s.getState().ui.focusItem).toBe(id('a'));
     expect(s.getState().ui.focusOffset).toBe(1);

@@ -55,7 +55,7 @@ describe('ticking an item', () => {
     const { s, cardId, itemId, list } = setup();
     s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
     const focus = s.getState().ui.focusItem;
-    expect(s.tickFromKeyboard(cardId, itemId, 0)).toBe(true);
+    s.tickFromKeyboard(cardId, itemId, 0);
     expect(s.getState().ui.focusItem).toBe(focus);
     expect(list().items[0].done).toBe(false);
   });

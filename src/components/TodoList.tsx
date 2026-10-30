@@ -101,7 +101,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       // Ctrl+Enter (⌘+Enter): tick or untick, like the Done box (owner request, 2026-10-15).
       e.preventDefault();
       const el = e.currentTarget;
-      if (!appStore.tickFromKeyboard(cardId, item.id, el.selectionStart)) el.blur();
+      appStore.tickFromKeyboard(cardId, item.id, el.selectionStart);
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const el = e.currentTarget;

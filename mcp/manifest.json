@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "busyants",
   "display_name": "BusyAnts",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Lets Claude read your BusyAnts boards and add to them: checklist items, notes, checklists, columns and boards.",
   "long_description": "Connects Claude to your BusyAnts boards. Claude can list and read your boards (shared boards too, read-only), and on your own boards add, edit, tick and move checklist items and add notes, checklists, columns and boards. Every change is saved online at once, like a change made in the app; before its first change in a session, a copy of your boards is kept in Version history. You sign in with your own Google account in your web browser: ask Claude to \"sign in to BusyAnts\". Deleting is off unless it is switched on from the project’s code (npm run mcp:delete-on); Claude can’t switch it.",
   "author": { "name": "BusyAnts" },

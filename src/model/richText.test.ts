@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deleteChar,
   deleteSel,
   fromPlain,
   hasFormatting,
@@ -19,6 +20,7 @@ import {
   splitAt,
   stepSize,
   stepSizes,
+  insertDivider,
   insertText,
   toggleList,
   toggleMark,
@@ -336,5 +338,119 @@ describe('text size as a number', () => {
     const sizes = [10, 13.6, 36, 16, 'small', 'large', 9, 37, -16, Number.NaN, Infinity, '20', '16px', null, true, 'huge'];
     const got = sizes.map((size) => parseRich([{ type: 'p', runs: [{ text: 'a', size }] }])![0].runs[0].size);
     expect(got).toEqual([10, 13.6, 36, undefined, 'small', 'large', ...Array(10).fill(undefined)]);
+  });
+});
+
+// The Journal's divider (owner decision 2026-10-31, "Button + type ---"): a line of its own whose
+// plain text is always `---`, so everything that reads the plain text (and an older app) sees `---`.
+describe('divider', () => {
+  const hr: Rich[number] = { type: 'hr', runs: [{ text: '---' }] };
+
+  it('its plain text is ---, and a note with one keeps its formatting saved', () => {
+    expect(plainOf([p('a'), hr, p('b')])).toBe('a\n---\nb');
+    expect(hasFormatting([p('a'), hr])).toBe(true);
+    expect(journalRich('Sun 18 Oct 2026\n\na\n---\nb', [p('a'), hr, p('b')])).toEqual([p('a'), hr, p('b')]);
+    // A plain note's --- line is words, as it always was.
+    expect(journalRich('Sun 18 Oct 2026\n\na\n---', undefined)).toEqual([p('a'), p('---')]);
+  });
+
+  it('loading keeps a divider, always as ---, and drops anything else in it', () => {
+    expect(parseRich([{ type: 'hr', runs: [{ text: '---' }] }])).toEqual([hr]);
+    expect(parseRich([{ type: 'hr', indent: 3, runs: [{ text: '<img src=x onerror=alert(1)>', b: true, hl: 'red' }, { text: 'more' }], onclick: 'x' }])).toEqual([hr]);
+    expect(parseRich([{ type: 'hr' }])).toEqual([hr]);
+  });
+
+  it('an older app, which reads a kind it does not know as a plain line, shows it as --- and keeps the rest', () => {
+    // The older app's fallback is the same code path as any unknown kind today.
+    const older = parseRich([p('a'), { type: 'some-new-kind', runs: [{ text: '---' }] }, { type: 'p', runs: [{ text: 'b', b: true }] }])!;
+    expect(older).toEqual([p('a'), p('---'), { type: 'p', runs: [{ text: 'b', b: true }] }]);
+    expect(plainOf(older)).toBe(plainOf([p('a'), hr, { type: 'p', runs: [{ text: 'b', b: true }] }]));
+  });
+
+  it('the Divider button puts one after the line and the cursor on a new empty line below it', () => {
+    expect(insertDivider([p('hello')], sel(0, 5))).toEqual({ rich: [p('hello'), hr, p('')], at: at(2, 0) });
+    expect(insertDivider([p('hello'), p('next')], sel(0, 2))).toEqual({ rich: [p('hello'), hr, p(''), p('next')], at: at(2, 0) });
+    // On an empty line, that line becomes the divider.
+    expect(insertDivider([p('a'), p(''), p('b')], sel(1, 0))).toEqual({ rich: [p('a'), hr, p(''), p('b')], at: at(2, 0) });
+    expect(insertDivider([p('')], sel(0, 0))).toEqual({ rich: [hr, p('')], at: at(1, 0) });
+    // Selected words are replaced first.
+    expect(insertDivider([p('abc')], sel(0, 1, 0, 3))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
+  });
+
+  it('typing --- on an otherwise empty line and pressing Enter makes a divider', () => {
+    expect(splitAt([p('a'), p('---')], sel(1, 3))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
+    expect(splitAt([{ type: 'p', runs: [{ text: '---', b: true }] }], sel(0, 3)).rich).toEqual([hr, p('')]);
+  });
+
+  it('--- anywhere else stays words', () => {
+    expect(splitAt([p('a ---')], sel(0, 5)).rich).toEqual([p('a ---'), p('')]);
+    expect(splitAt([p('----')], sel(0, 4)).rich).toEqual([p('----'), p('')]);
+    expect(splitAt([p('---')], sel(0, 2)).rich).toEqual([p('--'), p('-')]);
+    expect(splitAt([{ type: 'bullet', runs: [{ text: '---' }] }], sel(0, 3)).rich).toEqual([{ type: 'bullet', runs: [{ text: '---' }] }, { type: 'bullet', runs: [] }]);
+    expect(splitAt([{ type: 'h1', runs: [{ text: '---' }] }], sel(0, 3)).rich[0]).toEqual({ type: 'h1', runs: [{ text: '---' }] });
+  });
+
+  it('Backspace at the start of the line after it, or Delete just before it, removes it like one letter', () => {
+    expect(joinBackward([p('a'), hr, p('b')], 2)).toEqual({ rich: [p('a'), p('b')], at: at(1, 0) });
+    expect(joinForward([p('a'), hr, p('b')], 0)).toEqual({ rich: [p('a'), p('b')], at: at(0, 1) });
+    // A list item after it outdents first, as Backspace always does in a list.
+    expect(joinBackward([hr, { type: 'bullet', runs: [{ text: 'x' }] }], 1).rich).toEqual([hr, p('x')]);
+    // With the cursor on the divider itself, Backspace or Delete removes it.
+    expect(joinBackward([p('a'), hr, p('b')], 1)).toEqual({ rich: [p('a'), p('b')], at: at(0, 1) });
+    expect(joinForward([p('a'), hr, p('b')], 1)).toEqual({ rich: [p('a'), p('b')], at: at(1, 0) });
+    expect(joinBackward([hr], 0)).toEqual({ rich: [p('')], at: at(0, 0) });
+  });
+
+  it('nothing merges words into it: typing, Enter, styles and lists leave it a divider', () => {
+    expect(insertText([p('a'), hr], sel(1, 3), 'x')).toEqual({ rich: [p('a'), hr, p('x')], at: at(2, 1) });
+    expect(insertText([hr, p('a')], sel(0, 0), 'x')).toEqual({ rich: [p('x'), hr, p('a')], at: at(0, 1) });
+    expect(splitAt([p('a'), hr], sel(1, 3))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
+    expect(setBlockType([p('a'), hr], 0, 1, 'h1')).toEqual([{ type: 'h1', runs: [{ text: 'a' }] }, hr]);
+    expect(toggleList([p('a'), hr, p('b')], 0, 2, 'bullet')).toEqual([{ type: 'bullet', runs: [{ text: 'a' }] }, hr, { type: 'bullet', runs: [{ text: 'b' }] }]);
+    expect(toggleMark([p('a'), hr, p('b')], sel(0, 0, 2, 1), 'b')).toEqual([{ type: 'p', runs: [{ text: 'a', b: true }] }, hr, { type: 'p', runs: [{ text: 'b', b: true }] }]);
+    // A divider has no look of its own: bold words around it read as bold.
+    expect(marksAt([{ type: 'p', runs: [{ text: 'a', b: true }] }, hr, { type: 'p', runs: [{ text: 'b', b: true }] }], sel(0, 0, 2, 1)).b).toBe(true);
+  });
+
+  it('deleting a selection that holds a divider takes it out whole', () => {
+    expect(deleteSel([p('ab'), hr, p('cd')], sel(0, 1, 2, 1))).toEqual({ rich: [p('ad')], at: at(0, 1) });
+    // From the divider's start (select all): it goes, the last line keeps its kind.
+    expect(deleteSel([hr, { type: 'h1', runs: [{ text: 'cd' }] }], sel(0, 0, 1, 1))).toEqual({ rich: [{ type: 'h1', runs: [{ text: 'd' }] }], at: at(0, 0) });
+    expect(deleteSel([hr, p('a'), hr], sel(0, 0, 2, 3))).toEqual({ rich: [p('')], at: at(0, 0) });
+    // A selection starting just after it, or ending just before it, leaves it.
+    expect(deleteSel([hr, p('ab')], sel(0, 3, 1, 1))).toEqual({ rich: [hr, p('b')], at: at(1, 0) });
+    expect(deleteSel([p('ab'), hr], sel(0, 1, 1, 0))).toEqual({ rich: [p('a'), hr], at: at(0, 1) });
+    expect(plainOfSel([p('ab'), hr, p('cd')], sel(0, 1, 2, 1))).toBe('b\n---\nc');
+    // Ending part-way into it (its hidden ---) takes it out whole: no stray dashes (review).
+    expect(deleteSel([p('ab'), hr, p('cd')], sel(0, 1, 1, 1))).toEqual({ rich: [p('a'), p('cd')], at: at(0, 1) });
+    // Copy matches what cut takes out: no blank line from its edges (review).
+    expect(plainOfSel([p('a'), hr, p('bc')], sel(1, 3, 2, 1))).toBe('b');
+    expect(plainOfSel([p('a'), hr, p('bc')], sel(0, 0, 1, 0))).toBe('a');
+  });
+
+  it('Backspace and Delete with the cursor on it act on the side the key points to (review)', () => {
+    const rich = [p('ab'), hr, p('cd')];
+    // Just before it (the end of the line above): Backspace takes a letter, Delete the divider.
+    expect(deleteChar(rich, at(1, 0), true)).toEqual({ rich: [p('a'), hr, p('cd')], at: at(0, 1) });
+    expect(deleteChar(rich, at(1, 0), false)).toEqual({ rich: [p('ab'), p('cd')], at: at(0, 2) });
+    // Just after it (the start of the line below): Backspace takes the divider, Delete a letter.
+    expect(deleteChar(rich, at(1, 3), true)).toEqual({ rich: [p('ab'), p('cd')], at: at(1, 0) });
+    expect(deleteChar(rich, at(1, 3), false)).toEqual({ rich: [p('ab'), hr, p('d')], at: at(2, 0) });
+    // With no line on that side, the key takes the divider.
+    expect(deleteChar([p('a'), hr], at(1, 3), false)).toEqual({ rich: [p('a')], at: at(0, 1) });
+    // Elsewhere: one letter, a whole emoji, or the line edges as before.
+    expect(deleteChar([p('a😀')], at(0, 3), true)).toEqual({ rich: [p('a')], at: at(0, 1) });
+    expect(deleteChar([p('😀b')], at(0, 0), false)).toEqual({ rich: [p('b')], at: at(0, 0) });
+    expect(deleteChar(rich, at(2, 0), true)).toEqual({ rich: [p('ab'), p('cd')], at: at(1, 0) });
+    expect(deleteChar(rich, at(0, 2), false)).toEqual({ rich: [p('ab'), p('cd')], at: at(0, 2) });
+  });
+
+  it('typing or the Divider button with the cursor on a divider goes to the line beside it (review)', () => {
+    expect(insertText([p('a'), hr, p('b')], sel(1, 0), 'x')).toEqual({ rich: [p('ax'), hr, p('b')], at: at(0, 2) });
+    expect(insertText([p('a'), hr, p('b')], sel(1, 3), 'x')).toEqual({ rich: [p('a'), hr, p('xb')], at: at(2, 1) });
+    expect(insertDivider([p('a'), hr, p('')], sel(1, 3))).toEqual({ rich: [p('a'), hr, hr, p('')], at: at(3, 0) });
+    // An empty list item keeps its bullet: the divider goes after it.
+    const item = { type: 'bullet' as const, runs: [] };
+    expect(insertDivider([item], sel(0, 0))).toEqual({ rich: [item, hr, p('')], at: at(2, 0) });
   });
 });

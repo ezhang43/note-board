@@ -344,6 +344,8 @@ describe('journalPeek', () => {
     expect(journalPeek('Went for a walk\nthen lunch')).toBe('Went for a walk');
     expect(journalPeek('  Went for a walk  \r\nthen lunch')).toBe('Went for a walk');
     expect(journalPeek('\n\n  • first item\n• second')).toBe('• first item');
+    // A divider line is not words (review of the divider).
+    expect(journalPeek('---\nWent for a walk')).toBe('Went for a walk');
   });
   it('is empty when nothing is written', () => {
     expect(journalPeek('')).toBe('');
@@ -373,6 +375,8 @@ describe('journal page heading', () => {
     expect(journalWords('')).toBe(0);
     expect(journalWords('  \n ')).toBe(0);
     expect(journalWords('Quiet start.\n\n• Sam’s soup\n1.  Ten  quiet minutes')).toBe(7);
+    // A divider's line (---) is not a word (owner decision 2026-10-31).
+    expect(journalWords('one\n---\ntwo -- three')).toBe(4);
   });
 });
 

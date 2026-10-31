@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recolour, resizeCard, setCollapsedFor, updateCard } from '../src/model/board';
 import { serializeBoard } from '../src/model/persist';
-import { fromPlain, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
+import { fromPlain, insertDivider, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
 import { applyStyle, boxesOf, sizeStepChange } from '../src/model/textStyle';
 import type { Board } from '../src/model/types';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
@@ -180,6 +180,7 @@ describe('boards the app makes stay editable by the connector (guard: safeToEdit
     1,
     'bullet',
   );
+  const divided = insertDivider(rich, { start: { b: 0, o: 0 }, end: { b: 0, o: 0 } }).rich;
 
   it('the starting boards are editable', () => {
     expect(here(homeBoard())).toEqual({ ok: true });
@@ -195,6 +196,7 @@ describe('boards the app makes stay editable by the connector (guard: safeToEdit
       ['bold', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), { bold: true })],
       ['size step', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), sizeStepChange(x, boxesOf(x, ['noteIdea', 'listGroceries']), 1))],
       ['rich text', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(rich), rich }))],
+      ['journal divider', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(divided), rich: divided }))],
       ['card colour', (x) => recolour(x, ['noteCall'], 'ocean')],
     ];
     for (const [name, step] of steps) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { findItem } from '../model/checklist';
+import { findItem, flatIds } from '../model/checklist';
 import type { TodoCard } from '../model/types';
 import { createStore } from './store';
 
@@ -117,13 +117,16 @@ describe('pasting copied items while typing in another list (owner request 2026-
     s.selectItemRange(cardId, first, third);
     expect(s.copyItems()).toBe(true);
     const blank = other().items[0].id;
-    expect(s.pasteItemsInto(otherId, blank, 'one\ntwo\n  three')).toBe(true);
+    expect(s.pasteItemsInto(otherId, blank)).toBe(true);
     const items = other().items;
     expect(items.map((i) => i.text)).toEqual(['one', 'two']); // the blank item was replaced
     expect(items[1].children.map((c) => c.text)).toEqual(['three']);
     expect(items[1].style).toEqual({ bold: true });
     expect(items[1].children[0].done).toBe(true);
-    expect(items[1].id).not.toBe(s.getState().board.cards[cardId] && (s.getState().board.cards[cardId] as TodoCard).items[1].id);
+    // Fresh ids all the way down: nothing in the pasted subtree shares an id with the source list.
+    const sourceIds = new Set(flatIds((s.getState().board.cards[cardId] as TodoCard).items));
+    expect(flatIds(items).length).toBe(3);
+    expect(flatIds(items).filter((id) => sourceIds.has(id))).toEqual([]);
     expect(s.getState().ui.itemSel?.ids).toHaveLength(3);
     s.undo(); // one step
     expect(other().items.map((i) => i.text)).toEqual(['']);
@@ -134,21 +137,25 @@ describe('pasting copied items while typing in another list (owner request 2026-
     s.setItemText(otherId, other().items[0].id, 'mine');
     s.selectItemRange(cardId, first, second);
     s.copyItems();
-    expect(s.pasteItemsInto(otherId, other().items[0].id, 'one\ntwo')).toBe(true);
+    expect(s.pasteItemsInto(otherId, other().items[0].id)).toBe(true);
     expect(other().items.map((i) => i.text)).toEqual(['mine', 'one', 'two']);
   });
 
-  it('leaves plain text from another app alone', () => {
-    const { s, cardId, first, second, otherId, other } = twoLists();
-    s.selectItemRange(cardId, first, second);
+  it('does not paste a copy made across several lists as a run of items (SPEC: Ctrl+V does nothing for it)', () => {
+    const { s, cardId, first, third, otherId, other } = twoLists();
+    s.selectItemRange(cardId, first, third);
     s.copyItems();
-    expect(s.pasteItemsInto(otherId, other().items[0].id, 'milk\neggs')).toBe(false);
+    s.selectWholeList(cardId);
+    s.selectAllStep(); // every list in the column / on the board
+    if (!s.getState().ui.itemSel?.lists) s.selectAllStep();
+    expect(s.getState().ui.itemSel?.lists).toBeDefined();
+    expect(s.copyItems()).toBe(true);
+    expect(s.pasteItemsInto(otherId, other().items[0].id)).toBe(false);
     expect(other().items.map((i) => i.text)).toEqual(['']);
   });
 
   it('does nothing when nothing was copied', () => {
     const { s, otherId, other } = twoLists();
-    expect(s.pasteItemsInto(otherId, other().items[0].id, '')).toBe(false);
-    expect(s.pasteItemsInto(otherId, other().items[0].id, 'x')).toBe(false);
+    expect(s.pasteItemsInto(otherId, other().items[0].id)).toBe(false);
   });
 });

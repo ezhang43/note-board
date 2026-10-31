@@ -5,6 +5,7 @@ import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, t
 import { canMoveItem, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
+import { ITEMS_MARKER } from '../store/env';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
@@ -55,6 +56,8 @@ export function TodoBody({ card }: { card: TodoCard }) {
 
 const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string; item: TodoItem; depth: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  /** The last key pressed was Ctrl+Shift+V (paste as plain text). */
+  const plainPaste = useRef(false);
   const readOnly = use(BoardReadOnly);
   const wantsFocus = useAppState((s) => s.ui.focusItem === item.id);
   const focusOffset = useAppState((s) => (s.ui.focusItem === item.id ? s.ui.focusOffset : null));
@@ -93,6 +96,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing) return;
+    plainPaste.current = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v';
     if ((e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Enter') && heldAfterRemoving(e)) {
       e.preventDefault(); // the held key that just removed an item (Enter on its trash can, job 222) goes no further
       return;
@@ -157,8 +161,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
         onPaste={(e) => {
-          // Copied checklist items go in as items (levels, ticks, formatting); anything else pastes as text, as the browser does.
-          if (appStore.pasteItemsInto(cardId, item.id, e.clipboardData.getData('text/plain'))) {
+          // Copied checklist items go in as items (levels, ticks, formatting) only while our marker is still on the
+          // clipboard, so text copied later or elsewhere pastes as text, as the browser does; so does Ctrl+Shift+V (plain text).
+          const plain = plainPaste.current;
+          plainPaste.current = false;
+          if (!plain && e.clipboardData.types.includes(ITEMS_MARKER) && appStore.pasteItemsInto(cardId, item.id)) {
             e.preventDefault();
             e.currentTarget.blur(); // the pasted items are highlighted, as after pasting with items selected
           }

@@ -25,8 +25,16 @@ export function deviceStorage(): Storage | null {
   }
 }
 
-/** Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one). Says whether it got there. */
-export async function copyText(text: string): Promise<boolean> {
+/** Put on the clipboard with copied checklist items: a paste into an item makes them items only while it is still there, so a newer copy elsewhere wins. */
+export const ITEMS_MARKER = 'application/x-note-board-items';
+
+/**
+ * Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one).
+ * With a `marker`, the text goes out through the browser's own copy so the marker type rides along with it
+ * (as for copied blocks); where that is refused it is only text. Says whether it got there.
+ */
+export async function copyText(text: string, marker?: string): Promise<boolean> {
+  if (marker && copyMarked(text, marker)) return true;
   try {
     await globalThis.navigator.clipboard.writeText(text);
     return true;
@@ -34,6 +42,31 @@ export async function copyText(text: string): Promise<boolean> {
     // No clipboard access: copying within the board still works.
     return false;
   }
+}
+
+/** Writes `text` and `marker` together during a copy event (it replaces whatever was copied before). Must run inside the key press. */
+function copyMarked(text: string, marker: string): boolean {
+  let written = false;
+  const put = (e: ClipboardEvent) => {
+    if (!e.clipboardData) return;
+    e.clipboardData.setData('text/plain', text);
+    e.clipboardData.setData(marker, '1');
+    e.preventDefault();
+    written = true;
+  };
+  try {
+    document.addEventListener('copy', put, { once: true });
+    document.execCommand('copy');
+  } catch {
+    // No page to copy from (unit tests), or the browser said no: fall back to plain text.
+  } finally {
+    try {
+      document.removeEventListener('copy', put);
+    } catch {
+      // nothing to remove
+    }
+  }
+  return written;
 }
 
 /** Whether the computer is set to dark mode (false where there is no browser, as in unit tests). */

@@ -324,7 +324,19 @@ export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): T
 export function copyItems(items: TodoItem[], ids: string[]): TodoItem[] {
   const picked = new Set(ids);
   const keep = (it: TodoItem): TodoItem => ({ ...structuredClone(it), children: it.children.filter((c) => picked.has(c.id)).map(keep) });
-  return rootsOf(items, ids).map((id) => keep(findItem(items, id)!.item));
+  const roots = rootsOf(items, ids).map((id) => findItem(items, id)!);
+  const base = Math.min(...roots.map((r) => r.depth));
+  // Selected items whose parent wasn't copied keep their level relative to the least-indented one: a deeper
+  // one nests under the nearest copied item above it that is shallower (a first item can't nest under nothing).
+  const out: TodoItem[] = [];
+  const open: { depth: number; item: TodoItem }[] = [];
+  for (const r of roots) {
+    const copy = keep(r.item);
+    while (open.length && open[open.length - 1].depth >= r.depth - base) open.pop();
+    (open.length ? open[open.length - 1].item.children : out).push(copy);
+    open.push({ depth: r.depth - base, item: copy });
+  }
+  return out;
 }
 
 /**
@@ -375,12 +387,9 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
  * it is blank and has nothing under it, so a new list's empty first item isn't left behind.
  */
 export function pasteItemsInto(items: TodoItem[], itemId: string, pasted: TodoItem[]): TodoItem[] {
-  const loc = findItem(items, itemId);
-  const height = pasted.reduce((h, p) => Math.max(h, subtreeHeight(p)), 0);
-  if (!loc || loc.item.text.trim() !== '' || loc.item.children.length || loc.depth + height > MAX_DEPTH) return pasteItemsAfter(items, itemId, pasted);
-  const next = cloned(items);
-  const at = findItem(next, itemId)!;
-  at.list.splice(at.index, 1, ...structuredClone(pasted));
+  const next = pasteItemsAfter(items, itemId, pasted); // the depth rule lives there
+  const at = findItem(next, itemId);
+  if (at && at.item.text.trim() === '' && !at.item.children.length) at.list.splice(at.index, 1);
   return next;
 }
 

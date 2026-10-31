@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { add, box, cards, clickEmpty, dragPointer, freshBoardEachTest, grabPoint, looseCards } from './helpers';
 
 // Step 5: checklists — items, nesting, ticked items in place, item drag, multi-select and drop-to-board.
@@ -629,4 +629,58 @@ test('pasting plain text from another app into an item still goes into that one 
   await page.keyboard.press('Control+v');
   expect((await texts(list)).length).toBe(1);
   expect((await texts(list))[0]).toContain('milk');
+});
+
+/** Two lists: "one", "two" (the first two selected and copied with Ctrl+C), and another with a blank item the cursor is then put in. */
+async function copyTwoItemsAndClickBlank(page: Page, context: BrowserContext) {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const from = await makeList(page, ['one', 'two']);
+  const to = await makeList(page, ['mine']);
+  await page.keyboard.press('Enter');
+  await rowWithText(from, 'one').getByLabel('Item text').click();
+  await rowWithText(from, 'two').getByLabel('Item text').click({ modifiers: ['Shift'] });
+  await expect(from.locator('.todo-item.picked')).toHaveCount(2);
+  await page.keyboard.press('Control+c');
+  await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toBe('one\ntwo');
+  await to.getByLabel('Item text').nth(1).click();
+  return { from, to };
+}
+
+test('copied items paste as items only while they are the newest thing copied: text put on the clipboard later pastes as plain text', async ({ page, context }) => {
+  const { to } = await copyTwoItemsAndClickBlank(page, context);
+  await page.evaluate(() => navigator.clipboard.writeText('milk\neggs'));
+  await page.keyboard.press('Control+v');
+  expect((await texts(to)).length).toBe(2);
+  expect((await texts(to))[1]).toContain('milk');
+});
+
+test('the very same words copied later (not from our items) paste as plain text, not as items', async ({ page, context }) => {
+  const { to } = await copyTwoItemsAndClickBlank(page, context);
+  await page.evaluate(() => navigator.clipboard.writeText('one\ntwo')); // same words, no marker
+  await page.keyboard.press('Control+v');
+  expect((await texts(to)).length).toBe(2);
+  expect((await texts(to))[1]).toContain('one');
+});
+
+test('Ctrl+Shift+V pastes the copied items as plain text into the one item', async ({ page, context }) => {
+  const { to } = await copyTwoItemsAndClickBlank(page, context);
+  await page.keyboard.press('Control+Shift+v');
+  expect((await texts(to)).length).toBe(2);
+  expect((await texts(to))[1]).toContain('one');
+  await expect(page.locator('.todo-item.picked')).toHaveCount(0);
+});
+
+test('items copied across several lists paste into an item as plain text, not as a run of items', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const a = await makeList(page, ['one', 'two']);
+  const b = await makeList(page, ['three']);
+  await page.keyboard.press('Enter');
+  await rowWithText(a, 'one').getByLabel('Item text').click();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Control+a'); // the text, the list, then every list
+  await expect(page.locator('.todo-item.picked')).toHaveCount(4); // one, two, three and the blank item
+  await page.keyboard.press('Control+c');
+  await b.getByLabel('Item text').nth(1).click();
+  await page.keyboard.press('Control+v');
+  expect((await texts(b)).length).toBe(2);
+  await expect(page.locator('.todo-item.picked')).toHaveCount(0);
 });

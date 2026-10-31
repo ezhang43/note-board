@@ -500,6 +500,18 @@ describe('copying and cutting exactly what is highlighted (owner request)', () =
     expect(ids(C.copyItems(list(), ['scarf', 'Leave']))).toBe('scarf Leave');
   });
 
+  it('sub-items copied without their parent keep their levels relative to the least-indented one', () => {
+    // p(q2 q3(r3)) s: q2 (level 1) and r3 (level 2, under q3, which is not copied) keep one level between them.
+    const l = [t('p', [t('q2'), t('q3', [t('r3')])]), t('s')];
+    expect(ids(C.copyItems(l, ['q2', 'r3']))).toBe('q2(r3)');
+    expect(ids(C.copyItems(l, ['q2', 'r3', 's']))).toBe('q2(r3) s');
+    // a level gap closes to one level; a first item deeper than the rest cannot nest under nothing
+    const deep = [t('a', [t('b', [t('c', [t('d')])]), t('e')])];
+    expect(ids(C.copyItems(deep, ['e']))).toBe('e');
+    expect(ids(C.copyItems([t('x', [t('y', [t('z')]), t('w')]), t('v')], ['z', 'w', 'v']))).toBe('z w v');
+    expect(ids(C.copyItems([t('x', [t('y')]), t('v', [t('u', [t('k')])])], ['y', 'k']))).toBe('y(k)');
+  });
+
   it('as text: one per line in the order shown, indented relative to the least-indented one', () => {
     expect(C.selectionAsText(list(), ['Pack', 'shoes'])).toBe('Pack\n  shoes');
     expect(C.selectionAsText(list(), ['coat', 'scarf', 'Leave'])).toBe('  coat\n    scarf\nLeave');

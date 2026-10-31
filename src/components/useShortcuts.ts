@@ -120,7 +120,7 @@ export function useShortcuts() {
 
       // Several checklist items selected: these keys act on the items.
       if (state.ui.itemSel) {
-        if (key === 'delete' || key === 'backspace') return run(e, appStore.deleteSelectedItems);
+        if (key === 'delete' || key === 'backspace') return removeItemByKey(e, appStore.deleteSelectedItems); // held: removes once
         if (key === 'escape') return appStore.clearItemSelection();
         // Ctrl+A again: every list in the column, then every item on the board.
         if (mod && key === 'a') return run(e, appStore.selectAllStep);
@@ -158,10 +158,7 @@ export function useShortcuts() {
       // or the board's delete key removes that item like its trash can, never the whole card (owner report, job 218).
       const at = itemOf(e.target);
       if (at && state.ui.selection.every((id) => id === at.cardId) && (matches(hk.delete, e) || (!mod && (key === 'delete' || key === 'backspace')))) {
-        return removeItemByKey(e, () => {
-          appStore.trashItem(at.cardId, at.itemId, true);
-          return true;
-        });
+        return removeItemByKey(e, () => appStore.trashItem(at.cardId, at.itemId));
       }
       if (matches(hk.delete, e) || (!mod && key === 'backspace')) {
         if (appStore.deleteSelection()) e.preventDefault();

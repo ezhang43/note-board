@@ -84,6 +84,13 @@ export function generalSpot(board: Board, measured: MeasuredHeight, centre: Poin
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DATE_LINE = new RegExp(`^(?:${DAYS.join('|')}) (\\d{1,2}) (${MONTHS.join('|')}) (\\d{4})(?: |$)`);
 
+/**
+ * A Journal divider's words (owner decision 2026-10-31; see richText.ts): always these, never shown, so
+ * its plain text, which search, export and the board card read, is `---`; and an older app, which reads
+ * a kind of line it doesn't know as a plain line with its words, shows `---` and keeps the note's other formatting.
+ */
+export const DIVIDER = '---';
+
 /** What is written under a note's date line (the date line and the blank line after it left out). */
 export function journalBody(text: string): string {
   const i = text.indexOf('\n');
@@ -92,7 +99,7 @@ export function journalBody(text: string): string {
 
 /** The first line with words in what is written under a note's date line, trimmed: what a folded day shows after its date ('' when nothing is written). */
 export function journalPeek(body: string): string {
-  return body.split('\n').map((l) => l.trim()).find((l) => l && l !== '---') ?? '';
+  return body.split('\n').map((l) => l.trim()).find((l) => l && l !== DIVIDER) ?? '';
 }
 
 /**
@@ -210,8 +217,8 @@ export function isoWeek(key: DayKey): number {
 
 /** The words in a note's text under its date line; the "• " and "1. " list markers are not words. */
 export function journalWords(body: string): number {
-  // A divider's line (---, see richText.ts) is not a word.
-  return body.split('\n').flatMap((l) => (l === '---' ? [] : l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/))).filter(Boolean).length;
+  // A divider's line is not a word.
+  return body.split('\n').flatMap((l) => (l === DIVIDER ? [] : l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/))).filter(Boolean).length;
 }
 
 /** What the person chose to open (true) or shut (false), by group id; only choices that differ from the default are kept. */

@@ -328,6 +328,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       const onHr = rich[sel.start.b]?.type === 'hr' || rich[sel.end.b]?.type === 'hr';
       const take = (edit: R.Edit) => {
         e.preventDefault();
+        if (edit.rich === rich) return; // nothing to take (a key with no letter on its side): no change, no save
         pending.current = null;
         apply(edit.rich, at(edit.at), true);
       };
@@ -382,6 +383,15 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
     const onSelection = () => {
       const sel = readSel(el);
       if (!sel) return;
+      // The cursor never sits on a divider (a click on it, an undo that brings one back): it goes beside
+      // it, to the other side where there is no line, as the browser types nothing there.
+      const rich = cur.current;
+      if (collapsed(sel) && rich[sel.start.b]?.type === 'hr') {
+        const q = R.offHr(rich, sel.start);
+        const off = rich[q.b].type === 'hr' ? R.offHr(rich, { b: q.b, o: q.o ? 0 : 1 }) : q;
+        // Only onto a line (a note of nothing but dividers has none), so it never bounces; its own selectionchange carries on below.
+        if (rich[off.b].type !== 'hr') return setSel(el, at(off));
+      }
       saved.current = sel;
       const p = pending.current;
       if (p && !(collapsed(sel) && samePos(p.at, sel.start))) pending.current = null;
@@ -423,6 +433,9 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       else if (e.code === 'Digit7') run(() => handle.list('number'));
       else if (e.code === 'Digit8') run(() => handle.list('bullet'));
     } else if (key === 'b' || key === 'i' || key === 'u') run(() => handle.toggle(key));
+    // Select All by hand (⌘A on a Mac, where Ctrl+A goes to the line's start): the browser's own selects
+    // nothing in a note that starts with a divider.
+    else if (key === 'a' && (e.metaKey || !/Mac|iPhone|iPad/.test(navigator.userAgent))) run(() => document.getSelection()?.selectAllChildren(root.current!));
   };
 
   const onPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {

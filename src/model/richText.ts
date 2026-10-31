@@ -1,4 +1,4 @@
-import { journalBody } from './journal';
+import { DIVIDER, journalBody } from './journal';
 
 // Rich text in Journal notes only (owner request, 2026-10-19). A small typed format of our own,
 // kept in `NoteCard.rich` beside the note's plain text. The plain text stays the truth for every
@@ -79,12 +79,6 @@ const MAX_RUNS = 2000;
 const MARK_KEYS = ['b', 'i', 'u', 's', 'size', 'font', 'hl'] as const;
 
 export const isList = (t: BlockType) => t === 'bullet' || t === 'number';
-/**
- * The divider's words (owner decision 2026-10-31): always these, never shown, so its plain text, which
- * search, export and the board card read, is `---`; and an older app, which reads a kind of line it
- * doesn't know as a plain line with its words, shows `---` and keeps the note's other formatting.
- */
-export const DIVIDER = '---';
 const isHr = (blk: Block | undefined) => blk?.type === 'hr';
 
 // ---- small helpers ----
@@ -267,8 +261,9 @@ export function deleteSel(rich: Rich, sel: Sel): Edit {
   let joined = withRuns(first, [...slice(first.runs, 0, start.o), ...tail]);
   if (isHr(first)) {
     if (start.b === end.b && start.o === end.o) return { rich, at: start };
-    // The divider at the start goes: the line takes the last line's kind.
-    joined = isHr(last) ? block('p', 0, []) : withRuns(last, tail);
+    // The divider at the start goes. The last line's words left keep its kind; with none left (select
+    // all), a plain line, as the divider has no kind words can take (check of #226).
+    joined = tail.length ? withRuns(last, tail) : block('p', 0, []);
   }
   return { rich: [...rich.slice(0, start.b), joined, ...rich.slice(end.b + 1)], at: start };
 }
@@ -296,12 +291,17 @@ function offDivider(rich: Rich, p: Pos): Edit {
   return { rich: [...rich.slice(0, b), block('p', 0, []), ...rich.slice(b)], at: { b, o: 0 } };
 }
 
-/** The Divider button: a divider after the line (an empty line becomes one), and the cursor on a new empty line below it. */
+/**
+ * The Divider button: a divider after the line, and the cursor on a new empty line below it. An empty
+ * line (a heading too) becomes the divider; an empty list item keeps its bullet. Next to a divider with
+ * no line on that side, no second one is stacked on it: the cursor just goes to a new line below it.
+ */
 export function insertDivider(rich: Rich, sel: Sel): Edit {
   const cleared = deleteSel(rich, sel);
   const { b } = offHr(cleared.rich, cleared.at);
   const blk = cleared.rich[b];
-  const at = blk.type === 'p' && len(blk) === 0 ? b : b + 1;
+  if (isHr(blk)) return offDivider(cleared.rich, { b, o: 1 });
+  const at = !isList(blk.type) && len(blk) === 0 ? b : b + 1;
   return { rich: [...cleared.rich.slice(0, at), block('hr', 0, []), block('p', 0, []), ...cleared.rich.slice(b + 1)], at: { b: at + 1, o: 0 } };
 }
 
@@ -485,15 +485,24 @@ export function toggleList(rich: Rich, b0: number, b1: number, type: 'bullet' | 
   return setBlockType(rich, b0, b1, all ? 'p' : type);
 }
 
+const letters = new Intl.Segmenter();
+
 /** Backspace (`back`) or Delete of one letter at the cursor; at a line's edge it joins lines, and next to a divider it takes the divider out. */
-export function deleteChar(rich: Rich, at: Pos, back: boolean): Edit {
-  const p = offHr(rich, at);
+export function deleteChar(rich: Rich, p: Pos, back: boolean): Edit {
+  if (isHr(rich[p.b])) {
+    // Right after a divider Backspace takes it, right before it Delete does; the other key takes the
+    // letter on its side, and does nothing where there is no line on that side (check of #226).
+    const after = p.o > 0;
+    if (back === after) return dropDivider(rich, p.b, !after); // the cursor stays on its side
+    const b = after ? p.b + 1 : p.b - 1;
+    if (b < 0 || b >= rich.length) return { rich, at: p };
+    return deleteChar(rich, { b, o: after ? 0 : len(rich[b]) }, back);
+  }
   const blk = rich[p.b];
-  if (isHr(blk)) return dropDivider(rich, p.b, back);
   const text = blk.runs.map((r) => r.text).join('');
   if (back ? p.o === 0 : p.o >= text.length) return back ? joinBackward(rich, p.b) : joinForward(rich, p.b);
-  // An emoji is two code units: take both.
-  const step = /^[\uD800-\uDBFF][\uDC00-\uDFFF]$/.test(back ? text.slice(p.o - 2, p.o) : text.slice(p.o, p.o + 2)) ? 2 : 1;
-  const q = { b: p.b, o: back ? p.o - step : p.o + step };
+  // One letter as the reader sees it: a whole emoji, skin tone and flag included.
+  const starts = Array.from(letters.segment(text), (g) => g.index);
+  const q = { b: p.b, o: back ? starts.filter((i) => i < p.o).pop()! : (starts.find((i) => i > p.o) ?? text.length) };
   return deleteSel(rich, back ? { start: q, end: p } : { start: p, end: q });
 }

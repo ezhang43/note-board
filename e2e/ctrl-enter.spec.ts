@@ -54,13 +54,17 @@ test('Ctrl+Enter on a ticked item unticks it and keeps the cursor in it', async 
   await expect.poll(() => focused(page)).toBe('bread');
 });
 
-test('ticking the last open item leaves the field with the list selected; it is in the shortcuts list', async ({ page }) => {
+test('ticking the last open item keeps the cursor in it; Delete then removes only that item; it is in the shortcuts list', async ({ page }) => {
   const list = await checklist(page, ['bread']);
   await page.keyboard.press('Control+Enter');
   await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(1);
-  await expect.poll(() => focused(page)).toBeNull();
-  await expect(list).toHaveClass(/selected/);
+  await expect.poll(() => focused(page)).toBe('bread');
+  await page.keyboard.press('Delete');
+  await expect.poll(() => texts(list)).toEqual(['']); // the list keeps one blank item
+  await expect(list).toBeVisible();
+  await expect(page.locator('[data-card-id]')).toHaveCount(1);
 
+  await clickEmpty(page); // out of the text, so "?" is a shortcut
   await page.keyboard.press('?');
   await expect(page.getByText('Tick the item (or untick it); the cursor moves to the next one')).toBeVisible();
 });

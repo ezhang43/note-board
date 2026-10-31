@@ -134,8 +134,8 @@ export function ItemBar() {
       {button('Indent', <IndentIcon />, () => appStore.itemTab(cardId, itemId, false))}
       {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, caret()))}
       {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, caret()))}
-      {/* The cursor moves to the next open item; with none left it lets go, as Ctrl+Enter does. */}
-      {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()) || field.blur())}
+      {/* The cursor moves to the next open item; with none left it stays in the ticked one, as Ctrl+Enter does. */}
+      {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()))}
       {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
       {button('Done typing', 'Done', () => field.blur())}
     </div>

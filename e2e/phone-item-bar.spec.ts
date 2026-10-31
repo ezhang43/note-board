@@ -38,9 +38,10 @@ test('Tick moves the cursor to the next open item and the bar stays', async ({ p
   await items(page).getByRole('button', { name: 'Tick' }).tap();
   await expect.poll(() => typingIn(page)).toBe('one');
   await expect(items(page)).toBeVisible();
-  // Nothing open is left after this one: the cursor lets go and the bar goes.
+  // Nothing open is left after this one: the cursor stays in the item just ticked, and so does the bar.
   await items(page).getByRole('button', { name: 'Tick' }).tap();
-  await expect(items(page)).toBeHidden();
+  await expect.poll(() => typingIn(page)).toBe('one');
+  await expect(items(page)).toBeVisible();
 });
 
 test('Delete moves the cursor to the item above; deleting the last item leaves a blank one', async ({ page }) => {

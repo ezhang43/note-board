@@ -7,7 +7,7 @@ import { findItem } from '../src/model/checklist';
 import { serializeBoard } from '../src/model/persist';
 import type { NoteCard, TodoCard } from '../src/model/types';
 import { contentHash, VERSION_GAP_MS } from '../src/model/versions';
-import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
+import { asVersion, readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { addItems, deleteThings, planDelete, type Edit } from './edits';
 import { fakeFirestore } from './fakeFirestore';
 import { ownDb } from './firestore';
@@ -212,6 +212,13 @@ describe('the safety version', () => {
     await saveChange(deps, addApples());
     expect(fs.versions()).toEqual(['old']);
     expect(count(fs.own(), 'n1')).toBe(1);
+  });
+
+  it('is not saved again when the newest holds these boards saved by an older version of the app (only the version number differs)', async () => {
+    const { fs, deps } = setup();
+    fs.addVersion('old', deps.now() - 1000, contentHash(asVersion(ownRaw(), 3)));
+    await saveChange(deps, addApples());
+    expect(fs.versions()).toEqual(['old']);
   });
 
   it('a version the app saved recently still doesn’t stop the first one (the boards may have changed since)', async () => {

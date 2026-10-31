@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { serializeBoard } from '../model/persist';
-import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { asVersion, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, VERSION_GAP_MS, contentHash, type VersionMeta } from '../model/versions';
 import { createStore } from './store';
 import { VERSION_SAVE_WAIT_MS, deleteBoardSafely, localVersionStore, restoreFromBackup, restoreVersion, saveSafetyVersion, startVersions } from './versions';
@@ -37,6 +37,32 @@ describe('saving versions', () => {
     const list = await versions.list();
     expect(list).toHaveLength(1);
     expect(homeIn(await versions.get(list[0].id))?.name).toBe('My first board');
+  });
+
+  it('no new version when the newest holds the same boards saved by an older version of the app (only the version number differs)', async () => {
+    const store = createStore(null, (fn) => fn());
+    const versions = localVersionStore(memory());
+    const now = new Date(2026, 9, 4, 9, 0).getTime();
+    const before = asVersion(serializeWorkspace(store.workspace()), 3);
+    await versions.save({ id: 'v3', savedAt: now - 2 * VERSION_GAP_MS, cards: 0, columns: 0, hash: contentHash(before) }, before);
+    startVersions(store, versions, { now: () => now });
+    await settled();
+    store.renameBoard('After the update');
+    await settled();
+    expect((await versions.list()).map((v) => v.id)).toEqual(['v3']);
+  });
+
+  it('the same holds for a version saved before fingerprints existed (its boards are read to compare)', async () => {
+    const store = createStore(null, (fn) => fn());
+    const versions = localVersionStore(memory());
+    const now = new Date(2026, 9, 4, 9, 0).getTime();
+    const before = asVersion(serializeWorkspace(store.workspace()), 3);
+    await versions.save({ id: 'v3', savedAt: now - 2 * VERSION_GAP_MS, cards: 0, columns: 0 }, before);
+    startVersions(store, versions, { now: () => now });
+    await settled();
+    store.renameBoard('After the update');
+    await settled();
+    expect((await versions.list()).map((v) => v.id)).toEqual(['v3']);
   });
 
   it('no new version while editing carries on; one after a 10-minute quiet spell', async () => {

@@ -1,5 +1,5 @@
 import type { Board } from './types';
-import type { Workspace } from './workspace';
+import { OLDEST_WORKSPACE_VERSION, WORKSPACE_VERSION, asVersion, type Workspace } from './workspace';
 
 // Version history (owner request, like Google Docs): the board as it was, saved now and then,
 // to look back at and restore. Pure rules here; saving and loading live in src/store/versions.ts.
@@ -52,6 +52,16 @@ export function contentHash(data: string): string {
     return (h >>> 0).toString(36);
   };
   return `${pass(0x811c9dc5)}-${pass(0x050c5d1f)}-${data.length.toString(36)}`;
+}
+
+/**
+ * Whether `hash` (a version's fingerprint) is of `data`'s boards, also when an older version of the app
+ * saved them: only the version number differs, so an update alone makes no new version.
+ */
+export function sameSaved(hash: string, data: string): boolean {
+  if (hash === contentHash(data)) return true;
+  for (let n = OLDEST_WORKSPACE_VERSION; n < WORKSPACE_VERSION; n++) if (hash === contentHash(asVersion(data, n))) return true;
+  return false;
 }
 
 export function summarize(board: Board): { cards: number; columns: number } {

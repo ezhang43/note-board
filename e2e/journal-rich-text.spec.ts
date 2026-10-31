@@ -464,9 +464,40 @@ test('words made Small or Large before the size box keep their look, and show as
   await openJournal(page);
   await expect(editor(page).locator('[data-size="small"]')).toHaveCSS('font-size', '13.6px');
   await expect(editor(page).locator('[data-size="large"]')).toHaveCSS('font-size', '20.8px');
+  // The list marks the size the box shows: 14 for the old Small; nothing for the old Large's 21 (not in the list).
+  await editor(page).locator('[data-size="small"]').dblclick();
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('14');
+  await sizeBox(page).click();
+  await expect(sizeList(page).locator('[aria-pressed="true"]')).toHaveText('14');
+  // A press in the note shuts the Aa menu, and the size list starts shut each time it opens.
   await editor(page).locator('[data-size="large"]').dblclick();
   await tool(page, 'Text style').click();
   await expect(sizeBox(page)).toHaveText('21');
+  await sizeBox(page).click();
+  await expect(sizeList(page).getByRole('button')).toHaveCount(10);
+  await expect(sizeList(page).locator('[aria-pressed="true"]')).toHaveCount(0);
+  await sizeBox(page).click();
   await choice(page, 'Text size', 'Larger').click();
   await expect(editor(page).locator('[data-size="24"]')).toHaveText('huge');
+});
+
+// Follow-up from the check of #224 (owner, 2026-10-31).
+test('pressing the greyed − at 10 or + at 36 keeps the words selected in the note', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('a quiet day');
+  await selectLetters(page, 2, 7);
+  await tool(page, 'Text style').click();
+  for (const [size, name] of [['36', 'Larger'], ['10', 'Smaller']] as const) {
+    await sizeBox(page).click();
+    await sizeList(page).getByRole('button', { name: size, exact: true }).click();
+    const button = choice(page, 'Text size', name);
+    await expect(button).toBeDisabled();
+    // A real mouse press on the greyed button (Playwright's own click waits for it to be enabled).
+    const box = (await button.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(editor(page)).toBeFocused();
+    expect(await page.evaluate(() => document.getSelection()?.toString())).toBe('quiet');
+    await expect(editor(page).locator(`[data-size="${size}"]`)).toHaveText('quiet');
+  }
 });

@@ -1,5 +1,5 @@
 import type { StorageLike } from '../model/persist';
-import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, VERSION_GAP_MS, contentHash, needsVersion, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
+import { KEEP_VERSIONS, LOCAL_KEEP_VERSIONS, RETRY_MS, VERSION_GAP_MS, contentHash, needsVersion, sameSaved, summarizeWorkspace, versionsToDrop, type VersionMeta } from '../model/versions';
 import { readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { boardRights } from '../model/sharing';
 import { collab } from '../sync/collabSession';
@@ -104,9 +104,11 @@ async function tidyAfter(versions: VersionStore, meta: VersionMeta, data: string
   for (const id of versionsToDrop([meta, ...others], versions.keep ?? KEEP_VERSIONS)) await versions.remove(id);
 }
 
-/** Whether version `v` holds exactly `data`. Versions saved before fingerprints existed are downloaded to compare. */
+/** Whether version `v` holds `data`'s boards (see sameSaved). Versions saved before fingerprints existed are downloaded to compare. */
 async function sameBoards(versions: VersionStore, v: VersionMeta, data: string) {
-  return v.hash ? v.hash === contentHash(data) : (await versions.get(v.id)) === data;
+  if (v.hash) return sameSaved(v.hash, data);
+  const saved = await versions.get(v.id);
+  return saved !== null && sameSaved(contentHash(saved), data);
 }
 
 export const dataKey = (id: string) => `note-board:version:${id}`;

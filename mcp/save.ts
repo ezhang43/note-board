@@ -1,5 +1,5 @@
 import { problems } from '../src/model/board';
-import { contentHash, needsVersion, summarizeWorkspace } from '../src/model/versions';
+import { contentHash, needsVersion, sameSaved, summarizeWorkspace } from '../src/model/versions';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { safeToEdit } from './boards';
 import type { Edit } from './edits';
@@ -61,7 +61,7 @@ async function safetyVersion(deps: SaveDeps, raw: string, force: boolean) {
   const newest = await deps.db.newestVersion();
   const hash = contentHash(raw);
   const due = force || deps.memory.lastEditAt === null || needsVersion(newest?.savedAt ?? null, deps.memory.lastEditAt, now);
-  if (!due || newest?.hash === hash) return;
+  if (!due || (newest?.hash && sameSaved(newest.hash, raw))) return;
   await deps.db.addVersion({ id: crypto.randomUUID(), savedAt: now, ...summarizeWorkspace(readWorkspace(raw)!.ws), hash }, raw);
 }
 

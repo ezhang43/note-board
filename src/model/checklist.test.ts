@@ -500,6 +500,18 @@ describe('copying and cutting exactly what is highlighted (owner request)', () =
     expect(ids(C.copyItems(list(), ['scarf', 'Leave']))).toBe('scarf Leave');
   });
 
+  it('sub-items copied without their parent keep their levels relative to the least-indented one', () => {
+    // p(q2 q3(r3)) s: q2 (level 1) and r3 (level 2, under q3, which is not copied) keep one level between them.
+    const l = [t('p', [t('q2'), t('q3', [t('r3')])]), t('s')];
+    expect(ids(C.copyItems(l, ['q2', 'r3']))).toBe('q2(r3)');
+    expect(ids(C.copyItems(l, ['q2', 'r3', 's']))).toBe('q2(r3) s');
+    // a level gap closes to one level; a first item deeper than the rest cannot nest under nothing
+    const deep = [t('a', [t('b', [t('c', [t('d')])]), t('e')])];
+    expect(ids(C.copyItems(deep, ['e']))).toBe('e');
+    expect(ids(C.copyItems([t('x', [t('y', [t('z')]), t('w')]), t('v')], ['z', 'w', 'v']))).toBe('z w v');
+    expect(ids(C.copyItems([t('x', [t('y')]), t('v', [t('u', [t('k')])])], ['y', 'k']))).toBe('y(k)');
+  });
+
   it('as text: one per line in the order shown, indented relative to the least-indented one', () => {
     expect(C.selectionAsText(list(), ['Pack', 'shoes'])).toBe('Pack\n  shoes');
     expect(C.selectionAsText(list(), ['coat', 'scarf', 'Leave'])).toBe('  coat\n    scarf\nLeave');
@@ -669,5 +681,30 @@ describe('Ctrl+Enter: where the cursor goes after a tick (owner request, 2026-10
   });
   it('with no open item left, null', () => {
     expect(after([t('a'), t('b', true)], ['a'])).toBeNull();
+  });
+});
+
+describe('pasting items into the item the cursor is in (owner request 2026-10-31)', () => {
+  const t = (text: string, children: TodoItem[] = [], done = false, style?: TodoItem['style']): TodoItem => ({ id: text, text, done, children, ...(style ? { style } : {}) });
+
+  it('goes right after that item, at its level, keeping levels, ticks and formatting', () => {
+    const pasted = [t('p', [t('p1', [], true, { bold: true })], false, { font: 'serif' }), t('q', [], true)];
+    const out = C.pasteItemsInto([t('a', [t('a1')]), t('b')], 'a1', pasted);
+    expect(ids(out)).toBe('a(a1 p(p1) q) b');
+    expect(C.findItem(out, 'p1')!.item).toMatchObject({ done: true, style: { bold: true } });
+    expect(C.findItem(out, 'p')!.item.style).toEqual({ font: 'serif' });
+    expect(C.findItem(out, 'q')!.item.done).toBe(true);
+  });
+
+  it('replaces the item when it is blank with nothing under it', () => {
+    expect(ids(C.pasteItemsInto([t('a'), t(''), t('b')], '', [t('p'), t('q')]))).toBe('a p q b');
+    expect(ids(C.pasteItemsInto([t('a'), t(' ')], ' ', [t('p')]))).toBe('a p');
+  });
+
+  it('keeps a blank item that has sub-items, and never goes past the deepest level', () => {
+    expect(ids(C.pasteItemsInto([t('', [t('c')])], '', [t('p')]))).toBe('(c) p');
+    const deep = [t('a', [t('b', [t('c', [t('d', [t('e', [t('f')])])])])])];
+    const out = C.pasteItemsInto(deep, 'f', [t('x', [t('y')])]);
+    expect(C.findItem(out, 'y')!.depth).toBe(5);
   });
 });

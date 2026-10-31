@@ -7,7 +7,7 @@ import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDon
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
-import { copyText, typingAt } from '../env';
+import { copyText, ITEMS_MARKER, typingAt } from '../env';
 import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
@@ -90,18 +90,29 @@ export function checklistActions(ctx: StoreContext) {
     const sel = ctx.state.ui.itemSel;
     if (sel?.lists) {
       const board = ctx.state.board;
-      itemClipboard = sel.lists.flatMap((l) => {
+      const copied = sel.lists.flatMap((l) => {
         const card = board.cards[l.cardId];
         return card?.kind === 'todo' ? C.copyItems(card.items, l.ids) : [];
       });
+      // Text only, no marker: Ctrl+V does nothing for a copy across lists (SPEC), and the earlier copy is replaced.
+      itemClipboard = null;
       copyText(multiAsText(board, sel.lists));
-      return itemClipboard.length > 0;
+      return copied.length > 0;
     }
     const card = sel && ctx.state.board.cards[sel.cardId];
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
     if (!itemClipboard.length) return false;
-    copyText(C.selectionAsText(card.items, sel.ids));
+    copyText(C.selectionAsText(card.items, sel.ids), ITEMS_MARKER);
+    return true;
+  }
+
+  /** Pastes fresh copies of the copied items into a list (`put` decides where) and selects them: one undo step. */
+  function pasteAndSelect(cardId: string, put: (items: TodoItem[], fresh: TodoItem[]) => TodoItem[]): boolean {
+    const fresh = C.freshCopies(itemClipboard!);
+    commit((b) => C.editItems(b, cardId, (items) => put(items, fresh)), {
+      ui: { itemSel: { cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
+    });
     return true;
   }
 
@@ -319,11 +330,19 @@ export function checklistActions(ctx: StoreContext) {
       const card = sel && ctx.state.board.cards[sel.cardId];
       if (!sel || sel.lists || card?.kind !== 'todo' || !itemClipboard?.length) return false;
       const order = C.flatIds(card.items).filter((id) => sel.ids.includes(id));
-      const fresh = C.freshCopies(itemClipboard);
-      commit((b) => C.editItems(b, sel.cardId, (items) => C.pasteItemsAfter(items, order[order.length - 1], fresh)), {
-        ui: { itemSel: { cardId: sel.cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
-      });
-      return true;
+      return pasteAndSelect(sel.cardId, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
+    },
+
+    /**
+     * Ctrl+V while typing in item `itemId` (no items selected), when the component has seen that the
+     * computer's clipboard still holds our own item copy (its marker): the copied items are pasted as
+     * items, with their levels, ticks and formatting, after that item (in place of it when it is blank),
+     * and selected. Returns false when there is nothing to paste that way.
+     */
+    pasteItemsInto(cardId: string, itemId: string): boolean {
+      const card = ctx.state.board.cards[cardId];
+      if (card?.kind !== 'todo' || !itemClipboard?.length || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      return pasteAndSelect(cardId, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
     },
 
     // ---------- dragging checklist items ----------

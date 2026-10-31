@@ -4,7 +4,8 @@ import { add, clickEmpty } from './helpers';
 // Version history (owner request, like Google Docs): look back at earlier versions and restore one.
 
 test.beforeEach(async ({ page }) => {
-  await page.clock.install();
+  // A fixed midday, so the tests that skip the clock ahead never cross midnight into a new journal day.
+  await page.clock.install({ time: new Date(2026, 9, 14, 12) });
   await page.goto('/');
   await page.evaluate(() => (localStorage.clear(), localStorage.setItem('note-board:tour-done', '1')));
   await page.reload();

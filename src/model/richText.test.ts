@@ -414,8 +414,11 @@ describe('divider', () => {
 
   it('deleting a selection that holds a divider takes it out whole', () => {
     expect(deleteSel([p('ab'), hr, p('cd')], sel(0, 1, 2, 1))).toEqual({ rich: [p('ad')], at: at(0, 1) });
-    // From the divider's start (select all): it goes, the last line keeps its kind.
+    // From the divider's start: it goes; the last line's words left keep its kind, and with none left
+    // (select all) it is a plain line, as the divider has no kind words can take (check of #226).
     expect(deleteSel([hr, { type: 'h1', runs: [{ text: 'cd' }] }], sel(0, 0, 1, 1))).toEqual({ rich: [{ type: 'h1', runs: [{ text: 'd' }] }], at: at(0, 0) });
+    expect(deleteSel([hr, { type: 'h1', runs: [{ text: 'cd' }] }], sel(0, 0, 1, 2))).toEqual({ rich: [p('')], at: at(0, 0) });
+    expect(insertText([hr, p('a'), { type: 'bullet', runs: [{ text: 'b' }] }], sel(0, 0, 2, 1), 'new')).toEqual({ rich: [p('new')], at: at(0, 3) });
     expect(deleteSel([hr, p('a'), hr], sel(0, 0, 2, 3))).toEqual({ rich: [p('')], at: at(0, 0) });
     // A selection starting just after it, or ending just before it, leaves it.
     expect(deleteSel([hr, p('ab')], sel(0, 3, 1, 1))).toEqual({ rich: [hr, p('b')], at: at(1, 0) });
@@ -436,8 +439,16 @@ describe('divider', () => {
     // Just after it (the start of the line below): Backspace takes the divider, Delete a letter.
     expect(deleteChar(rich, at(1, 3), true)).toEqual({ rich: [p('ab'), p('cd')], at: at(1, 0) });
     expect(deleteChar(rich, at(1, 3), false)).toEqual({ rich: [p('ab'), hr, p('d')], at: at(2, 0) });
-    // With no line on that side, the key takes the divider.
-    expect(deleteChar([p('a'), hr], at(1, 3), false)).toEqual({ rich: [p('a')], at: at(0, 1) });
+    // With no line on that side, there is no letter to take: nothing happens (check of #226).
+    expect(deleteChar([hr, p('a')], at(0, 0), true)).toEqual({ rich: [hr, p('a')], at: at(0, 0) });
+    expect(deleteChar([p('a'), hr], at(1, 3), false)).toEqual({ rich: [p('a'), hr], at: at(1, 3) });
+    // The key pointing at the divider still takes it there.
+    expect(deleteChar([hr, p('a')], at(0, 0), false)).toEqual({ rich: [p('a')], at: at(0, 0) });
+    expect(deleteChar([p('a'), hr], at(1, 3), true)).toEqual({ rich: [p('a')], at: at(0, 1) });
+    // The letter beside it is a whole letter as the reader sees it: a skin tone or a flag is not cut in half.
+    expect(deleteChar([p('a👍🏽'), hr, p('b')], at(1, 0), true)).toEqual({ rich: [p('a'), hr, p('b')], at: at(0, 1) });
+    expect(deleteChar([p('a'), hr, p('🇺🇸b')], at(1, 3), false)).toEqual({ rich: [p('a'), hr, p('b')], at: at(2, 0) });
+    expect(deleteChar([p('é👨‍👩‍👧')], at(0, 0), false)).toEqual({ rich: [p('👨‍👩‍👧')], at: at(0, 0) });
     // Elsewhere: one letter, a whole emoji, or the line edges as before.
     expect(deleteChar([p('a😀')], at(0, 3), true)).toEqual({ rich: [p('a')], at: at(0, 1) });
     expect(deleteChar([p('😀b')], at(0, 0), false)).toEqual({ rich: [p('b')], at: at(0, 0) });
@@ -452,5 +463,11 @@ describe('divider', () => {
     // An empty list item keeps its bullet: the divider goes after it.
     const item = { type: 'bullet' as const, runs: [] };
     expect(insertDivider([item], sel(0, 0))).toEqual({ rich: [item, hr, p('')], at: at(2, 0) });
+    // An empty heading shows nothing: it is an empty line, so it becomes the divider (check of #226).
+    expect(insertDivider([p('a'), { type: 'h1', runs: [] }], sel(1, 0))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
+    // Just before a divider on the first line, or after one on the last, no second divider is stacked
+    // on it: the cursor goes to a new empty line below it (check of #226).
+    expect(insertDivider([hr, p('ab')], sel(0, 0))).toEqual({ rich: [hr, p(''), p('ab')], at: at(1, 0) });
+    expect(insertDivider([hr], sel(0, 3))).toEqual({ rich: [hr, p('')], at: at(1, 0) });
   });
 });

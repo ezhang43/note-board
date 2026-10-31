@@ -2611,6 +2611,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .rich > [data-indent='2'] { --indent: 2; }
 .rich > [data-indent='3'] { --indent: 3; }
 .rich > [data-indent='4'] { --indent: 4; }
+/* The divider (owner decision 2026-10-31): a thin line across the note, half a line of room above and below; its words (---) are not shown. */
+.rich > [data-type='hr'] { height: 1px; margin: calc(0.8em - 0.5px) 0; background: var(--line); }
+.rich > [data-type='hr'] > span { display: none; }
 .rich > [data-marker]::before {
   content: attr(data-marker);
   position: absolute;

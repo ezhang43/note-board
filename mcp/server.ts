@@ -70,7 +70,7 @@ export interface ServerOptions {
 }
 
 export function createServer(load: () => Promise<Snapshot>, write: Write, opts: ServerOptions = {}): McpServer {
-  const server = new McpServer({ name: 'busyants', version: '1.4.0' });
+  const server = new McpServer({ name: 'busyants', version: '1.5.0' });
   const deleteAllowed = opts.deleteAllowed ?? (async () => false);
   // Previews waiting for a confirm, by preview id; each is used once (kept only while running).
   const previews = new Map<string, Preview>();

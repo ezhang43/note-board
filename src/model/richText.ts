@@ -5,7 +5,7 @@ import { journalBody } from './journal';
 // other part of the app (search, export, copy, the board card, sync merges): the formatting is
 // only used while its plain text still matches the note's (see `journalRich`).
 
-export type BlockType = 'p' | 'h1' | 'h2' | 'bullet' | 'number';
+export type BlockType = 'p' | 'h1' | 'h2' | 'bullet' | 'number' | 'hr';
 /**
  * A size in px, from SIZE_STEPS' first to its last (the size box, owner pick 2026-10-30). 'small' and
  * 'large' are the words saved before it: still read, and shown as they always were.
@@ -25,7 +25,7 @@ export interface Run {
   font?: RunFont;
   hl?: Highlight;
 }
-/** One line: a paragraph, a heading or a list item. `indent` (1 to 4) only on list items. */
+/** One line: a paragraph, a heading, a list item or a divider. `indent` (1 to 4) only on list items. */
 export interface Block {
   type: BlockType;
   indent?: number;
@@ -63,7 +63,7 @@ export interface Look {
   mixed?: ('size' | 'font' | 'hl')[];
 }
 
-const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number'];
+const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number', 'hr'];
 /** The sizes in the size box's list, in px; 16 is the Journal's normal text. */
 export const SIZE_STEPS = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36];
 export const MIN_SIZE = SIZE_STEPS[0];
@@ -79,6 +79,13 @@ const MAX_RUNS = 2000;
 const MARK_KEYS = ['b', 'i', 'u', 's', 'size', 'font', 'hl'] as const;
 
 export const isList = (t: BlockType) => t === 'bullet' || t === 'number';
+/**
+ * The divider's words (owner decision 2026-10-31): always these, never shown, so its plain text, which
+ * search, export and the board card read, is `---`; and an older app, which reads a kind of line it
+ * doesn't know as a plain line with its words, shows `---` and keeps the note's other formatting.
+ */
+export const DIVIDER = '---';
+const isHr = (blk: Block | undefined) => blk?.type === 'hr';
 
 // ---- small helpers ----
 
@@ -117,6 +124,7 @@ function slice(runs: Run[], from: number, to = Infinity): Run[] {
 
 /** A block with the given type, dropping `indent` where it does not belong. */
 function block(type: BlockType, indent: number | undefined, runs: Run[]): Block {
+  if (type === 'hr') return { type, runs: [{ text: DIVIDER }] }; // its words and looks are never its own
   const n = isList(type) ? Math.min(MAX_INDENT, Math.max(0, indent ?? 0)) : 0;
   return n ? { type, indent: n, runs: norm(runs) } : { type, runs: norm(runs) };
 }
@@ -144,6 +152,7 @@ function selRuns(rich: Rich, sel: Sel): Run[] {
   const { start, end } = ordered(sel);
   const out: Run[] = [];
   for (let b = start.b; b <= end.b && b < rich.length; b++) {
+    if (isHr(rich[b])) continue; // a divider has no look of its own
     out.push(...slice(rich[b].runs, b === start.b ? start.o : 0, b === end.b ? end.o : Infinity));
   }
   return out;
@@ -202,10 +211,10 @@ export function journalRich(text: string, rich: Rich | undefined): Rich {
 
 /** The plain text of a selection, without list markers (for copy and cut). */
 export function plainOfSel(rich: Rich, sel: Sel): string {
-  const { start, end } = ordered(sel);
+  const { start, end } = edges(rich, sel);
   const lines: string[] = [];
   for (let b = start.b; b <= end.b && b < rich.length; b++) {
-    lines.push(slice(rich[b].runs, b === start.b ? start.o : 0, b === end.b ? end.o : Infinity).map((r) => r.text).join(''));
+    lines.push(isHr(rich[b]) ? DIVIDER : slice(rich[b].runs, b === start.b ? start.o : 0, b === end.b ? end.o : Infinity).map((r) => r.text).join(''));
   }
   return lines.join('\n');
 }
@@ -248,13 +257,52 @@ export function parseRich(v: unknown): Rich | undefined {
 
 // ---- editing ----
 
-/** Removes the selected text; the first block keeps its kind. */
+/** Removes the selected text; the first block keeps its kind. A divider in it goes whole. */
 export function deleteSel(rich: Rich, sel: Sel): Edit {
-  const { start, end } = ordered(sel);
+  const { start, end } = edges(rich, sel);
   const first = rich[start.b];
   const last = rich[end.b];
-  const joined = withRuns(first, [...slice(first.runs, 0, start.o), ...slice(last.runs, end.o)]);
+  // A divider the selection reaches into goes whole: none of its hidden --- is kept.
+  const tail = isHr(last) ? [] : slice(last.runs, end.o);
+  let joined = withRuns(first, [...slice(first.runs, 0, start.o), ...tail]);
+  if (isHr(first)) {
+    if (start.b === end.b && start.o === end.o) return { rich, at: start };
+    // The divider at the start goes: the line takes the last line's kind.
+    joined = isHr(last) ? block('p', 0, []) : withRuns(last, tail);
+  }
   return { rich: [...rich.slice(0, start.b), joined, ...rich.slice(end.b + 1)], at: start };
+}
+
+/** A selection, in order, that starts after a divider it starts just after and ends before one it ends just before. */
+function edges(rich: Rich, sel: Sel): Sel {
+  let { start, end } = ordered(sel);
+  if (isHr(rich[start.b]) && start.o > 0 && start.b < end.b) start = { b: start.b + 1, o: 0 };
+  if (isHr(rich[end.b]) && end.o === 0 && end.b > start.b) end = { b: end.b - 1, o: len(rich[end.b - 1]) };
+  return { start, end };
+}
+
+/** A cursor on a divider moves beside it: from just before it to the end of the line above, from just after it to the start of the line below, where there is one. */
+export function offHr(rich: Rich, p: Pos): Pos {
+  if (!isHr(rich[p.b])) return p;
+  if (p.o === 0 && p.b > 0) return { b: p.b - 1, o: len(rich[p.b - 1]) };
+  if (p.o > 0 && p.b < rich.length - 1) return { b: p.b + 1, o: 0 };
+  return p;
+}
+
+/** A place on a divider moves to a new empty line before it (at its start) or after it, so no words go into it. */
+function offDivider(rich: Rich, p: Pos): Edit {
+  if (!isHr(rich[p.b])) return { rich, at: p };
+  const b = p.o === 0 ? p.b : p.b + 1;
+  return { rich: [...rich.slice(0, b), block('p', 0, []), ...rich.slice(b)], at: { b, o: 0 } };
+}
+
+/** The Divider button: a divider after the line (an empty line becomes one), and the cursor on a new empty line below it. */
+export function insertDivider(rich: Rich, sel: Sel): Edit {
+  const cleared = deleteSel(rich, sel);
+  const { b } = offHr(cleared.rich, cleared.at);
+  const blk = cleared.rich[b];
+  const at = blk.type === 'p' && len(blk) === 0 ? b : b + 1;
+  return { rich: [...cleared.rich.slice(0, at), block('hr', 0, []), block('p', 0, []), ...cleared.rich.slice(b + 1)], at: { b: at + 1, o: 0 } };
 }
 
 /** The look new typing takes at a place: the letter before it, or the first letter of an empty start. */
@@ -265,7 +313,8 @@ function marksBefore(blk: Block, o: number): Marks {
 
 /** Types or pastes text over the selection. New lines make new blocks of the same kind. */
 export function insertText(rich: Rich, sel: Sel, text: string, marks?: Marks): Edit {
-  const cleared = deleteSel(rich, sel);
+  const deleted = deleteSel(rich, sel);
+  const cleared = offDivider(deleted.rich, offHr(deleted.rich, deleted.at));
   const { b, o } = cleared.at;
   const blk = cleared.rich[b];
   const look = marks ?? marksBefore(blk, o);
@@ -288,7 +337,13 @@ export function splitAt(rich: Rich, sel: Sel, marks?: Marks): Edit & { look?: Ma
   const cleared = deleteSel(rich, sel);
   const { b, o } = cleared.at;
   const blk = cleared.rich[b];
+  if (isHr(blk)) return offDivider(cleared.rich, cleared.at);
   const out = [...cleared.rich];
+  // --- typed on an otherwise empty line, then Enter: the line becomes a divider (owner decision 2026-10-31).
+  if (blk.type === 'p' && o === DIVIDER.length && plainOf([blk]) === DIVIDER) {
+    out.splice(b, 1, block('hr', 0, []), block('p', 0, []));
+    return { rich: out, at: { b: b + 1, o: 0 } };
+  }
   const size = (marks ?? marksBefore(blk, o)).size;
   const look = size === undefined ? {} : { look: { size } };
   if (isList(blk.type) && len(blk) === 0) {
@@ -301,24 +356,38 @@ export function splitAt(rich: Rich, sel: Sel, marks?: Marks): Edit & { look?: Ma
   return { rich: out, at: { b: b + 1, o: 0 }, ...(atEnd ? look : {}) };
 }
 
-/** Backspace at the start of a block: a list item outdents, then becomes a paragraph; otherwise it joins the line above. */
+/** Takes out the divider at `b`; the cursor goes to the end of the line above, or else the start of the next. */
+function dropDivider(rich: Rich, b: number, up: boolean): Edit {
+  const out = rich.length > 1 ? [...rich.slice(0, b), ...rich.slice(b + 1)] : [block('p', 0, [])];
+  if (up && b > 0) return { rich: out, at: { b: b - 1, o: len(out[b - 1]) } };
+  return b < out.length ? { rich: out, at: { b, o: 0 } } : { rich: out, at: { b: b - 1, o: len(out[b - 1]) } };
+}
+
+/**
+ * Backspace at the start of a block: a list item outdents, then becomes a paragraph; after a divider,
+ * the divider goes (like one letter); otherwise it joins the line above. On a divider, it goes.
+ */
 export function joinBackward(rich: Rich, b: number): Edit {
   const blk = rich[b];
   const out = [...rich];
+  if (isHr(blk)) return dropDivider(rich, b, true);
   if (isList(blk.type)) {
     out[b] = blk.indent ? block(blk.type, blk.indent - 1, blk.runs) : block('p', 0, blk.runs);
     return { rich: out, at: { b, o: 0 } };
   }
   if (b === 0) return { rich, at: { b, o: 0 } };
+  if (isHr(rich[b - 1])) return dropDivider(rich, b - 1, false);
   const above = rich[b - 1];
   out.splice(b - 1, 2, withRuns(above, [...above.runs, ...blk.runs]));
   return { rich: out, at: { b: b - 1, o: len(above) } };
 }
 
-/** Delete at the end of a block: joins the next one onto it. */
+/** Delete at the end of a block: joins the next one onto it, or takes out the divider after it. On a divider, it goes. */
 export function joinForward(rich: Rich, b: number): Edit {
   const blk = rich[b];
+  if (isHr(blk)) return dropDivider(rich, b, false);
   if (b >= rich.length - 1) return { rich, at: { b, o: len(blk) } };
+  if (isHr(rich[b + 1])) return { ...dropDivider(rich, b + 1, true), at: { b, o: len(blk) } };
   const out = [...rich];
   out.splice(b, 2, withRuns(blk, [...blk.runs, ...rich[b + 1].runs]));
   return { rich: out, at: { b, o: len(blk) } };
@@ -407,11 +476,24 @@ export function stepSizes(rich: Rich, sel: Sel, dir: 1 | -1): Rich {
 
 /** Normal, Heading 1 or Heading 2 (or a list kind) on blocks b0..b1. */
 export function setBlockType(rich: Rich, b0: number, b1: number, type: BlockType): Rich {
-  return rich.map((blk, b) => (b >= b0 && b <= b1 ? block(type, blk.indent, blk.runs) : blk));
+  return rich.map((blk, b) => (b >= b0 && b <= b1 && !isHr(blk) ? block(type, blk.indent, blk.runs) : blk));
 }
 
-/** The list buttons: make blocks b0..b1 that kind of list, or back to paragraphs when all already are. */
+/** The list buttons: make blocks b0..b1 that kind of list, or back to paragraphs when all already are (dividers stay). */
 export function toggleList(rich: Rich, b0: number, b1: number, type: 'bullet' | 'number'): Rich {
-  const all = rich.slice(b0, b1 + 1).every((blk) => blk.type === type);
+  const all = rich.slice(b0, b1 + 1).every((blk) => blk.type === type || isHr(blk));
   return setBlockType(rich, b0, b1, all ? 'p' : type);
+}
+
+/** Backspace (`back`) or Delete of one letter at the cursor; at a line's edge it joins lines, and next to a divider it takes the divider out. */
+export function deleteChar(rich: Rich, at: Pos, back: boolean): Edit {
+  const p = offHr(rich, at);
+  const blk = rich[p.b];
+  if (isHr(blk)) return dropDivider(rich, p.b, back);
+  const text = blk.runs.map((r) => r.text).join('');
+  if (back ? p.o === 0 : p.o >= text.length) return back ? joinBackward(rich, p.b) : joinForward(rich, p.b);
+  // An emoji is two code units: take both.
+  const step = /^[\uD800-\uDBFF][\uDC00-\uDFFF]$/.test(back ? text.slice(p.o - 2, p.o) : text.slice(p.o, p.o + 2)) ? 2 : 1;
+  const q = { b: p.b, o: back ? p.o - step : p.o + step };
+  return deleteSel(rich, back ? { start: q, end: p } : { start: p, end: q });
 }

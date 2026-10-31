@@ -92,7 +92,7 @@ export function journalBody(text: string): string {
 
 /** The first line with words in what is written under a note's date line, trimmed: what a folded day shows after its date ('' when nothing is written). */
 export function journalPeek(body: string): string {
-  return body.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+  return body.split('\n').map((l) => l.trim()).find((l) => l && l !== '---') ?? '';
 }
 
 /**
@@ -210,7 +210,8 @@ export function isoWeek(key: DayKey): number {
 
 /** The words in a note's text under its date line; the "• " and "1. " list markers are not words. */
 export function journalWords(body: string): number {
-  return body.split('\n').flatMap((l) => l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/)).filter(Boolean).length;
+  // A divider's line (---, see richText.ts) is not a word.
+  return body.split('\n').flatMap((l) => (l === '---' ? [] : l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/))).filter(Boolean).length;
 }
 
 /** What the person chose to open (true) or shut (false), by group id; only choices that differ from the default are kept. */

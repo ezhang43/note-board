@@ -18,7 +18,7 @@ const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children:
 
 const run: Required<Run> = { text: 'Hi', b: true, i: true, u: true, s: true, size: 'small', font: 'hand', hl: 'yellow' };
 const block: Required<Block> = { type: 'bullet', indent: 1, runs: [run, { text: ' there', size: 24 }] };
-const note: Required<NoteCard> = { ...base, id: 'n1', kind: 'note', x: 20, y: 40, text: 'Hi', rich: [block] };
+const note: Required<NoteCard> = { ...base, id: 'n1', kind: 'note', x: 20, y: 40, text: 'Hi', rich: [block, { type: 'hr', runs: [{ text: '---' }] }] };
 const todo: Required<TodoCard> = { ...base, id: 't1', kind: 'todo', x: 400, y: 80, title: 'List', items: [item], completedOpen: true };
 const link: Required<LinkCard> = { ...base, id: 'l1', kind: 'link', x: 400, y: 400, title: 'Docs', url: 'https://example.com' };
 const entry: Required<CompletedEntry> = { item: { ...subItem, id: 'i9' }, fromCardId: 't1', fromTitle: 'List', fromParentId: 'i1' };
@@ -67,7 +67,7 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const same = <A, B>(ok: Same<A, B>) => ok;
 const KINDS = ['board', 'completed', 'link', 'note', 'todo'] as const;
 same<Card['kind'], (typeof KINDS)[number]>(true);
-const BLOCK_TYPES = ['bullet', 'h1', 'h2', 'number', 'p'] as const;
+const BLOCK_TYPES = ['bullet', 'h1', 'h2', 'hr', 'number', 'p'] as const;
 same<BlockType, (typeof BLOCK_TYPES)[number]>(true);
 const SIZES = ['large', 'small'] as const;
 // A Journal run's size is also a number of px (owner pick, 2026-10-30), from SIZE_STEPS' first to its last.
@@ -81,7 +81,7 @@ same<Highlight, (typeof HIGHLIGHTS)[number]>(true);
 same<ColorKey, (typeof COLOR_KEYS)[number]>(true);
 
 /** The saved shape: each field's path (ids as `*`, a card's as its kind, list entries as `[]`), then the allowed values. */
-function shapeOf(raw: string): string[] {
+function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}): string[] {
   const paths = new Set<string>();
   const walk = (v: unknown, path: string) => {
     if (Array.isArray(v)) return v.length ? v.forEach((x) => walk(x, `${path}[]`)) : void paths.add(`${path}[]`);
@@ -94,7 +94,7 @@ function shapeOf(raw: string): string[] {
   };
   walk(JSON.parse(raw), '');
   const values = { kind: KINDS, color: [...COLOR_KEYS].sort(), 'rich type': BLOCK_TYPES, size: SIZES, font: FONTS, highlight: HIGHLIGHTS, 'rich size': [...SIZES, `${SIZE_STEPS[0]}-${SIZE_STEPS[SIZE_STEPS.length - 1]}`] };
-  return [...[...paths].sort(), ...Object.entries(values).map(([k, v]) => `${k}: ${v.join(' ')}`)];
+  return [...[...paths].sort(), ...Object.entries(values).map(([k, v]) => `${k}: ${v.filter((x) => !safe[k]?.includes(x)).join(' ')}`)];
 }
 
 /** The saved shape of each published version number. */
@@ -242,10 +242,21 @@ const SAVED_SHAPES: Record<number, string[]> = {
   // Journal text sizes as numbers of px (owner pick, 2026-10-30): an older app would drop them.
   4: [...SHAPE_3, 'rich size: large small 10-36'],
 };
+/**
+ * Values added under a version number without raising it, because every older copy of the app that
+ * saves that number reads them without losing anything written, so its saving over them is safe (and
+ * raising the number would make those copies show "Your board couldn't be loaded"). Only with the
+ * owner's say, and each needs a test of what an older copy does with it.
+ * - 'hr', the Journal's divider (owner decision 2026-10-31): an older copy reads a line of a kind it
+ *   doesn't know as a plain line with its words, and a divider's words are always `---`, its plain
+ *   text. So it shows `---` and keeps the note's other formatting; if it saves, the divider becomes
+ *   the words `---` (richText.test.ts, "an older app ...").
+ */
+const READ_SAFELY: Record<number, Record<string, readonly string[]>> = { 4: { 'rich type': ['hr'] } };
 
 describe('the saved version number goes up whenever the saved shape changes (review 137-A M1)', () => {
   it('the shape matches the one recorded for WORKSPACE_VERSION', () => {
-    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }));
+    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }), READ_SAFELY[WORKSPACE_VERSION]);
     expect(shape, 'The saved shape changed: raise WORKSPACE_VERSION and record the new shape under it').toEqual(SAVED_SHAPES[WORKSPACE_VERSION]);
   });
 

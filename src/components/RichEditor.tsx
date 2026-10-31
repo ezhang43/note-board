@@ -18,6 +18,8 @@ export interface RichEditorHandle {
   stepSize(dir: 1 | -1): void;
   setType(type: 'p' | 'h1' | 'h2'): void;
   list(type: 'bullet' | 'number'): void;
+  /** The Divider button. */
+  divider(): void;
 }
 
 interface Props {
@@ -41,6 +43,12 @@ function drawBlock(blk: Block, marker: string): HTMLDivElement {
   div.dataset.type = blk.type;
   if (blk.indent) div.dataset.indent = String(blk.indent);
   if (marker) div.dataset.marker = marker;
+  if (blk.type === 'hr') {
+    // A line, not text: the cursor goes before or after it, never in. Its words (---) are drawn hidden,
+    // so the page holds the same letters as the model and places on it read back as in the model.
+    div.contentEditable = 'false';
+    div.setAttribute('role', 'separator');
+  }
   for (const r of blk.runs) {
     const span = document.createElement('span');
     for (const k of ['b', 'i', 'u', 's'] as const) if (r[k]) span.dataset[k] = '';
@@ -277,6 +285,11 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       const sel = target();
       apply(R.toggleList(cur.current, ...lineRange(sel), type), sel, false);
     },
+    divider() {
+      const edit = R.insertDivider(cur.current, target());
+      pending.current = null;
+      apply(edit.rich, at(edit.at), false);
+    },
   };
   useImperativeHandle(ref, () => handle);
 
@@ -312,6 +325,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       if (!sel) return;
       const rich = cur.current;
       const across = sel.start.b !== sel.end.b;
+      const onHr = rich[sel.start.b]?.type === 'hr' || rich[sel.end.b]?.type === 'hr';
       const take = (edit: R.Edit) => {
         e.preventDefault();
         pending.current = null;
@@ -329,7 +343,8 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       if (t === 'insertText') {
         // Plain typing within a line is the browser's own, so spelling, autocorrect and phone
         // keyboards' suggestions keep working; it is read back after.
-        if (!marks && !across) return;
+        // A cursor on a divider (it has no words of its own) types beside it, through the model.
+        if (!marks && !across && !onHr) return;
         return take(R.insertText(rich, sel, (e.data ?? '').replace(/\r\n?/g, '\n'), marks));
       }
       if (t === 'insertFromDrop') {
@@ -347,12 +362,13 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       if (t.startsWith('format') || t.startsWith('history') || t === 'deleteByDrag') return e.preventDefault();
       if (t.startsWith('delete')) {
         if (!collapsed(sel)) {
-          if (across) take(R.deleteSel(rich, sel));
+          if (across || onHr) take(R.deleteSel(rich, sel));
           return;
         }
-        const back = t.includes('Backward');
-        if (back && sel.start.o === 0) return take(R.joinBackward(rich, sel.start.b));
-        if (!back && sel.start.o >= endOf([rich[sel.start.b]]).o) return take(R.joinForward(rich, sel.start.b));
+        // One letter within a line, by key, is the browser's own; at a line's edge or on a divider, the model's.
+        if (!t.endsWith('Backward') && !t.endsWith('Forward')) return;
+        const back = t.endsWith('Backward');
+        if (onHr || (back ? sel.start.o === 0 : sel.start.o >= endOf([rich[sel.start.b]]).o)) return take(R.deleteChar(rich, sel.start, back));
       }
     };
     const onInput = () => {

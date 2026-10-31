@@ -16,6 +16,8 @@ export function checklistActions(ctx: StoreContext) {
   const { commit, updateUi, requestSettle } = ctx;
   /** Copied checklist items. */
   let itemClipboard: TodoItem[] | null = null;
+  /** The plain text copied with them, to tell whether they are still the newest thing copied when a paste comes. */
+  let itemClipboardText: string | null = null;
 
   /**
    * Press-and-hold lift: how far each row slides. The lifted rows' list closes up over them, and the
@@ -94,14 +96,16 @@ export function checklistActions(ctx: StoreContext) {
         const card = board.cards[l.cardId];
         return card?.kind === 'todo' ? C.copyItems(card.items, l.ids) : [];
       });
-      copyText(multiAsText(board, sel.lists));
+      itemClipboardText = multiAsText(board, sel.lists);
+      copyText(itemClipboardText);
       return itemClipboard.length > 0;
     }
     const card = sel && ctx.state.board.cards[sel.cardId];
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
     if (!itemClipboard.length) return false;
-    copyText(C.selectionAsText(card.items, sel.ids));
+    itemClipboardText = C.selectionAsText(card.items, sel.ids);
+    copyText(itemClipboardText);
     return true;
   }
 
@@ -322,6 +326,24 @@ export function checklistActions(ctx: StoreContext) {
       const fresh = C.freshCopies(itemClipboard);
       commit((b) => C.editItems(b, sel.cardId, (items) => C.pasteItemsAfter(items, order[order.length - 1], fresh)), {
         ui: { itemSel: { cardId: sel.cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
+      });
+      return true;
+    },
+
+    /**
+     * Ctrl+V while typing in item `itemId` (no items selected): if the computer's clipboard still holds
+     * the text of the copied items (`clip`), they are pasted as items, with their levels, ticks and
+     * formatting, after that item (in place of it when it is blank), and selected. Anything else
+     * (text from another app, a newer copy) returns false and pastes as the browser does.
+     */
+    pasteItemsInto(cardId: string, itemId: string, clip: string): boolean {
+      const card = ctx.state.board.cards[cardId];
+      const same = (a: string) => a.replace(/\r\n/g, '\n');
+      if (card?.kind !== 'todo' || !itemClipboard?.length || itemClipboardText === null || !clip || same(clip) !== same(itemClipboardText)) return false;
+      if (ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      const fresh = C.freshCopies(itemClipboard);
+      commit((b) => C.editItems(b, cardId, (items) => C.pasteItemsInto(items, itemId, fresh)), {
+        ui: { itemSel: { cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
       });
       return true;
     },

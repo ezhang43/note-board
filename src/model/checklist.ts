@@ -370,6 +370,20 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
   return next;
 }
 
+/**
+ * Pastes items while typing in `itemId`: right after it (as `pasteItemsAfter`), but in place of it when
+ * it is blank and has nothing under it, so a new list's empty first item isn't left behind.
+ */
+export function pasteItemsInto(items: TodoItem[], itemId: string, pasted: TodoItem[]): TodoItem[] {
+  const loc = findItem(items, itemId);
+  const height = pasted.reduce((h, p) => Math.max(h, subtreeHeight(p)), 0);
+  if (!loc || loc.item.text.trim() !== '' || loc.item.children.length || loc.depth + height > MAX_DEPTH) return pasteItemsAfter(items, itemId, pasted);
+  const next = cloned(items);
+  const at = findItem(next, itemId)!;
+  at.list.splice(at.index, 1, ...structuredClone(pasted));
+  return next;
+}
+
 /** Where dragged items go in a list: before / after / nested under an item, or at the end. */
 export type ItemDrop = { mode: 'before' | 'after' | 'nest'; targetId: string } | { mode: 'append' };
 

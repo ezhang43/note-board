@@ -671,3 +671,28 @@ describe('Ctrl+Enter: where the cursor goes after a tick (owner request, 2026-10
     expect(after([t('a'), t('b', true)], ['a'])).toBeNull();
   });
 });
+
+describe('pasting items into the item the cursor is in (owner request 2026-10-31)', () => {
+  const t = (text: string, children: TodoItem[] = [], done = false, style?: TodoItem['style']): TodoItem => ({ id: text, text, done, children, ...(style ? { style } : {}) });
+
+  it('goes right after that item, at its level, keeping levels, ticks and formatting', () => {
+    const pasted = [t('p', [t('p1', [], true, { bold: true })], false, { font: 'serif' }), t('q', [], true)];
+    const out = C.pasteItemsInto([t('a', [t('a1')]), t('b')], 'a1', pasted);
+    expect(ids(out)).toBe('a(a1 p(p1) q) b');
+    expect(C.findItem(out, 'p1')!.item).toMatchObject({ done: true, style: { bold: true } });
+    expect(C.findItem(out, 'p')!.item.style).toEqual({ font: 'serif' });
+    expect(C.findItem(out, 'q')!.item.done).toBe(true);
+  });
+
+  it('replaces the item when it is blank with nothing under it', () => {
+    expect(ids(C.pasteItemsInto([t('a'), t(''), t('b')], '', [t('p'), t('q')]))).toBe('a p q b');
+    expect(ids(C.pasteItemsInto([t('a'), t(' ')], ' ', [t('p')]))).toBe('a p');
+  });
+
+  it('keeps a blank item that has sub-items, and never goes past the deepest level', () => {
+    expect(ids(C.pasteItemsInto([t('', [t('c')])], '', [t('p')]))).toBe('(c) p');
+    const deep = [t('a', [t('b', [t('c', [t('d', [t('e', [t('f')])])])])])];
+    const out = C.pasteItemsInto(deep, 'f', [t('x', [t('y')])]);
+    expect(C.findItem(out, 'y')!.depth).toBe(5);
+  });
+});

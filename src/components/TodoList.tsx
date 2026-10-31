@@ -156,6 +156,13 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
+        onPaste={(e) => {
+          // Copied checklist items go in as items (levels, ticks, formatting); anything else pastes as text, as the browser does.
+          if (appStore.pasteItemsInto(cardId, item.id, e.clipboardData.getData('text/plain'))) {
+            e.preventDefault();
+            e.currentTarget.blur(); // the pasted items are highlighted, as after pasting with items selected
+          }
+        }}
       />
       {/* Move up / down in a small pill over the free end of the row above (below the first row), on hover or keyboard focus, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18; the pill, 2026-10-22). */}
       {/* Faded (aria-disabled) at the end of its level; a list of one item has nothing to move, so no pill. The cursor goes into the item, as with the keyboard. */}

@@ -98,3 +98,57 @@ describe('checklist editing in the store', () => {
     expect(s.getState().ui.focusItem).toBe(second);
   });
 });
+
+describe('pasting copied items while typing in another list (owner request 2026-10-31)', () => {
+  /** Two lists: the first holds one, two (with sub-item two a, ticked, bold), three; the second holds one blank item. */
+  function twoLists() {
+    const { s, cardId, list, first, second, third } = setup();
+    s.itemTab(cardId, third, false); // three nests under two
+    s.toggleItem(cardId, third);
+    s.formatBoxes([{ cardId, itemId: second }], 'bold');
+    s.addCard('todo');
+    const otherId = s.getState().ui.selection[0];
+    const other = () => s.getState().board.cards[otherId] as TodoCard;
+    return { s, cardId, list, first, second, third, otherId, other };
+  }
+
+  it('pastes the copied items as separate items, with levels, ticks and formatting, after the item typed in', () => {
+    const { s, cardId, first, third, otherId, other } = twoLists();
+    s.selectItemRange(cardId, first, third);
+    expect(s.copyItems()).toBe(true);
+    const blank = other().items[0].id;
+    expect(s.pasteItemsInto(otherId, blank, 'one\ntwo\n  three')).toBe(true);
+    const items = other().items;
+    expect(items.map((i) => i.text)).toEqual(['one', 'two']); // the blank item was replaced
+    expect(items[1].children.map((c) => c.text)).toEqual(['three']);
+    expect(items[1].style).toEqual({ bold: true });
+    expect(items[1].children[0].done).toBe(true);
+    expect(items[1].id).not.toBe(s.getState().board.cards[cardId] && (s.getState().board.cards[cardId] as TodoCard).items[1].id);
+    expect(s.getState().ui.itemSel?.ids).toHaveLength(3);
+    s.undo(); // one step
+    expect(other().items.map((i) => i.text)).toEqual(['']);
+  });
+
+  it('goes after the item typed in when it has text', () => {
+    const { s, cardId, first, second, otherId, other } = twoLists();
+    s.setItemText(otherId, other().items[0].id, 'mine');
+    s.selectItemRange(cardId, first, second);
+    s.copyItems();
+    expect(s.pasteItemsInto(otherId, other().items[0].id, 'one\ntwo')).toBe(true);
+    expect(other().items.map((i) => i.text)).toEqual(['mine', 'one', 'two']);
+  });
+
+  it('leaves plain text from another app alone', () => {
+    const { s, cardId, first, second, otherId, other } = twoLists();
+    s.selectItemRange(cardId, first, second);
+    s.copyItems();
+    expect(s.pasteItemsInto(otherId, other().items[0].id, 'milk\neggs')).toBe(false);
+    expect(other().items.map((i) => i.text)).toEqual(['']);
+  });
+
+  it('does nothing when nothing was copied', () => {
+    const { s, otherId, other } = twoLists();
+    expect(s.pasteItemsInto(otherId, other().items[0].id, '')).toBe(false);
+    expect(s.pasteItemsInto(otherId, other().items[0].id, 'x')).toBe(false);
+  });
+});

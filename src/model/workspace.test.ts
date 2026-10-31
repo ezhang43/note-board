@@ -5,6 +5,8 @@ import { serializeBoard } from './persist';
 import type { Board, NoteCard } from './types';
 import {
   HOME_ID,
+  WORKSPACE_VERSION,
+  asVersion,
   boardLinks,
   boardTree,
   boardNeighbor,
@@ -43,6 +45,14 @@ describe('saving several boards', () => {
   it('a board saved before there were several boards becomes the home board', () => {
     const board = addCard(named('Mine'), createCard('todo', 't1'), { type: 'loose', x: 0, y: 0 });
     expect(readWorkspace(serializeBoard(board))).toEqual({ ws: { home: HOME_ID, boards: { [HOME_ID]: board } }, legacy: true });
+  });
+
+  it('asVersion gives the same saved text with only the version number changed, wherever the number sits', () => {
+    const data = serializeWorkspace(sample());
+    expect(asVersion(data, 3)).toBe(data.replace(`"version":${WORKSPACE_VERSION},`, '"version":3,'));
+    expect(asVersion(data, WORKSPACE_VERSION)).toBe(data);
+    // Not found by its place in the text (a change of field order can't silently break it).
+    expect(asVersion('{"home":"h","version":4,"boards":{}}', 3)).toBe('{"home":"h","version":3,"boards":{}}');
   });
 
   it('damaged data or data from a newer version can’t be read (null); parseWorkspace then starts fresh', () => {

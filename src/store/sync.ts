@@ -1,5 +1,5 @@
 import { contentHash } from '../model/versions';
-import { HOME_ID, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
+import { HOME_ID, asVersion, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import type { Store } from './store';
 
 /** The online copy of every board: the saved boards' JSON and which open page last wrote it. */
@@ -44,6 +44,8 @@ export type SaveState = 'saving' | 'saved' | 'failed' | 'held';
 
 /** Wait this long after the last board change before uploading, so typing isn't sent on every key. */
 export const SYNC_DELAY = 800;
+/** The version the held-back-changes note is always written as (keep it: notes already on devices are; review 181-A H1). */
+const HELD_NOTE_VERSION = 3;
 
 /**
  * The most characters the online rules accept for the saved boards.
@@ -122,10 +124,10 @@ export function startSync(
     return serializeWorkspace({ home: ws.home, boards: Object.fromEntries(Object.keys(boards).sort().map((id) => [id, boards[id]])) });
   };
   /**
-   * The note of changes held back (opts.heldBase), noted on the device: written as saved by version 3,
-   * so a note left before a version bump still matches the same boards after the app updates.
+   * The note of changes held back (opts.heldBase), noted on the device: always written as saved by
+   * HELD_NOTE_VERSION, so it still matches the same boards after a version bump.
    */
-  const heldHash = (ws: Workspace) => contentHash(ownKey(ws).replace(/^\{"version":\d+,/, '{"version":3,'));
+  const heldHash = (ws: Workspace) => contentHash(asVersion(ownKey(ws), HELD_NOTE_VERSION));
   /** Boards from the online copy, with the shared boards as they are here. */
   const withShared = (ws: Workspace): Workspace => {
     const here = store.workspace().boards;

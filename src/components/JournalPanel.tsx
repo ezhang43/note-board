@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { JOURNAL_NOTES, generalNote, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
-import { HIGHLIGHTS, journalRich, SIZE_STEPS, sizeMark, sizePx, type Look, type Toggle } from '../model/richText';
+import { HIGHLIGHTS, journalRich, MAX_SIZE, MIN_SIZE, SIZE_STEPS, sizeMark, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
@@ -139,9 +139,9 @@ export function JournalPanel() {
   const keep = (e: React.SyntheticEvent) => e.preventDefault();
   /** Whether a menu's choice is the selection's (none is when the selection has more than one: Mixed). */
   const is = (key: 'font' | 'hl', value: string) => !look.mixed?.includes(key) && (look[key] ?? '') === value;
-  // The size box: the selection's size in px, empty when it has more than one.
+  // The size box: the selection's size in px as shown (the old Small and Large show as 14 and 21), empty when it has more than one.
   const mixedSize = !!look.mixed?.includes('size');
-  const px = sizePx(look.size);
+  const px = Math.round(sizePx(look.size));
   const markButton = (mark: Toggle, label: string, keys: string, glyph: string) => (
     <button type="button" className={`jt-${mark}`} aria-label={label} title={`${label} (${keys})`} aria-pressed={look[mark]} onClick={() => act((h) => h.toggle(mark))}>
       {glyph}
@@ -319,14 +319,15 @@ export function JournalPanel() {
             </div>
             <div className="jt-row">
               <span className="jt-label">Size</span>
+              {/* aria-disabled, not disabled, at 10 and 36: a press on a disabled button may not reach the toolbar's keep in every browser, and would take the cursor out of the note. */}
               <div className="jt-size" role="group" aria-label="Text size">
-                <button type="button" aria-label="Smaller" title="Smaller" disabled={!mixedSize && px <= SIZE_STEPS[0]} onClick={() => act((h) => h.stepSize(-1))}>
+                <button type="button" aria-label="Smaller" title="Smaller" aria-disabled={!mixedSize && px <= MIN_SIZE} onClick={() => (mixedSize || px > MIN_SIZE) && act((h) => h.stepSize(-1))}>
                   −
                 </button>
-                <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${Math.round(px)}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
-                  {mixedSize ? '' : Math.round(px)}
+                <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${px}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
+                  {mixedSize ? '' : px}
                 </button>
-                <button type="button" aria-label="Larger" title="Larger" disabled={!mixedSize && px >= SIZE_STEPS[SIZE_STEPS.length - 1]} onClick={() => act((h) => h.stepSize(1))}>
+                <button type="button" aria-label="Larger" title="Larger" aria-disabled={!mixedSize && px >= MAX_SIZE} onClick={() => (mixedSize || px < MAX_SIZE) && act((h) => h.stepSize(1))}>
                   +
                 </button>
                 {sizesOpen && (

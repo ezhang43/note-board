@@ -66,6 +66,8 @@ export interface Look {
 const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number'];
 /** The sizes in the size box's list, in px; 16 is the Journal's normal text. */
 export const SIZE_STEPS = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36];
+export const MIN_SIZE = SIZE_STEPS[0];
+export const MAX_SIZE = SIZE_STEPS[SIZE_STEPS.length - 1];
 export const NORMAL_SIZE = 16;
 /** The old Small and Large were 0.85em and 1.3em of the 16px text. */
 const OLD_SIZES: Record<string, number> = { small: 13.6, large: 20.8 };
@@ -221,7 +223,7 @@ function parseRun(v: unknown): Run | null {
   if (r.u === true) out.u = true;
   if (r.s === true) out.s = true;
   const size = r.size;
-  if (typeof size === 'number' ? size >= SIZE_STEPS[0] && size <= SIZE_STEPS[SIZE_STEPS.length - 1] && size !== NORMAL_SIZE : size === 'small' || size === 'large') out.size = size as RunSize;
+  if (typeof size === 'number' ? size >= MIN_SIZE && size <= MAX_SIZE && size !== NORMAL_SIZE : size === 'small' || size === 'large') out.size = size as RunSize;
   const font = pick(r.font, RUN_FONTS);
   if (font) out.font = font;
   const hl = pick(r.hl, HIGHLIGHTS);
@@ -391,7 +393,7 @@ export const sizeMark = (px: number): RunSize | undefined => (px === NORMAL_SIZE
 export function stepSize(size: RunSize | undefined, dir: 1 | -1): number {
   const px = Math.round(sizePx(size)); // from the number the box shows (Small shows 14)
   const next = dir > 0 ? SIZE_STEPS.find((s) => s > px) : [...SIZE_STEPS].reverse().find((s) => s < px);
-  return next ?? (dir > 0 ? SIZE_STEPS[SIZE_STEPS.length - 1] : SIZE_STEPS[0]);
+  return next ?? (dir > 0 ? MAX_SIZE : MIN_SIZE);
 }
 
 /** − and + on a selection: each part steps from its own size, as in Google Docs. */

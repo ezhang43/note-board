@@ -6,7 +6,11 @@ import { journalBody } from './journal';
 // only used while its plain text still matches the note's (see `journalRich`).
 
 export type BlockType = 'p' | 'h1' | 'h2' | 'bullet' | 'number';
-export type RunSize = 'small' | 'large';
+/**
+ * A size in px, from SIZE_STEPS' first to its last (the size box, owner pick 2026-10-30). 'small' and
+ * 'large' are the words saved before it: still read, and shown as they always were.
+ */
+export type RunSize = 'small' | 'large' | number;
 export type RunFont = 'serif' | 'rounded' | 'hand' | 'mono';
 export type Highlight = 'yellow' | 'green' | 'blue' | 'pink';
 
@@ -60,7 +64,11 @@ export interface Look {
 }
 
 const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number'];
-const SIZES: RunSize[] = ['small', 'large'];
+/** The sizes in the size box's list, in px; 16 is the Journal's normal text. */
+export const SIZE_STEPS = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36];
+export const NORMAL_SIZE = 16;
+/** The old Small and Large were 0.85em and 1.3em of the 16px text. */
+const OLD_SIZES: Record<string, number> = { small: 13.6, large: 20.8 };
 const RUN_FONTS: RunFont[] = ['serif', 'rounded', 'hand', 'mono'];
 export const HIGHLIGHTS: Highlight[] = ['yellow', 'green', 'blue', 'pink'];
 const MAX_INDENT = 4;
@@ -212,8 +220,8 @@ function parseRun(v: unknown): Run | null {
   if (r.i === true) out.i = true;
   if (r.u === true) out.u = true;
   if (r.s === true) out.s = true;
-  const size = pick(r.size, SIZES);
-  if (size) out.size = size;
+  const size = r.size;
+  if (typeof size === 'number' ? size >= SIZE_STEPS[0] && size <= SIZE_STEPS[SIZE_STEPS.length - 1] && size !== NORMAL_SIZE : size === 'small' || size === 'large') out.size = size as RunSize;
   const font = pick(r.font, RUN_FONTS);
   if (font) out.font = font;
   const hl = pick(r.hl, HIGHLIGHTS);
@@ -269,20 +277,26 @@ export function insertText(rich: Rich, sel: Sel, text: string, marks?: Marks): E
   return { rich: [...cleared.rich.slice(0, b), ...made, ...cleared.rich.slice(b + 1)], at: { b: b + lines.length - 1, o: lastLen } };
 }
 
-/** Enter: splits the block. A list continues; an empty list item ends the list; after a heading comes a paragraph. */
-export function splitAt(rich: Rich, sel: Sel): Edit {
+/**
+ * Enter: splits the block. A list continues; an empty list item ends the list; after a heading comes a paragraph.
+ * `marks`: the look chosen for the next letters at the caret, if any. `look`: when the new line starts
+ * empty, the size its first letters take, kept from the caret (owner, 2026-10-30; only the size carries).
+ */
+export function splitAt(rich: Rich, sel: Sel, marks?: Marks): Edit & { look?: Marks } {
   const cleared = deleteSel(rich, sel);
   const { b, o } = cleared.at;
   const blk = cleared.rich[b];
   const out = [...cleared.rich];
+  const size = (marks ?? marksBefore(blk, o)).size;
+  const look = size === undefined ? {} : { look: { size } };
   if (isList(blk.type) && len(blk) === 0) {
     out[b] = block('p', 0, []);
-    return { rich: out, at: { b, o: 0 } };
+    return { rich: out, at: { b, o: 0 }, ...look };
   }
   const atEnd = o >= len(blk);
   const nextType = atEnd && (blk.type === 'h1' || blk.type === 'h2') ? 'p' : blk.type;
   out.splice(b, 1, withRuns(blk, slice(blk.runs, 0, o)), block(nextType, blk.indent, slice(blk.runs, o)));
-  return { rich: out, at: { b: b + 1, o: 0 } };
+  return { rich: out, at: { b: b + 1, o: 0 }, ...(atEnd ? look : {}) };
 }
 
 /** Backspace at the start of a block: a list item outdents, then becomes a paragraph; otherwise it joins the line above. */
@@ -362,6 +376,30 @@ export function setMark<K extends 'size' | 'font' | 'hl'>(rich: Rich, sel: Sel, 
     if (value === undefined) delete next[mark];
     else next[mark] = value;
     return next;
+  });
+}
+
+// ---- the size box ----
+
+/** A size in px (no size is normal). */
+export const sizePx = (size: RunSize | undefined): number => (size === undefined ? NORMAL_SIZE : typeof size === 'number' ? size : OLD_SIZES[size]);
+
+/** The mark for a size in px: normal is no mark, so plain text keeps its plain saved shape. */
+export const sizeMark = (px: number): RunSize | undefined => (px === NORMAL_SIZE ? undefined : px);
+
+/** − and +: the next size in the list below or above, stopping at the ends. */
+export function stepSize(size: RunSize | undefined, dir: 1 | -1): number {
+  const px = Math.round(sizePx(size)); // from the number the box shows (Small shows 14)
+  const next = dir > 0 ? SIZE_STEPS.find((s) => s > px) : [...SIZE_STEPS].reverse().find((s) => s < px);
+  return next ?? (dir > 0 ? SIZE_STEPS[SIZE_STEPS.length - 1] : SIZE_STEPS[0]);
+}
+
+/** − and + on a selection: each part steps from its own size, as in Google Docs. */
+export function stepSizes(rich: Rich, sel: Sel, dir: 1 | -1): Rich {
+  return mapSel(rich, sel, (r) => {
+    const { size: _old, ...rest } = r;
+    const size = sizeMark(stepSize(r.size, dir));
+    return size === undefined ? rest : { ...rest, size };
   });
 }
 

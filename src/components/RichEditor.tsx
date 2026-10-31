@@ -13,7 +13,9 @@ export interface RichEditorHandle {
   el: HTMLDivElement | null;
   focusEnd(): void;
   toggle(mark: Toggle): void;
-  setMark(key: 'size' | 'font' | 'hl', value: string | undefined): void;
+  setMark(key: 'size' | 'font' | 'hl', value: string | number | undefined): void;
+  /** The size box's − and +. */
+  stepSize(dir: 1 | -1): void;
   setType(type: 'p' | 'h1' | 'h2'): void;
   list(type: 'bullet' | 'number'): void;
 }
@@ -42,7 +44,9 @@ function drawBlock(blk: Block, marker: string): HTMLDivElement {
   for (const r of blk.runs) {
     const span = document.createElement('span');
     for (const k of ['b', 'i', 'u', 's'] as const) if (r[k]) span.dataset[k] = '';
-    if (r.size) span.dataset.size = r.size;
+    if (r.size) span.dataset.size = String(r.size);
+    // A size in px, as a share of the line's own size (NORMAL_SIZE px text), so it grows in a heading as Small and Large do.
+    if (typeof r.size === 'number') span.style.fontSize = `${r.size / R.NORMAL_SIZE}em`;
     if (r.font) span.dataset.font = r.font;
     if (r.hl) span.dataset.hl = r.hl;
     span.textContent = r.text;
@@ -107,7 +111,10 @@ function parse(root: HTMLElement): Rich {
           if (!(a instanceof HTMLSpanElement)) continue;
           const span = a.dataset;
           for (const k of ['b', 'i', 'u', 's'] as const) if (span[k] !== undefined) run[k] = true;
-          for (const k of ['size', 'font', 'hl'] as const) run[k] ??= span[k];
+          for (const k of ['font', 'hl'] as const) run[k] ??= span[k];
+          // A size in px reads back as a number; the old words stay words.
+          const size = span.size;
+          if (size !== undefined) run.size ??= size === 'small' || size === 'large' ? size : Number(size);
         }
         runs.push(run as unknown as Run);
       }
@@ -257,6 +264,11 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
         (rich, sel) => R.setMark(rich, sel, key, v as never),
         (l) => ({ ...l, [key]: v }),
       ),
+    stepSize: (dir) =>
+      format(
+        (rich, sel) => R.stepSizes(rich, sel, dir),
+        (l) => ({ ...l, size: R.sizeMark(R.stepSize(l.size, dir)) }),
+      ),
     setType(type) {
       const sel = target();
       apply(R.setBlockType(cur.current, ...lineRange(sel), type), sel, false);
@@ -305,10 +317,16 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
         pending.current = null;
         apply(edit.rich, at(edit.at), true);
       };
-      if (t === 'insertParagraph' || t === 'insertLineBreak') return take(R.splitAt(rich, sel));
+      const p = pending.current;
+      const marks = p && collapsed(sel) && samePos(p.at, sel.start) ? p.marks : undefined;
+      if (t === 'insertParagraph' || t === 'insertLineBreak') {
+        const edit = R.splitAt(rich, sel, marks);
+        take(edit);
+        // The new line starts empty: its size waits for the next letters, like a size chosen there.
+        if (edit.look) pending.current = { marks: edit.look, at: edit.at };
+        return;
+      }
       if (t === 'insertText') {
-        const p = pending.current;
-        const marks = p && collapsed(sel) && samePos(p.at, sel.start) ? p.marks : undefined;
         // Plain typing within a line is the browser's own, so spelling, autocorrect and phone
         // keyboards' suggestions keep working; it is read back after.
         if (!marks && !across) return;

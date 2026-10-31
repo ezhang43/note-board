@@ -3,7 +3,7 @@ import { shownName } from '../src/model/board';
 import { hrefOf } from '../src/model/cards';
 import { readShare } from '../src/model/sharing';
 import type { Board, Card, TodoItem } from '../src/model/types';
-import { boardTree, pathTo, readWorkspace, serializeWorkspace, type Workspace } from '../src/model/workspace';
+import { boardTree, pathTo, readWorkspace, serializeWorkspace, WORKSPACE_VERSION, type Workspace } from '../src/model/workspace';
 
 // The connector's view of a person's boards (pure: no network). What Firestore holds is read in
 // firestore.ts; here it becomes the board list, a board's outline, and the "safe to edit" check.
@@ -179,6 +179,8 @@ export function safeToEdit(raw: string | null): { ok: true } | { ok: false; reas
   });
   // Arrows saved before they were removed (owner, 2026-10-16) are known: the next save erases them.
   for (const b of Object.values(saved.boards)) delete (b as { arrows?: unknown } | null)?.arrows;
+  // An older version the app still reads (readWorkspace said so) is saved as this one: nothing lost.
+  saved.version = WORKSPACE_VERSION;
   if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), saved)) {
     return { ok: false, reason: 'the boards hold data this connector doesn’t know (saved by a newer version of the app?)' };
   }

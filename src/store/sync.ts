@@ -121,6 +121,11 @@ export function startSync(
     const { boards } = own(ws);
     return serializeWorkspace({ home: ws.home, boards: Object.fromEntries(Object.keys(boards).sort().map((id) => [id, boards[id]])) });
   };
+  /**
+   * The note of changes held back (opts.heldBase), noted on the device: written as saved by version 3,
+   * so a note left before a version bump still matches the same boards after the app updates.
+   */
+  const heldHash = (ws: Workspace) => contentHash(ownKey(ws).replace(/^\{"version":\d+,/, '{"version":3,'));
   /** Boards from the online copy, with the shared boards as they are here. */
   const withShared = (ws: Workspace): Workspace => {
     const here = store.workspace().boards;
@@ -395,7 +400,7 @@ export function startSync(
         if (timer) clearTimeout(timer);
         timer = null;
         const inIt = marker.deleting === 'started' && marker.data ? readWorkspace(marker.data)?.ws : null;
-        heldOn = inIt ? contentHash(ownKey(inIt)) : null;
+        heldOn = inIt ? heldHash(inIt) : null;
         held = true;
         const waitsHere = ready && madeHere && ownKey(store.workspace()) !== lastSynced;
         if (waitsHere) holdChange();
@@ -438,7 +443,7 @@ export function startSync(
       const ws = read(doc.data);
       if (!ws) return;
       const key = ownKey(ws);
-      const same = contentHash(key) === heldBase;
+      const same = heldHash(ws) === heldBase;
       if (!same) noteHeld(null);
       if (same || madeHere) {
         // This device's copy is newer: it goes as soon as it may.
@@ -483,7 +488,7 @@ export function startSync(
         return opts.onReady();
       }
       // Made on these very boards: this device's copy is newer, and goes online as soon as it may.
-      if (heldBase !== null && heldBase === contentHash(key)) {
+      if (heldBase !== null && heldBase === heldHash(ws)) {
         madeHere = true;
         if (held) holdChange();
         else schedule();

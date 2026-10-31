@@ -22,7 +22,7 @@ export const HOME_ID = 'home';
  * still open then refuses the boards instead of dropping what it doesn't know and saving that loss.
  * A test (persist-roundtrip) fails until it is raised. Every version from 3 up to it is read.
  */
-export const WORKSPACE_VERSION = 3;
+export const WORKSPACE_VERSION = 4;
 
 export function serializeWorkspace(ws: Workspace): string {
   return JSON.stringify({ version: WORKSPACE_VERSION, home: ws.home, boards: ws.boards });

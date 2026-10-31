@@ -5,8 +5,8 @@ import { createCard } from '../model/cards';
 import { BOARD_KEY, serializeBoard } from '../model/persist';
 import { journalRich, type Rich } from '../model/richText';
 import type { NoteCard } from '../model/types';
-import type { VersionMeta } from '../model/versions';
-import { readWorkspace, serializeWorkspace } from '../model/workspace';
+import { contentHash, type VersionMeta } from '../model/versions';
+import { readWorkspace, serializeWorkspace, WORKSPACE_VERSION } from '../model/workspace';
 import { createStore, type Store } from './store';
 import { claimDevice, OWNER_KEY, parkedKey } from './account';
 import { baseKey, ownBoardsGuard, sharesKey } from './sharing';
@@ -278,7 +278,7 @@ describe('syncing several boards (owner request)', () => {
     store.renameBoard('Second');
     vi.advanceTimersByTime(SYNC_DELAY);
     const sent = JSON.parse(fake.writes[fake.writes.length - 1].data);
-    expect(sent.version).toBe(3);
+    expect(sent.version).toBe(WORKSPACE_VERSION);
     expect(Object.keys(sent.boards).sort()).toEqual([home, id].sort());
     const writes = fake.writes.length;
     onSaveState.mockClear();
@@ -799,6 +799,16 @@ describe('changes held back while the account is being deleted elsewhere (181-A 
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(next.fake.writes).toHaveLength(1);
     expect(next.fake.writes[0].data).toContain('Typed while held');
+  });
+
+  it('a note left by the app before text sizes became numbers (saved version 3) still matches the same boards', () => {
+    const { first } = typedWhileHeld();
+    const ws = readWorkspace(boardJson('Mine'))!.ws;
+    const noted = contentHash(serializeWorkspace(ws).replace(`{"version":${WORKSPACE_VERSION},`, '{"version":3,'));
+    const next = page({ data: boardJson('Mine'), client: 'old-page' }, noted, first.store);
+    expect(next.store.getState().board.name).toBe('Typed while held');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    expect(next.fake.writes).toHaveLength(1);
   });
 
   it('if the boards online changed since (work done elsewhere later), they win as on any open, and the note is dropped', () => {

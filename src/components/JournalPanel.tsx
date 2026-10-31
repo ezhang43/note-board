@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { JOURNAL_NOTES, generalNote, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
-import { HIGHLIGHTS, journalRich, type Look, type Toggle } from '../model/richText';
+import { HIGHLIGHTS, journalRich, SIZE_STEPS, sizeMark, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
@@ -93,6 +93,8 @@ export function JournalPanel() {
   useEffect(() => () => savedTimers.current.forEach(clearTimeout), []);
   // The Aa menu (style, size, font, highlight).
   const [styleOpen, setStyleOpen] = useState(false);
+  // The size box's list (owner pick, 2026-10-30), open under the box.
+  const [sizesOpen, setSizesOpen] = useState(false);
   const tools = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -136,7 +138,10 @@ export function JournalPanel() {
   // Pressing a button must not take the cursor (or the highlighted words) away from the note.
   const keep = (e: React.SyntheticEvent) => e.preventDefault();
   /** Whether a menu's choice is the selection's (none is when the selection has more than one: Mixed). */
-  const is = (key: 'size' | 'font' | 'hl', value: string) => !look.mixed?.includes(key) && (look[key] ?? '') === value;
+  const is = (key: 'font' | 'hl', value: string) => !look.mixed?.includes(key) && (look[key] ?? '') === value;
+  // The size box: the selection's size in px, empty when it has more than one.
+  const mixedSize = !!look.mixed?.includes('size');
+  const px = sizePx(look.size);
   const markButton = (mark: Toggle, label: string, keys: string, glyph: string) => (
     <button type="button" className={`jt-${mark}`} aria-label={label} title={`${label} (${keys})`} aria-pressed={look[mark]} onClick={() => act((h) => h.toggle(mark))}>
       {glyph}
@@ -292,7 +297,10 @@ export function JournalPanel() {
             <path d="M3 11.5l5.6-5.6 2.5 2.5L5.5 14H3zM9.2 5.3L11 3.5l2 2-1.8 1.8M3 14h3" />
           </svg>
         </button>
-        <button type="button" className="jt-aa" aria-label="Text style" title="Style, size, font and highlight" aria-haspopup="true" aria-expanded={styleOpen} onClick={() => setStyleOpen((o) => !o)}>
+        <button type="button" className="jt-aa" aria-label="Text style" title="Style, size, font and highlight" aria-haspopup="true" aria-expanded={styleOpen} onClick={() => {
+            setSizesOpen(false); // the size list starts shut each time the menu opens
+            setStyleOpen((o) => !o);
+          }}>
           <span aria-hidden>
             <b>A</b>
             <small>a</small>
@@ -311,10 +319,26 @@ export function JournalPanel() {
             </div>
             <div className="jt-row">
               <span className="jt-label">Size</span>
-              <div className="jt-mini" role="group" aria-label="Text size">
-                {choice('Small', is('size', 'small'), () => act((h) => h.setMark('size', 'small')))}
-                {choice('Normal', is('size', ''), () => act((h) => h.setMark('size', undefined)))}
-                {choice('Large', is('size', 'large'), () => act((h) => h.setMark('size', 'large')))}
+              <div className="jt-size" role="group" aria-label="Text size">
+                <button type="button" aria-label="Smaller" title="Smaller" disabled={!mixedSize && px <= SIZE_STEPS[0]} onClick={() => act((h) => h.stepSize(-1))}>
+                  −
+                </button>
+                <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${Math.round(px)}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
+                  {mixedSize ? '' : Math.round(px)}
+                </button>
+                <button type="button" aria-label="Larger" title="Larger" disabled={!mixedSize && px >= SIZE_STEPS[SIZE_STEPS.length - 1]} onClick={() => act((h) => h.stepSize(1))}>
+                  +
+                </button>
+                {sizesOpen && (
+                  <div className="jt-sizes" role="group" aria-label="Sizes">
+                    {SIZE_STEPS.map((n) =>
+                      choice(String(n), !mixedSize && px === n, () => {
+                        act((h) => h.setMark('size', sizeMark(n)));
+                        setSizesOpen(false);
+                      }),
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="jt-row">

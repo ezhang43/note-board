@@ -13,7 +13,12 @@ import {
   plainOfSel,
   setBlockType,
   setMark,
+  SIZE_STEPS,
+  sizeMark,
+  sizePx,
   splitAt,
+  stepSize,
+  stepSizes,
   insertText,
   toggleList,
   toggleMark,
@@ -243,5 +248,93 @@ describe('formatting', () => {
   it('copying gives plain text', () => {
     const rich: Rich = [{ type: 'bullet', runs: [{ text: 'milk', b: true }] }, { type: 'bullet', runs: [{ text: 'eggs' }] }];
     expect(plainOfSel(rich, sel(0, 1, 1, 2))).toBe('ilk\neg');
+  });
+});
+
+// The size picker (owner pick, 2026-10-30): a number of px like Google Docs, 10 to 36, with − and +.
+describe('text size as a number', () => {
+  it('offers 10 to 36, with 16 as normal', () => {
+    expect(SIZE_STEPS).toEqual([10, 12, 14, 16, 18, 20, 24, 28, 32, 36]);
+    expect(sizePx(undefined)).toBe(16);
+    expect(sizePx(24)).toBe(24);
+  });
+
+  it('reads the old Small and Large as the sizes they always showed', () => {
+    expect(sizePx('small')).toBe(13.6);
+    expect(sizePx('large')).toBe(20.8);
+  });
+
+  it('16 is normal, so choosing it takes the size off', () => {
+    expect(sizeMark(16)).toBeUndefined();
+    expect(sizeMark(24)).toBe(24);
+  });
+
+  it('− and + step through the list and stop at 10 and 36', () => {
+    expect(stepSize(undefined, 1)).toBe(18);
+    expect(stepSize(undefined, -1)).toBe(14);
+    expect(stepSize(36, 1)).toBe(36);
+    expect(stepSize(10, -1)).toBe(10);
+    expect(stepSize('small', 1)).toBe(16);
+    expect(stepSize('small', -1)).toBe(12);
+    expect(stepSize('large', 1)).toBe(24);
+    expect(stepSize('large', -1)).toBe(20);
+  });
+
+  it('steps each part of a mixed selection on its own; 16 is left plain', () => {
+    const rich: Rich = [{ type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 20 }, { text: 'c', size: 'small' }] }];
+    expect(stepSizes(rich, sel(0, 0, 0, 3), 1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 18 }, { text: 'b', size: 24 }, { text: 'c' }] }]);
+    expect(stepSizes(rich, sel(0, 0, 0, 3), -1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 14 }, { text: 'b', size: 18 }, { text: 'c', size: 12 }] }]);
+    expect(stepSizes([{ type: 'p', runs: [{ text: 'a', size: 18 }] }], sel(0, 0, 0, 1), -1)).toEqual([p('a')]);
+  });
+
+  it('a number size is a mark like any other: shown, mixed, saved and checked', () => {
+    let rich: Rich = [p('abc')];
+    rich = setMark(rich, sel(0, 1, 0, 2), 'size', 28);
+    expect(rich).toEqual([{ type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 28 }, { text: 'c' }] }]);
+    expect(marksAt(rich, sel(0, 1, 0, 2)).size).toBe(28);
+    expect(marksAt(rich, sel(0, 0, 0, 2)).mixed).toEqual(['size']);
+    expect(hasFormatting(rich)).toBe(true);
+    expect(parseRich(rich)).toEqual(rich);
+  });
+
+  // Owner request, 2026-10-30: "the nextline should continue to keep the previous size".
+  it('Enter keeps the size for what is typed on the new line, in a paragraph and in a list', () => {
+    for (const type of ['p', 'bullet'] as const) {
+      const r = splitAt([{ type, runs: [{ text: 'big', size: 24 }] }], sel(0, 3));
+      expect(r.look).toEqual({ size: 24 });
+      const typed = insertText(r.rich, sel(1, 0), 'more', r.look);
+      expect(typed.rich[1]).toEqual({ type, runs: [{ text: 'more', size: 24 }] });
+    }
+  });
+
+  it('only the size goes on: bold, fonts and highlights stay as they were (they don’t carry)', () => {
+    expect(splitAt([{ type: 'p', runs: [{ text: 'x', b: true, font: 'mono', hl: 'yellow', size: 20 }] }], sel(0, 1)).look).toEqual({ size: 20 });
+    expect(splitAt([{ type: 'p', runs: [{ text: 'x', b: true }] }], sel(0, 1)).look).toBeUndefined();
+  });
+
+  it('a size chosen on an empty line, or kept from the line above, goes on again; also when Enter ends a list', () => {
+    expect(splitAt([p('')], sel(0, 0), { size: 24 }).look).toEqual({ size: 24 });
+    const left = splitAt([{ type: 'bullet', runs: [] }], sel(0, 0), { size: 24 });
+    expect(left.rich).toEqual([{ type: 'p', runs: [] }]);
+    expect(left.look).toEqual({ size: 24 });
+    expect(splitAt([{ type: 'p', runs: [{ text: 'a', size: 12 }] }], sel(0, 1), { size: 28 }).look).toEqual({ size: 28 });
+    expect(splitAt([{ type: 'p', runs: [{ text: 'a', size: 12 }] }], sel(0, 1), {}).look).toBeUndefined();
+  });
+
+  it('after a heading the new line is normal, unless the heading’s words were given a size', () => {
+    expect(splitAt([{ type: 'h1', runs: [{ text: 'Plans' }] }], sel(0, 5)).look).toBeUndefined();
+    expect(splitAt([{ type: 'h2', runs: [{ text: 'Plans', size: 28 }] }], sel(0, 5)).look).toEqual({ size: 28 });
+  });
+
+  it('Enter inside a line needs nothing extra: the words moved down keep their own size', () => {
+    const r = splitAt([{ type: 'p', runs: [{ text: 'ab', size: 24 }] }], sel(0, 1));
+    expect(r.rich[1]).toEqual({ type: 'p', runs: [{ text: 'b', size: 24 }] });
+    expect(r.look).toBeUndefined();
+  });
+
+  it('loading keeps sizes from 10 to 36 and the old Small and Large, and drops anything else (16 is normal: no size)', () => {
+    const sizes = [10, 13.6, 36, 16, 'small', 'large', 9, 37, -16, Number.NaN, Infinity, '20', '16px', null, true, 'huge'];
+    const got = sizes.map((size) => parseRich([{ type: 'p', runs: [{ text: 'a', size }] }])![0].runs[0].size);
+    expect(got).toEqual([10, 13.6, 36, undefined, 'small', 'large', ...Array(10).fill(undefined)]);
   });
 });

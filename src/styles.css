@@ -2696,6 +2696,22 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .jt-mini button { height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .jt-mini button[aria-pressed='true'] { background: var(--card-bg); color: var(--ink); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12); }
 :root[data-theme='dark'] .jt-mini button[aria-pressed='true'] { background: #3b3832; }
+/* The size box (owner pick, 2026-10-30): − [16] +, like Google Docs; the number opens the list of sizes under it. */
+.jt-size { position: relative; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); justify-self: start; }
+.jt-size > button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 15px; cursor: pointer; }
+.jt-size > button:disabled { opacity: 0.35; cursor: default; }
+.jt-size > .jt-size-box { width: 44px; background: var(--card-bg); color: var(--ink); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12); }
+:root[data-theme='dark'] .jt-size > .jt-size-box { background: #3b3832; }
+@media (hover: hover) {
+  .jt-size > button:not(:disabled):hover { color: var(--ink); }
+}
+.jt-sizes { position: absolute; top: calc(100% + 4px); left: 30px; z-index: 1; display: flex; flex-direction: column; width: 56px; max-height: 240px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--surface); box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .jt-sizes { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.jt-sizes button { flex: none; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.jt-sizes button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+@media (hover: hover) {
+  .jt-sizes button:hover { background: var(--hover); }
+}
 .jt-fonts, .jt-hls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .jt-fonts button, .jt-hls button:not(.jt-dot) { height: 28px; padding: 0 9px; border: 0; border-radius: 7px; background: var(--hover); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
 .jt-fonts button[aria-pressed='true'], .jt-hls button[aria-pressed='true']:not(.jt-dot) { background: var(--accent-soft); color: var(--accent-ink); }
@@ -2710,6 +2726,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .app.phone .journal-tools > button { min-width: 44px; height: 44px; font-size: 16px; }
 .app.phone .journal-tools .jt-aa { min-width: 52px; }
 .app.phone .jt-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.app.phone .jt-size > button, .app.phone .jt-sizes button { min-width: 44px; height: 44px; }
+.app.phone .jt-sizes { width: 64px; max-height: 50vh; left: 48px; }
 .app.phone .jt-mini button, .app.phone .jt-fonts button, .app.phone .jt-hls button:not(.jt-dot) { min-height: 44px; }
 .app.phone .jt-dot { width: 36px; height: 36px; }
 

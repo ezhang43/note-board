@@ -3,7 +3,7 @@ import * as B from './board';
 import { createBoardCard } from './cards';
 import { boardRights, boardsToShare, clashingBoards, groupBoardIds, joinLink, keptNotice, parseJoin, readShare, restorable, savedByNewer, serializeShare } from './sharing';
 import type { Board } from './types';
-import type { Workspace } from './workspace';
+import { WORKSPACE_VERSION, type Workspace } from './workspace';
 
 const opening = (b: Board, to: string, id = `card-${to}`) => B.addCard(b, createBoardCard(to, id), { type: 'loose', x: 0, y: 0 });
 
@@ -106,7 +106,7 @@ describe('the shared boards as saved online', () => {
   });
 
   it('only a version number above this app’s counts as saved by a newer app (job 98)', () => {
-    expect(savedByNewer(JSON.stringify({ version: 4, home: 'x', boards: {} }))).toBe(true);
+    expect(savedByNewer(JSON.stringify({ version: WORKSPACE_VERSION + 1, home: 'x', boards: {} }))).toBe(true);
     expect(savedByNewer(JSON.stringify({ version: 99 }))).toBe(true);
     expect(savedByNewer(serializeShare('trip', { trip: sample().boards.trip }))).toBe(false);
     expect(savedByNewer(JSON.stringify({ version: 2, home: 'x', boards: {} }))).toBe(false);

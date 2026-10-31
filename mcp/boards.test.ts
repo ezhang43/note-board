@@ -158,6 +158,11 @@ describe('safe to edit (round trip)', () => {
     data.boards.home.arrows = [{ id: 'r1', from: 'noteIdea', to: 'colIdeas' }];
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
+  it('yes for boards an older app saved (version 3): the edit saves them as this version', () => {
+    const data = JSON.parse(ownRaw());
+    data.version = 3;
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
   it('key order alone doesn’t matter', () => {
     const data = JSON.parse(ownRaw());
     const reordered = { boards: data.boards, home: data.home, version: data.version };

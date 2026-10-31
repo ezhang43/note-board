@@ -18,6 +18,9 @@ async function pick(page: Page, group: string, name: string) {
   if (!(await styleMenu(page).isVisible())) await tool(page, 'Text style').click();
   await choice(page, group, name).click();
 }
+const sizeList = (page: Page) => styleMenu(page).getByRole('group', { name: 'Sizes' });
+// Named for the size it shows ("Size 16", "Size: mixed"), so a screen reader hears it too.
+const sizeBox = (page: Page) => styleMenu(page).getByRole('group', { name: 'Text size' }).getByRole('button', { name: /^Size/ });
 const blocks = (page: Page) => editor(page).locator(':scope > div');
 const openJournal = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true }).click();
 /** The saved Journal note, straight from the browser's storage. */
@@ -112,15 +115,17 @@ test('headings, text size, font and highlight from the toolbar', async ({ page }
   await page.keyboard.type('a quiet day');
   await expect(blocks(page).nth(1)).toHaveAttribute('data-type', 'p');
   await selectLetters(page, 2, 7);
-  await pick(page, 'Text size', 'Large');
+  if (!(await styleMenu(page).isVisible())) await tool(page, 'Text style').click();
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '20', exact: true }).click();
   await pick(page, 'Font', 'Typewriter');
   await pick(page, 'Highlight', 'Yellow');
-  const quiet = editor(page).locator('[data-size="large"][data-font="mono"][data-hl="yellow"]');
+  const quiet = editor(page).locator('[data-size="20"][data-font="mono"][data-hl="yellow"]');
   await expect(quiet).toHaveText('quiet');
   await expect(quiet).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(choice(page, 'Highlight', 'Yellow')).toHaveAttribute('aria-pressed', 'true');
   await expect(choice(page, 'Font', 'Typewriter')).toHaveAttribute('aria-pressed', 'true');
-  await expect(choice(page, 'Text size', 'Large')).toHaveAttribute('aria-pressed', 'true');
+  await expect(sizeBox(page)).toHaveText('20');
   // None takes the highlight off again.
   await pick(page, 'Highlight', 'None');
   await expect(editor(page).locator('[data-hl]')).toHaveCount(0);
@@ -309,7 +314,7 @@ test('the Aa menu holds Style, Size, Font and Highlight, shows the selection’s
   await expect(tool(page, 'Text style')).toHaveAttribute('aria-expanded', 'true');
   for (const group of ['Style', 'Text size', 'Font', 'Highlight']) await expect(styleMenu(page).getByRole('group', { name: group })).toBeVisible();
   await expect(choice(page, 'Style', 'Normal')).toHaveAttribute('aria-pressed', 'true');
-  await expect(choice(page, 'Text size', 'Normal')).toHaveAttribute('aria-pressed', 'true');
+  await expect(sizeBox(page)).toHaveText('16');
   await expect(choice(page, 'Font', 'Plex Sans')).toHaveAttribute('aria-pressed', 'true');
   await expect(styleMenu(page).getByRole('group', { name: 'Font' }).getByRole('button')).toHaveText(['Plex Sans', 'Serif', 'Rounded', 'Handwritten', 'Typewriter']);
   await expect(styleMenu(page).getByRole('group', { name: 'Highlight' }).getByRole('button')).toHaveCount(5); // four colors and None
@@ -346,4 +351,122 @@ test('an empty note for today shows the placeholder, which goes as soon as anyth
   await page.keyboard.type('x');
   await expect(editor(page)).not.toHaveAttribute('data-placeholder', /./);
   expect(await shown()).toBe('none');
+});
+
+// The size picker (owner request, 2026-10-30, "Number box, like Google Docs"): the size in px, − and + beside it, a list under it.
+test('the size box shows the selection’s size; − and + step it, the list picks one, and the words stay selected', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('a quiet day');
+  await selectLetters(page, 2, 7);
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('16');
+  await expect(sizeBox(page)).toHaveAccessibleName('Size 16');
+  await choice(page, 'Text size', 'Larger').click();
+  const quiet = editor(page).locator('[data-size]');
+  await expect(quiet).toHaveText('quiet');
+  await expect(quiet).toHaveAttribute('data-size', '18');
+  await expect(quiet).toHaveCSS('font-size', '18px');
+  await expect(sizeBox(page)).toHaveText('18');
+  await expect(editor(page)).toBeFocused();
+  expect(await page.evaluate(() => document.getSelection()?.toString())).toBe('quiet');
+  // The list: 10 to 36; picking one closes it.
+  await sizeBox(page).click();
+  await expect(sizeBox(page)).toHaveAttribute('aria-expanded', 'true');
+  await expect(sizeList(page).getByRole('button')).toHaveText(['10', '12', '14', '16', '18', '20', '24', '28', '32', '36']);
+  await expect(sizeList(page).getByRole('button', { name: '18', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await sizeList(page).getByRole('button', { name: '28', exact: true }).click();
+  await expect(sizeList(page)).toHaveCount(0);
+  await expect(quiet).toHaveCSS('font-size', '28px');
+  await expect(sizeBox(page)).toHaveText('28');
+  await expect(editor(page)).toBeFocused();
+  expect(await page.evaluate(() => document.getSelection()?.toString())).toBe('quiet');
+  await choice(page, 'Text size', 'Smaller').click();
+  await expect(quiet).toHaveAttribute('data-size', '24');
+  // Stops at 36 and at 10.
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '36', exact: true }).click();
+  await expect(choice(page, 'Text size', 'Larger')).toBeDisabled();
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '10', exact: true }).click();
+  await expect(choice(page, 'Text size', 'Smaller')).toBeDisabled();
+  await expect(quiet).toHaveCSS('font-size', '10px');
+  // 16 is normal: the size comes off.
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '16', exact: true }).click();
+  await expect(editor(page).locator('[data-size]')).toHaveCount(0);
+  // A selection of more than one size shows an empty box; + steps each part.
+  await choice(page, 'Text size', 'Larger').click();
+  await page.keyboard.press('Control+a');
+  await expect(sizeBox(page)).toHaveText('');
+  await expect(sizeBox(page)).toHaveAccessibleName('Size: mixed');
+  await choice(page, 'Text size', 'Larger').click();
+  await expect(editor(page).locator('[data-size="20"]')).toHaveText('quiet');
+  await expect(editor(page).locator('[data-size="18"]')).toHaveText(['a ', ' day']);
+});
+
+test('a size before typing applies to what is typed next, and sizes are saved as numbers and kept after a reload', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('plain ');
+  await tool(page, 'Text style').click();
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '24', exact: true }).click();
+  await page.keyboard.type('big');
+  await expect(editor(page).locator('[data-size="24"]')).toHaveText('big');
+  await page.waitForTimeout(400);
+  expect((await savedNote(page)).rich).toEqual([{ type: 'p', runs: [{ text: 'plain ' }, { text: 'big', size: 24 }] }]);
+  await page.reload();
+  await openJournal(page);
+  await expect(editor(page).locator('[data-size="24"]')).toHaveCSS('font-size', '24px');
+});
+
+// Owner request, 2026-10-30: "the nextline should continue to keep the previous size".
+test('after Enter the new line keeps the size: in a paragraph, in a list, on an empty line and leaving the list', async ({ page }) => {
+  await openJournal(page);
+  await tool(page, 'Text style').click();
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '24', exact: true }).click();
+  await page.keyboard.type('one');
+  await page.keyboard.press('Enter');
+  await expect(async () => {
+    if (!(await styleMenu(page).isVisible())) await tool(page, 'Text style').click();
+    await expect(sizeBox(page)).toHaveText('24', { timeout: 200 });
+  }).toPass();
+  await page.keyboard.type('two');
+  await expect(blocks(page).nth(1).locator('[data-size="24"]')).toHaveText('two');
+  // In a bulleted list: the next item keeps it, an empty item too, and so does the line after the list.
+  await tool(page, 'Bulleted list').click();
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('three');
+  await expect(blocks(page).nth(2)).toHaveAttribute('data-type', 'bullet');
+  await expect(blocks(page).nth(2).locator('[data-size="24"]')).toHaveText('three');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('four');
+  await expect(blocks(page).nth(3)).toHaveAttribute('data-type', 'p');
+  await expect(blocks(page).nth(3).locator('[data-size="24"]')).toHaveText('four');
+  await expect(editor(page).locator('[data-size="24"]').last()).toHaveCSS('font-size', '24px');
+});
+
+test('words made Small or Large before the size box keep their look, and show as 14 and 21', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('tiny huge');
+  await page.waitForTimeout(400);
+  // A board saved by the app before the size box (Small and Large were words).
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const board = Object.values(raw.boards).find((b) => (b as { name: string }).name === 'Journal') as { cards: Record<string, { rich?: unknown }> };
+    const note = Object.values(board.cards)[0];
+    note.rich = [{ type: 'p', runs: [{ text: 'tiny', size: 'small' }, { text: ' ' }, { text: 'huge', size: 'large' }] }];
+    raw.version = 3;
+    localStorage.setItem('note-board:v1', JSON.stringify(raw));
+  });
+  await page.reload();
+  await openJournal(page);
+  await expect(editor(page).locator('[data-size="small"]')).toHaveCSS('font-size', '13.6px');
+  await expect(editor(page).locator('[data-size="large"]')).toHaveCSS('font-size', '20.8px');
+  await editor(page).locator('[data-size="large"]').dblclick();
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('21');
+  await choice(page, 'Text size', 'Larger').click();
+  await expect(editor(page).locator('[data-size="24"]')).toHaveText('huge');
 });

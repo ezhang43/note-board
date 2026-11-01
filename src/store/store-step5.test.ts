@@ -159,3 +159,39 @@ describe('pasting copied items while typing in another list (owner request 2026-
     expect(s.pasteItemsInto(otherId, other().items[0].id)).toBe(false);
   });
 });
+
+describe('pasting Journal lines into an item of a checklist (owner request 2026-11-01)', () => {
+  const bullet = (text: string, indent = 0, marks: object = {}) => ({ type: 'bullet', ...(indent ? { indent } : {}), runs: [{ text, ...marks }] });
+
+  it('pastes the lines as separate items, sub-items by indent level and the looks a checklist has, after the item, in one undo step', () => {
+    const { s, cardId, list, first } = setup();
+    const json = JSON.stringify([bullet('milk', 0, { b: true }), bullet('oat', 1), bullet('eggs'), { type: 'hr', runs: [{ text: '---' }] }, { type: 'p', runs: [{ text: 'plain' }] }]);
+    expect(s.pasteJournalInto(cardId, first, json)).toBe(true);
+    const items = list().items;
+    expect(items.map((i) => i.text)).toEqual(['one', 'milk', 'eggs', 'plain', 'two', 'three']);
+    expect(items[1].style).toEqual({ bold: true });
+    expect(items[1].children.map((c) => c.text)).toEqual(['oat']);
+    expect(s.getState().ui.itemSel?.ids).toHaveLength(4);
+    s.undo();
+    expect(list().items.map((i) => i.text)).toEqual(['one', 'two', 'three']);
+  });
+
+  it('puts the lines in place of the blank item the cursor is in', () => {
+    const { s, cardId, list, third } = setup();
+    s.setItemText(cardId, third, '');
+    expect(s.pasteJournalInto(cardId, third, JSON.stringify([bullet('x')]))).toBe(true);
+    expect(list().items.map((i) => i.text)).toEqual(['one', 'two', 'x']);
+  });
+
+  it('does nothing for bad data or only dividers, so the browser pastes the plain text', () => {
+    const { s, cardId, list, first } = setup();
+    for (const bad of ['', 'nope', '{}', '[]', JSON.stringify([{ type: 'hr', runs: [] }])]) expect(s.pasteJournalInto(cardId, first, bad)).toBe(false);
+    expect(list().items.map((i) => i.text)).toEqual(['one', 'two', 'three']);
+  });
+
+  it('does nothing for an item or a list that is gone', () => {
+    const { s, cardId } = setup();
+    expect(s.pasteJournalInto(cardId, 'nope', JSON.stringify([bullet('x')]))).toBe(false);
+    expect(s.pasteJournalInto('nope', 'nope', JSON.stringify([bullet('x')]))).toBe(false);
+  });
+});

@@ -25,16 +25,21 @@ export function deviceStorage(): Storage | null {
   }
 }
 
-/** Put on the clipboard with copied checklist items: a paste into an item makes them items only while it is still there, so a newer copy elsewhere wins. */
+/**
+ * Put on the clipboard with copied checklist items: a paste into an item makes them items only while it is still there, so a newer copy elsewhere wins.
+ * Its value is the items as JSON (see journalPaste), so a Journal note can paste them too, also from another tab.
+ */
 export const ITEMS_MARKER = 'application/x-note-board-items';
+/** Put on the clipboard with lines copied from a Journal note; its value is the lines with their looks as JSON (see journalPaste). */
+export const JOURNAL_MARKER = 'application/x-note-board-journal';
 
 /**
  * Puts text on the computer's clipboard, so it can be pasted into other apps (does nothing without one).
  * With a `marker`, the text goes out through the browser's own copy so the marker type rides along with it
- * (as for copied blocks); where that is refused it is only text. Says whether it got there.
+ * (as for copied blocks), holding `markerValue`; where that is refused it is only text. Says whether it got there.
  */
-export async function copyText(text: string, marker?: string): Promise<boolean> {
-  if (marker && copyMarked(text, marker)) return true;
+export async function copyText(text: string, marker?: string, markerValue = '1'): Promise<boolean> {
+  if (marker && copyMarked(text, marker, markerValue)) return true;
   try {
     await globalThis.navigator.clipboard.writeText(text);
     return true;
@@ -45,12 +50,12 @@ export async function copyText(text: string, marker?: string): Promise<boolean> 
 }
 
 /** Writes `text` and `marker` together during a copy event (it replaces whatever was copied before). Must run inside the key press. */
-function copyMarked(text: string, marker: string): boolean {
+function copyMarked(text: string, marker: string, markerValue: string): boolean {
   let written = false;
   const put = (e: ClipboardEvent) => {
     if (!e.clipboardData) return;
     e.clipboardData.setData('text/plain', text);
-    e.clipboardData.setData(marker, '1');
+    e.clipboardData.setData(marker, markerValue);
     e.preventDefault();
     written = true;
   };

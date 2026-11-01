@@ -73,7 +73,7 @@ export const NORMAL_SIZE = 16;
 const OLD_SIZES: Record<string, number> = { small: 13.6, large: 20.8 };
 const RUN_FONTS: RunFont[] = ['serif', 'rounded', 'hand', 'mono'];
 export const HIGHLIGHTS: Highlight[] = ['yellow', 'green', 'blue', 'pink'];
-const MAX_INDENT = 4;
+export const MAX_INDENT = 4;
 const MAX_BLOCKS = 20000;
 const MAX_RUNS = 2000;
 const MARK_KEYS = ['b', 'i', 'u', 's', 'size', 'font', 'hl'] as const;
@@ -213,6 +213,28 @@ export function plainOfSel(rich: Rich, sel: Sel): string {
   return lines.join('\n');
 }
 
+/**
+ * The lines of a selection with their looks, for copy and cut (rich paste, owner request 2026-11-01). The
+ * first line keeps its kind and indent only when the selection starts at its start (words from the middle
+ * of a list item are plain words), and one line of words inside a line is plain unless it is selected whole.
+ */
+export function sliceSel(rich: Rich, sel: Sel): Rich {
+  const { start, end } = edges(rich, sel);
+  const out: Rich = [];
+  for (let b = start.b; b <= end.b && b < rich.length; b++) {
+    const blk = rich[b];
+    if (isHr(blk)) {
+      out.push(block('hr', 0, []));
+      continue;
+    }
+    const from = b === start.b ? start.o : 0;
+    const to = b === end.b ? end.o : Infinity;
+    const keepsKind = b !== start.b || (from === 0 && (start.b !== end.b || to >= len(blk)));
+    out.push(keepsKind ? block(blk.type, blk.indent, slice(blk.runs, from, to)) : block('p', 0, slice(blk.runs, from, to)));
+  }
+  return out;
+}
+
 // ---- checking saved or imported formatting (it is untrusted) ----
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[]): T | undefined => (allowed.includes(v as T) ? (v as T) : undefined);
@@ -326,6 +348,56 @@ export function insertText(rich: Rich, sel: Sel, text: string, marks?: Marks): E
   );
   const lastLen = (lines.length === 1 ? o : 0) + lines[lines.length - 1].length;
   return { rich: [...cleared.rich.slice(0, b), ...made, ...cleared.rich.slice(b + 1)], at: { b: b + lines.length - 1, o: lastLen } };
+}
+
+/**
+ * Pastes lines copied from a Journal note (or turned from copied checklist items) over the selection, keeping
+ * their kinds, indents and looks (owner request 2026-11-01). One line of words goes inside the line at the caret
+ * (onto an empty plain line it also brings its kind). Several lines: the first joins the words before the caret
+ * (or, with nothing before it, brings its own kind), the last joins the words after it, and the lines between come
+ * whole. Dividers stay dividers, and the caret never ends on one. The caret goes to the end of the pasted words.
+ */
+export function insertRich(rich: Rich, sel: Sel, pasted: Rich): Edit {
+  const deleted = deleteSel(rich, sel);
+  const cleared = offDivider(deleted.rich, offHr(deleted.rich, deleted.at));
+  const { b, o } = cleared.at;
+  const blk = cleared.rich[b];
+  const before = slice(blk.runs, 0, o);
+  const after = slice(blk.runs, o);
+  const rest = (made: Block[], at: Pos): Edit => ({ rich: [...cleared.rich.slice(0, b), ...made, ...cleared.rich.slice(b + 1)], at });
+  if (!pasted.length) return cleared;
+  const [first, ...others] = pasted;
+  // Words of one line, inside the line at the caret.
+  if (!others.length && !isHr(first)) {
+    const bare = blk.type === 'p' && len(blk) === 0;
+    const at = { b, o: o + len(first) };
+    return rest([bare ? block(first.type, first.indent, first.runs) : withRuns(blk, [...before, ...first.runs, ...after])], at);
+  }
+  const made: Block[] = [];
+  // The first line: joined to the words before the caret, or its own when it is a divider or the caret is at a line's start.
+  if (isHr(first)) {
+    if (before.length) made.push(withRuns(blk, before));
+    made.push(block('hr', 0, []));
+  } else {
+    made.push(!before.length && first.type !== 'p' ? block(first.type, first.indent, first.runs) : withRuns(blk, [...before, ...first.runs]));
+  }
+  // The lines between come whole; the last joins the words after the caret.
+  const last = others[others.length - 1];
+  if (!last) return finishAfterDivider(cleared.rich, b, made, blk, after);
+  for (const m of others.slice(0, -1)) made.push(isHr(m) ? block('hr', 0, []) : block(m.type, m.indent, m.runs));
+  if (isHr(last)) {
+    made.push(block('hr', 0, []));
+    made.push(after.length ? withRuns(blk, after) : block('p', 0, []));
+    return rest(made, { b: b + made.length - 1, o: 0 });
+  }
+  made.push(block(last.type, last.indent, [...last.runs, ...after]));
+  return rest(made, { b: b + made.length - 1, o: len(last) });
+}
+
+/** A paste that is only a divider: it, then the words after the caret (or an empty line) for the caret. */
+function finishAfterDivider(rich: Rich, b: number, made: Block[], blk: Block, after: Run[]): Edit {
+  const lines = [...made, after.length ? withRuns(blk, after) : block('p', 0, [])];
+  return { rich: [...rich.slice(0, b), ...lines, ...rich.slice(b + 1)], at: { b: b + lines.length - 1, o: 0 } };
 }
 
 /**

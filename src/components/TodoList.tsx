@@ -5,7 +5,7 @@ import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, t
 import { canMoveItem, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
-import { ITEMS_MARKER } from '../store/env';
+import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
@@ -165,7 +165,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           // clipboard, so text copied later or elsewhere pastes as text, as the browser does; so does Ctrl+Shift+V (plain text).
           const plain = plainPaste.current;
           plainPaste.current = false;
-          if (!plain && e.clipboardData.types.includes(ITEMS_MARKER) && appStore.pasteItemsInto(cardId, item.id)) {
+          // Lines copied from a Journal note (the same, with its marker) go in as items too: the marker holds them as JSON, so this works from another tab.
+          const types = e.clipboardData.types;
+          const done = !plain && (types.includes(ITEMS_MARKER) ? appStore.pasteItemsInto(cardId, item.id) : types.includes(JOURNAL_MARKER) && appStore.pasteJournalInto(cardId, item.id, e.clipboardData.getData(JOURNAL_MARKER)));
+          if (done) {
             e.preventDefault();
             e.currentTarget.blur(); // the pasted items are highlighted, as after pasting with items selected
           }

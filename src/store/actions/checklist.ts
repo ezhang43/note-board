@@ -8,6 +8,7 @@ import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
 import { copyText, ITEMS_MARKER, typingAt } from '../env';
+import { decodeRich, encodeItems, richToItems } from '../../model/journalPaste';
 import type { ItemDrag, ItemHint } from '../types';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
@@ -103,13 +104,13 @@ export function checklistActions(ctx: StoreContext) {
     if (!sel || card?.kind !== 'todo') return false;
     itemClipboard = C.copyItems(card.items, sel.ids);
     if (!itemClipboard.length) return false;
-    copyText(C.selectionAsText(card.items, sel.ids), ITEMS_MARKER);
+    copyText(C.selectionAsText(card.items, sel.ids), ITEMS_MARKER, encodeItems(itemClipboard));
     return true;
   }
 
-  /** Pastes fresh copies of the copied items into a list (`put` decides where) and selects them: one undo step. */
-  function pasteAndSelect(cardId: string, put: (items: TodoItem[], fresh: TodoItem[]) => TodoItem[]): boolean {
-    const fresh = C.freshCopies(itemClipboard!);
+  /** Pastes fresh copies of `source` (the copied items) into a list (`put` decides where) and selects them: one undo step. */
+  function pasteAndSelect(cardId: string, source: TodoItem[], put: (items: TodoItem[], fresh: TodoItem[]) => TodoItem[]): boolean {
+    const fresh = C.freshCopies(source);
     commit((b) => C.editItems(b, cardId, (items) => put(items, fresh)), {
       ui: { itemSel: { cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
     });
@@ -330,7 +331,7 @@ export function checklistActions(ctx: StoreContext) {
       const card = sel && ctx.state.board.cards[sel.cardId];
       if (!sel || sel.lists || card?.kind !== 'todo' || !itemClipboard?.length) return false;
       const order = C.flatIds(card.items).filter((id) => sel.ids.includes(id));
-      return pasteAndSelect(sel.cardId, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
+      return pasteAndSelect(sel.cardId, itemClipboard, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
     },
 
     /**
@@ -342,7 +343,22 @@ export function checklistActions(ctx: StoreContext) {
     pasteItemsInto(cardId: string, itemId: string): boolean {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo' || !itemClipboard?.length || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
-      return pasteAndSelect(cardId, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
+      return pasteAndSelect(cardId, itemClipboard, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
+    },
+
+    /**
+     * Ctrl+V while typing in item `itemId` when the clipboard holds lines copied from a Journal note (its marker,
+     * with the lines as JSON in `json`): they are pasted as items right after that item (in place of it when it is
+     * blank), sub-items by indent level and keeping the looks a checklist has, and selected: one undo step.
+     * Returns false for anything unreadable or with no words in it, so the browser pastes the plain text.
+     */
+    pasteJournalInto(cardId: string, itemId: string, json: string): boolean {
+      const card = ctx.state.board.cards[cardId];
+      if (card?.kind !== 'todo' || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      const rich = decodeRich(json);
+      const items = rich && richToItems(rich);
+      if (!items?.length) return false;
+      return pasteAndSelect(cardId, items, (list, fresh) => C.pasteItemsInto(list, itemId, fresh));
     },
 
     // ---------- dragging checklist items ----------

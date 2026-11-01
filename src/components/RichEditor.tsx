@@ -1,7 +1,9 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react';
+import { decodeItems, decodeRich, encodeRich, itemsToRich } from '../model/journalPaste';
 import { deepEqual } from '../model/merge';
 import * as R from '../model/richText';
 import type { Block, BlockType, Look, Marks, Pos, Rich, Run, Sel, Toggle } from '../model/richText';
+import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 
 // The Journal's rich text box (owner request, 2026-10-19). A contentEditable whose content is drawn
 // from the typed format in model/richText with createElement and textContent only: nothing typed,
@@ -219,6 +221,8 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
   /** A look chosen with nothing selected, for the next letters typed at `pending.at`. */
   const pending = useRef<{ marks: Marks; at: Pos } | null>(null);
   const composing = useRef(false);
+  /** The last key pressed was Ctrl+Shift+V (paste as plain text). */
+  const plainPaste = useRef(false);
   const props = useRef({ onChange, onLook, onEscape });
   props.current = { onChange, onLook, onEscape };
 
@@ -415,6 +419,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
   }, []);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    plainPaste.current = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v';
     if (e.key === 'Escape') return onEscape();
     let sel = readSel(e.currentTarget);
     if (!sel) return;
@@ -445,11 +450,25 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
   };
 
   const onPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    // Only the plain text of anything pasted comes in.
+    // Lines copied in the app (a Journal note, or checklist items) come in with their looks, only while our marker is
+    // still on the clipboard; anything else, and Ctrl+Shift+V, comes in as the plain text alone, never markup.
     e.preventDefault();
     const sel = readSel(e.currentTarget);
-    const text = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
-    if (!sel || !text) return;
+    if (!sel) return;
+    const plain = plainPaste.current;
+    plainPaste.current = false;
+    const dt = e.clipboardData;
+    const lines = plain ? undefined : linesFrom(dt);
+    if (lines) {
+      const edit = R.insertRich(cur.current, sel, lines);
+      if (R.withinLimits(edit.rich)) {
+        pending.current = null;
+        apply(edit.rich, at(edit.at), false); // its own undo step, like a formatting change
+        return;
+      } // too big to keep its looks (the saved limits): the plain words go in below
+    }
+    const text = dt.getData('text/plain').replace(/\r\n?/g, '\n');
+    if (!text) return;
     const edit = R.insertText(cur.current, sel, text);
     pending.current = null;
     apply(edit.rich, at(edit.at), true);
@@ -460,6 +479,8 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
     if (!sel || collapsed(sel)) return;
     e.preventDefault();
     e.clipboardData.setData('text/plain', R.plainOfSel(cur.current, sel));
+    // The lines with their looks ride along under our own type (other apps never see it), so a paste in the Journal keeps them.
+    e.clipboardData.setData(JOURNAL_MARKER, encodeRich(R.sliceSel(cur.current, sel)));
     if (cut) {
       const edit = R.deleteSel(cur.current, sel);
       apply(edit.rich, at(edit.at), true);
@@ -478,6 +499,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       data-placeholder={placeholder}
       spellCheck
       onKeyDown={onKeyDown}
+      onKeyUp={() => (plainPaste.current = false)} // a Ctrl+Shift+V that pasted nothing must not turn the next paste plain
       onPaste={onPaste}
       onCopy={(e) => copy(e, false)}
       onCut={(e) => copy(e, true)}
@@ -487,6 +509,14 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       onBlur={(e) => onBlur?.(e.currentTarget)}
     />
   );
+}
+
+/** The lines to paste from what is on the clipboard: Journal lines, or copied checklist items as a bulleted list; undefined for anything else or anything unreadable. */
+function linesFrom(dt: DataTransfer): Rich | undefined {
+  if (dt.types.includes(JOURNAL_MARKER)) return decodeRich(dt.getData(JOURNAL_MARKER));
+  if (!dt.types.includes(ITEMS_MARKER)) return undefined;
+  const items = decodeItems(dt.getData(ITEMS_MARKER));
+  return items && itemsToRich(items);
 }
 
 function lookOfMarks(m: Marks): Partial<Look> {

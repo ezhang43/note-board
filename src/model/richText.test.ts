@@ -21,7 +21,9 @@ import {
   stepSize,
   stepSizes,
   insertDivider,
+  insertRich,
   insertText,
+  sliceSel,
   toggleList,
   toggleMark,
   withinLimits,
@@ -469,5 +471,81 @@ describe('divider', () => {
     // on it: the cursor goes to a new empty line below it (check of #226).
     expect(insertDivider([hr, p('ab')], sel(0, 0))).toEqual({ rich: [hr, p(''), p('ab')], at: at(1, 0) });
     expect(insertDivider([hr], sel(0, 3))).toEqual({ rich: [hr, p('')], at: at(1, 0) });
+  });
+});
+
+describe('sliceSel and insertRich (rich paste in the Journal, owner request 2026-11-01)', () => {
+  const l = (type: Rich[number]['type'], text: string, indent?: number, marks: object = {}): Rich[number] => ({ type, ...(indent ? { indent } : {}), runs: type === 'hr' ? [{ text: '---' }] : text ? [{ text, ...marks }] : [] });
+  const texts = (r: Rich) => r.map((b) => `${b.type}${b.indent ?? ''}:${b.runs.map((x) => x.text).join('')}`);
+
+  describe('sliceSel (what a copy carries)', () => {
+    const rich: Rich = [l('h1', 'Title'), l('bullet', 'milk', 0, { b: true }), l('bullet', 'oat', 1, { size: 24 }), l('hr', ''), l('p', 'end')];
+    it('keeps the types, indents and looks of every line it reaches', () => {
+      expect(texts(sliceSel(rich, sel(0, 0, 4, 3)))).toEqual(['h1:Title', 'bullet:milk', 'bullet1:oat', 'hr:---', 'p:end']);
+      expect(sliceSel(rich, sel(1, 0, 2, 3))[0].runs[0].b).toBe(true);
+      expect(sliceSel(rich, sel(1, 0, 2, 3))[1].runs[0].size).toBe(24);
+    });
+    it('cuts the first and last line at the selection, and the first one stays a list item only when it starts at its start', () => {
+      expect(texts(sliceSel(rich, sel(1, 1, 2, 2)))).toEqual(['p:ilk', 'bullet1:oa']);
+      expect(texts(sliceSel(rich, sel(1, 0, 2, 2)))).toEqual(['bullet:milk', 'bullet1:oa']);
+    });
+    it('is one plain line for words inside a line, and a whole line keeps its kind', () => {
+      expect(texts(sliceSel(rich, sel(1, 1, 1, 3)))).toEqual(['p:il']);
+      expect(texts(sliceSel(rich, sel(2, 0, 2, 3)))).toEqual(['bullet1:oat']);
+    });
+    it('works whichever way round the selection was made', () => {
+      expect(texts(sliceSel(rich, sel(2, 2, 1, 1)))).toEqual(texts(sliceSel(rich, sel(1, 1, 2, 2))));
+    });
+  });
+
+  describe('insertRich', () => {
+    it('puts one line of words inside the line at the caret, keeping their looks', () => {
+      const out = insertRich([l('p', 'ab')], sel(0, 1), [l('p', 'XY', 0, { b: true })]);
+      expect(out.rich[0].runs).toEqual([{ text: 'a' }, { text: 'XY', b: true }, { text: 'b' }]);
+      expect(out.at).toEqual(at(0, 3));
+    });
+    it('puts a whole copied list item on an empty plain line as a list item', () => {
+      const out = insertRich([l('p', '')], sel(0, 0), [l('bullet', 'milk', 1)]);
+      expect(texts(out.rich)).toEqual(['bullet1:milk']);
+      expect(out.at).toEqual(at(0, 4));
+    });
+    it('keeps an empty list item a list item when a single plain line is pasted into it', () => {
+      expect(texts(insertRich([l('bullet', '')], sel(0, 0), [l('p', 'x')]).rich)).toEqual(['bullet:x']);
+    });
+    it('puts several lines with their types and indents, the caret at the end of the last', () => {
+      const out = insertRich([l('p', '')], sel(0, 0), [l('bullet', 'a'), l('bullet', 'b', 1), l('bullet', 'c', 2)]);
+      expect(texts(out.rich)).toEqual(['bullet:a', 'bullet1:b', 'bullet2:c']);
+      expect(out.at).toEqual(at(2, 1));
+    });
+    it('joins the first line to the words before the caret and the last to the words after it', () => {
+      const out = insertRich([l('p', 'headtail')], sel(0, 4), [l('p', 'one'), l('bullet', 'two'), l('bullet', 'three', 1)]);
+      expect(texts(out.rich)).toEqual(['p:headone', 'bullet:two', 'bullet1:threetail']);
+      expect(out.at).toEqual(at(2, 5));
+    });
+    it('gives the first line its own kind when the caret is at the start of a line', () => {
+      expect(texts(insertRich([l('p', 'tail')], sel(0, 0), [l('h1', 'T'), l('bullet', 'a')]).rich)).toEqual(['h1:T', 'bullet:atail']);
+    });
+    it('replaces a selection', () => {
+      const out = insertRich([l('p', 'one'), l('p', 'two'), l('p', 'three')], sel(0, 1, 2, 2), [l('bullet', 'X'), l('bullet', 'Y')]);
+      expect(texts(out.rich)).toEqual(['p:oX', 'bullet:Yree']);
+    });
+    it('keeps dividers as dividers, with the caret on a line below one at the end', () => {
+      const a = insertRich([l('p', '')], sel(0, 0), [l('p', 'x'), l('hr', '')]);
+      expect(texts(a.rich)).toEqual(['p:x', 'hr:---', 'p:']);
+      expect(a.at).toEqual(at(2, 0));
+      const b = insertRich([l('p', 'ab')], sel(0, 1), [l('hr', '')]);
+      expect(texts(b.rich)).toEqual(['p:a', 'hr:---', 'p:b']);
+      expect(b.at).toEqual(at(2, 0));
+      const c = insertRich([l('p', '')], sel(0, 0), [l('hr', ''), l('p', 'y')]);
+      expect(texts(c.rich)).toEqual(['hr:---', 'p:y']);
+    });
+    it('pastes beside a divider, never into it', () => {
+      const out = insertRich([l('p', 'a'), l('hr', ''), l('p', 'b')], sel(1, 1), [l('bullet', 'x'), l('bullet', 'y')]);
+      expect(plainOf(out.rich)).toBe('a\n---\n• x\n• yb');
+    });
+    it('keeps the pasted words, and the plain text is what the lines read as', () => {
+      const out = insertRich([l('p', '')], sel(0, 0), [l('number', 'a'), l('number', 'b')]);
+      expect(plainOf(out.rich)).toBe('1. a\n2. b');
+    });
   });
 });

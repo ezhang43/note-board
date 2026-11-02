@@ -156,3 +156,72 @@ test('the bar fades in with a short movement, and not at all with reduced motion
   await expect(bar(page)).toBeVisible();
   expect(await bar(page).evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
 });
+
+/** A checklist "Groceries" with milk and eggs, both items picked (Ctrl+A twice); the bar is showing. */
+async function twoPicked(page: Page) {
+  await clickEmpty(page);
+  await add(page, 'Checklist', { stayInTitle: true });
+  await page.keyboard.type('Groceries');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('milk');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('eggs');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+a');
+  await expect(page.locator('.todo-item.picked')).toHaveCount(2);
+  await expect(bar(page)).toBeVisible();
+}
+
+test('clicking a bar button does not hide the bar: Bold then Italic right away', async ({ page }) => {
+  await twoPicked(page);
+  await bar(page).getByRole('button', { name: 'Bold' }).click();
+  await page.waitForTimeout(50);
+  expect(await bar(page).count()).toBe(1); // no auto-wait: it must not blink out
+  await bar(page).getByRole('button', { name: 'Italic' }).click();
+  for (const i of [0, 1]) {
+    const item = page.getByLabel('Item text').nth(i);
+    await expect.poll(() => item.evaluate((el) => getComputedStyle(el).fontStyle)).toBe('italic');
+    expect(await item.evaluate((el) => getComputedStyle(el).fontWeight)).toBe('600');
+  }
+});
+
+test('a key that is only a board shortcut ("q") does not hide the bar over picked items', async ({ page }) => {
+  await twoPicked(page);
+  await page.keyboard.press('q');
+  await page.waitForTimeout(500);
+  await expect(page.locator('.todo-item.picked')).toHaveCount(2);
+  expect(await bar(page).count()).toBe(1);
+});
+
+test('a letter typed over a word highlight across items hides the bar', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Checklist', { stayInTitle: true });
+  await page.keyboard.type('Groceries');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('alpha beta');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('gamma delta');
+  await clickEmpty(page);
+  const a = (await page.getByLabel('Item text').nth(0).boundingBox())!;
+  const b = (await page.getByLabel('Item text').nth(1).boundingBox())!;
+  await page.mouse.move(a.x + 40, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 40, b.y + b.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator('.word-mark').first()).toBeVisible();
+  await expect(bar(page)).toBeVisible();
+  await page.keyboard.press('x');
+  await expect(bar(page)).toHaveCount(0);
+});
+
+test('in a very short window the bar never sits over the toolbar', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 180 });
+  const field = await note(page);
+  await page.keyboard.press('Shift+Home');
+  await expect(bar(page)).toBeVisible();
+  const b = (await bar(page).boundingBox())!;
+  const toolbarBottom = await page.evaluate(() => Math.max(...[...document.querySelectorAll('.toolbar')].map((el) => el.getBoundingClientRect().bottom), 64));
+  expect(b.y).toBeGreaterThanOrEqual(toolbarBottom);
+  expect(b.y + b.height).toBeLessThanOrEqual(180);
+  void field;
+});

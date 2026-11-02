@@ -4,7 +4,7 @@ import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model
 import type { FormatAsk } from '../store/actions/format';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { boxKey, focusedBox } from './textBox';
-import { panelCovers } from './textField';
+import { isTextField, panelCovers } from './textField';
 
 // The small format bar (owner request): shows above a text box when some of its text is
 // highlighted, or above selected checklist items. Its buttons format whole text boxes.
@@ -74,7 +74,7 @@ export function FormatBar() {
   const [target, setTarget] = useState<Target | null>(null);
   const [shown, setShown] = useState(false);
   // `down`: a mouse button or finger is on the page. `waiting`: the highlight changed and the bar is due once it settles.
-  const quiet = useRef({ timer: 0, down: false, waiting: false, sig: '' });
+  const quiet = useRef({ timer: 0, down: false, waiting: false, sig: '', itemSig: '' });
   const viewOnly = useViewOnly();
   const [fontsOpen, setFontsOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -109,7 +109,14 @@ export function FormatBar() {
     q.waiting = false;
     setShown(false);
   };
-  useEffect(() => { if (!focusInBar()) moved(); }, [itemSel]); // checklist items picked or unpicked
+  // Checklist items picked or unpicked, or the words highlighted changed. A new object with the same picks (after
+  // formatting them) is not a change: the bar must stay under the person's pointer for the next click.
+  useEffect(() => {
+    const sig = JSON.stringify(itemSel);
+    if (sig === q.itemSig) return;
+    q.itemSig = sig;
+    if (!focusInBar()) moved();
+  }, [itemSel]);
   useEffect(() => () => clearTimeout(q.timer), []);
 
   useEffect(() => {
@@ -153,7 +160,11 @@ export function FormatBar() {
     const typing = (e: KeyboardEvent) => {
       if (focusInBar() || e.altKey) return;
       const k = e.key;
-      const edit = e.ctrlKey || e.metaKey ? k.length === 1 && 'xcv'.includes(k.toLowerCase()) : k.length === 1 || k === 'Backspace' || k === 'Delete' || k === 'Enter';
+      const mod = e.ctrlKey || e.metaKey;
+      // In a text box any character types; with picked items only a word highlight is typed over (a letter that is
+      // just a board shortcut, like "q", leaves the bar alone).
+      const types = isTextField(e.target) || !!appStore.getState().ui.itemSel?.words;
+      const edit = mod ? k.length === 1 && 'xcv'.includes(k.toLowerCase()) : k === 'Backspace' || k === 'Delete' || (types && (k.length === 1 || k === 'Enter'));
       if (edit) hide();
     };
     document.addEventListener('selectionchange', changed);
@@ -213,9 +224,10 @@ export function FormatBar() {
   const font: TextFont = now.font ?? 'sans';
   // Above the text (below the toolbar); else below it if that fits on screen; the bar never covers the highlighted words.
   const above = target.top - BAR_H - 6;
-  const underFits = target.bottom + 6 + BAR_H < window.innerHeight - 8;
-  const up = above > 72 || !underFits;
-  const style: CSSProperties = { left: Math.max(8, target.left), top: up ? Math.max(8, above) : target.bottom + 6 };
+  const up = above > 72;
+  // Neither side fits (a very short window): below, held inside the window, and never up over the toolbar.
+  const top = up ? above : Math.max(72, Math.min(target.bottom + 6, window.innerHeight - BAR_H - 8));
+  const style: CSSProperties = { left: Math.max(8, target.left), top };
   const apply = (ask: FormatAsk) => appStore.formatBoxes(target.boxes, ask);
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();

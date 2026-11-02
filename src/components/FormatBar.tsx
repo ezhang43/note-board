@@ -148,7 +148,9 @@ export function FormatBar() {
       const sig = highlightSig();
       if (sig === q.sig || focusInBar()) return;
       q.sig = sig;
-      moved();
+      // No text box has a highlight any more (focus left it for the picked items, say): the picked items arm the bar
+      // themselves, and this late event must not hide a bar that is already showing for them.
+      if (sig) moved();
     };
     const press = (e: Event) => {
       if (!(e.target instanceof Element && e.target.closest('.format-bar'))) q.down = true;

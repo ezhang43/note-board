@@ -23,11 +23,13 @@ const PAN_STEP = 80;
 
 /**
  * A Word-style highlight of letters in one list that the next typed character replaces (owner request, 2026-11-01).
- * Not while a container's "Delete …?" or the completed-items question asks, and not for Ctrl chords or composed input.
+ * Not while a container's "Delete …?" or the completed-items question asks, not for Ctrl chords or composed input,
+ * and not for keys pressed on a focused button, link, menu summary or drop-down list: those keys belong to it.
  */
 function typesOverWords(e: KeyboardEvent): boolean {
   const { itemSel, confirm, deleteCompleted } = appStore.getState().ui;
-  return !!itemSel?.words && !itemSel.lists && !e.isComposing && !(e.ctrlKey || e.metaKey) && !confirm && deleteCompleted !== 'ask';
+  return !!itemSel?.words && !itemSel.lists && !e.isComposing && !(e.ctrlKey || e.metaKey) && !confirm && deleteCompleted !== 'ask'
+    && !(e.target instanceof Element && e.target.closest('button, a, summary, select, [role="button"]'));
 }
 
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */

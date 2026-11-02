@@ -238,6 +238,16 @@ describe("while a container's \"Delete …?\" asks, no key changes the list behi
     expect(s.getState().board).toBe(before);
   });
 
+  it('a paste of lines copied from a Journal note does nothing too', () => {
+    const { s, col, id, ids } = asking();
+    const json = JSON.stringify([{ type: 'bullet', runs: [{ text: 'pasted' }] }]);
+    s.askDeleteColumn(col);
+    expect(s.getState().ui.confirm).not.toBeNull();
+    const before = s.getState().board;
+    expect(s.pasteJournalInto(id, ids[0], json)).toBe(false);
+    expect(s.getState().board).toBe(before);
+  });
+
   it('after the question closes, Tab indents again', () => {
     const { s, col, id, ids } = asking();
     s.selectItemRange(id, ids[1], ids[1]);

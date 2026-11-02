@@ -441,7 +441,7 @@ export function checklistActions(ctx: StoreContext) {
      */
     pasteJournalInto(cardId: string, itemId: string, json: string): boolean {
       const card = ctx.state.board.cards[cardId];
-      if (card?.kind !== 'todo' || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      if (card?.kind !== 'todo' || asking() || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
       const rich = decodeRich(json);
       const items = rich && richToItems(rich);
       if (!items?.length) return false;

@@ -308,6 +308,7 @@ test('while a container\'s "Delete …?" asks, Tab moves between its buttons, Es
   await expect(ask).toHaveCount(0);
   expect(await texts(list)).toEqual(ORIGINAL);
   expect(await x()).toBe(x0);
+  await expect(list.locator('.todo-item.picked')).toHaveCount(3); // Escape closed only the question: the items are still highlighted
 });
 
 test('a highlight from the very start of the first item to the very end of the last: both go whole, nothing blank is left behind', async ({ page }) => {
@@ -323,3 +324,17 @@ test('a highlight from the very start of the first item to the very end of the l
   await page.keyboard.press('Control+z');
   expect(await texts(list)).toEqual(ORIGINAL);
 });
+
+for (const key of ['Enter', 'Space']) {
+  test(`${key} on a focused button acts on the button, not on the highlighted words`, async ({ page }) => {
+    const list = await threeHighlighted(page);
+    // Focus a row's "Move up" button the way the keyboard would (Tab), without a mouse click that would clear the highlight.
+    const up = rows(list).nth(2).getByRole('button', { name: 'Move up' });
+    await up.focus();
+    await expect(up).toBeFocused();
+    await expect(list.locator('.todo-item.picked.words')).toHaveCount(3);
+    await page.keyboard.press(key);
+    // The button moved the item up; the words were neither replaced by a split nor deleted.
+    await expect.poll(() => texts(list)).toEqual(['alpha beta', 'epsilon zeta', 'gamma delta']);
+  });
+}

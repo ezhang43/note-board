@@ -79,10 +79,27 @@ test('clicking the trash can with nothing being typed in, then Delete: the card 
   await expect(cards(page)).toHaveCount(1);
 });
 
+/**
+ * The cursor at the end of the first item, then Shift+click at the end of item `last`: the letters from there,
+ * so the items after the first one up to `last` are removed whole (word highlights, owner request 2026-11-01).
+ */
+async function highlightAfterFirst(list: Locator, last: number) {
+  const end = async (n: number) => {
+    const b = (await list.getByLabel('Item text').nth(n).boundingBox())!;
+    return { x: b.x + b.width - 3, y: b.y + b.height / 2 };
+  };
+  const page = list.page();
+  const first = await end(0);
+  await page.mouse.click(first.x, first.y);
+  const to = await end(last);
+  await page.keyboard.down('Shift');
+  await page.mouse.click(to.x, to.y);
+  await page.keyboard.up('Shift');
+}
+
 test('Delete with items selected (Shift+click), then Delete again: the card stays', async ({ page }) => {
   const list = await checklist(page, ['bread', 'milk', 'eggs']);
-  await list.getByLabel('Item text').nth(1).click();
-  await list.getByLabel('Item text').nth(2).click({ modifiers: ['Shift'] });
+  await highlightAfterFirst(list, 2);
   await page.keyboard.press('Delete');
   await expect.poll(() => texts(list)).toEqual(['bread']);
   await expect.poll(() => focused(page)).toBe('bread');
@@ -102,8 +119,7 @@ test('trashing the only item leaves one blank item with the cursor in it; Delete
 
 test('holding Backspace with items selected removes them once; the item above keeps its text', async ({ page }) => {
   const list = await checklist(page, ['bread', 'milk', 'eggs', 'jam']);
-  await list.getByLabel('Item text').nth(1).click();
-  await list.getByLabel('Item text').nth(2).click({ modifiers: ['Shift'] });
+  await highlightAfterFirst(list, 2);
   await page.keyboard.down('Backspace');
   await page.keyboard.down('Backspace'); // repeats
   await page.keyboard.down('Backspace');

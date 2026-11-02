@@ -97,6 +97,14 @@ export function useShortcuts() {
       if (isTextField(e.target) || e.altKey) return;
 
       const state = appStore.getState();
+      // A Word-style highlight of letters across items (owner request, 2026-11-01): Delete, Backspace and Ctrl+X remove
+      // just those words, a typed letter or Enter replaces them; Ctrl+C copies them (below, with the other item keys).
+      if (state.ui.itemSel?.words && !state.ui.itemSel.lists && !e.isComposing) {
+        if (key === 'delete' || key === 'backspace') return removeItemByKey(e, () => appStore.deleteWords()); // held: removes once
+        if (key === 'enter' && !mod && !e.shiftKey) return run(e, appStore.enterOverWords);
+        // simple: one typed letter replaces them; letters built from several keys (accents, Chinese input) aren't caught here.
+        if (e.key.length === 1 && !mod) return run(e, () => appStore.deleteWords(e.key));
+      }
       // ? opens the keyboard shortcuts panel (it closes itself on ? or Escape: it covers the board).
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
       // Ctrl+Shift+Backspace: delete every ticked item on the board, after asking.

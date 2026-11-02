@@ -9,7 +9,8 @@ import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
 import { copyText, ITEMS_MARKER, typingAt } from '../env';
 import { decodeRich, encodeItems, richToItems } from '../../model/journalPaste';
-import type { ItemDrag, ItemHint } from '../types';
+import type { ItemDrag, ItemHint, ItemSelection } from '../types';
+import * as W from '../../model/wordRange';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
 
@@ -76,6 +77,7 @@ export function checklistActions(ctx: StoreContext) {
    */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    if (wordSel()) return deleteWords();
     return !!sel?.ids.length && actions.trashItem(sel.cardId, sel.ids[0]);
   }
 
@@ -87,8 +89,48 @@ export function checklistActions(ctx: StoreContext) {
     commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
   }
 
+  /** The Word-style highlight in one list, if that is what is selected. */
+  function wordSel(): (ItemSelection & { words: W.WordRange }) | null {
+    const sel = ctx.state.ui.itemSel;
+    return sel?.words && !sel.lists ? (sel as ItemSelection & { words: W.WordRange }) : null;
+  }
+
+  /** Select the letters from `anchor` to `focus` in one list, Word-style (the items they touch are selected too). */
+  function selectWords(cardId: string, anchor: W.ItemPoint, focus: W.ItemPoint) {
+    const card = ctx.state.board.cards[cardId];
+    if (card?.kind !== 'todo') return;
+    const words = { anchor, focus };
+    const ids = W.touchedIds(card.items, words);
+    if (ids.length) updateUi({ itemSel: { cardId, anchor: anchor.id, ids, words }, selection: [cardId] });
+  }
+
+  /**
+   * Delete, Backspace or a typed letter (`insert`) with a word highlight: removes just the highlighted
+   * words, joining what is left of its first and last items (wordRange.ts). One undo step; the cursor
+   * goes to where the words were. Returns whether anything changed.
+   */
+  function deleteWords(insert = ''): boolean {
+    const sel = wordSel();
+    if (!sel) return false;
+    return !!commit((b) => {
+      const card = b.cards[sel.cardId];
+      const r = card?.kind === 'todo' ? W.deleteRange(card.items, sel.words, insert) : null;
+      if (!r) return null;
+      return { board: C.editItems(b, sel.cardId, () => r.items), ui: { itemSel: null, focusItem: r.focus.id, focusOffset: r.focus.offset } };
+    });
+  }
+
   function copyItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    const words = wordSel();
+    if (words) {
+      const card = ctx.state.board.cards[words.cardId];
+      if (card?.kind !== 'todo') return false;
+      itemClipboard = W.sliceRange(card.items, words.words);
+      if (!itemClipboard.length) return false;
+      copyText(W.rangeAsText(card.items, words.words), ITEMS_MARKER, encodeItems(itemClipboard));
+      return true;
+    }
     if (sel?.lists) {
       const board = ctx.state.board;
       const copied = sel.lists.flatMap((l) => {
@@ -316,12 +358,38 @@ export function checklistActions(ctx: StoreContext) {
       return true;
     },
     clearItemSelection: () => updateUi({ itemSel: null }),
+    selectWords,
+    deleteWords,
+    /**
+     * Shift+click on an item's text: extends the word highlight from where it started, or starts one from
+     * `from` (the cursor in the item being typed in). Returns false when there is nothing to extend from.
+     */
+    extendWords(cardId: string, to: W.ItemPoint, from?: W.ItemPoint | null): boolean {
+      const sel = ctx.state.ui.itemSel;
+      const anchor = (sel?.cardId === cardId && !sel.lists ? sel.words?.anchor : null) ?? from;
+      if (!anchor) return false;
+      selectWords(cardId, anchor, to);
+      return true;
+    },
+    /** Enter with a word highlight: the words go and the item is split where they were, as Word does. One undo step. */
+    enterOverWords(): boolean {
+      const sel = wordSel();
+      if (!sel) return false;
+      return !!commit((b) => {
+        const card = b.cards[sel.cardId];
+        const r = card?.kind === 'todo' ? W.deleteRange(card.items, sel.words) : null;
+        const split = r && C.enterItem(r.items, r.focus.id, r.focus.offset, r.focus.offset, createItem());
+        if (!split) return null;
+        return { board: C.editItems(b, sel.cardId, () => split.items), ui: { itemSel: null, focusItem: split.focus, focusOffset: split.offset } };
+      });
+    },
     copyItems,
     deleteSelectedItems,
     /** Cut removes exactly what was copied: the selected items. Unselected sub-items stay, moving up a level. */
     cutItems(): boolean {
       const sel = ctx.state.ui.itemSel;
       if (!sel || sel.lists || !copyItems()) return false;
+      if (sel.words) return deleteWords(); // exactly the copied words, as Delete removes them
       commit((b) => C.editItems(b, sel.cardId, (items) => C.removeExactly(items, sel.ids)), { ui: { itemSel: null } });
       return true;
     },

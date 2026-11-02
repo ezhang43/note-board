@@ -99,8 +99,12 @@ test('checklist items copied with Ctrl+C paste into the Journal as a bulleted li
   const list = await makeList(page, ['milk', 'oat', 'eggs']);
   await list.getByLabel('Item text').nth(1).click();
   await page.keyboard.press('Tab');
-  await list.getByLabel('Item text').nth(0).click();
-  await list.getByLabel('Item text').nth(2).click({ modifiers: ['Shift'] });
+  // From the start of "milk" to the end of "eggs" (Shift+click on text highlights letters, owner request 2026-11-01).
+  await list.getByLabel('Item text').nth(0).click({ position: { x: 2, y: 8 } });
+  const eggs = (await list.getByLabel('Item text').nth(2).boundingBox())!;
+  await page.keyboard.down('Shift');
+  await page.mouse.click(eggs.x + eggs.width - 3, eggs.y + eggs.height / 2);
+  await page.keyboard.up('Shift');
   await expect(list.locator('.todo-item.picked')).toHaveCount(3);
   await page.keyboard.press('Control+c');
   await openJournal(page);

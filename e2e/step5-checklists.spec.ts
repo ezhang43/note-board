@@ -28,6 +28,17 @@ async function center(l: Locator) {
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
+/** Just before an item's first letter, and just past its last (one-line items). Dragging from one to the other
+ * highlights whole items, as in a word processor (word highlights, owner request 2026-11-01). */
+async function startOf(l: Locator) {
+  const b = await box(l);
+  return { x: b.x + 2, y: b.y + b.height / 2 };
+}
+async function endOf(l: Locator) {
+  const b = await box(l);
+  return { x: b.x + b.width - 3, y: b.y + b.height / 2 };
+}
+
 /** Drag an item by its grip to a point. */
 async function dragItem(page: Page, row: Locator, to: { x: number; y: number }, during?: () => Promise<void>) {
   await row.hover();
@@ -383,8 +394,9 @@ test('a list made from dragged-out items is as wide as the list they came from, 
 test('press and drag over items selects a range; Shift+click extends; Delete removes them; Escape clears', async ({ page }) => {
   const list = await makeList(page, ['one', 'two', 'three', 'four']);
   await clickEmpty(page);
-  const from = await center(rows(list).nth(0).getByLabel('Item text'));
-  const to = await center(rows(list).nth(1).getByLabel('Item text'));
+  // From the start of "one" to the start of "three": all of "one" and "two".
+  const from = await startOf(rows(list).nth(0).getByLabel('Item text'));
+  const to = await startOf(rows(list).nth(2).getByLabel('Item text'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
@@ -440,7 +452,13 @@ test('Ctrl+C / Ctrl+V pastes copied items after the selection; Ctrl+X cuts; Ctrl
     await page.mouse.move(to.x, to.y, { steps: 6 });
     await page.mouse.up();
   };
-  await select(0, 1);
+  // From the start of "one" to the start of "three": "one" and "two" whole.
+  const from = await startOf(rows(list).nth(0).getByLabel('Item text'));
+  const to = await startOf(rows(list).nth(2).getByLabel('Item text'));
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 });
+  await page.mouse.up();
   await page.keyboard.press('Control+c');
   await select(2, 1);
   await page.keyboard.press('Control+v');
@@ -532,8 +550,9 @@ test('copying several items also copies their text, one item per line (owner req
   const list = await makeList(page, ['one', 'two', 'two a', 'three']);
   await rowWithText(list, 'two a').getByLabel('Item text').press('Tab');
   await clickEmpty(page);
-  const from = await center(rows(list).nth(0).getByLabel('Item text'));
-  const to = await center(rows(list).nth(2).getByLabel('Item text'));
+  // From the start of "one" to the start of "three": the first three items whole.
+  const from = await startOf(rows(list).nth(0).getByLabel('Item text'));
+  const to = await startOf(rows(list).nth(3).getByLabel('Item text'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
@@ -564,9 +583,9 @@ test('copying copies exactly the highlighted items, keeping their levels; cut le
   await rowWithText(list, 'two a').getByLabel('Item text').press('Tab');
   await rowWithText(list, 'two b').getByLabel('Item text').press('Tab');
   await clickEmpty(page);
-  // Highlight "one" to "two a" (not "two b").
-  const from = await center(rowWithText(list, 'one').getByLabel('Item text'));
-  const to = await center(rowWithText(list, 'two a').getByLabel('Item text'));
+  // Highlight "one" to "two a" (not "two b"): from the start of "one" to the start of "two b".
+  const from = await startOf(rowWithText(list, 'one').getByLabel('Item text'));
+  const to = await startOf(rowWithText(list, 'two b').getByLabel('Item text'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
@@ -594,8 +613,8 @@ test('items dragged across while typing, copied, then pasted into an item of ano
 
   // Typing in "one", drag across to "two a": the three items are highlighted.
   await rowWithText(from, 'one').getByLabel('Item text').click();
-  const a = await center(rowWithText(from, 'one').getByLabel('Item text'));
-  const b = await center(rowWithText(from, 'two a').getByLabel('Item text'));
+  const a = await startOf(rowWithText(from, 'one').getByLabel('Item text'));
+  const b = await endOf(rowWithText(from, 'two a').getByLabel('Item text'));
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   await page.mouse.move(b.x, b.y, { steps: 6 });
@@ -637,8 +656,12 @@ async function copyTwoItemsAndClickBlank(page: Page, context: BrowserContext) {
   const from = await makeList(page, ['one', 'two']);
   const to = await makeList(page, ['mine']);
   await page.keyboard.press('Enter');
-  await rowWithText(from, 'one').getByLabel('Item text').click();
-  await rowWithText(from, 'two').getByLabel('Item text').click({ modifiers: ['Shift'] });
+  // From the start of "one" to the end of "two" (Shift+click on text highlights letters, owner request 2026-11-01).
+  await rowWithText(from, 'one').getByLabel('Item text').click({ position: { x: 2, y: 8 } });
+  const end = await endOf(rowWithText(from, 'two').getByLabel('Item text'));
+  await page.keyboard.down('Shift');
+  await page.mouse.click(end.x, end.y);
+  await page.keyboard.up('Shift');
   await expect(from.locator('.todo-item.picked')).toHaveCount(2);
   await page.keyboard.press('Control+c');
   await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toBe('one\ntwo');

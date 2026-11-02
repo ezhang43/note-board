@@ -291,7 +291,7 @@ function ancestorsOf(items: TodoItem[], id: string): TodoItem[] {
  * An open item can't sit under a ticked one (Clean up would sweep it away unticked): in a copy of the
  * list, untick the items an open `item` is nested in (owner decision, 2026-10-22, job 183).
  */
-function reopenAbove(items: TodoItem[], item: TodoItem): void {
+export function reopenAbove(items: TodoItem[], item: TodoItem): void {
   if (!item.done) for (const a of ancestorsOf(items, item.id)) a.done = false;
 }
 

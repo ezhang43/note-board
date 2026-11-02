@@ -122,6 +122,36 @@ describe('deleting a range (Delete, Backspace, typing over it, cut)', () => {
     expect(typed.focus).toEqual(at('y', 1));
   });
 
+  it('from letter 0 of the first item to the very end of the last: the last item goes whole too, its sub-items moving up (call 2026-11-02)', () => {
+    const items = [item('x', 'Buy milk'), item('y', 'Pay rent', [item('y1', 'kid')], { done: true }), item('z', 'next')];
+    const r = W.deleteRange(items, { anchor: at('x', 0), focus: at('y', 8) })!;
+    expect(shape(r.items)).toBe('kid | next');
+    expect(r.removed).toBe(2);
+    expect(r.focus).toEqual(at('y1', 0)); // the cursor is where the words were: in the item that follows
+  });
+
+  it('from letter 0 to the very end of the last item with nothing after it: the cursor goes to the end of the item before, or a blank item stays when the whole list goes', () => {
+    const items = [item('w', 'keep'), item('x', 'one'), item('y', 'two')];
+    const r = W.deleteRange(items, { anchor: at('x', 0), focus: at('y', 3) })!;
+    expect(shape(r.items)).toBe('keep');
+    expect(r.focus).toEqual(at('w', 4));
+    expect(r.removed).toBe(2);
+    const all = W.deleteRange([item('x', 'one'), item('y', 'two')], { anchor: at('x', 0), focus: at('y', 3) })!;
+    expect(all.items).toHaveLength(1);
+    expect(all.items[0].text).toBe('');
+    expect(all.focus).toEqual(at(all.items[0].id, 0));
+    expect(all.removed).toBe(2);
+  });
+
+  it('a typed letter over a highlight from letter 0 to the very end of the last item keeps the last item, holding the letter', () => {
+    const items = [item('x', 'one'), item('y', 'two', [item('y1', 'kid')])];
+    const r = W.deleteRange(items, { anchor: at('x', 0), focus: at('y', 3) }, 'X')!;
+    expect(shape(r.items)).toBe('X(kid)');
+    expect(r.items[0].id).toBe('y');
+    expect(r.focus).toEqual(at('y', 1));
+    expect(r.removed).toBe(1);
+  });
+
   it('from letter 0 into a sub-item: the sub-item stays, moving up into its parent\'s place', () => {
     const r = W.deleteRange(sample(), { anchor: at('a', 0), focus: at('g', 2) })!;
     expect(shape(r.items)).toBe('mma | delta | echo');

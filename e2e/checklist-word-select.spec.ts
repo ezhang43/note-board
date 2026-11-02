@@ -245,3 +245,81 @@ test("pressing on a row's own space (not its text) and dragging still selects wh
   expect(await texts(list)).toEqual(['four']);
   await expect(page.locator('.undo-toast')).toContainText('Deleted 3 items');
 });
+
+test('"!" typed over a highlight replaces it like any letter; it does not fit the board to the screen', async ({ page }) => {
+  const list = await threeHighlighted(page);
+  await page.keyboard.press('Shift+Digit1');
+  expect(await texts(list)).toEqual(['alpha ! zeta']);
+  await page.keyboard.press('Control+z');
+  expect(await texts(list)).toEqual(ORIGINAL);
+});
+
+test('an empty highlight: Ctrl+C and Ctrl+X leave the earlier copy (and the system clipboard) alone and change nothing', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const list = await threeHighlighted(page);
+  await page.keyboard.press('Control+c');
+  const clip = () => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'));
+  await expect.poll(clip).toBe('beta\ngamma delta\nepsilon');
+  // An empty highlight: Shift+click back on the spot the highlight started from.
+  const spot = await letterAt(field(list, 0), 6);
+  await page.keyboard.down('Shift');
+  await page.mouse.click(spot.x, spot.y);
+  await page.keyboard.up('Shift');
+  await expect(list.locator('.todo-item.picked.words')).toHaveCount(1); // the highlight exists, with both ends on the same spot
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+x');
+  expect(await texts(list)).toEqual(ORIGINAL);
+  expect(await clip()).toBe('beta\ngamma delta\nepsilon');
+  // The earlier copy still pastes as items.
+  const other = await makeList(page, []);
+  await field(other, 0).click();
+  await page.keyboard.press('Control+v');
+  expect(await texts(other)).toEqual(['beta', 'gamma delta', 'epsilon']);
+});
+
+test('while a container\'s "Delete …?" asks, Tab moves between its buttons, Escape closes it, and the list behind is left alone', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'New container');
+  await add(page, 'Checklist');
+  const id = await page.locator('.card.selected').getAttribute('data-card-id');
+  for (const [i, t] of ORIGINAL.entries()) {
+    if (i) await page.keyboard.press('Enter');
+    await page.keyboard.type(t);
+  }
+  const list = page.locator(`[data-card-id="${id}"]`);
+  await clickEmpty(page);
+  await drag(page, await letterAt(field(list, 0), 6), await letterAt(field(list, 2), 7));
+  await expect.poll(() => marks(list)).toEqual(['beta ', 'gamma delta ', 'epsilon']);
+  const x = async () => (await rows(list).nth(1).boundingBox())!.x;
+  const x0 = await x();
+  // A mouse click on the trash can clears the highlight first; a click made without the pointer (as a screen reader does) does not.
+  await page.locator('[data-col-id]').first().getByRole('button', { name: 'Delete container and its cards' }).evaluate((el) => (el as HTMLButtonElement).click());
+  const ask = page.getByRole('alertdialog', { name: 'Delete container?' });
+  await expect(ask).toBeVisible();
+  await expect(list.locator('.todo-item.picked')).toHaveCount(3); // the highlight is still there behind the question
+  await expect(ask.getByRole('button', { name: 'Keep container' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(ask.getByRole('button', { name: 'Delete container' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(ask.getByRole('button', { name: 'Keep container' })).toBeFocused();
+  expect(await x()).toBe(x0); // nothing was indented
+  expect(await texts(list)).toEqual(ORIGINAL);
+  await page.keyboard.press('Escape');
+  await expect(ask).toHaveCount(0);
+  expect(await texts(list)).toEqual(ORIGINAL);
+  expect(await x()).toBe(x0);
+});
+
+test('a highlight from the very start of the first item to the very end of the last: both go whole, nothing blank is left behind', async ({ page }) => {
+  const list = await makeList(page, ORIGINAL);
+  await clickEmpty(page);
+  const first = (await field(list, 0).boundingBox())!;
+  const second = (await field(list, 1).boundingBox())!;
+  await drag(page, { x: first.x + 1, y: first.y + first.height / 2 }, { x: second.x + second.width - 3, y: second.y + second.height / 2 });
+  await expect.poll(() => marks(list)).toEqual(['alpha beta ', 'gamma delta', null]);
+  await page.keyboard.press('Delete');
+  expect(await texts(list)).toEqual(['epsilon zeta']);
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 2 items');
+  await page.keyboard.press('Control+z');
+  expect(await texts(list)).toEqual(ORIGINAL);
+});

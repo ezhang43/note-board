@@ -421,7 +421,8 @@ test('press and drag over items selects a range; Shift+click extends; Delete rem
 test('with several items selected, ticking one ticks all, and dragging one moves all in order', async ({ page }) => {
   const list = await makeList(page, ['one', 'two', 'three', 'four']);
   await clickEmpty(page);
-  const from = await center(rows(list).nth(1).getByLabel('Item text'));
+  // From the start of "two" (a press past the end of its text would start the highlight after it, leaving it out).
+  const from = await startOf(rows(list).nth(1).getByLabel('Item text'));
   const to = await center(rows(list).nth(2).getByLabel('Item text'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
@@ -475,7 +476,8 @@ test('Ctrl+C / Ctrl+V pastes copied items after the selection; Ctrl+X cuts; Ctrl
 test('Tab and Shift+Tab move all selected items together (owner request)', async ({ page }) => {
   const list = await makeList(page, ['one', 'two', 'three', 'four']);
   await clickEmpty(page);
-  const from = await center(rows(list).nth(1).getByLabel('Item text'));
+  // From the start of "two" (a press past the end of its text would start the highlight after it, leaving it out).
+  const from = await startOf(rows(list).nth(1).getByLabel('Item text'));
   const to = await center(rows(list).nth(2).getByLabel('Item text'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
@@ -491,7 +493,7 @@ test('Tab and Shift+Tab move all selected items together (owner request)', async
 
   // Starting from the first item: it stays, the others nest under it.
   await page.keyboard.press('Escape');
-  const top = await center(rows(list).nth(0).getByLabel('Item text'));
+  const top = await startOf(rows(list).nth(0).getByLabel('Item text'));
   await page.mouse.move(top.x, top.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
@@ -567,7 +569,7 @@ test('Shift+click from the item being typed in selects the items between, at any
   const list = await makeList(page, ['one', 'two', 'two a', 'two b', 'three', 'four']);
   await rowWithText(list, 'two a').getByLabel('Item text').press('Tab');
   await rowWithText(list, 'two b').getByLabel('Item text').press('Tab');
-  await rowWithText(list, 'two b').getByLabel('Item text').click(); // typing in "two b"
+  await rowWithText(list, 'two b').getByLabel('Item text').click({ position: { x: 2, y: 8 } }); // typing in "two b", before its first letter
   await rowWithText(list, 'four').getByLabel('Item text').click({ modifiers: ['Shift'] });
   await expect(list.locator('.todo-item.picked')).toHaveCount(3);
   await page.keyboard.press('Tab');

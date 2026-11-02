@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, clickEmpty, freshBoardEachTest, rowSpace } from './helpers';
 
 // Word-style highlights across checklist items (owner request, 2026-11-01: "It should work like a word document
 // editor. It shouldn't highlight all of the row"). A drag from an item's text highlights exact letters across items;
@@ -166,4 +166,82 @@ test('Shift+click extends from the cursor, letter by letter; ticking one ticks e
   await expect.poll(() => marks(list)).toEqual(['beta ', 'gamma delta ', 'epsilon', null]);
   await rows(list).nth(1).getByRole('checkbox').check();
   await expect(list.getByRole('checkbox', { checked: true })).toHaveCount(3);
+});
+
+const ORIGINAL = ['alpha beta', 'gamma delta', 'epsilon zeta'];
+
+test('with a highlight, Ctrl+Shift+Backspace still asks first, and keys pressed while it asks leave the list alone', async ({ page }) => {
+  // A ticked item in another list, so there is something to ask about.
+  const other = await makeList(page, ['done one']);
+  await rows(other).nth(0).getByRole('checkbox').check();
+  const list = await threeHighlighted(page);
+  await page.keyboard.press('Control+Shift+Backspace');
+  const ask = page.getByRole('alertdialog', { name: 'Delete completed items?' });
+  await expect(ask).toContainText('Delete 1 completed item?');
+  expect(await texts(list)).toEqual(ORIGINAL);
+  for (const k of ['Delete', 'Backspace', 'x']) await page.keyboard.press(k);
+  expect(await texts(list)).toEqual(ORIGINAL);
+  await page.keyboard.press('Escape');
+  await expect(ask).toHaveCount(0);
+  expect(await texts(list)).toEqual(ORIGINAL);
+  expect(await texts(other)).toEqual(['done one']);
+});
+
+test('with a highlight, ? opens the shortcuts list, and keys typed while it is open leave the list alone', async ({ page }) => {
+  const list = await threeHighlighted(page);
+  await page.keyboard.press('?');
+  const panel = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(panel).toBeVisible();
+  expect(await texts(list)).toEqual(ORIGINAL);
+  await page.keyboard.press('x');
+  await page.keyboard.press('Delete');
+  expect(await texts(list)).toEqual(ORIGINAL);
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+});
+
+test('a highlight from the very start of the first item: Delete leaves the last item as it was, ticked and bold (owner decision 2026-11-02)', async ({ page }) => {
+  const list = await makeList(page, ['Buy milk', 'Pay rent']);
+  await page.keyboard.press('Control+b');
+  await rows(list).nth(1).getByRole('checkbox').check();
+  await clickEmpty(page);
+  const id = await rows(list).nth(1).getAttribute('data-item-id');
+  const weight = (n: number) => field(list, n).evaluate((el) => getComputedStyle(el).fontWeight);
+  const bold = await weight(1);
+  expect(bold).not.toBe(await weight(0));
+  const start = (await field(list, 0).boundingBox())!;
+  await drag(page, { x: start.x + 1, y: start.y + start.height / 2 }, await letterAt(field(list, 1), 4));
+  await expect.poll(() => marks(list)).toEqual(['Buy milk ', 'Pay ']);
+  await page.keyboard.press('Delete');
+  expect(await texts(list)).toEqual(['rent']);
+  await expect(rows(list).nth(0)).toHaveAttribute('data-item-id', id!);
+  await expect(rows(list).nth(0).getByRole('checkbox')).toBeChecked();
+  expect(await weight(0)).toBe(bold);
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 1 item');
+  await page.keyboard.press('Control+z');
+  expect(await texts(list)).toEqual(['Buy milk', 'Pay rent']);
+});
+
+test('a highlight from the very end of the first item: that item is not touched, and Ctrl+C copies no blank first line', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const list = await makeList(page, ORIGINAL);
+  await clickEmpty(page);
+  const end = (await field(list, 0).boundingBox())!;
+  await drag(page, { x: end.x + end.width - 3, y: end.y + end.height / 2 }, await letterAt(field(list, 2), 7));
+  await expect.poll(() => marks(list)).toEqual([' ', 'gamma delta ', 'epsilon']);
+  await expect(rows(list).nth(0)).not.toHaveClass(/picked/);
+  await page.keyboard.press('Control+c');
+  await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toBe('gamma delta\nepsilon');
+});
+
+/** A spot on row `n` that is neither its text nor a button: the row's own space under its text box. */
+test("pressing on a row's own space (not its text) and dragging still selects whole items", async ({ page }) => {
+  const list = await makeList(page, ['one', 'two', 'three', 'four']);
+  await clickEmpty(page);
+  await drag(page, await rowSpace(list, 0), await rowSpace(list, 2));
+  await expect(list.locator('.todo-item.picked')).toHaveCount(3);
+  await expect(list.locator('.todo-item.words')).toHaveCount(0);
+  await page.keyboard.press('Delete');
+  expect(await texts(list)).toEqual(['four']);
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 3 items');
 });

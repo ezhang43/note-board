@@ -1,4 +1,4 @@
-import { copyItems, findItem, flatIds, MAX_DEPTH, reopenAbove, selectionAsText } from './checklist';
+import { copyItems, findItem, flatIds, MAX_DEPTH, removeExactly, reopenAbove, selectionAsText } from './checklist';
 import type { TodoItem } from './types';
 
 // Word-style highlights across a list's items (owner request, 2026-11-01: "It should work like a word
@@ -33,8 +33,9 @@ export function ordered(items: TodoItem[], r: WordRange): { start: ItemPoint; en
 
 /**
  * The items the highlight touches, as shown: from its first item to its last. An end at the very start
- * of a later item leaves that item out, as nothing of it is highlighted (only the line break before it).
- * Ticking, the trash, dragging by the grip and Tab act on these.
+ * of a later item leaves that item out, and so does a start at the very end of an earlier (non-empty) one,
+ * as nothing of it is highlighted (only the line break). Ticking, the trash, dragging by the grip and Tab
+ * act on these. Only a line break highlighted touches none (the store then selects the first of the two).
  */
 export function touchedIds(items: TodoItem[], r: WordRange): string[] {
   const o = ordered(items, r);
@@ -42,7 +43,16 @@ export function touchedIds(items: TodoItem[], r: WordRange): string[] {
   const order = flatIds(items);
   const i = order.indexOf(o.start.id);
   const j = order.indexOf(o.end.id);
-  return order.slice(i, i < j && o.end.offset === 0 ? j : j + 1);
+  if (i === j) return [o.start.id];
+  // An empty first item is not "at its end": the highlight starts at its letter 0, so it goes whole (deleteRange).
+  const fromEnd = o.start.offset > 0 && o.start.offset === findItem(items, o.start.id)!.item.text.length;
+  return order.slice(fromEnd ? i + 1 : i, o.end.offset === 0 ? j : j + 1);
+}
+
+/** Nothing is highlighted: its two ends meet. */
+export function isEmpty(items: TodoItem[], r: WordRange): boolean {
+  const o = ordered(items, r);
+  return !!o && o.start.id === o.end.id && o.start.offset === o.end.offset;
 }
 
 /**
@@ -63,13 +73,19 @@ export function marksOf(items: TodoItem[], r: WordRange, id: string): [number, n
 
 /**
  * Deletes the highlighted words, like a word processor (Delete, Backspace, cut; `insert` is a typed
- * letter that replaces them). What is left of the first and last items is joined into the first one,
- * which keeps its id, tick and look. The items between go, and so does the last one; the last item's
- * sub-items move up under the joined item, and any other sub-item that comes after the highlight but
- * whose parent went moves up into its parent's place (as cut does). No letter outside the highlight is
- * lost. Returns the new items and where the cursor goes, or null when the range no longer fits the list.
+ * letter that replaces them). No letter outside the highlight is lost. Like Backspace and Delete at an
+ * item's edge (owner decision 2026-11-02):
+ * - Normally what is left of the first and last items is joined into the first one, which keeps its id,
+ *   level and look, and stays ticked only if both were (as Delete at the end of an item, job 200; a last
+ *   item highlighted to its very end goes whole, so its tick doesn't count). The
+ *   items between go, and so does the last one; the last item's sub-items move up under the joined item.
+ * - A highlight from letter 0 of its first item removes the items before the last one whole; the last
+ *   item stays, with its own id, tick, level, look and sub-items, keeping its text after the highlight.
+ * Any other sub-item that comes after the highlight but whose parent went moves up into its parent's
+ * place (as cut does). Returns the new items, where the cursor goes and how many items went whole (for
+ * the Undo message), or null when the range no longer fits the list.
  */
-export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { items: TodoItem[]; focus: ItemPoint } | null {
+export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { items: TodoItem[]; focus: ItemPoint; removed: number } | null {
   const o = ordered(items, r);
   if (!o) return null;
   const order = flatIds(items);
@@ -79,14 +95,23 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
   const first = findItem(next, o.start.id)!.item;
   const last = findItem(next, o.end.id)!.item;
   const tail = last.text.slice(o.end.offset);
-  first.text = first.text.slice(0, o.start.offset) + insert + tail;
-  if (i === j) return { items: next, focus: { id: first.id, offset: o.start.offset + insert.length } };
+  if (i === j) {
+    first.text = first.text.slice(0, o.start.offset) + insert + tail;
+    return { items: next, focus: { id: first.id, offset: o.start.offset + insert.length }, removed: 0 };
+  }
+  if (o.start.offset === 0) {
+    // The earlier items go whole; the last one stays as it was, less its highlighted letters.
+    last.text = insert + tail;
+    const kept = removeExactly(next, order.slice(i, j));
+    return { items: kept, focus: { id: last.id, offset: insert.length }, removed: j - i };
+  }
 
+  first.text = first.text.slice(0, o.start.offset) + insert + tail;
+  // Ticked only if both were, when the last item's text joins on; a last item highlighted to its end goes whole.
+  if (tail) first.done = first.done && last.done;
   const kids = last.children;
   last.children = [];
-  const gone = new Set(order.slice(i + 1, j + 1));
-  const prune = (list: TodoItem[]): TodoItem[] => list.flatMap((it) => (gone.has(it.id) ? prune(it.children) : [{ ...it, children: prune(it.children) }]));
-  const kept = prune(next);
+  const kept = removeExactly(next, order.slice(i + 1, j + 1));
   const joined = findItem(kept, first.id)!;
   if (joined.depth < MAX_DEPTH) {
     joined.item.children.unshift(...kids);
@@ -96,8 +121,10 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
     joined.list.splice(joined.index + 1, 0, ...kids);
     fitDepth(joined.list, joined.depth);
   }
-  for (const kid of kids) reopenAbove(kept, kid);
-  return { items: kept, focus: { id: first.id, offset: o.start.offset + insert.length } };
+  // Never open under a ticked item (job 183).
+  for (const it of [joined.item, ...kids]) reopenAbove(kept, it);
+  // The last item went whole too when none of its text was left to join on.
+  return { items: kept, focus: { id: first.id, offset: o.start.offset + insert.length }, removed: j - i - (tail ? 1 : 0) };
 }
 
 /** Items deeper than the 6 levels allow move out to sit beside their parent, in the same order (in place). */
@@ -141,3 +168,4 @@ export function rangeAsText(items: TodoItem[], r: WordRange): string {
   const cut = trimmed(items, r);
   return cut ? selectionAsText(cut, touchedIds(items, r)) : '';
 }
+

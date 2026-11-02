@@ -36,6 +36,19 @@ describe('the range', () => {
     expect(W.touchedIds(sample(), { anchor: at('d', 0), focus: at('d', 0) })).toEqual(['d']);
   });
 
+  it('a start at the very end of an item leaves that item out too; only a line break highlighted touches none', () => {
+    expect(W.touchedIds(sample(), { anchor: at('a', 5), focus: at('g', 2) })).toEqual(['b', 'g']);
+    expect(W.touchedIds(sample(), { anchor: at('d', 2), focus: at('a', 5) })).toEqual(['b', 'g', 'd']);
+    expect(W.touchedIds(sample(), { anchor: at('a', 5), focus: at('b', 0) })).toEqual([]);
+    expect(W.touchedIds(sample(), { anchor: at('a', 5), focus: at('a', 5) })).toEqual(['a']);
+  });
+
+  it('is empty when its ends meet', () => {
+    expect(W.isEmpty(sample(), { anchor: at('d', 2), focus: at('d', 2) })).toBe(true);
+    expect(W.isEmpty(sample(), { anchor: at('d', 2), focus: at('d', 3) })).toBe(false);
+    expect(W.isEmpty(sample(), { anchor: at('a', 5), focus: at('b', 0) })).toBe(false); // a line break
+  });
+
   it('the highlighted letters of each item', () => {
     const r = { anchor: at('g', 2), focus: at('a', 3) };
     expect(W.marksOf(sample(), r, 'a')).toEqual([3, 5, true]);
@@ -65,10 +78,62 @@ describe('deleting a range (Delete, Backspace, typing over it, cut)', () => {
     expect(r.focus).toEqual(at('b', 2));
   });
 
-  it('the first item keeps its id, tick and look; the last one goes', () => {
-    const items = [item('x', 'Splitwise pay', [], { done: true, style: { bold: true } }), item('y', 'Check again', [], { style: { size: 'large' } })];
+  it('the first item keeps its id, level and look; the last one goes', () => {
+    const items = [item('x', 'Splitwise pay', [], { done: true, style: { bold: true } }), item('y', 'Check again', [], { done: true, style: { size: 'large' } })];
     const r = W.deleteRange(items, { anchor: at('x', 10), focus: at('y', 6) })!;
     expect(r.items).toEqual([{ id: 'x', text: 'Splitwise again', done: true, children: [], style: { bold: true } }]);
+  });
+
+  it('the joined item is ticked only if both the first and the last item were (as Delete at the end of an item, job 200)', () => {
+    const two = (a: boolean, b: boolean) => [item('x', 'one', [], { done: a }), item('y', 'two', [], { done: b })];
+    const joined = (a: boolean, b: boolean) => W.deleteRange(two(a, b), { anchor: at('x', 1), focus: at('y', 1) })!.items[0].done;
+    expect(joined(true, true)).toBe(true);
+    expect(joined(true, false)).toBe(false);
+    expect(joined(false, true)).toBe(false);
+    expect(joined(false, false)).toBe(false);
+  });
+
+  it('a last item highlighted to its very end goes whole: its tick does not change the first one', () => {
+    const two = () => [item('x', 'one', [], { done: true }), item('y', 'two', [], { done: false })];
+    const r = W.deleteRange(two(), { anchor: at('x', 1), focus: at('y', 3) })!;
+    expect(r.items).toMatchObject([{ id: 'x', text: 'o', done: true }]);
+    expect(r.removed).toBe(1);
+  });
+
+  it('an empty first item where the highlight starts is touched, and goes whole', () => {
+    const list = () => [item('x', ''), item('y', 'two')];
+    const r = { anchor: at('x', 0), focus: at('y', 1) };
+    expect(W.touchedIds(list(), r)).toEqual(['x', 'y']);
+    expect(W.deleteRange(list(), r)).toMatchObject({ items: [{ id: 'y', text: 'wo' }], removed: 1 });
+  });
+
+  it('a highlight from letter 0 of its first item removes the earlier items whole: the last item stays as it was (owner decision 2026-11-02)', () => {
+    const items = [item('x', 'Buy milk'), item('y', 'Pay rent', [item('y1', 'kid')], { done: true, style: { bold: true } }), item('z', 'next')];
+    const r = W.deleteRange(items, { anchor: at('y', 4), focus: at('x', 0) })!;
+    expect(r.items).toEqual([
+      { id: 'y', text: 'rent', done: true, children: [{ id: 'y1', text: 'kid', done: false, children: [] }], style: { bold: true } },
+      { id: 'z', text: 'next', done: false, children: [] },
+    ]);
+    expect(r.focus).toEqual(at('y', 0));
+    expect(r.removed).toBe(1);
+    // A typed letter goes in front of what is left.
+    const typed = W.deleteRange(items, { anchor: at('x', 0), focus: at('y', 4) }, 'X')!;
+    expect(typed.items[0]).toMatchObject({ id: 'y', text: 'Xrent', done: true, style: { bold: true } });
+    expect(typed.focus).toEqual(at('y', 1));
+  });
+
+  it('from letter 0 into a sub-item: the sub-item stays, moving up into its parent\'s place', () => {
+    const r = W.deleteRange(sample(), { anchor: at('a', 0), focus: at('g', 2) })!;
+    expect(shape(r.items)).toBe('mma | delta | echo');
+    expect(r.items[0].id).toBe('g');
+    expect(r.removed).toBe(2);
+  });
+
+  it('says how many items went whole (for the Undo message): not the last one when some of its text is left', () => {
+    expect(W.deleteRange(sample(), { anchor: at('d', 1), focus: at('d', 4) })!.removed).toBe(0);
+    expect(W.deleteRange(sample(), { anchor: at('b', 2), focus: at('d', 3) })!.removed).toBe(1); // gamma; what is left of delta is joined on
+    expect(W.deleteRange(sample(), { anchor: at('a', 5), focus: at('b', 4) })!.removed).toBe(1); // all of beta
+    expect(W.deleteRange(sample(), { anchor: at('a', 2), focus: at('a', 2) }, 'X')!.removed).toBe(0);
   });
 
   it("the last item's sub-items move up under the joined item", () => {
@@ -88,10 +153,11 @@ describe('deleting a range (Delete, Backspace, typing over it, cut)', () => {
     expect(shape(r.items)).toBe('one.1 | two.2');
   });
 
-  it('an end at the start of an item joins that item in whole (a highlight of whole items)', () => {
+  it('from the start of one item to the start of another removes the items before it whole (a highlight of whole items)', () => {
     const r = W.deleteRange(sample(), { anchor: at('d', 0), focus: at('a', 0) })!;
     expect(shape(r.items)).toBe('delta | echo');
-    expect(r.items[0].id).toBe('a'); // the first item's id carries the text that is left
+    expect(r.items[0].id).toBe('d'); // delta stays as it was
+    expect(r.removed).toBe(3);
   });
 
   it('typing over the range puts the letter where it was', () => {
@@ -143,6 +209,13 @@ describe('copying a range', () => {
 
   it('within one item copies just those letters', () => {
     expect(shape(W.sliceRange(sample(), { anchor: at('d', 1), focus: at('d', 3) }))).toBe('el');
+  });
+
+  it('leaves out a first item highlighted only from its very end: no blank item, no empty first line', () => {
+    const r = { anchor: at('a', 5), focus: at('b', 2) };
+    expect(shape(W.sliceRange(sample(), r))).toBe('be');
+    expect(W.rangeAsText(sample(), r)).toBe('be');
+    expect(W.sliceRange(sample(), { anchor: at('a', 5), focus: at('b', 0) })).toEqual([]);
   });
 
   it('leaves out a last item with nothing of it highlighted', () => {

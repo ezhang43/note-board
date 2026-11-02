@@ -5,3 +5,5 @@
 - Ctrl+C / Ctrl+X take exactly the highlighted words; they paste into another list as items, and other apps get plain text.
 - Ticking, the trash and dragging by the grip still act on every item the highlight touches. Dragging from the grip or empty row space still selects whole items.
 - Shift+click on text extends the highlight.
+- Deleting a highlight works like Backspace: the joined item is ticked only if both ends were, and a highlight from the very start of an item removes the items before the last one whole, leaving the last item as it was. When whole items go, the Undo message shows.
+- With a highlight, Ctrl+Shift+Backspace still asks before deleting completed items, ? still opens the shortcuts list, and keys pressed while a question or panel is open leave the list alone.

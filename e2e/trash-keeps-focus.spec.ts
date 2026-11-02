@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, cards, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, cards, clickEmpty, freshBoardEachTest, rowSpace } from './helpers';
 
 // Job 222 (follow-up to job 218): pressing a checklist item's own trash can left the focus nowhere,
 // so the next Delete deleted the whole (selected) card. The cursor now goes to the item above
@@ -154,4 +154,47 @@ test('Enter with Ctrl or Shift on a focused trash can does nothing', async ({ pa
   await page.keyboard.press('Control+Enter');
   await page.keyboard.press('Shift+Enter');
   await expect.poll(() => texts(list)).toEqual(['bread', 'milk']);
+});
+
+/** Typing in item `from`, Shift+click on the empty space of row `to`: whole items, as before word highlights. */
+async function selectWholeItems(list: Locator, from: number, to: number) {
+  const page = list.page();
+  await list.getByLabel('Item text').nth(from).click();
+  const p = await rowSpace(list, to);
+  await page.keyboard.down('Shift');
+  await page.mouse.click(p.x, p.y);
+  await page.keyboard.up('Shift');
+  await expect(list.locator('.todo-item.picked')).toHaveCount(Math.abs(to - from) + 1);
+  await expect(list.locator('.todo-item.words')).toHaveCount(0);
+}
+
+test('whole items (Shift+click on row space): Delete removes them through the trash, the cursor goes above, the Undo message shows', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await selectWholeItems(list, 1, 2);
+  await page.keyboard.press('Delete');
+  await expect.poll(() => texts(list)).toEqual(['bread']);
+  await expect.poll(() => focused(page)).toBe('bread');
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 2 items');
+  await page.keyboard.press('Delete');
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test('whole items (Shift+click on row space): holding Backspace removes them once; the item above keeps its text', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs', 'jam']);
+  await selectWholeItems(list, 1, 2);
+  await page.keyboard.down('Backspace');
+  await page.keyboard.down('Backspace'); // repeats
+  await page.keyboard.down('Backspace');
+  await page.keyboard.up('Backspace');
+  await expect.poll(() => texts(list)).toEqual(['bread', 'jam']);
+  await expect.poll(() => focused(page)).toBe('bread');
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 2 items');
+});
+
+test('a word highlight that removes whole items shows the Undo message too', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await highlightAfterFirst(list, 2);
+  await page.keyboard.press('Delete');
+  await expect.poll(() => texts(list)).toEqual(['bread']);
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 2 items');
 });

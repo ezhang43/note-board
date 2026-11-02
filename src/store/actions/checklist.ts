@@ -77,6 +77,7 @@ export function checklistActions(ctx: StoreContext) {
    */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    if (asking()) return false;
     if (wordSel()) return deleteWords();
     return !!sel?.ids.length && actions.trashItem(sel.cardId, sel.ids[0]);
   }
@@ -88,6 +89,9 @@ export function checklistActions(ctx: StoreContext) {
     if (!sel || sel.lists) return;
     commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
   }
+
+  /** A container's "Delete …?" is asking: no item key edits the list behind the question. */
+  const asking = () => !!ctx.state.ui.confirm;
 
   /** The Word-style highlight in one list, if that is what is selected. */
   function wordSel(): (ItemSelection & { words: W.WordRange }) | null {
@@ -101,24 +105,41 @@ export function checklistActions(ctx: StoreContext) {
     if (card?.kind !== 'todo') return;
     const words = { anchor, focus };
     const ids = W.touchedIds(card.items, words);
-    if (ids.length) updateUi({ itemSel: { cardId, anchor: anchor.id, ids, words }, selection: [cardId] });
+    // Only the line break between two items highlighted: it still counts as a highlight (Delete joins them), on the first item.
+    const order = W.ordered(card.items, words);
+    if (order) updateUi({ itemSel: { cardId, anchor: anchor.id, ids: ids.length ? ids : [order.start.id], words }, selection: [cardId] });
   }
 
   /**
-   * Delete, Backspace or a typed letter (`insert`) with a word highlight: removes just the highlighted
-   * words, joining what is left of its first and last items (wordRange.ts). One undo step; the cursor
-   * goes to where the words were. Returns whether anything changed.
+   * Delete, Backspace, cut or a typed letter (`insert`) with a word highlight: removes just the highlighted
+   * words (wordRange.ts). When whole items go, it goes the way other item deletes do (the Undo message and
+   * "Deleted…" read out); words taken from inside items are like typing, with neither. One undo step; the
+   * cursor goes to where the words were. An empty highlight with nothing typed changes nothing. Returns
+   * whether anything changed. `split` (Enter) then splits the item there.
    */
-  function deleteWords(insert = ''): boolean {
+  function replaceWords(insert = '', split = false): boolean {
     const sel = wordSel();
-    if (!sel) return false;
-    return !!commit((b) => {
-      const card = b.cards[sel.cardId];
-      const r = card?.kind === 'todo' ? W.deleteRange(card.items, sel.words, insert) : null;
-      if (!r) return null;
-      return { board: C.editItems(b, sel.cardId, () => r.items), ui: { itemSel: null, focusItem: r.focus.id, focusOffset: r.focus.offset } };
-    });
+    const card = sel && ctx.state.board.cards[sel.cardId];
+    if (!sel || card?.kind !== 'todo' || asking()) return false;
+    if (!insert && !split && W.isEmpty(card.items, sel.words)) return false;
+    const r = W.deleteRange(card.items, sel.words, insert);
+    if (!r) return false;
+    const run = () =>
+      commit((b) => {
+        let items = r.items;
+        let focus = { id: r.focus.id, offset: r.focus.offset };
+        if (split) {
+          const s = C.enterItem(r.items, r.focus.id, r.focus.offset, r.focus.offset, createItem());
+          if (!s) return null;
+          items = s.items;
+          focus = { id: s.focus, offset: s.offset };
+        }
+        return { board: C.editItems(b, sel.cardId, () => items), ui: { itemSel: null, focusItem: focus.id, focusOffset: focus.offset } };
+      });
+    if (r.removed) return ctx.deleting(`Deleted ${count(r.removed, 'item')}`, run);
+    return !!run();
   }
+  const deleteWords = (insert = '') => replaceWords(insert);
 
   function copyItems(): boolean {
     const sel = ctx.state.ui.itemSel;
@@ -126,9 +147,11 @@ export function checklistActions(ctx: StoreContext) {
     if (words) {
       const card = ctx.state.board.cards[words.cardId];
       if (card?.kind !== 'todo') return false;
-      itemClipboard = W.sliceRange(card.items, words.words);
-      if (!itemClipboard.length) return false;
-      copyText(W.rangeAsText(card.items, words.words), ITEMS_MARKER, encodeItems(itemClipboard));
+      // Only a line break highlighted copies nothing, and leaves the earlier copy in place.
+      const slice = W.sliceRange(card.items, words.words);
+      if (!slice.length) return false;
+      itemClipboard = slice;
+      copyText(W.rangeAsText(card.items, words.words), ITEMS_MARKER, encodeItems(slice));
       return true;
     }
     if (sel?.lists) {
@@ -372,24 +395,19 @@ export function checklistActions(ctx: StoreContext) {
       return true;
     },
     /** Enter with a word highlight: the words go and the item is split where they were, as Word does. One undo step. */
-    enterOverWords(): boolean {
-      const sel = wordSel();
-      if (!sel) return false;
-      return !!commit((b) => {
-        const card = b.cards[sel.cardId];
-        const r = card?.kind === 'todo' ? W.deleteRange(card.items, sel.words) : null;
-        const split = r && C.enterItem(r.items, r.focus.id, r.focus.offset, r.focus.offset, createItem());
-        if (!split) return null;
-        return { board: C.editItems(b, sel.cardId, () => split.items), ui: { itemSel: null, focusItem: split.focus, focusOffset: split.offset } };
-      });
-    },
+    enterOverWords: () => replaceWords('', true),
     copyItems,
     deleteSelectedItems,
     /** Cut removes exactly what was copied: the selected items. Unselected sub-items stay, moving up a level. */
     cutItems(): boolean {
       const sel = ctx.state.ui.itemSel;
-      if (!sel || sel.lists || !copyItems()) return false;
-      if (sel.words) return deleteWords(); // exactly the copied words, as Delete removes them
+      if (!sel || sel.lists || asking()) return false;
+      // Exactly the copied words, as Delete removes them (only a line break: nothing to copy, the two still join).
+      if (sel.words) {
+        copyItems();
+        return deleteWords();
+      }
+      if (!copyItems()) return false;
       commit((b) => C.editItems(b, sel.cardId, (items) => C.removeExactly(items, sel.ids)), { ui: { itemSel: null } });
       return true;
     },

@@ -1,12 +1,16 @@
+import { flushSync } from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyEvent } from 'react';
 import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { boxKey, focusedBox } from './textBox';
-import { panelCovers } from './textField';
+import { isTextField, panelCovers } from './textField';
 
 // The small format bar (owner request): shows above a text box when some of its text is
 // highlighted, or above selected checklist items. Its buttons format whole text boxes.
+// It stays out of the way (owner, 2026-11-02): never while the mouse is still dragging a highlight, it appears
+// PAUSE ms after the highlight stops changing (mouse released, keys stopped), and goes at once when the person
+// types, deletes, cuts or copies. Alt+F10 shows it at once.
 // From the keyboard (job 174): Alt+F10 moves into it; arrows and Tab go round it; Escape goes back to the text.
 
 interface Target {
@@ -37,6 +41,12 @@ function findTarget(): Target | null {
   };
 }
 
+/** Which text is highlighted where, to tell a real change of highlight from a selectionchange that moved nothing. */
+function highlightSig(): string {
+  const typing = focusedBox();
+  return typing ? `${boxKey(typing.box)}:${typing.field.selectionStart}-${typing.field.selectionEnd}` : '';
+}
+
 /** While the keyboard is in the bar, the text it formats has lost focus: the bar must stay. */
 const focusInBar = () => document.activeElement?.closest('.format-bar') != null;
 
@@ -49,6 +59,7 @@ function refollow(t: Target): Target | null {
 }
 
 const BAR_H = 36;
+const PAUSE = 250; // ms after the highlight settles
 const SIZES: { key: TextSize; label: string; px: number }[] = [
   { key: 'small', label: 'Small', px: 11 },
   { key: 'normal', label: 'Normal', px: 14 },
@@ -61,6 +72,9 @@ export function FormatBar() {
   const view = useAppState((s) => s.view);
   const itemSel = useAppState((s) => s.ui.itemSel);
   const [target, setTarget] = useState<Target | null>(null);
+  const [shown, setShown] = useState(false);
+  // `down`: a mouse button or finger is on the page. `waiting`: the highlight changed and the bar is due once it settles.
+  const quiet = useRef({ timer: 0, down: false, waiting: false, sig: '', itemSig: '' });
   const viewOnly = useViewOnly();
   const [fontsOpen, setFontsOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -73,11 +87,52 @@ export function FormatBar() {
   const refresh = () => setTarget(focusInBar() ? (t) => t && refollow(t) : findTarget());
   useEffect(refresh, [board, view, itemSel]); // simple: `refresh` is new each render but only uses setTarget (stable)
 
+  const q = quiet.current;
+  /** The bar is due after the pause (if the highlight still exists by then). */
+  const arm = () => {
+    clearTimeout(q.timer);
+    q.timer = window.setTimeout(() => {
+      q.waiting = false;
+      if (findTarget() || focusInBar()) setShown(true);
+    }, PAUSE);
+  };
+  /** The highlight moved: hide the bar and bring it back after the pause, once the pointer is up. */
+  const moved = () => {
+    clearTimeout(q.timer);
+    q.waiting = true;
+    setShown(false);
+    if (!q.down) arm();
+  };
+  /** Typed, deleted, cut or copied: hide, and stay hidden until the highlight changes again. */
+  const hide = () => {
+    clearTimeout(q.timer);
+    q.waiting = false;
+    setShown(false);
+  };
+  // Checklist items picked or unpicked, or the words highlighted changed. A new object with the same picks (after
+  // formatting them) is not a change: the bar must stay under the person's pointer for the next click.
+  useEffect(() => {
+    const sig = JSON.stringify(itemSel);
+    if (sig === q.itemSig) return;
+    q.itemSig = sig;
+    if (!focusInBar()) moved();
+  }, [itemSel]);
+  useEffect(() => () => clearTimeout(q.timer), []);
+
   useEffect(() => {
     const update = refresh;
     // Alt+F10 (as in Google Docs): into the bar, while some text is highlighted.
     const toBar = (e: KeyboardEvent) => {
       if (e.key !== 'F10' || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || panelCovers() || focusInBar()) return;
+      const t = findTarget();
+      if (!t) return;
+      // Alt+F10 doesn't wait for the pause: show the bar now, then step into it.
+      clearTimeout(q.timer);
+      q.waiting = false;
+      flushSync(() => {
+        setTarget(t);
+        setShown(true);
+      });
       const first = document.querySelector<HTMLElement>('.format-bar button');
       if (!first) return;
       e.preventDefault();
@@ -88,15 +143,51 @@ export function FormatBar() {
     };
     // Text selection inside a field changes without any store change.
     const later = () => setTimeout(update, 0);
-    document.addEventListener('selectionchange', update);
-    document.addEventListener('select', update, true);
+    const changed = () => {
+      update();
+      const sig = highlightSig();
+      if (sig === q.sig || focusInBar()) return;
+      q.sig = sig;
+      // No text box has a highlight any more (focus left it for the picked items, say): the picked items arm the bar
+      // themselves, and this late event must not hide a bar that is already showing for them.
+      if (sig) moved();
+    };
+    const press = (e: Event) => {
+      if (!(e.target instanceof Element && e.target.closest('.format-bar'))) q.down = true;
+    };
+    const release = () => {
+      q.down = false;
+      if (q.waiting) arm();
+    };
+    const typing = (e: KeyboardEvent) => {
+      if (focusInBar() || e.altKey) return;
+      const k = e.key;
+      const mod = e.ctrlKey || e.metaKey;
+      // In a text box any character types; with picked items only a word highlight is typed over (a letter that is
+      // just a board shortcut, like "q", leaves the bar alone).
+      const types = isTextField(e.target) || !!appStore.getState().ui.itemSel?.words;
+      const edit = mod ? k.length === 1 && 'xcv'.includes(k.toLowerCase()) : k === 'Backspace' || k === 'Delete' || (types && (k.length === 1 || k === 'Enter'));
+      if (edit) hide();
+    };
+    document.addEventListener('selectionchange', changed);
+    document.addEventListener('select', changed, true);
+    document.addEventListener('pointerdown', press, true);
+    document.addEventListener('pointerup', release, true);
+    document.addEventListener('pointercancel', release, true);
+    window.addEventListener('blur', release);
+    document.addEventListener('keydown', typing, true);
     document.addEventListener('keyup', update, true);
     document.addEventListener('focusout', later, true);
     document.addEventListener('keydown', toBar);
     window.addEventListener('resize', update);
     return () => {
-      document.removeEventListener('selectionchange', update);
-      document.removeEventListener('select', update, true);
+      document.removeEventListener('selectionchange', changed);
+      document.removeEventListener('select', changed, true);
+      document.removeEventListener('pointerdown', press, true);
+      document.removeEventListener('pointerup', release, true);
+      document.removeEventListener('pointercancel', release, true);
+      window.removeEventListener('blur', release);
+      document.removeEventListener('keydown', typing, true);
       document.removeEventListener('keyup', update, true);
       document.removeEventListener('focusout', later, true);
       document.removeEventListener('keydown', toBar);
@@ -113,24 +204,32 @@ export function FormatBar() {
     return () => els.forEach((el) => el.classList.remove('format-target'));
   }, [hovering, keys]);
 
+  const visible = shown && !!target && !viewOnly;
   useEffect(() => {
-    if (!target) {
+    if (!target) setShown(false);
+  }, [target]);
+  useEffect(() => {
+    if (!visible) {
       setFontsOpen(false);
       setHovering(false);
     }
-  }, [target]);
+  }, [visible]);
 
   // Opened from the keyboard, the Font menu takes the keyboard (opened with the mouse it must not take the cursor).
   useEffect(() => {
     if (fontsOpen && focusInBar()) (fontMenu.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? fontMenu.current?.querySelector('button'))?.focus();
   }, [fontsOpen]);
 
-  if (!target || viewOnly) return null; // nothing is formatted on a read-only board (job 161)
+  if (!visible) return null; // not yet (or no longer) due; nothing is formatted on a read-only board (job 161)
   const now = styleOf(board, target.boxes[0]) ?? {};
   const size: TextSize = now.size ?? 'normal';
   const font: TextFont = now.font ?? 'sans';
-  const room = target.top - BAR_H - 6 > 72; // below the toolbar
-  const style: CSSProperties = { left: Math.max(8, target.left), top: room ? target.top - BAR_H - 6 : target.bottom + 6 };
+  // Above the text (below the toolbar); else below it if that fits on screen; the bar never covers the highlighted words.
+  const above = target.top - BAR_H - 6;
+  const up = above > 72;
+  // Neither side fits (a very short window): below, held inside the window, and never up over the toolbar.
+  const top = up ? above : Math.max(72, Math.min(target.bottom + 6, window.innerHeight - BAR_H - 8));
+  const style: CSSProperties = { left: Math.max(8, target.left), top };
   const apply = (ask: FormatAsk) => appStore.formatBoxes(target.boxes, ask);
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();
@@ -173,7 +272,7 @@ export function FormatBar() {
 
   return (
     <div
-      className="format-bar"
+      className={up ? 'format-bar' : 'format-bar below'}
       role="toolbar"
       aria-label="Text format"
       style={style}

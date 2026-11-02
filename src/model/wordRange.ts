@@ -80,7 +80,8 @@ export function marksOf(items: TodoItem[], r: WordRange, id: string): [number, n
  *   item highlighted to its very end goes whole, so its tick doesn't count). The
  *   items between go, and so does the last one; the last item's sub-items move up under the joined item.
  * - A highlight from letter 0 of its first item removes the items before the last one whole; the last
- *   item stays, with its own id, tick, level, look and sub-items, keeping its text after the highlight.
+ *   item stays, with its own id, tick, level, look and sub-items, keeping its text after the highlight
+ *   (or the typed letter). When none of its text is left and nothing is typed it goes whole too.
  * Any other sub-item that comes after the highlight but whose parent went moves up into its parent's
  * place (as cut does). Returns the new items, where the cursor goes and how many items went whole (for
  * the Undo message), or null when the range no longer fits the list.
@@ -100,10 +101,19 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
     return { items: next, focus: { id: first.id, offset: o.start.offset + insert.length }, removed: 0 };
   }
   if (o.start.offset === 0) {
-    // The earlier items go whole; the last one stays as it was, less its highlighted letters.
-    last.text = insert + tail;
-    const kept = removeExactly(next, order.slice(i, j));
-    return { items: kept, focus: { id: last.id, offset: insert.length }, removed: j - i };
+    // The earlier items go whole; the last one stays as it was, less its highlighted letters. With none of its text
+    // left and nothing typed it goes too, as in the other case below (owner call 2026-11-02); its sub-items move up.
+    const lastGoes = !insert && !tail;
+    if (!lastGoes) last.text = insert + tail;
+    const kept = removeExactly(next, order.slice(i, lastGoes ? j + 1 : j));
+    const removed = j - i + (lastGoes ? 1 : 0);
+    if (!lastGoes) return { items: kept, focus: { id: last.id, offset: insert.length }, removed };
+    // The cursor goes where the words were: the start of the next item, else the end of the one before (or the blank one left).
+    const left = new Set(flatIds(kept));
+    const after = order.slice(j + 1).find((id) => left.has(id));
+    const before = order.slice(0, i).reverse().find((id) => left.has(id));
+    const id = after ?? before ?? flatIds(kept)[0];
+    return { items: kept, focus: { id, offset: after || !before ? 0 : findItem(kept, id)!.item.text.length }, removed };
   }
 
   first.text = first.text.slice(0, o.start.offset) + insert + tail;

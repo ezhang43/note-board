@@ -21,6 +21,15 @@ const ARROWS_THEIRS = '.resize-edge, .resize-corner, select, [role="dialog"], [r
 /** Screen pixels the board pans per arrow press (Shift: five times that). */
 const PAN_STEP = 80;
 
+/**
+ * A Word-style highlight of letters in one list that the next typed character replaces (owner request, 2026-11-01).
+ * Not while a container's "Delete …?" or the completed-items question asks, and not for Ctrl chords or composed input.
+ */
+function typesOverWords(e: KeyboardEvent): boolean {
+  const { itemSel, confirm, deleteCompleted } = appStore.getState().ui;
+  return !!itemSel?.words && !itemSel.lists && !e.isComposing && !(e.ctrlKey || e.metaKey) && !confirm && deleteCompleted !== 'ask';
+}
+
 /** Board-wide keyboard shortcuts (⌘ works in place of Ctrl on a Mac). */
 export function useShortcuts() {
   useEffect(() => {
@@ -62,7 +71,8 @@ export function useShortcuts() {
       // wherever focus is: it can be on the page itself after a click on the panel's text.
       if (panelCovers()) return;
       // Shift+1: fit to screen (as in Figma and Miro), outside text fields.
-      if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit1' && !isTextField(e.target)) return run(e, appStore.fitToScreen);
+      // Not over a word highlight: there "!" (Shift+1) is a typed character that replaces the words, like any letter.
+      if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit1' && !isTextField(e.target) && !typesOverWords(e)) return run(e, appStore.fitToScreen);
 
       // Arrows move between a card's fields and between cards; Alt+arrows jump card to card.
       if (handleArrowKey(e)) return e.preventDefault();
@@ -103,12 +113,15 @@ export function useShortcuts() {
       // The Control key on a Mac too: there ⌘+Shift+Backspace is the browser's Clear browsing data.
       if (e.ctrlKey && !e.metaKey && e.shiftKey && key === 'backspace') return run(e, appStore.askDeleteCompleted);
       if (key === 'escape' && state.ui.deleteCompleted) return appStore.cancelDeleteCompleted();
+      // A container's "Delete …?" with items selected: Escape closes the question (the items stay selected), and Tab
+      // is left to the browser to move between the question's buttons; the store keeps its other item keys off the list.
+      if (key === 'escape' && state.ui.confirm && state.ui.itemSel) return appStore.cancelDelete();
       // While it asks, no other board key acts behind the question (Tab, Enter and Space work its buttons).
       if (state.ui.deleteCompleted === 'ask') return;
 
       // A Word-style highlight of letters across items (owner request, 2026-11-01): a typed letter or Enter replaces
       // them; Delete, Backspace, Ctrl+C and Ctrl+X are the item keys below. Not while a container's "Delete …?" asks.
-      if (state.ui.itemSel?.words && !state.ui.itemSel.lists && !e.isComposing && !mod && !state.ui.confirm) {
+      if (typesOverWords(e)) {
         if (key === 'enter' && !e.shiftKey) return run(e, appStore.enterOverWords);
         // simple: one typed letter replaces them; letters built from several keys (accents, Chinese input) aren't caught here.
         if (e.key.length === 1) return run(e, () => appStore.deleteWords(e.key));
@@ -132,7 +145,7 @@ export function useShortcuts() {
         if (key === 'escape') return appStore.clearItemSelection();
         // Ctrl+A again: every list in the column, then every item on the board.
         if (mod && key === 'a') return run(e, appStore.selectAllStep);
-        if (key === 'tab') return run(e, () => appStore.tabSelectedItems(e.shiftKey));
+        if (key === 'tab' && !state.ui.confirm) return run(e, () => appStore.tabSelectedItems(e.shiftKey));
         if (mod && key === 'c') return run(e, appStore.copyItems);
         if (mod && key === 'x') return run(e, appStore.cutItems);
         if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();

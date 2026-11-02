@@ -43,8 +43,8 @@ test('cards and items whose saved ids hold odd characters still work with search
   await expect(status).toHaveText(/^2 of 2/);
   await page.keyboard.press('Escape');
 
-  // Shift+click from the item being typed in.
-  await list.getByLabel('Item text').nth(0).click();
+  // Shift+click from the item being typed in (from its first letter: a highlight from its very end wouldn't touch it).
+  await list.getByLabel('Item text').nth(0).click({ position: { x: 2, y: 8 } });
   await list.getByLabel('Item text').nth(1).click({ modifiers: ['Shift'] });
   await expect(list.locator('.todo-item.picked')).toHaveCount(2);
   await page.keyboard.press('Escape');

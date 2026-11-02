@@ -13,6 +13,8 @@ import { ArrowIcon, GripIcon, TrashIcon } from './icons';
 import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
+import { marksOf } from '../model/wordRange';
+import { anchorOf, nearestPoint, offsetAt } from './wordPoint';
 
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
   return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
@@ -66,6 +68,14 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     if (!sel) return false;
     if (sel.lists) return sel.lists.some((l) => l.cardId === cardId && l.ids.includes(item.id));
     return sel.cardId === cardId && sel.ids.includes(item.id);
+  });
+  // A Word-style highlight in this list (owner request, 2026-11-01): which of this item's letters it covers, as text so the selector stays cheap to compare.
+  // simple: this walks the list's items for every row while a highlight shows; fine for lists of a few hundred items.
+  const words = useAppState((s) => {
+    const sel = s.ui.itemSel;
+    const card = s.board.cards[cardId];
+    if (!sel?.words || sel.lists || sel.cardId !== cardId || card?.kind !== 'todo') return null;
+    return marksOf(card.items, sel.words, item.id)?.join(',') ?? '';
   });
   const mark = useAppState((s) => {
     const h = s.ui.itemDrag?.hint;
@@ -132,6 +142,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     'todo-item',
     item.done && 'done',
     picked && 'picked',
+    words !== null && 'words',
     mark && `mark-${mark}`,
     dimmed && 'dimmed',
     lifting && 'lifting',
@@ -157,6 +168,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         find={`item:${cardId}:${item.id}`}
         placeholder="Add an item"
         value={item.text}
+        marks={words ? markParts(words) : null}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
@@ -223,6 +235,12 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   );
 });
 
+/** The highlighted letters from the row's selector ("from,to,true"). */
+function markParts(words: string): [number, number, boolean] {
+  const [from, to, on] = words.split(',');
+  return [Number(from), Number(to), on === 'true'];
+}
+
 /** The cursor is at the very end of the text, with nothing selected. */
 function atEnd(el: HTMLTextAreaElement) {
   return el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
@@ -241,21 +259,38 @@ function rowPointerDown(cardId: string, itemId: string) {
     const sel = appStore.getState().ui.selection;
     if (!(e.pointerType === 'touch' && sel.length > 1 && sel.includes(cardId))) appStore.select(cardId);
     // Shift+click extends the selection, or starts one from the item being typed in.
-    const typingIn = document.activeElement?.closest<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id]`)?.dataset.itemId;
-    if (e.shiftKey && appStore.extendItemSelection(cardId, itemId, typingIn)) {
-      e.preventDefault();
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      return;
+    const typingEl = document.activeElement instanceof HTMLTextAreaElement ? document.activeElement : null;
+    const typingIn = typingEl?.closest<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id]`)?.dataset.itemId;
+    // Pressed on the item's text: the highlight is of letters, Word-style (owner request, 2026-11-01); elsewhere on the row, of whole items.
+    const textEl = (e.target as Element).closest('.item-text') ? e.currentTarget.querySelector<HTMLTextAreaElement>('.item-text > textarea') : null;
+    if (e.shiftKey) {
+      const sel = appStore.getState().ui.itemSel;
+      if (textEl && !sel?.lists && (sel ? !!sel.words : typingIn !== itemId)) {
+        // In the item being typed in (with no highlight) the browser extends its own selection, letter by letter.
+        const from = typingIn && typingEl ? { id: typingIn, offset: anchorOf(typingEl) } : null;
+        if (appStore.extendWords(cardId, { id: itemId, offset: offsetAt(textEl, e.clientX, e.clientY) }, from)) {
+          e.preventDefault();
+          typingEl?.blur();
+          return;
+        }
+      } else if (!textEl || sel) {
+        if (appStore.extendItemSelection(cardId, itemId, typingIn)) {
+          e.preventDefault();
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          return;
+        }
+      } else return; // Shift+click in the item being typed in: the browser's own
     }
     appStore.clearItemSelection();
     // By finger, moving moves the board instead (owner request), so no range selection.
     if (e.pointerType === 'touch') return;
 
+    const anchor = textEl ? { id: itemId, offset: offsetAt(textEl, e.clientX, e.clientY) } : null;
     let selecting = false;
     const onMove = (ev: { clientX: number; clientY: number }) => {
       if (appStore.getState().ui.drag) return; // a long press turned this into dragging the card
       const over = rowUnder(ev.clientX, ev.clientY, cardId);
-      // Into another card of the same column: the selection carries on across the cards (owner request).
+      // Into another card of the same column: the selection carries on across the cards (owner request), as whole items.
       const elsewhere = over ? null : rowAt(ev.clientX, ev.clientY);
       const col = elsewhere && columnOf(appStore.getState().board, cardId);
       if (elsewhere && col && col.id === columnOf(appStore.getState().board, elsewhere.cardId)?.id) {
@@ -263,6 +298,18 @@ function rowPointerDown(cardId: string, itemId: string) {
         selecting = true;
         window.getSelection()?.removeAllRanges();
         return appStore.selectAcross(col.id, { cardId, itemId }, elsewhere);
+      }
+      if (anchor) {
+        // From the text: letter to letter, at the nearest line of the nearest item (between rows, above or below the text too).
+        const to = nearestPoint(cardId, ev.clientX, ev.clientY);
+        if (!selecting) {
+          if (!to || to.id === itemId) return; // still in its own item: the browser selects the letters
+          selecting = true;
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        }
+        window.getSelection()?.removeAllRanges();
+        if (to) appStore.selectWords(cardId, anchor, to);
+        return;
       }
       if (!selecting) {
         if (!over || over === itemId) return;

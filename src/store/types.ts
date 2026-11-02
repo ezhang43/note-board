@@ -1,3 +1,4 @@
+import type { WordRange } from '../model/wordRange';
 import type { Comment } from '../model/comments';
 import type { Match } from '../model/search';
 import type { VersionMeta } from '../model/versions';
@@ -100,6 +101,11 @@ export interface ItemSelection {
   lists?: ListSelection[];
   /** Which Ctrl+A step made it: every list in the column, or the whole board. */
   level?: 'column' | 'board';
+  /**
+   * A Word-style highlight of exact letters across items (owner request, 2026-11-01): from a letter in
+   * one item to a letter in another. `ids` are then the items it touches (ticking, the trash, the grip).
+   */
+  words?: WordRange;
 }
 
 /** Where dragged checklist items would go if dropped now, and which row shows the drop mark. */

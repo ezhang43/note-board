@@ -106,6 +106,14 @@ export function useShortcuts() {
       // While it asks, no other board key acts behind the question (Tab, Enter and Space work its buttons).
       if (state.ui.deleteCompleted === 'ask') return;
 
+      // A Word-style highlight of letters across items (owner request, 2026-11-01): a typed letter or Enter replaces
+      // them; Delete, Backspace, Ctrl+C and Ctrl+X are the item keys below. Not while a container's "Delete …?" asks.
+      if (state.ui.itemSel?.words && !state.ui.itemSel.lists && !e.isComposing && !mod && !state.ui.confirm) {
+        if (key === 'enter' && !e.shiftKey) return run(e, appStore.enterOverWords);
+        // simple: one typed letter replaces them; letters built from several keys (accents, Chinese input) aren't caught here.
+        if (e.key.length === 1) return run(e, () => appStore.deleteWords(e.key));
+      }
+
       // Ctrl+arrows switch boards (owner request, 2026-10-16). Control only: on a Mac the system
       // often keeps these keys for Spaces, and ⌘+arrows are the browser's.
       const move = BOARD_MOVE[e.key];

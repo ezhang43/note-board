@@ -167,3 +167,15 @@ export const holdAndMoveSteps = (from: Pt, to: Pt, holdMs = 700): TouchStep[] =>
 ];
 /** Rest a finger for `holdMs`, then move it to `to`; letting go. */
 export const holdAndDrag = (page: Page, from: Pt, to: Pt, holdMs = 700) => touch(page, [...holdAndMoveSteps(from, to, holdMs), { type: 'touchEnd' }]);
+
+/** A spot on checklist row `n` of `list` that is neither its text nor a button: the row's own space under its text box. */
+export async function rowSpace(list: Locator, n: number) {
+  return list.locator('[data-item-id]').nth(n).evaluate((row) => {
+    const r = row.getBoundingClientRect();
+    const t = row.querySelector('.item-text')!.getBoundingClientRect();
+    const p = { x: t.left + 8, y: (t.bottom + r.bottom) / 2 };
+    const hit = document.elementFromPoint(p.x, p.y);
+    if (hit !== row) throw new Error(`not the row's own space: ${hit?.tagName}.${hit?.className}`);
+    return p;
+  });
+}

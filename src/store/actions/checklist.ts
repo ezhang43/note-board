@@ -9,7 +9,8 @@ import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
 import { copyText, ITEMS_MARKER, typingAt } from '../env';
 import { decodeRich, encodeItems, richToItems } from '../../model/journalPaste';
-import type { ItemDrag, ItemHint } from '../types';
+import type { ItemDrag, ItemHint, ItemSelection } from '../types';
+import * as W from '../../model/wordRange';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
 
@@ -76,6 +77,8 @@ export function checklistActions(ctx: StoreContext) {
    */
   function deleteSelectedItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    if (asking()) return false;
+    if (wordSel()) return deleteWords();
     return !!sel?.ids.length && actions.trashItem(sel.cardId, sel.ids[0]);
   }
 
@@ -87,8 +90,70 @@ export function checklistActions(ctx: StoreContext) {
     commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
   }
 
+  /** A container's "Delete …?" is asking: no item key edits the list behind the question. */
+  const asking = () => !!ctx.state.ui.confirm;
+
+  /** The Word-style highlight in one list, if that is what is selected. */
+  function wordSel(): (ItemSelection & { words: W.WordRange }) | null {
+    const sel = ctx.state.ui.itemSel;
+    return sel?.words && !sel.lists ? (sel as ItemSelection & { words: W.WordRange }) : null;
+  }
+
+  /** Select the letters from `anchor` to `focus` in one list, Word-style (the items they touch are selected too). */
+  function selectWords(cardId: string, anchor: W.ItemPoint, focus: W.ItemPoint) {
+    const card = ctx.state.board.cards[cardId];
+    if (card?.kind !== 'todo') return;
+    const words = { anchor, focus };
+    const ids = W.touchedIds(card.items, words);
+    // Only the line break between two items highlighted: it still counts as a highlight (Delete joins them), on the first item.
+    const order = W.ordered(card.items, words);
+    if (order) updateUi({ itemSel: { cardId, anchor: anchor.id, ids: ids.length ? ids : [order.start.id], words }, selection: [cardId] });
+  }
+
+  /**
+   * Delete, Backspace, cut or a typed letter (`insert`) with a word highlight: removes just the highlighted
+   * words (wordRange.ts). When whole items go, it goes the way other item deletes do (the Undo message and
+   * "Deleted…" read out); words taken from inside items are like typing, with neither. One undo step; the
+   * cursor goes to where the words were. An empty highlight with nothing typed changes nothing. Returns
+   * whether anything changed. `split` (Enter) then splits the item there.
+   */
+  function replaceWords(insert = '', split = false): boolean {
+    const sel = wordSel();
+    const card = sel && ctx.state.board.cards[sel.cardId];
+    if (!sel || card?.kind !== 'todo' || asking()) return false;
+    if (!insert && !split && W.isEmpty(card.items, sel.words)) return false;
+    const r = W.deleteRange(card.items, sel.words, insert);
+    if (!r) return false;
+    const run = () =>
+      commit((b) => {
+        let items = r.items;
+        let focus = { id: r.focus.id, offset: r.focus.offset };
+        if (split) {
+          const s = C.enterItem(r.items, r.focus.id, r.focus.offset, r.focus.offset, createItem());
+          if (!s) return null;
+          items = s.items;
+          focus = { id: s.focus, offset: s.offset };
+        }
+        return { board: C.editItems(b, sel.cardId, () => items), ui: { itemSel: null, focusItem: focus.id, focusOffset: focus.offset } };
+      });
+    if (r.removed) return ctx.deleting(`Deleted ${count(r.removed, 'item')}`, run);
+    return !!run();
+  }
+  const deleteWords = (insert = '') => replaceWords(insert);
+
   function copyItems(): boolean {
     const sel = ctx.state.ui.itemSel;
+    const words = wordSel();
+    if (words) {
+      const card = ctx.state.board.cards[words.cardId];
+      if (card?.kind !== 'todo') return false;
+      // Only a line break highlighted copies nothing, and leaves the earlier copy in place.
+      const slice = W.sliceRange(card.items, words.words);
+      if (!slice.length) return false;
+      itemClipboard = slice;
+      copyText(W.rangeAsText(card.items, words.words), ITEMS_MARKER, encodeItems(slice));
+      return true;
+    }
     if (sel?.lists) {
       const board = ctx.state.board;
       const copied = sel.lists.flatMap((l) => {
@@ -316,12 +381,33 @@ export function checklistActions(ctx: StoreContext) {
       return true;
     },
     clearItemSelection: () => updateUi({ itemSel: null }),
+    selectWords,
+    deleteWords,
+    /**
+     * Shift+click on an item's text: extends the word highlight from where it started, or starts one from
+     * `from` (the cursor in the item being typed in). Returns false when there is nothing to extend from.
+     */
+    extendWords(cardId: string, to: W.ItemPoint, from?: W.ItemPoint | null): boolean {
+      const sel = ctx.state.ui.itemSel;
+      const anchor = (sel?.cardId === cardId && !sel.lists ? sel.words?.anchor : null) ?? from;
+      if (!anchor) return false;
+      selectWords(cardId, anchor, to);
+      return true;
+    },
+    /** Enter with a word highlight: the words go and the item is split where they were, as Word does. One undo step. */
+    enterOverWords: () => replaceWords('', true),
     copyItems,
     deleteSelectedItems,
     /** Cut removes exactly what was copied: the selected items. Unselected sub-items stay, moving up a level. */
     cutItems(): boolean {
       const sel = ctx.state.ui.itemSel;
-      if (!sel || sel.lists || !copyItems()) return false;
+      if (!sel || sel.lists || asking()) return false;
+      // Exactly the copied words, as Delete removes them (only a line break: nothing to copy, the two still join).
+      if (sel.words) {
+        copyItems();
+        return deleteWords();
+      }
+      if (!copyItems()) return false;
       commit((b) => C.editItems(b, sel.cardId, (items) => C.removeExactly(items, sel.ids)), { ui: { itemSel: null } });
       return true;
     },

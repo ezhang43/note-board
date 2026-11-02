@@ -86,7 +86,7 @@ export function checklistActions(ctx: StoreContext) {
   function tabSelectedItems(outdent: boolean) {
     const sel = ctx.state.ui.itemSel;
     // Tab doesn't apply across several lists (owner's choice).
-    if (!sel || sel.lists) return;
+    if (!sel || sel.lists || asking()) return;
     commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
   }
 
@@ -147,7 +147,8 @@ export function checklistActions(ctx: StoreContext) {
     if (words) {
       const card = ctx.state.board.cards[words.cardId];
       if (card?.kind !== 'todo') return false;
-      // Only a line break highlighted copies nothing, and leaves the earlier copy in place.
+      // An empty highlight, or only a line break, copies nothing and leaves the earlier copy in place.
+      if (W.isEmpty(card.items, words.words)) return false;
       const slice = W.sliceRange(card.items, words.words);
       if (!slice.length) return false;
       itemClipboard = slice;
@@ -404,7 +405,7 @@ export function checklistActions(ctx: StoreContext) {
       if (!sel || sel.lists || asking()) return false;
       // Exactly the copied words, as Delete removes them (only a line break: nothing to copy, the two still join).
       if (sel.words) {
-        copyItems();
+        copyItems(); // an empty highlight copies nothing, and deleteWords then changes nothing
         return deleteWords();
       }
       if (!copyItems()) return false;
@@ -415,7 +416,7 @@ export function checklistActions(ctx: StoreContext) {
     pasteItems(): boolean {
       const sel = ctx.state.ui.itemSel;
       const card = sel && ctx.state.board.cards[sel.cardId];
-      if (!sel || sel.lists || card?.kind !== 'todo' || !itemClipboard?.length) return false;
+      if (!sel || sel.lists || asking() || card?.kind !== 'todo' || !itemClipboard?.length) return false;
       const order = C.flatIds(card.items).filter((id) => sel.ids.includes(id));
       return pasteAndSelect(sel.cardId, itemClipboard, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
     },
@@ -428,7 +429,7 @@ export function checklistActions(ctx: StoreContext) {
      */
     pasteItemsInto(cardId: string, itemId: string): boolean {
       const card = ctx.state.board.cards[cardId];
-      if (card?.kind !== 'todo' || !itemClipboard?.length || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      if (card?.kind !== 'todo' || !itemClipboard?.length || asking() || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
       return pasteAndSelect(cardId, itemClipboard, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
     },
 

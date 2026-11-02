@@ -180,3 +180,70 @@ describe('a word highlight across items', () => {
     expect(s.getState().board).toBe(before);
   });
 });
+
+describe('an empty highlight and the clipboard (leftovers of PR #230)', () => {
+  it('Ctrl+C and Ctrl+X on an empty highlight keep the earlier copy and change nothing', () => {
+    const { s, id, ids, texts } = setup(['one', 'two', 'three']);
+    s.selectWords(id, { id: ids[2], offset: 0 }, { id: ids[2], offset: 5 });
+    expect(s.copyItems()).toBe(true);
+    s.selectWords(id, { id: ids[0], offset: 2 }, { id: ids[0], offset: 2 }); // both ends at the same point
+    expect(s.getState().ui.itemSel?.words).toBeTruthy();
+    const before = s.getState().board;
+    expect(s.copyItems()).toBe(false);
+    expect(s.cutItems()).toBe(false);
+    expect(s.getState().board).toBe(before);
+    // The earlier copy is still what pastes.
+    expect(s.pasteItemsInto(id, ids[1])).toBe(true);
+    expect(texts()).toEqual(['one', 'two', 'three', 'three']);
+    s.undo();
+    expect(texts()).toEqual(['one', 'two', 'three']);
+  });
+});
+
+describe("while a container's \"Delete …?\" asks, no key changes the list behind it", () => {
+  function asking() {
+    const s = createStore(null, (fn) => fn());
+    s.setViewportSize({ width: 1200, height: 800 });
+    s.addColumn();
+    const col = s.getState().ui.selection[0];
+    s.addCard('todo'); // into the selected container
+    const id = s.getState().ui.selection[0];
+    let item = (s.getState().board.cards[id] as TodoCard).items[0].id;
+    for (const t of ['one', 'two', 'three']) {
+      s.setItemText(id, item, t);
+      if (t !== 'three') {
+        s.itemEnter(id, item);
+        item = s.getState().ui.focusItem!;
+      }
+    }
+    vi.advanceTimersByTime(5000);
+    const ids = flatIds((s.getState().board.cards[id] as TodoCard).items);
+    return { s, col, id, ids };
+  }
+
+  it('Tab, Shift+Tab and paste on selected items do nothing to the list', () => {
+    const { s, col, id, ids } = asking();
+    // Something copied first, so a paste would add items.
+    s.selectItemRange(id, ids[0], ids[0]);
+    expect(s.copyItems()).toBe(true);
+    s.selectItemRange(id, ids[1], ids[2]);
+    s.askDeleteColumn(col);
+    expect(s.getState().ui.confirm).not.toBeNull();
+    const before = s.getState().board;
+    s.tabSelectedItems(false);
+    s.tabSelectedItems(true);
+    s.itemTab(id, ids[1], false);
+    expect(s.pasteItems()).toBe(false);
+    expect(s.pasteItemsInto(id, ids[0])).toBe(false);
+    expect(s.getState().board).toBe(before);
+  });
+
+  it('after the question closes, Tab indents again', () => {
+    const { s, col, id, ids } = asking();
+    s.selectItemRange(id, ids[1], ids[1]);
+    s.askDeleteColumn(col);
+    s.cancelDelete();
+    s.tabSelectedItems(false);
+    expect((s.getState().board.cards[id] as TodoCard).items[0].children.map((c) => c.text)).toEqual(['two']);
+  });
+});

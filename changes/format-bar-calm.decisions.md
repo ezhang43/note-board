@@ -1,0 +1,6 @@
+- 2026-11-02 Format bar pause: the bar waits 250ms after the highlight stops changing (mouse released, or keys stopped), the middle of the 200-300ms the owner allowed. Pressing a key restarts the wait.
+- 2026-11-02 Format bar fade: opacity plus a 4px slide, 150ms ease-out (strong ease-out curve), on appearing only. No fade-out, so it never blocks clicks as it leaves. No animation with reduced motion.
+- 2026-11-02 Format bar hides on typing, Backspace/Delete/Enter, Ctrl+X, Ctrl+C and Ctrl+V; Ctrl+B / Ctrl+I do not hide it. After Ctrl+C it stays hidden until the highlight actually changes.
+- 2026-11-02 Format bar placement: kept relative to the whole box (or the picked checklist items), which can never cover highlighted words. Above if there is room under the toolbar, else below; if neither fits it goes above, clamped to the top of the screen.
+- 2026-11-02 Phone and touch: no separate behavior. Highlights made by touch (long-press, selection handles) show the bar by the same "after the highlight stops changing" pause. The phone layout is otherwise unchanged.
+- 2026-11-02 Alt+F10 shows the bar at once (skips the pause) and moves into it, as before.

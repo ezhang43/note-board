@@ -10,6 +10,7 @@ import type { Point, View } from '../model/types';
 import type { ItemDrag } from '../store/store';
 import { canvasRect, clientToCanvas, finishGlide, glideBoard, setCanvasElement } from './canvasDom';
 import { followEdges } from './edgeFollow';
+import { Arrows } from './Arrows';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { EmptyStart } from './TemplatePicker';
@@ -372,6 +373,7 @@ export function Canvas() {
         <BoardReadOnly value={readOnly}>
           {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
         </BoardReadOnly>
+        <Arrows />
         {/* Alignment guides: where the dragged block lines up with another (owner request). */}
         {/* Keyed by place in the list: two guides can share axis, line and start (the block lined up
             with two others at once), and repeated keys made React leave old lines on the board. */}

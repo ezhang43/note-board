@@ -1,12 +1,12 @@
-import type { Board, Card, Column, CompletedCard, CompletedEntry, CompletedGroup, NoteCard, TodoCard, TodoItem } from './types';
+import type { Arrow, Board, Card, Column, CompletedCard, CompletedEntry, CompletedGroup, NoteCard, TodoCard, TodoItem } from './types';
 
 // Combining two people's edits to a board (real-time collaboration, owner request 2026-10-05).
 // `base` is the board both started from, `mine` this page's board, `theirs` the one someone else
-// saved. Changes to different things (cards, fields of a card, checklist items) are all
+// saved. Changes to different things (cards, fields of a card, checklist items, arrows) are all
 // kept. When both changed the very same thing, mine wins: it is the later change, since this page
 // sends the combined board straight after. A thing deleted on one side but edited on the other is
 // kept, so nothing typed is lost. The result always keeps the board's rules: every card in exactly
-// one place, every item in one list.
+// one place, every item in one list, no arrow to a missing block.
 
 type Obj = Record<string, unknown>;
 
@@ -284,6 +284,23 @@ function mergeItems(b: Board, m: Board, t: Board, cards: Record<string, Card>): 
 }
 
 /**
+ * Arrows (job card-arrows): ones either side drew are kept, ones either side deleted go, and never
+ * an arrow to a block that is gone or a second arrow between the same two blocks (both drew it).
+ */
+function mergeArrows(b: Board, m: Board, t: Board, blocks: (id: string) => boolean): Arrow[] {
+  const byId = (as: Arrow[] = []) => Object.fromEntries(as.map((a) => [a.id, a]));
+  const kept = mergeEntities(byId(b.arrows), byId(m.arrows), byId(t.arrows), (ba, ma, ta) => mergeFields(ba, ma, ta));
+  // Order doesn't show on the board: mine first, then theirs. The first arrow for a pair of blocks wins.
+  const out: Arrow[] = [];
+  for (const { id } of [...(m.arrows ?? []), ...(t.arrows ?? [])]) {
+    const a = kept[id];
+    if (!a || !blocks(a.from) || !blocks(a.to) || out.some((x) => x.id === id)) continue;
+    if (!out.some((x) => (x.from === a.from && x.to === a.to) || (x.from === a.to && x.to === a.from))) out.push(a);
+  }
+  return out;
+}
+
+/**
  * Columns and cards `side` deleted but `other` edited are kept, whole: they are put back on `side`
  * as they were in `base`, with what was in them (a column's cards, a list's items), as if `side` had
  * never deleted them. Otherwise only the edited part would come back (a list with just the item
@@ -331,11 +348,13 @@ export function mergeBoards(base: Board, mineAsIs: Board, theirsAsIs: Board): Bo
   for (const [id, col] of Object.entries(columns)) outColumns[id] = { ...col, cardIds: lists.get(`col:${id}`) ?? [] };
 
   const merged: Board = {
-    ...mergeFields(base, mine, theirs, ['cards', 'columns', 'order']),
+    ...mergeFields(base, mine, theirs, ['cards', 'columns', 'order', 'arrows']),
     cards,
     columns: outColumns,
     order: lists.get('order') ?? [],
   };
+  const arrows = mergeArrows(base, mine, theirs, (id) => Boolean(cards[id] || outColumns[id]));
+  if (arrows.length) merged.arrows = arrows;
   if (deepEqual(merged, theirsAsIs)) return theirsAsIs;
   if (deepEqual(merged, mineAsIs)) return mineAsIs;
   return merged;

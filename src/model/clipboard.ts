@@ -1,3 +1,4 @@
+import { addArrow, arrowsAmong } from './arrows';
 import { addCard as addCardAt, addColumn, columnOf, type Placement } from './board';
 import { isPermanent, newId, type MakeId } from './cards';
 import { freshCopies } from './checklist';
@@ -6,10 +7,14 @@ import type { Board, Card, Column } from './types';
 /** How far each paste is offset from the copied blocks (and from the previous paste). */
 const PASTE_OFFSET = 40;
 
-/** A copied block. Cards remember which column they came from so a copy can go back next to them. */
+/**
+ * A copied block. Cards remember which column they came from so a copy can go back next to them.
+ * An arrow between two copied blocks (job card-arrows) is copied too, by the blocks' old ids.
+ */
 export type ClipEntry =
   | { kind: 'card'; card: Card; columnId: string | null }
-  | { kind: 'column'; column: Column; cards: Card[] };
+  | { kind: 'column'; column: Column; cards: Card[] }
+  | { kind: 'arrow'; from: string; to: string };
 
 /**
  * Copies the selected blocks. A column copies with its cards; a card whose column is also
@@ -34,6 +39,9 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
     const copy = parent ? { ...structuredClone(card), x: parent.x, y: parent.y } : structuredClone(card);
     entries.push({ kind: 'card', card: copy, columnId: parent?.id ?? null });
   }
+  // Only arrows between blocks copied here (a container's cards count): never to one left behind.
+  const copied = entries.flatMap((e) => (e.kind === 'card' ? [e.card.id] : e.kind === 'column' ? [e.column.id] : []));
+  for (const a of arrowsAmong(board, copied)) entries.push({ kind: 'arrow', from: a.from, to: a.to });
   return entries;
 }
 
@@ -57,9 +65,18 @@ export function pasteBlocks(
   const off = PASTE_OFFSET * times;
   const ids: string[] = [];
   let b = board;
+  /** Each copied block's id → its copy's. */
+  const copyOf = new Map<string, string>();
   for (const e of entries) {
+    if (e.kind === 'arrow') {
+      const from = copyOf.get(e.from);
+      const to = copyOf.get(e.to);
+      if (from && to) b = addArrow(b, from, to, makeId('a')) ?? b;
+      continue;
+    }
     if (e.kind === 'column') {
       const cards = e.cards.map((c) => freshCard(c, makeId));
+      e.cards.forEach((c, i) => copyOf.set(c.id, cards[i].id));
       const col: Column = {
         ...structuredClone(e.column),
         id: makeId('c'),
@@ -68,11 +85,13 @@ export function pasteBlocks(
         y: e.column.y + off,
         cardIds: cards.map((c) => c.id),
       };
+      copyOf.set(e.column.id, col.id);
       b = addColumn({ ...b, cards: { ...b.cards, ...Object.fromEntries(cards.map((c) => [c.id, c])) } }, col);
       ids.push(col.id);
       continue;
     }
     const card = freshCard(e.card, makeId);
+    copyOf.set(e.card.id, card.id);
     const col = e.columnId ? b.columns[e.columnId] : undefined;
     let place: Placement;
     if (col) {

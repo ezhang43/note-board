@@ -1,3 +1,4 @@
+import { pruneArrows } from './arrows';
 import { isPermanent } from './cards';
 import { CARD_MAX_W, CARD_MIN_W, CARD_W, COLUMN_MAX_W, COLUMN_MIN_W, DEFAULT_BOARD_NAME } from './constants';
 import { AUTO_COLOUR_ORDER, type ColorKey } from './palette';
@@ -236,7 +237,7 @@ export function deleteCard(board: Board, cardId: string): Board {
   const detached = detach(board, cardId);
   const cards = { ...detached.cards };
   delete cards[cardId];
-  return { ...detached, cards };
+  return pruneArrows({ ...detached, cards });
 }
 
 /** Deletes a column and every card in it, except the Completed card, which is left loose where the column was. */
@@ -249,7 +250,7 @@ export function deleteColumn(board: Board, columnId: string): Board {
   for (const id of kept) cards[id] = { ...cards[id], x: col.x, y: col.y };
   const columns = { ...board.columns };
   delete columns[columnId];
-  return { ...board, cards, columns, order: [...board.order.filter((id) => id !== columnId), ...kept] };
+  return pruneArrows({ ...board, cards, columns, order: [...board.order.filter((id) => id !== columnId), ...kept] });
 }
 
 /** Deletes every listed card and column (columns go with their cards). */
@@ -381,5 +382,6 @@ export function problems(board: Board): string[] {
     const n = seen.get(id) ?? 0;
     if (n !== 1) out.push(`card ${id} is in ${n} places`);
   }
+  for (const a of board.arrows ?? []) if (!(board.cards[a.from] || board.columns[a.from]) || !(board.cards[a.to] || board.columns[a.to])) out.push(`arrow ${a.id} joins a missing block`);
   return out;
 }

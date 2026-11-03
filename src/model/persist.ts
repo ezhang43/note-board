@@ -196,7 +196,8 @@ export function readBoardData(version: unknown, b: unknown): Board | null {
   // Version 1 (step 1) only had the name and snap setting.
   if (version === 1) return { ...fresh, ...basics };
   if (version !== BOARD_VERSION) return null;
-  // Arrows saved before they were removed (owner, 2026-10-16) aren't read, so the next save erases them.
+  // Arrows aren't read here: a workspace from version 5 reads them (workspace.ts); ones saved before
+  // 2026-10-16 were erased by the owner's choice, so the next save drops them.
   return { ...basics, ...parseBlocks(b) };
 }
 

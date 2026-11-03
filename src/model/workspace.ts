@@ -1,4 +1,5 @@
 import { createBoard, deleteBlocks } from './board';
+import { readArrows } from './arrows';
 import { BOARD_VERSION, readBoard, readBoardData } from './persist';
 import type { Board } from './types';
 
@@ -22,7 +23,7 @@ export const HOME_ID = 'home';
  * still open then refuses the boards instead of dropping what it doesn't know and saving that loss.
  * A test (persist-roundtrip) fails until it is raised. Every version from OLDEST_WORKSPACE_VERSION up to it is read.
  */
-export const WORKSPACE_VERSION = 4;
+export const WORKSPACE_VERSION = 5;
 export const OLDEST_WORKSPACE_VERSION = 3;
 
 export function serializeWorkspace(ws: Workspace): string {
@@ -54,7 +55,11 @@ export function readWorkspace(raw: string | null): { ws: Workspace; legacy: bool
   const boards: Record<string, Board> = {};
   for (const [id, b] of Object.entries(data.boards)) {
     const board = readBoardData(BOARD_VERSION, b);
-    if (board) boards[id] = board;
+    if (!board) continue;
+    // Arrows are saved from version 5 (job card-arrows). Any in an older save are the ones removed
+    // on 2026-10-16, which the owner chose to erase, so they aren't read.
+    const arrows = data.version >= 5 && isObject(b) ? readArrows(b.arrows, board) : undefined;
+    boards[id] = arrows ? { ...board, arrows } : board;
   }
   const ids = Object.keys(boards);
   if (!ids.length) return null;

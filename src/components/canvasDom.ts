@@ -1,5 +1,6 @@
 import { COLUMN_DROP_REACH } from '../model/constants';
 import { columnAt, insertIndex } from '../model/geometry';
+import type { Board, Rect } from '../model/types';
 import { screenToBoard, zoomForFind } from '../model/view';
 import { appStore } from '../store/appStore';
 
@@ -140,4 +141,53 @@ export function revealOnBoard(el: Element) {
   }
   const r = el.getBoundingClientRect();
   appStore.panBy(Math.round(centre.x - (r.left + r.width / 2)), Math.round(centre.y - (r.top + r.height / 2)));
+}
+
+// Arrows between cards and containers (job card-arrows): where their blocks are drawn.
+
+const blockSelector = (id: string) => `.world [data-card-id="${CSS.escape(id)}"], .world [data-col-id="${CSS.escape(id)}"]`;
+
+/** The element drawn for a block; a card hidden in a collapsed container counts as its container. */
+export function blockEl(board: Board, id: string): HTMLElement | null {
+  const el = document.querySelector<HTMLElement>(blockSelector(id));
+  if (el) return el;
+  const col = Object.values(board.columns).find((c) => c.cardIds.includes(id));
+  return col ? document.querySelector<HTMLElement>(blockSelector(col.id)) : null;
+}
+
+/**
+ * Where an element is, in board pixels, given where the board's corner is on screen now (`origin`:
+ * a 1px-wide element at the board's 0,0, so its width is the zoom, right even while the board glides).
+ */
+export function boardRect(el: Element, origin: DOMRect): Rect {
+  const r = el.getBoundingClientRect();
+  const zoom = origin.width;
+  return { x: (r.left - origin.left) / zoom, y: (r.top - origin.top) / zoom, w: r.width / zoom, h: r.height / zoom };
+}
+
+/**
+ * Where everything a block's arrow dots must keep off is, in board pixels: every other card and
+ * container, and the title strip of the container the block sits in (the rest of it is free).
+ */
+export function dotObstacles(block: HTMLElement, origin: DOMRect): Rect[] {
+  const out: Rect[] = [];
+  for (const el of document.querySelectorAll<HTMLElement>('.world [data-card-id], .world [data-col-id]')) {
+    if (el === block || block.contains(el)) continue;
+    const header = el.contains(block) ? el.querySelector(':scope > .column-header') : el;
+    if (header) out.push(boardRect(header, origin));
+  }
+  return out;
+}
+
+/** The block (a card before its container) under a screen point, unless it is `from` or nested with it. */
+export function blockUnder(clientX: number, clientY: number, from: string): string | null {
+  const fromEl = document.querySelector(blockSelector(from));
+  for (const el of document.elementsFromPoint(clientX, clientY)) {
+    const block = el.closest<HTMLElement>('.world [data-card-id], .world [data-col-id]');
+    if (!block) continue;
+    const id = block.dataset.cardId ?? block.dataset.colId!;
+    if (id === from || fromEl?.contains(block) || block.contains(fromEl)) return null;
+    return id;
+  }
+  return null;
 }

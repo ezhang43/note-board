@@ -1,32 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, cards, clickEmpty, freshBoardEachTest, grabPoint } from './helpers';
+import { add, cards, clickEmpty, freshBoardEachTest } from './helpers';
 
-// Owner request (2026-10-16): arrows between cards and containers are gone. No connection dots
-// on hovered or selected blocks, and boards saved with arrows open without them, everything else kept.
+// Owner request (2026-10-16): the first arrows between cards and containers were removed, and boards
+// saved with them (saved versions 3 and 4) open without them, everything else kept. Arrows came back
+// on 2026-11-03 (job card-arrows, e2e/card-arrows.spec.ts) from saved version 5; the old ones stay erased.
 
 freshBoardEachTest();
 
-const anyArrowBits = (page: Page) => page.locator('.arrow-dot, .arrows-layer, [data-arrow-id], .arrow-delete');
+const anyArrowBits = (page: Page) => page.locator('[data-arrow-id]');
 
-test('hovering or selecting a card or container shows no connection dots', async ({ page }) => {
-  await add(page, 'New container');
-  await add(page, 'Note');
-  await clickEmpty(page);
-  await add(page, 'Note');
-  const note = page.locator('.card.selected');
-  await expect(note).toHaveCount(1);
-  const c = await box(note);
-  await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
-  await page.waitForTimeout(400); // the dots used to fade in after a moment
-  await expect(anyArrowBits(page)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Draw an arrow/ })).toHaveCount(0);
-  const g = await grabPoint(page.locator('[data-col-id]'));
-  await page.mouse.click(g.x, g.y);
-  await page.waitForTimeout(400);
-  await expect(anyArrowBits(page)).toHaveCount(0);
-});
-
-test('a board saved with arrows opens without them, keeping its cards; the next save drops them', async ({ page }) => {
+test('a board saved with the old arrows (version 4) opens without them, keeping its cards; the next save drops them', async ({ page }) => {
   await add(page, 'Note');
   await page.keyboard.type('first');
   await clickEmpty(page);
@@ -39,6 +22,7 @@ test('a board saved with arrows opens without them, keeping its cards; the next 
     const board = raw.boards[raw.home];
     const [a, b] = board.order;
     board.arrows = [{ id: 'x1', from: a, to: b }];
+    raw.version = 4;
     return JSON.stringify(raw);
   });
   // Put in before the app starts (it saves its own board as the page closes).

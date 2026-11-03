@@ -37,6 +37,8 @@
   --honey-ink: #1f1d1a;
   --nest-mark: #b07a0e;
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
+  /* Arrows between cards and containers (job card-arrows): thin gray, 3:1 against the board. */
+  --arrow-line: #8a8378;
   --colour-dot: #efece6;
   --toolbar-height: 64px;
   /* Layers, lowest first: a side panel, then the toolbar with its menus (File, Appearance, Boards, ⋯) and the Share panel, which open over it. */
@@ -98,6 +100,7 @@
   --honey: #f2c14e;
   --toast-action: #8a5a00;
   --honey-ink: #1b1a17;
+  --arrow-line: #857f75;
   --hl-yellow: #6b5a14;
   --hl-green: #2e5a2c;
   --hl-blue: #23466e;
@@ -1751,6 +1754,81 @@ html[data-glide] .world {
 .align-guide { position: absolute; pointer-events: none; z-index: 5; background: var(--accent); }
 .align-guide.x { width: 1.5px; margin-left: -0.75px; }
 .align-guide.y { height: 1.5px; margin-top: -0.75px; }
+
+/*
+ * Arrows between cards and containers (job card-arrows, placed by Arrows.tsx): a thin gray straight
+ * line with an open arrowhead, amber when selected, like a selected block. They zoom with the board.
+ */
+.arrows-layer { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 4; }
+.arrow-line { fill: none; stroke: var(--arrow-line); stroke-width: 1.5px; stroke-linecap: round; }
+.arrow-tip { fill: none; stroke: var(--arrow-line); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.arrow-tip.on { stroke: var(--accent); }
+.arrow.selected .arrow-line, .arrow-pending { stroke: var(--accent); stroke-width: 2px; }
+.arrow-pending { stroke-dasharray: 5 4; }
+/* A wider invisible line to click, so the thin one is easy to hit. */
+.arrow-hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; }
+@media (hover: hover) {
+  .arrow:not(.selected):hover .arrow-line { stroke: var(--ink-soft); }
+}
+.arrow-dot, .arrow-delete {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1)));
+  border-radius: 50%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Connection dots: small and soft, fading in after a moment so passing over cards doesn't flash them; amber under the pointer. */
+.arrow-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1.5px solid var(--ink-faint);
+  background: var(--surface);
+  opacity: 0.75;
+  transition: opacity 120ms var(--ease-out), background-color 120ms var(--ease-out), border-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+  animation: arrow-dot-in 150ms var(--ease-out) 100ms both;
+}
+@media (hover: hover) {
+  .arrow-dot:hover {
+    opacity: 1;
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: translate(-50%, -50%) scale(calc(1.4 / var(--zoom, 1)));
+  }
+}
+.arrow-dot:active { opacity: 1; background: var(--accent); border-color: var(--accent); }
+@keyframes arrow-dot-in { from { opacity: 0; } }
+/* A wider invisible ring so the small dot is easy to press (44px on a touch screen). */
+.arrow-dot::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
+@media (pointer: coarse) {
+  .arrow-dot { width: 14px; height: 14px; }
+  .arrow-dot::before { inset: -15px; }
+}
+.arrow-delete {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(31, 29, 26, 0.16);
+}
+@media (hover: hover) {
+  .arrow-delete:hover { color: var(--danger); }
+}
+@media (pointer: coarse) {
+  .arrow-delete { width: 32px; height: 32px; }
+  .arrow-delete::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+}
+.arrow-target { outline: 2px dashed var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .arrow-dot { animation: none; transition: none; }
+}
 
 /* Text format bar (owner request): above highlighted text or selected checklist items. */
 .format-bar {

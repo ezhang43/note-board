@@ -177,8 +177,9 @@ export function safeToEdit(raw: string | null): { ok: true } | { ok: false; reas
     if (v && typeof v.text === 'string' && Array.isArray(v.children)) delete v.due;
     return v;
   });
-  // Arrows saved before they were removed (owner, 2026-10-16) are known: the next save erases them.
-  for (const b of Object.values(saved.boards)) delete (b as { arrows?: unknown } | null)?.arrows;
+  // Arrows in a save older than version 5 are the ones removed on 2026-10-16: known, and the next
+  // save erases them. From version 5 arrows are boards' data (job card-arrows), compared like the rest.
+  if (saved.version < 5) for (const b of Object.values(saved.boards)) delete (b as { arrows?: unknown } | null)?.arrows;
   // An older version the app still reads (readWorkspace said so) is saved as this one: nothing lost.
   saved.version = WORKSPACE_VERSION;
   if (!isDeepStrictEqual(JSON.parse(serializeWorkspace(got.ws)), saved)) {

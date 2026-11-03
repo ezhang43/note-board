@@ -1,6 +1,7 @@
 import type { StorageLike } from '../model/persist';
 import { HOTKEYS_KEY, startingHotkeys } from '../model/hotkeys';
 import { COLOR_THEME_KEY, startingColorTheme } from '../model/theme';
+import { arrowActions } from './actions/arrows';
 import { blockActions } from './actions/blocks';
 import { boardActions } from './actions/boards';
 import { checklistActions } from './actions/checklist';
@@ -61,6 +62,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
       if (focusBlock === id) ctx.updateUi({ focusBlock: null });
     },
     ...blockActions(ctx),
+    ...arrowActions(ctx),
     ...boards,
     ...weightActions(ctx, boards.habitsBoard),
     ...habitColorActions(ctx, boards.habitsBoard),

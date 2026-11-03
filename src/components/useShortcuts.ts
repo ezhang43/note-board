@@ -153,6 +153,12 @@ export function useShortcuts() {
         if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();
       }
 
+      // A clicked arrow between blocks (job card-arrows): Delete / Backspace removes it.
+      if (state.ui.arrowSel && !state.ui.selection.length && !mod && (key === 'delete' || key === 'backspace')) {
+        const id = state.ui.arrowSel;
+        return run(e, () => appStore.deleteArrow(id));
+      }
+
       // Arrows move the selected blocks one grid step (Shift: five). With nothing selected they pan the board
       // like scrolling (owner request 2026-10-29): a view change only, and not on a phone-sized window.
       const step = NUDGE[e.key];

@@ -116,6 +116,7 @@ export interface StoreContext {
 /** What is cleared on screen when a different board is shown. */
 const BOARD_SWITCH_UI: Partial<Ui> = {
   selection: [],
+  arrowSel: null,
   confirm: null,
   deleteCompleted: null,
   undoToast: null,
@@ -270,7 +271,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   /** New ui with `change` applied, or the same object when nothing changes. */
   function uiWith(change: Partial<Ui>): Ui {
     const ui = state.ui;
-    const full = { ...change, canUndo: history.past.length > 0, canRedo: history.future.length > 0 };
+    const full: Partial<Ui> = { ...change, canUndo: history.past.length > 0, canRedo: history.future.length > 0 };
+    // Selecting a block lets go of a selected arrow (job card-arrows), wherever the selection is set.
+    if (change.selection?.length && !('arrowSel' in change)) full.arrowSel = null;
     return (Object.keys(full) as (keyof Ui)[]).every((k) => ui[k] === full[k]) ? ui : { ...ui, ...full };
   }
 

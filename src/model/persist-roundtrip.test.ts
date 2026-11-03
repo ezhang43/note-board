@@ -32,11 +32,15 @@ const board: Required<Board> = {
   cards: { n1: note, t1: todo, l1: link, k1: completed, b1: boardCard },
   columns: { c1: column },
   order: ['c1', 't1', 'l1', 'k1', 'b1'],
+  arrows: [{ id: 'a1', from: 'n1', to: 't1' }, { id: 'a2', from: 'c1', to: 'l1' }],
 };
 
 describe('save, load, save again', () => {
   it('a board with every field set comes back exactly as it went out', () => {
-    const text = serializeBoard(board);
+    // The single-board format is only read (boards saved before there were several), never written
+    // by the app, and has no arrows.
+    const { arrows: _arrows, ...single } = board;
+    const text = serializeBoard(single);
     const back = readBoard(text);
     expect(back).not.toBeNull();
     // Compare the saved JSON, not the objects: toEqual treats a missing field and undefined as the same.
@@ -241,6 +245,15 @@ const SAVED_SHAPES: Record<number, string[]> = {
   3: SHAPE_3,
   // Journal text sizes as numbers of px (owner pick, 2026-10-30): an older app would drop them.
   4: [...SHAPE_3, 'rich size: large small 10-36'],
+  // Arrows between cards and containers (job card-arrows, 2026-11-03); the Journal's divider, read
+  // safely under 4, is simply part of the shape from here on.
+  5: [
+    'boards.*.arrows[].from',
+    'boards.*.arrows[].id',
+    'boards.*.arrows[].to',
+    ...SHAPE_3.map((line) => (line === 'rich type: bullet h1 h2 number p' ? 'rich type: bullet h1 h2 hr number p' : line)),
+    'rich size: large small 10-36',
+  ],
 };
 /**
  * Values added under a version number without raising it, because every older copy of the app that

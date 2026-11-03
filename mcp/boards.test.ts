@@ -153,10 +153,21 @@ describe('safe to edit (round trip)', () => {
     data.boards.home.cards.listGroceries.items[0].due = '2026-10-07';
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
-  it('yes for boards saved with arrows, which were removed (owner, 2026-10-16): the next save erases them', () => {
+  it('yes for version 4 boards still holding the arrows removed on 2026-10-16: the next save erases them', () => {
     const data = JSON.parse(ownRaw());
+    data.version = 4;
     data.boards.home.arrows = [{ id: 'r1', from: 'noteIdea', to: 'colIdeas' }];
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('yes for version 5 boards with arrows (job card-arrows): they are known, and kept', () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.arrows = [{ id: 'r1', from: 'linkDocs', to: 'colIdeas' }];
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('no for version 5 boards with an arrow the app would drop (to a missing card): nothing is lost', () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.arrows = [{ id: 'r1', from: 'linkDocs', to: 'gone' }];
+    expect(safeToEdit(JSON.stringify(data)).ok).toBe(false);
   });
   it('yes for boards an older app saved (version 3): the edit saves them as this version', () => {
     const data = JSON.parse(ownRaw());

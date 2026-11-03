@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createBoardCard, createCard, createColumn } from './cards';
+import { addArrow, removeArrow } from './arrows';
 import { mergeBoards, mergeBoardSets } from './merge';
 import { journalDateLine } from './journal';
 import { journalRich, type Rich } from './richText';
@@ -188,6 +189,49 @@ describe('deleting', () => {
   });
 });
 
+describe('arrows (job card-arrows)', () => {
+  const withArrow = () => addArrow(sample(), 'n1', 'c1', 'r1')!;
+
+  it('arrows both drew are kept', () => {
+    const base = sample();
+    const mine = addArrow(base, 'n1', 'c1', 'r1')!;
+    const theirs = addArrow(base, 't1', 'n1', 'r2')!;
+    expect(mergeBoards(base, mine, theirs).arrows?.map((a) => a.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('one draws an arrow while the other deletes another: both happen', () => {
+    const base = withArrow();
+    const mine = addArrow(base, 't1', 'n1', 'r2')!;
+    const theirs = removeArrow(base, 'r1')!;
+    expect(mergeBoards(base, mine, theirs).arrows).toEqual([{ id: 'r2', from: 't1', to: 'n1' }]);
+    expect(mergeBoards(base, theirs, mine).arrows).toEqual([{ id: 'r2', from: 't1', to: 'n1' }]);
+  });
+
+  it('an arrow deleted on one side is gone; the last one going leaves no field', () => {
+    const base = withArrow();
+    const merged = mergeBoards(base, setText(base, 'n1', 'x'), removeArrow(base, 'r1')!);
+    expect('arrows' in merged).toBe(false);
+    expect(text(merged, 'n1')).toBe('x');
+  });
+
+  it('one draws an arrow to a card the other deletes: the arrow goes with the card', () => {
+    const base = sample();
+    const mine = addArrow(base, 'n1', 't1', 'r1')!;
+    const theirs = B.deleteCard(base, 't1');
+    const merged = mergeBoards(base, mine, theirs);
+    expect(merged.cards.t1).toBeUndefined();
+    expect('arrows' in merged).toBe(false);
+    expect(B.problems(merged)).toEqual([]);
+  });
+
+  it('both draw the same two blocks together: one arrow, not two', () => {
+    const base = sample();
+    const mine = addArrow(base, 'n1', 'c1', 'r1')!;
+    const theirs = addArrow(base, 'c1', 'n1', 'r2')!;
+    expect(mergeBoards(base, mine, theirs).arrows).toEqual([{ id: 'r1', from: 'n1', to: 'c1' }]);
+  });
+});
+
 describe('same thing changed by both', () => {
   it('mine wins', () => {
     const base = sample();
@@ -231,7 +275,7 @@ describe('random edits on both sides', () => {
     const anyCard = () => cardIds[Math.floor(r() * cardIds.length)];
     const anyCol = () => colIds[Math.floor(r() * colIds.length)];
     const id = `${tag}${Math.floor(r() * 1e6)}`;
-    switch (Math.floor(r() * 9)) {
+    switch (Math.floor(r() * 10)) {
       case 0:
         return B.addCard(b, note(id), { type: 'loose', x: 0, y: 0 });
       case 1:
@@ -254,6 +298,12 @@ describe('random edits on both sides', () => {
         // Add an item, or nest the last top-level item under the first.
         if (r() < 0.5 || xs.length < 2) return setItems(b, c, [...xs, item(id)]);
         return setItems(b, c, [{ ...xs[0], children: [...xs[0].children, xs[xs.length - 1]] }, ...xs.slice(1, -1)]);
+      }
+      case 8: {
+        // Draw an arrow between two blocks, or delete one.
+        const blocks = [...cardIds, ...colIds];
+        if (b.arrows?.length && r() < 0.3) return removeArrow(b, b.arrows[0].id) ?? b;
+        return addArrow(b, blocks[Math.floor(r() * blocks.length)], blocks[Math.floor(r() * blocks.length)], id) ?? b;
       }
       default:
         return cardIds.length ? B.updateCard(b, anyCard(), (c) => ({ ...c, color: tag === 'm' ? 'rose' : 'sky' })) : b;

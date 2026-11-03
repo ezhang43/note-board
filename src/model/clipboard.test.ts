@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as B from './board';
 import { createCard, createColumn } from './cards';
+import { addArrow } from './arrows';
 import { copyBlocks, pasteBlocks } from './clipboard';
 import { blocksTouching } from './layout';
 import type { Board, TodoCard } from './types';
@@ -97,5 +98,41 @@ describe('pasting a card whose column is gone', () => {
     const gone = B.deleteBlocks(b, ['c1']);
     const { board: out, ids: pasted } = pasteBlocks(gone, copied, 1, ids);
     expect(out.cards[pasted[0]]).toMatchObject({ x: 80, y: 80 });
+  });
+});
+
+describe('arrows copy with their blocks (job card-arrows)', () => {
+  function joined(): Board {
+    let b = board();
+    b = B.addCard(b, createCard('note', 'y'), { type: 'loose', x: 900, y: 40 });
+    b = addArrow(b, 'z', 'y', 'r1')!;
+    b = addArrow(b, 'a', 'z', 'r2')!;
+    b = addArrow(b, 'c1', 'y', 'r3')!;
+    return b;
+  }
+
+  it('only the arrows between the copied blocks are copied, joining the copies', () => {
+    const b = joined();
+    const { board: out, ids: pasted } = pasteBlocks(b, copyBlocks(b, ['z', 'y']), 1, ids);
+    const fresh = out.arrows!.slice(3);
+    expect(fresh).toHaveLength(1);
+    expect([fresh[0].from, fresh[0].to]).toEqual(pasted);
+    expect(fresh[0].id).not.toBe('r1');
+    expect(B.problems(out)).toEqual([]);
+  });
+
+  it('a copied container brings the arrows of the cards in it', () => {
+    const b = joined();
+    const { board: out, ids: pasted } = pasteBlocks(b, copyBlocks(b, ['c1', 'z', 'y']), 1, ids);
+    const fresh = out.arrows!.slice(3);
+    const [col, z, y] = pasted;
+    const newA = out.columns[col].cardIds[0];
+    expect(fresh.map((a) => [a.from, a.to])).toEqual([[z, y], [newA, z], [col, y]]);
+  });
+
+  it('one block alone copies no arrows; an arrow to a block not copied stays behind', () => {
+    const b = joined();
+    expect(pasteBlocks(b, copyBlocks(b, ['z']), 1, ids).board.arrows).toEqual(b.arrows);
+    expect(copyBlocks(b, ['z'])).toHaveLength(1);
   });
 });

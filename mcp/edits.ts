@@ -371,6 +371,8 @@ function whatWent(before: Workspace, after: Workspace, boardId: string): string[
         if (!left.has(itemId)) lines.push(`the item "${short(findItem(card.items, itemId)!.item.text.trim())}" (id: ${itemId}) from ${short(listName(card))} ${on}`);
       }
     }
+    const arrowsGone = goneArrows(was, now).length;
+    if (arrowsGone) lines.push(`${plural(arrowsGone, 'arrow')} joined to what goes ${on}`);
   }
   return lines;
 }
@@ -380,6 +382,9 @@ function whatWent(before: Workspace, after: Workspace, boardId: string): string[
  * their sub-items), so confirm_delete can tell whether any of it changed since the preview, even
  * where the preview's lines don't show it (a note's second line, a column's cards).
  */
+/** The arrows (job card-arrows) on `was` that `now` no longer has: the ones joined to something deleted. */
+const goneArrows = (was: Board, now: Board) => (was.arrows ?? []).filter((a) => !now.arrows?.some((x) => x.id === a.id));
+
 function fingerprint(before: Workspace, after: Workspace): string {
   const gone: unknown[] = [];
   for (const [id, b] of Object.entries(before.boards)) {
@@ -395,6 +400,7 @@ function fingerprint(before: Workspace, after: Workspace): string {
         for (const itemId of flatIds(card.items)) if (!left.has(itemId)) gone.push(['item', id, findItem(card.items, itemId)!.item]);
       }
     }
+    for (const a of goneArrows(b, now)) gone.push(['arrow', id, a]);
   }
   return JSON.stringify(gone);
 }

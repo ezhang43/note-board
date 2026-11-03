@@ -140,6 +140,8 @@ export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed' | 'journal' | 
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {
   selection: string[];
+  /** The clicked arrow (job card-arrows), shown selected while no block is; selecting a block lets it go. */
+  arrowSel: string | null;
   itemSel: ItemSelection | null;
   itemDrag: ItemDrag | null;
   /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where). */
@@ -239,6 +241,7 @@ export interface AppState {
 
 export const emptyUi: Ui = {
   selection: [],
+  arrowSel: null,
   itemSel: null,
   itemDrag: null,
   focusItem: null,

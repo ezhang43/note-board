@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addArrow } from '../src/model/arrows';
 import { addCard, createBoard, problems } from '../src/model/board';
 import { createBoardCard, createCard } from '../src/model/cards';
 import type { Board, BoardCard, NoteCard, TodoCard, TodoItem } from '../src/model/types';
@@ -229,6 +230,14 @@ describe('deleting (confirm_delete)', () => {
     const colPrint = expected(ws, ['colIdeas']);
     const swapped = ok(addChecklist('home', 'Swap', [], { column: 'Ideas' }, 'kSwap', ['s']), ok(deleteThings('home', ['noteIdea'], none, expected(ws, ['noteIdea']), 'z'), ws).ws).ws;
     expect(fails(deleteThings('home', ['colIdeas'], none, colPrint, 'z'), swapped)).toMatch(/changed since the preview/);
+  });
+
+  it('lists the arrows a delete takes with it, and refuses when one was drawn to it since the preview (job card-arrows)', () => {
+    const arrow = (w: Workspace, from: string, to: string, id: string): Workspace => ({ ...w, boards: { ...w.boards, home: addArrow(w.boards.home, from, to, id)! } });
+    const ws = arrow(sample(), 'noteCall', 'noteIdea', 'a1');
+    expect(plan(ws, ['noteCall']).lines).toContain('1 arrow joined to what goes on Home');
+    const print = expected(ws, ['noteCall']);
+    expect(fails(deleteThings('home', ['noteCall'], none, print, 'z'), arrow(ws, 'linkDocs', 'noteCall', 'a2'))).toMatch(/changed since the preview/);
   });
 
   it('still deletes when only something else changed (the board renamed, another note edited)', () => {

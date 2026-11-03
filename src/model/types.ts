@@ -136,6 +136,15 @@ export interface Board {
   columns: Record<string, Column>;
   /** Top-level blocks (columns and loose cards), back to front. */
   order: string[];
+  /** Arrows between cards and containers (job card-arrows); left out when the board has none. */
+  arrows?: Arrow[];
+}
+
+/** An arrow from one card or container to another (job card-arrows): no label, color or curve. */
+export interface Arrow {
+  id: string;
+  from: string;
+  to: string;
 }
 
 /**

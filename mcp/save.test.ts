@@ -57,8 +57,9 @@ describe('saving a change', () => {
     expect(Object.keys(fs.docs.get('boards/me')!.fields).sort()).toEqual(['client', 'data', 'updatedAt']);
   });
 
-  it('boards saved with arrows (removed, owner 2026-10-16) are saved without them, everything else kept', async () => {
+  it('version 4 boards still holding the arrows removed on 2026-10-16 are saved without them, everything else kept', async () => {
     const data = JSON.parse(ownRaw());
+    data.version = 4;
     data.boards.home.arrows = [{ id: 'r1', from: 'noteIdea', to: 'colIdeas' }];
     const { fs, deps } = setup(JSON.stringify(data));
     const r = await saveChange(deps, addApples());
@@ -66,6 +67,16 @@ describe('saving a change', () => {
     expect(fs.own()).not.toContain('arrows');
     expect(groceries(fs.own()).at(-1)!.text).toBe('Apples');
     expect(readWorkspace(fs.own())!.ws.boards.home.cards.noteIdea).toEqual(readWorkspace(ownRaw())!.ws.boards.home.cards.noteIdea);
+  });
+
+  it('arrows on the boards (version 5, job card-arrows) are kept when the connector saves', async () => {
+    const data = JSON.parse(ownRaw());
+    data.boards.home.arrows = [{ id: 'r1', from: 'linkDocs', to: 'colIdeas' }];
+    const { fs, deps } = setup(JSON.stringify(data));
+    const r = await saveChange(deps, addApples());
+    expect(r.isError).toBeFalsy();
+    expect(readWorkspace(fs.own())!.ws.boards.home.arrows).toEqual([{ id: 'r1', from: 'linkDocs', to: 'colIdeas' }]);
+    expect(groceries(fs.own()).at(-1)!.text).toBe('Apples');
   });
 
   it('saves under the condition that nothing changed since it read (updateTime precondition)', async () => {

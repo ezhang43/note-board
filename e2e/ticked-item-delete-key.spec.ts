@@ -230,6 +230,63 @@ test.describe('on a touch screen', () => {
     expect(await focused(page)).toBe('milk');
   });
 
+  // The tap rule (SPEC "Phone layout"): the same limits as a tap on the empty board, DRAG_THRESHOLD (5px) and HOLD_MS (450ms).
+  async function fingerOnFirstBox(page: Page) {
+    const list = await checklist(page, ['bread', 'milk']);
+    await list.getByLabel('Item text').nth(1).tap();
+    const box = list.getByRole('checkbox', { name: 'Done: bread' });
+    const b = (await box.boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', touchPoints: { x: number; y: number; id: number }[]) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+    return { box, send, at: { x: b.x + b.width / 2, y: b.y + b.height / 2, id: 1 } };
+  }
+
+  test('a finger lifted 3px from where it pressed ticks the box; 7px away ticks nothing', async ({ page }) => {
+    const { box, send, at } = await fingerOnFirstBox(page);
+    for (const dx of [7, 3]) {
+      await send('touchStart', [at]);
+      await send('touchMove', [{ ...at, x: at.x + dx }]);
+      await send('touchEnd', [{ ...at, x: at.x + dx }]);
+      await page.waitForTimeout(300);
+      if (dx === 7) await expect(box).not.toBeChecked();
+    }
+    await expect(box).toBeChecked();
+    expect(await focused(page)).toBe('milk');
+  });
+
+  test('a rest of 480ms ticks nothing, a quick press does', async ({ page }) => {
+    const { box, send, at } = await fingerOnFirstBox(page);
+    await send('touchStart', [at]);
+    await page.waitForTimeout(480);
+    await send('touchEnd', [at]);
+    await page.waitForTimeout(300);
+    await expect(box).not.toBeChecked();
+    await send('touchStart', [at]);
+    await send('touchEnd', [at]);
+    await expect(box).toBeChecked();
+  });
+
+  // Job 224 follow-up: a pinch whose first finger starts on the box, like a tap, ticks nothing when the fingers lift.
+  for (const firstLifts of ['the finger on the box', 'the other finger']) {
+    test(`a two-finger pinch that starts on a tick box ticks nothing (${firstLifts} lifts first)`, async ({ page }) => {
+      const { box, send, at: one } = await fingerOnFirstBox(page);
+      const two = { x: one.x + 120, y: one.y + 200, id: 2 };
+      await send('touchStart', [one]);
+      await send('touchStart', [one, two]);
+      await send('touchMove', [one, { ...two, x: two.x + 30 }]);
+      if (firstLifts === 'the finger on the box') {
+        await send('touchEnd', [one]);
+        await send('touchEnd', [two]);
+      } else {
+        await send('touchEnd', [two]);
+        await send('touchEnd', [one]);
+      }
+      await page.waitForTimeout(300);
+      await expect(box).not.toBeChecked();
+      expect(await focused(page)).toBe('milk');
+    });
+  }
+
   test('a tap with no text being typed in gives the box the keyboard, so a keyboard Delete removes the item, not the card', async ({ page }) => {
     const list = await checklist(page, ['bread', 'milk', 'eggs']);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

@@ -57,6 +57,27 @@ export function hasTicked(items: TodoItem[]): boolean {
 }
 
 /**
+ * "3 of 5 done" (owner request, 2026-11-03): how many of the items, at every level, are ticked, out of all of them.
+ * Worked out when shown, never saved. A blank item that is not ticked is left out of both numbers (so the blank item
+ * waiting at the end of a list doesn't stop it reading "all done"); a ticked blank one counts, as Clean up moves it
+ * like any other ticked item. For one parent's count, pass its `children`.
+ */
+export function doneCount(items: TodoItem[]): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+  for (const it of items) {
+    if (it.done || it.text.trim() !== '') {
+      total++;
+      if (it.done) done++;
+    }
+    const inner = doneCount(it.children);
+    done += inner.done;
+    total += inner.total;
+  }
+  return { done, total };
+}
+
+/**
  * Ctrl+Enter (owner request, 2026-10-15): after `id` is ticked (`before` → `after`), the open item
  * the cursor moves to: the nearest one that was below it, else the nearest above, else null.
  */

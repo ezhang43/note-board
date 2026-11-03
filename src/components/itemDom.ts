@@ -5,7 +5,8 @@ import { appStore } from '../store/appStore';
 import { clientToBoard, clientToCanvas, isOverCanvas } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { isTextField } from './textField';
-import { onLostFinger } from './touchHold';
+import { pressKind, type Touch } from '../model/tapZoom';
+import { HOLD_MS, onLostFinger } from './touchHold';
 
 // Reading checklist rows from the screen while selecting or dragging items.
 
@@ -44,28 +45,41 @@ export function itemOf(el: EventTarget | null): { cardId: string; itemId: string
  * on-screen keyboard stays up; that tap ticks the box on its touchend.
  */
 let keepFor: Element | null = null; // the tick box label whose press keeps the focus where it is
-let press = { x: 0, y: 0, at: 0 }; // where and when that press started
+let press: Touch = { x: 0, y: 0, t: 0 }; // where and when that press started
+let pinched = false; // a second finger came down during that press: a pinch, never a tap
+let stopWatching = () => {}; // stops listening for that second finger
 const typingIn = (box: Element) => isTextField(document.activeElement) && document.activeElement!.closest('[data-card-id]') === box.closest('[data-card-id]');
 type Point = { clientX: number; clientY: number };
 export const tickBoxPress = {
   onPointerDown(e: Point & { pointerType: string; currentTarget: Element; preventDefault(): void }) {
+    stopWatching();
     keepFor = e.pointerType !== 'mouse' && typingIn(e.currentTarget) ? e.currentTarget : null;
-    press = { x: e.clientX, y: e.clientY, at: performance.now() };
-    if (keepFor) e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+    press = { x: e.clientX, y: e.clientY, t: performance.now() };
+    pinched = false;
+    if (!keepFor) return;
+    e.preventDefault(); // no mousedown, so no focus change (Chrome on Android)
+    // A second finger anywhere cancels the tap, even if it lifts before this one (this finger's own pointerdown has passed the window).
+    const second = (ev: PointerEvent) => {
+      if (!ev.isPrimary) pinched = true;
+    };
+    window.addEventListener('pointerdown', second, true);
+    stopWatching = () => window.removeEventListener('pointerdown', second, true);
   },
   onPointerCancel() {
     keepFor = null;
+    stopWatching();
   },
   // Safari on an iPhone sends no click after that pointerdown, so a tap ticks here instead: cancelling the touchend
   // stops the browser's own click (no second tick, no focus change), and a click from the page doesn't move the focus.
   onTouchEnd(e: { currentTarget: Element; touches: { length: number }; changedTouches: ArrayLike<Point>; preventDefault(): void }) {
     if (keepFor !== e.currentTarget) return;
     const t = e.changedTouches[0];
-    // Only a tap, as a click would be: one finger, lifted where it pressed, within half a second (not a slide, pinch or long press).
-    const tap = e.touches.length === 0 && e.changedTouches.length === 1 && Math.hypot(t.clientX - press.x, t.clientY - press.y) < 10 && performance.now() - press.at < 500;
+    // Only a tap, by the same limits as a tap on the empty board (SPEC "Phone layout"): one finger the whole time, quick, and not moved.
+    const tap = !pinched && e.touches.length === 0 && e.changedTouches.length === 1 && pressKind(press, { x: t.clientX, y: t.clientY, t: performance.now() }, false, HOLD_MS) === 'tap';
     e.preventDefault();
     if (tap) e.currentTarget.querySelector('input')?.click();
     keepFor = null;
+    stopWatching();
   },
   onClick(e: { target: EventTarget; currentTarget: Element; preventDefault(): void }) {
     // A tap on the label around the box: the label would focus the box, so tick it through the box instead.

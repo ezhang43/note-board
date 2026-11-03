@@ -708,3 +708,43 @@ describe('pasting items into the item the cursor is in (owner request 2026-10-31
     expect(C.findItem(out, 'y')!.depth).toBe(5);
   });
 });
+
+describe('done count (owner request 2026-11-03: "3 of 5 done")', () => {
+  const blank = (id: string, done = false): TodoItem => ({ id, text: '', done, children: [] });
+
+  it('counts every item at every level: ticked over all', () => {
+    // sample(): a, a1, a2, b, c (done), c1 -> six items, one ticked
+    expect(C.doneCount(sample())).toEqual({ done: 1, total: 6 });
+    expect(C.doneCount([item('x', [item('y', [item('z', [], true)], true)], true), item('w')])).toEqual({ done: 3, total: 4 });
+  });
+
+  it('an empty list counts nothing', () => {
+    expect(C.doneCount([])).toEqual({ done: 0, total: 0 });
+  });
+
+  it('a blank open item is not counted, so the blank item waiting at the end of a list does not hold back "all done"', () => {
+    expect(C.doneCount([item('a', [], true), item('b', [], true), blank('end')])).toEqual({ done: 2, total: 2 });
+    expect(C.doneCount([blank('only')])).toEqual({ done: 0, total: 0 });
+    expect(C.doneCount([{ id: 'sp', text: '   ', done: false, children: [] }])).toEqual({ done: 0, total: 0 });
+  });
+
+  it('a ticked blank item is counted, as Clean up moves it like any other ticked item', () => {
+    expect(C.doneCount([item('a', [], true), blank('t', true)])).toEqual({ done: 2, total: 2 });
+  });
+
+  it('a blank parent is not counted but the items under it are', () => {
+    expect(C.doneCount([{ id: 'p', text: '', done: false, children: [item('k', [], true), item('l')] }])).toEqual({ done: 1, total: 2 });
+  });
+
+  it("a parent's own count covers all its descendants, not itself", () => {
+    const trip = item('trip', [item('t1', [item('t1a', [], true)], true), item('t2'), item('t3')], true);
+    expect(C.doneCount(trip.children)).toEqual({ done: 2, total: 4 });
+  });
+
+  it('does not change what it is given', () => {
+    const items = sample();
+    const before = JSON.stringify(items);
+    C.doneCount(items);
+    expect(JSON.stringify(items)).toBe(before);
+  });
+});

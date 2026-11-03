@@ -879,15 +879,34 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .card-header > .title-cell { order: -1; flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; }
 /* Above Clean up's touch press area, which reaches up 12px: when Clean up is on its own line the title's lower edge keeps its taps. */
 .title-cell > .card-title { align-self: center; position: relative; z-index: 1; }
+/*
+ * A list's "3/5" count (owner request 2026-11-03) sits right after the title in the title cell. The title keeps its whole width (job 208): when
+ * title and count don't fit side by side, the count drops to the line under it, ahead of Clean up. Quiet gray; the calm tick green once everything
+ * is ticked; not selectable.
+ */
+.title-count {
+  flex: none;
+  padding-right: 2px;
+  font-size: calc(12px * var(--fs, 1) * var(--ts, 1));
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink-faint);
+  user-select: none;
+}
+.item-count { margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
+.title-count.all-done, .item-count.all-done { color: var(--checkbox); }
+/* A bold tint is too deep for the green: the count keeps the color's own text color, a little heavier. */
+.card.bold-tint .title-count.all-done { color: var(--tint-text); font-weight: 600; }
 .title-cell > .list-clean-up { margin-left: auto; }
 /* Empty on an open card: it would only take a few pixels of the title's room. */
 .card-header:has(> .title-cell) > .card-meta { display: none; }
-.card-header:has(> .title-cell > .list-clean-up) { align-items: flex-start; --row: max(36px, calc(var(--btn) + 4px)); flex-wrap: wrap; justify-content: flex-end; }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) { align-items: flex-start; --row: max(36px, calc(var(--btn) + 4px)); flex-wrap: wrap; justify-content: flex-end; }
 /* The cell is never narrower than Clean up, so the arrow and trash can drop to a line of their own, at the right, when the two won't fit side by side (as they did before). */
 .card .card-header > .title-cell:has(> .list-clean-up) { min-width: calc(60px * var(--hb)); }
-.card-header:has(> .title-cell > .list-clean-up) > .icon-button { margin-top: calc((var(--row) - var(--btn)) / 2); }
-.card-header:has(> .title-cell > .list-clean-up) > .comment-slot { height: var(--row); align-items: center; }
-.card-header:has(> .title-cell > .list-clean-up) .title-cell > .card-title { min-height: var(--row); align-content: center; }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) > .icon-button { margin-top: calc((var(--row) - var(--btn)) / 2); }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) > .comment-slot { height: var(--row); align-items: center; }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) .title-cell > .card-title { min-height: var(--row); align-content: center; }
 /* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
 .card-header + :is(.todo-body, .link-body, .board-body) { padding-top: calc(8px * min(var(--bs), 1.75)); }
 /* A board card's name is plain text, so it wraps (a long board name) rather than being cut off. */
@@ -2000,7 +2019,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .app.phone .find-bar input { flex: 1; width: auto; min-width: 0; height: 40px; font-size: 16px; }
 .app.phone .find-bar .icon-button { width: 40px; height: 40px; }
 
-.find-marks, .word-marks, .text-mirror {
+.find-marks, .word-marks, .text-mirror, .tail-marks {
   grid-area: 1 / 1;
   font: inherit;
   line-height: inherit;
@@ -2014,6 +2033,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .find-mark { background: var(--find-mark); color: inherit; border-radius: 2px; }
 .find-mark.current { background: var(--find-current); box-shadow: 0 0 0 2px var(--find-current); }
 .find-marks .find-mark { color: transparent; }
+.tail-marks::before { content: attr(data-value); }
 .card.find-target, .column.find-target, .help-button.find-target, .tb-button.find-target, .link-url.find-current { outline: 3px solid var(--find-outline); outline-offset: 2px; }
 
 /* Download as picture / PDF (job 163): the hidden copy of the board that is drawn. It is invisible and

@@ -2,7 +2,7 @@ import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { canMoveItem, ITEM_INDENT } from '../model/checklist';
+import { canMoveItem, doneCount, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
@@ -24,22 +24,39 @@ function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number 
 export function TodoTitle({ card }: { card: TodoCard }) {
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(card.id, title);
+  // "3/5" after the title (owner request, 2026-11-03): worked out here, never saved. Plain text, so it is not editable, not focusable and not part of the title.
+  // Screen readers get "3 of 5 done" as the title's description instead of the drawn numbers.
+  const { done, total } = doneCount(card.items);
+  const countId = `done-count-${card.id}`;
   return (
-    <AutoSizeInput
-      className="card-title"
-      ref={title}
-      aria-label="List title"
-      {...boxProps({ cardId: card.id }, card.style)}
-      find={`title:${card.id}`}
-      placeholder="List title"
-      value={card.title}
-      onChange={(text) => appStore.setCardTitle(card.id, text)}
-      onKeyDown={(e) => {
-        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-        e.preventDefault();
-        appStore.focusFirstItem(card.id);
-      }}
-    />
+    <>
+      <AutoSizeInput
+        className="card-title"
+        ref={title}
+        aria-label="List title"
+        aria-describedby={total ? countId : undefined}
+        {...boxProps({ cardId: card.id }, card.style)}
+        find={`title:${card.id}`}
+        placeholder="List title"
+        value={card.title}
+        onChange={(text) => appStore.setCardTitle(card.id, text)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          appStore.focusFirstItem(card.id);
+        }}
+      />
+      {total > 0 && (
+        <>
+          <span className={done === total ? 'title-count all-done' : 'title-count'} style={{ '--ts': styleCss(card.style)['--ts'] } as CSSProperties} aria-hidden="true">
+            {done}/{total}
+          </span>
+          <span id={countId} hidden>
+            {done} of {total} done
+          </span>
+        </>
+      )}
+    </>
   );
 }
 
@@ -138,6 +155,9 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     // Up / Down arrows are handled board-wide (keyboardNav.ts), across items and cards.
   }
 
+  // A parent's own "1/3" after its text (owner request, 2026-11-03): everything under it, blank open items left out.
+  const sub = doneCount(item.children);
+  const tail = sub.total && item.text.trim() !== '' ? { text: `${sub.done}/${sub.total}`, done: sub.done === sub.total } : null;
   const classes = [
     'todo-item',
     item.done && 'done',
@@ -169,6 +189,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         placeholder="Add an item"
         value={item.text}
         marks={words ? markParts(words) : null}
+        tail={tail}
         onChange={(text) => appStore.setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}

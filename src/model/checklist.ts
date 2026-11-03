@@ -118,6 +118,7 @@ export function enterItem(
   if (start === 0 && after !== '') {
     loc.item.text = after;
     loc.list.splice(loc.index, 0, blank);
+    reopenAbove(next, blank); // an open item never sits under a ticked one
     return { items: next, focus: id, offset: 0 };
   }
   let before = text.slice(0, start);
@@ -129,6 +130,7 @@ export function enterItem(
   const added = { ...blank, text: rest, done: after !== '' && loc.item.done };
   if (loc.item.children.length) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
+  reopenAbove(next, added); // e.g. Enter at the end of the last ticked sub-item: its new blank sibling unticks the parent
   return { items: next, focus: added.id, offset: 0 };
 }
 
@@ -377,9 +379,21 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
   const height = pasted.reduce((h, p) => Math.max(h, subtreeHeight(p)), 0);
   let loc = findItem(next, afterId);
   while (loc && loc.depth + height > MAX_DEPTH) loc = loc.parent && findItem(next, loc.parent.id);
-  if (loc) loc.list.splice(loc.index + 1, 0, ...structuredClone(pasted));
-  else next.push(...structuredClone(pasted));
+  const copies = structuredClone(pasted);
+  if (loc) loc.list.splice(loc.index + 1, 0, ...copies);
+  else next.push(...copies);
+  // An open item never sits under a ticked one: inside the paste, then the ticked items it lands under (one pass, not one per item).
+  reopenWithin(copies);
+  if (loc && copies.some((c) => !c.done)) for (const a of ancestorsOf(next, loc.item.id)) a.done = false; // the pasted items sit beside `loc.item`
   return next;
+}
+
+/** Unticks every ticked item that has an open item under it, in place (pasted copies keep their other ticks). */
+function reopenWithin(list: TodoItem[]): void {
+  for (const it of list) {
+    reopenWithin(it.children);
+    if (it.children.some((c) => !c.done)) it.done = false;
+  }
 }
 
 /**

@@ -47,6 +47,17 @@ describe('add_items', () => {
     expect(item(r.ws, 'listGroceries', 'n')!.parent!.id).toBe('iBread');
   });
 
+  it('an item added under a ticked item (or after its last sub-item) unticks it, as in the app; ticked siblings stay ticked', () => {
+    const ticked = ok(setItemsDone('home', ['iBox'], true)).ws; // ticking the last open sub-item ticks Free range and Eggs
+    expect(item(ticked, 'listGroceries', 'iEggs')!.item.done).toBe(true);
+    const under = ok(addItems('home', 'listGroceries', [{ text: 'C', under: 'iEggs' }], ['c']), ticked);
+    expect(item(under.ws, 'listGroceries', 'iEggs')!.item.done).toBe(false);
+    expect(item(under.ws, 'listGroceries', 'iFree')!.item.done).toBe(true);
+    const after = ok(addItems('home', 'listGroceries', [{ text: 'D', after: 'iBox' }], ['d']), ticked);
+    expect(item(after.ws, 'listGroceries', 'iEggs')!.item.done).toBe(false);
+    expect(item(after.ws, 'listGroceries', 'iBox')!.item.done).toBe(true);
+  });
+
   it('runs again with the same ids without adding anything twice', () => {
     const edit = addItems('home', 'Groceries', [{ text: 'Apples' }], ['n1']);
     const once = ok(edit);

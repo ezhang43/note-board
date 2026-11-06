@@ -105,6 +105,17 @@ export function sizeStepChange(board: Board, boxes: Box[], dir: 1 | -1): StyleCh
   return { size: SIZES[Math.min(SIZES.length - 1, Math.max(0, now + dir))] };
 }
 
+/**
+ * The Google Docs size keys, with Ctrl or ⌘ held: Shift+. (or >) is larger, Shift+, (or <) is smaller. Matched by the
+ * character and by the key's position, so other layouts work too. Used by the board and by the Journal.
+ */
+export function sizeKeyDir(e: { key: string; code: string; shiftKey: boolean }): 1 | -1 | null {
+  if (!e.shiftKey) return null;
+  if (e.key === '>' || e.code === 'Period') return 1;
+  if (e.key === '<' || e.code === 'Comma') return -1;
+  return null;
+}
+
 /** Every text box in these cards and columns (a column's title, then its cards'). */
 export function boxesOf(board: Board, ids: string[]): Box[] {
   const ofCard = (cardId: string): Box[] => {

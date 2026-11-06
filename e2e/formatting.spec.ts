@@ -52,6 +52,23 @@ test('Ctrl+Shift+> / < make the box larger / smaller; Enter keeps the format on 
   await expect.poll(() => css(l.getByLabel('Item text').nth(1), 'font-weight')).toBe('600');
 });
 
+// The Google Docs keys (owner request, 2026-11-06): ⌘+Shift+. / ⌘+Shift+, on a Mac do the same as Ctrl.
+test('⌘+Shift+. / ⌘+Shift+, make the box larger / smaller too, one step at a time', async ({ page }) => {
+  const l = await list(page, 'Groceries', ['milk']);
+  const milk = l.getByLabel('Item text').first();
+  const size = async () => parseFloat(await css(milk, 'font-size'));
+  const normal = await size();
+  await page.keyboard.press('Meta+Shift+Period');
+  await expect.poll(size).toBeGreaterThan(normal);
+  const large = await size();
+  await page.keyboard.press('Meta+Shift+Period'); // already the largest: stays
+  await page.keyboard.press('Meta+Shift+Comma');
+  await expect.poll(size).toBe(normal);
+  await page.keyboard.press('Meta+Shift+Comma');
+  await expect.poll(size).toBeLessThan(normal);
+  expect(large).toBeGreaterThan(normal);
+});
+
 test('highlighting text shows the bar; it formats the whole box, and the Font menu changes the typeface', async ({ page }) => {
   const l = await list(page, 'Groceries', ['milk']);
   const title = l.getByLabel('List title');

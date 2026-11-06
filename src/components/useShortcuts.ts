@@ -3,6 +3,7 @@ import { ZOOM_STEP } from '../model/constants';
 import { shownName } from '../model/board';
 import { DEFAULT_HOTKEYS, matches } from '../model/hotkeys';
 import { shortcutKey } from '../model/keys';
+import { sizeKeyDir } from '../model/textStyle';
 import { appStore } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { handleArrowKey } from './keyboardNav';
@@ -232,8 +233,8 @@ const NUDGE: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [
 
 /** Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+> larger, Ctrl+Shift+< smaller (by key position too, as on other layouts). */
 function formatAsk(e: KeyboardEvent, key: string): FormatAsk | null {
-  if (e.shiftKey && (e.key === '>' || e.code === 'Period')) return 'larger';
-  if (e.shiftKey && (e.key === '<' || e.code === 'Comma')) return 'smaller';
+  const size = sizeKeyDir(e);
+  if (size) return size === 1 ? 'larger' : 'smaller';
   if (e.shiftKey) return null;
   return key === 'b' ? 'bold' : key === 'i' ? 'italic' : null;
 }

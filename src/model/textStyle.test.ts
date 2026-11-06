@@ -3,7 +3,7 @@ import * as B from './board';
 import { createCard, createColumn } from './cards';
 import { enterItem, freshCopies, mergeNextItem } from './checklist';
 import { parseBoard, serializeBoard } from './persist';
-import { applyStyle, boxesOf, sizeStepChange, styleCss, styleOf, toggleChange, type Box } from './textStyle';
+import { applyStyle, boxesOf, sizeKeyDir, sizeStepChange, styleCss, styleOf, toggleChange, type Box } from './textStyle';
 import type { Board, TodoCard, TodoItem } from './types';
 
 const item = (id: string, children: TodoItem[] = []): TodoItem => ({ id, text: id, done: false, children });
@@ -100,5 +100,22 @@ describe('formatting stays with the text', () => {
     const raw = JSON.parse(serializeBoard(b));
     raw.board.cards.N.style = { size: 'huge', bold: 'yes', font: 'comic' };
     expect(styleOf(parseBoard(JSON.stringify(raw)), { cardId: 'N' })).toBeUndefined();
+  });
+});
+
+describe('the Google Docs size keys (owner request, 2026-11-06)', () => {
+  const k = (key: string, code: string, shiftKey = true) => ({ key, code, shiftKey });
+  it('Shift+> / Shift+. is larger and Shift+< / Shift+, is smaller, by character or by key position', () => {
+    expect(sizeKeyDir(k('>', 'Period'))).toBe(1);
+    expect(sizeKeyDir(k('<', 'Comma'))).toBe(-1);
+    expect(sizeKeyDir(k('.', 'Period'))).toBe(1);
+    expect(sizeKeyDir(k(',', 'Comma'))).toBe(-1);
+    expect(sizeKeyDir(k('>', 'KeyZ'))).toBe(1); // another layout: the character decides
+    expect(sizeKeyDir(k('x', 'Period'))).toBe(1); // another layout: the key position decides
+  });
+  it('is nothing without Shift or on other keys', () => {
+    expect(sizeKeyDir(k('.', 'Period', false))).toBeNull();
+    expect(sizeKeyDir(k(',', 'Comma', false))).toBeNull();
+    expect(sizeKeyDir(k('b', 'KeyB'))).toBeNull();
   });
 });

@@ -293,7 +293,7 @@ export function FormatBar() {
           key={s.key}
           type="button"
           aria-label={s.label}
-          title={`${s.label} text (Ctrl+Shift+> / <)`}
+          title={`${s.label} text (Ctrl+Shift+. / Ctrl+Shift+,)`}
           aria-pressed={size === s.key}
           style={{ fontSize: s.px }}
           onClick={() => apply({ size: s.key })}

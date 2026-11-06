@@ -44,7 +44,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
     title: 'Text',
     keys: [
       ['Ctrl+B / Ctrl+I', 'Bold / italic: the whole text box, selected items, or every box in selected cards'],
-      ['Ctrl+Shift+> / <', 'Larger / smaller (Small, Normal, Large)'],
+      ['Ctrl+Shift+. / Ctrl+Shift+,', 'Larger / smaller (Small, Normal, Large), as in Google Docs'],
       ['Highlight some text', 'Shows the format bar: bold, italic, size and font'],
       ['Alt+F10', 'With text highlighted: move into the format bar (arrows or Tab to move around it, Enter to press, Escape to go back to the text)'],
     ],
@@ -72,6 +72,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Ctrl+B / Ctrl+I / Ctrl+U', 'Bold / italic / underline the selected words (or what you type next)'],
       ['Ctrl+Shift+X', 'Strikethrough'],
       ['Ctrl+Shift+8 / Ctrl+Shift+7', 'Bulleted / numbered list'],
+      ['Ctrl+Shift+. / Ctrl+Shift+,', 'Larger / smaller text: the next size up or down in the Aa menu, as in Google Docs'],
       ['Enter', 'Next list item; on an empty item, end the list'],
       ['Tab / Shift+Tab in a list', 'Indent / outdent the item'],
     ],

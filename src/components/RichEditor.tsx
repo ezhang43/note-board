@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } fro
 import { decodeItems, decodeRich, encodeRich, itemsToRich } from '../model/journalPaste';
 import { deepEqual } from '../model/merge';
 import * as R from '../model/richText';
+import { sizeKeyDir } from '../model/textStyle';
 import type { Block, BlockType, Look, Marks, Pos, Rich, Run, Sel, Toggle } from '../model/richText';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 
@@ -439,7 +440,9 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       e.preventDefault();
       fn();
     };
-    if (e.shiftKey) {
+    const size = sizeKeyDir(e); // the Google Docs keys, Ctrl/⌘+Shift+. larger and Shift+, smaller: the Aa menu's + and −
+    if (size) run(() => handle.stepSize(size));
+    else if (e.shiftKey) {
       if (e.code === 'KeyX') run(() => handle.toggle('s'));
       else if (e.code === 'Digit7') run(() => handle.list('number'));
       else if (e.code === 'Digit8') run(() => handle.list('bullet'));

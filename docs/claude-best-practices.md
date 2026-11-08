@@ -3,7 +3,7 @@
 Owner request, 2026-10-29: follow Anthropic's Claude Code best-practices pages, and when a page
 changes, apply the change that day.
 
-- **Last checked: 2026-10-29** (every URL below was fetched that day, with Claude Code 2.1.312 installed).
+- **Last checked: 2026-11-08** (every URL below was fetched that day, with Claude Code 2.1.319 installed).
 - Paraphrased, not quoted. Section names are the page's own headings, so the daily check can find them.
 - Anthropic's older engineering post, `https://www.anthropic.com/engineering/claude-code-best-practices`
   ("Claude Code: Best practices for agentic coding"), now answers with a permanent redirect (HTTP 308) to
@@ -29,16 +29,16 @@ changes, apply the change that day.
 
 | # | Page | URL | Fingerprint |
 | - | - | - | - |
-| 1 | Best practices for Claude Code | https://code.claude.com/docs/en/best-practices.md | 3a737bc6ffa8 |
-| 2 | How Claude remembers your project (CLAUDE.md, rules, memory) | https://code.claude.com/docs/en/memory.md | f19bb5aa909f |
-| 3 | Extend Claude with skills | https://code.claude.com/docs/en/skills.md | 0a5e9e2e7602 |
-| 4 | Create custom subagents | https://code.claude.com/docs/en/sub-agents.md | c6af4f0b650d |
-| 5 | Automate actions with hooks (guide) | https://code.claude.com/docs/en/hooks-guide.md | 0449c1803dce |
-| 6 | Hooks reference | https://code.claude.com/docs/en/hooks.md | ffc7195446eb |
-| 7 | Settings files and precedence | https://code.claude.com/docs/en/settings.md | 70064d76e67c |
-| 8 | Configure permissions | https://code.claude.com/docs/en/permissions.md | a72bafb46a55 |
-| 9 | Manage costs effectively | https://code.claude.com/docs/en/costs.md | 68019dc152b7 |
-| 10 | Common workflows | https://code.claude.com/docs/en/common-workflows.md | 5a5584f7189b |
+| 1 | Best practices for Claude Code | https://code.claude.com/docs/en/best-practices.md | fe692b7566e6 |
+| 2 | How Claude remembers your project (CLAUDE.md, rules, memory) | https://code.claude.com/docs/en/memory.md | 275fe39e8501 |
+| 3 | Extend Claude with skills | https://code.claude.com/docs/en/skills.md | 977bb9f8d6a0 |
+| 4 | Create custom subagents | https://code.claude.com/docs/en/sub-agents.md | db8a532d4c04 |
+| 5 | Automate actions with hooks (guide) | https://code.claude.com/docs/en/hooks-guide.md | 662e38ddd6af |
+| 6 | Hooks reference | https://code.claude.com/docs/en/hooks.md | 302eb7b42195 |
+| 7 | Settings files and precedence | https://code.claude.com/docs/en/settings.md | 448f49ae3a98 |
+| 8 | Configure permissions | https://code.claude.com/docs/en/permissions.md | 70a451a0e032 |
+| 9 | Manage costs effectively | https://code.claude.com/docs/en/costs.md | e07ef16eda37 |
+| 10 | Common workflows | https://code.claude.com/docs/en/common-workflows.md | fcd7053b20f2 |
 
 Index of all pages (to spot new ones): https://code.claude.com/docs/llms.txt. Pages 6 and 8 are large
 reference pages; this first pass read their headings and the sections that give advice (hook security,

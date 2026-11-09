@@ -359,9 +359,9 @@ export function checklistActions(ctx: StoreContext) {
      * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so
      * the cursor goes back into it at `caret` (else the nearest item still drawn, see stepOpen) and the keyboard stays up.
      */
-    undoInItem(cardId: string, itemId: string, caret: number) {
+    undoInItem(cardId: string, itemId: string, caret: number, end = caret) {
       const board = ctx.state.board;
-      ctx.undoOn(ctx.state.boards.open, 'undo', { cardId, itemId, caret });
+      ctx.undoOn(ctx.state.boards.open, 'undo', { cardId, itemId, caret, end });
       if (ctx.state.board !== board) announce('Undid the last change');
     },
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?" (every ticked item on the board, job 200), or say there are none. */

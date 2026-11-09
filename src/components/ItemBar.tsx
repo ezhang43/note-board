@@ -129,7 +129,7 @@ export function ItemBar() {
   const caret = () => field.selectionStart ?? 0;
   return (
     <div ref={bar} className="item-bar" role="toolbar" aria-label="Item actions" style={{ bottom: cover }}>
-      {button('Undo', <UndoIcon />, () => appStore.undoInItem(cardId, itemId, caret()), !canUndo)}
+      {button('Undo', <UndoIcon />, () => appStore.undoInItem(cardId, itemId, caret(), field.selectionEnd ?? caret()), !canUndo)}
       {button('Outdent', <IndentIcon out />, () => appStore.itemTab(cardId, itemId, true))}
       {button('Indent', <IndentIcon />, () => appStore.itemTab(cardId, itemId, false))}
       {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, caret()))}

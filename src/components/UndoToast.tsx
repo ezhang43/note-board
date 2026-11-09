@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { appStore, useAppState } from '../store/appStore';
 import { calendar, useCalendar } from '../store/calendar';
+import { keepsBlockCursor } from './textField';
 
 /** How long the Undo message stays (ms), not counting while the pointer or keyboard is on it. */
 const UNDO_TOAST_MS = 6000;
@@ -68,7 +69,7 @@ function Pill({ text, onUndo, onDismiss }: { text: string; onUndo: ((kept: boole
     <div className="undo-toast" onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
       <span>{text}</span>
       {onUndo && (
-        <button type="button" onClick={(e) => onUndo(document.activeElement === e.currentTarget)}>
+        <button type="button" onClick={(e) => onUndo(document.activeElement === e.currentTarget)} {...keepsBlockCursor}>
           Undo
         </button>
       )}

@@ -10,9 +10,9 @@ beforeEach(() => vi.stubGlobal('window', { matchMedia: () => ({ matches: true })
 afterEach(() => vi.unstubAllGlobals());
 
 /** Puts the cursor in the text box of this checklist item, as the browser would. */
-function typeIn(cardId: string, itemId: string, caret?: number) {
+function typeIn(cardId: string, itemId: string, caret?: number, end = caret) {
   const row = { dataset: { itemId }, closest: () => ({ dataset: { cardId } }) };
-  vi.stubGlobal('document', { activeElement: { isContentEditable: false, matches: () => true, closest: () => row, selectionStart: caret } });
+  vi.stubGlobal('document', { activeElement: { isContentEditable: false, matches: () => true, closest: () => row, selectionStart: caret, selectionEnd: end } });
 }
 
 function setup(names: string[]) {
@@ -60,7 +60,7 @@ describe('Ctrl+Z while typing in a checklist item', () => {
     expect(s.getState().ui.focusItem).toBe(id('b'));
   });
 
-  it('keeps the cursor in an item still there, at its place in the text', () => {
+  it('keeps the cursor in an item still there; when the undo changes its text, at the end of it, as the browser puts it', () => {
     const { s, cardId, id, list } = setup(['a', 'b']);
     const b = id('b');
     typeIn(cardId, b, 1);
@@ -68,7 +68,34 @@ describe('Ctrl+Z while typing in a checklist item', () => {
     s.undo(); // the typing goes, the item stays
     expect(list().items.map((i) => i.id)).toContain(b);
     expect(s.getState().ui.focusItem).toBe(b);
-    expect(s.getState().ui.focusOffset).toBe(1);
+    expect(s.getState().ui.focusOffset).toBeNull(); // the end of its text
+  });
+
+  it('keeps highlighted words highlighted when the undo leaves the item as it is (owner, 2026-11-09)', () => {
+    const { s, cardId, id } = setup(['abcd', 'x']);
+    s.setItemText(cardId, id('x'), 'xy'); // something else changes
+    const abcd = id('abcd');
+    typeIn(cardId, abcd, 1, 3); // "bc" highlighted
+    s.undo();
+    expect(s.getState().ui.focusItem).toBe(abcd);
+    expect(s.getState().ui.focusOffset).toEqual([1, 3]);
+  });
+});
+
+describe('Ctrl+Z then Ctrl+Y on typing (owner, 2026-11-09)', () => {
+  it('puts the cursor at the end of the text the redo brings back, not where it was before the redo', () => {
+    const { s, cardId, id, list } = setup(['hello', 'x']);
+    const hello = id('hello');
+    typeIn(cardId, hello, 11);
+    s.setItemText(cardId, hello, 'hello world');
+    s.undo();
+    expect(list().items[0].text).toBe('hello');
+    s.focusTaken(hello);
+    typeIn(cardId, hello, 5); // the browser put it at the end of "hello"
+    s.redo();
+    expect(list().items[0].text).toBe('hello world');
+    expect(s.getState().ui.focusItem).toBe(hello);
+    expect(s.getState().ui.focusOffset).toBeNull(); // the end of "hello world"
   });
 });
 
@@ -83,6 +110,29 @@ describe('Ctrl+Z that redraws the item being typed in (code review)', () => {
     expect(list().items.map((i) => i.text)).toEqual(['b', 'a']);
     expect(s.getState().ui.focusItem).toBe(a);
     expect(s.getState().ui.focusOffset).toBe(1);
+  });
+});
+
+describe('Ctrl+Z that moves the item being typed in to another list (code review, 2026-11-09)', () => {
+  it('follows it there, and that list is the one selected, so Delete after Escape never takes the other card', () => {
+    const { s, cardId: a, id } = setup(['a1', 'a2']);
+    s.addCard('todo');
+    const l = s.getState().ui.selection[0];
+    const lItems = () => (s.getState().board.cards[l] as TodoCard).items;
+    s.setItemText(l, lItems()[0].id, 'l1');
+    s.itemEnter(l, lItems()[0].id);
+    const l1 = lItems()[0].id;
+    s.startItemDrag(l, l1, { x: 0, y: 0 });
+    s.moveItemDrag({ x: 5, y: 5 }, { cardId: a, drop: { mode: 'after', targetId: id('a1') }, markId: id('a1'), markMode: 'after' });
+    s.dropItems(); // l1 is now in list a
+    expect(id('l1')).toBe(l1);
+    s.select(a);
+    typeIn(a, l1, 1);
+    s.undo(); // l1 goes back to its own list
+    expect(lItems().map((i) => i.id)).toContain(l1);
+    expect(s.getState().ui.focusItem).toBe(l1);
+    expect(s.getState().ui.focusOffset).toBe(1);
+    expect(s.getState().ui.selection).toEqual([l]);
   });
 });
 
@@ -130,17 +180,32 @@ describe('undo that hides the whole list while typing in it', () => {
     expect(s.deleteSelection()).toBe(false);
   });
 
-  it('an undo that removes the whole card leaves the selection as it is without typing', () => {
+  /** A note and a new checklist, both selected; `typing`: the cursor is in the checklist's item. */
+  function twoSelected(typing: boolean) {
     const s = createStore(null, (fn) => fn());
     s.setViewportSize({ width: 1200, height: 800 });
+    s.addCard('note');
+    const note = s.getState().ui.selection[0];
     s.addCard('todo');
     const cardId = s.getState().ui.selection[0];
-    const item = (s.getState().board.cards[cardId] as TodoCard).items[0].id;
-    typeIn(cardId, item);
-    s.undo(); // the new card goes
+    s.pressBlock(note, true);
+    expect(s.getState().ui.selection).toEqual(expect.arrayContaining([cardId, note]));
+    if (typing) typeIn(cardId, (s.getState().board.cards[cardId] as TodoCard).items[0].id);
+    s.undo(); // the new checklist goes
     expect(s.getState().board.cards[cardId]).toBeUndefined();
+    return { s, note };
+  }
+
+  it('an undo that removes the whole card being typed in lets go of every selected block too', () => {
+    const { s } = twoSelected(true);
     expect(s.getState().ui.focusItem).toBeNull();
     expect(s.getState().ui.selection).toEqual([]);
+    expect(s.deleteSelection()).toBe(false);
+  });
+
+  it('without typing, the same undo keeps the other selected block selected', () => {
+    const { s, note } = twoSelected(false);
+    expect(s.getState().ui.selection).toEqual([note]);
   });
 });
 
@@ -157,11 +222,27 @@ describe('Undo in the phone item bar', () => {
   });
 
   it('keeps the cursor at its place in an item that stays', () => {
+    const { s, cardId, id } = setup(['ab', 'x']);
+    const ab = id('ab');
+    s.setItemText(cardId, id('x'), 'xy');
+    s.undoInItem(cardId, ab, 1);
+    expect(s.getState().ui.focusItem).toBe(ab);
+    expect(s.getState().ui.focusOffset).toBe(1);
+  });
+
+  it('keeps highlighted letters highlighted, as Ctrl+Z does (code review)', () => {
+    const { s, cardId, id } = setup(['abcd', 'x']);
+    s.setItemText(cardId, id('x'), 'xy');
+    s.undoInItem(cardId, id('abcd'), 1, 3);
+    expect(s.getState().ui.focusOffset).toEqual([1, 3]);
+  });
+
+  it('puts the cursor at the end of the text when the undo changes it, as Ctrl+Z does', () => {
     const { s, cardId, id } = setup(['ab']);
     const ab = id('ab');
     s.setItemText(cardId, ab, 'abc');
     s.undoInItem(cardId, ab, 2);
     expect(s.getState().ui.focusItem).toBe(ab);
-    expect(s.getState().ui.focusOffset).toBe(2);
+    expect(s.getState().ui.focusOffset).toBeNull();
   });
 });

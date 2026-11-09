@@ -75,6 +75,80 @@ test('Ctrl+Z that collapses the list being typed in: the card is let go, and Bac
   await expect(cards(page)).toHaveCount(1);
 });
 
+const caretIn = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    return el instanceof HTMLTextAreaElement ? [el.value, el.selectionStart, el.selectionEnd] : null;
+  });
+
+test('Ctrl+Z then Ctrl+Y on typing puts the cursor at the end of the text it brings back (owner, 2026-11-09)', async ({ page }) => {
+  const list = await checklist(page, ['hello', 'x']);
+  await list.getByLabel('Item text').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' world');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => texts(list)).toEqual(['hello', 'x']);
+  await page.keyboard.press('Control+y');
+  await expect.poll(() => texts(list)).toEqual(['hello world', 'x']);
+  await expect.poll(() => caretIn(page)).toEqual(['hello world', 11, 11]);
+});
+
+test('highlighted words stay highlighted after an undo that leaves their item as it is (owner, 2026-11-09)', async ({ page }) => {
+  const list = await checklist(page, ['abcd', 'x']);
+  const first = list.getByLabel('Item text').first();
+  await first.click();
+  await first.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(1, 3)); // "bc"
+  await page.keyboard.press('Control+z'); // takes back the typing in the other item
+  await expect.poll(() => texts(list)).toEqual(['abcd', '']);
+  await expect.poll(() => caretIn(page)).toEqual(['abcd', 1, 3]);
+});
+
+for (const name of ['Undo', 'Redo']) {
+  test(`the toolbar's ${name} clicked while typing keeps the cursor in the item, so Backspace never deletes the card (owner, 2026-11-09)`, async ({ page }) => {
+    const list = await checklist(page, ['one']);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('two');
+    if (name === 'Redo') {
+      await page.keyboard.press('Control+z');
+      await page.keyboard.press('Control+z');
+      await expect.poll(() => texts(list)).toEqual(['one']);
+    }
+    const button = page.getByRole('button', { name: new RegExp(`^${name} \\(`) });
+    await button.click();
+    await expect.poll(() => focused(page)).not.toBeNull();
+    await expect(button).not.toBeFocused();
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+    await expect(cards(page)).toHaveCount(1);
+  });
+}
+
+test("the toolbar's Undo clicked while typing in a note keeps the cursor there too, so Backspace never deletes the note (code review)", async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.type('abc');
+  const undo = page.getByRole('button', { name: /^Undo \(/ });
+  await undo.click();
+  await expect(undo).not.toBeFocused();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[data-card-id]') != null)).toBe(true);
+  for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+  await expect(cards(page)).toHaveCount(1);
+});
+
+test("the Undo message's Undo clicked while typing keeps the cursor in the item, so Backspace never deletes a card (owner, 2026-11-09)", async ({ page }) => {
+  const list = await checklist(page, ['one']);
+  await clickEmpty(page);
+  await add(page, 'Note');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Delete'); // the note goes, and the Undo message shows
+  await expect(cards(page)).toHaveCount(1);
+  await list.getByLabel('Item text').click();
+  await page.locator('.undo-toast').getByRole('button', { name: 'Undo' }).click();
+  await expect(cards(page)).toHaveCount(2);
+  await expect.poll(() => focused(page)).toBe('one');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+  await expect(cards(page)).toHaveCount(2);
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   const bar = (page: Page) => page.getByRole('toolbar', { name: 'Item actions' });

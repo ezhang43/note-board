@@ -7,7 +7,7 @@ import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, seriali
 import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
-import { cursorAfterStep, type ItemAt } from '../model/undoCursor';
+import { caretAfterStep, cursorAfterStep, type TypingAt } from '../model/undoCursor';
 import { dropEmptyFolds } from '../model/checklist';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
@@ -105,7 +105,7 @@ export interface StoreContext {
    */
   commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
   /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. `typing`: the item the cursor is in on the open board (see stepOpen; read from the page when left out, unused for other boards). */
-  undoOn(id: string, which: 'undo' | 'redo', typing?: ItemAt & { caret?: number }): void;
+  undoOn(id: string, which: 'undo' | 'redo', typing?: TypingAt): void;
   /**
    * A delete: `run` makes it, as one change on board `board` (the open one by default). When it changed
    * something, `text` is said aloud and shown with Undo. Returns whether it did.
@@ -532,14 +532,16 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
    * row (which loses the cursor); when the step takes it off the screen, the cursor goes to the nearest item still drawn,
    * never to the page, where Backspace would delete the card (job undo-keeps-cursor). Only the open board has a cursor.
    */
-  function stepOpen(which: 'undo' | 'redo', typing: (ItemAt & { caret?: number }) | null = typingAt()) {
+  function stepOpen(which: 'undo' | 'redo', typing: TypingAt | null = typingAt()) {
     if (state.ui.preview || locked()) return;
     const before = state.board;
     const step = (which === 'undo' ? undoStep : redoStep)(history, before);
     if (step && step.board !== before) edits++; // counted before it shows, for version history
     const to = step && step.board !== before && typing?.itemId ? cursorAfterStep(before, step.board, typing) : undefined;
     // No item of that list is drawn now (it was collapsed, or the card is gone): nothing stays selected, so Backspace on the page deletes nothing.
-    const ui: Partial<Ui> = to ? { focusItem: to.itemId, focusOffset: to.itemId === typing!.itemId ? (typing!.caret ?? null) : null } : to === null ? { selection: [] } : {};
+    // Moved to another list: that list is the one selected, as while typing in it, so Delete after Escape never takes the other card.
+    const moved = to && to.cardId !== typing!.cardId ? { selection: [to.cardId] } : {};
+    const ui: Partial<Ui> = to ? { focusItem: to.itemId, focusOffset: caretAfterStep(before, step!.board, typing!, to), ...moved } : to === null ? { selection: [] } : {};
     restore(step, true, state.boards, ui);
   }
 
@@ -555,7 +557,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });
   }
 
-  function undoOn(id: string, which: 'undo' | 'redo', typing?: ItemAt & { caret?: number }) {
+  function undoOn(id: string, which: 'undo' | 'redo', typing?: TypingAt) {
     if (id === state.boards.open) return stepOpen(which, typing);
     const before = state.boards.others[id];
     const h = histories.get(id);

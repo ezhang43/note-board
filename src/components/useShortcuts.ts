@@ -11,6 +11,7 @@ import { isPhone } from './usePhone';
 import type { FormatAsk } from '../store/actions/format';
 import { itemOf, removeItemByKey } from './itemDom';
 import { focusedBox } from './textBox';
+import { cursorLost, leaveField, watchLostCursor } from './lostCursor';
 import { isTextField, panelCovers } from './textField';
 
 /** Where keys never act on the board behind (C-M1): panels, popover menus and the Undo message. */
@@ -92,7 +93,7 @@ export function useShortcuts() {
 
       // Escape while typing in a card leaves the text field, keeping the card selected (so arrows then move it).
       if (key === 'escape' && isTextField(e.target) && (e.target as HTMLElement).closest('[data-card-id], [data-col-id]')) {
-        return (e.target as HTMLElement).blur();
+        return leaveField(e.target as HTMLElement);
       }
 
       // Ctrl+A in a checklist item whose text is already all selected: every item in that list
@@ -101,13 +102,18 @@ export function useShortcuts() {
         const field = e.target;
         const cardId = field.closest('[data-item-id]') && field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
         if (cardId && field.selectionStart === 0 && field.selectionEnd === field.value.length) {
-          field.blur();
+          leaveField(field);
           return run(e, () => appStore.selectWholeList(cardId));
         }
       }
 
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
+      // The keyboard fell out of a block without the person leaving it (something else took its text box away, job
+      // sync-keeps-cursor): the selection is let go at every key until a click or focus move, so keys typed on as if
+      // still in the box never delete or move a block (Backspace, Delete, arrows; Ctrl+A then Delete too).
+      const { selection, itemSel } = appStore.getState().ui;
+      if ((selection.length || itemSel) && cursorLost()) appStore.clearSelection();
 
       const state = appStore.getState();
       // ? opens the keyboard shortcuts panel (it closes itself on ? or Escape: it covers the board).
@@ -189,7 +195,11 @@ export function useShortcuts() {
       } else if (!mod && key === 'escape') appStore.clearSelection();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const unwatch = watchLostCursor();
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      unwatch();
+    };
   }, []);
 }
 

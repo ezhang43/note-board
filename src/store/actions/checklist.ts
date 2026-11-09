@@ -357,18 +357,12 @@ export function checklistActions(ctx: StoreContext) {
     },
     /**
      * Undo from the phone's item bar. The item being typed in can be redrawn or removed by the undo, so
-     * the cursor goes back into it at `caret` (else the item next to it) and the keyboard stays up.
+     * the cursor goes back into it at `caret` (else the nearest item still drawn, see stepOpen) and the keyboard stays up.
      */
-    undoInItem(cardId: string, itemId: string, caret: number) {
-      const before = ctx.state.board.cards[cardId];
-      const shown = before?.kind === 'todo' ? visibleItems(before) : [];
+    undoInItem(cardId: string, itemId: string, caret: number, end = caret) {
       const board = ctx.state.board;
-      ctx.undoOn(ctx.state.boards.open, 'undo');
+      ctx.undoOn(ctx.state.boards.open, 'undo', { cardId, itemId, caret, end });
       if (ctx.state.board !== board) announce('Undid the last change');
-      const after = ctx.state.board.cards[cardId];
-      if (after?.kind !== 'todo') return;
-      const focus = C.findItem(after.items, itemId) ? itemId : C.focusAfterRemoving(shown, after.items, [itemId]);
-      if (focus) updateUi({ focusItem: focus, focusOffset: focus === itemId ? caret : null });
     },
     /** Ctrl+Shift+Backspace (owner request): ask "Delete N completed items?" (every ticked item on the board, job 200), or say there are none. */
     askDeleteCompleted() {

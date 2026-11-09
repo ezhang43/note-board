@@ -24,6 +24,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
 import { arrowThroughMenu } from './menuArrows';
+import { keepsBlockCursor } from './textField';
 import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
@@ -584,6 +585,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
             title="Undo (Ctrl+Z)"
             aria-disabled={canUndo ? undefined : true}
             onClick={appStore.undo}
+            {...keepsBlockCursor}
           >
             <UndoIcon />
           </button>
@@ -594,6 +596,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
             title="Redo (Ctrl+Y)"
             aria-disabled={canRedo ? undefined : true}
             onClick={appStore.redo}
+            {...keepsBlockCursor}
           >
             <RedoIcon />
           </button>

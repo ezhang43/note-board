@@ -2,11 +2,23 @@ import { useEffect, useState, type RefObject } from 'react';
 import { appStore } from '../store/appStore';
 
 /** True while the user is typing in a text box (checkboxes don't count). */
-export function isTextField(target: EventTarget | null): boolean {
+export function isTextField(target: EventTarget | null): target is HTMLElement {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
   return target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'checkbox';
 }
+
+/**
+ * For the Undo and Redo buttons (owner, 2026-11-09): pressed with a pointer while typing in a block (a checklist item, a note,
+ * a title), they leave the cursor there, as Ctrl+Z does, so the undo can put it back where it belongs and a Backspace after
+ * it edits text, never deleting the selected card. Reached with Tab, a button still takes the keyboard focus and shows its ring.
+ * Text boxes outside the board (a panel's, the board name) lose the cursor as before: some save on leaving.
+ */
+function keepBlockCursor(e: { preventDefault(): void }) {
+  const el = document.activeElement;
+  if (isTextField(el) && el.closest('[data-card-id], [data-col-id]')) e.preventDefault();
+}
+export const keepsBlockCursor = { onPointerDown: keepBlockCursor, onMouseDown: keepBlockCursor };
 
 /** True while a panel covers the board (Send feedback, Delete account): board keys then leave it alone. */
 export const panelCovers = () => document.querySelector('[aria-modal="true"]') !== null;

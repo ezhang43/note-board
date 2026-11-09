@@ -117,13 +117,13 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   });
 
   // Put the cursor in this item's text when asked: at the end (new item, Tab, Backspace) or at a
-  // given spot (where two items were joined by Delete).
+  // given spot (where two items were joined by Delete), or highlight the letters an undo left highlighted.
   useEffect(() => {
     const el = ref.current;
     if (!wantsFocus || !el) return;
     el.focus({ preventScroll: true });
-    const at = focusOffset ?? el.value.length;
-    el.setSelectionRange(at, at);
+    const [from, to] = Array.isArray(focusOffset) ? focusOffset : [focusOffset ?? el.value.length, focusOffset ?? el.value.length];
+    el.setSelectionRange(from, to);
     appStore.focusTaken(item.id);
   }, [wantsFocus, focusOffset, item.id]);
 

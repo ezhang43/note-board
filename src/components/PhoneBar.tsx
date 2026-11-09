@@ -14,6 +14,7 @@ import {
 } from './Toolbar';
 import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
+import { keepsBlockCursor } from './textField';
 import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
@@ -152,10 +153,10 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
       <nav className="phone-bar" role="toolbar" aria-label="Board actions">
         {!viewOnly && (
           <>
-            <button type="button" aria-label="Undo" aria-disabled={canUndo ? undefined : true} onClick={appStore.undo}>
+            <button type="button" aria-label="Undo" aria-disabled={canUndo ? undefined : true} onClick={appStore.undo} {...keepsBlockCursor}>
               <UndoIcon />
             </button>
-            <button type="button" aria-label="Redo" aria-disabled={canRedo ? undefined : true} onClick={appStore.redo}>
+            <button type="button" aria-label="Redo" aria-disabled={canRedo ? undefined : true} onClick={appStore.redo} {...keepsBlockCursor}>
               <RedoIcon />
             </button>
             <button type="button" className="phone-add-button" aria-label="Add" aria-haspopup="menu" aria-expanded={open === 'add'} onClick={() => toggle('add')}>

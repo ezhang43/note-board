@@ -5,6 +5,7 @@ import type { VersionMeta } from '../model/versions';
 import type { Guide } from '../model/align';
 import type { ItemDrop } from '../model/checklist';
 import type { ListSelection } from '../model/multiSelect';
+import type { TextSpot } from '../model/undoCursor';
 import type { ResizeDir } from '../model/sizing';
 import type { Board, CardKind, Point, Rect, View } from '../model/types';
 import type { Links, Member, Role } from './collab';
@@ -142,9 +143,9 @@ export interface Ui {
   selection: string[];
   itemSel: ItemSelection | null;
   itemDrag: ItemDrag | null;
-  /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where). */
+  /** A checklist item whose text box should get the cursor (at the end of its text, unless focusOffset says where, or which letters to highlight). */
   focusItem: string | null;
-  focusOffset: number | null;
+  focusOffset: TextSpot;
   /** A new note, link or column whose first text field should get the cursor. */
   focusBlock: string | null;
   colourMenuOpen: boolean;

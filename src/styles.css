@@ -950,8 +950,36 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   gap: calc(6px * var(--bb));
   border-radius: 4px;
   /* Each level is indented 32px (--indent, set by the row: 32px times its level), but in a narrow list the deepest levels stop short so the text keeps 32px: the row's width less the tick box, the gap and the buttons' strip (the widest, 46px). */
-  padding-left: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - 20px * var(--bs) - 32px));
+  --inset: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - 20px * var(--bs) - 32px));
+  padding-left: var(--inset);
 }
+/*
+ * A parent item's fold arrow (owner request, 2026-11-09): just left of its tick box, in the indent (a top-level
+ * item's sits in the card's padding), on the middle of the first line. Above the tick box's widened press area.
+ */
+.item-fold {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--line) / 2 + 4px - 8px * var(--bb));
+  left: calc(var(--inset) - 12px * var(--bb));
+  width: calc(12px * var(--bb));
+  height: calc(16px * var(--bb));
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.item-fold svg { width: calc(10px * var(--bb)); height: calc(10px * var(--bb)); }
+.item-fold:disabled { cursor: default; }
+@media (hover: hover) {
+  .item-fold:not(:disabled):hover { color: var(--ink); }
+}
+.todo-item.find-target { outline: 3px solid var(--find-outline); outline-offset: 2px; }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
 .app.phone .todo-item { --bs: 1; }
 .app.phone .todo-item input[type='checkbox'] { --box: 16px; }
@@ -3433,6 +3461,15 @@ a.cal-open { align-self: flex-start; }
 
   /* A tick box is pressed from 44px wide (22px to its left, over the card's padding), as tall as its row. */
   .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
+  /*
+   * The fold arrow is pressed from 44px square, reaching left of it (over the indent or the card's padding), never over
+   * its own tick box, whose press area then starts at the box. Where it reaches over the rows above and below, their
+   * tick boxes' press areas stay on top.
+   */
+  .item-fold { z-index: 1; }
+  .item-fold::after { content: ''; position: absolute; top: 50%; right: 0; width: 44px; height: 44px; translate: 0 -50%; }
+  .tick { position: relative; z-index: 2; }
+  .todo-item:has(> .item-fold) > .tick { padding-left: 6px; margin-left: -6px; }
 
   /*
    * A card's or container's collapse arrow and trash can show only on the selected one (owner request,

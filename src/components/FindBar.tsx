@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { shownName } from '../model/board';
-import { findMatches, findMatchesAcross, type BoardMatch, type Match } from '../model/search';
+import { findMatches, findMatchesAcross, inFoldedItem, type BoardMatch, type Match } from '../model/search';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
 import { ArrowIcon, CloseIcon } from './icons';
@@ -8,7 +8,10 @@ import { panelCovers } from './textField';
 
 /** The element to bring into view for a match: its marked text, or what hides it. */
 function targetOf(m: Match): Element | null {
-  if (m.showInstead) return document.querySelector(`[data-card-id="${CSS.escape(m.showInstead)}"], [data-col-id="${CSS.escape(m.showInstead)}"]`);
+  if (m.showInstead) {
+    const id = CSS.escape(m.showInstead);
+    return document.querySelector(`[data-card-id="${id}"], [data-col-id="${id}"], [data-item-id="${id}"]`);
+  }
   const box = document.querySelector(`[data-find="${CSS.escape(m.key)}"]`);
   return box?.querySelector('mark[data-current]') ?? box;
 }
@@ -110,7 +113,7 @@ export function FindBar() {
   };
   const step = (by: 1 | -1) => matches.length && go(here ? (at + by + matches.length) % matches.length : at);
   const where = current && !here ? ` · ${shownName(appStore.boardName(current.boardId))}` : '';
-  const count = !query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${where || (inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? ' · in a closed card' : '')}` : 'No matches';
+  const count = !query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${where || (inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? (here && inFoldedItem(board, current) ? ' · in a folded item' : ' · in a closed card') : '')}` : 'No matches';
   return (
     <div className="find-bar" role="search" aria-label="Search the board" onKeyDown={(e) => {
         if (e.key !== 'Escape') return;

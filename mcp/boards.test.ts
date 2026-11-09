@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { recolour, resizeCard, setCollapsedFor, updateCard } from '../src/model/board';
+import { editItems, toggleFold } from '../src/model/checklist';
 import { serializeBoard } from '../src/model/persist';
 import { fromPlain, insertDivider, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
 import { applyStyle, boxesOf, sizeStepChange } from '../src/model/textStyle';
-import type { Board } from '../src/model/types';
+import type { Board, TodoCard } from '../src/model/types';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit } from './boards';
 import { homeBoard, ownRaw, sampleSnapshot, workBoard } from './sample';
@@ -198,6 +199,10 @@ describe('boards the app makes stay editable by the connector (guard: safeToEdit
       ['rich text', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(rich), rich }))],
       ['journal divider', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(divided), rich: divided }))],
       ['card colour', (x) => recolour(x, ['noteCall'], 'ocean')],
+      // Folding an item's sub-items (owner request, 2026-11-09); a fold left with no sub-items is kept as saved too.
+      ['item folded', (x) => editItems(x, 'listGroceries', (items) => toggleFold([...items, { id: 'fz', text: 'Trip', done: false, children: [{ id: 'fz1', text: 'Flights', done: false, children: [] }] }], 'fz'))],
+      // (set straight on the card: editItems drops such a fold, but a saved board can hold one)
+      ['fold left with no sub-items', (x) => updateCard(x, 'listGroceries', (c) => ({ ...c, items: [...(c as TodoCard).items, { id: 'fe', text: 'Empty', done: false, children: [], folded: true as const }] }))],
     ];
     for (const [name, step] of steps) {
       b = step(b);

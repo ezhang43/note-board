@@ -77,17 +77,6 @@ export function doneCount(items: TodoItem[]): { done: number; total: number } {
   return { done, total };
 }
 
-/**
- * Ctrl+Enter (owner request, 2026-10-15): after `id` is ticked (`before` → `after`), the open item
- * the cursor moves to: the nearest one that was below it, else the nearest above, else null.
- */
-export function nextOpenItem(before: TodoItem[], after: TodoItem[], id: string): string | null {
-  const stillOpen = new Set(flatIds(after).filter((x) => !findItem(after, x)!.item.done));
-  const order = flatIds(before);
-  const i = order.indexOf(id);
-  return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0)).reverse()].find((x) => stillOpen.has(x)) ?? null;
-}
-
 /** Items shown from `a` to `b` inclusive (either way round), ticked ones included. */
 export function itemRange(items: TodoItem[], a: string, b: string): string[] {
   const order = flatIds(items);

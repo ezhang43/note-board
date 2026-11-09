@@ -15,6 +15,7 @@ import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 import { marksOf } from '../model/wordRange';
 import { anchorOf, nearestPoint, offsetAt } from './wordPoint';
+import { leaveField } from './lostCursor';
 
 /** The rows drawn: a folded item's sub-items are not (owner request, 2026-11-09). */
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
@@ -233,7 +234,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           const done = !plain && (types.includes(ITEMS_MARKER) ? appStore.pasteItemsInto(cardId, item.id) : types.includes(JOURNAL_MARKER) && appStore.pasteJournalInto(cardId, item.id, e.clipboardData.getData(JOURNAL_MARKER)));
           if (done) {
             e.preventDefault();
-            e.currentTarget.blur(); // the pasted items are highlighted, as after pasting with items selected
+            leaveField(e.currentTarget); // the pasted items are highlighted, as after pasting with items selected
           }
         }}
       />

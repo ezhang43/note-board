@@ -1,6 +1,7 @@
 import { nearestInDirection, type Direction } from '../model/geometry';
 import { appStore } from '../store/appStore';
 import { caretOnFirstLine, caretOnLastLine } from './caret';
+import { leaveField } from './lostCursor';
 import { isTextField } from './textField';
 
 // Moving around with the keyboard. This reads the cards' text fields from the screen, so the order
@@ -43,7 +44,7 @@ function reveal(el: Element) {
 function goToBlock(id: string, shown: Element, field: Field | null, atEnd: boolean) {
   appStore.select(id);
   if (field) focusField(field, atEnd);
-  else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  else if (document.activeElement instanceof HTMLElement) leaveField(document.activeElement);
   reveal(shown);
 }
 

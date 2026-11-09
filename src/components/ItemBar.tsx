@@ -4,6 +4,7 @@ import { panToShow } from '../model/view';
 import { canvasRect, isGliding } from './canvasDom';
 import { caretLine } from './caret';
 import { ArrowIcon, CheckIcon, IndentIcon, TrashIcon, UndoIcon } from './icons';
+import { leaveField } from './lostCursor';
 
 type Typing = { field: HTMLInputElement | HTMLTextAreaElement; item: { cardId: string; itemId: string } | null };
 
@@ -137,7 +138,7 @@ export function ItemBar() {
       {/* The cursor stays in the ticked item, as Ctrl+Enter does, so the keyboard stays up. */}
       {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()))}
       {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
-      {button('Done typing', 'Done', () => field.blur())}
+      {button('Done typing', 'Done', () => leaveField(field))}
     </div>
   );
 }

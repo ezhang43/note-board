@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_HOTKEYS, hotkeyFromEvent, labelOf, matches, problemWith, startingHotkeys, type Binding } from './hotkeys';
+import { DEFAULT_HOTKEYS, hotkeyFromEvent, labelOf, matches, problemWith, startingHotkeys, stopsWhenLost, type Binding } from './hotkeys';
 
 const ev = (key: string, extra: Partial<{ code: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }> = {}) => ({
   key,
@@ -137,5 +137,34 @@ describe('problemWith (a key someone wants for an action)', () => {
     for (const k of [b('t', true), b('w', true), b('n', true), b('q', true), b('r', true), b('l', true), b('p', true), b('s', true), b('1', true), b('9', true), b('t', true, true)]) {
       expect(problemWith(DEFAULT_HOTKEYS, 'delete', k)).toMatch(/kept by the browser/);
     }
+  });
+});
+
+describe('stopsWhenLost (owner decision on PR #242, 2026-11-09)', () => {
+  const key = (k: string, more: Partial<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }> = {}) =>
+    ({ key: k, code: k.length === 1 ? `Key${k.toUpperCase()}` : k, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...more });
+  const del = DEFAULT_HOTKEYS.delete;
+
+  it('stops Delete, Backspace and the arrow keys (Shift too), the keys that delete or move a block', () => {
+    for (const k of ['Delete', 'Backspace', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) expect(stopsWhenLost(key(k), del)).toBe(true);
+    expect(stopsWhenLost(key('ArrowUp', { shiftKey: true }), del)).toBe(true);
+    expect(stopsWhenLost(key('Delete', { shiftKey: true }), del)).toBe(true);
+  });
+
+  it('stops the board’s own Delete key when it was changed', () => {
+    expect(stopsWhenLost(key('x'), { key: 'x', mod: false, shift: false })).toBe(true);
+    expect(stopsWhenLost(key('x'), del)).toBe(false);
+  });
+
+  it('lets every other key through: Shift, Ctrl, Meta and Alt alone, Ctrl+C, Ctrl+D, Ctrl+A, Escape, letters', () => {
+    for (const k of ['Shift', 'Control', 'Meta', 'Alt', 'Escape', 'Enter', 'Tab', 'a']) expect(stopsWhenLost(key(k), del)).toBe(false);
+    for (const k of ['c', 'd', 'a', 'v', 'x']) expect(stopsWhenLost(key(k, { ctrlKey: true }), del)).toBe(false);
+    expect(stopsWhenLost(key('c', { metaKey: true }), del)).toBe(false);
+  });
+
+  it('lets through the arrows with Ctrl or ⌘ (switching boards) and Ctrl+Shift+Backspace (which asks first)', () => {
+    expect(stopsWhenLost(key('ArrowRight', { ctrlKey: true }), del)).toBe(false);
+    expect(stopsWhenLost(key('ArrowLeft', { metaKey: true }), del)).toBe(false);
+    expect(stopsWhenLost(key('Backspace', { ctrlKey: true, shiftKey: true }), del)).toBe(false);
   });
 });

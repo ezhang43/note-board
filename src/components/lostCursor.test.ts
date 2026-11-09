@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cursorLost, leaveField, watchLostCursor } from './lostCursor';
+import { cursorLost, forgetLostCursor, leaveField, watchLostCursor } from './lostCursor';
 
 // Job sync-keeps-cursor (2026-11-09): the text box being typed in leaves the screen because of something else (a synced
 // change redrawing the list): the cursor falls onto the page, and Delete / Backspace must not delete the block.
@@ -167,5 +167,21 @@ describe('cursorLost', () => {
     other.remove();
     await later();
     expect(cursorLost()).toBe(true);
+  });
+
+  it('is still true when a key presses a button (Space on a tick box sends a click) and a change takes the box away just after (code review)', async () => {
+    field.focus();
+    field.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    field.blur(); // the box loses the cursor but stays on the page (a redraw moving it, say)
+    await later();
+    expect(cursorLost()).toBe(true);
+  });
+
+  it('is false once the person switches boards from the keyboard (code review)', async () => {
+    field.focus();
+    field.remove();
+    await later();
+    forgetLostCursor();
+    expect(cursorLost()).toBe(false);
   });
 });

@@ -34,6 +34,7 @@ const onFocusOut = (e: FocusEvent) => {
 };
 const onPointer = (e: PointerEvent | MouseEvent) => {
   if (e.type === 'pointermove' && !e.buttons) return; // only a pressed pointer, as in a drag
+  if (e.type === 'click' && !e.detail) return; // a click a key makes (Space on a tick box) is no press
   pointerAt = performance.now();
   if (e.type === 'pointerdown' && cursorLost()) held = null; // a click after the box went chooses what is selected
 };
@@ -52,6 +53,11 @@ export function watchLostCursor(): () => void {
   };
 }
 
+/** Forgets the box the keyboard fell out of: the person moved on (switched boards from the keyboard). */
+export function forgetLostCursor() {
+  held = null;
+}
+
 /** Takes the cursor out of a text box on purpose (a key or button the app answers that way), so the selected block can be deleted. */
 export function leaveField(el: HTMLElement) {
   if (el === held) held = null;
@@ -68,3 +74,4 @@ export function leaveField(el: HTMLElement) {
 export function cursorLost(): boolean {
   return held !== null && document.activeElement !== held;
 }
+

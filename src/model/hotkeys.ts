@@ -114,3 +114,16 @@ export function startingHotkeys(saved: string | null): Hotkeys {
   const clash = ACTIONS.some((a, i) => ACTIONS.some((o, j) => i < j && same(out[a], out[o])));
   return clash ? DEFAULT_HOTKEYS : out;
 }
+
+const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+
+/**
+ * The keys the board stops while the cursor has fallen out of a block's text box (job sync-keeps-cursor; owner
+ * decision on PR #242, 2026-11-09): the ones that delete or move a block. Delete, Backspace, the board's own Delete
+ * key (`deleteKey`, if changed) and the arrows (Shift too). Every other key (Shift alone, Ctrl+C, Ctrl+D, Ctrl+arrows
+ * switching boards, Ctrl+Shift+Backspace, which asks first) works as usual.
+ */
+export function stopsWhenLost(e: KeyEventLike, deleteKey: Binding): boolean {
+  if (matches(deleteKey, e)) return true;
+  return !(e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace' || ARROWS.has(e.key));
+}

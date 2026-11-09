@@ -75,13 +75,15 @@ test('the item being typed in is deleted on another device: Backspace and Delete
 
   // Alice goes on typing, and presses an arrow as if still in the box: the card neither goes nor moves.
   const at = await place(alice);
+  const onScreen = await list(alice).boundingBox();
   await alice.keyboard.press('ArrowLeft');
   await alice.keyboard.press('Backspace');
   await alice.keyboard.press('Delete');
   await alice.keyboard.press('Backspace');
   await expect(list(alice)).toHaveCount(1);
   await expect.poll(() => texts(alice)).toEqual(['one']);
-  expect(await place(alice)).toEqual(at); // (with nothing selected the arrow pans the view, as anywhere)
+  expect(await place(alice)).toEqual(at);
+  expect(await list(alice).boundingBox()).toEqual(onScreen); // the arrow did nothing else either: no pan (owner, PR #242)
   await expect(list(alice)).not.toHaveClass(/selected/); // the selection was let go
   // Nothing was deleted for Bob either.
   await aliceSyncs(alice, bob, ['one']);
@@ -97,13 +99,41 @@ test('the item being typed in is deleted on another device: Backspace and Delete
   await bob.context().close();
 });
 
+test('while the cursor is lost, Shift, Ctrl+C and Ctrl+D work as usual and keep the card selected; Backspace and Delete still delete nothing (owner, PR #242)', async ({ browser }) => {
+  const { alice, bob } = await sharedChecklist(browser);
+  await list(alice).getByLabel('Item text').nth(1).click();
+  await list(bob).getByLabel('Item text').nth(1).fill('');
+  await bob.keyboard.press('Backspace');
+  await expect.poll(() => texts(alice), { timeout: 8000 }).toEqual(['one']);
+  expect(await onPage(alice)).toBe(true);
+
+  await alice.keyboard.down('Shift');
+  await alice.keyboard.up('Shift');
+  await alice.keyboard.press('Control');
+  await expect(list(alice)).toHaveClass(/selected/);
+  await alice.keyboard.press('ControlOrMeta+c');
+  await expect(list(alice)).toHaveClass(/selected/);
+  await alice.keyboard.press('ControlOrMeta+d'); // duplicates the card, and the copy is selected
+  await expect(list(alice)).toHaveCount(2);
+  await expect(alice.locator('article.selected')).toHaveCount(1);
+
+  // The guard is still on: Backspace and Delete delete nothing, and let the copy go.
+  await alice.keyboard.press('Backspace');
+  await alice.keyboard.press('Delete');
+  await expect(list(alice)).toHaveCount(2);
+  await expect(alice.locator('article.selected')).toHaveCount(0);
+  await alice.context().close();
+  await bob.context().close();
+});
+
 test('the row being typed in is moved by another device: the cursor stays in it, and Backspace never deletes the card (code review)', async ({ browser }) => {
   const { alice, bob } = await sharedChecklist(browser);
   await list(alice).getByLabel('Item text').first().click();
   await alice.keyboard.press('End');
-  await alice.keyboard.press('Space'); // a click inside the box being typed in, then typing, as people do
+  // Types, then clicks inside the box being typed in, as people do (a press just before the change arrives).
+  await alice.keyboard.press('Space');
   await list(alice).getByLabel('Item text').first().click();
-  await alice.keyboard.press('Backspace');
+  await alice.keyboard.press('Backspace'); // takes the space back off
 
   // Bob moves "two" to the top.
   await list(bob).getByLabel('Item text').nth(1).click();

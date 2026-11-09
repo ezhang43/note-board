@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { ZOOM_STEP } from '../model/constants';
 import { shownName } from '../model/board';
-import { DEFAULT_HOTKEYS, matches } from '../model/hotkeys';
+import { DEFAULT_HOTKEYS, matches, stopsWhenLost } from '../model/hotkeys';
 import { shortcutKey } from '../model/keys';
 import { sizeKeyDir } from '../model/textStyle';
 import { appStore } from '../store/appStore';
@@ -11,7 +11,7 @@ import { isPhone } from './usePhone';
 import type { FormatAsk } from '../store/actions/format';
 import { itemOf, removeItemByKey } from './itemDom';
 import { focusedBox } from './textBox';
-import { cursorLost, leaveField, watchLostCursor } from './lostCursor';
+import { cursorLost, forgetLostCursor, leaveField, watchLostCursor } from './lostCursor';
 import { isTextField, panelCovers } from './textField';
 
 /** Where keys never act on the board behind (C-M1): panels, popover menus and the Undo message. */
@@ -109,12 +109,6 @@ export function useShortcuts() {
 
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
-      // The keyboard fell out of a block without the person leaving it (something else took its text box away, job
-      // sync-keeps-cursor): the selection is let go at every key until a click or focus move, so keys typed on as if
-      // still in the box never delete or move a block (Backspace, Delete, arrows; Ctrl+A then Delete too).
-      const { selection, itemSel } = appStore.getState().ui;
-      if ((selection.length || itemSel) && cursorLost()) appStore.clearSelection();
-
       const state = appStore.getState();
       // ? opens the keyboard shortcuts panel (it closes itself on ? or Escape: it covers the board).
       if (e.key === '?' && !mod) return run(e, appStore.toggleShortcuts);
@@ -127,6 +121,13 @@ export function useShortcuts() {
       if (key === 'escape' && state.ui.confirm && state.ui.itemSel) return appStore.cancelDelete();
       // While it asks, no other board key acts behind the question (Tab, Enter and Space work its buttons).
       if (state.ui.deleteCompleted === 'ask') return;
+      // The keyboard fell out of a block without the person leaving it (something else took its text box away, job
+      // sync-keeps-cursor): until a click or focus move, Delete, Backspace and the arrows typed on as if still in the
+      // box only let the selection go (Ctrl+A then Delete too). Every other key works as usual (owner, PR #242).
+      if (cursorLost() && stopsWhenLost(e, state.view.hotkeys.delete)) {
+        e.preventDefault();
+        return appStore.clearSelection();
+      }
 
       // A Word-style highlight of letters across items (owner request, 2026-11-01): a typed letter or Enter replaces
       // them; Delete, Backspace, Ctrl+C and Ctrl+X are the item keys below. Not while a container's "Delete …?" asks.
@@ -144,7 +145,9 @@ export function useShortcuts() {
         return run(e, () => {
           if (e.repeat || e.isComposing || state.ui.shortcutsOpen) return;
           const id = appStore.moveBoard(move);
-          if (id) toast(`Switched to ${shownName(appStore.boardName(id))}`);
+          if (!id) return;
+          forgetLostCursor(); // a new board: nothing there was being typed in
+          toast(`Switched to ${shownName(appStore.boardName(id))}`);
         });
       }
 

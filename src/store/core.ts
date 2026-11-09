@@ -7,11 +7,12 @@ import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, seriali
 import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
+import { cursorAfterStep, type ItemAt } from '../model/undoCursor';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
 import { announce } from './announce';
-import { prefersDark, type Schedule } from './env';
+import { prefersDark, typingAt, type Schedule } from './env';
 import { emptyUi, type AppState, type Boards, type Ui } from './types';
 
 // The store's core: the one state object, saving, undo history, the change function and the
@@ -102,8 +103,8 @@ export interface StoreContext {
    * old version is shown.
    */
   commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
-  /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. */
-  undoOn(id: string, which: 'undo' | 'redo'): void;
+  /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. `typing`: the item the cursor is in on the open board (see stepOpen; read from the page when left out, unused for other boards). */
+  undoOn(id: string, which: 'undo' | 'redo', typing?: ItemAt & { caret?: number }): void;
   /**
    * A delete: `run` makes it, as one change on board `board` (the open one by default). When it changed
    * something, `text` is said aloud and shown with Undo. Returns whether it did.
@@ -392,7 +393,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
    * heights known here are from before it and would move blocks wrongly). Blocks that change size
    * here are tidied once they have been drawn.
    */
-  function restore(result: { history: History; board: Board } | null, tidy = true, boards = state.boards) {
+  function restore(result: { history: History; board: Board } | null, tidy = true, boards = state.boards, ui: Partial<Ui> = {}) {
     if (!result) return;
     history = result.history;
     set({
@@ -407,6 +408,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         marquee: null,
         itemSel: null,
         itemDrag: null,
+        ...ui,
       }),
     });
     if (tidy) requestSettle();
@@ -521,11 +523,21 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (others !== state.boards.others) set({ ...state, boards: { ...state.boards, others } });
   }
 
-  function stepOpen(which: 'undo' | 'redo') {
+  /**
+   * Undo or redo on the open board. `typing` is the checklist item the cursor is in (read from the page unless given),
+   * with `caret`, where it is in the text. The item is asked to take the cursor again, as the step can redraw or move its
+   * row (which loses the cursor); when the step takes it off the screen, the cursor goes to the nearest item still drawn,
+   * never to the page, where Backspace would delete the card (job undo-keeps-cursor). Only the open board has a cursor.
+   */
+  function stepOpen(which: 'undo' | 'redo', typing: (ItemAt & { caret?: number }) | null = typingAt()) {
     if (state.ui.preview || locked()) return;
-    const step = (which === 'undo' ? undoStep : redoStep)(history, state.board);
-    if (step && step.board !== state.board) edits++; // counted before it shows, for version history
-    restore(step);
+    const before = state.board;
+    const step = (which === 'undo' ? undoStep : redoStep)(history, before);
+    if (step && step.board !== before) edits++; // counted before it shows, for version history
+    const to = step && step.board !== before && typing?.itemId ? cursorAfterStep(before, step.board, typing) : undefined;
+    // No item of that list is drawn now (it was collapsed, or the card is gone): nothing stays selected, so Backspace on the page deletes nothing.
+    const ui: Partial<Ui> = to ? { focusItem: to.itemId, focusOffset: to.itemId === typing!.itemId ? (typing!.caret ?? null) : null } : to === null ? { selection: [] } : {};
+    restore(step, true, state.boards, ui);
   }
 
   function commitTo(id: string, fn: (b: Board) => Board, merge?: string) {
@@ -539,8 +551,8 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });
   }
 
-  function undoOn(id: string, which: 'undo' | 'redo') {
-    if (id === state.boards.open) return stepOpen(which);
+  function undoOn(id: string, which: 'undo' | 'redo', typing?: ItemAt & { caret?: number }) {
+    if (id === state.boards.open) return stepOpen(which, typing);
     const before = state.boards.others[id];
     const h = histories.get(id);
     if (!before || !h || state.ui.preview || locked(id)) return;

@@ -141,10 +141,12 @@ describe('items selected in several lists', () => {
       expect(items(a).map((i) => i.text)).toEqual(['one']);
       expect(s.getState().ui.focusItem).toBe(before);
       s.undo();
+      s.focusTaken(s.getState().ui.focusItem!); // the undo asks the row typed in to take the cursor again; the browser does
       typeIn(a, items(a)[0].id); // the same list
       s.trashItem(a, items(a)[1].id);
-      expect(s.getState().ui.focusItem).toBe(before);
+      expect(s.getState().ui.focusItem).toBeNull(); // still no request to move it
       s.undo();
+      s.focusTaken(s.getState().ui.focusItem!);
       typeIn(b, items(b)[0].id); // the item being typed in is the one removed: the cursor moves
       s.trashItem(b, items(b)[0].id);
       expect(s.getState().ui.focusItem).toBe(items(b)[0].id);

@@ -1,5 +1,5 @@
 import { newId, type MakeId } from './cards';
-import { deleteItems, editItems, findItem, flatIds, setItemsDone } from './checklist';
+import { deleteItems, editItems, findItem, setItemsDone, shownIds, withHidden } from './checklist';
 import type { Board, TodoCard } from './types';
 
 // Checklist items selected in several lists at once (owner request): by Ctrl+A pressed again and
@@ -12,10 +12,10 @@ export interface ListSelection {
   ids: string[];
 }
 
-/** The items of a list you can see: none if the card is collapsed. */
+/** The items of a list you can see: none if the card is collapsed, and none hidden in a folded item. */
 export function visibleItems(card: TodoCard): string[] {
   if (card.collapsed) return [];
-  return flatIds(card.items);
+  return shownIds(card.items);
 }
 
 function listsOf(board: Board, cardIds: string[]): ListSelection[] {
@@ -71,7 +71,7 @@ export function multiAsText(board: Board, lists: ListSelection[]): string {
     .flatMap(({ cardId, ids }) => {
       const card = board.cards[cardId];
       if (card?.kind !== 'todo') return [];
-      const rows = ids.map((id) => findItem(card.items, id)).filter((r) => r !== null);
+      const rows = withHidden(card.items, ids).map((id) => findItem(card.items, id)).filter((r) => r !== null); // a folded item's hidden sub-items come too
       const top = Math.min(...rows.map((r) => r.depth));
       return [card.title || 'Untitled list', ...rows.map((r) => '  '.repeat(r.depth - top + 1) + r.item.text)];
     })

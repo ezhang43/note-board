@@ -42,7 +42,7 @@ describe('ticking an item', () => {
     expect(list().items[0]).toMatchObject({ id: itemId, done: true });
   });
 
-  it('Ctrl+Enter (or the phone’s Tick) says which item was ticked or unticked, since the cursor leaves its box', () => {
+  it('Ctrl+Enter (or the phone’s Tick) says which item was ticked or unticked, since no tick box was pressed', () => {
     const { s, cardId, itemId } = setup();
     announce('');
     s.tickFromKeyboard(cardId, itemId, 0);

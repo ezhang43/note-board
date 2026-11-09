@@ -53,6 +53,11 @@ describe('the cursor after undo or redo', () => {
     const after = board([it_('a1'), it_('a3')], [it_('l1'), it_('a2', [it_('a2x')])]);
     expect(cursorAfterStep(board(), after, { cardId: 'A', itemId: 'a2' })).toEqual({ cardId: 'L', itemId: 'a2' });
   });
+  it('goes to the folded item above a sub-item a fold hid (PR #239)', () => {
+    const folded = board([it_('a1'), { ...it_('a2', [it_('a2x')]), folded: true }, it_('a3')]);
+    expect(drawnItems(folded, 'A')).toEqual(['a1', 'a2', 'a3']);
+    expect(cursorAfterStep(board(), folded, { cardId: 'A', itemId: 'a2x' })).toEqual({ cardId: 'A', itemId: 'a2' });
+  });
   it('is nowhere when the list draws no item any more (collapsed) or is gone', () => {
     expect(cursorAfterStep(board(), collapse(board(), 'A'), { cardId: 'A', itemId: 'a1' })).toBeNull();
     const b = board();

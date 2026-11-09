@@ -1,3 +1,4 @@
+import { findItem, isFolded } from './checklist';
 import { completedCardOf } from './completed';
 import type { Board, Card, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
@@ -12,8 +13,9 @@ export interface Match {
   start: number;
   end: number;
   /**
-   * The card or column to show when the box itself is out of sight (collapsed), or the Completed
-   * record's id for matches in the Completed panel.
+   * The card or column to show when the box itself is out of sight (collapsed), the folded item to
+   * show for a sub-item folded away (a search never unfolds it), or the Completed record's id for
+   * matches in the Completed panel.
    */
   showInstead: string | null;
 }
@@ -40,7 +42,8 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
   const items = (card: Card, list: TodoItem[], hidden: string | null, prefix: 'item' | 'done') => {
     for (const it of list) {
       out.push({ key: `${prefix}:${card.id}:${it.id}`, text: it.text, showInstead: hidden });
-      items(card, it.children, hidden, prefix);
+      // Sub-items folded away (owner request, 2026-11-09) show as their folded item; the Completed panel shows every item.
+      items(card, it.children, hidden ?? (prefix === 'item' && isFolded(it) ? it.id : null), prefix);
     }
   };
   const cardBoxes = (card: Card, hiddenBy: string | null) => {
@@ -75,6 +78,13 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
   const done = completedCardOf(board);
   if (done) for (const g of done.groups) for (const e of g.entries) items(done, [e.item], done.id, 'done');
   return out;
+}
+
+/** The match is in a folded checklist item's hidden sub-items (not in a closed card or container, or Completed). */
+export function inFoldedItem(board: Board, m: Match): boolean {
+  if (!m.showInstead || !m.key.startsWith('item:')) return false;
+  const card = board.cards[m.key.split(':')[1]];
+  return card?.kind === 'todo' && !!findItem(card.items, m.showInstead);
 }
 
 /** Every place `query` is found on the board, in board order. */

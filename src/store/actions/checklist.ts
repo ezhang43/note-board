@@ -29,7 +29,7 @@ export function checklistActions(ctx: StoreContext) {
     const gap = Object.values(heights).reduce((sum, h) => sum + h, 0);
     const itemsOf = (cardId: string) => {
       const card = ctx.state.board.cards[cardId];
-      return card?.kind === 'todo' ? C.flatIds(card.items) : [];
+      return card?.kind === 'todo' ? C.shownIds(card.items) : []; // the rows drawn
     };
     const mark = hint && 'markMode' in hint && hint.markMode && hint.markId ? { markId: hint.markId, markMode: hint.markMode } : null;
     const target = mark && hint && 'cardId' in hint ? hint.cardId : null;
@@ -178,7 +178,7 @@ export function checklistActions(ctx: StoreContext) {
   function pasteAndSelect(cardId: string, source: TodoItem[], put: (items: TodoItem[], fresh: TodoItem[]) => TodoItem[]): boolean {
     const fresh = C.freshCopies(source);
     commit((b) => C.editItems(b, cardId, (items) => put(items, fresh)), {
-      ui: { itemSel: { cardId, anchor: fresh[0].id, ids: fresh.flatMap(C.subtreeIds) } },
+      ui: { itemSel: { cardId, anchor: fresh[0].id, ids: C.shownIds(fresh) } }, // not what pasted folded items hide
     });
     return true;
   }
@@ -219,6 +219,26 @@ export function checklistActions(ctx: StoreContext) {
     /** Ctrl+Shift+Up / Down: move the item past its neighbour; the cursor stays in it at `caret`. */
     moveItem(cardId: string, itemId: string, dir: -1 | 1, caret: number) {
       commit((b) => C.editItems(b, cardId, (items) => C.moveItemBy(items, itemId, dir)), { ui: { focusItem: itemId, focusOffset: caret } });
+    },
+    /**
+     * The arrow by a parent item, or Ctrl+Up / Ctrl+Down in it (owner request, 2026-11-09): hides or shows its
+     * sub-items. Saved with the board, one undo step. A cursor in a sub-item it hides moves to the folded item,
+     * and selected items it hides are let go.
+     */
+    toggleFold(cardId: string, itemId: string) {
+      const card = ctx.state.board.cards[cardId];
+      const items = card?.kind === 'todo' ? C.toggleFold(card.items, itemId) : null;
+      if (!items) return;
+      const shown = new Set(C.shownIds(items));
+      const at = typingAt();
+      const sel = ctx.state.ui.itemSel;
+      const lost = (l: { cardId: string; ids: string[] }) => l.cardId === cardId && l.ids.some((id) => !shown.has(id));
+      commit((b) => C.editItems(b, cardId, () => items), {
+        ui: {
+          ...(at?.cardId === cardId && at.itemId && !shown.has(at.itemId) && { focusItem: itemId, focusOffset: null }),
+          ...(sel && (lost(sel) || sel.lists?.some(lost)) && { itemSel: null }),
+        },
+      });
     },
     /** Enter in a list's title: the cursor moves to its first item. */
     focusFirstItem(cardId: string) {
@@ -294,19 +314,13 @@ export function checklistActions(ctx: StoreContext) {
     },
     /**
      * Ctrl+Enter while typing in an item (owner request, 2026-10-15; also the phone item bar's Tick,
-     * 2026-10-19): the same as its Done box. After a tick the cursor moves to the next open item (below,
-     * else above); with none left, or after an untick, it stays in the item at `caret`, so the next Delete
-     * acts on that item and never on the list (job 223).
+     * 2026-10-19): the same as its Done box. The cursor never moves on (owner request, 2026-11-09): it stays
+     * in the item at `caret`, ticked or unticked, so the next Delete acts on that item and never on the
+     * list (job 223).
      */
     tickFromKeyboard(cardId: string, itemId: string, caret: number) {
-      const card = ctx.state.board.cards[cardId];
-      const item = card?.kind === 'todo' ? C.findItem(card.items, itemId)?.item : null;
-      if (card?.kind !== 'todo' || !item) return;
-      const ticking = !item.done;
-      const ids = listsIncluding(cardId, itemId)?.find((l) => l.cardId === cardId)?.ids ?? selectedItemsIncluding(cardId, itemId) ?? [itemId];
       if (!actions.toggleItem(cardId, itemId, true)) return; // refused (read-only, an old version): the cursor stays
-      const next = ticking ? C.nextOpenItem(card.items, C.setItemsDone(card.items, ids, true), itemId) : null;
-      updateUi({ focusItem: next ?? itemId, focusOffset: next ? null : caret });
+      updateUi({ focusItem: itemId, focusOffset: caret });
     },
     /**
      * Trash can: deletes the item and everything under it (or every selected item, if it is one of them).
@@ -475,7 +489,9 @@ export function checklistActions(ctx: StoreContext) {
       if (!d) return;
       const h = d.hint;
       if (!h) return updateUi({ itemDrag: null });
-      const keep = d.roots.length > 1 ? d.allIds : null;
+      const card = ctx.state.board.cards[d.cardId];
+      const shown = new Set(card?.kind === 'todo' ? C.shownIds(card.items) : []);
+      const keep = d.roots.length > 1 ? d.allIds.filter((id) => shown.has(id)) : null; // not what folded items hide
       if ('newList' in h) {
         const id = newId('k');
         const snap = (v: number) => snapIf(ctx.state.board.snap, v);

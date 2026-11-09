@@ -28,20 +28,17 @@ test.beforeEach(async ({ page }) => {
   await fontsLoaded(page);
 });
 
-test('Tick moves the cursor to the next open item and the bar stays', async ({ page }) => {
+test('Tick keeps the cursor in the item and the bar stays', async ({ page }) => {
   const card = await list(page, ['one', 'two', 'three']);
   await card.getByLabel('Item text').nth(1).tap();
   await items(page).getByRole('button', { name: 'Tick' }).tap();
   await expect(items(page)).toBeVisible();
-  await expect.poll(() => typingIn(page)).toBe('three');
-  // Ticking the last open item sends the cursor up, to "one".
+  await expect.poll(() => typingIn(page)).toBe('two');
+  // Ticking again unticks it, and the cursor is still in it.
   await items(page).getByRole('button', { name: 'Tick' }).tap();
-  await expect.poll(() => typingIn(page)).toBe('one');
+  await expect.poll(() => typingIn(page)).toBe('two');
   await expect(items(page)).toBeVisible();
-  // Nothing open is left after this one: the cursor stays in the item just ticked, and so does the bar.
-  await items(page).getByRole('button', { name: 'Tick' }).tap();
-  await expect.poll(() => typingIn(page)).toBe('one');
-  await expect(items(page)).toBeVisible();
+  await expect(card.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(0);
 });
 
 test('Delete moves the cursor to the item above; deleting the last item leaves a blank one', async ({ page }) => {

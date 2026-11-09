@@ -44,11 +44,94 @@ export function subtreeHeight(item: TodoItem): number {
 
 /** The bottom-most item shown under (or as) this item. */
 function lastVisible(item: TodoItem): TodoItem {
-  return item.children.length ? lastVisible(item.children[item.children.length - 1]) : item;
+  return item.children.length && !item.folded ? lastVisible(item.children[item.children.length - 1]) : item;
 }
 
+/** Every item, shown or hidden in a fold, top to bottom. */
 export function flatIds(items: TodoItem[]): string[] {
   return items.flatMap(subtreeIds);
+}
+
+// ---------- folding a parent item's sub-items (owner request, 2026-11-09) ----------
+
+/** Whether an item's sub-items are hidden: a fold counts only while there are sub-items to hide. */
+export function isFolded(item: TodoItem): boolean {
+  return !!item.folded && item.children.length > 0;
+}
+
+/** The items shown, top to bottom: everything under a folded item is left out. */
+export function shownIds(items: TodoItem[]): string[] {
+  return items.flatMap((it) => [it.id, ...(isFolded(it) ? [] : shownIds(it.children))]);
+}
+
+/** `ids` plus everything hidden under the folded items among them (what a copy, cut or delete takes), in list order. */
+export function withHidden(items: TodoItem[], ids: string[], alone: readonly string[] = []): string[] {
+  const given = new Set(ids);
+  const skip = new Set(alone); // a word highlight's end items: their hidden sub-items stay
+  const out: string[] = [];
+  let added = false;
+  // One walk down the list: under a given folded item, everything is taken.
+  const walk = (list: TodoItem[], taken: boolean) => {
+    for (const it of list) {
+      if (taken || given.has(it.id)) out.push(it.id);
+      if (taken && !given.has(it.id)) added = true;
+      walk(it.children, taken || (given.has(it.id) && !skip.has(it.id) && isFolded(it)));
+    }
+  };
+  walk(items, false);
+  return added ? out : ids;
+}
+
+/** Unfolds every item above `id`, so it is in sight (the same list when none is folded). */
+export function showItem(items: TodoItem[], id: string): TodoItem[] {
+  if (!ancestorsOf(items, id).some((a) => a.folded)) return items;
+  const next = cloned(items);
+  for (const a of ancestorsOf(next, id)) delete a.folded;
+  return next;
+}
+
+/** Folds an item with sub-items, or unfolds it (the open state is left out, not saved as false). Null for an item with none. */
+export function toggleFold(items: TodoItem[], id: string): TodoItem[] | null {
+  const loc = findItem(items, id);
+  if (!loc?.item.children.length) return null;
+  const next = cloned(items);
+  const it = findItem(next, id)!.item;
+  if (it.folded) delete it.folded;
+  else it.folded = true;
+  return next;
+}
+
+/** Without its fold, in place: an item that gets a new sub-item is opened so it is in sight. */
+function unfold(item: TodoItem) {
+  delete item.folded;
+}
+
+/** The same items with a fold dropped from every item left with no sub-items; the same array when there is none. */
+function dropFoldsIn(items: TodoItem[]): TodoItem[] {
+  let changed = false;
+  const out = items.map((it) => {
+    const children = dropFoldsIn(it.children);
+    if (children === it.children && !(it.folded && !it.children.length)) return it;
+    changed = true;
+    const { folded, ...rest } = { ...it, children };
+    return folded && children.length ? { ...rest, folded } : rest;
+  });
+  return changed ? out : items;
+}
+
+/**
+ * After any change to the board: a fold left on an item whose last sub-item went (deleted, dragged
+ * out, cleaned up) is dropped, so a later sub-item isn't hidden as soon as it is added. Only lists that
+ * changed since `before` are looked at; the same board comes back when nothing needs it.
+ */
+export function dropEmptyFolds(before: Board, board: Board): Board {
+  let cards: Board['cards'] | null = null;
+  for (const [id, card] of Object.entries(board.cards)) {
+    if (card.kind !== 'todo' || before.cards[id] === card) continue;
+    const items = dropFoldsIn(card.items);
+    if (items !== card.items) (cards ??= { ...board.cards })[id] = { ...card, items };
+  }
+  return cards ? { ...board, cards } : board;
 }
 
 /** True if any item, at any level, is ticked. */
@@ -77,20 +160,9 @@ export function doneCount(items: TodoItem[]): { done: number; total: number } {
   return { done, total };
 }
 
-/**
- * Ctrl+Enter (owner request, 2026-10-15): after `id` is ticked (`before` → `after`), the open item
- * the cursor moves to: the nearest one that was below it, else the nearest above, else null.
- */
-export function nextOpenItem(before: TodoItem[], after: TodoItem[], id: string): string | null {
-  const stillOpen = new Set(flatIds(after).filter((x) => !findItem(after, x)!.item.done));
-  const order = flatIds(before);
-  const i = order.indexOf(id);
-  return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0)).reverse()].find((x) => stillOpen.has(x)) ?? null;
-}
-
 /** Items shown from `a` to `b` inclusive (either way round), ticked ones included. */
 export function itemRange(items: TodoItem[], a: string, b: string): string[] {
-  const order = flatIds(items);
+  const order = shownIds(items);
   const i = order.indexOf(a);
   const j = order.indexOf(b);
   if (i === -1 || j === -1) return [];
@@ -118,7 +190,8 @@ function cloned(items: TodoItem[]): TodoItem[] {
  * - At the start of an item with text: `blank` goes right above it; the cursor stays with the text.
  * - Anywhere else: the text after the cursor moves into `blank` (one space at the split is dropped),
  *   directly below: as the item's first
- *   sub-item when it has sub-items (they stay where they are), otherwise right after it. A split
+ *   sub-item when it has sub-items shown (they stay where they are), otherwise right after it (after
+ *   the whole group when its sub-items are folded away). A split
  *   ticked item stays ticked in both halves; an empty new item is never ticked.
  * Returns the new items and where the cursor goes (item id and offset).
  */
@@ -149,7 +222,7 @@ export function enterItem(
   else if (rest && before.endsWith(' ')) before = before.slice(0, -1);
   loc.item.text = before;
   const added = { ...blank, text: rest, done: after !== '' && loc.item.done };
-  if (loc.item.children.length) loc.item.children.unshift(added);
+  if (loc.item.children.length && !isFolded(loc.item)) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
   reopenAbove(next, added); // e.g. Enter at the end of the last ticked sub-item: its new blank sibling unticks the parent
   return { items: next, focus: added.id, offset: 0 };
@@ -172,6 +245,7 @@ function indentIn(items: TodoItem[], id: string): boolean {
   if (!above) return false;
   loc.list.splice(loc.index, 1);
   above.children.push(loc.item);
+  unfold(above); // nested under a folded item: it opens, so the item stays in sight
   reopenAbove(items, loc.item);
   return true;
 }
@@ -221,7 +295,7 @@ export function outdentItems(items: TodoItem[], ids: string[]): TodoItem[] | nul
  * the cursor goes (the join point).
  */
 export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[]; caret: number } | null {
-  const order = flatIds(items);
+  const order = shownIds(items);
   const at = order.indexOf(id);
   const nextId = at < 0 ? undefined : order[at + 1];
   if (!nextId) return null;
@@ -268,7 +342,7 @@ export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoIte
   const next = cloned(items);
   removeItemInPlace(next, id);
   if (!next.some((it) => !it.done)) return null;
-  return { items: next, focus: focusAfterRemoving(flatIds(items), next, [id]) };
+  return { items: next, focus: focusAfterRemoving(shownIds(items), next, [id]) };
 }
 
 /**
@@ -284,7 +358,7 @@ export function focusAfterRemoving(shown: string[], after: TodoItem[], gone: str
   return (
     shown.slice(0, at).reverse().find((x) => left.has(x)) ??
     shown.slice(at + 1).find((x) => left.has(x)) ??
-    flatIds(after).find((x) => !shown.includes(x) && findItem(after, x)!.item.text === '' && !findItem(after, x)!.item.done) ??
+    shownIds(after).find((x) => !shown.includes(x) && findItem(after, x)!.item.text === '' && !findItem(after, x)!.item.done) ??
     null
   );
 }
@@ -344,7 +418,8 @@ export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): T
  * Copies of exactly the selected items, for the clipboard: each keeps only the sub-items that are
  * selected too (sub-items that weren't highlighted are left out).
  */
-export function copyItems(items: TodoItem[], ids: string[]): TodoItem[] {
+export function copyItems(items: TodoItem[], ids: string[], alone: readonly string[] = []): TodoItem[] {
+  ids = withHidden(items, ids, alone); // a folded item's hidden sub-items go with it (not those of `alone`)
   const picked = new Set(ids);
   const keep = (it: TodoItem): TodoItem => ({ ...structuredClone(it), children: it.children.filter((c) => picked.has(c.id)).map(keep) });
   const roots = rootsOf(items, ids).map((id) => findItem(items, id)!);
@@ -366,8 +441,8 @@ export function copyItems(items: TodoItem[], ids: string[]): TodoItem[] {
  * Cut: removes exactly the selected items. A sub-item that wasn't selected stays, moving up into
  * the place of the removed item it was under. An emptied list gets one blank item.
  */
-export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId = newId): TodoItem[] {
-  const picked = new Set(ids);
+export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId = newId, alone: readonly string[] = []): TodoItem[] {
+  const picked = new Set(withHidden(items, ids, alone)); // a folded item's hidden sub-items go with it (those of `alone` move up)
   const prune = (list: TodoItem[]): TodoItem[] =>
     list.flatMap((it) => (picked.has(it.id) ? prune(it.children) : [{ ...it, children: prune(it.children) }]));
   return refill(prune(items), makeId);
@@ -377,8 +452,8 @@ export function removeExactly(items: TodoItem[], ids: string[], makeId: MakeId =
  * The selected items as plain text for other apps, exactly as highlighted: one per line in the
  * order shown, indented two spaces per level below the least-indented selected item.
  */
-export function selectionAsText(items: TodoItem[], ids: string[]): string {
-  const picked = new Set(ids);
+export function selectionAsText(items: TodoItem[], ids: string[], alone: readonly string[] = []): string {
+  const picked = new Set(withHidden(items, ids, alone)); // a folded item's hidden sub-items come too (not those of `alone`)
   const rows = flatIds(items)
     .filter((id) => picked.has(id))
     .map((id) => findItem(items, id)!);
@@ -550,6 +625,7 @@ export function insertItems(items: TodoItem[], drop: ItemDrop, moving: TodoItem[
   if (drop.mode === 'nest') {
     if (t.depth + 1 + height > MAX_DEPTH) return null;
     t.item.children.unshift(...moving);
+    unfold(t.item); // dropped into a folded item: it opens, so the dropped items are in sight
   } else {
     if (t.depth + height > MAX_DEPTH) return null;
     t.list.splice(t.index + (drop.mode === 'after' ? 1 : 0), 0, ...moving);
@@ -565,7 +641,7 @@ export function editItems(board: Board, cardId: string, change: (items: TodoItem
   return updateCard(board, cardId, (card) => {
     if (card.kind !== 'todo') return card;
     const items = change(card.items);
-    return items ? { ...card, items } : card;
+    return items ? { ...card, items: dropFoldsIn(items) } : card; // a fold left with nothing under it goes, for every caller
   });
 }
 

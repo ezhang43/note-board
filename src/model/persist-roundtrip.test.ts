@@ -13,8 +13,8 @@ import { readWorkspace, serializeWorkspace, WORKSPACE_VERSION } from './workspac
 const style: Required<TextStyle> = { size: 'large', bold: true, italic: true, font: 'serif' };
 const base = { color: 'rose', collapsed: true, w: 300, h: 200, titleColor: 'tomato', collapsedH: 60, style } as const;
 
-const subItem: Required<TodoItem> = { id: 'i2', text: 'sub', done: true, children: [], style };
-const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children: [subItem], style };
+const subItem: Required<TodoItem> = { id: 'i2', text: 'sub', done: true, children: [], style, folded: true };
+const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children: [subItem], style, folded: true };
 
 const run: Required<Run> = { text: 'Hi', b: true, i: true, u: true, s: true, size: 'small', font: 'hand', hl: 'yellow' };
 const block: Required<Block> = { type: 'bullet', indent: 1, runs: [run, { text: ' there', size: 24 }] };
@@ -81,13 +81,14 @@ same<Highlight, (typeof HIGHLIGHTS)[number]>(true);
 same<ColorKey, (typeof COLOR_KEYS)[number]>(true);
 
 /** The saved shape: each field's path (ids as `*`, a card's as its kind, list entries as `[]`), then the allowed values. */
-function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}): string[] {
+function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}, safeItemFields: readonly string[] = []): string[] {
   const paths = new Set<string>();
   const walk = (v: unknown, path: string) => {
     if (Array.isArray(v)) return v.length ? v.forEach((x) => walk(x, `${path}[]`)) : void paths.add(`${path}[]`);
     if (typeof v !== 'object' || v === null) return void paths.add(path);
     const ids = /(^|\.)(boards|cards|columns)$/.test(path);
     for (const [k, x] of Object.entries(v)) {
+      if (safeItemFields.includes(k) && Array.isArray((v as { children?: unknown }).children)) continue; // a checklist item's
       const key = !ids ? k : path.endsWith('cards') ? (x as Card).kind : '*';
       walk(x, path ? `${path}.${key}` : key);
     }
@@ -253,10 +254,18 @@ const SAVED_SHAPES: Record<number, string[]> = {
  *   the words `---` (richText.test.ts, "an older app ...").
  */
 const READ_SAFELY: Record<number, Record<string, readonly string[]>> = { 4: { 'rich type': ['hr'] } };
+/**
+ * Checklist item fields added under a version number without raising it, on the same terms as READ_SAFELY.
+ * - `folded` on a checklist item (owner request, 2026-11-09; no bump, the worker's recommended call, put
+ *   to the owner in the pull request): an older copy reads an item field it doesn't know by leaving it out
+ *   and keeps the item, its words, tick, look and sub-items. So it shows the sub-items open; if it saves,
+ *   only the fold is lost (fold.test.ts, "an older app ...").
+ */
+const READ_SAFELY_ITEM_FIELDS: Record<number, readonly string[]> = { 4: ['folded'] };
 
 describe('the saved version number goes up whenever the saved shape changes (review 137-A M1)', () => {
   it('the shape matches the one recorded for WORKSPACE_VERSION', () => {
-    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }), READ_SAFELY[WORKSPACE_VERSION]);
+    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }), READ_SAFELY[WORKSPACE_VERSION], READ_SAFELY_ITEM_FIELDS[WORKSPACE_VERSION]);
     expect(shape, 'The saved shape changed: raise WORKSPACE_VERSION and record the new shape under it').toEqual(SAVED_SHAPES[WORKSPACE_VERSION]);
   });
 

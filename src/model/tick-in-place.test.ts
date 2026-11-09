@@ -27,12 +27,6 @@ describe('ticking leaves an item where it is', () => {
     expect(C.rootsOf(l, ['c', 'b'])).toEqual(['b', 'c']);
   });
 
-  it('after a tick the cursor goes to the next open item below, past ticked ones', () => {
-    const before = [item('a'), item('b', true), item('c')];
-    const after = C.setItemsDone(before, ['a'], true);
-    expect(C.nextOpenItem(before, after, 'a')).toBe('c');
-  });
-
   it('Ctrl+Shift+Up / Down pass ticked items at the top level too', () => {
     const l = [item('a'), item('b', true), item('c')];
     expect(outline(C.moveItemBy(l, 'c', -1)!)).toBe('a c +b');

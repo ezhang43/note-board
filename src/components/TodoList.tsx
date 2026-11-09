@@ -2,22 +2,23 @@ import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { canMoveItem, doneCount, ITEM_INDENT } from '../model/checklist';
+import { canMoveItem, doneCount, isFolded, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
-import { ArrowIcon, GripIcon, TrashIcon } from './icons';
+import { ArrowIcon, ChevronIcon, GripIcon, TrashIcon } from './icons';
 import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
 import { marksOf } from '../model/wordRange';
 import { anchorOf, nearestPoint, offsetAt } from './wordPoint';
 
+/** The rows drawn: a folded item's sub-items are not (owner request, 2026-11-09). */
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
-  return items.flatMap((item) => [{ item, depth }, ...flatten(item.children, depth + 1)]);
+  return items.flatMap((item) => [{ item, depth }, ...(isFolded(item) ? [] : flatten(item.children, depth + 1))]);
 }
 
 /** A to-do list's title. It sits on the card's button row (see CardView), so the list's body starts right under it. */
@@ -98,6 +99,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     const h = s.ui.itemDrag?.hint;
     return h && 'markId' in h && h.markId === item.id ? h.markMode : null;
   });
+  // A search match inside this folded item rings the item (it stays folded: search only reads).
+  const findTarget = useAppState((s) => {
+    const m = s.ui.find?.current;
+    return !!m && m.showInstead === item.id && m.key.startsWith(`item:${cardId}:`); // in this list, not one with the same ids
+  });
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
   // Lifted by press-and-hold (phone): the rows slide aside by this many px (0: back in place).
   const lifting = useAppState((s) => !!s.ui.itemDrag?.lift);
@@ -137,6 +143,12 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       e.preventDefault();
       const el = e.currentTarget;
       appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && item.children.length && (e.key === 'ArrowUp') !== isFolded(item)) {
+      // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy). With nothing
+      // to fold or unfold, the key is left to the browser (jump by paragraph; on a Mac, to the start or end).
+      e.preventDefault();
+      e.stopPropagation(); // not the board's Ctrl+arrows
+      appStore.toggleFold(cardId, item.id);
     } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
       e.preventDefault();
       e.stopPropagation(); // not the board's Up / Down
@@ -166,7 +178,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     mark && `mark-${mark}`,
     dimmed && 'dimmed',
     lifting && 'lifting',
+    findTarget && 'find-target',
   ];
+  const folded = isFolded(item);
+  const foldLabel = folded ? 'Show sub-items' : 'Hide sub-items';
   return (
     <div
       className={classes.filter(Boolean).join(' ')}
@@ -177,6 +192,21 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
+      {/* A parent item's arrow, just left of its tick box (owner request, 2026-11-09): hides or shows its sub-items. A press keeps the cursor where it is. */}
+      {item.children.length > 0 && (
+        <button
+          type="button"
+          className="item-fold"
+          aria-expanded={!folded}
+          aria-label={foldLabel}
+          title={foldLabel}
+          disabled={readOnly}
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => appStore.toggleFold(cardId, item.id)}
+        >
+          <ChevronIcon collapsed={folded} color="currentColor" />
+        </button>
+      )}
       <label className="tick" {...tickBoxPress}>
         <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={tickBoxClick} />
       </label>

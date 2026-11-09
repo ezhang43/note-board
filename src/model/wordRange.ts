@@ -1,9 +1,11 @@
-import { copyItems, findItem, flatIds, MAX_DEPTH, removeExactly, reopenAbove, selectionAsText } from './checklist';
+import { newId } from './cards';
+import { copyItems, findItem, isFolded, MAX_DEPTH, removeExactly, reopenAbove, selectionAsText, shownIds } from './checklist';
 import type { TodoItem } from './types';
 
 // Word-style highlights across a list's items (owner request, 2026-11-01: "It should work like a word
 // document editor"). A highlight runs from a letter in one item to a letter in another, in the order the
-// items are shown, as if the list were one long text with a line break after every item. Pure: every
+// items are shown, as if the list were one long text with a line break after every item. A folded item's
+// hidden sub-items are not rows of that text: they go with their folded item (removeExactly takes them). Pure: every
 // function returns new data and never changes what it is given.
 
 /** A spot in a list's text: just before letter `offset` of item `id` (its text's length = after its last letter). */
@@ -20,7 +22,7 @@ export interface WordRange {
 
 /** The two ends in the order shown (start before end), or null if either item is gone. */
 export function ordered(items: TodoItem[], r: WordRange): { start: ItemPoint; end: ItemPoint } | null {
-  const order = flatIds(items);
+  const order = shownIds(items);
   const a = order.indexOf(r.anchor.id);
   const f = order.indexOf(r.focus.id);
   if (a < 0 || f < 0) return null;
@@ -40,7 +42,7 @@ export function ordered(items: TodoItem[], r: WordRange): { start: ItemPoint; en
 export function touchedIds(items: TodoItem[], r: WordRange): string[] {
   const o = ordered(items, r);
   if (!o) return [];
-  const order = flatIds(items);
+  const order = shownIds(items);
   const i = order.indexOf(o.start.id);
   const j = order.indexOf(o.end.id);
   if (i === j) return [o.start.id];
@@ -62,7 +64,7 @@ export function isEmpty(items: TodoItem[], r: WordRange): boolean {
 export function marksOf(items: TodoItem[], r: WordRange, id: string): [number, number, boolean] | null {
   const o = ordered(items, r);
   if (!o) return null;
-  const order = flatIds(items);
+  const order = shownIds(items);
   const i = order.indexOf(o.start.id);
   const j = order.indexOf(o.end.id);
   const k = order.indexOf(id);
@@ -89,7 +91,7 @@ export function marksOf(items: TodoItem[], r: WordRange, id: string): [number, n
 export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { items: TodoItem[]; focus: ItemPoint; removed: number } | null {
   const o = ordered(items, r);
   if (!o) return null;
-  const order = flatIds(items);
+  const order = shownIds(items);
   const i = order.indexOf(o.start.id);
   const j = order.indexOf(o.end.id);
   const next = structuredClone(items);
@@ -105,14 +107,15 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
     // left and nothing typed it goes too, as in the other case below (owner call 2026-11-02); its sub-items move up.
     const lastGoes = !insert && !tail;
     if (!lastGoes) last.text = insert + tail;
-    const kept = removeExactly(next, order.slice(i, lastGoes ? j + 1 : j));
+    // A folded last item's hidden sub-items move up like its shown ones would.
+    const kept = removeExactly(next, order.slice(i, lastGoes ? j + 1 : j), newId, [last.id]);
     const removed = j - i + (lastGoes ? 1 : 0);
     if (!lastGoes) return { items: kept, focus: { id: last.id, offset: insert.length }, removed };
     // The cursor goes where the words were: the start of the next item, else the end of the one before (or the blank one left).
-    const left = new Set(flatIds(kept));
+    const left = new Set(shownIds(kept));
     const after = order.slice(j + 1).find((id) => left.has(id));
     const before = order.slice(0, i).reverse().find((id) => left.has(id));
-    const id = after ?? before ?? flatIds(kept)[0];
+    const id = after ?? before ?? shownIds(kept)[0];
     return { items: kept, focus: { id, offset: after || !before ? 0 : findItem(kept, id)!.item.text.length }, removed };
   }
 
@@ -121,10 +124,14 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
   if (tail) first.done = first.done && last.done;
   const kids = last.children;
   last.children = [];
+  // A folded first item keeps its hidden sub-items (they come before the last item's in the list).
+  const firstFolded = isFolded(first);
   const kept = removeExactly(next, order.slice(i + 1, j + 1));
   const joined = findItem(kept, first.id)!;
   if (joined.depth < MAX_DEPTH) {
-    joined.item.children.unshift(...kids);
+    if (firstFolded) joined.item.children.push(...kids);
+    else joined.item.children.unshift(...kids);
+    if (kids.length) delete joined.item.folded; // the sub-items it takes over stay in sight
     fitDepth(joined.item.children, joined.depth + 1);
   } else {
     // The joined item is as deep as items go: its new sub-items sit right after it instead.
@@ -170,12 +177,18 @@ function trimmed(items: TodoItem[], r: WordRange): TodoItem[] | null {
  */
 export function sliceRange(items: TodoItem[], r: WordRange): TodoItem[] {
   const cut = trimmed(items, r);
-  return cut ? copyItems(cut, touchedIds(items, r)) : [];
+  return cut ? copyItems(cut, touchedIds(items, r), endsOf(items, r)) : [];
 }
 
 /** The highlighted words as plain text for other apps: one item a line, indented as copied items are. */
 export function rangeAsText(items: TodoItem[], r: WordRange): string {
   const cut = trimmed(items, r);
-  return cut ? selectionAsText(cut, touchedIds(items, r)) : '';
+  return cut ? selectionAsText(cut, touchedIds(items, r), endsOf(items, r)) : '';
+}
+
+/** The items a highlight only partly takes (a first one from partway, and the last one): their hidden sub-items stay in the list, so they aren't copied. */
+function endsOf(items: TodoItem[], r: WordRange): string[] {
+  const o = ordered(items, r);
+  return o ? [o.end.id, ...(o.start.offset > 0 ? [o.start.id] : [])] : [];
 }
 

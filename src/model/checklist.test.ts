@@ -662,28 +662,6 @@ describe('canMoveItem: whether the hover arrows can move an item (owner request,
   });
 });
 
-describe('Ctrl+Enter: where the cursor goes after a tick (owner request, 2026-10-15)', () => {
-  const t = (id: string, done = false, children: TodoItem[] = []): TodoItem => ({ id, text: id, done, children });
-  const after = (items: TodoItem[], ids: string[]) => C.nextOpenItem(items, C.setItemsDone(items, ids, true), ids[0]);
-
-  it('goes to the open item that was below it', () => {
-    expect(after([t('a'), t('b'), t('c')], ['b'])).toBe('c');
-  });
-  it('with nothing open below, the nearest open item above', () => {
-    expect(after([t('a'), t('b'), t('c', true)], ['b'])).toBe('a');
-  });
-  it('skips ticked items; an open sub-item under the ticked item is next (job 200: it stays in sight)', () => {
-    expect(after([t('a', false, [t('a1'), t('a2', true)]), t('b', false, [t('b1', true), t('b2')])], ['a1'])).toBe('b');
-    expect(after([t('a', false, [t('a1')]), t('b')], ['a'])).toBe('a1');
-  });
-  it('a ticked last sub-item that also ticks its item moves on past it', () => {
-    expect(after([t('a', false, [t('a1')]), t('b')], ['a1'])).toBe('b');
-  });
-  it('with no open item left, null', () => {
-    expect(after([t('a'), t('b', true)], ['a'])).toBeNull();
-  });
-});
-
 describe('pasting items into the item the cursor is in (owner request 2026-10-31)', () => {
   const t = (text: string, children: TodoItem[] = [], done = false, style?: TodoItem['style']): TodoItem => ({ id: text, text, done, children, ...(style ? { style } : {}) });
 

@@ -53,7 +53,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
     title: 'Checklists',
     keys: [
       ['Enter', 'Split at the cursor; at the start, add an item above'],
-      ['Ctrl+Enter', 'Tick the item (or untick it); the cursor moves to the next one'],
+      ['Ctrl+Enter', 'Tick the item (or untick it); the cursor stays in it'],
       ['Tab / Shift+Tab', 'Nest under the item above / move out a level'],
       ['Backspace in an empty item', 'Delete it'],
       ['Delete at the end', 'Join the next item into this one'],

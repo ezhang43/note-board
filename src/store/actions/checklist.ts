@@ -314,19 +314,13 @@ export function checklistActions(ctx: StoreContext) {
     },
     /**
      * Ctrl+Enter while typing in an item (owner request, 2026-10-15; also the phone item bar's Tick,
-     * 2026-10-19): the same as its Done box. After a tick the cursor moves to the next open item (below,
-     * else above); with none left, or after an untick, it stays in the item at `caret`, so the next Delete
-     * acts on that item and never on the list (job 223).
+     * 2026-10-19): the same as its Done box. The cursor never moves on (owner request, 2026-11-09): it stays
+     * in the item at `caret`, ticked or unticked, so the next Delete acts on that item and never on the
+     * list (job 223).
      */
     tickFromKeyboard(cardId: string, itemId: string, caret: number) {
-      const card = ctx.state.board.cards[cardId];
-      const item = card?.kind === 'todo' ? C.findItem(card.items, itemId)?.item : null;
-      if (card?.kind !== 'todo' || !item) return;
-      const ticking = !item.done;
-      const ids = listsIncluding(cardId, itemId)?.find((l) => l.cardId === cardId)?.ids ?? selectedItemsIncluding(cardId, itemId) ?? [itemId];
       if (!actions.toggleItem(cardId, itemId, true)) return; // refused (read-only, an old version): the cursor stays
-      const next = ticking ? C.nextOpenItem(card.items, C.setItemsDone(card.items, ids, true), itemId) : null;
-      updateUi({ focusItem: next ?? itemId, focusOffset: next ? null : caret });
+      updateUi({ focusItem: itemId, focusOffset: caret });
     },
     /**
      * Trash can: deletes the item and everything under it (or every selected item, if it is one of them).

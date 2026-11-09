@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { add, clickEmpty, freshBoardEachTest } from './helpers';
 
 // Ctrl+Enter in a checklist item (owner request, 2026-10-15): ticks it as if its Done box were
-// clicked; the cursor moves on to the next open item. On a ticked item it unticks it.
+// clicked; the cursor stays in the item (owner request, 2026-11-09). On a ticked item it unticks it.
 
 freshBoardEachTest();
 
@@ -22,24 +22,34 @@ async function checklist(page: Page, items: string[]) {
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
 const focused = (page: Page) => page.evaluate(() => (document.activeElement as HTMLTextAreaElement | null)?.value ?? null);
 
-test('Ctrl+Enter ticks the item, the cursor moves to the next one, and Ctrl+Z brings it back', async ({ page }) => {
+test('Ctrl+Enter ticks the item, the cursor stays in it, and Ctrl+Z brings it back', async ({ page }) => {
   const list = await checklist(page, ['bread', 'milk', 'eggs']);
   await list.getByLabel('Item text').nth(1).click();
   await page.keyboard.press('Control+Enter');
   await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(1);
   await expect(list.getByRole('checkbox', { name: 'Done: milk' })).toBeChecked(); // ticked in its place (job 200)
   expect(await texts(list)).toEqual(['bread', 'milk', 'eggs']);
-  expect(await focused(page)).toBe('eggs');
-  // A screen reader hears which item was ticked, since the cursor left its box.
+  expect(await focused(page)).toBe('milk');
+  // A screen reader hears which item was ticked, since the tick box was not the thing pressed.
   await expect(page.getByTestId('announcer')).toHaveText('Ticked: milk');
-  // Typing goes on in the next item; nothing was split or added.
+  // Typing goes on in the same item; nothing was split or added.
   await page.keyboard.type('!');
-  await expect.poll(() => texts(list)).toEqual(['bread', 'milk', 'eggs!']);
+  await expect.poll(() => texts(list)).toEqual(['bread', 'milk!', 'eggs']);
 
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
   await expect.poll(() => texts(list)).toEqual(['bread', 'milk', 'eggs']);
   await expect(list.getByRole('checkbox', { name: 'Done', checked: true })).toHaveCount(0);
+});
+
+test('a Delete right after Ctrl+Enter removes only the ticked item, though open items are below', async ({ page }) => {
+  const list = await checklist(page, ['bread', 'milk', 'eggs']);
+  await list.getByLabel('Item text').nth(1).click();
+  await page.keyboard.press('Control+Enter');
+  await expect.poll(() => focused(page)).toBe('milk');
+  await page.keyboard.press('Delete');
+  await expect.poll(() => texts(list)).toEqual(['bread', 'eggs']);
+  await expect(page.locator('[data-card-id]')).toHaveCount(1);
 });
 
 test('Ctrl+Enter on a ticked item unticks it and keeps the cursor in it', async ({ page }) => {
@@ -66,5 +76,5 @@ test('ticking the last open item keeps the cursor in it; Delete then removes onl
 
   await clickEmpty(page); // out of the text, so "?" is a shortcut
   await page.keyboard.press('?');
-  await expect(page.getByText('Tick the item (or untick it); the cursor moves to the next one')).toBeVisible();
+  await expect(page.getByText('Tick the item (or untick it); the cursor stays in it')).toBeVisible();
 });

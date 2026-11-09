@@ -76,12 +76,6 @@ describe('what is shown is what the keys work on', () => {
     expect(C.itemRange(sample(), 'a', 'b')).toEqual(['a', 'b']);
   });
 
-  it('Ctrl+Enter on a folded item moves the cursor to the next item shown, never into the fold', () => {
-    const before = sample();
-    const after = C.setItemsDone(before, ['a'], true);
-    expect(C.nextOpenItem(before, after, 'a')).toBe('b');
-  });
-
   it('Enter at the end of a folded item adds the new item after the whole group, not inside the fold', () => {
     const r = C.enterItem(sample(), 'a', 1, 1, item('new'))!;
     expect(ids(r.items)).toBe('a(a1(a1x) a2) new b');

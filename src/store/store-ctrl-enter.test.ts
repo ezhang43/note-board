@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TodoCard } from '../model/types';
 import { createStore } from './store';
 
-// Ctrl+Enter in a checklist item (owner request, 2026-10-15): ticks it like its Done box, then the
-// cursor moves on to the next open item; on a ticked item it unticks it and the cursor stays.
+// Ctrl+Enter in a checklist item (owner request, 2026-10-15): ticks it like its Done box. The cursor
+// never moves on to another item (owner request, 2026-11-09): it stays in the item, ticked or unticked.
 
 beforeEach(() => vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) })); // reduced motion
 afterEach(() => vi.unstubAllGlobals());
@@ -28,18 +28,41 @@ function setup(names: string[]) {
 }
 
 describe('Ctrl+Enter in a checklist item', () => {
-  it('ticks it, moves the cursor to the item below, and is one undo step', () => {
+  it('ticks it, keeps the cursor in it (not on the item below), and is one undo step', () => {
     const { s, cardId, id, texts } = setup(['a', 'b', 'c']);
     s.tickFromKeyboard(cardId, id('b'), 1);
-    expect(texts()).toBe('a +b c'); // "b" now shows in Completed
-    expect(s.getState().ui.focusItem).toBe(id('c'));
+    expect(texts()).toBe('a +b c');
+    expect(s.getState().ui.focusItem).toBe(id('b'));
+    expect(s.getState().ui.focusOffset).toBe(1);
     s.undo();
     expect(texts()).toBe('a b c');
   });
 
-  it('from the last open item, the cursor goes to the one above', () => {
+  it('from the last open item, the cursor stays in it too (not the one above)', () => {
     const { s, cardId, id } = setup(['a', 'b']);
     s.tickFromKeyboard(cardId, id('b'), 0);
+    expect(s.getState().ui.focusItem).toBe(id('b'));
+  });
+
+  it('a Delete right after a tick removes just that item, wherever open items are', () => {
+    const { s, cardId, id, texts } = setup(['a', 'b', 'c']);
+    s.tickFromKeyboard(cardId, id('b'), 1);
+    s.deleteTickedItem(cardId, s.getState().ui.focusItem!);
+    expect(texts()).toBe('a c');
+  });
+
+  it('with the items selected, it ticks them all and the cursor stays in the item it was pressed in', () => {
+    const { s, cardId, id, texts } = setup(['a', 'b', 'c']);
+    s.selectWholeList(cardId);
+    s.tickFromKeyboard(cardId, id('b'), 1);
+    expect(texts()).toBe('+a +b +c');
+    expect(s.getState().ui.focusItem).toBe(id('b'));
+  });
+
+  it('ticking an item that has an open sub-item keeps the cursor in the item, not in the sub-item', () => {
+    const { s, cardId, id } = setup(['a', 'b']);
+    s.itemEnter(cardId, id('a')); // new first sub-item of "a"
+    s.tickFromKeyboard(cardId, id('a'), 0);
     expect(s.getState().ui.focusItem).toBe(id('a'));
   });
 

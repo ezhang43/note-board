@@ -1,4 +1,4 @@
-import { isFolded } from './checklist';
+import { findItem, isFolded } from './checklist';
 import { completedCardOf } from './completed';
 import type { Board, Card, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
@@ -82,7 +82,9 @@ function boxes(board: Board): { key: string; text: string; showInstead: string |
 
 /** The match is in a folded checklist item's hidden sub-items (not in a closed card or container, or Completed). */
 export function inFoldedItem(board: Board, m: Match): boolean {
-  return !!m.showInstead && !board.cards[m.showInstead] && !board.columns[m.showInstead];
+  if (!m.showInstead || !m.key.startsWith('item:')) return false;
+  const card = board.cards[m.key.split(':')[1]];
+  return card?.kind === 'todo' && !!findItem(card.items, m.showInstead);
 }
 
 /** Every place `query` is found on the board, in board order. */

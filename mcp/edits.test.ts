@@ -6,7 +6,7 @@ import { CARD_W } from '../src/model/constants';
 import { estimateHeight } from '../src/model/milanote';
 import type { NoteCard, TodoCard, TodoItem } from '../src/model/types';
 import { readWorkspace, serializeWorkspace, type Workspace } from '../src/model/workspace';
-import { addItems, addNote, editItems, moveItems, setItemsDone, type Edit } from './edits';
+import { addItems, addNote, editItems, moveItems, planDelete, setItemsDone, type Edit } from './edits';
 import { ownRaw } from './sample';
 
 // The connector's changes to a board (pure): each tool's edit on the sample boards.
@@ -44,6 +44,24 @@ describe('folded items', () => {
     const items = list(moved.ws, 'listGroceries').items;
     expect(shownIds(items)).toContain('iBread');
     expect(findItem(items, 'iFree')!.item.folded).toBe(true); // a fold that doesn't hide it stays
+  });
+
+  it('a fold is dropped when the connector deletes or moves out the last sub-item, as in the app', () => {
+    const plan = planDelete(folded(), 'home', ['iBox'], new Set(), (p) => `${p}_x`);
+    if ('error' in plan) throw new Error(plan.error);
+    expect('folded' in item(plan.ws, 'listGroceries', 'iFree')!.item).toBe(false);
+    expect(item(plan.ws, 'listGroceries', 'iEggs')!.item.folded).toBe(true); // it still has Free range
+    const moved = ok(moveItems('home', ['iBox'], { list: 'Groceries', after: 'iBread' }), folded());
+    expect('folded' in item(moved.ws, 'listGroceries', 'iFree')!.item).toBe(false);
+    expect(item(moved.ws, 'listGroceries', 'iEggs')!.item.folded).toBe(true);
+  });
+
+  it('a move that changes nothing reports nothing, even in a list holding a saved fold with no sub-items', () => {
+    const ws = sample();
+    list(ws, 'listGroceries').items.push({ id: 'fe', text: 'Empty', done: false, children: [], folded: true });
+    const r = ok(moveItems('home', ['iBread'], { list: 'Groceries', after: 'iEggs' }), ws);
+    expect(r.changed).toEqual([]);
+    expect(r.ws).toBe(ws);
   });
 });
 

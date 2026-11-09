@@ -103,6 +103,44 @@ test('Ctrl+Up folds and Ctrl+Down unfolds the item being typed in; the cursor st
   await expect(text(page, 'trip')).toBeFocused();
 });
 
+/** Presses `key` in the focused text and says whether the app blocked the browser's own use of it. */
+async function blocked(page: Page, key: string) {
+  await page.evaluate(() => {
+    const w = window as unknown as { lastKey?: KeyboardEvent; watching?: boolean };
+    w.lastKey = undefined;
+    if (!w.watching) window.addEventListener('keydown', (e) => e.key.startsWith('Arrow') && (w.lastKey = e), { capture: true });
+    w.watching = true;
+  });
+  await page.keyboard.press(key);
+  return page.evaluate(() => (window as unknown as { lastKey?: KeyboardEvent }).lastKey?.defaultPrevented ?? null);
+}
+
+test('Ctrl+Up / Ctrl+Down are left to the browser when there is nothing to fold or unfold', async ({ page }) => {
+  await seed(page, list());
+  await text(page, 'trip').click();
+  // Open item: Ctrl+Down has nothing to do, so the browser keeps it (jump by paragraph, or to the end on a Mac).
+  expect(await blocked(page, 'Control+ArrowDown')).toBe(false);
+  expect(await blocked(page, 'Control+ArrowUp')).toBe(true);
+  await expect(row(page, 'ho')).toHaveCount(0);
+  // Folded item: Ctrl+Up has nothing to do.
+  expect(await blocked(page, 'Control+ArrowUp')).toBe(false);
+  await expect(row(page, 'ho')).toHaveCount(0);
+  expect(await blocked(page, 'Meta+ArrowDown')).toBe(true);
+  await expect(row(page, 'ho')).toBeVisible();
+  // No sub-items: nothing to fold.
+  await text(page, 'milk').click();
+  expect(await blocked(page, 'Control+ArrowUp')).toBe(false);
+});
+
+test('the arrow darkens on hover', async ({ page }) => {
+  await seed(page, list());
+  const stroke = () => fold(page, 'trip').locator('svg').evaluate((el) => getComputedStyle(el).stroke);
+  await page.mouse.move(5, 5);
+  const resting = await stroke();
+  await fold(page, 'trip').hover();
+  await expect.poll(stroke).not.toBe(resting);
+});
+
 test('folding while typing in a sub-item puts the cursor on the folded item', async ({ page }) => {
   await seed(page, list());
   await text(page, 'ho').click();

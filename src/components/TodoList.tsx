@@ -100,7 +100,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     return h && 'markId' in h && h.markId === item.id ? h.markMode : null;
   });
   // A search match inside this folded item rings the item (it stays folded: search only reads).
-  const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === item.id);
+  const findTarget = useAppState((s) => {
+    const m = s.ui.find?.current;
+    return !!m && m.showInstead === item.id && m.key.startsWith(`item:${cardId}:`); // in this list, not one with the same ids
+  });
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
   // Lifted by press-and-hold (phone): the rows slide aside by this many px (0: back in place).
   const lifting = useAppState((s) => !!s.ui.itemDrag?.lift);
@@ -140,11 +143,12 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       e.preventDefault();
       const el = e.currentTarget;
       appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
-    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && item.children.length && !readOnly) {
-      // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy); only on an item that has some.
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && item.children.length && (e.key === 'ArrowUp') !== isFolded(item)) {
+      // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy). With nothing
+      // to fold or unfold, the key is left to the browser (jump by paragraph; on a Mac, to the start or end).
       e.preventDefault();
       e.stopPropagation(); // not the board's Ctrl+arrows
-      if ((e.key === 'ArrowUp') !== isFolded(item)) appStore.toggleFold(cardId, item.id);
+      appStore.toggleFold(cardId, item.id);
     } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
       e.preventDefault();
       e.stopPropagation(); // not the board's Up / Down
@@ -200,7 +204,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => appStore.toggleFold(cardId, item.id)}
         >
-          <ChevronIcon collapsed={folded} />
+          <ChevronIcon collapsed={folded} color="currentColor" />
         </button>
       )}
       <label className="tick" {...tickBoxPress}>

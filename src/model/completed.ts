@@ -177,9 +177,7 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
     b = editItems(b, src.id, (items) => {
       const next = structuredClone(items);
       const parent = entry.fromParentId ? findItem(next, entry.fromParentId) : null;
-      if (parent && parent.depth + 1 + subtreeHeight(item) <= MAX_DEPTH) {
-        parent.item.children.push(item);
-      }
+      if (parent && parent.depth + 1 + subtreeHeight(item) <= MAX_DEPTH) parent.item.children.push(item);
       else return [...next, item];
       // An open item can't sit under a ticked one: untick the items it went back under. Put back under a
       // folded item, the folds above it open, so it is in sight.

@@ -66,13 +66,20 @@ export function shownIds(items: TodoItem[]): string[] {
 
 /** `ids` plus everything hidden under the folded items among them (what a copy, cut or delete takes), in list order. */
 export function withHidden(items: TodoItem[], ids: string[], alone: readonly string[] = []): string[] {
-  const out = new Set(ids);
-  for (const id of ids) {
-    if (alone.includes(id)) continue; // a word highlight's end items: their hidden sub-items stay
-    const loc = findItem(items, id);
-    if (loc && isFolded(loc.item)) loc.item.children.flatMap(subtreeIds).forEach((x) => out.add(x));
-  }
-  return out.size === ids.length ? ids : flatIds(items).filter((x) => out.has(x));
+  const given = new Set(ids);
+  const skip = new Set(alone); // a word highlight's end items: their hidden sub-items stay
+  const out: string[] = [];
+  let added = false;
+  // One walk down the list: under a given folded item, everything is taken.
+  const walk = (list: TodoItem[], taken: boolean) => {
+    for (const it of list) {
+      if (taken || given.has(it.id)) out.push(it.id);
+      if (taken && !given.has(it.id)) added = true;
+      walk(it.children, taken || (given.has(it.id) && !skip.has(it.id) && isFolded(it)));
+    }
+  };
+  walk(items, false);
+  return added ? out : ids;
 }
 
 /** Unfolds every item above `id`, so it is in sight (the same list when none is folded). */
@@ -645,7 +652,7 @@ export function editItems(board: Board, cardId: string, change: (items: TodoItem
   return updateCard(board, cardId, (card) => {
     if (card.kind !== 'todo') return card;
     const items = change(card.items);
-    return items ? { ...card, items } : card;
+    return items ? { ...card, items: dropFoldsIn(items) } : card; // a fold left with nothing under it goes, for every caller
   });
 }
 

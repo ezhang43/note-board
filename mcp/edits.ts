@@ -186,7 +186,7 @@ export function moveItems(boardId: string, ids: string[], to: MoveTo): Edit {
     const placed = moving.reduce((l, m) => showItem(l, m.id), insertItems(base, drop, moving) ?? refuse('That would nest items deeper than 6 levels.')); // in sight, as when adding
     for (const [listId, rest] of sources) if (listId !== dest.id) b = withList(b, b.cards[listId] as TodoCard, refill(rest));
     const next = withList(b, dest, placed);
-    if (JSON.stringify((next.cards[dest.id] as TodoCard).items) === JSON.stringify(dest.items) && sources.size === 1 && sources.has(dest.id)) return b;
+    if (JSON.stringify(placed) === JSON.stringify(dest.items) && sources.size === 1 && sources.has(dest.id)) return b;
     const where = to.after ? ` (after "${short(findItem(placed, to.after)!.item.text)}")` : to.before ? ` (before "${short(findItem(placed, to.before)!.item.text)}")` : to.under ? ` (under "${short(target!.item.text)}")` : '';
     for (const m of moving) changed.push(`Moved "${short(m.text)}" to ${listName(dest)}${where}`);
     return next;

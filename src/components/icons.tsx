@@ -98,7 +98,8 @@ export function SameWidthIcon() {
   );
 }
 
-export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
+/** `color`: the arrow's stroke; `currentColor` lets the button's CSS (its hover) set it. */
+export function ChevronIcon({ collapsed, color = 'var(--ink-faint)' }: { collapsed: boolean; color?: string }) {
   return (
     <svg
       width="12"
@@ -107,7 +108,7 @@ export function ChevronIcon({ collapsed }: { collapsed: boolean }) {
       strokeWidth="1.8"
       {...common}
       className="collapse-arrow"
-      style={{ stroke: 'var(--ink-faint)', transform: collapsed ? 'rotate(-90deg)' : 'none' }}
+      style={{ stroke: color, transform: collapsed ? 'rotate(-90deg)' : 'none' }}
     >
       <path d="M3 4.5l3 3 3-3" />
     </svg>

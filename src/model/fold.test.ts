@@ -168,6 +168,14 @@ describe('a fold with nothing left under it', () => {
     // Only cards that changed are looked at: an untouched card keeps its saved data as it is.
     expect(C.dropEmptyFolds(b, b)).toBe(b);
   });
+
+  it('editItems, which every list change goes through (the app and the connector), drops it too', () => {
+    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items: [item('a', [item('a1')], { folded: true }), item('b', [item('b1')], { folded: true })] };
+    const b: Board = { ...createBoard(), cards: { t1: card }, order: ['t1'] };
+    const after = (C.editItems(b, 't1', (its) => C.deleteItems(its, ['a1'], makeId)).cards.t1 as TodoCard).items;
+    expect('folded' in after[0]).toBe(false);
+    expect(after[1].folded).toBe(true);
+  });
 });
 
 describe('saving and syncing', () => {

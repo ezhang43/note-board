@@ -1,6 +1,6 @@
 import { addCard, type Placement } from './board';
 import { newId, type MakeId } from './cards';
-import { MAX_DEPTH, editItems, findItem, hasTicked, refill, setItemsDone, subtreeHeight, subtreeIds } from './checklist';
+import { MAX_DEPTH, editItems, findItem, hasTicked, refill, setItemsDone, showItem, subtreeHeight, subtreeIds } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, CompletedGroup, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
@@ -177,10 +177,13 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
     b = editItems(b, src.id, (items) => {
       const next = structuredClone(items);
       const parent = entry.fromParentId ? findItem(next, entry.fromParentId) : null;
-      if (parent && parent.depth + 1 + subtreeHeight(item) <= MAX_DEPTH) parent.item.children.push(item);
+      if (parent && parent.depth + 1 + subtreeHeight(item) <= MAX_DEPTH) {
+        parent.item.children.push(item);
+      }
       else return [...next, item];
-      // An open item can't sit under a ticked one: untick the items it went back under.
-      return setItemsDone(next, [item.id], false);
+      // An open item can't sit under a ticked one: untick the items it went back under. Put back under a
+      // folded item, the folds above it open, so it is in sight.
+      return setItemsDone(showItem(next, item.id), [item.id], false);
     });
     return { board: b, cardId: src.id };
   }

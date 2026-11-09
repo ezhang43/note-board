@@ -60,6 +60,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Delete in a ticked item', 'Delete it, like its trash can'],
       ['Up / Down', 'Move between items and cards'],
       ['Ctrl+Shift+Up / Down', 'Move the item up / down past its neighbor'],
+      ['Ctrl+Up / Down', 'Hide / show the sub-items of the item being typed in'],
       ['Shift+click, or press and drag', 'Select several items (drag on into the next cards of a container)'],
       ['Ctrl+A again and again', "Select the item text, the list, the container's lists, then the whole board"],
       ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy / cut / paste selected items'],

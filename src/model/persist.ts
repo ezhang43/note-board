@@ -52,12 +52,12 @@ const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fa
 /** A resized width/height, or null for "not resized" (also for anything unreadable). */
 const size = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
-/** Only the fields named here are kept: a `due` saved before due dates were removed (owner, 2026-10-16) is erased. */
+/** Only the fields named here are kept (a fold only when it is exactly true): a `due` saved before due dates were removed (owner, 2026-10-16) is erased. */
 function parseItems(v: unknown, depth = 0): TodoItem[] {
   if (!Array.isArray(v) || depth > 10) return [];
   return v.filter(isObject).flatMap((it) =>
     typeof it.id === 'string'
-      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style) }]
+      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style), ...(it.folded === true && { folded: true as const }) }]
       : [],
   );
 }

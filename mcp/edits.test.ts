@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, createBoard, problems } from '../src/model/board';
 import { createCard, createColumn } from '../src/model/cards';
-import { findItem } from '../src/model/checklist';
+import { findItem, shownIds, toggleFold } from '../src/model/checklist';
 import { CARD_W } from '../src/model/constants';
 import { estimateHeight } from '../src/model/milanote';
 import type { NoteCard, TodoCard, TodoItem } from '../src/model/types';
@@ -27,6 +27,25 @@ function fails(edit: Edit, ws = sample()) {
 const list = (ws: Workspace, id: string, board = 'home') => ws.boards[board].cards[id] as TodoCard;
 const texts = (items: TodoItem[]): unknown[] => items.map((it) => (it.children.length ? [it.text, texts(it.children)] : it.text));
 const item = (ws: Workspace, listId: string, id: string, board = 'home') => findItem(list(ws, listId, board).items, id);
+
+/** The sample with Eggs and its Free range folded away in the app (owner request, 2026-11-09). */
+function folded(): Workspace {
+  const ws = sample();
+  const l = list(ws, 'listGroceries');
+  l.items = toggleFold(toggleFold(l.items, 'iFree')!, 'iEggs')!;
+  return ws;
+}
+
+describe('folded items', () => {
+  it('items added or moved under a folded item open the folds above them, so the change can be seen', () => {
+    const added = ok(addItems('home', 'listGroceries', [{ text: 'C', under: 'iFree' }, { text: 'D', after: 'iBox' }], ['c', 'd']), folded());
+    expect(shownIds(list(added.ws, 'listGroceries').items)).toEqual(expect.arrayContaining(['c', 'd']));
+    const moved = ok(moveItems('home', ['iBread'], { list: 'Groceries', under: 'iEggs' }), folded());
+    const items = list(moved.ws, 'listGroceries').items;
+    expect(shownIds(items)).toContain('iBread');
+    expect(findItem(items, 'iFree')!.item.folded).toBe(true); // a fold that doesn't hide it stays
+  });
+});
 
 describe('add_items', () => {
   it('adds items at the end of a list named by its title, in order (a due date given is ignored)', () => {

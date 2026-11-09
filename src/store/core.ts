@@ -7,6 +7,7 @@ import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, seriali
 import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
+import { dropEmptyFolds } from '../model/checklist';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
 import type { Board, Point, Size, View } from '../model/types';
@@ -290,7 +291,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     const before = state.board;
     const result = fn(before);
     if (!result) return null;
-    const { board, ui } = 'board' in result ? result : { board: result, ui: undefined };
+    const { board: changed, ui } = 'board' in result ? result : { board: result, ui: undefined };
+    // A fold left with nothing under it goes with the change that emptied it (owner request, 2026-11-09).
+    const board = changed === before ? before : dropEmptyFolds(before, changed);
     // A board this person may only view or comment on (job 161): every change to it stops here,
     // whatever asked for it (a button, a key, a paste, a drop); screen-only changes still apply.
     if (board !== before && locked()) {
@@ -532,8 +535,9 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (id === state.boards.open) return void commit(fn, { merge });
     const before = state.boards.others[id];
     if (!before || state.ui.preview || locked(id)) return;
-    const board = fn(before);
-    if (board === before) return;
+    const changed = fn(before);
+    if (changed === before) return;
+    const board = dropEmptyFolds(before, changed); // as in commit
     histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, merge ?? null, Date.now()));
     edits++;
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });

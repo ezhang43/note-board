@@ -51,6 +51,11 @@ export interface TodoItem {
   done: boolean;
   children: TodoItem[];
   style?: TextStyle;
+  /**
+   * Its sub-items are hidden (owner request, 2026-11-09): saved with the board, left out when open.
+   * Only counts while it has sub-items (see isFolded); a fold left with none is dropped on the next change.
+   */
+  folded?: true;
 }
 
 export interface TodoCard extends CardBase {

@@ -1,6 +1,6 @@
 import { addCard, addColumn, createBoard, deleteBlocks, placementForNewCard, setItemText, shownName, topLevelOf } from '../src/model/board';
 import { createBoardCard, createCard, createColumn, createItem, isPermanent, type MakeId } from '../src/model/cards';
-import { editItems as changeItems, deleteItems, extractItems, findItem, flatIds, insertItems, refill, rootsOf, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
+import { editItems as changeItems, deleteItems, extractItems, findItem, flatIds, insertItems, refill, rootsOf, showItem, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
 import { blockRect, spotForNewBlock, type MeasuredHeight } from '../src/model/layout';
 import { estimateHeight } from '../src/model/milanote';
@@ -96,7 +96,8 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
         drop = kids.length ? { mode: 'after', targetId: kids[kids.length - 1].id } : { mode: 'nest', targetId: target.item.id };
       }
       const item: TodoItem = { ...createItem(id), text };
-      items = insertItems(items, drop, [item]) ?? refuse('That would nest items deeper than 6 levels.');
+      // Under a folded item, the folds above it open, so it can be seen in the app.
+      items = showItem(insertItems(items, drop, [item]) ?? refuse('That would nest items deeper than 6 levels.'), id);
       if (n.after) lastAfter[n.after] = id;
       changed.push(`Added "${short(text)}" (id: ${id}) to ${listName(list)}`);
     });
@@ -182,7 +183,7 @@ export function moveItems(boardId: string, ids: string[], to: MoveTo): Edit {
       const kids = target.item.children;
       drop = kids.length ? { mode: 'after', targetId: kids[kids.length - 1].id } : { mode: 'nest', targetId: target.item.id };
     }
-    const placed = insertItems(base, drop, moving) ?? refuse('That would nest items deeper than 6 levels.');
+    const placed = moving.reduce((l, m) => showItem(l, m.id), insertItems(base, drop, moving) ?? refuse('That would nest items deeper than 6 levels.')); // in sight, as when adding
     for (const [listId, rest] of sources) if (listId !== dest.id) b = withList(b, b.cards[listId] as TodoCard, refill(rest));
     const next = withList(b, dest, placed);
     if (JSON.stringify((next.cards[dest.id] as TodoCard).items) === JSON.stringify(dest.items) && sources.size === 1 && sources.has(dest.id)) return b;

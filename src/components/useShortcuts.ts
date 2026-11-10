@@ -56,7 +56,7 @@ export function useShortcuts() {
       // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
       const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && e.target.closest('.weight-new') !== null;
-      if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new')) return;
+      if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new, .jn-rename')) return;
       const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
       if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
       if (inJournal && mod && key === 'y') return run(e, redo);

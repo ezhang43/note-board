@@ -2,7 +2,7 @@ import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
-import { JOURNAL_NAME, JOURNAL_NOTES, findJournalBoard, generalNote, generalSpot, hiddenJournal, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
+import { JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
 import { hasFormatting, plainOf, withinLimits, type Rich } from '../../model/richText';
 import { spotForNewBlock } from '../../model/layout';
@@ -60,6 +60,22 @@ export function boardActions(ctx: StoreContext) {
     const id = journalId();
     if (!id) return;
     ctx.commitTo(id, (b) => B.updateCard(b, noteId, (c) => (c.kind === 'note' ? writeJournal(c, rich) : c)), typing ? `text:${noteId}` : undefined);
+  };
+
+  /**
+   * The "General notes" note, made when it is first written, renamed or added below (see withFirst),
+   * with the id the panel shows it under (so the sheet keeps the cursor as it comes), or a new one.
+   */
+  const firstNote = (id?: string): NoteCard => ({ ...createCard('note', id), kind: 'note', text: `${JOURNAL_NOTES}\n\n`, general: 1 }) as NoteCard;
+  /** The Journal board `b` with `card` as its first general note, beside everything; unchanged if it has one already (or that id is taken). */
+  const withFirst = (b: Board, card: NoteCard): Board => {
+    if (generalNotes(b).length || b.cards[card.id]) return b;
+    const open = journalId() === ctx.state.boards.open;
+    return B.addCard(b, card, { type: 'loose', ...generalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) });
+  };
+  /** A note just added to the Journal board is tidied at once when that board is the open one (drawn). */
+  const settle = (boardId: string, cardId: string) => {
+    if (boardId === ctx.state.boards.open && ctx.state.board.cards[cardId]) ctx.requestSettle([cardId]);
   };
 
   return {
@@ -143,26 +159,66 @@ export function boardActions(ctx: StoreContext) {
     },
     setJournal,
     /**
-     * Typing or formatting in the Journal panel's general notes (owner request, 2026-10-29): written
-     * as setJournal writes a day, into the Journal board's "General notes" note. The note is added on
-     * the first typing, not when the panel opens, so opening it changes nothing; that first typing and
-     * the note's coming are one undo step.
+     * Typing or formatting in one of the Journal panel's general notes (owner request, 2026-10-29;
+     * several since 2026-11-10): written as setJournal writes a day, into the general note `noteId`,
+     * or the first one when it is left out. With none yet, the "General notes" note is added on the
+     * first typing, not when the panel opens, so opening it changes nothing; that first typing and the
+     * note's coming are one undo step.
      */
-    setJournalNotes(rich: Rich, typing = true) {
+    setJournalNotes(rich: Rich, typing = true, noteId?: string) {
       const id = journalId();
       const board = id ? ctx.workspace().boards[id] : undefined;
       if (!id || !board) return; // the Journal board went (sync or a restore) while the panel was open
-      const existing = generalNote(board);
-      if (existing) return setJournal(existing, rich, typing);
+      const ids = generalNotes(board);
+      if (noteId && ids.includes(noteId)) return setJournal(noteId, rich, typing);
+      if (ids.length) return noteId ? undefined : setJournal(ids[0], rich, typing); // a note named that went (undo, sync) is left alone
       if (!plainOf(rich) && !hasFormatting(rich)) return; // nothing written: nothing is added
-      const card = writeJournal({ ...createCard('note'), kind: 'note', text: `${JOURNAL_NOTES}\n\n` }, rich);
+      const card = writeJournal(firstNote(noteId), rich);
+      ctx.commitTo(id, (b) => withFirst(b, card), typing ? `text:${card.id}` : undefined);
+      settle(id, card.id);
+    },
+    /**
+     * The + in a general note's header (owner decision, 2026-11-10): adds an "Untitled note" right
+     * below the general note `after` as one undo step. With none written yet, `after` is the id the
+     * panel shows "General notes" under, and that note is added with it. Returns the new note's id,
+     * or null when nothing was added.
+     */
+    addJournalNote(after: string): string | null {
+      const id = journalId();
+      if (!id || !ctx.workspace().boards[id]) return null;
+      const note = { ...createCard('note'), kind: 'note', text: `${UNTITLED_NOTE}\n\n` } as NoteCard;
       const open = id === ctx.state.boards.open;
-      ctx.commitTo(
-        id,
-        (b) => (generalNote(b) ? b : B.addCard(b, card, { type: 'loose', ...generalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) })),
-        typing ? `text:${card.id}` : undefined,
-      );
-      if (open && ctx.state.board.cards[card.id]) ctx.requestSettle([card.id]);
+      ctx.commitTo(id, (b) => {
+        const withIt = withFirst(b, firstNote(after));
+        return addGeneralNote(withIt, after, note, generalSpotBelow(withIt, after, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }));
+      });
+      if (!ctx.workspace().boards[id]?.cards[note.id]) return null;
+      settle(id, note.id);
+      return note.id;
+    },
+    /**
+     * Renaming a general note in its header (owner decision, 2026-11-10): its first line becomes
+     * `name` ("Untitled note" when empty), as one undo step. With none written yet, `noteId` is the id
+     * the panel shows "General notes" under, and that note is added with the new name (the same name adds nothing).
+     */
+    renameJournalNote(noteId: string, name: string) {
+      const id = journalId();
+      if (!id || !ctx.workspace().boards[id]) return;
+      ctx.commitTo(id, (b) => {
+        if (generalNotes(b).length) return renameGeneralNote(b, noteId, name);
+        const first = firstNote(noteId);
+        const renamed = renameGeneralNote(withFirst(b, first), noteId, name);
+        return (renamed.cards[noteId] as NoteCard | undefined)?.text !== first.text ? renamed : b;
+      });
+      if (ctx.workspace().boards[id]?.cards[noteId]) settle(id, noteId);
+    },
+    /**
+     * The trash in a general note's header (owner decision, 2026-11-10): deletes it at once with the
+     * Undo message; Undo or Ctrl+Z in the panel brings it back. The last general note is never deleted.
+     */
+    deleteJournalNote(noteId: string) {
+      const id = journalId();
+      if (id) ctx.deleting('Deleted 1 note', () => ctx.commitTo(id, (b) => deleteGeneralNote(b, noteId)), id);
     },
     /** Ctrl+Z / Ctrl+Y in the Journal panel: on the Journal board's own history, whichever board is open. */
     undoJournal() {

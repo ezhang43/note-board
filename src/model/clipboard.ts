@@ -39,6 +39,8 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
 
 function freshCard(card: Card, makeId: MakeId): Card {
   const copy = { ...structuredClone(card), id: makeId('k') };
+  // A copy of a Journal general note is an ordinary note (2026-11-10): its place in the panel's list stays with the original.
+  if (copy.kind === 'note') delete copy.general;
   return copy.kind === 'todo' ? { ...copy, items: freshCopies(copy.items, makeId) } : copy;
 }
 

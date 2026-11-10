@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { JOURNAL_NOTES, generalNote, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { JOURNAL_NOTES, UNTITLED_NOTE, generalNotes, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, noteName, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
 import { HIGHLIGHTS, journalRich, MAX_SIZE, MIN_SIZE, SIZE_STEPS, sizeMark, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
-import { CaretIcon } from './icons';
+import { CaretIcon, PlusIcon, TrashIcon } from './icons';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 
 /** Which year, month and week groups are open: kept on this device only, never in the board's data (owner request, 2026-10-19). */
@@ -65,12 +66,19 @@ export function JournalPanel() {
       )}
     </button>
   );
-  // The general notes (owner request, 2026-10-29): open each time the panel opens (view state, like a day's fold).
-  const notesCard = useMemo(() => (board ? board.cards[generalNote(board) ?? ''] : undefined), [board]);
-  const notesText = notesCard?.kind === 'note' ? notesCard.text : '';
-  const notesRich = useMemo(() => journalRich(notesText, notesCard?.kind === 'note' ? notesCard.rich : undefined), [notesCard, notesText]);
-  const notesPeek = journalPeek(journalBody(notesText));
-  const [notesOpen, setNotesOpen] = useState(true);
+  // The general notes (owner request, 2026-10-29; several, with names, 2026-11-10): each open every time the
+  // panel opens (view state, like a day's fold). With none written yet, one "General notes" note is shown,
+  // under the id it gets when it is first written, renamed or added below, so its sheet stays the same.
+  const [firstId] = useState(() => newId('k'));
+  const written = useMemo(() => (board ? generalNotes(board) : []), [board]);
+  const generals = written.length ? written : [firstId];
+  /** General notes folded this visit, by id. */
+  const [shutNotes, setShutNotes] = useState<ReadonlySet<string>>(new Set());
+  /** The name being typed in a general note's header (view state until Enter or leaving the field saves it). */
+  const [renaming, setRenaming] = useState<{ key: string; draft: string } | null>(null);
+  const renameField = useRef<HTMLInputElement>(null);
+  /** The general note whose name button takes the keyboard back once its name field goes (Enter or Escape). */
+  const refocusName = useRef<string | null>(null);
   // Days whose fold was turned over this visit (view state: not saved, not undoable, gone when the panel closes):
   // today starts open and every earlier day starts folded, showing its first line.
   const [turned, setTurned] = useState<ReadonlySet<string>>(new Set());
@@ -102,7 +110,19 @@ export function JournalPanel() {
     first.current?.focusEnd();
   }, []);
 
+  // A name field just opened has the cursor, with its text selected (owner decision, 2026-11-10).
+  const renamingKey = renaming?.key;
   useLayoutEffect(() => {
+    if (!renamingKey) return;
+    renameField.current?.focus();
+    renameField.current?.select();
+  }, [renamingKey]);
+
+  useLayoutEffect(() => {
+    if (refocusName.current && !renaming) {
+      root.current?.querySelector<HTMLElement>(`[data-note="${CSS.escape(refocusName.current)}"] .jn-name`)?.focus();
+      refocusName.current = null;
+    }
     if (typing.current && !typing.current.isConnected) {
       typing.current = null;
       root.current?.focus();
@@ -251,6 +271,126 @@ export function JournalPanel() {
     );
   };
 
+  /** One general note's sheet: an arrow that folds it, its name (click to rename), + and the trash. */
+  const generalSheet = (key: string, count: number) => {
+    const card = board?.cards[key];
+    const text = card?.kind === 'note' ? card.text : `${JOURNAL_NOTES}\n\n`;
+    const name = noteName(text) || UNTITLED_NOTE;
+    const value = journalRich(text, card?.kind === 'note' ? card.rich : undefined);
+    const peek = journalPeek(journalBody(text));
+    const open = !shutNotes.has(key);
+    const editing = renaming?.key === key ? renaming : null;
+    const finish = (save: boolean) => {
+      // Enter or Escape unmounts the field; a blur that follows finds `renaming` already gone.
+      if (!editing) return;
+      if (save) appStore.renameJournalNote(key, editing.draft);
+      setRenaming(null);
+    };
+    return (
+      <section key={key} data-note={key} className={`journal-notes${open ? '' : ' shut'}`}>
+        <h3 className="jn-head">
+          <button
+            type="button"
+            className="jg-head jg-notes"
+            aria-expanded={open}
+            aria-label={name}
+            title={open ? 'Fold' : 'Open'}
+            onClick={(ev) => {
+              // Folding it while it holds the cursor takes the cursor to this arrow, as a day's fold does.
+              if (open) typing.current = null;
+              ev.currentTarget.focus();
+              setShutNotes((was) => {
+                const next = new Set(was);
+                if (!next.delete(key)) next.add(key);
+                return next;
+              });
+            }}
+          />
+          {editing ? (
+            <input
+              ref={renameField}
+              className="jn-rename"
+              aria-label="Name"
+              value={editing.draft}
+              maxLength={200}
+              onChange={(ev) => setRenaming({ key, draft: ev.target.value })}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter') {
+                  ev.preventDefault();
+                  refocusName.current = key;
+                  finish(true);
+                } else if (ev.key === 'Escape') {
+                  refocusName.current = key;
+                  finish(false);
+                }
+              }}
+              onBlur={() => finish(true)}
+            />
+          ) : (
+            <button type="button" className="jn-name jp-title" aria-label={`Rename ${name}`} title="Rename" onClick={() => setRenaming({ key, draft: name })}>
+              {name}
+            </button>
+          )}
+          {!open && !editing && peek && <span className="jg-peek">{peek}</span>}
+          <span className="jn-tools">
+            <button
+              type="button"
+              className="jn-add"
+              aria-label="Add a general note"
+              title="Add a general note"
+              onClick={() => {
+                const added = appStore.addJournalNote(key);
+                if (added) setRenaming({ key: added, draft: UNTITLED_NOTE });
+              }}
+            >
+              <PlusIcon />
+            </button>
+            {count > 1 && (
+              <button
+                type="button"
+                className="jn-del"
+                aria-label={`Delete “${name}”`}
+                title="Delete"
+                onClick={() => {
+                  appStore.deleteJournalNote(key);
+                  root.current?.focus(); // the button goes with its note; Ctrl+Z in the panel brings it back
+                }}
+              >
+                <TrashIcon />
+              </button>
+            )}
+          </span>
+        </h3>
+        {open && (
+          <RichEditor
+            ref={(h) => {
+              if (h) handles.current.set(key, h);
+              else handles.current.delete(key);
+            }}
+            value={value}
+            label={name}
+            placeholder={peek ? undefined : NOTES_PLACEHOLDER}
+            onChange={(rich, typed) => appStore.setJournalNotes(rich, typed, key)}
+            onLook={(l) => {
+              active.current = handles.current.get(key) ?? null;
+              setLook((was) => (deepEqual(was, l) ? was : l));
+            }}
+            onFocus={(el) => {
+              typing.current = el;
+              active.current = handles.current.get(key) ?? null;
+            }}
+            onBlur={(el) => {
+              queueMicrotask(() => {
+                if (el.isConnected && typing.current === el) typing.current = null;
+              });
+            }}
+            onEscape={() => root.current?.focus()}
+          />
+        )}
+      </section>
+    );
+  };
+
   const thisYear = today.slice(0, 4);
   const timeline = years.flatMap((y) => {
     const months = y.months
@@ -367,52 +507,7 @@ export function JournalPanel() {
         )}
       </div>
       {/* Only with a Journal board to write into, like the days. */}
-      {board && (
-        <section className={`journal-notes${notesOpen ? '' : ' shut'}`}>
-          <h3>
-            <button
-              type="button"
-              className="jg-head jg-notes"
-              aria-expanded={notesOpen}
-              onClick={(ev) => {
-                // Folding them while they hold the cursor takes the cursor to this header, as a day's fold does.
-                if (notesOpen) typing.current = null;
-                ev.currentTarget.focus();
-                setNotesOpen((o) => !o);
-              }}
-            >
-              <span className="jp-title">{JOURNAL_NOTES}</span>
-              {!notesOpen && notesPeek && <span className="jg-peek">{notesPeek}</span>}
-            </button>
-          </h3>
-          {notesOpen && (
-            <RichEditor
-              ref={(h) => {
-                if (h) handles.current.set(JOURNAL_NOTES, h);
-                else handles.current.delete(JOURNAL_NOTES);
-              }}
-              value={notesRich}
-              label={JOURNAL_NOTES}
-              placeholder={notesPeek ? undefined : NOTES_PLACEHOLDER}
-              onChange={(rich, typed) => appStore.setJournalNotes(rich, typed)}
-              onLook={(l) => {
-                active.current = handles.current.get(JOURNAL_NOTES) ?? null;
-                setLook((was) => (deepEqual(was, l) ? was : l));
-              }}
-              onFocus={(el) => {
-                typing.current = el;
-                active.current = handles.current.get(JOURNAL_NOTES) ?? null;
-              }}
-              onBlur={(el) => {
-                queueMicrotask(() => {
-                  if (el.isConnected && typing.current === el) typing.current = null;
-                });
-              }}
-              onEscape={() => root.current?.focus()}
-            />
-          )}
-        </section>
-      )}
+      {board && generals.map((id) => generalSheet(id, generals.length))}
       {todayEntry && entry(todayEntry, true)}
       {timeline}
     </div>

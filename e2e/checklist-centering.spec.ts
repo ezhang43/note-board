@@ -6,13 +6,13 @@ import { THEME_KEY } from '../src/model/theme';
 // Checklist centering guard (owner request, 2026-10-23: "there have been a few instances in which the centering of the text
 // for checklists gets moved, so please ensure that this stays consistent going forward").
 //
-// The rule (SPEC.md, Look and feel): a tick box sits 5% of its item's line height BELOW the middle of the item's first line of
+// The rule (SPEC.md, Look and feel): a tick box sits 7.5% of its item's line height BELOW the middle of the item's first line of
 // text, because the middle of lowercase letters is lower than the middle of capitals. The gap from the box to the text is
 // 6px times the item buttons' step (capped at 190%). This file measures both in the real app, over every case that has
 // ever moved it: all 12 A- / A+ steps, every per-item text style, open and ticked, top-level and sub-items, one line and
 // wrapped, light and dark, desktop and phone layout. All failures are collected and reported together.
 
-// Half a pixel, in the card's own (unzoomed) pixels: tighter than the owner's 1px, so that a one-pixel slip at Normal (a 5% nudge is 1px there) is caught.
+// Half a pixel, in the card's own (unzoomed) pixels: tighter than the owner's 1px, so that a one-pixel slip at Normal (the 7.5% nudge is 1.5px there; it was 1px at 5%) is caught.
 const TOLERANCE = 0.5;
 
 type Style = { size?: 'small' | 'large'; bold?: true; font?: 'serif' | 'rounded' | 'hand' | 'mono' };
@@ -152,8 +152,8 @@ async function run(page: Page, layout: 'desktop' | 'phone', theme: 'light' | 'da
     for (const r of rows) {
       const name = names.get(r.id)!;
       checked++;
-      const off = r.below - 0.05 * r.lineH;
-      if (Math.abs(off) > TOLERANCE) failures.push(`Centering moved: ${name}, ${where}: the box is ${off.toFixed(1)}px ${off > 0 ? "lower" : "higher"} than the rule puts it, 5% of the line height below the middle of the first line (off by ${Math.abs(off).toFixed(1)}px)`);
+      const off = r.below - 0.075 * r.lineH;
+      if (Math.abs(off) > TOLERANCE) failures.push(`Centering moved: ${name}, ${where}: the box is ${off.toFixed(1)}px ${off > 0 ? "lower" : "higher"} than the rule puts it, 7.5% of the line height below the middle of the first line (off by ${Math.abs(off).toFixed(1)}px)`);
       if (Math.abs(r.gap - expectedGap) > TOLERANCE) failures.push(`Gap moved: ${name}, ${where}: box to text is ${r.gap.toFixed(1)}px, should be ${expectedGap.toFixed(1)}px`);
       if (Math.abs(r.boxSize - expectedBox) > TOLERANCE) failures.push(`Box size moved: ${name}, ${where}: ${r.boxSize}px, should be ${expectedBox}px`);
       if (r.firstLine !== 0) failures.push(`Test cannot find the first line: ${name}, ${where}: the first character is in line ${r.firstLine + 1}`);

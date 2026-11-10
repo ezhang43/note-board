@@ -35,7 +35,7 @@ async function box(l: Locator) {
 async function grabPoint(block: Locator) {
   const b = await box(block);
   const isColumn = (await block.getAttribute('data-col-id')) !== null;
-  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 }; // a card's title shares its header row: grab the padding left of it
+  return isColumn ? { x: b.x + b.width - 124, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 }; // a card's title shares its header row: grab the padding left of it
 }
 
 async function dragTo(page: Page, block: Locator, to: { x: number; y: number }) {

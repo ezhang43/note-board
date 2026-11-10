@@ -998,8 +998,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   height: var(--box);
   /* Centered on the first line: the text box's 4px of padding, then half a line, less half the box. */
   margin: calc(var(--line) / 2 + 4px - var(--box) / 2) 0 0;
-  /* Then nudged down 5% of the line (1px at Normal, 2px at 200%): the middle of lowercase text, which most items are, sits lower than the middle of capitals. */
-  translate: 0 calc(var(--line) * 0.05);
+  /* Then nudged down 7.5% of the line (1.5px at Normal, 3px at 200%; 5% before owner request 2026-11-10): the middle of lowercase text, which most items are, sits lower than the middle of capitals. */
+  translate: 0 calc(var(--line) * 0.075);
   flex-shrink: 0;
   border: calc(1.5px * var(--bs)) solid var(--tick-edge);
   border-radius: calc(6px * var(--bs));

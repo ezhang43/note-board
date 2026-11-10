@@ -137,6 +137,38 @@ test('opening or folding a day does not touch the groups above it', async ({ pag
   await expect(day(page, TUESDAY)).toHaveAttribute('aria-expanded', 'true');
 });
 
+// Every day's header shows the group headers' small arrow (owner request, 2026-11-10): down when open, turned when folded.
+const arrow = (page: Page, date: string) =>
+  day(page, date).evaluate((el) => {
+    const s = getComputedStyle(el, '::before');
+    return { shown: s.display !== 'none' && s.content !== 'none', transform: s.transform, width: s.width };
+  });
+
+test("today's page and every earlier day show the fold arrow, which turns when the day is folded", async ({ page }) => {
+  const open = await arrow(page, TODAY);
+  expect(open.shown).toBe(true);
+  expect(open.width).toBe('6px');
+  expect(open.transform).not.toBe('none');
+  await day(page, TODAY).click();
+  const shut = await arrow(page, TODAY);
+  expect(shut.shown).toBe(true);
+  expect(shut.transform).not.toBe(open.transform);
+  // The earlier days start folded; opening one turns its arrow the way today's turned.
+  const folded = await arrow(page, TUESDAY);
+  expect(folded.shown).toBe(true);
+  expect(folded.transform).toBe(shut.transform);
+  await day(page, TUESDAY).click();
+  expect((await arrow(page, TUESDAY)).transform).toBe(open.transform);
+});
+
+test('the day arrows turn with the groups\' 150ms motion, and not at all with reduced motion', async ({ page }) => {
+  const duration = () => day(page, TODAY).evaluate((el) => getComputedStyle(el, '::before').transitionDuration);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  expect(await duration()).toBe('0.15s');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await duration()).toBe('0s');
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 

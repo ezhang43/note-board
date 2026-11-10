@@ -321,27 +321,50 @@ function anyText(items: TodoItem[]): boolean {
 /**
  * Removes one item from a (cloned) list, in place. Normally its sub-items go with it; but when the
  * item itself is blank and something under it has text, its sub-items are kept and move up one
- * level into its place (owner's rule), unless `keepChildren` is false.
+ * level into its place (owner's rule), unless `keepChildren` is false. Returns the id of the item it
+ * was nested in, for `tickCompleteParents`: only when the removed item was open (null for a top-level
+ * item, a ticked one or one not found), since only an open item can have been what kept that item open.
  */
-function removeItemInPlace(items: TodoItem[], id: string, keepChildren = true) {
+function removeItemInPlace(items: TodoItem[], id: string, keepChildren = true): string | null {
   const loc = findItem(items, id);
-  if (!loc) return;
+  if (!loc) return null;
   const promote = keepChildren && isBlank(loc.item) && anyText(loc.item.children);
   loc.list.splice(loc.index, 1, ...(promote ? loc.item.children : []));
+  return loc.item.done ? null : (loc.parent?.id ?? null);
+}
+
+/**
+ * After items were removed from a (cloned) list, in place: an item left with sub-items that are all
+ * ticked is ticked, and so on upwards, as when the last open sub-item is ticked (owner request,
+ * 2026-11-10: a blank sub-item added under a ticked parent unticks it; taking that item away ticks it
+ * again). An item left with no sub-items keeps its tick as it is. `parentIds` are the items the
+ * removed ones were nested in.
+ */
+function tickCompleteParents(items: TodoItem[], parentIds: (string | null)[]) {
+  for (const id of new Set(parentIds)) {
+    if (!id || !findItem(items, id)) continue;
+    const chain = [findItem(items, id)!.item, ...ancestorsOf(items, id).reverse()]; // innermost first
+    for (const it of chain) {
+      if (it.children.length && it.children.every((c) => c.done)) it.done = true;
+      else break;
+    }
+  }
 }
 
 /**
  * Backspace in an empty item deletes it, and the cursor goes to the item shown above it.
  * Its sub-items stay (moving up a level) if any of them has text; otherwise they go too.
  * Never empties the list: a list's last item, or its last open one, can't be deleted this way (the
- * cursor always has an open item to go to).
+ * cursor always has an open item to go to). That is judged before the parent is ticked again, so a
+ * blank sub-item under the list's only open item can still go.
  */
 export function removeEmptyItem(items: TodoItem[], id: string): { items: TodoItem[]; focus: string | null } | null {
   const loc = findItem(items, id);
   if (!loc || loc.item.text !== '') return null;
   const next = cloned(items);
-  removeItemInPlace(next, id);
+  const parent = removeItemInPlace(next, id);
   if (!next.some((it) => !it.done)) return null;
+  tickCompleteParents(next, [parent]);
   return { items: next, focus: focusAfterRemoving(shownIds(items), next, [id]) };
 }
 
@@ -370,7 +393,8 @@ export function focusAfterRemoving(shown: string[], after: TodoItem[], gone: str
  */
 export function deleteItems(items: TodoItem[], ids: string[], makeId: MakeId = newId, keepChildren = true): TodoItem[] {
   const next = cloned(items);
-  for (const id of ids) removeItemInPlace(next, id, keepChildren);
+  const parents = ids.map((id) => removeItemInPlace(next, id, keepChildren));
+  tickCompleteParents(next, parents);
   return refill(next, makeId);
 }
 

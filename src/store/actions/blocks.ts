@@ -28,13 +28,21 @@ import type { SidePanelKind, Ui } from '../types';
 
 /** After expanding a block, blocks it pushes aside within this long (ms) are remembered, to go back when it collapses. */
 const EXPAND_WATCH_MS = 1500;
+/** Start remembering what opening collapsed block `id` pushes aside (call just before the commit that opens it). */
+function watchExpanding(ctx: StoreContext, id: string) {
+  ctx.layout.pushedBy.delete(id);
+  ctx.layout.expanding = { id, until: Date.now() + EXPAND_WATCH_MS };
+}
 /** Imported cards start this far (screen pixels) below the top of the board area. */
 const IMPORT_TOP_MARGIN = 40;
 
-/** Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). A loose card can be given a width. */
-export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement, w: number | null = null) {
+/**
+ * Adds a new card and selects it with the cursor in its first field (a new to-do list: its title). A loose card can be given a width.
+ * With `open`, the collapsed container it goes into is opened in the same step so the new card shows.
+ */
+export function addNewCard(ctx: StoreContext, kind: CardKind, place: B.Placement, w: number | null = null, open = false) {
   const card = { ...createCard(kind), w };
-  ctx.commit((b) => B.addCard(b, card, place), { ui: { selection: [card.id], itemSel: null, focusBlock: card.id } });
+  ctx.commit((b) => B.addCard(open && place.type === 'column' ? B.toggleCollapsed(b, place.columnId) : b, card, place), { ui: { selection: [card.id], itemSel: null, focusBlock: card.id } });
   ctx.requestSettle([place.type === 'column' ? place.columnId : card.id]);
 }
 
@@ -296,6 +304,16 @@ export function blockActions(ctx: StoreContext) {
       addNewCard(ctx, kind, place, w);
     },
     /**
+     * A container's + button (owner request, 2026-11-10): a new card of `kind` as the last card of container `columnId`,
+     * selected, with the cursor in its first field. A collapsed container opens in the same step. One undo step.
+     */
+    addCardToColumn(columnId: string, kind: CardKind) {
+      const col = ctx.state.board.columns[columnId];
+      if (!col) return;
+      if (col.collapsed) watchExpanding(ctx, columnId);
+      addNewCard(ctx, kind, { type: 'column', columnId, index: col.cardIds.length }, null, col.collapsed);
+    },
+    /**
      * A web address pasted or dropped on the board (job 124): a selected link card, one undo step.
      * It goes at the end of the container it was dropped on (`columnId`), else into the selected container,
      * else loose with its middle at `at` (a board point, where it was dropped) or the middle of the screen.
@@ -429,8 +447,7 @@ export function blockActions(ctx: StoreContext) {
       const blk = B.blockOf(ctx.state.board, id);
       if (!blk) return;
       if (blk.collapsed) {
-        layout.pushedBy.delete(id);
-        layout.expanding = { id, until: Date.now() + EXPAND_WATCH_MS };
+        watchExpanding(ctx, id);
         commit((b) => B.toggleCollapsed(b, id));
         return;
       }

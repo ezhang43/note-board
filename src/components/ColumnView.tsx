@@ -8,7 +8,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useTakeFocus } from './useTakeFocus';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
-import { ChevronIcon, ResizeIcon, TrashIcon } from './icons';
+import { ChevronIcon, PlusIcon, ResizeIcon, TrashIcon } from './icons';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
@@ -77,7 +77,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       data-col-id={id}
       aria-label={col.title ? `Container: ${col.title}` : 'Untitled container'}
       className={classes.filter(Boolean).join(' ')}
-      style={{ left: resize?.liveX ?? pos.x, top: resize?.liveY ?? pos.y, width: w, minHeight: minH, '--bg': colors.bg, '--edge': colors.edge, '--col-text': colors.text } as CSSProperties}
+      style={{ left: resize?.liveX ?? pos.x, top: resize?.liveY ?? pos.y, width: w, minHeight: minH, '--col-n': w, '--bg': colors.bg, '--edge': colors.edge, '--col-text': colors.text } as CSSProperties}
       onPointerDown={blockPointerDown('column', id)}
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
@@ -101,6 +101,15 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           </span>
         </div>
         <div className="column-actions">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Add a checklist"
+            title="Add a checklist"
+            onClick={() => appStore.addCardToColumn(id, 'todo')}
+          >
+            <PlusIcon size={16} />
+          </button>
           <button
             type="button"
             className="icon-button"

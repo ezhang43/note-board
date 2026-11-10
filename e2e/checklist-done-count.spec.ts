@@ -117,6 +117,53 @@ function check(layout: 'desktop' | 'phone') {
     await expect(row(page, 'trip').getByLabel('Item text')).toBeFocused();
   });
 
+  // Owner request 2026-11-10 ("nudge it"): the digits' vertical middle lines up with the middle of the capitals of the text they follow,
+  // at every text step. The capitals' middle is worked out from the font (canvas metrics) and the first line's box; the digits' from a zero-size
+  // probe inside the count that sits on its baseline.
+  for (const size of ['small', 'normal', 'large', 'huge', 'maximum'] as FontSize[]) {
+    test(`the counts' digits are centered on the capitals of the text they follow, at ${size} text (${layout})`, async ({ page }) => {
+      await seed(page, { size, w: 1200 }); // wide, so the list's count stays on the title's line
+      const r = await page.evaluate(() => {
+        const ctx = document.createElement('canvas').getContext('2d')!;
+        // Middle (y) of the capitals of the first line of a text field, from its font and box.
+        const capMiddle = (field: HTMLElement) => {
+          const cs = getComputedStyle(field);
+          ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const m = ctx.measureText('H');
+          const lh = cs.lineHeight === 'normal' ? m.fontBoundingBoxAscent + m.fontBoundingBoxDescent : parseFloat(cs.lineHeight);
+          const box = field.getBoundingClientRect();
+          const scale = box.height / (field as HTMLElement).offsetHeight; // the phone zooms the whole board
+          const top = box.top + (parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth)) * scale;
+          const contentH = field instanceof HTMLInputElement ? field.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) : lh;
+          const baseline = top + ((contentH * scale - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent) * scale) / 2) + m.fontBoundingBoxAscent * scale;
+          return baseline - (m.actualBoundingBoxAscent * scale) / 2;
+        };
+        // Middle (y) of the digits of a count.
+        const digitMiddle = (count: HTMLElement) => {
+          const cs = getComputedStyle(count);
+          ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const m = ctx.measureText('0123456789');
+          const probe = document.createElement('span');
+          probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+          count.append(probe);
+          const baseline = probe.getBoundingClientRect().bottom;
+          probe.remove();
+          const box = count.getBoundingClientRect();
+          const scale = box.height / count.offsetHeight;
+          return baseline - (m.actualBoundingBoxAscent * scale) / 2;
+        };
+        const c = document.querySelector('[data-card-id="t1"]')!;
+        const item = c.querySelector('[data-item-id="trip"]')!;
+        return {
+          item: digitMiddle(item.querySelector('.item-count')!) - capMiddle(item.querySelector('textarea')!),
+          title: digitMiddle(c.querySelector('.title-count')!) - capMiddle(c.querySelector('.card-title input')!),
+        };
+      });
+      expect(Math.abs(r.item), `the parent item's digits are ${r.item.toFixed(2)}px off the capitals' middle`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(r.title), `the list's digits are ${r.title.toFixed(2)}px off the capitals' middle`).toBeLessThanOrEqual(0.5);
+    });
+  }
+
   test(`the counts follow ticking and unticking (${layout})`, async ({ page }) => {
     await seed(page);
     await expect(listCount(page)).toHaveText('3/6');

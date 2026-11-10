@@ -120,7 +120,7 @@ function check(layout: 'desktop' | 'phone') {
   // Owner request 2026-11-10 ("nudge it"): the digits' vertical middle lines up with the middle of the capitals of the text they follow,
   // at every text step. The capitals' middle is worked out from the font (canvas metrics) and the first line's box; the digits' from a zero-size
   // probe inside the count that sits on its baseline.
-  for (const size of ['normal', 'large', 'maximum'] as FontSize[]) {
+  for (const size of ['small', 'normal', 'large', 'huge', 'maximum'] as FontSize[]) {
     test(`the counts' digits are centered on the capitals of the text they follow, at ${size} text (${layout})`, async ({ page }) => {
       await seed(page, { size, w: 1200 }); // wide, so the list's count stays on the title's line
       const r = await page.evaluate(() => {

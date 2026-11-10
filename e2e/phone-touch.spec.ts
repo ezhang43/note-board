@@ -385,11 +385,12 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     await addMenu(page, 'Container');
     await makeRoomAtRight(page);
     const col = page.locator('[data-col-id]').first();
+    const plus = col.getByRole('button', { name: 'Add a checklist' });
     const collapse = col.getByRole('button', { name: 'Collapse container' });
     const del = col.getByRole('button', { name: 'Delete container and its cards' });
     const corner = col.getByRole('button', { name: 'Resize container', exact: true });
     const strip = col.getByRole('button', { name: 'Resize container width' });
-    for (const c of [collapse, del, corner]) {
+    for (const c of [plus, collapse, del, corner]) {
       const r = await reach(c);
       expect(r.w).toBeGreaterThanOrEqual(44);
       expect(r.h).toBeGreaterThanOrEqual(44);
@@ -397,7 +398,7 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     }
     expect((await reach(strip)).w).toBeGreaterThanOrEqual(44);
     expect(await keepsItsOwnBox(strip, 'centre')).toBe(true);
-    for (const c of [collapse, del, corner, strip]) expect(await takenFromOthers(c)).toBe(0);
+    for (const c of [plus, collapse, del, corner, strip]) expect(await takenFromOthers(c)).toBe(0);
   });
 
   test('a collapsed card: the width strip and the buttons stay apart', async ({ page }) => {

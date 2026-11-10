@@ -823,6 +823,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   --hb: min(var(--bs), 2.5);
   --btn: calc(32px * var(--hb));
 }
+/* A container has three of them (add a checklist, collapse, delete): they stop growing where the three still leave room for the title (about 56px) in the container's own width (--col-n, unitless px), so a narrow container at a huge text size keeps its title. */
+.column { --hb: max(1, min(var(--bs), 2.5, calc((var(--col-n, 240) - 84) / 96))); }
 /* On a phone they keep their size, like the item buttons. */
 .app.phone :is(.card, .column) { --bs: 1; }
 /* A card's and a container's header buttons (owner request, 2026-10-22): 32px with a 16px icon, up from 28px and 12-14px. */
@@ -1883,6 +1885,8 @@ html[data-glide] .world {
   .card-header > .block-trash::before { left: 0; right: -16px; }
   .column-actions > .icon-button::before { top: -8px; bottom: -6px; }
   .column-actions > .icon-button:first-of-type::before { left: -14px; right: -4px; }
+  /* The add button comes first; the collapse arrow's area starts at its own box so it never covers the add button's right edge. */
+  .column-actions > .icon-button:nth-of-type(2)::before { left: 0; }
   .column-actions > .block-trash::before { left: 0; right: -16px; }
   /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
   .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }

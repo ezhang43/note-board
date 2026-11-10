@@ -93,7 +93,7 @@ export async function box(l: Locator) {
 export async function grabPoint(block: Locator) {
   const b = await box(block);
   const isColumn = (await block.getAttribute('data-col-id')) !== null;
-  return isColumn ? { x: b.x + b.width - 84, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 };
+  return isColumn ? { x: b.x + b.width - 124, y: b.y + 26 } : { x: b.x + 8, y: b.y + 18 };
 }
 
 /** Drag from `from` to `to` in small steps. */

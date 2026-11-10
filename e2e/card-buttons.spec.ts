@@ -24,15 +24,17 @@ async function sizes(btn: Locator) {
   return { w: b.width, h: b.height, icon: i.width, iconH: i.height };
 }
 
-async function check(blocks: { block: Locator; buttons: string[] }[], scale: number) {
-  for (const { block, buttons } of blocks) {
+async function check(blocks: { block: Locator; buttons: string[]; cap?: number }[], scale: number) {
+  for (const { block, buttons, cap } of blocks) {
+    // A container's three buttons stop growing where they still leave its title room (about 2x in a 280px container).
+    const want = cap ? Math.min(scale, cap) : scale;
     await block.hover();
     for (const name of buttons) {
       const s = await sizes(block.getByRole('button', { name }));
-      expect(s.w, `${name} width`).toBeGreaterThanOrEqual(BUTTON * scale - 0.5);
-      expect(s.h, `${name} height`).toBeGreaterThanOrEqual(BUTTON * scale - 0.5);
-      expect(s.icon, `${name} icon`).toBeGreaterThanOrEqual(ICON * scale - 0.5);
-      expect(s.iconH, `${name} icon height`).toBeGreaterThanOrEqual(ICON * scale - 0.5);
+      expect(s.w, `${name} width`).toBeGreaterThanOrEqual(BUTTON * want - 0.5);
+      expect(s.h, `${name} height`).toBeGreaterThanOrEqual(BUTTON * want - 0.5);
+      expect(s.icon, `${name} icon`).toBeGreaterThanOrEqual(ICON * want - 0.5);
+      expect(s.iconH, `${name} icon height`).toBeGreaterThanOrEqual(ICON * want - 0.5);
     }
   }
 }
@@ -51,7 +53,7 @@ async function oneOfEach(page: Page) {
   return [
     { block: loose.nth(0), buttons: ['Collapse card', 'Delete card'] },
     { block: loose.nth(1), buttons: ['Collapse card', 'Delete card'] },
-    { block: columns(page).first(), buttons: ['Collapse container', 'Delete container and its cards'] },
+    { block: columns(page).first(), buttons: ['Add a checklist', 'Collapse container', 'Delete container and its cards'], cap: 2 },
   ];
 }
 
@@ -113,9 +115,12 @@ for (const [name, seed] of Object.entries(seeds)) {
       const block = seed.kind === 'card' ? page.locator('.card.loose').first() : columns(page).first();
       await block.hover();
       const buttons = await block.locator('.card-header > .icon-button, .column-actions > .icon-button').all();
-      expect(buttons).toHaveLength(2);
-      const [a, b, c] = [await box(buttons[0]), await box(buttons[1]), await box(block)];
-      expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+      // A container has a third button first: add a checklist (owner request, 2026-11-10).
+      expect(buttons).toHaveLength(seed.kind === 'card' ? 2 : 3);
+      const boxes = await Promise.all(buttons.map(box));
+      const c = await box(block);
+      for (let i = 1; i < boxes.length; i++) expect(boxes[i - 1].x + boxes[i - 1].width).toBeLessThanOrEqual(boxes[i].x);
+      const [a, b] = [boxes[0], boxes[boxes.length - 1]];
       expect(b.x + b.width).toBeLessThanOrEqual(c.x + c.width);
       expect(a.x).toBeGreaterThanOrEqual(c.x);
       expect(a.y).toBeGreaterThanOrEqual(c.y);

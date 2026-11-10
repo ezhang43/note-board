@@ -9,3 +9,5 @@
 - The Journal panel can now hold several general notes. The + at the right of a note's header ("Add a general note") adds an "Untitled note" right below it, with its name selected so you can type a new one straight away.
 - Click a note's name to rename it: Enter or clicking away saves, Escape puts the old name back, and an empty name becomes "Untitled note". Only the small arrow folds a note now.
 - The trash in a note's header deletes it, with "Deleted 1 note" and Undo; Ctrl+Z brings it back too. The last one can't be deleted, so there is always one. The existing "General notes" note keeps its name and words.
+- If an older copy of the app (one still open in another tab or on another device) saves the Journal, your extra general notes no longer drop out of the panel: this device remembers them and lists them again, and the next change puts them back in place everywhere.
+- Typing a name with a Japanese or Chinese keyboard: the Enter that picks a character no longer saves the name early.

@@ -109,4 +109,10 @@ describe('copying a Journal general note', () => {
     expect((out.cards[copy] as NoteCard).text).toBe('Recipes\n\nflour');
     expect((out.cards.g1 as NoteCard).general).toBe(2);
   });
+  it('one named like a date line keeps a place, so the panel never takes the copy for that day', () => {
+    const b = B.addCard(B.createBoard(), { ...createCard('note', 'g1'), text: 'Tue 10 Nov 2026\n\nplans', general: 2 } as NoteCard, { type: 'loose', x: 0, y: 0 });
+    const { board: out, ids: [copy] } = pasteBlocks(b, copyBlocks(b, ['g1']), 1, ids);
+    expect((out.cards[copy] as NoteCard).general).toBe(2);
+    expect((out.cards[copy] as NoteCard).text).toBe('Tue 10 Nov 2026\n\nplans');
+  });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, cleanNoteName, deleteGeneralNote, findJournalBoard, generalNote, generalNotes, generalSpot, generalSpotBelow, noteName, renameGeneralNote, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, cleanNoteName, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, noteName, readsAsDay, renameGeneralNote, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { dayKey as calendarDayKey } from './calendar';
 import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
@@ -382,18 +382,21 @@ describe('journal page heading', () => {
 
 // General notes (owner request, 2026-10-29): one note on the Journal board, first line "General notes", never a day.
 
-describe('generalNote', () => {
+/** The first general note, or null. */
+const firstGeneral = (b: Board): string | null => generalNotes(b)[0] ?? null;
+
+describe('the first general note', () => {
   it('is the note whose first line is exactly "General notes"', () => {
     let b = createBoard();
     ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\nhi', 0, 0));
-    expect(generalNote(b)).toBeNull();
+    expect(firstGeneral(b)).toBeNull();
     const g = noteAt(b, `${JOURNAL_NOTES}\n\nmy list`, 300, 0);
-    expect(generalNote(g.board)).toBe(g.id);
-    expect(generalNote(noteAt(b, 'General notes\r\n\nx', 300, 0).board)).not.toBeNull();
+    expect(firstGeneral(g.board)).toBe(g.id);
+    expect(firstGeneral(noteAt(b, 'General notes\r\n\nx', 300, 0).board)).not.toBeNull();
     // Anything else on the first line is an ordinary note.
-    expect(generalNote(noteAt(b, 'General notes about cats', 300, 0).board)).toBeNull();
-    expect(generalNote(noteAt(b, 'general notes', 300, 0).board)).toBeNull();
-    expect(generalNote(addCard(b, { ...createCard('todo'), title: JOURNAL_NOTES } as Card, { type: 'loose', x: 300, y: 0 }))).toBeNull();
+    expect(firstGeneral(noteAt(b, 'General notes about cats', 300, 0).board)).toBeNull();
+    expect(firstGeneral(noteAt(b, 'general notes', 300, 0).board)).toBeNull();
+    expect(firstGeneral(addCard(b, { ...createCard('todo'), title: JOURNAL_NOTES } as Card, { type: 'loose', x: 300, y: 0 }))).toBeNull();
   });
 
   it('is never a day, and a day is never it', () => {
@@ -401,14 +404,14 @@ describe('generalNote', () => {
     expect(journalEntries(g.board)).toEqual([]);
     expect(groupJournal(journalEntries(g.board), '2026-10-18')).toEqual([]);
     const d = noteAt(createBoard(), 'Sun 18 Oct 2026\n\nGeneral notes', 0, 0);
-    expect(generalNote(d.board)).toBeNull();
+    expect(firstGeneral(d.board)).toBeNull();
   });
 
   it('with two (two devices, or a copy), the same one everywhere: the smaller id', () => {
     let b = createBoard();
     b = addCard(b, { ...createCard('note', 'k-b'), text: `${JOURNAL_NOTES}\n\nb` } as Card, { type: 'loose', x: 0, y: 0 });
     b = addCard(b, { ...createCard('note', 'k-a'), text: `${JOURNAL_NOTES}\n\na` } as Card, { type: 'loose', x: 0, y: 300 });
-    expect(generalNote(b)).toBe('k-a');
+    expect(firstGeneral(b)).toBe('k-a');
   });
 });
 
@@ -469,7 +472,7 @@ describe('several general notes', () => {
   it('a board saved before this loads with its one "General notes" note, unchanged, and nothing else', () => {
     const { board, id } = legacy();
     expect(generalNotes(board)).toEqual([id]);
-    expect(generalNote(board)).toBe(id);
+    expect(firstGeneral(board)).toBe(id);
     expect(board.cards[id]).not.toHaveProperty('general');
     expect(noteName((board.cards[id] as NoteCard).text)).toBe('General notes');
   });
@@ -585,5 +588,66 @@ describe('several general notes', () => {
   it('cleanNoteName: one line, trimmed, never empty', () => {
     expect(cleanNoteName('')).toBe(UNTITLED_NOTE);
     expect(cleanNoteName(' a\r\n b ')).toBe('a b');
+  });
+  // An older app drops the places (2026-11-10 follow-up): the ids this device saw as general notes
+  // (`known`) find them again, in their order, and the next add, rename or delete writes the places back.
+  const stripped = () => {
+    const { board, id } = legacy();
+    let b = addGeneralNote(board, id, untitled('n-b'), { x: 400, y: 300 });
+    b = addGeneralNote(b, 'n-b', untitled('n-c'), { x: 400, y: 600 });
+    b = renameGeneralNote(renameGeneralNote(b, 'n-b', 'Recipes'), 'n-c', 'Tue 10 Nov 2026');
+    const ids = generalNotes(b);
+    const drop = (c: Card): Card => {
+      if (c.kind !== 'note') return c;
+      const { general: _g, ...rest } = c;
+      return rest;
+    };
+    const old: Board = { ...b, cards: Object.fromEntries(Object.entries(b.cards).map(([k, c]) => [k, drop(c)])) };
+    return { old, ids, id };
+  };
+
+  it('an older save without places: the notes this device knew are general notes again, in their order, words untouched', () => {
+    const { old, ids, id } = stripped();
+    expect(ids).toEqual([id, 'n-b', 'n-c']);
+    expect(generalNotes(old)).toEqual([id]);
+    expect(generalNotes(old, ids)).toEqual(ids);
+    // Known ids that are gone are skipped.
+    expect(generalNotes(old, ['gone', ...ids])).toEqual(ids);
+    // A "General notes" note it didn't know comes first.
+    expect(generalNotes(old, ['n-b'])).toEqual([id, 'n-b']);
+    // Once any note has a place again, what was known doesn't matter.
+    const placed = renameGeneralNote(old, 'n-b', 'Recipes 2', ids);
+    expect(generalNotes(placed)).toEqual(ids);
+    expect(ids.map((k) => (placed.cards[k] as NoteCard).general)).toEqual([1, 2, 3]);
+    expect((placed.cards[id] as NoteCard).text).toBe(`${JOURNAL_NOTES}\n\nmy list`);
+    expect((placed.cards['n-c'] as NoteCard).text).toBe(`Tue 10 Nov 2026\n\n`);
+  });
+
+  it('adding and deleting with what was known write the places back too', () => {
+    const { old, ids, id } = stripped();
+    const added = addGeneralNote(old, 'n-c', untitled('n-d'), { x: 400, y: 900 }, ids);
+    expect(generalNotes(added)).toEqual([...ids, 'n-d']);
+    const gone = deleteGeneralNote(old, 'n-b', ids);
+    expect(gone.cards['n-b']).toBeUndefined();
+    expect(generalNotes(gone, ids)).toEqual([id, 'n-c']);
+  });
+
+  it('a general note named like a date line is never taken for that day, with its place or once it has lost it', () => {
+    const { old, ids } = stripped();
+    const withPlaces = renameGeneralNote(old, 'n-b', 'Recipes!', ids);
+    const day = noteAt(withPlaces, 'Tue 10 Nov 2026\n\nreal day', 0, 900);
+    expect(journalEntries(day.board).map((e) => e.id)).not.toContain('n-c');
+    expect(todaysNote(day.board, 'Tue 10 Nov 2026')).toBe(day.id);
+    // Without places, what was known keeps it out of the days.
+    const oldDay = noteAt(old, 'Tue 10 Nov 2026\n\nreal day', 0, 900);
+    expect(journalEntries(oldDay.board, '', ids).map((e) => e.id)).not.toContain('n-c');
+    expect(todaysNote(oldDay.board, 'Tue 10 Nov 2026', ids)).toBe(oldDay.id);
+  });
+
+  it('readsAsDay: a first line the panel would take for a day', () => {
+    expect(readsAsDay('Tue 10 Nov 2026')).toBe(true);
+    expect(readsAsDay('Tue 10 Nov 2026 trip\n\nx')).toBe(true);
+    expect(readsAsDay('Recipes')).toBe(false);
+    expect(readsAsDay(`${JOURNAL_NOTES}\n\n`)).toBe(false);
   });
 });

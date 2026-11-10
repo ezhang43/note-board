@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { freshBoardEachTest } from './helpers';
+import { cards, freshBoardEachTest } from './helpers';
 
 // Several general notes in the Journal panel, each with a name (owner request, 2026-11-10): a + in a
 // note's header adds an "Untitled note" below it, clicking the name renames it, and a trash deletes it
@@ -145,4 +145,80 @@ test.describe('on a phone', () => {
     await trash(page, 1).tap();
     await expect(sections(page)).toHaveCount(1);
   });
+});
+
+// Follow-up review of #246 (2026-11-10).
+
+test('Enter that picks a character in an input method (IME) does not save the name', async ({ page }) => {
+  await openJournal(page);
+  await nameBtn(page, 0).click();
+  await rename(page).fill('日本');
+  await rename(page).dispatchEvent('keydown', { key: 'Enter', isComposing: true, keyCode: 229, bubbles: true });
+  await expect(rename(page)).toBeFocused();
+  await expect(rename(page)).toHaveValue('日本');
+  expect(await names(page)).toEqual([]); // still typing: no name button yet
+  await page.keyboard.press('Enter');
+  expect(await names(page)).toEqual(['日本']);
+});
+
+test('a name being typed comes back, with the cursor, when its note goes and comes back (undo, redo)', async ({ page }) => {
+  await openJournal(page);
+  await add(page, 0).click();
+  await expect(rename(page)).toBeFocused();
+  await page.keyboard.type('Rec');
+  // Undo and redo from outside the field (as another device or the toolbar would), so the field never loses focus first.
+  const key = (k: string) => panel(page).dispatchEvent('keydown', { key: k, ctrlKey: true, bubbles: true });
+  await key('z');
+  await expect(sections(page)).toHaveCount(1);
+  await key('y');
+  await expect(sections(page)).toHaveCount(2);
+  await expect(rename(page)).toBeFocused();
+  await expect(rename(page)).toHaveValue('Rec');
+  await page.keyboard.press('Enter');
+  expect(await names(page)).toEqual(['General notes', 'Rec']);
+});
+
+test('+ on the note not yet written, with the Journal board open behind the panel, puts the two notes clear of each other', async ({ page }) => {
+  await page.getByLabel('Board name').fill('Journal');
+  await page.keyboard.press('Enter');
+  await openJournal(page);
+  await add(page, 0).click();
+  await page.keyboard.press('Enter');
+  await expect(cards(page)).toHaveCount(3); // today's note and the two general notes
+  await page.waitForTimeout(500); // drawn and tidied
+  const boxes = await cards(page).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const [a, b] = [boxes[i], boxes[j]];
+      const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      expect(overlap, `cards ${i} and ${j} overlap`).toBe(false);
+    }
+});
+
+test('after an older copy of the app drops their places, the panel still lists every general note, and the next rename writes them back', async ({ page }) => {
+  await openJournal(page);
+  await add(page, 0).click();
+  await page.keyboard.type('Recipes');
+  await page.keyboard.press('Enter');
+  await add(page, 1).click();
+  await page.keyboard.type('Trips');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  expect(await savedNames(page)).toEqual(['General notes', 'Recipes', 'Trips']);
+  // What an older app saves: the same notes and words, without their places.
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    for (const b of Object.values(raw.boards) as { cards: Record<string, { general?: number }> }[]) for (const c of Object.values(b.cards)) delete c.general;
+    localStorage.setItem('note-board:v1', JSON.stringify(raw));
+  });
+  await page.reload();
+  expect(await savedNames(page)).toEqual([]);
+  await openJournal(page);
+  await expect(sections(page)).toHaveCount(3);
+  expect(await names(page)).toEqual(['General notes', 'Recipes', 'Trips']);
+  await nameBtn(page, 2).click();
+  await page.keyboard.type('Trips 2026');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  expect(await savedNames(page)).toEqual(['General notes', 'Recipes', 'Trips 2026']);
 });

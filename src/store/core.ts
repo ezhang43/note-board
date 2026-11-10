@@ -88,6 +88,8 @@ export interface StoreContext {
     /** Until when (ms) blocks opened by Expand all are still growing; meanwhile higher blocks win. */
     expandAllUntil: number;
   };
+  /** Reads a value saved in the browser (null if there is none or storage is unavailable). */
+  read(key: string): string | null;
   /** Saves a value in the browser (does nothing if storage is unavailable). */
   write(key: string, value: string): void;
   /** Every board as saved: the open one and the others (the same object until one changes). */
@@ -601,6 +603,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     viewportSize: () => viewportSize,
     liveSelection,
     layout,
+    read,
     write,
     workspace,
     setOthers,

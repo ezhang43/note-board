@@ -585,4 +585,83 @@ describe('several Journal general notes', () => {
     const id = again.getState().ui.journalBoard!;
     expect(JSON.parse(storage.getItem('note-board:v1')!).boards[id].cards).toEqual(saved.boards[id].cards);
   });
+// An older copy of the app drops the general notes' places (2026-11-10 follow-up): this device
+// remembers which notes were general notes, finds them again, and the next change writes the places back.
+describe('Journal general notes after an older app saved them', () => {
+  const strip = (s: Store) => {
+    const ws = s.workspace();
+    const id = s.getState().ui.journalBoard!;
+    const b = ws.boards[id];
+    const cards = Object.fromEntries(
+      Object.entries(b.cards).map(([k, c]) => {
+        if (c.kind !== 'note') return [k, c];
+        const { general: _g, ...rest } = c;
+        return [k, rest];
+      }),
+    );
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [id]: { ...b, cards } } });
+  };
+  const text = (s: Store, k: string) => (s.workspace().boards[s.getState().ui.journalBoard!].cards[k] as NoteCard).text;
+  const three = (storage = memoryStorage()) => {
+    const s = createStore(storage, later);
+    s.setViewportSize({ width: 1000, height: 800 });
+    s.openJournal();
+    s.setJournalNotes(fromPlain('list'));
+    const first = s.journalGeneralNotes()[0];
+    const b = s.addJournalNote(first)!;
+    s.renameJournalNote(b, 'Recipes');
+    const c = s.addJournalNote(b)!;
+    s.renameJournalNote(c, 'Tue 10 Nov 2026');
+    s.rememberJournalNotes();
+    return { s, ids: [first, b, c], storage };
+  };
+
+  it('finds every one again, in order, with its words, and the next rename writes the places back', () => {
+    const { s, ids } = three();
+    strip(s);
+    expect(generalNotes(s.workspace().boards[s.getState().ui.journalBoard!])).toEqual([ids[0]]);
+    expect(s.journalGeneralNotes()).toEqual(ids);
+    expect(text(s, ids[1])).toBe('Recipes\n\n');
+    s.renameJournalNote(ids[1], 'Recipes 2');
+    expect(generalNotes(s.workspace().boards[s.getState().ui.journalBoard!])).toEqual(ids);
+    expect(text(s, ids[0])).toBe('General notes\n\nlist');
+  });
+
+  it('remembers them after the page is opened again (saved on this device)', () => {
+    const { s, ids, storage } = three();
+    strip(s);
+    s.flush();
+    const again = createStore(storage, later);
+    again.openJournal();
+    expect(again.journalGeneralNotes()).toEqual(ids);
+  });
+
+  it('typing and deleting find them too; one named like a date is never taken for that day', () => {
+    const { s, ids } = three();
+    strip(s);
+    s.setJournalNotes(fromPlain('more'), true, ids[2]);
+    expect(text(s, ids[2])).toBe('Tue 10 Nov 2026\n\nmore');
+    s.deleteJournalNote(ids[1]);
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+  });
+});
+
+describe('placing general notes on the open Journal board', () => {
+  it('+ on the note not yet written puts the two notes clear of each other', () => {
+    const s = setup();
+    s.openJournal();
+    const jid = s.getState().ui.journalBoard!;
+    s.openBoard(jid);
+    const added = s.addJournalNote('kFirst')!;
+    const b = s.getState().board;
+    const [first] = generalNotes(b).filter((k) => k !== added);
+    const r = (k: string) => {
+      const c = b.cards[k] as NoteCard;
+      return { x: c.x, y: c.y, w: c.w ?? 280, h: c.h ?? 160 }; // not drawn here: a new note's height
+    };
+    const a = r(first);
+    const n = r(added);
+    expect(n.y).toBeGreaterThanOrEqual(a.y + a.h);
+  });
+});
 });

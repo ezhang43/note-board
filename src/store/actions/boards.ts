@@ -2,11 +2,11 @@ import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
-import { JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
+import { JOURNAL_KNOWN_KEY, JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
 import { hasFormatting, plainOf, withinLimits, type Rich } from '../../model/richText';
-import { spotForNewBlock } from '../../model/layout';
-import type { Board, NoteCard, TodoCard } from '../../model/types';
+import { spotForNewBlock, type MeasuredHeight } from '../../model/layout';
+import type { Board, NoteCard, Point, TodoCard } from '../../model/types';
 import { boardNeighbor, pathTo, withoutBoard, type Workspace } from '../../model/workspace';
 import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
@@ -63,20 +63,59 @@ export function boardActions(ctx: StoreContext) {
   };
 
   /**
+   * Where a new block goes on board `boardId`: placed by what is drawn when it is the open board;
+   * elsewhere heights are guessed, and it is tidied once that board is drawn.
+   */
+  const placing = (boardId: string): [MeasuredHeight, Point] =>
+    boardId === ctx.state.boards.open ? [ctx.measured, ctx.screenCentre()] : [() => undefined, { x: 0, y: 0 }];
+  /**
+   * The general notes this device last saw on the Journal board, by id, in order (2026-11-10 follow-up):
+   * an older copy of the app drops their places, and these find them again (see generalNotes).
+   * Kept in this browser only; the board's own data is never changed by them until the next change in the panel.
+   */
+  let known: string[] | null = null;
+  const knownNotes = (): string[] => {
+    if (known) return known;
+    try {
+      const got: unknown = JSON.parse(ctx.read(JOURNAL_KNOWN_KEY) ?? '[]');
+      known = Array.isArray(got) ? got.filter((x): x is string => typeof x === 'string').slice(0, 500) : [];
+    } catch {
+      known = [];
+    }
+    return known;
+  };
+  const journalBoardNow = (): Board | undefined => {
+    const id = journalId();
+    return id ? ctx.workspace().boards[id] : undefined;
+  };
+  /**
    * The "General notes" note, made when it is first written, renamed or added below (see withFirst),
    * with the id the panel shows it under (so the sheet keeps the cursor as it comes), or a new one.
    */
   const firstNote = (id?: string): NoteCard => ({ ...createCard('note', id), kind: 'note', text: `${JOURNAL_NOTES}\n\n`, general: 1 }) as NoteCard;
   /** The Journal board `b` with `card` as its first general note, beside everything; unchanged if it has one already (or that id is taken). */
   const withFirst = (b: Board, card: NoteCard): Board => {
-    if (generalNotes(b).length || b.cards[card.id]) return b;
-    const open = journalId() === ctx.state.boards.open;
-    return B.addCard(b, card, { type: 'loose', ...generalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) });
+    const id = journalId();
+    if (!id || generalNotes(b, knownNotes()).length || b.cards[card.id]) return b;
+    return B.addCard(b, card, { type: 'loose', ...generalSpot(b, ...placing(id)) });
   };
-  /** A note just added to the Journal board is tidied at once when that board is the open one (drawn). */
-  const settle = (boardId: string, cardId: string) => {
-    if (boardId === ctx.state.boards.open && ctx.state.board.cards[cardId]) ctx.requestSettle([cardId]);
+  /** Notes just added to the Journal board are tidied at once when that board is the open one (drawn). */
+  const settle = (boardId: string, cardIds: string[]) => {
+    const here = boardId === ctx.state.boards.open ? cardIds.filter((k) => ctx.state.board.cards[k]) : [];
+    if (here.length) ctx.requestSettle(here);
   };
+  /**
+   * Remembers the Journal board's general notes on this device once they have places (see knownNotes):
+   * after each change in the panel, and whenever the panel shows them (they may have come from another device).
+   */
+  function remember() {
+    const b = journalBoardNow();
+    if (!b) return;
+    const ids = generalNotes(b);
+    if (!ids.some((k) => (b.cards[k] as NoteCard).general !== undefined) || deepEqual(ids, knownNotes())) return;
+    known = ids;
+    ctx.write(JOURNAL_KNOWN_KEY, JSON.stringify(ids));
+  }
 
   return {
     hiddenBoards: hidden,
@@ -146,13 +185,9 @@ export function boardActions(ctx: StoreContext) {
       }
       const line = journalDateLine(new Date());
       const note = { ...createCard('note'), text: `${line}\n\n` };
-      // On the open board it is placed by what is drawn; elsewhere heights are guessed, and it is
-      // tidied once that board is drawn.
-      const open = id === ctx.state.boards.open;
-      ctx.commitTo(id, (b) =>
-        todaysNote(b, line) ? b : B.addCard(b, note, { type: 'loose', ...journalSpot(b, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }) }),
-      );
-      if (open && ctx.state.board.cards[note.id]) ctx.requestSettle([note.id]);
+      const at = placing(id);
+      ctx.commitTo(id, (b) => (todaysNote(b, line, knownNotes()) ? b : B.addCard(b, note, { type: 'loose', ...journalSpot(b, ...at, knownNotes()) })));
+      settle(id, [note.id]);
       // Nothing stays selected behind the panel, so a key meant for the journal can't delete it.
       ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false, selection: [], itemSel: null });
       return null;
@@ -169,13 +204,14 @@ export function boardActions(ctx: StoreContext) {
       const id = journalId();
       const board = id ? ctx.workspace().boards[id] : undefined;
       if (!id || !board) return; // the Journal board went (sync or a restore) while the panel was open
-      const ids = generalNotes(board);
+      const ids = generalNotes(board, knownNotes());
       if (noteId && ids.includes(noteId)) return setJournal(noteId, rich, typing);
       if (ids.length) return noteId ? undefined : setJournal(ids[0], rich, typing); // a note named that went (undo, sync) is left alone
       if (!plainOf(rich) && !hasFormatting(rich)) return; // nothing written: nothing is added
       const card = writeJournal(firstNote(noteId), rich);
       ctx.commitTo(id, (b) => withFirst(b, card), typing ? `text:${card.id}` : undefined);
-      settle(id, card.id);
+      settle(id, [card.id]);
+      remember();
     },
     /**
      * The + in a general note's header (owner decision, 2026-11-10): adds an "Untitled note" right
@@ -187,13 +223,17 @@ export function boardActions(ctx: StoreContext) {
       const id = journalId();
       if (!id || !ctx.workspace().boards[id]) return null;
       const note = { ...createCard('note'), kind: 'note', text: `${UNTITLED_NOTE}\n\n` } as NoteCard;
-      const open = id === ctx.state.boards.open;
+      const at = placing(id);
+      let made: string | null = null;
       ctx.commitTo(id, (b) => {
         const withIt = withFirst(b, firstNote(after));
-        return addGeneralNote(withIt, after, note, generalSpotBelow(withIt, after, open ? ctx.measured : () => undefined, open ? ctx.screenCentre() : { x: 0, y: 0 }));
+        if (withIt !== b) made = after;
+        return addGeneralNote(withIt, after, note, generalSpotBelow(withIt, after, ...at), knownNotes());
       });
       if (!ctx.workspace().boards[id]?.cards[note.id]) return null;
-      settle(id, note.id);
+      // Both when the first comes with it: it isn't drawn yet, so the new one was placed below its guessed height.
+      settle(id, made ? [made, note.id] : [note.id]);
+      remember();
       return note.id;
     },
     /**
@@ -205,12 +245,13 @@ export function boardActions(ctx: StoreContext) {
       const id = journalId();
       if (!id || !ctx.workspace().boards[id]) return;
       ctx.commitTo(id, (b) => {
-        if (generalNotes(b).length) return renameGeneralNote(b, noteId, name);
+        if (generalNotes(b, knownNotes()).length) return renameGeneralNote(b, noteId, name, knownNotes());
         const first = firstNote(noteId);
         const renamed = renameGeneralNote(withFirst(b, first), noteId, name);
         return (renamed.cards[noteId] as NoteCard | undefined)?.text !== first.text ? renamed : b;
       });
-      if (ctx.workspace().boards[id]?.cards[noteId]) settle(id, noteId);
+      settle(id, [noteId]);
+      remember();
     },
     /**
      * The trash in a general note's header (owner decision, 2026-11-10): deletes it at once with the
@@ -218,8 +259,16 @@ export function boardActions(ctx: StoreContext) {
      */
     deleteJournalNote(noteId: string) {
       const id = journalId();
-      if (id) ctx.deleting('Deleted 1 note', () => ctx.commitTo(id, (b) => deleteGeneralNote(b, noteId)), id);
+      if (id) ctx.deleting('Deleted 1 note', () => ctx.commitTo(id, (b) => deleteGeneralNote(b, noteId, knownNotes())), id);
+      remember();
     },
+    /** The Journal panel's general notes, in order (see generalNotes), with what this device remembers of them. */
+    journalGeneralNotes(): string[] {
+      const b = journalBoardNow();
+      return b ? generalNotes(b, knownNotes()) : [];
+    },
+    /** The panel shows the general notes: this device remembers them (see remember). */
+    rememberJournalNotes: remember,
     /** Ctrl+Z / Ctrl+Y in the Journal panel: on the Journal board's own history, whichever board is open. */
     undoJournal() {
       const id = journalId();

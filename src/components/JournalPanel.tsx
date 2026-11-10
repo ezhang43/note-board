@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { JOURNAL_NOTES, UNTITLED_NOTE, generalNotes, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, noteName, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { JOURNAL_NOTES, UNTITLED_NOTE, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, noteName, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
 import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
@@ -32,7 +32,11 @@ export function JournalPanel() {
     if (!id) return undefined;
     return id === s.boards.open ? s.board : s.boards.others[id];
   });
-  const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date())) : []), [board]);
+  // The general notes, with those this device remembers when an older app has dropped their places
+  // (2026-11-10 follow-up; see generalNotes). They are never days, whatever their names.
+  const written = useMemo(() => (board ? appStore.journalGeneralNotes() : []), [board]);
+  useEffect(() => appStore.rememberJournalNotes(), [board]);
+  const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date()), written) : []), [board, written]);
   const today = dayKey(new Date());
   const years = useMemo(() => groupJournal(entries, today), [entries, today]);
   /** Today's note, which has the page on top (always the first entry when there is one). */
@@ -70,13 +74,20 @@ export function JournalPanel() {
   // panel opens (view state, like a day's fold). With none written yet, one "General notes" note is shown,
   // under the id it gets when it is first written, renamed or added below, so its sheet stays the same.
   const [firstId] = useState(() => newId('k'));
-  const written = useMemo(() => (board ? generalNotes(board) : []), [board]);
   const generals = written.length ? written : [firstId];
+  /** The notes shown now, for a name field that goes with its note (see finish). */
+  const shown = useRef(generals);
+  shown.current = generals;
   /** General notes folded this visit, by id. */
   const [shutNotes, setShutNotes] = useState<ReadonlySet<string>>(new Set());
   /** The name being typed in a general note's header (view state until Enter or leaving the field saves it). */
   const [renaming, setRenaming] = useState<{ key: string; draft: string } | null>(null);
-  const renameField = useRef<HTMLInputElement>(null);
+  // A name field has the cursor, with its text selected, each time it appears (owner decision, 2026-11-10):
+  // when opened, and when its note comes back (redo, or from another device) with the name being typed.
+  const renameField = useCallback((el: HTMLInputElement | null) => {
+    el?.focus();
+    el?.select();
+  }, []);
   /** The general note whose name button takes the keyboard back once its name field goes (Enter or Escape). */
   const refocusName = useRef<string | null>(null);
   // Days whose fold was turned over this visit (view state: not saved, not undoable, gone when the panel closes):
@@ -109,14 +120,6 @@ export function JournalPanel() {
     active.current = first.current;
     first.current?.focusEnd();
   }, []);
-
-  // A name field just opened has the cursor, with its text selected (owner decision, 2026-11-10).
-  const renamingKey = renaming?.key;
-  useLayoutEffect(() => {
-    if (!renamingKey) return;
-    renameField.current?.focus();
-    renameField.current?.select();
-  }, [renamingKey]);
 
   useLayoutEffect(() => {
     if (refocusName.current && !renaming) {
@@ -281,8 +284,9 @@ export function JournalPanel() {
     const open = !shutNotes.has(key);
     const editing = renaming?.key === key ? renaming : null;
     const finish = (save: boolean) => {
-      // Enter or Escape unmounts the field; a blur that follows finds `renaming` already gone.
-      if (!editing) return;
+      // Enter or Escape unmounts the field; a blur that follows finds `renaming` already gone. A field that
+      // goes with its note (undo, or from another device) keeps the name being typed, for when the note comes back.
+      if (!editing || !shown.current.includes(key)) return;
       if (save) appStore.renameJournalNote(key, editing.draft);
       setRenaming(null);
     };
@@ -315,6 +319,8 @@ export function JournalPanel() {
               maxLength={200}
               onChange={(ev) => setRenaming({ key, draft: ev.target.value })}
               onKeyDown={(ev) => {
+                // The Enter that picks a character in an input method (IME) is part of the typing.
+                if (ev.key === 'Enter' && (ev.nativeEvent.isComposing || ev.keyCode === 229)) return;
                 if (ev.key === 'Enter') {
                   ev.preventDefault();
                   refocusName.current = key;

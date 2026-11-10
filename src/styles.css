@@ -896,8 +896,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   color: var(--ink-faint);
   user-select: none;
 }
-.item-count { margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
+.item-count { position: relative; top: -0.09em; margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
 .title-count.all-done, .item-count.all-done { color: var(--checkbox); }
+/* The parent's count is nudged up ~1px at Normal (owner request 2026-11-10) so its digits' middle meets the middle of the capitals of the text; relative, in em of its own size, so it holds at every text step and moves nothing else. */
 /* A bold tint is too deep for the green: the count keeps the color's own text color, a little heavier. */
 .card.bold-tint .title-count.all-done { color: var(--tint-text); font-weight: 600; }
 .title-cell > .list-clean-up { margin-left: auto; }

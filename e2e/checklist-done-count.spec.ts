@@ -192,6 +192,30 @@ function check(layout: 'desktop' | 'phone') {
     }
   });
 
+  test(`only a top-level parent shows a count; an indented item with its own sub-items shows none (${layout})`, async ({ page }) => {
+    // Trip (top level) > Flights (level 1) > Seat, Meal (level 2); Hotel (level 1, leaf).
+    await seed(page, {
+      items: [item('trip', 'Trip', false, [item('fl', 'Flights', false, [item('seat', 'Seat', true), item('meal', 'Meal')]), item('ho', 'Hotel', true)])],
+    });
+    // The top-level parent still counts everything under it at every level (2 of 4).
+    await expect(rowCount(page, 'trip')).toHaveText('2/4');
+    // The indented parent has sub-items of its own but shows no count; nor does a leaf.
+    await expect(row(page, 'fl')).toBeVisible();
+    await expect(rowCount(page, 'fl')).toHaveCount(0);
+    await expect(rowCount(page, 'ho')).toHaveCount(0);
+    // The list title's count is unchanged.
+    await expect(listCount(page)).toHaveText('2/5');
+  });
+
+  test(`a folded indented parent shows no count either (${layout})`, async ({ page }) => {
+    await seed(page, {
+      items: [item('trip', 'Trip', false, [{ ...item('fl', 'Flights', false, [item('seat', 'Seat', true), item('meal', 'Meal')]), folded: true } as Item])],
+    });
+    await expect(row(page, 'fl')).toBeVisible();
+    await expect(rowCount(page, 'fl')).toHaveCount(0);
+    await expect(rowCount(page, 'trip')).toHaveText('1/3');
+  });
+
   test(`a blank parent shows no count of its own (nothing to put it after), and the placeholder is clear (${layout})`, async ({ page }) => {
     await seed(page, { items: [item('p', '', false, [item('k', 'Kid', true), item('l', 'Other')])] });
     await expect(listCount(page)).toHaveText('1/2');

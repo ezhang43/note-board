@@ -168,8 +168,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     // Up / Down arrows are handled board-wide (keyboardNav.ts), across items and cards.
   }
 
-  // A parent's own "1/3" after its text (owner request, 2026-11-03): everything under it, blank open items left out.
-  const sub = doneCount(item.children);
+  // A top-level parent's own "1/3" after its text (owner request, 2026-11-03; top level only, 2026-11-10): everything under it, blank open items left out.
+  const sub = depth === 0 ? doneCount(item.children) : { done: 0, total: 0 };
   const tail = sub.total && item.text.trim() !== '' ? { text: `${sub.done}/${sub.total}`, done: sub.done === sub.total } : null;
   const classes = [
     'todo-item',

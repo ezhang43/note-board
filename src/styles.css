@@ -890,6 +890,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  */
 .title-count {
   flex: none;
+  position: relative;
+  top: 0.12em; /* see .item-count below */
   padding-right: 2px;
   font-size: calc(12px * var(--fs, 1) * var(--ts, 1));
   font-weight: 500;
@@ -898,9 +900,9 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   color: var(--ink-faint);
   user-select: none;
 }
-.item-count { position: relative; top: -0.08em; margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
+.item-count { position: relative; top: 0.03em; margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
 .title-count.all-done, .item-count.all-done { color: var(--checkbox); }
-/* The parent's count is nudged up ~1px at Normal (owner request 2026-11-10) so its digits' middle meets the middle of the capitals of the text; relative, in em of its own size, so it holds at every text step and moves nothing else. */
+/* The counts' digits sit with their middle on the middle of the lowercase letters of the text (owner requests 2026-11-10 and 2026-11-11: first on the capitals, then lowered); relative, in em of their own size, so it holds at every text step and moves nothing else. */
 /* A bold tint is too deep for the green: the count keeps the color's own text color, a little heavier. */
 .card.bold-tint .title-count.all-done { color: var(--tint-text); font-weight: 600; }
 .title-cell > .list-clean-up { margin-left: auto; }

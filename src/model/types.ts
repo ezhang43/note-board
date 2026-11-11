@@ -59,7 +59,8 @@ export interface TodoItem {
   style?: TextStyle;
   /**
    * Its sub-items are hidden (owner request, 2026-11-09): saved with the board, left out when open.
-   * Only counts while it has sub-items (see isFolded); a fold left with none is dropped on the next change.
+   * Only counts while it has 2 or more sub-items (see isFolded, owner request 2026-11-11); a fold left with none is dropped on the next change,
+   * and one left with a single sub-item is kept as saved but shows open, so it is back when a second one comes.
    */
   folded?: true;
 }

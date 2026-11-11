@@ -89,7 +89,7 @@ describe('add_items', () => {
   });
 
   it('an item added under a ticked item (or after its last sub-item) unticks it, as in the app; ticked siblings stay ticked', () => {
-    const ticked = ok(setItemsDone('home', ['iBox'], true)).ws; // ticking the last open sub-item ticks Free range and Eggs
+    const ticked = ok(setItemsDone('home', ['iBox'], true, '2026-11-11')).ws; // ticking the last open sub-item ticks Free range and Eggs
     expect(item(ticked, 'listGroceries', 'iEggs')!.item.done).toBe(true);
     const under = ok(addItems('home', 'listGroceries', [{ text: 'C', under: 'iEggs' }], ['c']), ticked);
     expect(item(under.ws, 'listGroceries', 'iEggs')!.item.done).toBe(false);
@@ -157,22 +157,22 @@ describe('edit_items', () => {
 
 describe('set_items_done', () => {
   it('ticks items (the last open sub-item ticks its parent, as in the app) and unticks', () => {
-    const r = ok(setItemsDone('home', ['iBox'], true));
+    const r = ok(setItemsDone('home', ['iBox'], true, '2026-11-11'));
     expect(item(r.ws, 'listGroceries', 'iEggs')!.item.done).toBe(true);
     expect(r.changed).toEqual(['Ticked "Box of 12"']);
-    const back = ok(setItemsDone('home', ['iBread'], false));
+    const back = ok(setItemsDone('home', ['iBread'], false, '2026-11-11'));
     expect(item(back.ws, 'listGroceries', 'iBread')!.item.done).toBe(false);
     expect(back.changed).toEqual(['Unticked "Bread"']);
   });
 
   it('an item already in that state changes nothing', () => {
-    const r = ok(setItemsDone('home', ['iBread'], true));
+    const r = ok(setItemsDone('home', ['iBread'], true, '2026-11-11'));
     expect(r.changed).toEqual([]);
     expect(serializeWorkspace(r.ws)).toBe(serializeWorkspace(sample()));
   });
 
   it('an unknown item is an error', () => {
-    expect(fails(setItemsDone('home', ['nope'], true))).toMatch(/No item with id "nope"/);
+    expect(fails(setItemsDone('home', ['nope'], true, '2026-11-11'))).toMatch(/No item with id "nope"/);
   });
 });
 
@@ -288,5 +288,43 @@ describe('add_note', () => {
     expect(fails(addNote('home', 'x', { column: 'Nope' }, 'k1'))).toMatch(/No column called "Nope"/);
     expect(fails(addNote('home', 'x', { near: 'nope' }, 'k1'))).toMatch(/No card or column with id "nope"/);
     expect(fails(addNote('home', 'x', { column: 'Ideas', near: 'linkDocs' }, 'k1'))).toMatch(/only one of/);
+  });
+});
+
+describe('estimates and ticked days (job saved-estimate-doneon)', () => {
+  it('add_items: an item can be added with an estimate in minutes', () => {
+    const r = ok(addItems('home', 'Groceries', [{ text: 'Apples', estimate: 20 }], ['n1']));
+    expect(item(r.ws, 'listGroceries', 'n1')!.item).toEqual({ id: 'n1', text: 'Apples', done: false, children: [], estimate: 20 });
+    expect(r.changed).toEqual(['Added "Apples" (id: n1) to Groceries (estimate: 20m)']);
+  });
+
+  it('edit_items: sets or clears an estimate, with or without new text', () => {
+    const set = ok(editItems('home', [{ item: 'iEggs', estimate: 45 }]));
+    expect(item(set.ws, 'listGroceries', 'iEggs')!.item.estimate).toBe(45);
+    expect(set.changed).toEqual(['Set the estimate of "Eggs" to 45m']);
+    const both = ok(editItems('home', [{ item: 'iEggs', text: 'Eggs (6)', estimate: 60 }]));
+    expect(item(both.ws, 'listGroceries', 'iEggs')!.item).toMatchObject({ text: 'Eggs (6)', estimate: 60 });
+    const cleared = ok(editItems('home', [{ item: 'iEggs', estimate: null }]), set.ws);
+    expect('estimate' in item(cleared.ws, 'listGroceries', 'iEggs')!.item).toBe(false);
+    expect(cleared.changed).toEqual(['Cleared the estimate of "Eggs"']);
+    expect(ok(editItems('home', [{ item: 'iEggs', estimate: 45 }]), set.ws).changed).toEqual([]);
+  });
+
+  it('edit_items: an item change with neither text nor estimate is an error', () => {
+    expect(fails(editItems('home', [{ item: 'iEggs' }]))).toMatch(/text or an estimate/);
+  });
+
+  it('set_items_done: ticking stamps the day it is given; unticking clears it', () => {
+    const r = ok(setItemsDone('home', ['iBox'], true, '2026-11-11'));
+    expect(item(r.ws, 'listGroceries', 'iBox')!.item.doneOn).toBe('2026-11-11');
+    expect(item(r.ws, 'listGroceries', 'iEggs')!.item.doneOn).toBe('2026-11-11');
+    const back = ok(setItemsDone('home', ['iBox'], false, '2026-11-12'), r.ws);
+    expect('doneOn' in item(back.ws, 'listGroceries', 'iBox')!.item).toBe(false);
+  });
+
+  it('add_note: a note can be added with an estimate', () => {
+    const r = ok(addNote('home', 'Buy stamps', {}, 'k1', 15));
+    expect((r.ws.boards.home.cards.k1 as NoteCard).estimate).toBe(15);
+    expect(r.changed[0]).toMatch(/\(estimate: 15m\)$/);
   });
 });

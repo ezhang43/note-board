@@ -103,7 +103,7 @@ describe('the other ways in keep following the rule, and ticking the last sub-it
 
   it('ticking the last open sub-item ticks the parent (and so on upwards); unticking unticks the parents', () => {
     const open = [t('p', [t('a', [], true), t('b')])];
-    expect(outline(C.setItemsDone(open, ['b'], true))).toBe('+p(+a +b)');
-    expect(outline(C.setItemsDone(C.setItemsDone(open, ['b'], true), ['a'], false))).toBe('p(a +b)');
+    expect(outline(C.setItemsDone(open, ['b'], true, '2026-11-11'))).toBe('+p(+a +b)');
+    expect(outline(C.setItemsDone(C.setItemsDone(open, ['b'], true, '2026-11-11'), ['a'], false, '2026-11-11'))).toBe('p(a +b)');
   });
 });

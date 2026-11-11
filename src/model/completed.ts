@@ -1,6 +1,6 @@
 import { addCard, type Placement } from './board';
 import { newId, type MakeId } from './cards';
-import { MAX_DEPTH, editItems, findItem, hasTicked, refill, setItemsDone, showItem, subtreeHeight, subtreeIds } from './checklist';
+import { MAX_DEPTH, editItems, findItem, hasTicked, refill, setItemsDone, showItem, subtreeHeight, subtreeIds, untick } from './checklist';
 import type { Board, Card, CompletedCard, CompletedEntry, CompletedGroup, TodoItem } from './types';
 
 // Clean up (owner request): every ticked checklist item moves into the board's one master
@@ -170,7 +170,8 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
     .map((g) => ({ ...g, entries: g.entries.filter((e) => e !== entry) }))
     .filter((g) => g.entries.length);
   let b: Board = { ...folded, cards: { ...folded.cards, [done.id]: { ...done, groups } } };
-  const item: TodoItem = { ...structuredClone(entry.item), done: false };
+  const item: TodoItem = structuredClone(entry.item);
+  untick(item); // with the day it was ticked
 
   const src = b.cards[entry.fromCardId];
   if (src?.kind === 'todo') {
@@ -181,7 +182,7 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
       else return [...next, item];
       // An open item can't sit under a ticked one: untick the items it went back under. Put back under a
       // folded item, the folds above it open, so it is in sight.
-      return setItemsDone(showItem(next, item.id), [item.id], false);
+      return setItemsDone(showItem(next, item.id), [item.id], false, ''); // unticking: no day is stamped
     });
     return { board: b, cardId: src.id };
   }

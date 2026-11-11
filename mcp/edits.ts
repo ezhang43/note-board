@@ -2,6 +2,7 @@ import { addCard, addColumn, createBoard, deleteBlocks, placementForNewCard, set
 import { createBoardCard, createCard, createColumn, createItem, isPermanent, type MakeId } from '../src/model/cards';
 import { editItems as changeItems, deleteItems, extractItems, findItem, flatIds, insertItems, refill, rootsOf, showItem, setItemsDone as tick, type ItemDrop } from '../src/model/checklist';
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../src/model/constants';
+import { estimateLabel, readEstimate, setEstimate } from '../src/model/estimate';
 import { blockRect, spotForNewBlock, type MeasuredHeight } from '../src/model/layout';
 import { estimateHeight } from '../src/model/milanote';
 import type { Board, Card, NoteCard, TodoCard, TodoItem } from '../src/model/types';
@@ -72,7 +73,15 @@ export interface NewItem {
   after?: string;
   /** An item id in the list: the new item goes as its last sub-item. */
   under?: string;
+  /** How long it should take, in whole minutes (1 to a day). */
+  estimate?: number;
 }
+
+/** An estimate given to a tool: whole minutes from 1 to a day, or refused. */
+function estimateOf(v: number): number {
+  return readEstimate(v) ?? refuse('An estimate is whole minutes, from 1 to 1440 (a day).');
+}
+const estimateNote = (v: number | undefined) => (v === undefined ? '' : ` (estimate: ${estimateLabel(v)})`);
 
 /** add_items: `ids` are the new items' ids, one per item. */
 export function addItems(boardId: string, listQuery: string, newItems: NewItem[], ids: string[]): Edit {
@@ -95,11 +104,11 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
         const kids = target.item.children;
         drop = kids.length ? { mode: 'after', targetId: kids[kids.length - 1].id } : { mode: 'nest', targetId: target.item.id };
       }
-      const item: TodoItem = { ...createItem(id), text };
+      const item: TodoItem = { ...createItem(id), text, ...(n.estimate !== undefined && { estimate: estimateOf(n.estimate) }) };
       // Under a folded item, the folds above it open, so it can be seen in the app.
       items = showItem(insertItems(items, drop, [item]) ?? refuse('That would nest items deeper than 6 levels.'), id);
       if (n.after) lastAfter[n.after] = id;
-      changed.push(`Added "${short(text)}" (id: ${id}) to ${listName(list)}`);
+      changed.push(`Added "${short(text)}" (id: ${id}) to ${listName(list)}${estimateNote(item.estimate)}`);
     });
     return changed.length ? withList(b, list, items) : b;
   });
@@ -107,33 +116,44 @@ export function addItems(boardId: string, listQuery: string, newItems: NewItem[]
 
 export interface ItemChange {
   item: string;
-  text: string;
+  text?: string;
+  /** A new estimate in whole minutes, or null to clear it. */
+  estimate?: number | null;
 }
 
-/** edit_items: new text for items. */
+/** edit_items: new text or estimates for items. */
 export function editItems(boardId: string, changes: ItemChange[]): Edit {
   return onBoard(boardId, (b, changed) => {
     for (const ch of changes) {
+      if (ch.text === undefined && ch.estimate === undefined) refuse(`Give a new text or an estimate for item "${ch.item}".`);
       const list = listOf(b, ch.item);
       const old = findItem(list.items, ch.item)!.item;
-      const text = itemText(ch.text);
+      const text = ch.text === undefined ? old.text : itemText(ch.text);
       if (text !== old.text) {
         b = setItemText(b, list.id, ch.item, text);
         changed.push(`Changed "${short(old.text)}" to "${short(text)}"`);
       }
+      if (ch.estimate === undefined) continue;
+      const minutes = ch.estimate === null ? null : estimateOf(ch.estimate);
+      if ((old.estimate ?? null) === minutes) continue;
+      b = setEstimate(b, list.id, ch.item, minutes);
+      changed.push(minutes === null ? `Cleared the estimate of "${short(text)}"` : `Set the estimate of "${short(text)}" to ${estimateLabel(minutes)}`);
     }
     return b;
   });
 }
 
-/** set_items_done: tick (or untick) items, as clicking their boxes in the app does. */
-export function setItemsDone(boardId: string, ids: string[], done: boolean): Edit {
+/**
+ * set_items_done: tick (or untick) items, as clicking their boxes in the app does. Ticked items get
+ * `today` ("YYYY-MM-DD"), made when the Edit is made so running it again gives the same boards.
+ */
+export function setItemsDone(boardId: string, ids: string[], done: boolean, today: string): Edit {
   return onBoard(boardId, (b, changed) => {
     for (const id of ids) {
       const list = listOf(b, id);
       const it = findItem(list.items, id)!.item;
       if (it.done === done) continue;
-      b = withList(b, list, tick(list.items, [id], done));
+      b = withList(b, list, tick(list.items, [id], done, today));
       changed.push(`${done ? 'Ticked' : 'Unticked'} "${short(it.text)}"`);
     }
     return b;
@@ -261,13 +281,13 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 const firstLine = (text: string) => short(text.trim().split('\n')[0].trim());
 
 /** add_note: a note placed as placeCard says. `id` is the new note's id. */
-export function addNote(boardId: string, text: string, where: Where, id: string): Edit {
+export function addNote(boardId: string, text: string, where: Where, id: string, estimate?: number): Edit {
   return onBoard(boardId, (b, changed) => {
     if (b.cards[id]) return b; // already there: this Edit ran before
     if (!text.trim()) refuse('A note’s text can’t be blank.');
-    const note: NoteCard = { ...(createCard('note', id) as NoteCard), text };
+    const note: NoteCard = { ...(createCard('note', id) as NoteCard), text, ...(estimate !== undefined && { estimate: estimateOf(estimate) }) };
     const { board, place } = placeCard(b, note, where);
-    changed.push(`Added a note (id: ${id}) ${place}: "${firstLine(text)}"`);
+    changed.push(`Added a note (id: ${id}) ${place}: "${firstLine(text)}"${estimateNote(note.estimate)}`);
     return board;
   });
 }

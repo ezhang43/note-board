@@ -1,3 +1,4 @@
+import { tickedOn } from './estimate';
 import { addDays, eventsOnDay, weekDays, weekStart, type CalEvent, type DayKey } from './calendar';
 import { findHabitsBoard, habitList, isHabit, tickedDays, weekCount } from './habits';
 import { findJournalBoard, journalDayKey, journalEntries } from './journal';
@@ -38,22 +39,11 @@ export interface WeekReview {
   journalCount: number;
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * The day an item was ticked, when it has one. `doneOn` is a planned optional field on to-do items
- * (plan job 6) that isn't saved yet, so it is read here if present; items without it are not counted.
- */
-function doneOn(item: TodoItem): DayKey | null {
-  const day = (item as { doneOn?: unknown }).doneOn;
-  return item.done && typeof day === 'string' && DAY.test(day) ? day : null;
-}
-
 function doneIn(board: Board, from: DayKey, to: DayKey): DoneItem[] {
   const out: DoneItem[] = [];
   const walk = (items: TodoItem[], cardId: string, cardTitle: string) => {
     for (const i of items) {
-      const day = doneOn(i);
+      const day = tickedOn(i);
       if (day && day >= from && day <= to) out.push({ cardId, cardTitle, itemId: i.id, text: i.text, doneOn: day });
       walk(i.children, cardId, cardTitle);
     }

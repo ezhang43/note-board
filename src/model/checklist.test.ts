@@ -189,16 +189,16 @@ describe('deleting a blank item that has sub-items (owner rule)', () => {
 
 describe('ticking and deleting', () => {
   it('ticking an item (with its sub-items) or a sub-item leaves it in place (job 200)', () => {
-    const ticked = C.setItemsDone(sample(), ['a'], true);
+    const ticked = C.setItemsDone(sample(), ['a'], true, '2026-11-11');
     expect(ids(ticked)).toBe('a(a1 a2) b c(c1)');
     expect(C.findItem(ticked, 'a')!.item.done).toBe(true);
-    const sub = C.setItemsDone(sample(), ['a1'], true);
+    const sub = C.setItemsDone(sample(), ['a1'], true, '2026-11-11');
     expect(ids(sub)).toBe('a(a1 a2) b c(c1)');
     expect(C.findItem(sub, 'a1')!.item.done).toBe(true);
   });
 
   it('unticking a ticked item leaves it in place too', () => {
-    const out = C.setItemsDone(sample(), ['c'], false);
+    const out = C.setItemsDone(sample(), ['c'], false, '2026-11-11');
     expect(ids(out)).toBe('a(a1 a2) b c(c1)');
     expect(C.findItem(out, 'c')!.item.done).toBe(false);
   });
@@ -518,18 +518,18 @@ describe('sub-items all ticked tick their item (owner request)', () => {
 
   it('ticking the last open sub-item ticks the item (and upwards), which stays in place', () => {
     const items = [t('a', false, [t('a1', true), t('a2', false, [t('x', true), t('y')])]), t('b')];
-    const out = C.setItemsDone(items, ['y'], true);
+    const out = C.setItemsDone(items, ['y'], true, '2026-11-11');
     expect(doneIds(out)).toEqual(['a', 'a1', 'a2', 'x', 'y']);
     expect(out.map((i) => i.id)).toEqual(['a', 'b']);
   });
 
   it('stops where an item still has open sub-items', () => {
-    const out = C.setItemsDone([t('a', false, [t('a1'), t('a2')])], ['a1'], true);
+    const out = C.setItemsDone([t('a', false, [t('a1'), t('a2')])], ['a1'], true, '2026-11-11');
     expect(doneIds(out)).toEqual(['a1']);
   });
 
   it('unticking a sub-item unticks the items it is in', () => {
-    const out = C.setItemsDone([t('a', true, [t('a1', true, [t('z', true)])])], ['z'], false);
+    const out = C.setItemsDone([t('a', true, [t('a1', true, [t('z', true)])])], ['z'], false, '2026-11-11');
     expect(doneIds(out)).toEqual([]);
   });
 });
@@ -774,5 +774,58 @@ describe('done count (owner request 2026-11-03: "3 of 5 done")', () => {
     const before = JSON.stringify(items);
     C.doneCount(items);
     expect(JSON.stringify(items)).toBe(before);
+  });
+});
+
+describe('the day an item was ticked (job saved-estimate-doneon)', () => {
+  const day = (items: TodoItem[], id: string) => C.findItem(items, id)!.item.doneOn;
+  const TODAY = '2026-11-11';
+
+  it('ticking an item stamps it with today; unticking clears the day', () => {
+    const ticked = C.setItemsDone(sample(), ['b'], true, TODAY);
+    expect(day(ticked, 'b')).toBe(TODAY);
+    const unticked = C.setItemsDone(ticked, ['b'], false, '2026-11-12');
+    expect(C.findItem(unticked, 'b')!.item).toEqual(item('b'));
+  });
+
+  it('ticking the last open sub-item ticks its parent with today too', () => {
+    const one = C.setItemsDone(sample(), ['a1'], true, '2026-11-10');
+    const both = C.setItemsDone(one, ['a2'], true, TODAY);
+    expect([day(both, 'a1'), day(both, 'a2'), day(both, 'a')]).toEqual(['2026-11-10', TODAY, TODAY]);
+  });
+
+  it('an item already ticked keeps the day it was ticked on', () => {
+    const before = C.setItemsDone(sample(), ['b'], true, '2026-11-01');
+    const again = C.setItemsDone(before, ['b', 'a1'], true, TODAY);
+    expect(day(again, 'b')).toBe('2026-11-01');
+    expect(day(again, 'a1')).toBe(TODAY);
+  });
+
+  it('an item ticked before days were saved stays ticked with no day', () => {
+    const again = C.setItemsDone(sample(), ['c'], true, TODAY);
+    expect(day(again, 'c')).toBeUndefined();
+  });
+
+  it('unticking a sub-item clears the day of the items it unticks above it', () => {
+    const all = C.setItemsDone(sample(), ['a1', 'a2'], true, TODAY);
+    expect(day(all, 'a')).toBe(TODAY);
+    const out = C.setItemsDone(all, ['a1'], false, TODAY);
+    expect(C.findItem(out, 'a')!.item.done).toBe(false);
+    expect('doneOn' in C.findItem(out, 'a')!.item).toBe(false);
+  });
+
+  it('an item unticked because an open item went under it loses its day too', () => {
+    const ticked = C.setItemsDone([item('p', [item('q')])], ['q'], true, TODAY);
+    expect(day(ticked, 'p')).toBe(TODAY);
+    const pasted = C.pasteItemsAfter(ticked, 'q', [item('new')]);
+    expect(C.findItem(pasted, 'p')!.item.done).toBe(false);
+    expect('doneOn' in C.findItem(pasted, 'p')!.item).toBe(false);
+  });
+
+  it('joining an open item onto a ticked one unticks it and clears its day', () => {
+    const ticked = C.setItemsDone([item('x'), item('y')], ['x'], true, TODAY);
+    const joined = C.mergeNextItem(ticked, 'x')!.items;
+    expect(joined[0].done).toBe(false);
+    expect('doneOn' in joined[0]).toBe(false);
   });
 });

@@ -9,3 +9,8 @@
 - 2026-11-11, owner request: the page security policy change is marked high-risk. It waits for the owner to check sign-in and sync on the live site.
 - 2026-11-11, owner request: "done" applies only to checklist items. A checklist card counts as done when every item is ticked. Note cards get no "Done?" prompt.
 - 2026-11-11, owner request: re-plan suggestions and the focus timer's "Done?" prompt appear in a small card at the bottom of the screen, whichever panel is open. Its Undo stays until the card is closed.
+- 2026-11-11, owner request: scheduling and re-planning use a "My day" setting in the Calendar panel. It defaults to 9:00 to 18:00 and is kept on each device, not synced.
+- 2026-11-11, owner request: a card with no time estimate is scheduled as a 30-minute block.
+- 2026-11-11, owner request: blocks scheduled one after another get a 5-minute gap between them.
+- 2026-11-11, owner request: build order is brain dump, scheduling, focus on a card, weekly review, the re-plan suggestion, then "Tidy with AI". "AI suggests my week" and "AI picks what to drop" come last, after the rest has been used for a while.
+- 2026-11-11, owner request: "Brain dump" opens from the board's + add menu and the ⋯ menu, on the phone too.

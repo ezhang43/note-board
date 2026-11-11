@@ -46,6 +46,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Note',
     'Checklist',
     'New container',
+    'Brain dump',
     'Color of selected cards and containers',
     'Arrange',
     'File',

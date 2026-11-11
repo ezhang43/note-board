@@ -40,7 +40,7 @@ function check(layout: 'desktop' | 'phone') {
     test(`each level's tick box sits 32px right of its parent's (${size}, ${layout})`, async ({ page }) => {
       await page.goto('/');
       await fontsLoaded(page);
-      await seed(page, size, size === 'normal' ? 240 : 800); // the biggest text needs a wide card (the narrow-card cap below)
+      await seed(page, size, size === 'normal' ? 280 : 800); // the biggest text needs a wide card (the narrow-card cap below); Normal's four levels need 96px of indent, which a 240px card, less the estimate clock's 26px, no longer has
       const [a, b, c, d, e] = await boxOffsets(page);
       expect(a).toBeCloseTo(0, 1);
       expect(b).toBeCloseTo(32, 1);
@@ -85,7 +85,7 @@ for (const size of ['normal', 'large'] as FontSize[]) test(`in a narrow list the
     expect(r.boxInside, `level ${i} box inside the card`).toBe(true);
     // Never less deeper than the level above it, and a full 32px per level while there is room.
     if (i) expect(r.indent).toBeGreaterThanOrEqual(rows[i - 1].indent);
-    if (i <= 3 && size === 'normal') expect(r.indent).toBe(i * 32);
+    if (i <= 2 && size === 'normal') expect(r.indent).toBe(i * 32); // (the 4th level's 96px no longer fits a 240px card: the estimate clock's strip takes 26px more)
   }
 });
 

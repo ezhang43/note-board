@@ -473,4 +473,23 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     // (No trash can on each row on a phone, 2026-10-19: Delete is in the item bar. See phone-item-bar.spec.ts.)
     await expect(page.locator('[data-card-id]').first().getByRole('button', { name: 'Delete item' })).toBeHidden();
   });
+
+  test('a checklist item being typed in: the estimate clock and the grip each keep a full touch area, and neither takes the other', async ({ page }) => {
+    await addMenu(page, 'Checklist');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('one');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('two');
+    const card = page.locator('[data-card-id]').first();
+    const clock = card.getByRole('button', { name: 'Add a time estimate' }).last();
+    const grip = card.getByRole('button', { name: 'Drag item' }).last();
+    await expect(clock).toBeVisible();
+    for (const c of [clock, grip]) {
+      const r = await reach(c);
+      expect(r.w).toBeGreaterThanOrEqual(44);
+      expect(r.h).toBeGreaterThanOrEqual(44);
+      // (Each one's whole drawn box answers to itself: neither area covers the other. Like the grip always did, the clock's area wins over the card's width strip at the right edge.)
+      expect(await keepsItsOwnBox(c)).toBe(true);
+    }
+  });
 });

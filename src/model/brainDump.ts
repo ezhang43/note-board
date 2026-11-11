@@ -16,9 +16,6 @@ export type Draft = {
   kind: 'note' | 'todo';
 };
 
-/** The longest estimate read (a whole day): anything bigger is left in the title as text. */
-const MAX_MINUTES = MAX_ESTIMATE; // the same cap as a time estimate on a card
-
 // Hours ("1h", "2 hours", "1.5h", "1h30", "1h30m", "1h 30 min") or minutes ("30m", "45 min"),
 // standing alone: not glued into a word or number ("3mm", "a1h", "2.5.1h"), and "30 m" with a
 // space is not an estimate (it could be metres).
@@ -38,7 +35,8 @@ function minutesOf(m: RegExpMatchArray): number | null {
   } else {
     total = Number(mins);
   }
-  return total >= 1 && total <= MAX_MINUTES ? total : null;
+  // Up to a time estimate's cap (a whole day): anything bigger is left in the title as text.
+  return total >= 1 && total <= MAX_ESTIMATE ? total : null;
 }
 
 const cut = (title: string) => Array.from(title).slice(0, NOTE_NAME_MAX).join('').trim();

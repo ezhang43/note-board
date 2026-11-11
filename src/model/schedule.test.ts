@@ -1,6 +1,14 @@
 process.env.TZ = 'America/New_York';
 import { describe, expect, it } from 'vitest';
-import { fixedEvents, freeSlots, repack, type ScheduleEvent, type Task } from './schedule';
+import {
+  DEFAULT_MINUTES,
+  fixedEvents,
+  freeSlots,
+  repack as repackWith,
+  type RepackOptions,
+  type ScheduleEvent,
+  type Task,
+} from './schedule';
 
 // Day scheduler (the "wow" plan, job 9): the pure part. Free gaps between fixed events, and a plan
 // that packs the app's own blocks and new tasks into them. Times are local 'YYYY-MM-DDTHH:MM'.
@@ -25,6 +33,15 @@ const ev = (id: string, s: string, e: string, over: Partial<ScheduleEvent> = {})
 const block = (id: string, s: string, e: string, cardId = `card-${id}`, over: Partial<ScheduleEvent> = {}) =>
   ev(id, s, e, { block: { cardId }, ...over });
 const task = (cardId: string, minutes: number): Task => ({ cardId, title: cardId, minutes });
+// Most cases below count without a gap; the default gap has its own cases.
+const repack = (
+  blocks: ScheduleEvent[],
+  tasks: Task[],
+  fixed: ScheduleEvent[],
+  now: Date,
+  dayEnd: Date,
+  opts: RepackOptions = { gapMinutes: 0 },
+) => repackWith(blocks, tasks, fixed, now, dayEnd, opts);
 const slot = (s: string, e: string, day = D) => ({ start: `${day}T${s}`, end: `${day}T${e}` });
 
 describe('fixedEvents', () => {
@@ -130,6 +147,49 @@ describe('repack', () => {
     expect(odd.creates.map((c) => c.start)).toEqual([`${D}T09:00`, `${D}T09:35`]); // gap rounds up to 5
     const none = repack([], [task('a', 30), task('b', 30)], [], now, end);
     expect(none.creates.map((c) => c.start)).toEqual([`${D}T09:00`, `${D}T09:30`]);
+  });
+
+  it('leaves 5 minutes between blocks unless told otherwise', () => {
+    const plan = repackWith([], [task('a', 30), task('b', 30)], [], now, end);
+    expect(plan.creates.map((c) => c.start)).toEqual([`${D}T09:00`, `${D}T09:35`]);
+    const blocks = [block('b1', '10:00', '10:30'), block('b2', '11:00', '11:30')];
+    expect(repackWith(blocks, [], [], now, end).moves.map((m) => m.start)).toEqual([`${D}T09:00`, `${D}T09:35`]);
+    // the gap is only between blocks, not after a meeting
+    const fixed = [ev('m', '09:00', '10:00')];
+    expect(repackWith([], [task('a', 30)], fixed, now, end).creates[0].start).toBe(`${D}T10:00`);
+  });
+
+  it('never places before the day start, even when now is earlier', () => {
+    const opts = { gapMinutes: 0, dayStart: at('09:00') };
+    const plan = repack([block('b', '07:30', '08:30')], [task('t', 30)], [], at('07:12'), end, opts);
+    expect(plan.moves).toEqual([{ eventId: 'b', start: `${D}T09:00`, end: `${D}T10:00` }]);
+    expect(plan.creates[0].start).toBe(`${D}T10:00`);
+    expect(freeSlots([], at('07:12'), end, { dayStart: at('09:00') })).toEqual([slot('09:00', '17:00')]);
+    // a day start in the past changes nothing
+    expect(freeSlots([], at('10:02'), end, { dayStart: at('09:00') })).toEqual([slot('10:05', '17:00')]);
+  });
+
+  it('counts a task with no estimate as 30 minutes', () => {
+    const plan = repack([], [{ cardId: 'a', title: 'a' }, { cardId: 'b', title: 'b', minutes: null }], [], now, end);
+    expect(DEFAULT_MINUTES).toBe(30);
+    expect(plan.creates.map((c) => [c.start, c.end])).toEqual([
+      [`${D}T09:00`, `${D}T09:30`],
+      [`${D}T09:30`, `${D}T10:00`],
+    ]);
+  });
+
+  it('treats a block whose card is gone as fixed', () => {
+    const gone = block('gone', '09:00', '10:00', 'card-gone');
+    const kept = block('kept', '12:00', '13:00', 'card-kept');
+    const opts = { gapMinutes: 0, knownCards: ['card-kept'] };
+    const plan = repack([gone, kept], [task('t', 30)], [], now, end, opts);
+    expect(plan.moves).toEqual([{ eventId: 'kept', start: `${D}T10:00`, end: `${D}T11:00` }]);
+    expect(plan.creates[0].start).toBe(`${D}T11:00`);
+    expect(plan.drops).toEqual([]);
+    expect(freeSlots([gone, kept], now, end, { knownCards: ['card-kept'] })).toEqual([slot('10:00', '17:00')]);
+    expect(fixedEvents([gone, kept], new Set(['card-kept'])).map((e) => e.id)).toEqual(['gone']);
+    // with no list, every card counts as known
+    expect(repack([gone], [], [], now, end).moves).toEqual([]);
   });
 
   it('packs around back-to-back meetings and never touches them', () => {

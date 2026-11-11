@@ -17,8 +17,12 @@ export interface Slot {
 export interface Task {
   cardId: string;
   title: string;
-  minutes: number;
+  /** The estimate in minutes; none means DEFAULT_MINUTES. */
+  minutes?: number | null;
 }
+
+/** How long a task with no estimate counts for. */
+export const DEFAULT_MINUTES = 30;
 
 export interface Plan {
   /** Existing blocks to put somewhere else, in the order they will sit. A block already in place is left out. */
@@ -29,13 +33,21 @@ export interface Plan {
   drops: string[];
 }
 
-export interface RepackOptions {
-  /** Minutes left free between two placed blocks, rounded up to 5. Default 0. */
+export interface SlotOptions {
+  /** Nothing is placed before this ("My day" start), even when now is earlier. */
+  dayStart?: Date;
+  /** Cards that still exist. A block of any other card counts as fixed. Leave out to treat every card as known. */
+  knownCards?: Iterable<string>;
+}
+
+export interface RepackOptions extends SlotOptions {
+  /** Minutes left free between two placed blocks, rounded up to 5. Default 5. */
   gapMinutes?: number;
 }
 
 const MIN = 60_000;
 const STEP = 5 * MIN;
+const DEFAULT_GAP = 5;
 const pad = (n: number) => String(n).padStart(2, '0');
 
 // simple: the 5-minute marks are counted from the epoch, which is the same as on the clock for every
@@ -56,16 +68,22 @@ function format(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Events that stay where they are: timed events that aren't the app's own editable blocks. */
-export function fixedEvents(events: ScheduleEvent[]): ScheduleEvent[] {
-  return events.filter((e) => !e.allDay && !(e.block && e.editable));
+/** Whether the app may move this event: its own block, one the person can edit, of a card that still exists. */
+const movable = (e: ScheduleEvent, known: Set<string> | null) =>
+  !e.allDay && !!e.block && e.editable && (!known || known.has(e.block.cardId));
+const knownSet = (cards?: Iterable<string>) => (cards ? new Set(cards) : null);
+
+/** Events that stay where they are: timed events that aren't blocks the app may move. */
+export function fixedEvents(events: ScheduleEvent[], knownCards?: Iterable<string>): ScheduleEvent[] {
+  const known = knownSet(knownCards);
+  return events.filter((e) => !e.allDay && !movable(e, known));
 }
 
 type Span = [start: number, end: number];
 
 /** The gaps between `busy` events inside [now, dayEnd], now rounded up and the day end down to 5 minutes. */
-function gaps(busy: ScheduleEvent[], now: Date, dayEnd: Date): Span[] {
-  const from = up5(now.getTime());
+function gaps(busy: ScheduleEvent[], now: Date, dayEnd: Date, dayStart?: Date): Span[] {
+  const from = up5(Math.max(now.getTime(), dayStart?.getTime() ?? -Infinity));
   const to = down5(dayEnd.getTime());
   if (!(from < to)) return [];
   const spans = busy
@@ -90,8 +108,8 @@ function gaps(busy: ScheduleEvent[], now: Date, dayEnd: Date): Span[] {
 }
 
 /** The free gaps in the rest of the day. All-day events are ignored; a movable block counts as free time. */
-export function freeSlots(events: ScheduleEvent[], now: Date, dayEnd: Date): Slot[] {
-  return gaps(fixedEvents(events), now, dayEnd).map(([s, e]) => ({ start: format(s), end: format(e) }));
+export function freeSlots(events: ScheduleEvent[], now: Date, dayEnd: Date, opts: SlotOptions = {}): Slot[] {
+  return gaps(fixedEvents(events, opts.knownCards), now, dayEnd, opts.dayStart).map(([s, e]) => ({ start: format(s), end: format(e) }));
 }
 
 interface Item {
@@ -104,7 +122,8 @@ interface Item {
 /**
  * Packs the movable `blocks` (in start order, ties by id) and then the `tasks` (in the order given) into
  * the free gaps from now to the day end, each at the earliest spot after the one before it, so the order
- * is kept. Lengths round up to 5 minutes. A fixed event is never moved and nothing is placed before now.
+ * is kept. Lengths round up to 5 minutes. A fixed event is never moved and nothing is placed before now
+ * or before `opts.dayStart`. A block whose card is not in `opts.knownCards` counts as fixed.
  * What has no room goes to `drops`. The same input always gives the same plan, and nothing is changed.
  */
 export function repack(
@@ -117,21 +136,23 @@ export function repack(
 ): Plan {
   const nowMs = now.getTime();
   const endMs = dayEnd.getTime();
-  const gap = Math.ceil(Math.max(0, opts.gapMinutes || 0) / 5) * STEP;
-  // Fixed events, plus any app block the person can't edit (it counts as fixed).
-  const slots = gaps(fixedEvents([...fixed, ...blocks]), now, dayEnd);
+  const gap = Math.ceil(Math.max(0, opts.gapMinutes ?? DEFAULT_GAP) / 5) * STEP;
+  const known = knownSet(opts.knownCards);
+  // Fixed events, plus any app block that can't move (not editable, or its card is gone).
+  const slots = gaps(fixedEvents([...fixed, ...blocks], opts.knownCards), now, dayEnd, opts.dayStart);
 
   // Movable blocks that aren't over yet (a block already over is history) and start before the day ends.
   const items: Item[] = blocks
-    .filter((e) => e.block && e.editable && !e.allDay)
+    .filter((e) => movable(e, known))
     .map((e) => ({ e, s: parse(e.start), end: parse(e.end) }))
     .filter(({ s, end }) => s < end && end > nowMs && s < endMs)
     .sort((a, b) => a.s - b.s || (a.e.id < b.e.id ? -1 : a.e.id > b.e.id ? 1 : 0))
     .map(({ e, s, end }) => ({ cardId: e.block!.cardId, length: Math.max(STEP, up5(end - s)), block: e, title: e.title }));
 
   for (const t of tasks) {
-    const ok = Number.isFinite(t.minutes) && t.minutes > 0;
-    items.push({ cardId: t.cardId, length: ok ? Math.ceil(t.minutes / 5) * STEP : NaN, block: null, title: t.title });
+    const minutes = t.minutes ?? DEFAULT_MINUTES;
+    const ok = Number.isFinite(minutes) && minutes > 0;
+    items.push({ cardId: t.cardId, length: ok ? Math.ceil(minutes / 5) * STEP : NaN, block: null, title: t.title });
   }
 
   const plan: Plan = { moves: [], creates: [], drops: [] };

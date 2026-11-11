@@ -175,6 +175,8 @@ describe('leaving a share sends one leave', () => {
     const ends = {
       answer: () => waiting.splice(0).forEach((w) => void server.server.leave(carol, 'sgood').then(w.done)),
       fail: (e: Error) => waiting.splice(0).forEach((w) => w.failed(e)),
+      // The answer arrives, but its write to the server isn't modeled (it happened before a re-join).
+      resolve: () => waiting.splice(0).forEach((w) => w.done()),
     };
     const leave = vi.fn(() => new Promise<void>((done, failed) => void waiting.push({ done, failed })));
     let list: (ids: string[], confirmed: boolean) => void = () => {};
@@ -355,4 +357,32 @@ describe('leaving a share sends one leave', () => {
     expect(page.leave).toHaveBeenCalledTimes(2);
   });
 
+
+  it('opening the link of a board being left (still here) doesn’t let an old list bring it back', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    await page.sharing.join('sgood', 'goodkey');
+    page.ends.answer();
+    await left;
+    await settle();
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('a leave answering after the board was reopened from a new link doesn’t close the reopened board', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    const joined = page.sharing.join('sgood', 'e2');
+    await settle();
+    expect(await joined).toBe('n1');
+    page.ends.resolve();
+    await left;
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(true);
+  });
 });

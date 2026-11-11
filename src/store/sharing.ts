@@ -605,7 +605,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   /** The share can't be opened any more (removed, deleted, or left): its boards go from here. */
   function gone(s: Share, why: 'removed' | 'deleted' | 'left') {
-    if (!shares.has(s.id)) return;
+    // Not a newer copy of it (opened again from a link since): only this one.
+    if (shares.get(s.id) !== s) return;
     const ws = store.workspace();
     const ids = idsOf(s);
     const name = (s.root && ws.boards[s.root]?.name.trim()) || 'A shared board';
@@ -879,8 +880,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Not while their role isn't known yet (the People list hasn't answered): code review.
       if (here && role && role !== 'edit') backend.join(id, key).catch(() => {});
       const added = !here && (await backend.join(id, key));
-      // On it again (only once the join has worked): a list naming it opens it as usual.
-      left.delete(id);
+      // On it again (only once a join has worked, not while it is still here being left): a list
+      // naming it opens it as usual.
+      if (!here) left.delete(id);
       const s = open(id) ?? need(id);
       // (People arriving wake it too: it waits on until the board has, or the share has gone.)
       while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));

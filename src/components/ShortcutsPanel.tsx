@@ -74,6 +74,8 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Ctrl+Shift+X', 'Strikethrough'],
       ['Ctrl+Shift+8 / Ctrl+Shift+7', 'Bulleted / numbered list'],
       ['Ctrl+Shift+. / Ctrl+Shift+,', 'Larger / smaller text: the next size up or down in the Aa menu, as in Google Docs'],
+      ['Alt+I, then R', 'Divider line, as the Divider button does (Option on a Mac), as in Google Docs'],
+      ['-- then Enter', 'On an empty line, turn it into a divider line'],
       ['Enter', 'Next list item; on an empty item, end the list'],
       ['Tab / Shift+Tab in a list', 'Indent / outdent the item'],
     ],

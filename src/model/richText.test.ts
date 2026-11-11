@@ -379,17 +379,24 @@ describe('divider', () => {
     expect(insertDivider([p('abc')], sel(0, 1, 0, 3))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
   });
 
-  it('typing --- on an otherwise empty line and pressing Enter makes a divider', () => {
-    expect(splitAt([p('a'), p('---')], sel(1, 3))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
-    expect(splitAt([{ type: 'p', runs: [{ text: '---', b: true }] }], sel(0, 3)).rich).toEqual([hr, p('')]);
+  it('typing -- on an otherwise empty plain line and pressing Enter makes a divider (owner request 2026-11-11, was ---)', () => {
+    expect(splitAt([p('a'), p('--')], sel(1, 2))).toEqual({ rich: [p('a'), hr, p('')], at: at(2, 0) });
+    expect(splitAt([{ type: 'p', runs: [{ text: '--', b: true }] }], sel(0, 2)).rich).toEqual([hr, p('')]);
   });
 
-  it('--- anywhere else stays words', () => {
-    expect(splitAt([p('a ---')], sel(0, 5)).rich).toEqual([p('a ---'), p('')]);
-    expect(splitAt([p('----')], sel(0, 4)).rich).toEqual([p('----'), p('')]);
+  it('--- and Enter no longer makes a divider, not even on a plain --- line written before; it stays words', () => {
+    expect(splitAt([p('a'), p('---')], sel(1, 3))).toEqual({ rich: [p('a'), p('---'), p('')], at: at(2, 0) });
+    expect(splitAt([{ type: 'p', runs: [{ text: '---', b: true }] }], sel(0, 3)).rich).toEqual([{ type: 'p', runs: [{ text: '---', b: true }] }, p('')]);
+  });
+
+  it('-- anywhere else stays words', () => {
+    expect(splitAt([p('a --')], sel(0, 4)).rich).toEqual([p('a --'), p('')]);
     expect(splitAt([p('---')], sel(0, 2)).rich).toEqual([p('--'), p('-')]);
-    expect(splitAt([{ type: 'bullet', runs: [{ text: '---' }] }], sel(0, 3)).rich).toEqual([{ type: 'bullet', runs: [{ text: '---' }] }, { type: 'bullet', runs: [] }]);
-    expect(splitAt([{ type: 'h1', runs: [{ text: '---' }] }], sel(0, 3)).rich[0]).toEqual({ type: 'h1', runs: [{ text: '---' }] });
+    expect(splitAt([p('--')], sel(0, 1)).rich).toEqual([p('-'), p('-')]);
+    expect(splitAt([p('--x')], sel(0, 3)).rich).toEqual([p('--x'), p('')]);
+    expect(splitAt([p('a ---')], sel(0, 5)).rich).toEqual([p('a ---'), p('')]);
+    expect(splitAt([{ type: 'bullet', runs: [{ text: '--' }] }], sel(0, 2)).rich).toEqual([{ type: 'bullet', runs: [{ text: '--' }] }, { type: 'bullet', runs: [] }]);
+    expect(splitAt([{ type: 'h1', runs: [{ text: '--' }] }], sel(0, 2)).rich[0]).toEqual({ type: 'h1', runs: [{ text: '--' }] });
   });
 
   it('Backspace at the start of the line after it, or Delete just before it, removes it like one letter', () => {

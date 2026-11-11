@@ -449,7 +449,7 @@ export function JournalPanel() {
         <span className="jt-sep" aria-hidden />
         {listButton('bullet', 'Bulleted list', 'Ctrl+Shift+8', '•')}
         {listButton('number', 'Numbered list', 'Ctrl+Shift+7', '1.')}
-        <button type="button" aria-label="Divider" title="Divider" onClick={() => act((h) => h.divider())}>
+        <button type="button" aria-label="Divider" title="Divider (Alt+I, then R)" onClick={() => act((h) => h.divider())}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
             <path d="M2 8h12" />
             <path d="M4 3.5h8M4 12.5h8" opacity="0.45" />

@@ -29,7 +29,7 @@ const savedNote = (page: Page) =>
 
 test('the Divider button puts a line under the current line and the cursor on a new line below it; it is kept after a reload', async ({ page }) => {
   await openJournal(page);
-  await expect(divider(page)).toHaveAttribute('title', 'Divider');
+  await expect(divider(page)).toHaveAttribute('title', 'Divider (Alt+I, then R)');
   await page.keyboard.type('hello');
   await divider(page).click();
   await expect(editor(page)).toBeFocused();
@@ -65,16 +65,90 @@ test('the Divider button is its own undo step', async ({ page }) => {
   await expect(lines(page)).toHaveCount(1);
 });
 
-test('typing --- on an empty line and pressing Enter makes a divider; --- anywhere else stays words', async ({ page }) => {
+test('typing -- on an empty line and pressing Enter makes a divider; -- anywhere else, and --- , stay words (owner request 2026-11-11)', async ({ page }) => {
   await openJournal(page);
-  await page.keyboard.type('a ---');
+  await page.keyboard.type('a --');
   await page.keyboard.press('Enter');
   await page.keyboard.type('---');
   await page.keyboard.press('Enter');
+  await page.keyboard.type('--');
+  await page.keyboard.press('Enter');
   await page.keyboard.type('b');
-  expect(await types(page)).toEqual(['p:a ---', 'hr:', 'p:b']);
+  expect(await types(page)).toEqual(['p:a --', 'p:---', 'hr:', 'p:b']);
   await page.waitForTimeout(400);
-  expect((await savedNote(page)).text.split('\n').slice(2)).toEqual(['a ---', '---', 'b']);
+  // Its plain text is still the line --- (the board card, search and exports are unchanged).
+  expect((await savedNote(page)).text.split('\n').slice(2)).toEqual(['a --', '---', '---', 'b']);
+});
+
+test('Alt+I then R puts a divider where the Divider button does, as one Ctrl+Z step', async ({ page }) => {
+  await openJournal(page);
+  await expect(divider(page)).toHaveAttribute('title', 'Divider (Alt+I, then R)');
+  await page.keyboard.type('hello');
+  await page.waitForTimeout(1300); // a pause, so the typing is an undo step of its own
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyR');
+  await page.keyboard.up('Alt');
+  await page.keyboard.type('after');
+  expect(await types(page)).toEqual(['p:hello', 'hr:', 'p:after']);
+  await page.waitForTimeout(1300);
+  await page.keyboard.press('Control+z'); // "after" typed
+  expect(await types(page)).toEqual(['p:hello', 'hr:', 'p:']);
+  await page.keyboard.press('Control+z'); // the divider, in one step
+  expect(await types(page)).toEqual(['p:hello']);
+});
+
+test('Alt+I, Alt released, then R works within the time; a late R, or any other key between, is just typing', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('one');
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.up('Alt');
+  await page.keyboard.press('KeyR');
+  expect(await types(page)).toEqual(['p:one', 'hr:', 'p:']);
+  // Another key between cancels it: the R is a letter, and nothing stray was typed by Alt+I.
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.up('Alt');
+  await page.keyboard.type('xr');
+  expect(await types(page)).toEqual(['p:one', 'hr:', 'p:xr']);
+  // Too late.
+  await page.keyboard.press('Enter');
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.up('Alt');
+  await page.waitForTimeout(1700);
+  await page.keyboard.type('r');
+  expect(await types(page)).toEqual(['p:one', 'hr:', 'p:xr', 'p:r']);
+  // R alone is only a letter.
+  await page.keyboard.type('r');
+  expect(await types(page)).toEqual(['p:one', 'hr:', 'p:xr', 'p:rr']);
+});
+
+test('Alt+I then R replaces a selection, as the button does; with the cursor out of the note it does nothing', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('abc');
+  await page.keyboard.press('Shift+Home');
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyR');
+  await page.keyboard.up('Alt');
+  expect(await types(page)).toEqual(['hr:', 'p:']); // the selection is replaced, as with the button
+  // With the keyboard out of the note, the keys add no divider (and nothing on the board behind).
+  await page.keyboard.press('Escape');
+  await page.keyboard.down('Alt');
+  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyR');
+  await page.keyboard.up('Alt');
+  await expect(lines(page)).toHaveCount(1);
+});
+
+test('the Keyboard shortcuts panel lists Alt+I, then R for the divider', async ({ page }) => {
+  await page.goto('/');
+  await page.keyboard.press('?');
+  const list = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(list).toContainText('Alt+I, then R');
+  await expect(list).toContainText('Divider');
 });
 
 test('Backspace at the start of the line after a divider, or Delete just before it, removes it; Ctrl+Z brings it back', async ({ page }) => {

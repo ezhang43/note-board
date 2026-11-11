@@ -181,6 +181,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * naming it after that means they were added back), or its link is opened here.
    */
   const left = new Set<string>();
+  /**
+   * Shares whose clean-up leave (off this person's list after the share went) is on its way: until it
+   * answers, the server's list still names them, so the list doesn't open them again meanwhile.
+   */
+  const cleaning = new Map<string, Promise<void>>();
   let listLoaded = false;
   let readyFired = false;
   let applying = false;
@@ -578,13 +583,20 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * Every leave of share `id` sent from here. 'own': this person's own (the Share panel, a damaged
    * link), sent once (see `leaving`), with one retry if it fails after its boards have already gone
    * from here. 'retry': that retry. 'clean-up': off their list after the share went (removed or
-   * deleted); it joins their own leave if one is on its way, and is otherwise sent as it is (not
-   * remembered in `leaving` or `left`, so it never hides a later notice, list or join, and not retried).
+   * deleted); it joins their own leave if one is on its way, and is otherwise sent once, not retried,
+   * and kept only in `cleaning` until it answers (not as their own leave, which would hide a later
+   * "no longer shared with you" note or a board they are added back to).
    */
   function sendLeave(id: string, kind: 'own' | 'retry' | 'clean-up' = 'own'): Promise<void> {
     const sent = leaving.get(id);
     if (sent) return sent;
-    if (kind === 'clean-up') return backend.leave(id);
+    if (kind === 'clean-up') {
+      const cleanUp = backend.leave(id).finally(() => {
+        if (cleaning.get(id) === cleanUp) cleaning.delete(id);
+      });
+      cleaning.set(id, cleanUp);
+      return cleanUp;
+    }
     left.add(id);
     const leave = backend.leave(id).then(
       () => {
@@ -750,7 +762,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {
       if (confirmed) for (const id of left) if (!ids.includes(id)) left.delete(id);
-      for (const id of ids) if (!leaving.has(id) && !left.has(id)) open(id);
+      for (const id of ids) if (!leaving.has(id) && !left.has(id) && !cleaning.has(id)) open(id);
       if (confirmed) {
         // Left on another device (only by the server's own list: the offline copy may be out of date).
         // One whose leave is on its way here waits for that leave: if it fails, nothing changes.
@@ -870,10 +882,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Opening a link to a board already here just opens it. The link is also tried online, not
       // waited for (offline, a save waits for the connection), when it may give a higher role (a
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
-      // simple: a leave of it still on its way here (clicked just before) can still take it away again
+      // simple: a leave of it still on its way here (clicked just before, or the clean-up after being
+      // removed) can still take it away again
       // once it answers, as before. Not waited for, since a leave can wait offline for the connection;
       // upgrade if people report a board they reopened going again.
       left.delete(id);
+      cleaning.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
       // Not while their role isn't known yet (the People list hasn't answered): code review.

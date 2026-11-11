@@ -352,5 +352,26 @@ describe('leaving a share sends one leave', () => {
     await settle();
     expect(page.sharing.isShared('n1')).toBe(false);
     expect(page.notices).toEqual(['“Trip” is no longer shared with you.', '“Trip” is no longer shared with you.']);
+    expect(page.leave).toHaveBeenCalledTimes(2);
+  });
+
+  it('the clean-up leave after being removed is guarded too: an old list doesn’t reopen the board or say so twice', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+    // The server's list still names it until the clean-up leave lands.
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+    // Once it has landed, a list naming it means they were added back.
+    page.ends.answer();
+    await settle();
+    await server.server.join(person('carol'), 'sgood', 'e2');
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(true);
   });
 });

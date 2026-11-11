@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react';
 import { decodeItems, decodeRich, encodeRich, itemsToRich } from '../model/journalPaste';
+import { dividerKeyStep } from '../model/dividerKeys';
 import { deepEqual } from '../model/merge';
 import * as R from '../model/richText';
 import { sizeKeyDir } from '../model/textStyle';
@@ -224,6 +225,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
   const composing = useRef(false);
   /** The last key pressed was Ctrl+Shift+V (paste as plain text). */
   const plainPaste = useRef(false);
+  const altI = useRef<number | null>(null); // when Alt+I was pressed, for Alt+I then R
   const props = useRef({ onChange, onLook, onEscape });
   props.current = { onChange, onLook, onEscape };
 
@@ -421,7 +423,15 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     plainPaste.current = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v';
+    // Alt+I, then R: the Divider button (owner request 2026-11-11, as in Google Docs). Both keys are stopped, so no board key or stray character follows.
+    const step = dividerKeyStep(altI.current, e.nativeEvent, Date.now()); // before Escape: any other key cancels it
+    altI.current = step.armed;
+    if (step.prevent) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (e.key === 'Escape') return onEscape();
+    if (step.fire) return handle.divider();
     let sel = readSel(e.currentTarget);
     if (!sel) return;
     // A key pressed right after a click on a divider, before the selection watcher has moved the
@@ -509,7 +519,10 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       // Dragging words would copy them, not move them (the drop comes in as plain text): not offered.
       onDragStart={(e) => e.preventDefault()}
       onFocus={(e) => onFocus?.(e.currentTarget)}
-      onBlur={(e) => onBlur?.(e.currentTarget)}
+      onBlur={(e) => {
+        altI.current = null; // Alt+I, then leaving the note: a later R is only a letter
+        onBlur?.(e.currentTarget);
+      }}
     />
   );
 }

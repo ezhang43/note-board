@@ -63,6 +63,8 @@ export interface Look {
   mixed?: ('size' | 'font' | 'hl')[];
 }
 
+/** What typed on an empty plain line, then Enter, makes a divider. Not `DIVIDER`: that is the divider's saved plain text, and a typed `---` is words. */
+const DIVIDER_TYPED = '--';
 const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number', 'hr'];
 /** The sizes in the size box's list, in px; 16 is the Journal's normal text. */
 export const SIZE_STEPS = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36];
@@ -411,8 +413,9 @@ export function splitAt(rich: Rich, sel: Sel, marks?: Marks): Edit & { look?: Ma
   const blk = cleared.rich[b];
   if (isHr(blk)) return offDivider(cleared.rich, cleared.at);
   const out = [...cleared.rich];
-  // --- typed on an otherwise empty line, then Enter: the line becomes a divider (owner decision 2026-10-31).
-  if (blk.type === 'p' && o === DIVIDER.length && plainOf([blk]) === DIVIDER) {
+  // -- typed on an otherwise empty plain line, then Enter: the line becomes a divider (owner decision 2026-10-31, typed ---;
+  // owner request 2026-11-11, typed --). A plain --- line, typed or written before, is words: it is the same line as a typed one.
+  if (blk.type === 'p' && o === DIVIDER_TYPED.length && plainOf([blk]) === DIVIDER_TYPED) {
     out.splice(b, 1, block('hr', 0, []), block('p', 0, []));
     return { rich: out, at: { b: b + 1, o: 0 } };
   }

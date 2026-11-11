@@ -585,8 +585,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       (e) => {
         leaving.delete(id);
         left.delete(id);
-        // It went from here meanwhile, and gone() left the clean-up leave to this one: try it once
-        // more (not after signing out).
+        // Its boards have already gone from here (gone() left the clean-up leave to this one, or a
+        // damaged link's): try it once more (not after signing out).
         if (retry && !shares.has(id) && !stopped) sendLeave(id, false).catch(() => {});
         throw e;
       },
@@ -627,7 +627,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     } else applyBoards(Object.fromEntries(ids.map((id) => [id, ws.boards[id]])), {});
     // Off this person's list of shares too (it may already be).
     const selfLeave = leaving.has(s.id);
-    if (why !== 'left') sendLeave(s.id).catch(() => {});
+    // (Not retried: it was never retried, and nothing waits on it.)
+    if (why !== 'left') sendLeave(s.id, false).catch(() => {});
     if (why === 'removed' && !selfLeave) opts.onNotice?.(`“${name}” is no longer shared with you.`);
     if (why === 'deleted' && !s.owner) opts.onNotice?.(`“${name}” was deleted by the person who shared it.`);
     publish();
@@ -862,6 +863,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Opening a link to a board already here just opens it. The link is also tried online, not
       // waited for (offline, a save waits for the connection), when it may give a higher role (a
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
+      // A leave of it still on its way here goes first, so it can't undo this join.
+      while (leaving.has(id)) await leaving.get(id)!.catch(() => {});
       left.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
@@ -880,8 +883,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         // the app, which an updated app opens (job #91).
         // Not after signing out, or once it went (that already took them off).
         if (added && !s.owner && !s.unreadable && shares.has(id)) {
-          await sendLeave(id).catch(() => {});
+          // Its boards go first, so a leave that fails gets the one retry (see sendLeave).
           gone(s, 'left');
+          await sendLeave(id).catch(() => {});
         }
         throw new Error('This shared board can’t be opened');
       }

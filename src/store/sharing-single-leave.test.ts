@@ -185,7 +185,7 @@ describe('leaving a share sends one leave', () => {
     await settle();
     await joined;
     list(['sgood'], true);
-    return { sharing, leave, notices, ends, waiting, list: (ids: string[], confirmed: boolean) => list(ids, confirmed) };
+    return { sharing, leave, notices, ends, list: (ids: string[], confirmed: boolean) => list(ids, confirmed) };
   }
 
   it('the offline copy of the list dropping the board while the leave is on its way changes nothing: still one leave, no notice', async () => {
@@ -309,5 +309,45 @@ describe('leaving a share sends one leave', () => {
     await settle();
     expect(page.leave).toHaveBeenCalledTimes(1);
     expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+  });
+
+  it('a link to a damaged share whose leave fails gets the one retry too', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    const real = server.backendFor(person('carol'));
+    const leave = vi.fn().mockRejectedValueOnce(new Error('offline')).mockImplementation((id: string) => real.leave(id));
+    const storage = memoryStorage();
+    const sharing = startSharing(createStore(storage, (fn) => fn()), { ...real, leave, watchMyShares: () => () => {} }, { client: 'carol-page', storage });
+    const joined = sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow('This shared board can’t be opened');
+    expect(leave).toHaveBeenCalledTimes(2);
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
+  });
+
+  it('the clean-up leave after being removed isn’t retried (as before)', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    page.ends.fail(new Error('refused'));
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+  });
+
+  it('opening the link again while a leave is on its way waits for it, so the leave doesn’t undo the join', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    // Carol is sent the new link and opens it before the clean-up leave has answered.
+    const joined = page.sharing.join('sgood', 'e2');
+    joined.catch(() => {});
+    await settle();
+    page.ends.answer();
+    await settle();
+    page.list(['sgood'], true);
+    await settle();
+    expect(await joined).toBe('n1');
+    expect(server.shares.get('sgood')!.people.map((p) => p.uid)).toContain('carol');
+    expect(page.sharing.isShared('n1')).toBe(true);
   });
 });

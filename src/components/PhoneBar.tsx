@@ -3,6 +3,7 @@ import { ShareButton } from './SharePanel';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { CoffeeIcon, HistoryIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
 import {
+  BrainDumpButton,
   CleanUpButton,
   CollapseAllButton,
   ColourControl,
@@ -67,6 +68,16 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
           <button type="button" role="menuitem" onClick={() => add('board')}>
             Sub-board
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(null);
+              appStore.openBrainDump();
+            }}
+          >
+            Brain dump
+          </button>
         </div>
       )}
       {open === 'more' && (
@@ -113,6 +124,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             {!viewOnly && (
               <>
                 <div className="phone-rows">
+                  <BrainDumpButton labelled onOpen={() => setOpen(null)} />
                   <SnapButton />
                   <ColourControl />
                 </div>

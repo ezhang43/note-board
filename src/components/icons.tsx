@@ -347,6 +347,16 @@ export function NoteIcon() {
   );
 }
 
+/** Brain dump: a few lines of text with a spark, lines becoming cards. */
+export function BrainDumpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M4 6h8M4 12h5M4 18h8" />
+      <path d="M17 4v6M14 7h6M17 14v6M14 17h6" />
+    </svg>
+  );
+}
+
 export function ChecklistIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>

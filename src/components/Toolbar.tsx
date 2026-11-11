@@ -25,7 +25,7 @@ import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
 import { arrowThroughMenu } from './menuArrows';
 import { keepsBlockCursor } from './textField';
-import { AppearanceIcon, ArrangeIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
+import { AppearanceIcon, ArrangeIcon, BrainDumpIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -45,6 +45,28 @@ function NewColumnButton() {
     <button type="button" className="tb-button add-column" aria-label="New container" title="Click to add a container, or drag it onto the board" {...drag}>
       <ContainerIcon />
       <span className="tb-label">Container</span>
+    </button>
+  );
+}
+
+/**
+ * Brain dump (wow plan, job 3): opens the dialog where typed lines become cards. An icon in the Add group
+ * (so the toolbar still fits), a row with words in the ⋯ menu. Not shown on a board that may only be viewed.
+ */
+export function BrainDumpButton({ labelled = false, onOpen }: { labelled?: boolean; onOpen?: () => void }) {
+  return (
+    <button
+      type="button"
+      className={labelled ? 'tb-button' : 'tb-button icon-only add-brain-dump'}
+      aria-label="Brain dump"
+      title="Brain dump: type or paste a list, one card per line"
+      onClick={() => {
+        onOpen?.();
+        appStore.openBrainDump();
+      }}
+    >
+      <BrainDumpIcon />
+      {labelled && 'Brain dump'}
     </button>
   );
 }
@@ -521,12 +543,13 @@ function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
   const viewOnly = useViewOnly();
   return (
     <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
-      <button type="button" className="tb-button icon-only" aria-label="More" title="More: Arrange, File, Feedback, Appearance, Sign out" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="tb-button icon-only" aria-label="More" title="More: Brain dump, Arrange, File, Feedback, Appearance, Sign out" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <MoreIcon />
       </button>
       {open && (
         <div className="toolbar-more phone-more" role="dialog" aria-label="More">
           <div className="phone-rows">
+            {!viewOnly && <BrainDumpButton labelled onOpen={() => setOpen(false)} />}
             {!viewOnly && <ArrangeMenu />}
             <FileMenu />
             <FeedbackButton onOpen={() => setOpen(false)} />
@@ -607,6 +630,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
           <AddCardButton kind="note" label="Note" />
           <AddCardButton kind="todo" label="Checklist" />
           <NewColumnButton />
+          {!folded && <BrainDumpButton />}
 
           <div className="toolbar-divider" aria-hidden="true" />
           <ColourControl />

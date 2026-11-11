@@ -52,7 +52,7 @@ function pictureData(src: string, maxW: number, maxH: number): Promise<string | 
 /** Swaps every picture in the copy that comes from another site for its data, or the blank panel. */
 async function inlineOtherSitePictures(copy: HTMLElement, scale: number) {
   const others = [...copy.querySelectorAll('img')].filter((img) => /^https?:/.test(img.src) && new URL(img.src).origin !== location.origin);
-  const loads = new Map<string, Promise<string | null>>(); // each address loaded once
+  const loads = new Map<string, Promise<string | null>>(); // one load per address and drawn size (the same picture at the same size on several cards)
   await Promise.all(
     others.map(async (img) => {
       const box = img.getBoundingClientRect();

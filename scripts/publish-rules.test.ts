@@ -23,6 +23,7 @@ describe('risky files', () => {
       'src/model/merge.ts',
       'src/model/sharing.ts',
       'firestore.rules',
+      'scripts/csp.ts',
       'mcp/save.ts',
       'mcp/server.ts',
       'mcp/login/login.ts',
@@ -31,7 +32,7 @@ describe('risky files', () => {
   });
 
   it('test files never count, and other files are low-risk', () => {
-    for (const f of ['src/model/persist.test.ts', 'src/sync/pageHide.test.ts', 'src/store/sync.test.ts', 'e2e/sync.spec.ts', 'src/components/Toolbar.tsx', 'src/model/arrows.ts', 'CHANGELOG.md', 'src/store/actions/blocks.ts', 'mcp/save.test.ts', 'src/model/merge.test.ts', 'src/model/sharing.test.ts', 'src/store/sharing.test.ts', 'src/store/account.test.ts'])
+    for (const f of ['src/model/persist.test.ts', 'src/sync/pageHide.test.ts', 'src/store/sync.test.ts', 'e2e/sync.spec.ts', 'src/components/Toolbar.tsx', 'src/model/arrows.ts', 'CHANGELOG.md', 'src/store/actions/blocks.ts', 'mcp/save.test.ts', 'src/model/merge.test.ts', 'src/model/sharing.test.ts', 'src/store/sharing.test.ts', 'src/store/account.test.ts', 'scripts/csp.test.ts'])
       expect(isRiskyFile(f), f).toBe(false);
   });
 });

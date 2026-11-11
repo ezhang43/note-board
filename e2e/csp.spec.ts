@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { add, cards, fontsLoaded } from './helpers';
 import { clearViolations, cspGuard, violations } from './csp-guard';
 
-// Content Security Policy (job 11): the main flows of the app in `npm run dev` break none of the page's
+// Content Security Policy (job 11): the flows tested here, in `npm run dev`, break none of the page's
 // rules on where scripts, frames and requests may come from. The published build is checked in
 // published-csp.spec.ts. No test needs the internet: a blocked request is refused before it leaves.
 
@@ -49,7 +49,7 @@ test('the page carries the policy, and it really blocks a request to a site not 
   await clearViolations(page);
 });
 
-test('editing a board, a checklist, the Journal and the side panels', async ({ page }) => {
+test('editing a note and a checklist, undo and redo, and the focus timer', async ({ page }) => {
   await open(page);
   await add(page, 'Note');
   await page.keyboard.type('Hello');
@@ -101,7 +101,7 @@ test('sharing a board, and someone joining it with the link', async ({ page, bro
   await bob.context().close();
 });
 
-test('backup download and restore, Markdown and PDF import, Download as text', async ({ page }, info) => {
+test('backup download and restore, Download as text, and PDF import', async ({ page }, info) => {
   await open(page);
   await add(page, 'Note');
   await page.keyboard.type('Keep me');

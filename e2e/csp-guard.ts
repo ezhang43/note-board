@@ -26,7 +26,8 @@ const consoleOf = (page: Page) => (page as Page & { cspConsole?: string[] }).csp
  * policy since cspGuard (any page opened in this tab, and directives the browser ignored).
  */
 export async function violations(page: Page): Promise<string[]> {
-  const inPage = await page.evaluate(() => [...((window as unknown as { __csp?: string[] }).__csp ?? [])]).catch(() => []);
+  // Not caught: a page that can't be read fails the test rather than passing it with nothing seen.
+  const inPage = await page.evaluate(() => [...((window as unknown as { __csp?: string[] }).__csp ?? [])]);
   return [...inPage, ...consoleOf(page).map((m) => `console: ${m}`)];
 }
 

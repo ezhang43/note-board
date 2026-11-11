@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { BUILD_ONLY, DEV_ONLY, cspPolicy, inlineScripts, scriptHash, withCsp } from './csp';
 import { goatcounterLoader } from './goatcounter';
+import { AUTH_DOMAIN } from '../src/sync/firebaseProject';
 
 // Job 11: the Content Security Policy on every page.
 
@@ -54,9 +55,9 @@ describe('Content Security Policy', () => {
     expect(built['frame-src']).toContain('https://note-board-a672a.firebaseapp.com');
   });
 
-  it('the sign-in frame is the Firebase project the app signs in with', () => {
-    const domain = /authDomain: '([^']+)'/.exec(readFileSync('src/sync/firebase.ts', 'utf8'))![1];
-    expect(built['frame-src']).toContain(`https://${domain}`);
+  it('the sign-in frame is the Firebase project the app signs in with (one place sets it)', () => {
+    expect(built['frame-src']).toContain(`https://${AUTH_DOMAIN}`);
+    expect(readFileSync('src/sync/firebase.ts', 'utf8')).toMatch(/authDomain: AUTH_DOMAIN\b/);
   });
 
   it('the built policy is the dev one without the dev-only sources and with the build-only ones', () => {
@@ -79,6 +80,14 @@ describe('Content Security Policy', () => {
     expect(at).toBeLessThan(out.indexOf('<link'));
     expect(out).toContain(scriptHash('a()'));
     expect(() => withCsp('<html><head></head></html>', false)).toThrow();
+  });
+
+  it('hashes an inline script as the browser reads it: a Windows (CRLF) checkout gives the same hash', () => {
+    // The HTML parser turns CRLF and a lone CR into LF before the script's text is hashed.
+    const lf = '<meta charset="utf-8" /><script>\n  a();\n  b();\n</script>';
+    const crlf = lf.replace(/\n/g, '\r\n');
+    expect(withCsp(crlf, false)).toContain(scriptHash('\n  a();\n  b();\n'));
+    expect(withCsp(lf.replace(/\n/g, '\r'), false)).toContain(scriptHash('\n  a();\n  b();\n'));
   });
 
   it('keeps GoatCounter out of `npm run dev`', () => {

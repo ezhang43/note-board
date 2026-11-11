@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
+// The Firebase project's sign-in domain: sign-in's hidden frame comes from it.
+import { AUTH_DOMAIN } from '../src/sync/firebaseProject';
 
 // Content Security Policy (job 11, high-risk): which sites the pages may load scripts, frames and
 // styles from and send requests to, so a script slipped into a page can't load more code from
@@ -13,8 +15,6 @@ import type { Plugin } from 'vite';
 // script could still send data to an attacker's own account on a service listed here (their own
 // Firestore project or Anthropic key). Paths narrow Google's shared hosts where the app's use is known.
 
-/** The Firebase project's sign-in domain (src/sync/firebase.ts authDomain): sign-in's hidden frame comes from it. */
-const AUTH_DOMAIN = 'https://note-board-a672a.firebaseapp.com';
 
 /** Every page, built or in `npm run dev`. */
 const BASE: Record<string, string[]> = {
@@ -54,7 +54,7 @@ const BASE: Record<string, string[]> = {
   ],
   'frame-src': [
     // Firebase sign-in's hidden frame (@firebase/auth getIframeUrl: https://<authDomain>/__/auth/iframe).
-    AUTH_DOMAIN,
+    `https://${AUTH_DOMAIN}`,
     'https://accounts.google.com/gsi/',
     // Link-card players (src/model/media.ts).
     'https://www.youtube-nocookie.com',
@@ -84,7 +84,9 @@ export const scriptHash = (code: string) => `'sha256-${createHash('sha256').upda
 
 /** The text of every inline <script> (one without src) in a page. */
 export function inlineScripts(html: string): string[] {
-  return [...html.matchAll(/<script\b(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  // As the browser reads it: the HTML parser turns CRLF and a lone CR into LF before hashing, so a
+  // Windows checkout (CRLF) must hash the same text.
+  return [...html.matchAll(/<script\b(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1].replace(/\r\n?/g, '\n'));
 }
 
 /**

@@ -169,7 +169,7 @@ test('deleting also removes the Journal general notes this device remembers (202
   const alice = await person(browser, `Alice${tag()}`);
   const remembered = () => alice.evaluate(() => Object.keys(localStorage).filter((k) => k.endsWith('note-board:journal-notes')));
   await alice.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true }).click();
-  await alice.getByRole('button', { name: 'Add a general note' }).first().click();
+  await alice.getByRole('button', { name: 'Add a general note' }).click();
   await alice.keyboard.press('Enter');
   await expect.poll(remembered).toHaveLength(1);
   await alice.keyboard.press('Escape');

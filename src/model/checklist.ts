@@ -324,6 +324,21 @@ export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[
   return { items: next, caret };
 }
 
+/**
+ * Backspace at the very start of an item, the mirror of Delete at the end: the item is joined onto
+ * the end of the item shown above it, exactly as Delete at the end of that item would join it (that
+ * item keeps its id, level and look; this one's sub-items move up one level into its place; ticked
+ * only if both were). Nothing happens on the first item of the list. Returns the new items, the item
+ * the cursor goes to (the one above) and where in it (the join point).
+ */
+export function mergePrevItem(items: TodoItem[], id: string): { items: TodoItem[]; focus: string; caret: number } | null {
+  const order = shownIds(items);
+  const at = order.indexOf(id);
+  const prevId = at > 0 ? order[at - 1] : undefined;
+  const result = prevId ? mergeNextItem(items, prevId) : null;
+  return result && { ...result, focus: prevId! };
+}
+
 const isBlank = (it: TodoItem) => it.text.trim() === '';
 
 /** True if any of these items, or anything nested under them, has text. */

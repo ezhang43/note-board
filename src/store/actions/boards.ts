@@ -230,21 +230,23 @@ export function boardActions(ctx: StoreContext) {
       remember();
     },
     /**
-     * The + in a general note's header (owner decision, 2026-11-10): adds an "Untitled note" right
-     * below the general note `after` as one undo step. With none written yet, `after` is the id the
-     * panel shows "General notes" under, and that note is added with it. Returns the new note's id,
-     * or null when nothing was added.
+     * The + at the top of the general notes (owner request, 2026-11-11; it was in each note's header,
+     * 2026-11-10): adds an "Untitled note" as the first general note, above every other, as one undo
+     * step. `first` is the id of the note the panel shows on top: with none written yet, it is the id
+     * the panel shows "General notes" under, and that note is added with it (below the new one).
+     * Returns the new note's id, or null when nothing was added.
      */
-    addJournalNote(after: string): string | null {
+    addJournalNote(first: string): string | null {
       const id = journalId();
       if (!id || !ctx.workspace().boards[id]) return null;
       const note = { ...createCard('note'), kind: 'note', text: `${UNTITLED_NOTE}\n\n` } as NoteCard;
       const at = placing(id);
       let made: string | null = null;
       ctx.commitTo(id, (b) => {
-        const withIt = withFirst(b, firstNote(after));
-        if (withIt !== b) made = after;
-        return addGeneralNote(withIt, after, note, generalSpotBelow(withIt, after, ...at), knownNotes());
+        const withIt = withFirst(b, firstNote(first));
+        if (withIt !== b) made = first;
+        // On the board it goes below the old first (the list's order is `general`, not where they sit).
+        return addGeneralNote(withIt, note, generalSpotBelow(withIt, first, ...at), knownNotes());
       });
       if (!ctx.workspace().boards[id]?.cards[note.id]) return null;
       // Both when the first comes with it: it isn't drawn yet, so the new one was placed below its guessed height.

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
 import { dropAccess, keepAccess, readAccess } from '../model/calendar';
+import { AUTH_DOMAIN } from './firebaseProject';
 
 // Sign-in only, so the sign-in screen downloads no more of Firebase than it needs (job 169); the
 // database (Firestore) is in ./database, loaded once someone is signed in.
@@ -9,7 +10,7 @@ import { dropAccess, keepAccess, readAccess } from '../model/calendar';
 // firestore.rules decide who may read or write the board.
 export const app = initializeApp({
   apiKey: 'AIzaSyBHun-34SrmkErUqS25OJax0JCzl2xe4Wo',
-  authDomain: 'note-board-a672a.firebaseapp.com',
+  authDomain: AUTH_DOMAIN,
   projectId: 'note-board-a672a',
   storageBucket: 'note-board-a672a.firebasestorage.app',
   messagingSenderId: '1016497512471',

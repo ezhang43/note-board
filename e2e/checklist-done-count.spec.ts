@@ -230,7 +230,7 @@ function check(layout: 'desktop' | 'phone') {
           const count = c.querySelector('.title-count')!.getBoundingClientRect();
           const title = c.querySelector('.card-title')!.getBoundingClientRect();
           const sub = c.querySelector('[data-item-id="trip"] .item-count')!.getBoundingClientRect();
-          const area = c.querySelector('[data-item-id="trip"] textarea')!.getBoundingClientRect();
+          const area = c.querySelector('[data-item-id="trip"]')!.getBoundingClientRect(); // the row, buttons' strip included: a full last line lets the count spill into it (2026-11-11)
           const bg = getComputedStyle(c).backgroundColor;
           const fg = getComputedStyle(c.querySelector('.title-count')!).color;
           return {

@@ -581,13 +581,16 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * deleted); it joins their own leave if one is on its way, and is otherwise sent once, as before
    * (not kept as their own leave: that would hide a later "no longer shared with you" note).
    */
-  function sendLeave(id: string, kind: 'own' | 'retry' | 'clean-up' = 'own'): Promise<void> {
+  function sendLeave(id: string, kind: 'own' | 'retry' | 'clean-up' = 'own', share?: Share): Promise<void> {
     const sent = leaving.get(id);
     if (sent) return sent;
     if (kind === 'clean-up') return backend.leave(id);
     left.add(id);
     const leave = backend.leave(id).then(
       () => {
+        // `share`'s boards go before the leave stops counting as on its way, so the server's word that
+        // they are off it, arriving in between, isn't taken for a removal (a second leave and a note).
+        if (share) gone(share, 'left');
         leaving.delete(id);
       },
       (e) => {
@@ -920,8 +923,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     async leave(id: string) {
       const s = need(id);
       if (s.owner) throw new Error('The person who shared a board can’t leave it');
-      await sendLeave(id);
-      gone(s, 'left');
+      // Its boards go once the leave has answered (see sendLeave). A second click waits for the first.
+      await sendLeave(id, 'own', s);
     },
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */
     async deleteShare(id: string) {

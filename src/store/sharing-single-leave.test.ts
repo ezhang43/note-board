@@ -385,4 +385,30 @@ describe('leaving a share sends one leave', () => {
     await settle();
     expect(page.sharing.isShared('n1')).toBe(true);
   });
+
+  it('the server saying they are off it just as the leave answers (before the board has gone) is still that leave', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const storage = memoryStorage();
+    const real = server.backendFor(person('carol'));
+    // The share's watch, so the test can say "no access" at the moment it chooses.
+    const refusals: ((e: unknown) => void)[] = [];
+    const watchShare: typeof real.watchShare = (id, onChange, onError) => (refusals.push(onError), real.watchShare(id, onChange, () => {}));
+    let answered: Promise<void> = Promise.resolve();
+    const leave = vi.fn((id: string) => (answered = real.leave(id)));
+    const notices: string[] = [];
+    const sharing = startSharing(createStore(storage, (fn) => fn()), { ...real, leave, watchShare, watchMyShares: () => () => {} }, { client: 'carol-page', storage, onNotice: (t) => notices.push(t) });
+    const joined = sharing.join('sgood', 'goodkey');
+    await settle();
+    await joined;
+    const left = sharing.leave('sgood');
+    // Runs right after the page has heard the leave answer, before leave() closes the board.
+    void answered.then(() => refusals.forEach((no) => no(Object.assign(new Error('No longer shared with you'), { code: 'permission-denied' }))));
+    await left;
+    await settle();
+    expect(leave).toHaveBeenCalledTimes(1);
+    expect(notices).toEqual([]);
+    expect(sharing.isShared('n1')).toBe(false);
+  });
 });

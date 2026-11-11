@@ -13,7 +13,7 @@ const sections = (page: Page) => panel(page).locator('section.journal-notes');
 const note = (page: Page, i: number) => sections(page).nth(i);
 const fold = (page: Page, i: number) => note(page, i).locator('.jg-notes');
 const nameBtn = (page: Page, i: number) => note(page, i).locator('.jn-name');
-const add = (page: Page) => panel(page).locator('.jn-bar').getByRole('button', { name: 'Add a general note' });
+const add = (page: Page) => panel(page).locator('.history-head').getByRole('button', { name: 'Add a general note' });
 const trash = (page: Page, i: number) => note(page, i).locator('.jn-del');
 const rename = (page: Page) => panel(page).locator('input.jn-rename');
 const names = (page: Page) => sections(page).locator('.jn-name').allTextContents();
@@ -56,7 +56,7 @@ test('one + at the very top adds an "Untitled note" first, with the cursor in it
   await expect(note(page, 0).locator('.rich')).toHaveText('flour');
 });
 
-test('there is a single + for all the general notes: none in a note\'s header, one in a slim row above the first, at its right end', async ({ page }) => {
+test('there is a single +, in the panel header right beside the close X (no slim row under the Formatting bar)', async ({ page }) => {
   await openJournal(page);
   await add(page).click();
   await page.keyboard.press('Enter');
@@ -64,21 +64,28 @@ test('there is a single + for all the general notes: none in a note\'s header, o
   await page.keyboard.press('Enter');
   await expect(sections(page)).toHaveCount(3);
   await expect(panel(page).getByRole('button', { name: 'Add a general note' })).toHaveCount(1);
+  await expect(panel(page).locator('.jn-bar')).toHaveCount(0); // the slim row is gone
   await expect(sections(page).locator('.jn-add')).toHaveCount(0);
-  const bar = (await panel(page).locator('.jn-bar').boundingBox())!;
+  const close = panel(page).locator('.history-head').getByRole('button', { name: 'Close journal' });
   const button = (await add(page).boundingBox())!;
-  const first = (await note(page, 0).boundingBox())!;
+  const x = (await close.boundingBox())!;
+  const head = (await panel(page).locator('.history-head').boundingBox())!;
+  // Same row as the X, immediately to its left, the same size, in the header.
+  expect(button.x + button.width).toBeLessThanOrEqual(x.x + 1);
+  expect(x.x - (button.x + button.width)).toBeLessThanOrEqual(8);
+  expect(Math.abs(button.y + button.height / 2 - (x.y + x.height / 2))).toBeLessThanOrEqual(1);
+  expect(Math.abs(button.width - x.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(button.height - x.height)).toBeLessThanOrEqual(1);
+  expect(button.y).toBeGreaterThanOrEqual(head.y - 1);
+  expect(button.y + button.height).toBeLessThanOrEqual(head.y + head.height + 1);
+  // It is not left over the Formatting bar or the notes.
   const tools = (await panel(page).getByRole('toolbar', { name: 'Formatting' }).boundingBox())!;
-  expect(bar.y).toBeGreaterThanOrEqual(tools.y + tools.height - 1); // under the Formatting bar
-  expect(bar.y + bar.height).toBeLessThanOrEqual(first.y + 1); // above the first note
-  expect(button.x + button.width).toBeGreaterThan(first.x + first.width - 40); // at the right end
-  // ...lined up over the trash button, not past it.
-  const bin = (await trash(page, 0).boundingBox())!;
-  expect(Math.abs(button.x + button.width - (bin.x + bin.width))).toBeLessThanOrEqual(1);
-  // It works from the keyboard, with a visible focus ring.
+  expect(button.y + button.height).toBeLessThanOrEqual(tools.y + 1);
+  // It works from the keyboard (Tab order: + then X), with a visible focus ring.
   await add(page).focus();
-  await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
   await expect(add(page)).toBeFocused();
   await expect(add(page)).toHaveCSS('outline-style', 'solid');
   await expect(add(page)).toHaveCSS('outline-width', '2px');
@@ -171,15 +178,26 @@ test('each note folds by its arrow only, showing its first line', async ({ page 
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test('the arrow, name, the top + and the trash are each at least 44px to press', async ({ page }) => {
+  test('the arrow, name, the header + (beside the X) and the trash are each at least 44px to press', async ({ page }) => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).locator('.phone-tiles').getByRole('button', { name: 'Journal', exact: true }).tap();
     await add(page).tap();
     await expect(rename(page)).toBeFocused();
     await page.keyboard.press('Enter');
-    const bar = (await panel(page).locator('.jn-bar').boundingBox())!;
     const view = page.viewportSize()!;
-    expect(bar.x + bar.width).toBeLessThanOrEqual(view.width);
+    // The + sits in the header beside the X: one row, the title not wrapped, nothing past the screen edge.
+    const closeBox = (await panel(page).locator('.history-head').getByRole('button', { name: 'Close journal' }).boundingBox())!;
+    const plusBox = (await add(page).boundingBox())!;
+    const title = (await panel(page).locator('.history-head h2').boundingBox())!;
+    expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(view.width);
+    expect(plusBox.x + plusBox.width).toBeLessThanOrEqual(closeBox.x + 1);
+    expect(Math.abs(plusBox.y - closeBox.y)).toBeLessThanOrEqual(1);
+    expect(title.x + title.width).toBeLessThanOrEqual(plusBox.x + 1);
+    expect(title.height).toBeLessThan(30);
+    for (const el of [panel(page).locator('.history-head').getByRole('button', { name: 'Close journal' })]) {
+      const box = (await el.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
     for (const el of [fold(page, 0), nameBtn(page, 0), add(page), trash(page, 0)]) {
       const box = (await el.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
@@ -192,9 +210,6 @@ test.describe('on a phone', () => {
     const sheet = (await note(page, 0).boundingBox())!;
     const bin = (await trash(page, 0).boundingBox())!;
     expect(bin.x + bin.width).toBeLessThanOrEqual(sheet.x + sheet.width);
-    // The top + lines up with the trash buttons below it.
-    const plus = (await add(page).boundingBox())!;
-    expect(Math.abs(plus.x + plus.width - (bin.x + bin.width))).toBeLessThanOrEqual(1);
     await trash(page, 1).tap();
     await expect(sections(page)).toHaveCount(1);
   });

@@ -5,8 +5,9 @@ import { escapeIsForPanel } from './textField';
 /**
  * A panel beside the board, in the right-hand spot Version history also uses (one at a
  * time); on a phone it fills the screen. It only frames what it holds: a title, ×, and Escape to close.
+ * `actions` are icon buttons in the header, just left of the × (the Journal's +).
  */
-export function SidePanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function SidePanel({ title, onClose, actions, children }: { title: string; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
   useEffect(() => {
     // Escape meant for something else (see escapeIsForPanel) leaves it open.
     const key = (e: KeyboardEvent) => escapeIsForPanel(e) && onClose();
@@ -21,6 +22,7 @@ export function SidePanel({ title, onClose, children }: { title: string; onClose
     <aside className="history-panel side-panel" aria-label={title} tabIndex={-1}>
       <header className="history-head">
         <h2>{title}</h2>
+        {actions}
         <button type="button" className="icon-button" aria-label={`Close ${title.toLowerCase()}`} title="Close (Esc)" onClick={onClose}>
           <CloseIcon />
         </button>

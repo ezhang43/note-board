@@ -101,9 +101,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         </SidePanel>
       )}
       {sidePanel === 'journal' && (
-        <SidePanel title="Journal" onClose={closeJournal}>
-          <JournalPanel />
-        </SidePanel>
+        <JournalPanel onClose={closeJournal} />
       )}
       {sidePanel === 'habits' && (
         <SidePanel title="Habits" onClose={closeHabits}>

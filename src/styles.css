@@ -2172,6 +2172,28 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   outline: none;
 }
 .delete-account .feedback-count { margin-top: 2px; text-align: right; }
+
+/* Brain dump (wow plan, job 3): a text box, the cards it will make, and Add. The shortcuts panel's frame; a bottom sheet on a phone. */
+.brain-dump { width: min(620px, 100%); }
+.brain-dump-text { display: block; width: 100%; margin-top: 10px; box-sizing: border-box; }
+.brain-dump-preview { margin: 12px 0; }
+.brain-dump-preview ul { list-style: none; margin: 0 0 6px; padding: 0; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.brain-dump-preview li { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: 14px; }
+.brain-dump-preview li + li { border-top: 1px solid var(--line); }
+.brain-dump-kind { flex: none; width: 66px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.brain-dump-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.brain-dump-time { flex: none; padding: 0 7px; font-size: 12px; line-height: 18px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 999px; }
+.brain-dump .confirm-actions button { height: 36px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--ink); }
+.brain-dump .confirm-actions .confirm-send { color: var(--on-accent); }
+@media (max-width: 599px) {
+  .brain-dump-backdrop { align-items: flex-end; padding: 0; }
+  .brain-dump { width: 100%; max-height: 92vh; max-height: 92dvh; padding: 14px 16px max(16px, env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; transform-origin: bottom center; }
+  .brain-dump .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  /* 16px so the phone does not zoom the page when the box takes the cursor. */
+  .brain-dump-text { font-size: 16px; }
+  .brain-dump-preview ul { max-height: 28vh; }
+  .brain-dump .confirm-actions button { height: 48px; font-size: 15px; }
+}
 .confirm-send { border: none; background: var(--accent); color: var(--on-accent); }
 
 /* Web addresses in a note, as links under its text (owner request). */

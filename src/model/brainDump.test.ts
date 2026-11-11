@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IMPORT_MAX_CARDS } from './importFile';
 import { NOTE_NAME_MAX } from './journal';
-import { parseBrainDump } from './brainDump';
+import { draftCards, minutesLabel, parseBrainDump } from './brainDump';
 
 const titles = (text: string) => parseBrainDump(text).map((d) => d.title);
 const one = (text: string) => parseBrainDump(text)[0];
@@ -163,5 +163,37 @@ describe('parseBrainDump: limits', () => {
     const t = Date.now();
     parseBrainDump(`${'1 '.repeat(100000)}30m`);
     expect(Date.now() - t).toBeLessThan(2000);
+  });
+});
+
+describe('draftCards', () => {
+  it('makes a note card from a note draft and a checklist from a checkbox draft, in order', () => {
+    const cards = draftCards(parseBrainDump('Buy milk\n[ ] Pack bag'));
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({ kind: 'note', text: 'Buy milk' });
+    expect(cards[1]).toMatchObject({ kind: 'todo', title: 'Pack bag' });
+    if (cards[1].kind === 'todo') expect(cards[1].items).toHaveLength(1);
+  });
+  it('gives every card its own id', () => {
+    const cards = draftCards(parseBrainDump('a\nb\nc\n[ ] d'));
+    expect(new Set(cards.map((c) => c.id)).size).toBe(4);
+  });
+  it('keeps the estimate off the card, because the save format has no place for it yet', () => {
+    const cards = draftCards(parseBrainDump('Write report 1h30\n[ ] Pack bag (20m)'));
+    expect(JSON.stringify(cards)).not.toMatch(/minutes|estimate/);
+  });
+  it('gives nothing for nothing', () => {
+    expect(draftCards([])).toEqual([]);
+    expect(draftCards(parseBrainDump('  \n\n'))).toEqual([]);
+  });
+});
+
+describe('minutesLabel', () => {
+  it('writes minutes, whole hours, and hours with minutes', () => {
+    expect(minutesLabel(30)).toBe('30 min');
+    expect(minutesLabel(60)).toBe('1 h');
+    expect(minutesLabel(90)).toBe('1 h 30 min');
+    expect(minutesLabel(1440)).toBe('24 h');
+    expect(minutesLabel(5)).toBe('5 min');
   });
 });

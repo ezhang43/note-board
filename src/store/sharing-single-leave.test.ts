@@ -160,4 +160,72 @@ describe('leaving a share sends one leave', () => {
     expect(sharing.isShared('n1')).toBe(false);
     expect(notices).toEqual(['“Trip” was deleted by the person who shared it.']);
   });
+
+  /** Carol's page with a shared-boards list the test sends itself, and a leave the test answers. */
+  async function drivenDevice() {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const carol = person('carol');
+    const real = server.backendFor(carol);
+    // Each leave reaches the server only when the test says so.
+    const waiting: { done: () => void; failed: (e: Error) => void }[] = [];
+    const ends = {
+      answer: () => waiting.splice(0).forEach((w) => void server.server.leave(carol, 'sgood').then(w.done)),
+      fail: (e: Error) => waiting.splice(0).forEach((w) => w.failed(e)),
+    };
+    const leave = vi.fn(() => new Promise<void>((done, failed) => void waiting.push({ done, failed })));
+    let list: (ids: string[], confirmed: boolean) => void = () => {};
+    const notices: string[] = [];
+    const sharing = startSharing(store, { ...real, leave, watchMyShares: (fn) => ((list = fn), () => {}) }, { client: 'carol-page', storage, onNotice: (t) => notices.push(t) });
+    list([], true);
+    const joined = sharing.join('sgood', 'goodkey');
+    await settle();
+    await joined;
+    list(['sgood'], true);
+    return { sharing, leave, notices, ends, list: (ids: string[], confirmed: boolean) => list(ids, confirmed) };
+  }
+
+  it('the offline copy of the list dropping the board while the leave is on its way changes nothing: still one leave, no notice', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    // Firestore's offline copy shows the leave at once (not confirmed by the server).
+    page.list([], false);
+    // The server takes Carol off; its word reaches the share's watch before the leave answers.
+    await server.server.leave(person('carol'), 'sgood');
+    await settle();
+    page.ends.answer();
+    await left;
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('a leave that fails after the server already took them off still reports the failure, and tries the clean-up once more', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    left.catch(() => {});
+    await server.server.leave(person('carol'), 'sgood');
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    page.ends.fail(new Error('offline'));
+    await expect(left).rejects.toThrow('offline');
+    expect(page.leave).toHaveBeenCalledTimes(2);
+  });
+
+  it('a late list naming a board whose leave failed still opens it (they are still on it)', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    left.catch(() => {});
+    page.ends.fail(new Error('offline'));
+    await expect(left).rejects.toThrow('offline');
+    expect(page.sharing.isShared('n1')).toBe(true);
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(true);
+    expect(page.notices).toEqual([]);
+  });
 });

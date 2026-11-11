@@ -401,6 +401,36 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     for (const c of [plus, collapse, del, corner, strip]) expect(await takenFromOthers(c)).toBe(0);
   });
 
+  test('a container\'s +: the new checklist is the first card, on screen, with the cursor in its title (owner request 2026-11-11)', async ({ page }) => {
+    await addMenu(page, 'Container');
+    await addMenu(page, 'Note');
+    await addMenu(page, 'Note');
+    const col = page.locator('[data-col-id]').first();
+    // Pan back up until the container's header is clear of the top bar (the notes took the view down).
+    await page.mouse.move(200, 400);
+    for (let i = 0; i < 40 && (await rect(col)).y < 70; i++) {
+      await page.mouse.wheel(0, -40);
+      await page.waitForTimeout(30);
+    }
+    await col.getByLabel('Container title').tap(); // select the container again so its + shows
+    const before = await rect(col);
+    await col.getByRole('button', { name: 'Add a checklist' }).tap();
+    const cards = col.locator('[data-card-id]');
+    await expect(cards).toHaveCount(3);
+    const first = cards.first();
+    await expect(first).toHaveAttribute('data-kind', 'todo');
+    await expect(first.getByLabel('List title')).toBeFocused();
+    const r = await rect(first);
+    expect(r.y).toBeGreaterThanOrEqual(0);
+    expect(r.x).toBeGreaterThanOrEqual(0);
+    expect(r.x + r.width).toBeLessThanOrEqual(390 + 1);
+    expect(r.y + Math.min(r.height, 60)).toBeLessThanOrEqual(844);
+    // The container grew downward: the notes under it, still in their order.
+    await expect(cards.nth(1)).toHaveAttribute('data-kind', 'note');
+    expect((await rect(cards.nth(1))).y).toBeGreaterThan(r.y);
+    expect(before.width).toBeGreaterThan(0);
+  });
+
   test('a collapsed card: the width strip and the buttons stay apart', async ({ page }) => {
     await addMenu(page, 'Note');
     await page.keyboard.type('Hello');

@@ -14,7 +14,7 @@ import { boardRights, restorable, VIEW_ONLY_NOTE } from '../../model/sharing';
 import { FONT_KEY, nextFontSize, phoneReadableZoom } from '../../model/font';
 import { DEFAULT_HOTKEYS, HOTKEYS_KEY, problemWith, type Binding, type HotkeyAction } from '../../model/hotkeys';
 import { COLOR_THEME_KEY, THEME_KEY, type ColorTheme } from '../../model/theme';
-import type { Board, CardKind, Point, View } from '../../model/types';
+import type { Board, Card, CardKind, Point, View } from '../../model/types';
 import type { VersionMeta } from '../../model/versions';
 import type { Match } from '../../model/search';
 import { pinchView } from '../../model/pinch';
@@ -51,6 +51,29 @@ export function addNewColumn(ctx: StoreContext, at: Point) {
   const col = { ...createColumn(), ...at };
   ctx.commit((b) => B.addColumn(b, col), { ui: { selection: [col.id], itemSel: null, focusBlock: col.id } });
   ctx.requestSettle([col.id]);
+}
+
+/**
+ * Adds several new loose cards in one undo step: packed in lanes at the top middle of the screen (or the
+ * nearest free space, then the view is moved to them), selected, and laid out again with their real heights
+ * once drawn. Used by Import file and the Brain dump. The caller has checked that the board may be changed.
+ */
+export function addCardsInLanes(ctx: StoreContext, cards: Card[]) {
+  ctx.updateUi({ preview: null }); // an old version being looked at is put away first (edits are refused while it is shown)
+  const ids = cards.map((c) => c.id);
+  const guess = new Map(cards.map((c) => [c.id, estimateHeight(c)]));
+  const size = packInLanes(ids, (id) => guess.get(id)!, { x: 0, y: 0 });
+  const centre = ctx.screenCentre();
+  const top = screenToBoard(ctx.state.view, { x: 0, y: IMPORT_TOP_MARGIN }).y;
+  const want = { x: centre.x - size.w / 2, y: top };
+  const origin = spotForNewBlock(ctx.state.board, size.w, size.h, { x: centre.x, y: top + size.h / 2 }, ctx.measured);
+  const { spots } = packInLanes(ids, (id) => guess.get(id)!, origin);
+  ctx.commit((b) => addImported(b, cards, spots), { ui: { selection: ids, itemSel: null, colourMenuOpen: false, confirm: null } });
+  ctx.layout.importLayout = { ids, origin };
+  // If free space was found elsewhere, bring it to where the cards were meant to appear.
+  const z = ctx.state.view.zoom;
+  if (Math.abs(want.x - origin.x) > GRID || Math.abs(want.y - origin.y) > GRID)
+    ctx.updateView((v) => panBy(v, Math.round((want.x - origin.x) * z), Math.round((want.y - origin.y) * z)));
 }
 
 export function blockActions(ctx: StoreContext) {
@@ -352,21 +375,7 @@ export function blockActions(ctx: StoreContext) {
       if (ctx.viewOnly()) return { added: 0, note: VIEW_ONLY_NOTE };
       const { cards, note } = readImport(name, text, (html) => new DOMParser().parseFromString(html, 'text/html'));
       if (!cards.length) return { added: 0, note };
-      updateUi({ preview: null }); // an old version being looked at is put away first (edits are refused while it is shown)
-      const ids = cards.map((c) => c.id);
-      const guess = new Map(cards.map((c) => [c.id, estimateHeight(c)]));
-      const size = packInLanes(ids, (id) => guess.get(id)!, { x: 0, y: 0 });
-      const centre = ctx.screenCentre();
-      const top = screenToBoard(ctx.state.view, { x: 0, y: IMPORT_TOP_MARGIN }).y;
-      const want = { x: centre.x - size.w / 2, y: top };
-      const origin = spotForNewBlock(ctx.state.board, size.w, size.h, { x: centre.x, y: top + size.h / 2 }, measured);
-      const { spots } = packInLanes(ids, (id) => guess.get(id)!, origin);
-      commit((b) => addImported(b, cards, spots), { ui: { selection: ids, itemSel: null, colourMenuOpen: false, confirm: null } });
-      layout.importLayout = { ids, origin };
-      // If free space was found elsewhere, bring it to where the cards were meant to appear.
-      const z = ctx.state.view.zoom;
-      if (Math.abs(want.x - origin.x) > GRID || Math.abs(want.y - origin.y) > GRID)
-        updateView((v) => panBy(v, Math.round((want.x - origin.x) * z), Math.round((want.y - origin.y) * z)));
+      addCardsInLanes(ctx, cards);
       return { added: cards.length, note };
     },
 

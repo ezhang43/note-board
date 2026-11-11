@@ -33,7 +33,7 @@ const makeId = (p: string) => `${p}${++n}`;
 
 describe('folding an item', () => {
   it('toggleFold folds an item with sub-items and unfolds it again; the open state is left out, not saved as false', () => {
-    const open = [item('a', [item('a1')]), item('b')];
+    const open = [item('a', [item('a1'), item('a2')]), item('b')];
     const folded = C.toggleFold(open, 'a')!;
     expect(folded[0].folded).toBe(true);
     expect(open[0].folded).toBeUndefined(); // the input is not changed
@@ -47,7 +47,7 @@ describe('folding an item', () => {
   });
 
   it('isFolded needs sub-items: a fold left on an item with none counts as open', () => {
-    expect(C.isFolded(item('a', [item('a1')], { folded: true }))).toBe(true);
+    expect(C.isFolded(item('a', [item('a1'), item('a2')], { folded: true }))).toBe(true);
     expect(C.isFolded(item('a', [], { folded: true }))).toBe(false);
     expect(C.isFolded(item('a', [item('a1')]))).toBe(false);
   });
@@ -55,7 +55,7 @@ describe('folding an item', () => {
   it('shownIds leaves out everything under a folded item; flatIds still lists them all', () => {
     expect(C.shownIds(sample())).toEqual(['a', 'b']);
     expect(C.flatIds(sample())).toEqual(['a', 'a1', 'a1x', 'a2', 'b']);
-    const inner = [item('a', [item('a1', [item('a1x')], { folded: true }), item('a2')])];
+    const inner = [item('a', [item('a1', [item('a1x'), item('a1y')], { folded: true }), item('a2')])];
     expect(C.shownIds(inner)).toEqual(['a', 'a1', 'a2']);
   });
 
@@ -116,7 +116,7 @@ describe('what is shown is what the keys work on', () => {
   it('Backspace in an empty item below a folded one puts the cursor on the folded item', () => {
     const items = [...sample(), { ...item('e'), text: '' }];
     expect(C.removeEmptyItem(items, 'e')!.focus).toBe('b');
-    const after = [item('a', [item('a1')], { folded: true }), { ...item('e'), text: '' }, item('z')];
+    const after = [item('a', [item('a1'), item('a2')], { folded: true }), { ...item('e'), text: '' }, item('z')];
     expect(C.removeEmptyItem(after, 'e')!.focus).toBe('a');
   });
 });
@@ -169,6 +169,55 @@ describe('a fold with nothing left under it', () => {
     const after = (C.editItems(b, 't1', (its) => C.deleteItems(its, ['a1'], makeId)).cards.t1 as TodoCard).items;
     expect('folded' in after[0]).toBe(false);
     expect(after[1].folded).toBe(true);
+  });
+});
+
+// Eric, 2026-11-11: "for sub-checklist items, the collapse button should only be there if there are 2 or more items."
+describe('a fold needs two sub-items', () => {
+  it('canFold is true from two direct sub-items, at any level', () => {
+    expect(C.canFold(item('a'))).toBe(false);
+    expect(C.canFold(item('a', [item('a1')]))).toBe(false);
+    expect(C.canFold(item('a', [item('a1'), item('a2')]))).toBe(true);
+    // Two levels down only counts for the item that has them as direct sub-items.
+    expect(C.canFold(item('a', [item('a1', [item('x'), item('y')])]))).toBe(false);
+  });
+
+  it('a fold saved on an item with one sub-item counts as open: the sub-item shows, and the saved data is not rewritten', () => {
+    const items = [item('a', [item('a1')], { folded: true }), item('b')];
+    expect(C.isFolded(items[0])).toBe(false);
+    expect(C.shownIds(items)).toEqual(['a', 'a1', 'b']);
+    expect(items[0].folded).toBe(true);
+    // Copying it takes nothing hidden, and a search match in the sub-item is not "in a folded item".
+    expect(C.withHidden(items, ['a'])).toEqual(['a']);
+    expect(C.isFolded(item('a', [item('a1'), item('a2')], { folded: true }))).toBe(true);
+  });
+
+  it('an item with one sub-item has nothing to fold', () => {
+    expect(C.toggleFold([item('a', [item('a1')])], 'a')).toBeNull();
+    expect(C.toggleFold([item('a', [item('a1')], { folded: true })], 'a')).toBeNull();
+    expect(C.toggleFold([item('a', [item('a1'), item('a2')])], 'a')![0].folded).toBe(true);
+  });
+
+  it('a fold on an item with one sub-item is kept (not dropped as empty), so it is there again when a second one comes', () => {
+    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items: [item('a', [item('a1')], { folded: true })] };
+    const b: Board = { ...createBoard(), cards: { t1: card }, order: ['t1'] };
+    const after = (C.editItems(b, 't1', (its) => its.map((it) => ({ ...it, text: 'x' }))).cards.t1 as TodoCard).items;
+    expect(after[0].folded).toBe(true);
+  });
+
+  it('showItem opens only the folds that hide something: a saved fold on a one-sub-item ancestor is kept', () => {
+    const items = [item('g', [item('p', [item('x')], { folded: true }), item('q')], { folded: true })];
+    const shown = C.showItem(items, 'x');
+    expect(shown[0].folded).toBeUndefined();
+    expect(shown[0].children[0].folded).toBe(true);
+  });
+
+  it('hasFoldable says whether a list needs room for its top-level fold arrows', () => {
+    expect(C.hasFoldable([item('a', [item('a1')]), item('b')])).toBe(false);
+    expect(C.hasFoldable([item('a', [item('a1')]), item('b', [item('b1'), item('b2')])])).toBe(true);
+    // Only top-level parents give the list its arrow room.
+    expect(C.hasFoldable([item('a', [item('a1', [item('x'), item('y')]), item('a2')])])).toBe(true);
+    expect(C.hasFoldable([item('a', [item('a1', [item('x'), item('y')])])])).toBe(false);
   });
 });
 
@@ -245,7 +294,7 @@ describe('search, Clean up and the Completed panel', () => {
   });
 
   it('the outermost fold is the one ringed', () => {
-    const items = [item('a', [item('a1', [item('deep')], { folded: true })], { folded: true })];
+    const items = [item('a', [item('a1', [item('deep'), item('deep2')], { folded: true }), item('a2')], { folded: true })];
     expect(findMatches(board(items), 'deep')[0].showInstead).toBe('a');
   });
 
@@ -264,12 +313,12 @@ describe('search, Clean up and the Completed panel', () => {
   });
 
   it('an item put back from the Completed panel under a folded item unfolds it, so it is in sight', () => {
-    const items = [item('a', [{ ...item('a1'), done: true }, item('a2')]), item('b')];
+    const items = [item('a', [{ ...item('a1'), done: true }, item('a2'), item('a3')]), item('b')];
     const cleaned = cleanUp(board(items), '2026-11-09', { type: 'loose', x: 0, y: 600 }).board;
     const folded = { ...cleaned, cards: { ...cleaned.cards, t1: { ...(cleaned.cards.t1 as TodoCard), items: C.toggleFold((cleaned.cards.t1 as TodoCard).items, 'a')! } } };
     const back = restoreEntry(folded, 'a1', { type: 'loose', x: 0, y: 0 }).board;
     const a = (back.cards.t1 as TodoCard).items[0];
-    expect(ids([a])).toBe('a(a2 a1)');
+    expect(ids([a])).toBe('a(a2 a3 a1)');
     expect(a.folded).toBeUndefined();
   });
 });
@@ -311,7 +360,7 @@ describe('review fixes', () => {
 
   it('putting an item back under a folded grandparent opens every fold above it', () => {
     const b = (items: TodoItem[]): Board => ({ ...createBoard(), cards: { t1: { ...(createCard('todo', 't1') as TodoCard), items } }, order: ['t1'] });
-    const cleaned = cleanUp(b([item('g', [item('p', [{ ...item('x'), done: true }, item('y')])])]), '2026-11-09', { type: 'loose', x: 0, y: 600 }).board;
+    const cleaned = cleanUp(b([item('g', [item('p', [{ ...item('x'), done: true }, item('y'), item('y2')]), item('q')])]), '2026-11-09', { type: 'loose', x: 0, y: 600 }).board;
     const t1 = cleaned.cards.t1 as TodoCard;
     const folded = { ...cleaned, cards: { ...cleaned.cards, t1: { ...t1, items: C.toggleFold(C.toggleFold(t1.items, 'p')!, 'g')! } } };
     const back = restoreEntry(folded, 'x', { type: 'loose', x: 0, y: 0 }).board;
@@ -319,7 +368,7 @@ describe('review fixes', () => {
   });
 
   it('the cursor never goes to a hidden blank sub-item after a delete', () => {
-    const items = [item('a', [{ ...item('h'), text: '' }], { folded: true }), item('z')];
+    const items = [item('a', [{ ...item('h'), text: '' }, item('h2')], { folded: true }), item('z')];
     const after = [items[0]];
     expect(C.focusAfterRemoving(['z'], after, ['z'])).toBeNull();
   });

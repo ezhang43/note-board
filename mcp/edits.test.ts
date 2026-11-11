@@ -32,6 +32,10 @@ const item = (ws: Workspace, listId: string, id: string, board = 'home') => find
 function folded(): Workspace {
   const ws = sample();
   const l = list(ws, 'listGroceries');
+  // A fold needs 2 or more sub-items (2026-11-11): give "Free range" and "Eggs" a second one each.
+  const free = findItem(l.items, 'iFree')!.item;
+  free.children.push({ id: 'iBox2', text: 'Box of 6', done: false, children: [] });
+  findItem(l.items, 'iEggs')!.item.children.push({ id: 'iDozen', text: 'Dozen', done: false, children: [] });
   l.items = toggleFold(toggleFold(l.items, 'iFree')!, 'iEggs')!;
   return ws;
 }
@@ -47,11 +51,11 @@ describe('folded items', () => {
   });
 
   it('a fold is dropped when the connector deletes or moves out the last sub-item, as in the app', () => {
-    const plan = planDelete(folded(), 'home', ['iBox'], new Set(), (p) => `${p}_x`);
+    const plan = planDelete(folded(), 'home', ['iBox', 'iBox2'], new Set(), (p) => `${p}_x`);
     if ('error' in plan) throw new Error(plan.error);
     expect('folded' in item(plan.ws, 'listGroceries', 'iFree')!.item).toBe(false);
     expect(item(plan.ws, 'listGroceries', 'iEggs')!.item.folded).toBe(true); // it still has Free range
-    const moved = ok(moveItems('home', ['iBox'], { list: 'Groceries', after: 'iBread' }), folded());
+    const moved = ok(moveItems('home', ['iBox', 'iBox2'], { list: 'Groceries', after: 'iBread' }), folded());
     expect('folded' in item(moved.ws, 'listGroceries', 'iFree')!.item).toBe(false);
     expect(item(moved.ws, 'listGroceries', 'iEggs')!.item.folded).toBe(true);
   });

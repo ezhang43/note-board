@@ -24,7 +24,7 @@ const MIN_CONTRAST = 9;
 type Item = { id: string; text: string; done: boolean; children: Item[]; folded?: true };
 const item = (id: string, children: Item[] = [], folded = false): Item => ({ id, text: `Item ${id}`, done: false, children, ...(folded ? { folded: true as const } : {}) });
 
-async function seed(page: Page, items: Item[] = [item('a', [item('b', [item('c')]), item('d', [item('f')], true)]), item('e', [item('g')], true)]) {
+async function seed(page: Page, items: Item[] = [item('a', [item('b', [item('c'), item('c2')]), item('d', [item('f'), item('f2')], true)]), item('e', [item('g'), item('g2')], true)]) {
   // a: an open parent with an open sub-parent (b) and a folded one (d); e: a folded top-level parent.
   await page.evaluate((items) => {
     const base = { color: null, collapsed: false, h: null };
@@ -107,7 +107,7 @@ async function run(page: Page, layout: 'desktop' | 'phone', theme: 'light' | 'da
 
 // The room for a top-level arrow goes to a list that has one, and to no other (SPEC.md): a list without a parent item keeps its tick boxes
 // 13px (the card's padding and border) from the card's edge; a list with one has them a little further in, so the arrow fits.
-for (const [name, items, shifted] of [['without', [item('a'), item('b', [], false)], false], ['with', [item('a', [item('b')]), item('c')], true]] as const) {
+for (const [name, items, shifted] of [['without', [item('a'), item('b', [], false)], false], ['with', [item('a', [item('b'), item('b2')]), item('c')], true]] as const) {
   test(`a list ${name} a parent item has its tick boxes ${shifted ? 'shifted in to make room for the arrow' : '13px from the card edge, as before'}`, async ({ page }) => {
     await seed(page, items as unknown as Item[]);
     await page.reload();

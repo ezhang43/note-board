@@ -44,7 +44,7 @@ export function subtreeHeight(item: TodoItem): number {
 
 /** The bottom-most item shown under (or as) this item. */
 function lastVisible(item: TodoItem): TodoItem {
-  return item.children.length && !item.folded ? lastVisible(item.children[item.children.length - 1]) : item;
+  return item.children.length && !isFolded(item) ? lastVisible(item.children[item.children.length - 1]) : item;
 }
 
 /** Every item, shown or hidden in a fold, top to bottom. */
@@ -54,9 +54,22 @@ export function flatIds(items: TodoItem[]): string[] {
 
 // ---------- folding a parent item's sub-items (owner request, 2026-11-09) ----------
 
-/** Whether an item's sub-items are hidden: a fold counts only while there are sub-items to hide. */
+/** Whether an item can fold: it has 2 or more direct sub-items (owner request, 2026-11-11; one sub-item needs no fold). */
+export function canFold(item: TodoItem): boolean {
+  return item.children.length >= 2;
+}
+
+/** Whether a list has a top-level parent that can fold, so its arrow needs room left of the rows. */
+export function hasFoldable(items: TodoItem[]): boolean {
+  return items.some(canFold);
+}
+
+/**
+ * Whether an item's sub-items are hidden: a fold counts only while it can fold. A fold saved on an item with
+ * one sub-item (or none) is kept as saved but shows as open, so it is back if a second sub-item comes.
+ */
 export function isFolded(item: TodoItem): boolean {
-  return !!item.folded && item.children.length > 0;
+  return !!item.folded && canFold(item);
 }
 
 /** The items shown, top to bottom: everything under a folded item is left out. */
@@ -84,16 +97,16 @@ export function withHidden(items: TodoItem[], ids: string[], alone: readonly str
 
 /** Unfolds every item above `id`, so it is in sight (the same list when none is folded). */
 export function showItem(items: TodoItem[], id: string): TodoItem[] {
-  if (!ancestorsOf(items, id).some((a) => a.folded)) return items;
+  if (!ancestorsOf(items, id).some(isFolded)) return items;
   const next = cloned(items);
-  for (const a of ancestorsOf(next, id)) delete a.folded;
+  for (const a of ancestorsOf(next, id)) if (isFolded(a)) delete a.folded; // a saved fold on a one-sub-item parent stays
   return next;
 }
 
-/** Folds an item with sub-items, or unfolds it (the open state is left out, not saved as false). Null for an item with none. */
+/** Folds an item with 2 or more sub-items, or unfolds it (the open state is left out, not saved as false). Null for an item that can't fold. */
 export function toggleFold(items: TodoItem[], id: string): TodoItem[] | null {
   const loc = findItem(items, id);
-  if (!loc?.item.children.length) return null;
+  if (!loc || !canFold(loc.item)) return null;
   const next = cloned(items);
   const it = findItem(next, id)!.item;
   if (it.folded) delete it.folded;

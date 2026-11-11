@@ -185,7 +185,7 @@ describe('leaving a share sends one leave', () => {
     await settle();
     await joined;
     list(['sgood'], true);
-    return { sharing, leave, notices, ends, list: (ids: string[], confirmed: boolean) => list(ids, confirmed) };
+    return { sharing, leave, notices, ends, waiting, list: (ids: string[], confirmed: boolean) => list(ids, confirmed) };
   }
 
   it('the offline copy of the list dropping the board while the leave is on its way changes nothing: still one leave, no notice', async () => {
@@ -239,5 +239,75 @@ describe('leaving a share sends one leave', () => {
     expect(page.leave).toHaveBeenCalledTimes(1);
     expect(page.sharing.isShared('n1')).toBe(false);
     expect(page.notices).toEqual([]);
+  });
+
+  // Owner decision on #269 (2026-11-11).
+  it('the server’s list dropping the board while its leave is on its way doesn’t close it: a leave that fails changes nothing', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    left.catch(() => {});
+    // Firestore's list already shows the leave (it counts as confirmed), before the leave answers.
+    page.list([], true);
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(true);
+    page.ends.fail(new Error('offline'));
+    await expect(left).rejects.toThrow('offline');
+    expect(page.sharing.isShared('n1')).toBe(true);
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('the server’s list dropping the board while its leave is on its way: once the leave answers, the board goes, with one leave', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    page.list([], true);
+    page.ends.answer();
+    await settle();
+    await left;
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('the one retry after a failed leave is guarded too: an old list doesn’t reopen the board, and no notice shows', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    left.catch(() => {});
+    await server.server.leave(person('carol'), 'sgood');
+    await settle();
+    page.ends.fail(new Error('offline'));
+    await expect(left).rejects.toThrow('offline');
+    // A list from before the leave arrives while the retry is on its way.
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(2);
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('no retry of a failed leave goes out after signing out', async () => {
+    const page = await drivenDevice();
+    const left = page.sharing.leave('sgood');
+    left.catch(() => {});
+    await server.server.leave(person('carol'), 'sgood');
+    await settle();
+    page.sharing.stop();
+    page.ends.fail(new Error('offline'));
+    await expect(left).rejects.toThrow('offline');
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+  });
+
+  it('the clean-up leave after being removed is guarded too: an old list doesn’t reopen the board or say so twice', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+    // The server's list still names it until the clean-up leave lands.
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
   });
 });

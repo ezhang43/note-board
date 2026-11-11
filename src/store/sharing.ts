@@ -574,19 +574,23 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   /** This person's own leave of share `id`, sent once (see `leaving`). */
-  function sendLeave(id: string): Promise<void> {
+  function sendLeave(id: string, retry = true): Promise<void> {
     const sent = leaving.get(id);
     if (sent) return sent;
     left.add(id);
-    const leave = backend
-      .leave(id)
-      .catch((e) => {
+    const leave = backend.leave(id).then(
+      () => {
+        leaving.delete(id);
+      },
+      (e) => {
+        leaving.delete(id);
         left.delete(id);
-        // It went from here meanwhile, and gone() left the clean-up leave to this one: try it once more.
-        if (!shares.has(id)) backend.leave(id).catch(() => {});
+        // It went from here meanwhile, and gone() left the clean-up leave to this one: try it once
+        // more (not after signing out).
+        if (retry && !shares.has(id) && !stopped) sendLeave(id, false).catch(() => {});
         throw e;
-      })
-      .finally(() => leaving.delete(id));
+      },
+    );
     leaving.set(id, leave);
     return leave;
   }
@@ -623,7 +627,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     } else applyBoards(Object.fromEntries(ids.map((id) => [id, ws.boards[id]])), {});
     // Off this person's list of shares too (it may already be).
     const selfLeave = leaving.has(s.id);
-    if (why !== 'left' && !selfLeave) backend.leave(s.id).catch(() => {});
+    if (why !== 'left') sendLeave(s.id).catch(() => {});
     if (why === 'removed' && !selfLeave) opts.onNotice?.(`“${name}” is no longer shared with you.`);
     if (why === 'deleted' && !s.owner) opts.onNotice?.(`“${name}” was deleted by the person who shared it.`);
     publish();
@@ -741,7 +745,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       for (const id of ids) if (!leaving.has(id) && !left.has(id)) open(id);
       if (confirmed) {
         // Left on another device (only by the server's own list: the offline copy may be out of date).
-        for (const s of [...shares.values()]) if (!ids.includes(s.id) && s.ready && !s.deleting) gone(s, 'left');
+        // One whose leave is on its way here waits for that leave: if it fails, nothing changes.
+        for (const s of [...shares.values()])
+          if (!ids.includes(s.id) && s.ready && !s.deleting && !leaving.has(s.id)) gone(s, 'left');
         said = true;
         // Kept even when empty, so the next page here knows at once (job #33).
         remember();

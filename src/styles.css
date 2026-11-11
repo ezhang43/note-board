@@ -3279,7 +3279,7 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 @media (prefers-reduced-motion: no-preference) {
   .cal-ghost { animation: cal-lift 120ms var(--ease-out); }
   @keyframes cal-lift { from { scale: 1; box-shadow: none; } }
-  .cal-day, .cal-cell { transition: background-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out); }
+  body.cal-dragging .cal-day, body.cal-dragging .cal-cell { transition: background-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out); }
 }
 .cal-more {
   min-width: 0;

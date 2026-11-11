@@ -58,7 +58,7 @@ describe('the cursor after undo or redo', () => {
     expect(cursorAfterStep(before, board([it_('a1'), it_('a2', [it_('a2x')])], [it_('a3')]), { cardId: 'A', itemId: 'a3' })).toEqual({ cardId: 'A', itemId: 'a2x' });
   });
   it('goes to the folded item above a sub-item a fold hid (PR #239)', () => {
-    const folded = board([it_('a1'), { ...it_('a2', [it_('a2x')]), folded: true }, it_('a3')]);
+    const folded = board([it_('a1'), { ...it_('a2', [it_('a2x'), it_('a2y')]), folded: true }, it_('a3')]);
     expect(drawnItems(folded, 'A')).toEqual(['a1', 'a2', 'a3']);
     expect(cursorAfterStep(board(), folded, { cardId: 'A', itemId: 'a2x' })).toEqual({ cardId: 'A', itemId: 'a2' });
   });

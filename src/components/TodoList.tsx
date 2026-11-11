@@ -2,7 +2,7 @@ import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { canMoveItem, doneCount, isFolded, ITEM_INDENT } from '../model/checklist';
+import { canFold, canMoveItem, doneCount, hasFoldable, isFolded, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
@@ -66,8 +66,8 @@ export function TodoTitle({ card }: { card: TodoCard }) {
 export function TodoBody({ card }: { card: TodoCard }) {
   return (
     <div className="todo-body" data-todo-of={card.id}>
-      {/* A list with a top-level parent item has the left room for its fold arrow (styles.css). */}
-      <div className={card.items.some((it) => it.children.length > 0) ? 'todo-items has-fold' : 'todo-items'}>
+      {/* A list with a top-level parent that can fold has the left room for its arrow (styles.css). */}
+      <div className={hasFoldable(card.items) ? 'todo-items has-fold' : 'todo-items'}>
         {flatten(card.items).map(({ item, depth }) => (
           <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />
         ))}
@@ -145,7 +145,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       e.preventDefault();
       const el = e.currentTarget;
       appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
-    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && item.children.length && (e.key === 'ArrowUp') !== isFolded(item)) {
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && canFold(item) && (e.key === 'ArrowUp') !== isFolded(item)) {
       // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy). With nothing
       // to fold or unfold, the key is left to the browser (jump by paragraph; on a Mac, to the start or end).
       e.preventDefault();
@@ -194,8 +194,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
-      {/* A parent item's arrow, just left of its tick box (owner request, 2026-11-09): hides or shows its sub-items. A press keeps the cursor where it is. */}
-      {item.children.length > 0 && (
+      {/* A parent item's arrow, just left of its tick box (owner request, 2026-11-09): hides or shows its sub-items. Only with 2 or more of them (owner request, 2026-11-11). A press keeps the cursor where it is. */}
+      {canFold(item) && (
         <button
           type="button"
           className="item-fold"

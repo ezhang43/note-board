@@ -1,4 +1,5 @@
 import { BoardReadOnly, boxProps } from './textBox';
+import { EstimateChip } from './Estimate';
 import { memo, use, useRef, useState, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
 import { collapsedPreview, domainOf, hrefOf, isPermanent } from '../model/cards';
@@ -105,6 +106,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       <div className="card-header" data-todo-of={card.kind === 'todo' && !card.collapsed ? id : undefined}>
         <span className="card-meta">{card.collapsed ? (card.kind === 'board' ? <BoardCardName boardId={card.boardId} /> : collapsedPreview(card)) : ''}</span>
         <CommentChip id={id} />
+        {card.kind === 'note' && <EstimateChip cardId={id} itemId={null} estimate={card.estimate} />}
         <button
           type="button"
           className="icon-button"

@@ -1,5 +1,6 @@
 import { createBoard } from './board';
 import { COLUMN_W } from './constants';
+import { readDay, readEstimate } from './estimate';
 import { isColorKey } from './palette';
 import { parseRich } from './richText';
 import { parseStyle } from './textStyle';
@@ -53,11 +54,16 @@ const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fa
 const size = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
 /** Only the fields named here are kept (a fold only when it is exactly true): a `due` saved before due dates were removed (owner, 2026-10-16) is erased. */
+// An estimate and a ticked day are kept only when valid (job saved-estimate-doneon); a bad one is dropped, keeping the rest.
+const estimateField = (v: unknown) => (readEstimate(v) !== undefined ? { estimate: v as number } : {});
+// A day left on an open item is kept as saved (another device may have unticked it at the same time), so the board reads back exactly.
+const dayField = (v: unknown) => (readDay(v) !== undefined ? { doneOn: v as string } : {});
+
 function parseItems(v: unknown, depth = 0): TodoItem[] {
   if (!Array.isArray(v) || depth > 10) return [];
   return v.filter(isObject).flatMap((it) =>
     typeof it.id === 'string'
-      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style), ...(it.folded === true && { folded: true as const }) }]
+      ? [{ id: it.id, text: str(it.text, ''), done: bool(it.done, false), children: parseItems(it.children, depth + 1), ...styleField(it.style), ...(it.folded === true && { folded: true as const }), ...estimateField(it.estimate), ...dayField(it.doneOn) }]
       : [],
   );
 }
@@ -100,7 +106,7 @@ function parseCard(id: string, c: unknown): Card | null {
     const rich = parseRich(c.rich);
     // A Journal general note's place in the panel's list (2026-11-10): only a finite number is read.
     const general = typeof c.general === 'number' && Number.isFinite(c.general) ? { general: c.general } : {};
-    return { ...base, kind, text: str(c.text, ''), ...(rich ? { rich } : {}), ...general };
+    return { ...base, kind, text: str(c.text, ''), ...(rich ? { rich } : {}), ...general, ...estimateField(c.estimate) };
   }
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
   if (kind === 'completed') return { ...base, kind, groups: parseGroups(c.groups) };

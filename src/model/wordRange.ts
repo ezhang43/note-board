@@ -1,5 +1,5 @@
 import { newId } from './cards';
-import { copyItems, findItem, isFolded, MAX_DEPTH, removeExactly, reopenAbove, selectionAsText, shownIds } from './checklist';
+import { copyItems, findItem, isFolded, MAX_DEPTH, removeExactly, reopenAbove, selectionAsText, shownIds, untick } from './checklist';
 import type { TodoItem } from './types';
 
 // Word-style highlights across a list's items (owner request, 2026-11-01: "It should work like a word
@@ -121,7 +121,7 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
 
   first.text = first.text.slice(0, o.start.offset) + insert + tail;
   // Ticked only if both were, when the last item's text joins on; a last item highlighted to its end goes whole.
-  if (tail) first.done = first.done && last.done;
+  if (tail && !last.done) untick(first);
   const kids = last.children;
   last.children = [];
   // A folded first item keeps its hidden sub-items (they come before the last item's in the list).

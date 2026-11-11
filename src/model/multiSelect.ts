@@ -83,7 +83,7 @@ export function deleteAcross(board: Board, lists: ListSelection[], makeId: MakeI
   return lists.reduce((b, l) => editItems(b, l.cardId, (items) => deleteItems(items, l.ids, makeId)), board);
 }
 
-/** Ticking one of them ticks (or unticks) the selected items in every list. */
-export function setDoneAcross(board: Board, lists: ListSelection[], done: boolean): Board {
-  return lists.reduce((b, l) => editItems(b, l.cardId, (items) => setItemsDone(items, l.ids, done)), board);
+/** Ticking one of them ticks (or unticks) the selected items in every list; ticked ones get `today`. */
+export function setDoneAcross(board: Board, lists: ListSelection[], done: boolean, today: string): Board {
+  return lists.reduce((b, l) => editItems(b, l.cardId, (items) => setItemsDone(items, l.ids, done, today)), board);
 }

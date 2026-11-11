@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
 import './appFonts';
 import { Canvas } from './components/Canvas';
 import { CommentThread } from './components/Comments';
+import { EstimatePicker } from './components/Estimate';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { UndoToast } from './components/UndoToast';
 import { DeleteCompleted } from './components/DeleteCompleted';
@@ -123,6 +124,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <BrainDumpDialog />
       <Tour />
       <CommentThread />
+      <EstimatePicker />
       <ConfirmDialog />
     </div>
   );

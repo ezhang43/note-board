@@ -381,6 +381,15 @@ test.describe('7. 44px touch areas around the small card controls', () => {
     expect(await takenFromOthers(corner)).toBe(0);
   });
 
+  test('a note\'s estimate clock shows only on the selected note, like its collapse and delete (job saved-estimate-doneon)', async ({ page }) => {
+    await addMenu(page, 'Note');
+    await addMenu(page, 'Note');
+    const [first, second] = [page.locator('[data-card-id]').first(), page.locator('[data-card-id]').nth(1)];
+    await expect(second.getByRole('button', { name: 'Add a time estimate' })).toBeVisible();
+    await expect(first.getByRole('button', { name: 'Collapse card' })).toBeHidden();
+    await expect(first.getByRole('button', { name: 'Add a time estimate' })).toBeHidden();
+  });
+
   test('a container: collapse, delete, resize corner and the width strip', async ({ page }) => {
     await addMenu(page, 'Container');
     await makeRoomAtRight(page);

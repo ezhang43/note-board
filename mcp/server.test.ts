@@ -119,6 +119,29 @@ describe('the connector’s write tools', () => {
     expect(readWorkspace(fs.own())!.ws.boards.home.columns.colIdeas.cardIds).toHaveLength(2);
   });
 
+  it('estimates on add_items, edit_items and add_note; set_items_done stamps today (job saved-estimate-doneon)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 11, 9, 30));
+    try {
+      const { fs, client } = connectWithWrites();
+      const c = await client;
+      expect(text(await c.callTool({ name: 'add_items', arguments: { board: 'home', list: 'Groceries', items: [{ text: 'Apples', estimate: 20 }] } }))).toContain('(estimate: 20m)');
+      expect(text(await c.callTool({ name: 'edit_items', arguments: { board: 'home', changes: [{ item: 'iEggs', estimate: 45 }] } }))).toContain('Set the estimate of "Eggs" to 45m');
+      expect(text(await c.callTool({ name: 'set_items_done', arguments: { board: 'home', items: ['iMilk'], done: true } }))).toContain('Ticked "Milk"');
+      expect(text(await c.callTool({ name: 'add_note', arguments: { board: 'home', text: 'Ring Sam', estimate: 10 } }))).toContain('(estimate: 10m)');
+      const all = items(fs);
+      expect(all.find((i) => i.id === 'iMilk')!.doneOn).toBe('2026-11-11');
+      expect(all.find((i) => i.id === 'iEggs')!.estimate).toBe(45);
+      expect(all.at(-1)).toMatchObject({ text: 'Apples', estimate: 20 });
+      for (const bad of [0, 1.5, 24 * 60 + 1]) {
+        const r = await c.callTool({ name: 'edit_items', arguments: { board: 'home', changes: [{ item: 'iEggs', estimate: bad }] } });
+        expect(r.isError, String(bad)).toBe(true);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a shared board is read-only: refused, nothing saved', async () => {
     const { fs, client } = connectWithWrites();
     const r = await (await client).callTool({ name: 'add_items', arguments: { board: 'Trip', list: 'Bookings', items: [{ text: 'Flights' }] } });

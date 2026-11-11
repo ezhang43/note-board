@@ -57,9 +57,9 @@ describe('saving several boards', () => {
 
   // Journal text 14 by default (owner pick B, 2026-11-11): a size of 16 is now saved, which an older
   // copy would drop, so the saved version goes 4 -> 5 and an older copy refuses instead of saving over.
-  it('saves as version 5, and reads boards saved as version 4 (Journal sizes and all) unchanged', () => {
-    expect(WORKSPACE_VERSION).toBe(5);
-    expect(JSON.parse(serializeWorkspace(sample())).version).toBe(5);
+  it('saves as version 6, and reads boards saved as version 4 (Journal sizes and all) unchanged', () => {
+    expect(WORKSPACE_VERSION).toBe(6);
+    expect(JSON.parse(serializeWorkspace(sample())).version).toBe(6);
     const rich = [
       { type: 'h1', runs: [{ text: 'Plans', size: 24 }] },
       { type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 20 }, { text: 'c', size: 'small' }, { text: 'd', size: 'large' }, { text: 'e', size: 14 }] },
@@ -69,12 +69,13 @@ describe('saving several boards', () => {
     const got = readWorkspace(v4);
     expect(got).not.toBeNull();
     const back = JSON.parse(serializeWorkspace(got!.ws));
-    expect(back.version).toBe(5);
+    expect(back.version).toBe(6);
     expect(back.boards.home.cards.n1.rich).toEqual(rich);
   });
 
-  it('boards saved by a version above 5 are refused (null), so they are never saved over', () => {
-    expect(readWorkspace(asVersion(serializeWorkspace(sample()), 6))).toBeNull();
+  it('boards saved by a version above 6 are refused (null), so they are never saved over', () => {
+    expect(readWorkspace(asVersion(serializeWorkspace(sample()), 7))).toBeNull();
+    expect(readWorkspace(asVersion(serializeWorkspace(sample()), 5))).not.toBeNull();
     expect(readWorkspace(asVersion(serializeWorkspace(sample()), 4))).not.toBeNull();
   });
 

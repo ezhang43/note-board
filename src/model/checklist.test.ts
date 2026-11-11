@@ -462,6 +462,56 @@ describe('Delete at the end of an item (owner request)', () => {
   });
 });
 
+describe('Backspace at the start of an item (the mirror of Delete at the end)', () => {
+  const t = (id: string, text: string, children: TodoItem[] = [], done = false): TodoItem => ({ id, text, done, children });
+
+  it('joins this item onto the end of the item shown above, keeping that one; cursor at the join', () => {
+    const r = C.mergePrevItem([t('a', 'Buy '), t('b', 'milk'), t('c', 'eggs')], 'b')!;
+    expect(r.items.map((i) => i.text)).toEqual(['Buy milk', 'eggs']);
+    expect(ids(r.items)).toBe('a c');
+    expect(r.focus).toBe('a');
+    expect(r.caret).toBe(4);
+  });
+
+  it("this item's sub-items move up one level into its place", () => {
+    const r = C.mergePrevItem([t('a', 'A'), t('b', 'B', [t('b1', 'B1')]), t('c', 'C')], 'b')!;
+    expect(ids(r.items)).toBe('a b1 c');
+    expect(r.items[0].text).toBe('AB');
+  });
+
+  it('a first sub-item joins onto its parent (the item shown above it)', () => {
+    const r = C.mergePrevItem([t('a', 'A', [t('a1', 'one', [t('a11', 'deep')]), t('a2', 'two')])], 'a1')!;
+    expect(ids(r.items)).toBe('a(a11 a2)');
+    expect(r.items[0].text).toBe('Aone');
+    expect(r.focus).toBe('a');
+  });
+
+  it('an item after a sub-item joins onto that sub-item (the item shown above, not the parent)', () => {
+    const r = C.mergePrevItem([t('a', 'A', [t('a1', 'one')]), t('b', 'B')], 'b')!;
+    expect(ids(r.items)).toBe('a(a1)');
+    expect(r.items[0].children[0].text).toBe('oneB');
+    expect(r.focus).toBe('a1');
+  });
+
+  it('skips sub-items hidden under a folded item: joins onto the folded item', () => {
+    const items: TodoItem[] = [{ ...t('a', 'A', [t('a1', 'x'), t('a2', 'y')]), folded: true }, t('b', 'B')];
+    const r = C.mergePrevItem(items, 'b')!;
+    expect(r.focus).toBe('a');
+    expect(r.items[0].text).toBe('AB');
+    expect(ids(r.items)).toBe('a(a1 a2)');
+  });
+
+  it('does nothing on the first item of a list', () => {
+    expect(C.mergePrevItem([t('a', 'A'), t('b', 'B')], 'a')).toBeNull();
+  });
+
+  it('ticked items join like any other: ticked only when both were (job 200)', () => {
+    expect(C.mergePrevItem([t('a', 'A'), t('b', 'B', [], true)], 'b')!.items).toEqual([t('a', 'AB')]);
+    expect(C.mergePrevItem([t('a', 'A', [], true), t('b', 'B')], 'b')!.items).toEqual([t('a', 'AB')]);
+    expect(C.mergePrevItem([t('a', 'A', [], true), t('b', 'B', [], true)], 'b')!.items).toEqual([t('a', 'AB', [], true)]);
+  });
+});
+
 describe('sub-items all ticked tick their item (owner request)', () => {
   const t = (id: string, done = false, children: TodoItem[] = []): TodoItem => ({ id, text: id, done, children });
   const doneIds = (items: TodoItem[]): string[] => items.flatMap((i) => [...(i.done ? [i.id] : []), ...doneIds(i.children)]);

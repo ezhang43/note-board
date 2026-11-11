@@ -1887,6 +1887,8 @@ html[data-glide] .world {
   .card-header > .icon-button::before { top: -12px; bottom: -2px; }
   /* The first icon button (not :first-of-type: a note's estimate clock is a button too and comes before it). */
   .card-header > .icon-button:not(.icon-button ~ .icon-button)::before { left: -10px; right: -4px; }
+  /* A note's estimate clock leaves a gap that this wider press area fills, so it never covers the clock (more specific than its 4px below). */
+  .card > .card-header > .estimate-chip { margin-right: 10px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
   /* Clean up (job 200): its press area reaches up like theirs. It comes later in the page order than the arrow and the comment chip, so where the areas overlap it wins and its drawn box is never taken by a neighbor. */
@@ -2498,10 +2500,6 @@ button.estimate-chip:active { transform: scale(0.97); }
 }
 /* While its box is open, the chip stays shown (the box sits under it and the keyboard comes back to it). */
 .estimate-chip.add[aria-expanded='true'] { visibility: visible; opacity: 1; }
-@media (hover: none) {
-  /* A note's clock leaves a gap that collapse's wider press area fills, so that area never covers the clock. */
-  .card-header > .estimate-chip { margin-right: 10px; }
-}
 
 /* The box it opens: under its chip, over the board. */
 .estimate-picker {
@@ -3644,6 +3642,7 @@ a.cal-open { align-self: flex-start; }
    * around them take no taps: a tap on another card selects it, never deletes it.
    */
   .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .card:not(.selected, :focus-within) > .card-header > .estimate-chip.add,
   .canvas .card:not(.selected, :focus-within) > .card-header > .title-cell > .list-clean-up,
   .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
 

@@ -88,13 +88,18 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
   const view = useAppState((s) => s.view);
   const board = useAppState((s) => s.board);
 
-  const close = () => {
+  const close = (into?: HTMLElement | null) => {
     setOpen(null);
-    chipOf(target)?.focus({ preventScroll: true });
+    (into ?? chipOf(target))?.focus({ preventScroll: true });
   };
   const set = (minutes: number | null) => {
     appStore.setEstimate(cardId, itemId, minutes);
-    close();
+    // A cleared item has no pill left (and no clock), so the keyboard goes back into the item's text.
+    const text =
+      minutes === null && itemId !== null
+        ? document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id="${CSS.escape(itemId)}"] [aria-label="Item text"]`)
+        : null;
+    close(text);
   };
 
   // Under its chip (above it when there is no room below), kept on screen, following it as the board moves.

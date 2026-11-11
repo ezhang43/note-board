@@ -61,6 +61,8 @@ test('an item with an estimate: its pill changes it with a quick choice, it is s
   await picker(page).getByRole('button', { name: 'Clear' }).click();
   await expect(row(page).getByRole('button', { name: /^Time estimate:/ })).toHaveCount(0);
   await expect.poll(async () => 'estimate' in ((await saved(page)).item ?? {})).toBe(false);
+  // Its pill is gone, so the keyboard goes back into the item's text.
+  await expect(row(page).getByLabel('Item text')).toBeFocused();
 
   // Ctrl+Z brings it back, as with any change.
   await page.keyboard.press('Control+z');

@@ -532,7 +532,7 @@ test('normal Journal text is 14px, also in notes saved before; sized words and h
   await blocks(page).nth(0).dblclick();
   await tool(page, 'Text style').click();
   await expect(sizeBox(page)).toHaveText('16');
-  // A word made 16 is saved as 16, under version 5, and draws at 16px.
+  // A word made 16 is saved as 16, under the current version (6), and draws at 16px.
   await blocks(page).nth(3).getByText('plain').dblclick();
   await tool(page, 'Text style').click();
   await sizeBox(page).click();
@@ -540,7 +540,7 @@ test('normal Journal text is 14px, also in notes saved before; sized words and h
   await expect(editor(page).locator('[data-size="16"]')).toHaveCSS('font-size', '16px');
   await page.waitForTimeout(400);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:v1')!).version);
-  expect(saved).toBe(5);
+  expect(saved).toBe(6);
   expect(((await savedNote(page)).rich as { runs: { size?: unknown }[] }[])[3].runs.map((r) => r.size)).toEqual([16, undefined, 20]);
 });
 

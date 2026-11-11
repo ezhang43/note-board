@@ -234,7 +234,9 @@ export function enterItem(
   if (rest.startsWith(' ')) rest = rest.slice(1);
   else if (rest && before.endsWith(' ')) before = before.slice(0, -1);
   loc.item.text = before;
-  const added = { ...blank, text: rest, done: after !== '' && loc.item.done };
+  // A ticked half keeps the day it was ticked; the time estimate stays on the first half only.
+  const done = after !== '' && loc.item.done;
+  const added: TodoItem = { ...blank, text: rest, done, ...(done && loc.item.doneOn ? { doneOn: loc.item.doneOn } : {}) };
   if (loc.item.children.length && !isFolded(loc.item)) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
   reopenAbove(next, added); // e.g. Enter at the end of the last ticked sub-item: its new blank sibling unticks the parent
@@ -317,8 +319,10 @@ export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[
   const below = findItem(next, nextId)!;
   const caret = cur.text.length;
   cur.text += below.item.text;
+  // One estimate is kept: the upper item's, or the lower one's when it has none (Enter at an item's start, then Backspace, gives it back).
+  if (cur.estimate === undefined && below.item.estimate !== undefined) cur.estimate = below.item.estimate;
   // Ticked only if both were (job 200: they can now be side by side), and never open under a ticked item (job 183).
-  cur.done = cur.done && below.item.done;
+  if (!below.item.done) untick(cur);
   below.list.splice(below.index, 1, ...below.item.children);
   for (const it of [cur, ...below.item.children]) reopenAbove(next, it);
   return { items: next, caret };
@@ -373,8 +377,9 @@ function tickCompleteParents(items: TodoItem[], parentIds: (string | null)[]) {
     if (!id || !findItem(items, id)) continue;
     const chain = [findItem(items, id)!.item, ...ancestorsOf(items, id).reverse()]; // innermost first
     for (const it of chain) {
-      if (it.children.length && it.children.every((c) => c.done)) it.done = true;
-      else break;
+      if (!(it.children.length && it.children.every((c) => c.done))) break;
+      if (!it.done) delete it.doneOn; // ticked again by a removal: no day (a day left from before would be stale)
+      it.done = true;
     }
   }
 }
@@ -441,25 +446,37 @@ function ancestorsOf(items: TodoItem[], id: string): TodoItem[] {
  * list, untick the items an open `item` is nested in (owner decision, 2026-10-22, job 183).
  */
 export function reopenAbove(items: TodoItem[], item: TodoItem): void {
-  if (!item.done) for (const a of ancestorsOf(items, item.id)) a.done = false;
+  if (!item.done) for (const a of ancestorsOf(items, item.id)) untick(a);
+}
+
+/** Unticks an item in a copy of the list, with the day it was ticked (job saved-estimate-doneon). */
+export function untick(item: TodoItem): void {
+  item.done = false;
+  delete item.doneOn;
 }
 
 /**
  * Tick or untick items; they stay where they are. Owner's rule: when ticking leaves every sub-item of
  * an item ticked, that item is ticked too (and so on upwards). Unticking a sub-item unticks the items
- * it is nested in.
+ * it is nested in. Each item that becomes ticked is stamped with `today` ("YYYY-MM-DD", made by the
+ * caller so this stays pure); one already ticked keeps its day; an unticked one loses it.
  */
-export function setItemsDone(items: TodoItem[], ids: string[], done: boolean): TodoItem[] {
+export function setItemsDone(items: TodoItem[], ids: string[], done: boolean, today: string): TodoItem[] {
   const next = cloned(items);
+  const tick = (it: TodoItem) => {
+    if (it.done) return;
+    it.done = true;
+    it.doneOn = today;
+  };
   for (const id of ids) {
     const loc = findItem(next, id);
-    if (loc) loc.item.done = done;
+    if (loc) (done ? tick : untick)(loc.item);
   }
   for (const id of ids) {
     const above = ancestorsOf(next, id).reverse(); // innermost first
     for (const it of above) {
-      if (!done) it.done = false;
-      else if (it.children.every((c) => c.done)) it.done = true;
+      if (!done) untick(it);
+      else if (it.children.every((c) => c.done)) tick(it);
       else break;
     }
   }
@@ -532,7 +549,7 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
   else next.push(...copies);
   // An open item never sits under a ticked one: inside the paste, then the ticked items it lands under (one pass, not one per item).
   reopenWithin(copies);
-  if (loc && copies.some((c) => !c.done)) for (const a of ancestorsOf(next, loc.item.id)) a.done = false; // the pasted items sit beside `loc.item`
+  if (loc && copies.some((c) => !c.done)) for (const a of ancestorsOf(next, loc.item.id)) untick(a); // the pasted items sit beside `loc.item`
   return next;
 }
 
@@ -540,7 +557,7 @@ export function pasteItemsAfter(items: TodoItem[], afterId: string, pasted: Todo
 function reopenWithin(list: TodoItem[]): void {
   for (const it of list) {
     reopenWithin(it.children);
-    if (it.children.some((c) => !c.done)) it.done = false;
+    if (it.children.some((c) => !c.done)) untick(it);
   }
 }
 

@@ -16,9 +16,9 @@ const items = (b: Board, id: string) => (b.cards[id] as TodoCard).items;
 
 describe('ticking leaves an item where it is', () => {
   it('a ticked top-level item keeps its place, and so does an unticked one', () => {
-    const ticked = C.setItemsDone([item('a'), item('b'), item('c')], ['b'], true);
+    const ticked = C.setItemsDone([item('a'), item('b'), item('c')], ['b'], true, '2026-11-11');
     expect(outline(ticked)).toBe('a +b c');
-    expect(outline(C.setItemsDone(ticked, ['b'], false))).toBe('a b c');
+    expect(outline(C.setItemsDone(ticked, ['b'], false, '2026-11-11'))).toBe('a b c');
   });
 
   it('the order shown is the list’s own order, ticked items included', () => {

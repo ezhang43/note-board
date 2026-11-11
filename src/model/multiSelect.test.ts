@@ -93,7 +93,7 @@ describe('copying, deleting and ticking across lists', () => {
   });
 
   it('ticks (or unticks) the selected items in every list', () => {
-    const out = setDoneAcross(board(), [{ cardId: 'A', ids: ['a1'] }, { cardId: 'B', ids: ['b1'] }], true);
+    const out = setDoneAcross(board(), [{ cardId: 'A', ids: ['a1'] }, { cardId: 'B', ids: ['b1'] }], true, '2026-11-11');
     expect((out.cards.A as TodoCard).items[0].done).toBe(true);
     expect((out.cards.B as TodoCard).items[0].done).toBe(true);
   });

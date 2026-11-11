@@ -2,8 +2,9 @@ import { createItem, newId } from '../../model/cards';
 import { announce, count } from '../announce';
 import { columnOf } from '../../model/board';
 import * as C from '../../model/checklist';
-import { deleteTicked, tickedCount } from '../../model/completed';
+import { dayKey, deleteTicked, tickedCount } from '../../model/completed';
 import { boardLists, columnLists, deleteAcross, multiAsText, rangeAcross, setDoneAcross, visibleItems, type ListSelection } from '../../model/multiSelect';
+import { setEstimate } from '../../model/estimate';
 import { snapIf } from '../../model/geometry';
 import type { Point, TodoItem } from '../../model/types';
 import type { StoreContext } from '../core';
@@ -310,16 +311,23 @@ export function checklistActions(ctx: StoreContext) {
       // One of the items selected across several lists: tick (or untick) them all at once.
       const lists = listsIncluding(cardId, itemId);
       if (lists) {
-        const done = !!commit((b) => setDoneAcross(b, lists, !item.done));
+        const done = !!commit((b) => setDoneAcross(b, lists, !item.done, dayKey(new Date())));
         if (done) announce(`${word}: ${count(itemsIn(lists), 'item')}`);
         return done;
       }
       // Ticked items stay where they are (job 200): a clicked box tells a screen reader itself, so one item is only said from the keyboard.
       const ids = selectedItemsIncluding(cardId, itemId) ?? [itemId];
-      const done = !!commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done)));
+      const done = !!commit((b) => C.editItems(b, cardId, (items) => C.setItemsDone(items, ids, !item.done, dayKey(new Date()))));
       if (done && ids.length > 1) announce(`${word}: ${count(ids.length, 'item')}`);
       else if (done && sayOne) announce(`${word}: ${item.text.trim() || 'item'}`);
       return done;
+    },
+    /**
+     * Sets (or with null clears) how long a note (`itemId` null) or a checklist item should take, in
+     * whole minutes: one undo step; nothing for the same estimate or one out of range (job saved-estimate-doneon).
+     */
+    setEstimate(cardId: string, itemId: string | null, minutes: number | null) {
+      commit((b) => setEstimate(b, cardId, itemId, minutes));
     },
     /**
      * Ctrl+Enter while typing in an item (owner request, 2026-10-15; also the phone item bar's Tick,

@@ -165,7 +165,7 @@ describe('collapse, colour and edit', () => {
     const nested = { id: 'n', text: 'inner', done: false, children: [] };
     b = B.updateCard(b, 't', () => ({ ...t, items: [{ ...t.items[0], children: [nested] }] }));
     b = B.setItemText(b, 't', 'n', 'changed');
-    b = editItems(b, 't', (items) => setItemsDone(items, ['n'], true));
+    b = editItems(b, 't', (items) => setItemsDone(items, ['n'], true, '2026-11-11'));
     const inner = (b.cards.t as TodoCard).items[0].children[0];
     expect(inner).toMatchObject({ text: 'changed', done: true });
   });

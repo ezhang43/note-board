@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { newId } from '../src/model/cards';
+import { dayKey } from '../src/model/completed';
+import { MAX_ESTIMATE } from '../src/model/estimate';
 import { boardsToShare, clashingBoards, readShare } from '../src/model/sharing';
 import { readWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit, type Snapshot } from './boards';
@@ -59,6 +61,7 @@ const PREVIEW_MS = 10 * 60 * 1000;
 
 const itemId = z.string().min(1).describe('An item’s id, as read_board shows it');
 const text = z.string().max(MAX_TEXT);
+const estimate = z.number().int().min(1).max(MAX_ESTIMATE).describe(`How long it should take, in whole minutes (1 to ${MAX_ESTIMATE})`);
 
 export interface ServerOptions {
   /** Whether the owner lets Claude delete (the "Let Claude delete" setting); off when not given. */
@@ -70,7 +73,7 @@ export interface ServerOptions {
 }
 
 export function createServer(load: () => Promise<Snapshot>, write: Write, opts: ServerOptions = {}): McpServer {
-  const server = new McpServer({ name: 'busyants', version: '1.6.0' });
+  const server = new McpServer({ name: 'busyants', version: '1.7.0' });
   const deleteAllowed = opts.deleteAllowed ?? (async () => false);
   // Previews waiting for a confirm, by preview id; each is used once (kept only while running).
   const previews = new Map<string, Preview>();
@@ -149,6 +152,7 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
               text: text.min(1).describe('The item’s text (one line)'),
               after: itemId.optional().describe('Put it right after this item'),
               under: itemId.optional().describe('Put it as the last sub-item of this item'),
+              estimate: estimate.optional(),
             }),
           )
           .min(1)
@@ -163,11 +167,11 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
     'edit_items',
     {
       title: 'Edit checklist items',
-      description: `Changes items’ text, by item id, on one of your own boards. At most ${MAX_CHANGES} changes per call.`,
+      description: `Changes items’ text or time estimate, by item id, on one of your own boards (estimate: null clears it). At most ${MAX_CHANGES} changes per call.`,
       inputSchema: {
         board: boardArg,
         changes: z
-          .array(z.object({ item: itemId, text: text.min(1) }))
+          .array(z.object({ item: itemId, text: text.min(1).optional(), estimate: estimate.nullable().optional() }))
           .min(1)
           .max(MAX_CHANGES),
       },
@@ -180,11 +184,11 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
     'set_items_done',
     {
       title: 'Tick or untick checklist items',
-      description: `Ticks (done: true) or unticks (done: false) items by id on one of your own boards, as clicking their boxes in the app does. At most ${MAX_CHANGES} items per call.`,
+      description: `Ticks (done: true) or unticks (done: false) items by id on one of your own boards, as clicking their boxes in the app does; a ticked item is marked with today’s date, an unticked one loses it. At most ${MAX_CHANGES} items per call.`,
       inputSchema: { board: boardArg, items: z.array(itemId).min(1).max(MAX_CHANGES), done: z.boolean() },
       annotations: changes,
     },
-    ({ board, items, done }) => change(board, (id) => setItemsDone(id, items, done)),
+    ({ board, items, done }) => change(board, (id) => setItemsDone(id, items, done, dayKey(new Date()))),
   );
 
   server.registerTool(
@@ -218,10 +222,11 @@ export function createServer(load: () => Promise<Snapshot>, write: Write, opts: 
         text: text.min(1).describe('The note’s text (several lines are fine)'),
         column: z.string().min(1).optional(),
         near: z.string().min(1).optional().describe('A card’s or column’s id'),
+        estimate: estimate.optional(),
       },
       annotations: changes,
     },
-    ({ board, text: note, column, near }) => change(board, (id) => addNote(id, note, { column, near }, newId('k'))),
+    ({ board, text: note, column, near, estimate: minutes }) => change(board, (id) => addNote(id, note, { column, near }, newId('k'), minutes)),
   );
 
   const column = z.string().min(1).optional().describe('Put it at the end of this column (its id or title)');

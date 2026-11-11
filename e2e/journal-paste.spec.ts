@@ -55,7 +55,7 @@ test('Journal lines paste into another Journal note with their size and list lev
   await typeAndCopyJournal(page);
   await notes(page).click();
   await page.keyboard.press('Control+v');
-  await expect(notes(page).locator('[data-size="18"]')).toHaveText('plan');
+  await expect(notes(page).locator('[data-size="16"]')).toHaveText('plan'); // Larger on 14px text is 16
   expect(await typeOf(notes(page))).toEqual(['p:plan', 'bullet:milk', 'bullet1:oat']);
   // The words on the clipboard are still plain words for other apps.
   await expect.poll(() => page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'))).toContain('milk');

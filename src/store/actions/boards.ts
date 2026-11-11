@@ -94,7 +94,7 @@ export function boardActions(ctx: StoreContext) {
     return id ? ctx.workspace().boards[id] : undefined;
   };
   /**
-   * The "General notes" note, made when it is first written, renamed or added below (see withFirst),
+   * The "General notes" note, made when it is first written, renamed, or has a note added above it (see withFirst),
    * with the id the panel shows it under (so the sheet keeps the cursor as it comes), or a new one.
    */
   const firstNote = (id?: string): NoteCard => ({ ...createCard('note', id), kind: 'note', text: `${JOURNAL_NOTES}\n\n`, general: 1 }) as NoteCard;
@@ -212,8 +212,10 @@ export function boardActions(ctx: StoreContext) {
     /**
      * Typing or formatting in one of the Journal panel's general notes (owner request, 2026-10-29;
      * several since 2026-11-10): written as setJournal writes a day, into the general note `noteId`,
-     * or the first one when it is left out. With none yet, the "General notes" note is added on the
-     * first typing, not when the panel opens, so opening it changes nothing; that first typing and the
+     * or the first one in the list when it is left out. Since new notes go on top (2026-11-11), that is
+     * the newest "Untitled note", not "General notes", once one has been added. The panel always passes
+     * `noteId`, so only a caller that leaves it out gets this default.
+     * With none yet, the "General notes" note is added on the first typing, not when the panel opens, so opening it changes nothing; that first typing and the
      * note's coming are one undo step.
      */
     setJournalNotes(rich: Rich, typing = true, noteId?: string) {

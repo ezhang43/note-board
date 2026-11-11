@@ -497,6 +497,35 @@ describe('several Journal general notes', () => {
     expect(generals(s).map((n) => n.general)).toEqual([1, 2, 3]);
   });
 
+  it.each(['gone-id', ''])('+ given a stale id (%j, after undo or sync) still adds on top and hides none of the written notes', (stale) => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('first'));
+    const [first] = generals(s);
+    const b = s.addJournalNote(first.id)!;
+    const before = generals(s).map((n) => n.id);
+    const added = s.addJournalNote(stale)!;
+    expect(added).toBeTruthy();
+    expect(generals(s).map((n) => n.id)).toEqual([added, ...before]);
+    // Every earlier note keeps its words, and nothing named "General notes" was added a second time.
+    expect(generals(s).find((n) => n.id === first.id)!.text).toBe('General notes\n\nfirst');
+    expect(generals(s).find((n) => n.id === b)!.text).toBe('Untitled note\n\n');
+    expect(names(s).filter((n) => n === 'General notes')).toHaveLength(1);
+    expect(generals(s).map((n) => n.general)).toEqual([1, 2, 3]);
+  });
+
+  it('typing with no note named goes into the first note in the list, which is the newest "Untitled note" once one was added', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('first'));
+    const [first] = generals(s);
+    const b = s.addJournalNote(first.id)!;
+    s.setJournalNotes(fromPlain('no name'));
+    expect(generals(s)[0].id).toBe(b);
+    expect(generals(s)[0].text).toBe('Untitled note\n\nno name');
+    expect(generals(s)[1].text).toBe('General notes\n\nfirst');
+  });
+
   it('renames a note as one undo step; the existing note keeps its text; an empty name is "Untitled note"', () => {
     const s = setup();
     s.openJournal();

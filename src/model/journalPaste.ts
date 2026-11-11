@@ -1,6 +1,6 @@
 import { newId, type MakeId } from './cards';
 import { MAX_DEPTH } from './checklist';
-import { isList, MAX_INDENT, NORMAL_SIZE, parseRich, sizePx, type Block, type Marks, type Rich, type Run } from './richText';
+import { isList, MAX_INDENT, parseRich, plainSize, sizePx, type Block, type Marks, type Rich, type Run } from './richText';
 import { parseStyle } from './textStyle';
 import type { TextStyle, TodoItem } from './types';
 
@@ -11,8 +11,8 @@ import type { TextStyle, TodoItem } from './types';
 
 /** How many items a paste may bring (the clipboard is untrusted); sub-items go as deep as a checklist does. */
 const MAX_ITEMS = 5000;
-/** A checklist item's Small and Large, as Journal sizes in px: sizes the size box lists. */
-const SMALL_PX = 14;
+/** A checklist item's Small and Large, as Journal sizes in px: sizes the size box lists (Small one step under the 14px normal text). */
+const SMALL_PX = 12;
 const LARGE_PX = 20;
 
 // ---- Journal lines <-> checklist items ----
@@ -28,8 +28,9 @@ function styleOf(blk: Block): TextStyle | undefined {
     return first !== undefined && runs.every((r) => get(r) === first) ? first : undefined;
   };
   const sizeKind = (r: Run) => {
-    const px = sizePx(r.size);
-    return px < NORMAL_SIZE ? 'small' : px > NORMAL_SIZE ? 'large' : 'normal';
+    const px = sizePx(r.size, blk.type); // the old Small (13.6px) is still Small
+    const plain = plainSize(blk.type);
+    return px < plain ? 'small' : px > plain ? 'large' : 'normal';
   };
   const kind = same(sizeKind);
   // A heading is bold (Heading 1 also large) unless its words have a size of their own.

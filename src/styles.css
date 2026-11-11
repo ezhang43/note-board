@@ -2483,7 +2483,10 @@ button.estimate-chip:active { transform: scale(0.97); }
 /* A collapsed card's one-line header keeps its room for the preview: no clock to add an estimate (expand the card
    first), and from 225% up no pill either, so the buttons still fit a 200px card. */
 .card.collapsed > .card-header > .estimate-chip.add,
+.canvas[data-big-text] .card-header > .estimate-chip.add,
 .canvas[data-big-text] .card.collapsed > .card-header > .estimate-chip { display: none; }
+/* From 225% up an open note's two buttons fill its header: a set pill goes after them, so it wraps below, at the right. */
+.canvas[data-big-text] .card:not(.collapsed) > .card-header > .estimate-chip { order: 1; }
 /* On an item: on the first line, after the text. */
 .todo-item > .estimate-chip { margin-top: calc(var(--line) / 2 + 4px - 11px); }
 .todo-item > .estimate-chip.add { position: absolute; z-index: 1; top: calc(var(--line) / 2 + 4px - 11px); right: calc(46px * var(--bb)); margin: 0; background: var(--card-bg); opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }

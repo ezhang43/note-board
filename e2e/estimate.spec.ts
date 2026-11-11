@@ -149,6 +149,27 @@ test('a collapsed note shows no clock to add an estimate (expand it first), so i
   await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeVisible();
 });
 
+test('at the biggest text a note keeps its two buttons on one line: no clock, and a set pill comes after them', async ({ page }) => {
+  await note(page).hover();
+  await note(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await picker(page).getByRole('button', { name: '30m' }).click();
+  for (let i = 0; i < 10; i++) await page.getByRole('button', { name: 'Larger text' }).click();
+  await note(page).hover();
+  const chip = note(page).getByRole('button', { name: 'Time estimate: 30m' });
+  const collapse = await note(page).getByRole('button', { name: 'Collapse card' }).boundingBox();
+  const del = await note(page).getByRole('button', { name: 'Delete card' }).boundingBox();
+  const pill = await chip.boundingBox();
+  expect(Math.abs(collapse!.y - del!.y)).toBeLessThan(1);
+  // The pill comes after the buttons: beside them when it fits, else on a line below; always inside the card.
+  const c = (await note(page).boundingBox())!;
+  expect(pill!.x >= del!.x + del!.width - 1 || pill!.y >= del!.y + del!.height - 1).toBe(true);
+  expect(pill!.x + pill!.width).toBeLessThanOrEqual(c.x + c.width + 1);
+  await chip.click();
+  await picker(page).getByRole('button', { name: 'Clear' }).click();
+  await note(page).hover();
+  await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeHidden();
+});
+
 test('ticking an item saves the day it was ticked; unticking clears it', async ({ page }) => {
   const today = await page.evaluate(() => {
     const d = new Date();

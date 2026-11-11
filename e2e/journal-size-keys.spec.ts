@@ -20,17 +20,18 @@ test('Ctrl+Shift+. / Ctrl+Shift+, step the selected words through the size list,
   await openJournal(page);
   await page.keyboard.type('a quiet day');
   await selectLetters(page, 2, 7);
+  // Normal Journal text is 14 (owner request 2026-11-11), so the first step up is 16.
   await page.keyboard.press('Control+Shift+Period');
-  await expect(quiet(page)).toHaveAttribute('data-size', '18');
+  await expect(quiet(page)).toHaveAttribute('data-size', '16');
   await expect(quiet(page)).toHaveText('quiet');
   await page.keyboard.press('Control+Shift+Period');
-  await expect(quiet(page)).toHaveAttribute('data-size', '20');
-  await page.keyboard.press('Control+Shift+Comma');
   await expect(quiet(page)).toHaveAttribute('data-size', '18');
   await page.keyboard.press('Control+Shift+Comma');
-  await expect(quiet(page)).toHaveCount(0); // back to 16: no size mark
+  await expect(quiet(page)).toHaveAttribute('data-size', '16');
   await page.keyboard.press('Control+Shift+Comma');
-  await expect(quiet(page)).toHaveAttribute('data-size', '14');
+  await expect(quiet(page)).toHaveCount(0); // back to 14: no size mark
+  await page.keyboard.press('Control+Shift+Comma');
+  await expect(quiet(page)).toHaveAttribute('data-size', '12');
   // The words stay selected and the cursor stays in the note.
   await expect(editor(page)).toBeFocused();
   expect(await page.evaluate(() => document.getSelection()?.toString())).toBe('quiet');
@@ -41,17 +42,17 @@ test('⌘+Shift+. / ⌘+Shift+, work too', async ({ page }) => {
   await page.keyboard.type('a quiet day');
   await selectLetters(page, 2, 7);
   await page.keyboard.press('Meta+Shift+Period');
-  await expect(quiet(page)).toHaveAttribute('data-size', '18');
+  await expect(quiet(page)).toHaveAttribute('data-size', '16');
   await page.keyboard.press('Meta+Shift+Comma');
   await page.keyboard.press('Meta+Shift+Comma');
-  await expect(quiet(page)).toHaveAttribute('data-size', '14');
+  await expect(quiet(page)).toHaveAttribute('data-size', '12');
 });
 
 test('nothing happens past 10 or 36, and each press is one Ctrl+Z step', async ({ page }) => {
   await openJournal(page);
   await page.keyboard.type('a quiet day');
   await selectLetters(page, 2, 7);
-  for (let i = 0; i < 9; i++) await page.keyboard.press('Control+Shift+Period'); // 18, 20, 24, 28, 32, 36, then three more
+  for (let i = 0; i < 9; i++) await page.keyboard.press('Control+Shift+Period'); // 16, 18, 20, 24, 28, 32, 36, then two more
   await expect(quiet(page)).toHaveAttribute('data-size', '36');
   await page.keyboard.press('Control+z'); // the presses at the limit made no step: this goes back from 36 to 32
   await expect(quiet(page)).toHaveAttribute('data-size', '32');
@@ -68,7 +69,7 @@ test('with nothing selected, the keys set the size of what is typed next', async
   await page.keyboard.type('big ');
   await page.keyboard.press('Control+Shift+Period');
   await page.keyboard.type('words');
-  await expect(quiet(page)).toHaveAttribute('data-size', '18');
+  await expect(quiet(page)).toHaveAttribute('data-size', '16');
   await expect(quiet(page)).toHaveText('words');
 });
 
@@ -83,9 +84,9 @@ test('in the Journal the keys leave the selected board card alone', async ({ pag
   await page.keyboard.type('a quiet day');
   await selectLetters(page, 2, 7);
   await page.keyboard.press('Control+Shift+Period');
-  await expect(quiet(page)).toHaveAttribute('data-size', '18');
+  await expect(quiet(page)).toHaveAttribute('data-size', '16');
   await page.keyboard.press('Meta+Shift+Period');
-  await expect(quiet(page)).toHaveAttribute('data-size', '20');
+  await expect(quiet(page)).toHaveAttribute('data-size', '18');
   await page.getByRole('complementary', { name: 'Journal' }).getByRole('button', { name: 'Close journal' }).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(title).toHaveValue('Groceries');

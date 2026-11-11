@@ -13,8 +13,11 @@ import {
   plainOf,
   plainOfSel,
   setBlockType,
+  plainSize,
   setMark,
+  setSize,
   SIZE_STEPS,
+  sizeEm,
   sizeMark,
   sizePx,
   splitAt,
@@ -257,25 +260,49 @@ describe('formatting', () => {
 
 // The size picker (owner pick, 2026-10-30): a number of px like Google Docs, 10 to 36, with − and +.
 describe('text size as a number', () => {
-  it('offers 10 to 36, with 16 as normal', () => {
+  it('offers 10 to 36; normal text is 14 (owner request 2026-11-11), a heading’s own size still 16', () => {
     expect(SIZE_STEPS).toEqual([10, 12, 14, 16, 18, 20, 24, 28, 32, 36]);
-    expect(sizePx(undefined)).toBe(16);
+    expect(sizePx(undefined)).toBe(14);
+    expect(sizePx(undefined, 'bullet')).toBe(14);
+    expect(sizePx(undefined, 'h1')).toBe(16);
+    expect(sizePx(undefined, 'h2')).toBe(16);
     expect(sizePx(24)).toBe(24);
+    expect(plainSize('p')).toBe(14);
+    expect(plainSize('number')).toBe(14);
+    expect(plainSize('h1')).toBe(16);
   });
 
   it('reads the old Small and Large as the sizes they always showed', () => {
     expect(sizePx('small')).toBe(13.6);
     expect(sizePx('large')).toBe(20.8);
+    expect(sizePx('small', 'h1')).toBe(13.6);
   });
 
-  it('16 is normal, so choosing it takes the size off', () => {
-    expect(sizeMark(16)).toBeUndefined();
+  it('14 is normal in a normal line, so choosing it takes the size off; 16 is now a size of its own', () => {
+    expect(sizeMark(14)).toBeUndefined();
+    expect(sizeMark(16)).toBe(16);
     expect(sizeMark(24)).toBe(24);
+    // In a heading 16 is still the heading's own size (owner, 2026-11-11: a plain heading's box reads 16).
+    expect(sizeMark(16, 'h1')).toBeUndefined();
+    expect(sizeMark(14, 'h2')).toBe(14);
   });
 
-  it('− and + step through the list and stop at 10 and 36', () => {
-    expect(stepSize(undefined, 1)).toBe(18);
-    expect(stepSize(undefined, -1)).toBe(14);
+  it('a size draws as a share of its line: px of 14 in a normal line (same px as before), of 16 in a heading (same look as before)', () => {
+    expect(sizeEm(24, 'p')).toBeCloseTo(24 / 14);
+    expect(sizeEm(16, 'bullet')).toBeCloseTo(16 / 14);
+    expect(sizeEm(24, 'h1')).toBeCloseTo(1.5);
+    // The old Small and Large: 13.6px and 20.8px in a normal line, 0.85 and 1.3 of a heading, as they always were.
+    expect(sizeEm('small', 'p') * 14).toBeCloseTo(13.6);
+    expect(sizeEm('large', 'number') * 14).toBeCloseTo(20.8);
+    expect(sizeEm('small', 'h1')).toBeCloseTo(0.85);
+    expect(sizeEm('large', 'h2')).toBeCloseTo(1.3);
+  });
+
+  it('− and + step through the list from the number shown and stop at 10 and 36', () => {
+    expect(stepSize(undefined, 1)).toBe(16);
+    expect(stepSize(undefined, -1)).toBe(12);
+    expect(stepSize(undefined, 1, 'h1')).toBe(18);
+    expect(stepSize(undefined, -1, 'h1')).toBe(14);
     expect(stepSize(36, 1)).toBe(36);
     expect(stepSize(10, -1)).toBe(10);
     expect(stepSize('small', 1)).toBe(16);
@@ -284,11 +311,66 @@ describe('text size as a number', () => {
     expect(stepSize('large', -1)).toBe(20);
   });
 
-  it('steps each part of a mixed selection on its own; 16 is left plain', () => {
+  it('steps each part of a mixed selection on its own; 14 is left plain, 16 is saved', () => {
     const rich: Rich = [{ type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 20 }, { text: 'c', size: 'small' }] }];
-    expect(stepSizes(rich, sel(0, 0, 0, 3), 1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 18 }, { text: 'b', size: 24 }, { text: 'c' }] }]);
-    expect(stepSizes(rich, sel(0, 0, 0, 3), -1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 14 }, { text: 'b', size: 18 }, { text: 'c', size: 12 }] }]);
-    expect(stepSizes([{ type: 'p', runs: [{ text: 'a', size: 18 }] }], sel(0, 0, 0, 1), -1)).toEqual([p('a')]);
+    expect(stepSizes(rich, sel(0, 0, 0, 3), 1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 16 }, { text: 'b', size: 24 }, { text: 'c', size: 16 }] }]);
+    expect(stepSizes(rich, sel(0, 0, 0, 3), -1)).toEqual([{ type: 'p', runs: [{ text: 'a', size: 12 }, { text: 'b', size: 18 }, { text: 'c', size: 12 }] }]);
+    expect(stepSizes([{ type: 'p', runs: [{ text: 'a', size: 16 }] }], sel(0, 0, 0, 1), -1)).toEqual([p('a')]);
+  });
+
+  it('steps in a heading from its own 16, and back to plain at 16', () => {
+    const h: Rich = [{ type: 'h1', runs: [{ text: 'Plans' }] }];
+    const up = stepSizes(h, sel(0, 0, 0, 5), 1);
+    expect(up).toEqual([{ type: 'h1', runs: [{ text: 'Plans', size: 18 }] }]);
+    expect(stepSizes(up, sel(0, 0, 0, 5), -1)).toEqual(h);
+  });
+
+  it('choosing a size over a heading and a normal line saves each in its own plain form', () => {
+    const rich: Rich = [{ type: 'h1', runs: [{ text: 'Plans' }] }, p('today')];
+    expect(setSize(rich, sel(0, 0, 1, 5), 16)).toEqual([{ type: 'h1', runs: [{ text: 'Plans' }] }, { type: 'p', runs: [{ text: 'today', size: 16 }] }]);
+    expect(setSize(rich, sel(0, 0, 1, 5), 14)).toEqual([{ type: 'h1', runs: [{ text: 'Plans', size: 14 }] }, p('today')]);
+    expect(setSize(rich, sel(0, 0, 1, 5), 24)).toEqual([{ type: 'h1', runs: [{ text: 'Plans', size: 24 }] }, { type: 'p', runs: [{ text: 'today', size: 24 }] }]);
+  });
+
+  it('the size box shows the size on screen: a saved 14 and plain text are both 14, not mixed', () => {
+    const rich: Rich = [{ type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 14 }, { text: 'c', size: 'small' }] }];
+    const l = marksAt(rich, sel(0, 0, 0, 2));
+    expect(l.mixed).toBeUndefined();
+    expect(sizePx(l.size, l.type)).toBe(14);
+    // The old Small (13.6px) is a size of its own next to them, as it was next to plain text before.
+    expect(marksAt(rich, sel(0, 0, 0, 3)).mixed).toEqual(['size']);
+    // At the caret after an old Small word, typing keeps Small (a look button there must not drop it).
+    expect(marksAt(rich, sel(0, 3)).size).toBe('small');
+    // A selection that starts at the end of a heading and covers only a plain line shows that line's 14.
+    const fromHead = marksAt([{ type: 'h1', runs: [{ text: 'Plans' }] }, p('today')], sel(0, 5, 1, 5));
+    expect(fromHead.mixed).toBeUndefined();
+    expect(sizePx(fromHead.size, fromHead.type)).toBe(14);
+    // And one that starts on a divider and covers a plain heading shows the heading's 16.
+    const fromHr = marksAt([{ type: 'hr', runs: [{ text: '---' }] }, { type: 'h2', runs: [{ text: 'Head' }] }], sel(0, 3, 1, 4));
+    expect(sizePx(fromHr.size, fromHr.type)).toBe(16);
+    // A plain heading (16) and a plain line (14) are two sizes.
+    expect(marksAt([{ type: 'h1', runs: [{ text: 'H' }] }, p('a')], sel(0, 0, 1, 1)).mixed).toEqual(['size']);
+    // A heading word made 14 and a plain line read 14, so the box shows 14.
+    const both = marksAt([{ type: 'h2', runs: [{ text: 'H', size: 14 }] }, p('a')], sel(0, 0, 1, 1));
+    expect(both.mixed).toBeUndefined();
+    expect(sizePx(both.size, both.type)).toBe(14);
+    expect(sizePx(marksAt([{ type: 'h1', runs: [{ text: 'H' }] }], sel(0, 1)).size, 'h1')).toBe(16);
+  });
+
+  it('saved sizes come back exactly: plain, 14, 16, the old Small and Large, and sizes in headings', () => {
+    const rich: Rich = [
+      { type: 'p', runs: [{ text: 'a' }, { text: 'b', size: 14 }, { text: 'c', size: 16 }, { text: 'd', size: 'small' }, { text: 'e', size: 'large' }, { text: 'f', size: 24 }] },
+      { type: 'h1', runs: [{ text: 'g' }, { text: 'h', size: 14 }, { text: 'i', size: 16 }, { text: 'j', size: 28 }] },
+      { type: 'bullet', runs: [{ text: 'k', size: 16 }] },
+    ];
+    expect(parseRich(JSON.parse(JSON.stringify(rich)))).toEqual(rich);
+  });
+
+  it('Enter keeps a 16 (now a size of its own) for the next line; plain stays plain', () => {
+    const r = splitAt([{ type: 'p', runs: [{ text: 'mid', size: 16 }] }], sel(0, 3));
+    expect(r.look).toEqual({ size: 16 });
+    expect(insertText(r.rich, sel(1, 0), 'more', r.look).rich[1]).toEqual({ type: 'p', runs: [{ text: 'more', size: 16 }] });
+    expect(splitAt([p('plain')], sel(0, 5)).look).toBeUndefined();
   });
 
   it('a number size is a mark like any other: shown, mixed, saved and checked', () => {
@@ -336,10 +418,10 @@ describe('text size as a number', () => {
     expect(r.look).toBeUndefined();
   });
 
-  it('loading keeps sizes from 10 to 36 and the old Small and Large, and drops anything else (16 is normal: no size)', () => {
-    const sizes = [10, 13.6, 36, 16, 'small', 'large', 9, 37, -16, Number.NaN, Infinity, '20', '16px', null, true, 'huge'];
+  it('loading keeps sizes from 10 to 36 (16 and 14 too, since 2026-11-11) and the old Small and Large, and drops anything else', () => {
+    const sizes = [10, 13.6, 36, 16, 14, 'small', 'large', 9, 37, -16, Number.NaN, Infinity, '20', '16px', null, true, 'huge'];
     const got = sizes.map((size) => parseRich([{ type: 'p', runs: [{ text: 'a', size }] }])![0].runs[0].size);
-    expect(got).toEqual([10, 13.6, 36, undefined, 'small', 'large', ...Array(10).fill(undefined)]);
+    expect(got).toEqual([10, 13.6, 36, 16, 14, 'small', 'large', ...Array(10).fill(undefined)]);
   });
 });
 

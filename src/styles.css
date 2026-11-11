@@ -1,4 +1,6 @@
 :root {
+  /* Normal Journal text, as a share of the Journal's 16px text box: 14px (owner request 2026-11-11). Keep in step with NORMAL_SIZE in src/model/richText.ts. */
+  --journal-text: 0.875em;
   /*
    * "Honey Workshop" (owner decision 2026-10-16): calm cream surfaces with honey accents, from the
    * app icon's tones (owner request), so the app and its icon feel like one thing.
@@ -2613,7 +2615,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 /* A day's header shows the same small arrow as the groups (owner request, 2026-11-10). */
 .jg-peek { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; color: var(--ink); font-size: 15px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
 .journal-entry .rich, .journal-notes .rich {
-  min-height: 1.6em;
+  min-height: 1.4em; /* one 14px line (1.6 of 14px) */
   padding: 0;
   color: var(--ink);
   font-size: 16px;
@@ -2623,7 +2625,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   outline: none;
 }
 .journal-entry .rich, .journal-notes .rich { position: relative; }
-.rich[data-placeholder]:not(:has(> div + div))::before { content: attr(data-placeholder); position: absolute; left: 0; top: 0; color: var(--placeholder); pointer-events: none; }
+.rich[data-placeholder]:not(:has(> div + div))::before { content: attr(data-placeholder); position: absolute; left: 0; top: 0; color: var(--placeholder); font-size: var(--journal-text); pointer-events: none; }
+/* Normal Journal text is 14px (owner request 2026-11-11). The box itself stays 16px, so headings (1.45em and
+   1.2em of it) and dividers keep their size and a phone doesn't zoom in on the box; sized words draw by sizeEm. */
+.rich > :not([data-type='h1'], [data-type='h2'], [data-type='hr']) { font-size: var(--journal-text); }
 .app.phone .journal-entry .rich, .app.phone .journal-notes .rich { font-size: 16px; }
 /* The general notes (owner request, 2026-10-29): a quieter sheet above today's page, its header a fold button with the groups' arrow. */
 .journal-notes { margin: 12px 0 0; padding: 12px 20px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; }
@@ -2634,7 +2639,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .journal-notes .jp-title { flex: none; font-size: 15px; }
 /* Folded, one line of what is written follows the title. */
 .journal-notes .jg-peek { -webkit-line-clamp: 1; line-clamp: 1; color: var(--ink-soft); }
-.journal-notes .rich { min-height: calc(3 * 1.6em); }
+.journal-notes .rich { min-height: calc(3 * 1.4em); }
 /* Several general notes (owner request, 2026-11-10): the arrow folds, the name renames, + adds one below, the trash deletes. */
 .journal-notes + .journal-notes { margin-top: 8px; }
 .journal-notes .jn-head { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -2724,8 +2729,6 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .rich [data-u] { text-decoration-line: underline; }
 .rich [data-s] { text-decoration-line: line-through; }
 .rich [data-u][data-s] { text-decoration-line: underline line-through; }
-.rich [data-size='small'] { font-size: 0.85em; }
-.rich [data-size='large'] { font-size: 1.3em; }
 .rich [data-font='serif'] { font-family: var(--font-serif); }
 .rich [data-font='rounded'] { font-family: var(--font-rounded); }
 .rich [data-font='hand'] { font-family: var(--font-hand); }

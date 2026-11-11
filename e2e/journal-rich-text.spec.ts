@@ -19,7 +19,7 @@ async function pick(page: Page, group: string, name: string) {
   await choice(page, group, name).click();
 }
 const sizeList = (page: Page) => styleMenu(page).getByRole('group', { name: 'Sizes' });
-// Named for the size it shows ("Size 16", "Size: mixed"), so a screen reader hears it too.
+// Named for the size it shows ("Size 14", "Size: mixed"), so a screen reader hears it too.
 const sizeBox = (page: Page) => styleMenu(page).getByRole('group', { name: 'Text size' }).getByRole('button', { name: /^Size/ });
 const blocks = (page: Page) => editor(page).locator(':scope > div');
 const openJournal = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true }).click();
@@ -293,7 +293,9 @@ test.describe('on a phone', () => {
       expect(r.x + r.width).toBeLessThanOrEqual(390);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    // The box stays 16px so the phone doesn't zoom in on it; its normal lines are 14px (2026-11-11).
     await expect(editor(page)).toHaveCSS('font-size', '16px');
+    await expect(blocks(page).first()).toHaveCSS('font-size', '14px');
     await editor(page).tap();
     await tool(page, 'Numbered list').tap();
     await page.keyboard.type('one');
@@ -314,7 +316,7 @@ test('the Aa menu holds Style, Size, Font and Highlight, shows the selection’s
   await expect(tool(page, 'Text style')).toHaveAttribute('aria-expanded', 'true');
   for (const group of ['Style', 'Text size', 'Font', 'Highlight']) await expect(styleMenu(page).getByRole('group', { name: group })).toBeVisible();
   await expect(choice(page, 'Style', 'Normal')).toHaveAttribute('aria-pressed', 'true');
-  await expect(sizeBox(page)).toHaveText('16');
+  await expect(sizeBox(page)).toHaveText('14');
   await expect(choice(page, 'Font', 'Plex Sans')).toHaveAttribute('aria-pressed', 'true');
   await expect(styleMenu(page).getByRole('group', { name: 'Font' }).getByRole('button')).toHaveText(['Plex Sans', 'Serif', 'Rounded', 'Handwritten', 'Typewriter']);
   await expect(styleMenu(page).getByRole('group', { name: 'Highlight' }).getByRole('button')).toHaveCount(5); // four colors and None
@@ -359,11 +361,15 @@ test('the size box shows the selection’s size; − and + step it, the list pic
   await page.keyboard.type('a quiet day');
   await selectLetters(page, 2, 7);
   await tool(page, 'Text style').click();
-  await expect(sizeBox(page)).toHaveText('16');
-  await expect(sizeBox(page)).toHaveAccessibleName('Size 16');
+  // Normal Journal text is 14 (owner request 2026-11-11).
+  await expect(sizeBox(page)).toHaveText('14');
+  await expect(sizeBox(page)).toHaveAccessibleName('Size 14');
   await choice(page, 'Text size', 'Larger').click();
   const quiet = editor(page).locator('[data-size]');
   await expect(quiet).toHaveText('quiet');
+  await expect(quiet).toHaveAttribute('data-size', '16');
+  await expect(quiet).toHaveCSS('font-size', '16px');
+  await choice(page, 'Text size', 'Larger').click();
   await expect(quiet).toHaveAttribute('data-size', '18');
   await expect(quiet).toHaveCSS('font-size', '18px');
   await expect(sizeBox(page)).toHaveText('18');
@@ -390,9 +396,9 @@ test('the size box shows the selection’s size; − and + step it, the list pic
   await sizeList(page).getByRole('button', { name: '10', exact: true }).click();
   await expect(choice(page, 'Text size', 'Smaller')).toBeDisabled();
   await expect(quiet).toHaveCSS('font-size', '10px');
-  // 16 is normal: the size comes off.
+  // 14 is normal: the size comes off.
   await sizeBox(page).click();
-  await sizeList(page).getByRole('button', { name: '16', exact: true }).click();
+  await sizeList(page).getByRole('button', { name: '14', exact: true }).click();
   await expect(editor(page).locator('[data-size]')).toHaveCount(0);
   // A selection of more than one size shows an empty box; + steps each part.
   await choice(page, 'Text size', 'Larger').click();
@@ -400,8 +406,8 @@ test('the size box shows the selection’s size; − and + step it, the list pic
   await expect(sizeBox(page)).toHaveText('');
   await expect(sizeBox(page)).toHaveAccessibleName('Size: mixed');
   await choice(page, 'Text size', 'Larger').click();
-  await expect(editor(page).locator('[data-size="20"]')).toHaveText('quiet');
-  await expect(editor(page).locator('[data-size="18"]')).toHaveText(['a ', ' day']);
+  await expect(editor(page).locator('[data-size="18"]')).toHaveText('quiet');
+  await expect(editor(page).locator('[data-size="16"]')).toHaveText(['a ', ' day']);
 });
 
 test('a size before typing applies to what is typed next, and sizes are saved as numbers and kept after a reload', async ({ page }) => {
@@ -480,6 +486,62 @@ test('words made Small or Large before the size box keep their look, and show as
   await sizeBox(page).click();
   await choice(page, 'Text size', 'Larger').click();
   await expect(editor(page).locator('[data-size="24"]')).toHaveText('huge');
+});
+
+// Owner request, 2026-11-11: "the default font size in the journal should be 14 and start there".
+test('normal Journal text is 14px, also in notes saved before; sized words and headings keep their size; 16 is saved', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('x');
+  await page.waitForTimeout(400);
+  // A board saved by the app before (version 4): plain words, a word sized 20, headings with and without a size.
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const board = Object.values(raw.boards).find((b) => (b as { name: string }).name === 'Journal') as { cards: Record<string, { text: string; rich?: unknown }> };
+    const note = Object.values(board.cards)[0];
+    const date = note.text.split('\n')[0];
+    note.text = `${date}\n\nPlans\nBig plans\nSmall head\nplain sized`;
+    note.rich = [
+      { type: 'h1', runs: [{ text: 'Plans' }] },
+      { type: 'h1', runs: [{ text: 'Big plans', size: 24 }] },
+      { type: 'h2', runs: [{ text: 'Small head' }] },
+      { type: 'p', runs: [{ text: 'plain ' }, { text: 'sized', size: 20 }] },
+    ];
+    raw.version = 4;
+    localStorage.setItem('note-board:v1', JSON.stringify(raw));
+  });
+  await page.reload();
+  await openJournal(page);
+  await expect(blocks(page)).toHaveCount(4);
+  // Plain text now draws at 14px; the word sized 20 is still 20px.
+  await expect(blocks(page).nth(3)).toHaveCSS('font-size', '14px');
+  await expect(blocks(page).nth(3).locator('span').first()).toHaveCSS('font-size', '14px');
+  await expect(editor(page).locator('[data-size="20"]')).toHaveCSS('font-size', '20px');
+  // Headings keep their size: 1.45 and 1.2 of 16px, and a heading word sized 24 is still 1.5 of its heading.
+  await expect(blocks(page).nth(0)).toHaveCSS('font-size', '23.2px');
+  await expect(blocks(page).nth(2)).toHaveCSS('font-size', '19.2px');
+  await expect(editor(page).locator('[data-size="24"]')).toHaveCSS('font-size', '34.8px');
+  // The box: 14 for normal text, 16 for a plain heading (its own size), 20 for the sized word.
+  await blocks(page).nth(3).locator('span').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Home');
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('14');
+  await editor(page).locator('[data-size="20"]').dblclick();
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('20');
+  await blocks(page).nth(0).dblclick();
+  await tool(page, 'Text style').click();
+  await expect(sizeBox(page)).toHaveText('16');
+  // A word made 16 is saved as 16, under version 5, and draws at 16px.
+  await blocks(page).nth(3).getByText('plain').dblclick();
+  await tool(page, 'Text style').click();
+  await sizeBox(page).click();
+  await sizeList(page).getByRole('button', { name: '16', exact: true }).click();
+  await expect(editor(page).locator('[data-size="16"]')).toHaveCSS('font-size', '16px');
+  await page.waitForTimeout(400);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:v1')!).version);
+  expect(saved).toBe(5);
+  expect(((await savedNote(page)).rich as { runs: { size?: unknown }[] }[])[3].runs.map((r) => r.size)).toEqual([16, undefined, 20]);
 });
 
 // Follow-up from the check of #224 (owner, 2026-10-31).

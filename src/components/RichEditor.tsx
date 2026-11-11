@@ -17,9 +17,11 @@ export interface RichEditorHandle {
   el: HTMLDivElement | null;
   focusEnd(): void;
   toggle(mark: Toggle): void;
-  setMark(key: 'size' | 'font' | 'hl', value: string | number | undefined): void;
+  setMark(key: 'font' | 'hl', value: string | undefined): void; // sizes go through setSize
   /** The size box's − and +. */
   stepSize(dir: 1 | -1): void;
+  /** A size picked from the size box's list, in px. */
+  setSize(px: number): void;
   setType(type: 'p' | 'h1' | 'h2'): void;
   list(type: 'bullet' | 'number'): void;
   /** The Divider button. */
@@ -56,9 +58,11 @@ function drawBlock(blk: Block, marker: string): HTMLDivElement {
   for (const r of blk.runs) {
     const span = document.createElement('span');
     for (const k of ['b', 'i', 'u', 's'] as const) if (r[k]) span.dataset[k] = '';
-    if (r.size) span.dataset.size = String(r.size);
-    // A size in px, as a share of the line's own size (NORMAL_SIZE px text), so it grows in a heading as Small and Large do.
-    if (typeof r.size === 'number') span.style.fontSize = `${r.size / R.NORMAL_SIZE}em`;
+    // A size as a share of the line's own size: its px in a normal line, a share of 16 in a heading (R.sizeEm).
+    if (r.size) {
+      span.dataset.size = String(r.size);
+      span.style.fontSize = `${R.sizeEm(r.size, blk.type)}em`;
+    }
     if (r.font) span.dataset.font = r.font;
     if (r.hl) span.dataset.hl = r.hl;
     span.textContent = r.text;
@@ -294,7 +298,12 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
     stepSize: (dir) =>
       format(
         (rich, sel) => R.stepSizes(rich, sel, dir),
-        (l) => ({ ...l, size: R.sizeMark(R.stepSize(l.size, dir)) }),
+        (l) => ({ ...l, size: R.sizeMark(R.stepSize(l.size, dir, l.type), l.type) }),
+      ),
+    setSize: (px) =>
+      format(
+        (rich, sel) => R.setSize(rich, sel, px),
+        (l) => ({ ...l, size: R.sizeMark(px, l.type) }),
       ),
     setType(type) {
       const sel = target();

@@ -1,6 +1,7 @@
 import { addCard as addCardAt, addColumn, columnOf, type Placement } from './board';
 import { isPermanent, newId, type MakeId } from './cards';
 import { freshCopies } from './checklist';
+import { readsAsDay } from './journal';
 import type { Board, Card, Column } from './types';
 
 /** How far each paste is offset from the copied blocks (and from the previous paste). */
@@ -39,6 +40,9 @@ export function copyBlocks(board: Board, ids: string[]): ClipEntry[] {
 
 function freshCard(card: Card, makeId: MakeId): Card {
   const copy = { ...structuredClone(card), id: makeId('k') };
+  // A copy of a Journal general note is an ordinary note (2026-11-10): its place in the panel's list stays with the
+  // original. One named like a date line keeps a place, so the panel never takes the copy for that day (it shows as a general note).
+  if (copy.kind === 'note' && !readsAsDay(copy.text)) delete copy.general;
   return copy.kind === 'todo' ? { ...copy, items: freshCopies(copy.items, makeId) } : copy;
 }
 

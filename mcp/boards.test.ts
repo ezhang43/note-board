@@ -203,6 +203,8 @@ describe('boards the app makes stay editable by the connector (guard: safeToEdit
       ['item folded', (x) => editItems(x, 'listGroceries', (items) => toggleFold([...items, { id: 'fz', text: 'Trip', done: false, children: [{ id: 'fz1', text: 'Flights', done: false, children: [] }] }], 'fz'))],
       // (set straight on the card: editItems drops such a fold, but a saved board can hold one)
       ['fold left with no sub-items', (x) => updateCard(x, 'listGroceries', (c) => ({ ...c, items: [...(c as TodoCard).items, { id: 'fe', text: 'Empty', done: false, children: [], folded: true as const }] }))],
+      // A Journal general note's place in the panel's list (owner request, 2026-11-10).
+      ['journal general note', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, general: 2 }))],
     ];
     for (const [name, step] of steps) {
       b = step(b);

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { JOURNAL_NOTES, findJournalBoard, generalNote, generalSpot, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, cleanNoteName, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, noteName, readsAsDay, renameGeneralNote, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { dayKey as calendarDayKey } from './calendar';
 import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
-import type { Board, Card } from './types';
+import type { Board, Card, NoteCard } from './types';
 import type { Workspace } from './workspace';
 
 // Daily journal (owner request, 2026-10-18).
@@ -382,18 +382,21 @@ describe('journal page heading', () => {
 
 // General notes (owner request, 2026-10-29): one note on the Journal board, first line "General notes", never a day.
 
-describe('generalNote', () => {
+/** The first general note, or null. */
+const firstGeneral = (b: Board): string | null => generalNotes(b)[0] ?? null;
+
+describe('the first general note', () => {
   it('is the note whose first line is exactly "General notes"', () => {
     let b = createBoard();
     ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\nhi', 0, 0));
-    expect(generalNote(b)).toBeNull();
+    expect(firstGeneral(b)).toBeNull();
     const g = noteAt(b, `${JOURNAL_NOTES}\n\nmy list`, 300, 0);
-    expect(generalNote(g.board)).toBe(g.id);
-    expect(generalNote(noteAt(b, 'General notes\r\n\nx', 300, 0).board)).not.toBeNull();
+    expect(firstGeneral(g.board)).toBe(g.id);
+    expect(firstGeneral(noteAt(b, 'General notes\r\n\nx', 300, 0).board)).not.toBeNull();
     // Anything else on the first line is an ordinary note.
-    expect(generalNote(noteAt(b, 'General notes about cats', 300, 0).board)).toBeNull();
-    expect(generalNote(noteAt(b, 'general notes', 300, 0).board)).toBeNull();
-    expect(generalNote(addCard(b, { ...createCard('todo'), title: JOURNAL_NOTES } as Card, { type: 'loose', x: 300, y: 0 }))).toBeNull();
+    expect(firstGeneral(noteAt(b, 'General notes about cats', 300, 0).board)).toBeNull();
+    expect(firstGeneral(noteAt(b, 'general notes', 300, 0).board)).toBeNull();
+    expect(firstGeneral(addCard(b, { ...createCard('todo'), title: JOURNAL_NOTES } as Card, { type: 'loose', x: 300, y: 0 }))).toBeNull();
   });
 
   it('is never a day, and a day is never it', () => {
@@ -401,14 +404,14 @@ describe('generalNote', () => {
     expect(journalEntries(g.board)).toEqual([]);
     expect(groupJournal(journalEntries(g.board), '2026-10-18')).toEqual([]);
     const d = noteAt(createBoard(), 'Sun 18 Oct 2026\n\nGeneral notes', 0, 0);
-    expect(generalNote(d.board)).toBeNull();
+    expect(firstGeneral(d.board)).toBeNull();
   });
 
   it('with two (two devices, or a copy), the same one everywhere: the smaller id', () => {
     let b = createBoard();
     b = addCard(b, { ...createCard('note', 'k-b'), text: `${JOURNAL_NOTES}\n\nb` } as Card, { type: 'loose', x: 0, y: 0 });
     b = addCard(b, { ...createCard('note', 'k-a'), text: `${JOURNAL_NOTES}\n\na` } as Card, { type: 'loose', x: 0, y: 300 });
-    expect(generalNote(b)).toBe('k-a');
+    expect(firstGeneral(b)).toBe('k-a');
   });
 });
 
@@ -449,5 +452,228 @@ describe('the general notes and the Journal board', () => {
     expect(spot.y).toBe(40);
     const rect = { ...spot, w: CARD_W, h: NEW_BLOCK_H.note };
     for (const c of Object.values(b.cards)) expect(overlaps(rect, { x: c.x, y: c.y, w: CARD_W, h: NEW_BLOCK_H.note }, 10)).toBe(false);
+  });
+});
+
+// Several general notes, each with a name (owner request, 2026-11-10). The first line is the name; a
+// note added or renamed in the panel carries `general` (its place in the list), so a renamed note is
+// still known. A board saved before this has one "General notes" note and no `general` field.
+describe('several general notes', () => {
+  const none = () => undefined;
+  const legacy = () => {
+    let b = createBoard();
+    ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\nday', 0, 0));
+    const g = noteAt(b, `${JOURNAL_NOTES}\n\nmy list`, 400, 0);
+    return { board: g.board, id: g.id };
+  };
+  const untitled = (id: string) => ({ ...createCard('note', id), text: `${UNTITLED_NOTE}\n\n` }) as NoteCard;
+  const names = (b: Board) => generalNotes(b).map((id) => noteName((b.cards[id] as NoteCard).text));
+
+  it('a board saved before this loads with its one "General notes" note, unchanged, and nothing else', () => {
+    const { board, id } = legacy();
+    expect(generalNotes(board)).toEqual([id]);
+    expect(firstGeneral(board)).toBe(id);
+    expect(board.cards[id]).not.toHaveProperty('general');
+    expect(noteName((board.cards[id] as NoteCard).text)).toBe('General notes');
+  });
+
+  it('once they have places, another note named "General notes" (a stray copy) stays an ordinary note', () => {
+    const { board, id } = legacy();
+    const stray = noteAt(board, `${JOURNAL_NOTES}\n\nstray`, 800, 0);
+    // Before: the smaller id is the general note, as before.
+    expect(generalNotes(stray.board)).toHaveLength(1);
+    const first = generalNotes(stray.board)[0];
+    const renamed = renameGeneralNote(stray.board, first, 'Ideas');
+    expect(generalNotes(renamed)).toEqual([first]);
+    expect(names(renamed)).toEqual(['Ideas']);
+    expect([id, stray.id]).toContain(first);
+  });
+
+  it('adds "Untitled note" right below the one it is added from, numbering them all in order', () => {
+    const { board, id } = legacy();
+    const one = addGeneralNote(board, id, untitled('n-z'), { x: 400, y: 300 });
+    expect(generalNotes(one)).toEqual([id, 'n-z']);
+    expect(names(one)).toEqual(['General notes', 'Untitled note']);
+    // The first keeps its text; both now carry their place.
+    expect((one.cards[id] as NoteCard).text).toBe(`${JOURNAL_NOTES}\n\nmy list`);
+    expect((one.cards[id] as NoteCard).general).toBe(1);
+    expect((one.cards['n-z'] as NoteCard).general).toBe(2);
+    // Added from the first again: between the two, whatever the ids.
+    const two = addGeneralNote(one, id, untitled('n-a'), { x: 400, y: 600 });
+    expect(generalNotes(two)).toEqual([id, 'n-a', 'n-z']);
+    expect(two.order).toContain('n-a');
+    // From one that isn't a general note: nothing.
+    expect(addGeneralNote(one, 'nope', untitled('n-b'), { x: 0, y: 0 })).toBe(one);
+  });
+
+  it('renames a note: only its first line changes; an empty name is "Untitled note"; the same name changes nothing', () => {
+    const { board, id } = legacy();
+    const renamed = renameGeneralNote(board, id, '  Recipes  ');
+    expect((renamed.cards[id] as NoteCard).text).toBe('Recipes\n\nmy list');
+    // Still a general note after its first line changed.
+    expect(generalNotes(renamed)).toEqual([id]);
+    expect(names(renameGeneralNote(board, id, '   '))).toEqual(['Untitled note']);
+    expect(names(renameGeneralNote(board, id, 'two\nlines'))).toEqual(['two lines']);
+    expect(renameGeneralNote(board, id, 'General notes')).toBe(board);
+    expect(renameGeneralNote(board, 'nope', 'x')).toBe(board);
+  });
+
+  it('keeps the formatting of what is written when renamed', () => {
+    const { board, id } = legacy();
+    const rich = [{ type: 'p' as const, runs: [{ text: 'my list', b: true as const }] }];
+    const withRich = { ...board, cards: { ...board.cards, [id]: { ...(board.cards[id] as NoteCard), rich } } };
+    expect((renameGeneralNote(withRich, id, 'Ideas').cards[id] as NoteCard).rich).toEqual(rich);
+  });
+
+  it('deletes one, but never the last', () => {
+    const { board, id } = legacy();
+    expect(deleteGeneralNote(board, id)).toBe(board);
+    const two = addGeneralNote(board, id, untitled('n-z'), { x: 400, y: 300 });
+    const gone = deleteGeneralNote(two, id);
+    expect(generalNotes(gone)).toEqual(['n-z']);
+    expect(gone.cards[id]).toBeUndefined();
+    expect(gone.order).not.toContain(id);
+    expect(deleteGeneralNote(gone, 'n-z')).toBe(gone);
+    // Only general notes: a day is never deleted this way.
+    const day = Object.keys(two.cards).find((k) => !generalNotes(two).includes(k))!;
+    expect(deleteGeneralNote(two, day)).toBe(two);
+  });
+
+  it("a general note is never a day, even named like one, and is left out where today's note goes", () => {
+    const { board, id } = legacy();
+    const dated = renameGeneralNote(board, id, 'Sun 18 Oct 2026');
+    expect(journalEntries(dated).map((e) => e.body)).toEqual(['day']);
+    expect(todaysNote(dated, 'Sun 18 Oct 2026')).not.toBe(id);
+    const two = addGeneralNote(board, id, untitled('n-z'), { x: -800, y: -900 });
+    const spot = journalSpot(two, none, { x: 0, y: 0 });
+    expect(spot.x).toBe(0);
+  });
+
+  it('keeps the Journal board hidden with several, and an ordinary note still lists it', () => {
+    const { board, id } = legacy();
+    const ws = (b: Board): Workspace => ({ home: 'home', boards: { home: createBoard(), j: { ...b, name: 'Journal' } } });
+    const two = addGeneralNote(board, id, untitled('n-z'), { x: 400, y: 300 });
+    expect(hiddenJournal(ws(two), [])).toBe('j');
+    expect(hiddenJournal(ws(noteAt(two, 'Ordinary note', 900, 0).board), [])).toBeNull();
+  });
+
+  it('an older app, which drops the field, keeps every note and its text: the extra ones become ordinary notes on the board', () => {
+    const { board, id } = legacy();
+    const two = renameGeneralNote(addGeneralNote(board, id, untitled('n-z'), { x: 400, y: 300 }), 'n-z', 'Recipes');
+    const strip = (b: Board): Board => ({
+      ...b,
+      cards: Object.fromEntries(
+        Object.entries(b.cards).map(([k, c]) => {
+          if (c.kind !== 'note') return [k, c];
+          const { general: _g, ...rest } = c;
+          return [k, rest];
+        }),
+      ),
+    });
+    const old = strip(two);
+    expect(Object.keys(old.cards).sort()).toEqual(Object.keys(two.cards).sort());
+    expect((old.cards['n-z'] as NoteCard).text).toBe('Recipes\n\n');
+    // The note still named "General notes" is found again; the other is an ordinary note.
+    expect(generalNotes(old)).toEqual([id]);
+  });
+
+  it('places a new one below the one given or, without it, beside everything', () => {
+    const { board, id } = legacy();
+    const below = generalSpotBelow(board, id, none, { x: 0, y: 0 });
+    expect(below.x).toBe(400);
+    expect(below.y).toBeGreaterThan(NEW_BLOCK_H.note);
+    expect(generalSpotBelow(board, 'missing', none, { x: 0, y: 0 })).toEqual(generalSpot(board, none, { x: 0, y: 0 }));
+  });
+
+  it('cleanNoteName: one line, trimmed, never empty', () => {
+    expect(cleanNoteName('')).toBe(UNTITLED_NOTE);
+    expect(cleanNoteName(' a\r\n b ')).toBe('a b');
+  });
+  it('cleanNoteName: at most 200 characters, as the name field allows (also from a paste or the connector)', () => {
+    expect(cleanNoteName('x'.repeat(300))).toBe('x'.repeat(200));
+    expect(cleanNoteName(`${'x'.repeat(199)}  y`)).toBe('x'.repeat(199));
+    // Counted in characters: an emoji is never cut in half.
+    expect(cleanNoteName(`${'x'.repeat(199)}😀😀`)).toBe(`${'x'.repeat(199)}😀`);
+  });
+
+  it('renaming to the name it has already changes nothing, even a name typed longer on the board', () => {
+    const { board, id } = legacy();
+    const two = addGeneralNote(board, id, untitled('n-b'), { x: 400, y: 300 });
+    const long = `${'L'.repeat(300)}`;
+    const b = { ...two, cards: { ...two.cards, 'n-b': { ...(two.cards['n-b'] as NoteCard), text: `${long}\n\nwords` } } };
+    expect(generalNotes(b)).toContain('n-b');
+    // The name field holds all of it; leaving it unchanged saves nothing.
+    expect(renameGeneralNote(b, 'n-b', long)).toBe(b);
+  });
+  // An older app drops the places (2026-11-10 follow-up): the ids this device saw as general notes
+  // (`known`) find them again, in their order, and the next add, rename or delete writes the places back.
+  const stripped = () => {
+    const { board, id } = legacy();
+    let b = addGeneralNote(board, id, untitled('n-b'), { x: 400, y: 300 });
+    b = addGeneralNote(b, 'n-b', untitled('n-c'), { x: 400, y: 600 });
+    b = renameGeneralNote(renameGeneralNote(b, 'n-b', 'Recipes'), 'n-c', 'Tue 10 Nov 2026');
+    const ids = generalNotes(b);
+    const drop = (c: Card): Card => {
+      if (c.kind !== 'note') return c;
+      const { general: _g, ...rest } = c;
+      return rest;
+    };
+    const old: Board = { ...b, cards: Object.fromEntries(Object.entries(b.cards).map(([k, c]) => [k, drop(c)])) };
+    return { old, ids, id };
+  };
+
+  it('an older save without places: the notes this device knew are general notes again, in their order, words untouched', () => {
+    const { old, ids, id } = stripped();
+    expect(ids).toEqual([id, 'n-b', 'n-c']);
+    expect(generalNotes(old)).toEqual([id]);
+    expect(generalNotes(old, ids)).toEqual(ids);
+    // Known ids that are gone are skipped.
+    expect(generalNotes(old, ['gone', ...ids])).toEqual(ids);
+    // A "General notes" note it didn't know comes first.
+    expect(generalNotes(old, ['n-b'])).toEqual([id, 'n-b']);
+    // Once any note has a place again, what was known doesn't matter.
+    const placed = renameGeneralNote(old, 'n-b', 'Recipes 2', ids);
+    expect(generalNotes(placed)).toEqual(ids);
+    expect(ids.map((k) => (placed.cards[k] as NoteCard).general)).toEqual([1, 2, 3]);
+    expect((placed.cards[id] as NoteCard).text).toBe(`${JOURNAL_NOTES}\n\nmy list`);
+    expect((placed.cards['n-c'] as NoteCard).text).toBe(`Tue 10 Nov 2026\n\n`);
+  });
+
+  it('some with places (another device added one), the others only known: those known follow, and the next change places them all', () => {
+    const { old, ids, id } = stripped();
+    // A device that never saw them adds one below "General notes": only those two get places.
+    const other = addGeneralNote(old, id, untitled('n-d'), { x: 400, y: 900 });
+    expect(generalNotes(other)).toEqual([id, 'n-d']);
+    expect(generalNotes(other, ids)).toEqual([id, 'n-d', 'n-b', 'n-c']);
+    const renamed = renameGeneralNote(other, 'n-b', 'Recipes 2', ids);
+    expect(generalNotes(renamed)).toEqual([id, 'n-d', 'n-b', 'n-c']);
+  });
+
+  it('adding and deleting with what was known write the places back too', () => {
+    const { old, ids, id } = stripped();
+    const added = addGeneralNote(old, 'n-c', untitled('n-d'), { x: 400, y: 900 }, ids);
+    expect(generalNotes(added)).toEqual([...ids, 'n-d']);
+    const gone = deleteGeneralNote(old, 'n-b', ids);
+    expect(gone.cards['n-b']).toBeUndefined();
+    expect(generalNotes(gone, ids)).toEqual([id, 'n-c']);
+  });
+
+  it('a general note named like a date line is never taken for that day, with its place or once it has lost it', () => {
+    const { old, ids } = stripped();
+    const withPlaces = renameGeneralNote(old, 'n-b', 'Recipes!', ids);
+    const day = noteAt(withPlaces, 'Tue 10 Nov 2026\n\nreal day', 0, 900);
+    expect(journalEntries(day.board).map((e) => e.id)).not.toContain('n-c');
+    expect(todaysNote(day.board, 'Tue 10 Nov 2026')).toBe(day.id);
+    // Without places, what was known keeps it out of the days.
+    const oldDay = noteAt(old, 'Tue 10 Nov 2026\n\nreal day', 0, 900);
+    expect(journalEntries(oldDay.board, '', ids).map((e) => e.id)).not.toContain('n-c');
+    expect(todaysNote(oldDay.board, 'Tue 10 Nov 2026', ids)).toBe(oldDay.id);
+  });
+
+  it('readsAsDay: a first line the panel would take for a day', () => {
+    expect(readsAsDay('Tue 10 Nov 2026')).toBe(true);
+    expect(readsAsDay('Tue 10 Nov 2026 trip\n\nx')).toBe(true);
+    expect(readsAsDay('Recipes')).toBe(false);
+    expect(readsAsDay(`${JOURNAL_NOTES}\n\n`)).toBe(false);
   });
 });

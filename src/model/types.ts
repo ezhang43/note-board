@@ -43,6 +43,12 @@ export interface NoteCard extends CardBase {
   text: string;
   /** Journal notes only: the body's formatting, used while its plain text matches `text` (see richText.ts). */
   rich?: Rich;
+  /**
+   * Journal general notes only (owner request, 2026-11-10): its place in the panel's list of general
+   * notes, whose name is the note's first line. Left out on every other note, and on the one
+   * "General notes" note of a Journal saved before there could be several (found by its first line).
+   */
+  general?: number;
 }
 
 export interface TodoItem {

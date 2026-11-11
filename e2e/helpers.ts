@@ -67,6 +67,9 @@ export async function toggleDark(page: Page) {
   await menu.getByRole('button', { name: 'Dark mode' }).click();
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+  // Colors fade to the new theme (a tick box's 120ms, for one): read them once every color fade has ended,
+  // not part-way (a slow computer read a tick box 90% of the way to dark, PR #246 checks).
+  await page.waitForFunction(() => document.getAnimations().every((a) => !(a instanceof CSSTransition && /color/.test(a.transitionProperty))));
 }
 
 /**

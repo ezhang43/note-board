@@ -165,6 +165,23 @@ test('deleting also removes the Google Calendar access kept on this device (job 
   expect(alice.errors).toEqual([]);
 });
 
+test('deleting also removes the Journal general notes this device remembers (2026-11-10)', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  const remembered = () => alice.evaluate(() => Object.keys(localStorage).filter((k) => k.endsWith('note-board:journal-notes')));
+  await alice.locator('.corner-controls').getByRole('button', { name: 'Journal', exact: true }).click();
+  await alice.getByRole('button', { name: 'Add a general note' }).first().click();
+  await alice.keyboard.press('Enter');
+  await expect.poll(remembered).toHaveLength(1);
+  await alice.keyboard.press('Escape');
+
+  await openPanel(alice);
+  await panel(alice).getByLabel('Type DELETE to confirm').fill('DELETE');
+  await panel(alice).getByRole('button', { name: 'Delete my account' }).click();
+  await expect(alice.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 8000 });
+  expect(await remembered()).toEqual([]);
+  expect(alice.errors).toEqual([]);
+});
+
 test('if deleting fails, nothing is deleted on the device and the panel says to try again', async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`);

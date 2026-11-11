@@ -98,7 +98,9 @@ function parseCard(id: string, c: unknown): Card | null {
   if (kind === 'note') {
     // A Journal note's formatting is untrusted when loaded or imported: parseRich keeps only known values.
     const rich = parseRich(c.rich);
-    return { ...base, kind, text: str(c.text, ''), ...(rich ? { rich } : {}) };
+    // A Journal general note's place in the panel's list (2026-11-10): only a finite number is read.
+    const general = typeof c.general === 'number' && Number.isFinite(c.general) ? { general: c.general } : {};
+    return { ...base, kind, text: str(c.text, ''), ...(rich ? { rich } : {}), ...general };
   }
   if (kind === 'link') return { ...base, kind, title: str(c.title, ''), url: str(c.url, '') };
   if (kind === 'completed') return { ...base, kind, groups: parseGroups(c.groups) };

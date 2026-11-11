@@ -3,7 +3,7 @@ import * as B from './board';
 import { createCard, createColumn } from './cards';
 import { copyBlocks, pasteBlocks } from './clipboard';
 import { blocksTouching } from './layout';
-import type { Board, TodoCard } from './types';
+import type { Board, NoteCard, TodoCard } from './types';
 
 let n = 0;
 const ids = (p: string) => `${p}${++n}`;
@@ -97,5 +97,22 @@ describe('pasting a card whose column is gone', () => {
     const gone = B.deleteBlocks(b, ['c1']);
     const { board: out, ids: pasted } = pasteBlocks(gone, copied, 1, ids);
     expect(out.cards[pasted[0]]).toMatchObject({ x: 80, y: 80 });
+  });
+});
+
+// A copy of a Journal general note is an ordinary note (2026-11-10): its place in the panel's list stays with the original.
+describe('copying a Journal general note', () => {
+  it('leaves its place in the list behind', () => {
+    const b = B.addCard(B.createBoard(), { ...createCard('note', 'g1'), text: 'Recipes\n\nflour', general: 2 } as NoteCard, { type: 'loose', x: 0, y: 0 });
+    const { board: out, ids: [copy] } = pasteBlocks(b, copyBlocks(b, ['g1']), 1, ids);
+    expect(out.cards[copy]).not.toHaveProperty('general');
+    expect((out.cards[copy] as NoteCard).text).toBe('Recipes\n\nflour');
+    expect((out.cards.g1 as NoteCard).general).toBe(2);
+  });
+  it('one named like a date line keeps a place, so the panel never takes the copy for that day', () => {
+    const b = B.addCard(B.createBoard(), { ...createCard('note', 'g1'), text: 'Tue 10 Nov 2026\n\nplans', general: 2 } as NoteCard, { type: 'loose', x: 0, y: 0 });
+    const { board: out, ids: [copy] } = pasteBlocks(b, copyBlocks(b, ['g1']), 1, ids);
+    expect((out.cards[copy] as NoteCard).general).toBe(2);
+    expect((out.cards[copy] as NoteCard).text).toBe('Tue 10 Nov 2026\n\nplans');
   });
 });

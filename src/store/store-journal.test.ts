@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { journalDateLine } from '../model/journal';
+import { generalNotes, journalDateLine } from '../model/journal';
 import { fromPlain, type Rich } from '../model/richText';
 import type { NoteCard } from '../model/types';
 import type { StorageLike } from '../model/persist';
@@ -459,4 +459,253 @@ describe('Journal general notes', () => {
     s.setJournalNotes(fromPlain('secret'));
     expect(general(s)).toEqual([]);
   });
+});
+
+// Several general notes, with names (owner request, 2026-11-10).
+describe('several Journal general notes', () => {
+  const generals = (s: Store) => {
+    const id = s.getState().ui.journalBoard!;
+    const b = s.workspace().boards[id];
+    return generalNotes(b).map((k) => b.cards[k] as NoteCard);
+  };
+  const names = (s: Store) => generals(s).map((n) => n.text.split('\n')[0]);
+
+  it('+ on the one note not yet written makes it and an "Untitled note" below it, in one undo step', () => {
+    const s = setup();
+    s.openJournal();
+    const id = s.addJournalNote('kFirst');
+    expect(id).toBeTruthy();
+    expect(names(s)).toEqual(['General notes', 'Untitled note']);
+    expect(generals(s)[1].id).toBe(id);
+    expect(s.hiddenBoards()).toEqual([s.getState().ui.journalBoard]);
+    s.undoJournal();
+    expect(generals(s)).toEqual([]);
+    expect(journalNotes(s)).toHaveLength(1); // today's note stays
+  });
+
+  it('+ adds right below the note it is on; typing goes into the note named', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('first'));
+    const [first] = generals(s);
+    const b = s.addJournalNote(first.id)!;
+    const c = s.addJournalNote(first.id)!;
+    expect(generals(s).map((n) => n.id)).toEqual([first.id, c, b]);
+    s.setJournalNotes(fromPlain('in b'), true, b);
+    expect(generals(s).find((n) => n.id === b)!.text).toBe('Untitled note\n\nin b');
+    expect(generals(s)[0].text).toBe('General notes\n\nfirst');
+  });
+
+  it('renames a note as one undo step; the existing note keeps its text; an empty name is "Untitled note"', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('keep me'));
+    const [first] = generals(s);
+    s.renameJournalNote(first.id, 'Ideas');
+    expect(generals(s)[0].text).toBe('Ideas\n\nkeep me');
+    s.renameJournalNote(first.id, '');
+    expect(names(s)).toEqual(['Untitled note']);
+    s.undoJournal();
+    expect(names(s)).toEqual(['Ideas']);
+    s.undoJournal();
+    expect(generals(s)[0].text).toBe('General notes\n\nkeep me');
+  });
+
+  it('renaming the note not yet written makes it with that name; the same name makes nothing', () => {
+    const s = setup();
+    s.openJournal();
+    s.renameJournalNote('kFirst', 'General notes');
+    expect(generals(s)).toEqual([]);
+    s.renameJournalNote('kFirst', 'To do');
+    expect(names(s)).toEqual(['To do']);
+  });
+
+  it('deletes a note with the Undo message, Undo brings it back in one step, and the last one is never deleted', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('first'));
+    const [first] = generals(s);
+    const b = s.addJournalNote(first.id)!;
+    s.setJournalNotes(fromPlain('second'), true, b);
+    s.deleteJournalNote(b);
+    expect(generals(s).map((n) => n.id)).toEqual([first.id]);
+    expect(s.getState().ui.undoToast?.text).toBe('Deleted 1 note');
+    s.undoJournal();
+    expect(generals(s).map((n) => n.text)).toEqual(['General notes\n\nfirst', 'Untitled note\n\nsecond']);
+    s.deleteJournalNote(b);
+    s.deleteJournalNote(first.id); // the last: kept
+    expect(generals(s).map((n) => n.id)).toEqual([first.id]);
+  });
+
+  it('several notes are kept after a reload, in order, with their names', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    s.setJournalNotes(fromPlain('a'));
+    const b = s.addJournalNote(generals(s)[0].id)!;
+    s.renameJournalNote(b, 'Recipes');
+    s.flush();
+    const again = createStore(storage, later);
+    again.openJournal();
+    expect(names(again)).toEqual(['General notes', 'Recipes']);
+  });
+
+  it('a Journal saved before there could be several (no place saved) shows its one note, and + or rename then numbers it', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    s.setJournalNotes(fromPlain('old words'));
+    s.flush();
+    // As an older copy of the app saved it: no `general`.
+    const saved = JSON.parse(storage.getItem('note-board:v1')!);
+    const jid = s.getState().ui.journalBoard!;
+    for (const c of Object.values(saved.boards[jid].cards) as { general?: number }[]) delete c.general;
+    storage.setItem('note-board:v1', JSON.stringify(saved));
+    const again = createStore(storage, later);
+    again.openJournal();
+    expect(generals(again).map((n) => n.text)).toEqual(['General notes\n\nold words']);
+    expect(generals(again)[0].general).toBeUndefined();
+    const b = again.addJournalNote(generals(again)[0].id)!;
+    expect(generals(again).map((n) => [n.general, n.text.split('\n')[0]])).toEqual([[1, 'General notes'], [2, 'Untitled note']]);
+    expect(generals(again)[1].id).toBe(b);
+    expect(generals(again)[0].text).toBe('General notes\n\nold words');
+  });
+
+  it('a Journal saved before this, with its one General notes note, loads unchanged', () => {
+    const storage = memoryStorage();
+    const s = createStore(storage, later);
+    s.openJournal();
+    s.setJournalNotes(fromPlain('old text'));
+    s.flush();
+    const saved = JSON.parse(storage.getItem('note-board:v1')!);
+    const again = createStore(storage, later);
+    again.openJournal();
+    expect(generals(again).map((n) => n.text)).toEqual(['General notes\n\nold text']);
+    again.flush();
+    const id = again.getState().ui.journalBoard!;
+    expect(JSON.parse(storage.getItem('note-board:v1')!).boards[id].cards).toEqual(saved.boards[id].cards);
+  });
+// An older copy of the app drops the general notes' places (2026-11-10 follow-up): this device
+// remembers which notes were general notes, finds them again, and the next change writes the places back.
+describe('Journal general notes after an older app saved them', () => {
+  const strip = (s: Store) => {
+    const ws = s.workspace();
+    const id = s.getState().ui.journalBoard!;
+    const b = ws.boards[id];
+    const cards = Object.fromEntries(
+      Object.entries(b.cards).map(([k, c]) => {
+        if (c.kind !== 'note') return [k, c];
+        const { general: _g, ...rest } = c;
+        return [k, rest];
+      }),
+    );
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [id]: { ...b, cards } } });
+  };
+  const text = (s: Store, k: string) => (s.workspace().boards[s.getState().ui.journalBoard!].cards[k] as NoteCard).text;
+  const three = (storage = memoryStorage()) => {
+    const s = createStore(storage, later);
+    s.setViewportSize({ width: 1000, height: 800 });
+    s.openJournal();
+    s.setJournalNotes(fromPlain('list'));
+    const first = s.journalGeneralNotes()[0];
+    const b = s.addJournalNote(first)!;
+    s.renameJournalNote(b, 'Recipes');
+    const c = s.addJournalNote(b)!;
+    s.renameJournalNote(c, 'Tue 10 Nov 2026');
+    s.rememberJournalNotes();
+    return { s, ids: [first, b, c], storage };
+  };
+
+  it('finds every one again, in order, with its words, and the next rename writes the places back', () => {
+    const { s, ids } = three();
+    strip(s);
+    expect(generalNotes(s.workspace().boards[s.getState().ui.journalBoard!])).toEqual([ids[0]]);
+    expect(s.journalGeneralNotes()).toEqual(ids);
+    expect(text(s, ids[1])).toBe('Recipes\n\n');
+    s.renameJournalNote(ids[1], 'Recipes 2');
+    expect(generalNotes(s.workspace().boards[s.getState().ui.journalBoard!])).toEqual(ids);
+    expect(text(s, ids[0])).toBe('General notes\n\nlist');
+  });
+
+  it('remembers them after the page is opened again (saved on this device)', () => {
+    const { s, ids, storage } = three();
+    strip(s);
+    s.flush();
+    const again = createStore(storage, later);
+    again.openJournal();
+    expect(again.journalGeneralNotes()).toEqual(ids);
+  });
+
+  it('deleting one, then Undo, brings it back in its place in the list', () => {
+    const { s, ids } = three();
+    strip(s);
+    s.deleteJournalNote(ids[1]);
+    s.rememberJournalNotes();
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+    s.undoJournal();
+    expect(s.journalGeneralNotes()).toEqual(ids);
+  });
+
+  it('another device that never saw them adds a note: this device still lists the ones it remembers, after those with places', () => {
+    const { s, ids } = three();
+    strip(s);
+    // As another device would: "General notes" and a new note get places, the other two don't.
+    const ws = s.workspace();
+    const id = s.getState().ui.journalBoard!;
+    const b = ws.boards[id];
+    const d = { ...(b.cards[ids[1]] as NoteCard), id: 'n-d', text: 'From phone\n\n', general: 2 };
+    const first = { ...(b.cards[ids[0]] as NoteCard), general: 1 };
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [id]: { ...b, cards: { ...b.cards, [ids[0]]: first, 'n-d': d } } } });
+    s.rememberJournalNotes();
+    expect(s.journalGeneralNotes()).toEqual([ids[0], 'n-d', ids[1], ids[2]]);
+  });
+
+  it('a full list of remembered ids drops gone ones first, never the notes listed now', () => {
+    const storage = memoryStorage();
+    const { s, ids } = three(storage);
+    const gone = Array.from({ length: 600 }, (_, i) => `gone-${i}`);
+    storage.setItem('note-board:journal-notes', JSON.stringify([...ids, ...gone]));
+    s.renameJournalNote(ids[1], 'Recipes 3');
+    const kept = JSON.parse(storage.getItem('note-board:journal-notes')!) as string[];
+    expect(kept.length).toBeLessThanOrEqual(500);
+    expect(kept.slice(0, 3)).toEqual(ids);
+  });
+
+  it('what another tab remembers is read again, not kept from when this page opened', () => {
+    const storage = memoryStorage();
+    const { s, ids } = three(storage);
+    strip(s);
+    expect(s.journalGeneralNotes()).toEqual(ids);
+    storage.setItem('note-board:journal-notes', JSON.stringify([ids[0], ids[2]]));
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+  });
+
+  it('typing and deleting find them too; one named like a date is never taken for that day', () => {
+    const { s, ids } = three();
+    strip(s);
+    s.setJournalNotes(fromPlain('more'), true, ids[2]);
+    expect(text(s, ids[2])).toBe('Tue 10 Nov 2026\n\nmore');
+    s.deleteJournalNote(ids[1]);
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+  });
+});
+
+describe('placing general notes on the open Journal board', () => {
+  it('+ on the note not yet written puts the two notes clear of each other', () => {
+    const s = setup();
+    s.openJournal();
+    const jid = s.getState().ui.journalBoard!;
+    s.openBoard(jid);
+    const added = s.addJournalNote('kFirst')!;
+    const b = s.getState().board;
+    const [first] = generalNotes(b).filter((k) => k !== added);
+    const r = (k: string) => {
+      const c = b.cards[k] as NoteCard;
+      return { x: c.x, y: c.y, w: c.w ?? 280, h: c.h ?? 160 }; // not drawn here: a new note's height
+    };
+    const a = r(first);
+    const n = r(added);
+    expect(n.y).toBeGreaterThanOrEqual(a.y + a.h);
+  });
+});
 });

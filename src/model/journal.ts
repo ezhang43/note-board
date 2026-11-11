@@ -1,8 +1,9 @@
 import { addDays, addMonths, dayLabel, MONTH_NAMES, MONTHS, weekStart, type DayKey } from './calendar';
 import { dayKey } from './completed';
 import { BLOCK_GAP, CARD_W, GRID, NEW_BLOCK_H } from './constants';
-import { spotForNewBlock, topLevelRects, type MeasuredHeight } from './layout';
-import type { Board, Point } from './types';
+import { addCard, deleteBlocks, updateCard } from './board';
+import { blockRect, spotForNewBlock, topLevelRects, type MeasuredHeight } from './layout';
+import type { Board, Card, NoteCard, Point } from './types';
 import { boardTree, type Workspace } from './workspace';
 
 // Daily journal (owner request, 2026-10-18): the Journal button opens a side panel that writes
@@ -30,9 +31,16 @@ export function findJournalBoard(ws: Workspace, shared: string[]): string | null
 const firstLine = (text: string) => text.split('\n')[0].trimEnd();
 const isDay = (text: string, dateLine: string) => firstLine(text) === dateLine || firstLine(text).startsWith(`${dateLine} `);
 
-/** The note on `board` whose first line is `dateLine`, with or without a title after it (today's note), or null. */
-export function todaysNote(board: Board, dateLine: string): string | null {
-  const note = Object.values(board.cards).find((c) => c.kind === 'note' && isDay(c.text, dateLine));
+/** Whether a note whose text is `text` would be read as a day: its first line starts with a date line. */
+export const readsAsDay = (text: string): boolean => DATE_LINE.test(firstLine(text));
+
+/**
+ * The note on `board` whose first line is `dateLine`, with or without a title after it (today's note),
+ * or null. Never a general note (`known`: see generalNotes), whatever its name.
+ */
+export function todaysNote(board: Board, dateLine: string, known: readonly string[] = []): string | null {
+  const general = new Set(generalNotes(board, known));
+  const note = Object.values(board.cards).find((c) => c.kind === 'note' && !general.has(c.id) && isDay(c.text, dateLine));
   return note?.id ?? null;
 }
 
@@ -40,10 +48,9 @@ export function todaysNote(board: Board, dateLine: string): string | null {
  * Where today's note goes: straight above every other block, level with the leftmost, so the
  * newest sits on top and nothing moves. On an empty board, the middle of the screen (`centre`).
  */
-export function journalSpot(board: Board, measured: MeasuredHeight, centre: Point): Point {
+export function journalSpot(board: Board, measured: MeasuredHeight, centre: Point, known: readonly string[] = []): Point {
   // The general notes are left out, wherever they were moved, so they never shift the days' column.
-  const notes = generalNote(board);
-  const rects = topLevelRects(board, measured, notes ? [notes] : []);
+  const rects = topLevelRects(board, measured, generalNotes(board, known));
   if (!rects.length) return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, centre, measured);
   const left = Math.min(...rects.map((r) => r.x));
   const top = Math.min(...rects.map((r) => r.y));
@@ -51,22 +58,127 @@ export function journalSpot(board: Board, measured: MeasuredHeight, centre: Poin
   return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, { x: left + CARD_W / 2, y: top - GRID - BLOCK_GAP - NEW_BLOCK_H.note / 2 }, measured);
 }
 
-// General notes (owner request, 2026-10-29): one note on the Journal board, not tied to a day, shown
-// at the top of the panel. Like a day, it is known by its first line, so it travels as an ordinary
-// note through sync, backups, export and import, copying and Version history, and needs no new field.
+// General notes (owner request, 2026-10-29): notes on the Journal board, not tied to a day, shown at
+// the top of the panel. The first was known by its first line alone, "General notes"; since there can
+// be several, each with a name (2026-11-10), a note added or renamed in the panel also carries its place
+// in the list (`general`). Otherwise they are ordinary notes: sync, backups, export and import, copying
+// and Version history carry them like any other.
 
 /** The first line of the general notes. A date line never is this, so they are never mistaken for a day. */
 export const JOURNAL_NOTES = 'General notes';
 
+/** Where this browser keeps the ids of the Journal's general notes it last saw with places (see generalNotes' `known`). */
+export const JOURNAL_KNOWN_KEY = 'note-board:journal-notes';
+
+/** The name a general note gets when added, or when its name is cleared (owner decision, 2026-11-10). */
+export const UNTITLED_NOTE = 'Untitled note';
+
 /**
- * The general notes on `board`: the note whose first line is exactly "General notes", or null. With
- * more than one (written on two devices before they synced, or a copy), the smallest id, so every
- * device shows the same one; the others are ordinary notes on the board.
+ * A general note added or renamed in the panel (owner request, 2026-11-10: several, with names): it
+ * carries its place in the list, so it is known whatever its first line (its name) says.
  */
-export function generalNote(board: Board): string | null {
+const isGeneral = (c: Card): boolean => c.kind === 'note' && typeof c.general === 'number';
+
+/**
+ * The note whose first line is exactly "General notes" and has no place in the list: the one general
+ * note a Journal had before there could be several. With more than one (written on two devices before
+ * they synced, or a copy), the smallest id, so every device shows the same one; the others are ordinary notes.
+ */
+function firstStyleNote(board: Board): string | null {
   let id: string | null = null;
-  for (const c of Object.values(board.cards)) if (c.kind === 'note' && firstLine(c.text) === JOURNAL_NOTES && (id === null || c.id < id)) id = c.id;
+  for (const c of Object.values(board.cards)) if (c.kind === 'note' && !isGeneral(c) && firstLine(c.text) === JOURNAL_NOTES && (id === null || c.id < id)) id = c.id;
   return id;
+}
+
+/**
+ * The general notes on `board`, in the panel's order: those with a place, by place (ties by id), then
+ * the other notes this device last saw as general notes (`known`: their ids, in order; 2026-11-10
+ * follow-up), since an older copy of the app drops the places and another device may then have placed
+ * only some. With no place at all (a Journal saved before there could be several, or by an older copy),
+ * the "General notes" note found by its first line (see firstStyleNote) comes first if it isn't known.
+ * Adding, renaming or deleting numbers them all again, so the places are written back, and once any has
+ * a place, another note named "General notes" stays an ordinary note.
+ */
+export function generalNotes(board: Board, known: readonly string[] = []): string[] {
+  const placed = Object.values(board.cards)
+    .filter((c): c is NoteCard => isGeneral(c))
+    .sort((a, b) => a.general! - b.general! || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((c) => c.id);
+  const found = [...new Set(known)].filter((id) => board.cards[id]?.kind === 'note' && !placed.includes(id));
+  if (placed.length) return [...placed, ...found];
+  const first = firstStyleNote(board);
+  return first && !found.includes(first) ? [first, ...found] : found;
+}
+
+
+/** A general note's name: its first line. */
+export const noteName = (text: string): string => firstLine(text).trim();
+
+/** A name as typed, on one line and trimmed; an empty one is "Untitled note". */
+export const NOTE_NAME_MAX = 200;
+export function cleanNoteName(raw: string): string {
+  const one = raw.replace(/\s+/g, ' ').trim();
+  // Counted in characters, so an emoji is never cut in half.
+  return Array.from(one).slice(0, NOTE_NAME_MAX).join('').trim() || UNTITLED_NOTE;
+}
+
+/** `board` with the general notes `ids` numbered 1, 2, 3… in that order (only those whose number changes are touched). */
+function numbered(board: Board, ids: string[]): Board {
+  const cards = { ...board.cards };
+  let changed = false;
+  ids.forEach((id, i) => {
+    const c = cards[id];
+    if (c?.kind === 'note' && c.general !== i + 1) {
+      cards[id] = { ...c, general: i + 1 };
+      changed = true;
+    }
+  });
+  return changed ? { ...board, cards } : board;
+}
+
+/**
+ * Adds `note` (a new "Untitled note") as a general note right after the general note `after`, loose
+ * at `at`, and numbers them all. Unchanged when `after` isn't a general note.
+ */
+export function addGeneralNote(board: Board, after: string, note: NoteCard, at: Point, known: readonly string[] = []): Board {
+  const ids = generalNotes(board, known);
+  const i = ids.indexOf(after);
+  if (i < 0 || board.cards[note.id]) return board;
+  const added = addCard(board, { ...note, general: 0 }, { type: 'loose', ...at });
+  return numbered(added, [...ids.slice(0, i + 1), note.id, ...ids.slice(i + 1)]);
+}
+
+/**
+ * Renames the general note `id`: its first line becomes `name` (see cleanNoteName), and what is
+ * written under it, with its formatting, stays. All are numbered, so a renamed "General notes" note
+ * is still known. Unchanged when the name is the same or `id` isn't a general note.
+ */
+export function renameGeneralNote(board: Board, id: string, name: string, known: readonly string[] = []): Board {
+  const ids = generalNotes(board, known);
+  const c = board.cards[id];
+  if (!ids.includes(id) || c?.kind !== 'note') return board;
+  const next = cleanNoteName(name);
+  // The name it has (cleaned the same way): nothing to save, so a name made longer on the board isn't cut.
+  if (next === firstLine(c.text) || next === cleanNoteName(firstLine(c.text))) return board;
+  const i = c.text.indexOf('\n');
+  const text = `${next}${i < 0 ? '\n\n' : c.text.slice(i)}`;
+  return numbered(updateCard(board, id, (card) => ({ ...card, text }) as NoteCard), ids);
+}
+
+/** Deletes the general note `id`, unless it is the last one (or isn't a general note). */
+export function deleteGeneralNote(board: Board, id: string, known: readonly string[] = []): Board {
+  const ids = generalNotes(board, known);
+  return ids.length > 1 && ids.includes(id) ? numbered(deleteBlocks(board, [id]), ids.filter((k) => k !== id)) : board;
+}
+
+/**
+ * Where a general note added after `after` goes on the Journal board: straight below it, on a free
+ * spot; when `after` isn't on the board loose, where the first general notes go (see generalSpot).
+ */
+export function generalSpotBelow(board: Board, after: string, measured: MeasuredHeight, centre: Point): Point {
+  const r = board.order.includes(after) ? blockRect(board, after, measured) : null;
+  if (!r) return generalSpot(board, measured, centre);
+  return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, { x: r.x + CARD_W / 2, y: r.y + r.h + GRID + BLOCK_GAP + NEW_BLOCK_H.note / 2 }, measured);
 }
 
 /**
@@ -114,10 +226,11 @@ export function withJournalBody(text: string, body: string): string {
  * The dated notes on a Journal board: today's (`today`: its date line) first, then the others,
  * newest day first. Each is the note's id, its date line and what is written under it.
  */
-export function journalEntries(board: Board, today = ''): { id: string; date: string; body: string }[] {
+export function journalEntries(board: Board, today = '', known: readonly string[] = []): { id: string; date: string; body: string }[] {
   const out: { id: string; date: string; body: string; day: number }[] = [];
+  const general = new Set(generalNotes(board, known)); // never a day, whatever its name (see generalNotes)
   for (const c of Object.values(board.cards)) {
-    const m = c.kind === 'note' ? DATE_LINE.exec(firstLine(c.text)) : null;
+    const m = c.kind === 'note' && !general.has(c.id) ? DATE_LINE.exec(firstLine(c.text)) : null;
     if (c.kind !== 'note' || !m) continue;
     out.push({ id: c.id, date: firstLine(c.text), body: journalBody(c.text), day: Number(m[3]) * 10000 + MONTHS.indexOf(m[2]) * 100 + Number(m[1]) });
   }
@@ -128,14 +241,14 @@ export function journalEntries(board: Board, today = ''): { id: string; date: st
 /**
  * The Journal board kept out of the Boards menu: the one the panel uses (see findJournalBoard),
  * when no card opens it and it holds only dated notes and its general notes, so nothing on it is out
- * of sight (a second "General notes" note isn't in the panel, so it lists the board). A Journal
+ * of sight (a second "General notes" note without a place in the list isn't in the panel, so it lists the board). A Journal
  * board with a card on Home (as the Journal button used to make) stays listed. Never the home board.
  */
 export function hiddenJournal(ws: Workspace, shared: string[]): string | null {
   const id = findJournalBoard(ws, shared);
   if (!id || id === ws.home) return null;
   const board = ws.boards[id];
-  const shown = journalEntries(board).length + (generalNote(board) ? 1 : 0);
+  const shown = journalEntries(board).length + generalNotes(board).length;
   if (Object.keys(board.columns).length || shown !== Object.keys(board.cards).length) return null;
   const opened = Object.values(ws.boards).some((b) => Object.values(b.cards).some((c) => c.kind === 'board' && c.boardId === id));
   return opened ? null : id;

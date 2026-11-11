@@ -86,7 +86,7 @@ test('folded, the header shows their first line', async ({ page }) => {
   await notes(page).click();
   await page.keyboard.type('Call the plumber\nBuy stamps');
   await header(page).click();
-  await expect(header(page).locator('.jg-peek')).toHaveText('Call the plumber');
+  await expect(panel(page).locator('.journal-notes .jg-peek')).toHaveText('Call the plumber');
 });
 
 test.describe('on a phone', () => {

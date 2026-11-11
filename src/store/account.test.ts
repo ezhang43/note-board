@@ -202,6 +202,8 @@ describe('accountKeys', () => {
       // Changes held back while the account was being deleted elsewhere (review 181-A H1).
       'note-board:held-edits:me',
       'note-board:held-edits:someone-else',
+      // The Journal's general notes this device remembers (2026-11-10): ids of this person's notes.
+      'note-board:journal-notes',
       // Settings of this device, not the account's data.
       'note-board:theme',
       'note-board:color-theme',
@@ -235,6 +237,7 @@ describe('accountKeys', () => {
         'note-board:parked:me',
         'note-board:parked-bases:me',
         'note-board:held-edits:me',
+        'note-board:journal-notes',
         'note-board:calendar-access',
       ].sort(),
     );

@@ -137,15 +137,15 @@ function numbered(board: Board, ids: string[]): Board {
 }
 
 /**
- * Adds `note` (a new "Untitled note") as a general note right after the general note `after`, loose
- * at `at`, and numbers them all. Unchanged when `after` isn't a general note.
+ * Adds `note` (a new "Untitled note") as the first general note (owner request, 2026-11-11: the + is at
+ * the top of the list, so the new note goes on top), loose at `at`, and numbers them all (those only
+ * `known` too). Unchanged when a card with that id is already on the board.
  */
-export function addGeneralNote(board: Board, after: string, note: NoteCard, at: Point, known: readonly string[] = []): Board {
+export function addGeneralNote(board: Board, note: NoteCard, at: Point, known: readonly string[] = []): Board {
+  if (board.cards[note.id]) return board;
   const ids = generalNotes(board, known);
-  const i = ids.indexOf(after);
-  if (i < 0 || board.cards[note.id]) return board;
   const added = addCard(board, { ...note, general: 0 }, { type: 'loose', ...at });
-  return numbered(added, [...ids.slice(0, i + 1), note.id, ...ids.slice(i + 1)]);
+  return numbered(added, [note.id, ...ids]);
 }
 
 /**
@@ -172,11 +172,12 @@ export function deleteGeneralNote(board: Board, id: string, known: readonly stri
 }
 
 /**
- * Where a general note added after `after` goes on the Journal board: straight below it, on a free
- * spot; when `after` isn't on the board loose, where the first general notes go (see generalSpot).
+ * Where a new general note goes on the Journal board: straight below the note `below` (the old first
+ * one, since new notes go to the top of the list), on a free spot; when `below` isn't on the board
+ * loose, where the first general notes go (see generalSpot).
  */
-export function generalSpotBelow(board: Board, after: string, measured: MeasuredHeight, centre: Point): Point {
-  const r = board.order.includes(after) ? blockRect(board, after, measured) : null;
+export function generalSpotBelow(board: Board, below: string, measured: MeasuredHeight, centre: Point): Point {
+  const r = board.order.includes(below) ? blockRect(board, below, measured) : null;
   if (!r) return generalSpot(board, measured, centre);
   return spotForNewBlock(board, CARD_W, NEW_BLOCK_H.note, { x: r.x + CARD_W / 2, y: r.y + r.h + GRID + BLOCK_GAP + NEW_BLOCK_H.note / 2 }, measured);
 }

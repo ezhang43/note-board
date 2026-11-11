@@ -356,6 +356,21 @@ export function moveDraftStart(d: Draft, startDate: string): Draft {
 }
 
 /**
+ * Dragging an event onto another day (owner request, 2026-11-11): the event's draft moved by as many
+ * days as `target` is from `grabbed`, the day it was picked up on (a multi-day event can be picked up
+ * on any of its days, as in Google Calendar). Its time of day, length, title and guests stay; null
+ * when dropped on the day it was picked up on. The same draft the form would save, so a drag is
+ * saved, emailed about and undone exactly as a change made in the form.
+ */
+export function dragDraft(e: CalEvent, grabbed: DayKey, target: DayKey): Draft | null {
+  if (!isDay(grabbed) || !isDay(target)) return null;
+  const days = Math.round((toDate(target).getTime() - toDate(grabbed).getTime()) / 86_400_000);
+  if (days === 0) return null;
+  const d = draftFor(e);
+  return moveDraftStart(d, addDays(d.startDate, days));
+}
+
+/**
  * A new start time moves the end time by as much, so the event keeps its length, as in Google
  * Calendar (job 216). A one-day event whose end would pass midnight ends at 23:59 instead (the
  * quick-add shows no end date); an event over several days carries its end across midnight.

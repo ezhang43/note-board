@@ -20,8 +20,11 @@ function keepBlockCursor(e: { preventDefault(): void }) {
 }
 export const keepsBlockCursor = { onPointerDown: keepBlockCursor, onMouseDown: keepBlockCursor };
 
-/** True while a panel covers the board (Send feedback, Delete account): board keys then leave it alone. */
-export const panelCovers = () => document.querySelector('[aria-modal="true"]') !== null;
+/**
+ * True while a panel covers the board (Send feedback, Delete account), or a calendar event is being
+ * dragged (`body.cal-dragging`, whose Escape is the drag's): board keys then leave it alone.
+ */
+export const panelCovers = () => document.querySelector('[aria-modal="true"], body.cal-dragging') !== null;
 
 /**
  * Whether this Escape is for the side panel or Version history (so it closes it), and not for

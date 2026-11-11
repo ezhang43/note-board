@@ -19,6 +19,7 @@ import {
   dayLabel,
   draftBody,
   draftFor,
+  dragDraft,
   emailGuests,
   eventsOnDay,
   exceptionChange,
@@ -316,6 +317,58 @@ describe('editing an event', () => {
     expect(untitled.title).toBe('(No title)');
     expect(draftFor(untitled).title).toBe('');
     expect(draftBody(draftFor(untitled), 'UTC')?.summary).toBe('');
+  });
+
+  describe('dragging an event onto another day (owner request 2026-11-11)', () => {
+    it('a timed event keeps its time of day and length on the new day', () => {
+      const d = dragDraft(timed(), '2026-10-06', '2026-10-09');
+      expect(d).toMatchObject({ startDate: '2026-10-09', startTime: '10:00', endDate: '2026-10-09', endTime: '11:00', title: 'Dentist', allDay: false });
+      expect(draftBody(d!, 'UTC')).toMatchObject({ start: { dateTime: '2026-10-09T10:00:00' }, end: { dateTime: '2026-10-09T11:00:00' } });
+    });
+
+    it('a timed event over midnight keeps its end on the day after', () => {
+      const d = dragDraft(timed({ start: '2026-10-06T23:00', end: '2026-10-07T01:00' }), '2026-10-06', '2026-10-20');
+      expect(d).toMatchObject({ startDate: '2026-10-20', startTime: '23:00', endDate: '2026-10-21', endTime: '01:00' });
+    });
+
+    it('an all-day event moves with its one day', () => {
+      const d = dragDraft(timed({ allDay: true, start: '2026-10-09', end: '2026-10-10' }), '2026-10-09', '2026-10-12');
+      expect(d).toMatchObject({ allDay: true, startDate: '2026-10-12', endDate: '2026-10-12' });
+      expect(draftBody(d!, 'UTC')).toMatchObject({ start: { date: '2026-10-12' }, end: { date: '2026-10-13' } });
+    });
+
+    it('a multi-day event keeps its number of days', () => {
+      const trip = timed({ allDay: true, start: '2026-10-08', end: '2026-10-11' }); // 8th to 10th
+      const d = dragDraft(trip, '2026-10-08', '2026-10-15');
+      expect(draftBody(d!, 'UTC')).toMatchObject({ start: { date: '2026-10-15' }, end: { date: '2026-10-18' } });
+    });
+
+    it('moves by the days between where it was picked up and where it was dropped, so a middle day of a multi-day event can be the handle', () => {
+      const trip = timed({ allDay: true, start: '2026-10-08', end: '2026-10-11' });
+      // Picked up on the 10th, dropped on the 12th: two days later, not onto the 12th as its first day.
+      expect(draftBody(dragDraft(trip, '2026-10-10', '2026-10-12')!, 'UTC')).toMatchObject({ start: { date: '2026-10-10' }, end: { date: '2026-10-13' } });
+      // And earlier.
+      expect(draftBody(dragDraft(trip, '2026-10-10', '2026-10-09')!, 'UTC')).toMatchObject({ start: { date: '2026-10-07' }, end: { date: '2026-10-10' } });
+    });
+
+    it('works across months, years and a clock change', () => {
+      expect(dragDraft(timed({ start: '2026-10-30T09:00', end: '2026-10-30T10:00' }), '2026-10-30', '2026-11-02')).toMatchObject({ startDate: '2026-11-02', endDate: '2026-11-02' });
+      expect(dragDraft(timed({ start: '2026-12-31T09:00', end: '2026-12-31T10:00' }), '2026-12-31', '2027-01-01')).toMatchObject({ startDate: '2027-01-01', endDate: '2027-01-01' });
+      expect(dragDraft(timed({ start: '2026-03-28T09:00', end: '2026-03-28T10:00' }), '2026-03-28', '2026-04-04')).toMatchObject({ startDate: '2026-04-04', startTime: '09:00' });
+    });
+
+    it('dropping on the day it was picked up on moves nothing', () => {
+      expect(dragDraft(timed(), '2026-10-06', '2026-10-06')).toBeNull();
+    });
+
+    it('keeps the guests (the person themself left out) and the title', () => {
+      const lunch = timed({ title: 'Lunch', guests: [{ email: 'me@example.com', self: true }, { email: 'sam@example.com' }] });
+      expect(dragDraft(lunch, '2026-10-06', '2026-10-07')).toMatchObject({ title: 'Lunch', guests: ['sam@example.com'] });
+    });
+
+    it('an untitled event stays untitled', () => {
+      expect(dragDraft(timed({ title: '(No title)' }), '2026-10-06', '2026-10-07')?.title).toBe('');
+    });
   });
 
   it('moving the start day moves the end day with it', () => {

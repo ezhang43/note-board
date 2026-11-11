@@ -890,11 +890,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const added = !here && (await backend.join(id, key));
       // On it again (only once a join has worked, not while it is still here being left): a list
       // naming it opens it as usual.
-      // A leave of it sent before this join belongs to the copy that went: this one isn't being left.
-      if (!here) {
-        left.delete(id);
-        leaving.delete(id);
-      }
+      if (!here) left.delete(id);
+      // A leave of it sent before this join put them back on it belongs to the copy that went: this one
+      // isn't being left. (simple: in Firestore that old leave can still land after the join and take
+      // them off again, shown then as a removal; upgrade by checking the leave against the copy.)
+      if (added) leaving.delete(id);
       const s = open(id) ?? need(id);
       // (People arriving wake it too: it waits on until the board has, or the share has gone.)
       while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
@@ -934,6 +934,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       if (s.owner) throw new Error('The person who shared a board can’t leave it');
       // Its boards go once the leave has answered (see sendLeave); a second click waits for the first.
       await sendLeave(id, 'own', s);
+      // (Already gone then, unless this copy's Leave joined a leave sent for another: a safety net.)
+      gone(s, 'left');
     },
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */
     async deleteShare(id: string) {

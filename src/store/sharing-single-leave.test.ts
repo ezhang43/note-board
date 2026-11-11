@@ -177,6 +177,7 @@ describe('leaving a share sends one leave', () => {
       fail: (e: Error) => waiting.splice(0).forEach((w) => w.failed(e)),
       // The answer arrives, but its write to the server isn't modeled (it happened before a re-join).
       resolve: () => waiting.splice(0).forEach((w) => w.done()),
+      failFirst: (e: Error) => waiting.shift()?.failed(e),
     };
     const leave = vi.fn(() => new Promise<void>((done, failed) => void waiting.push({ done, failed })));
     let list: (ids: string[], confirmed: boolean) => void = () => {};
@@ -444,5 +445,34 @@ describe('leaving a share sends one leave', () => {
     await settle();
     expect(page.sharing.isShared('n1')).toBe(false);
     expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+  });
+
+  it('the first leave failing after re-joining and leaving again doesn’t retry or spoil the second leave', async () => {
+    const page = await drivenDevice();
+    const first = page.sharing.leave('sgood');
+    first.catch(() => {});
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    const joined = page.sharing.join('sgood', 'e2');
+    await settle();
+    await joined;
+    const second = page.sharing.leave('sgood');
+    page.ends.failFirst(new Error('offline'));
+    await expect(first).rejects.toThrow('offline');
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(2);
+    // The second leave is still on its way: another click waits for it.
+    const third = page.sharing.leave('sgood');
+    expect(page.leave).toHaveBeenCalledTimes(2);
+    // An old list naming it doesn't bring back the board being left.
+    page.list(['sgood'], true);
+    await settle();
+    page.ends.answer();
+    await second;
+    await third;
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.leave).toHaveBeenCalledTimes(2);
+    expect(page.notices).toEqual([]);
   });
 });

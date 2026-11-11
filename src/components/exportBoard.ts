@@ -10,6 +10,40 @@ const BLANK_PICTURE =
   'data:image/svg+xml,' +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#9a948a" fill-opacity="0.25"/></svg>');
 
+/**
+ * A picture from another site, as a data: address the drawing can use. html-to-image would fetch it,
+ * which the Content Security Policy (job 11) refuses for sites not on its list; loading it as a
+ * picture is allowed, and a site that sends a CORS header lets us read it back. Null when it won't.
+ */
+function pictureData(src: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = Object.assign(document.createElement('canvas'), { width: img.naturalWidth, height: img.naturalHeight });
+        c.getContext('2d')!.drawImage(img, 0, 0);
+        resolve(c.toDataURL('image/png'));
+      } catch {
+        resolve(null); // no CORS header: the canvas is "tainted"
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** Swaps every picture in the copy that comes from another site for its data, or the blank panel. */
+async function inlineOtherSitePictures(copy: HTMLElement) {
+  const others = [...copy.querySelectorAll('img')].filter((img) => /^https?:/.test(img.src) && new URL(img.src).origin !== location.origin);
+  await Promise.all(
+    others.map(async (img) => {
+      img.removeAttribute('srcset');
+      img.src = (await pictureData(img.src)) ?? BLANK_PICTURE;
+    }),
+  );
+}
+
 /** State classes that only mean something while someone is working on the board. */
 const WORKING = ['selected', 'dragging', 'find-target', 'drop-target', 'size-match', 'append-target', 'following'];
 
@@ -56,6 +90,7 @@ export async function boardPicture(kind: 'png' | 'pdf'): Promise<Blob | null> {
 
   document.body.append(copy);
   try {
+    await inlineOtherSitePictures(copy);
     await nextFrame();
     const { toCanvas } = await import('html-to-image'); // loaded only when someone downloads a picture
     const drawn = await toCanvas(copy, {

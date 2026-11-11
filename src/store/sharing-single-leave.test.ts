@@ -366,12 +366,36 @@ describe('leaving a share sends one leave', () => {
     await settle();
     expect(page.leave).toHaveBeenCalledTimes(1);
     expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
-    // Once it has landed, a list naming it means they were added back.
+    // Once it has landed (the server's list drops it), a list naming it means they were added back.
     page.ends.answer();
     await settle();
+    page.list([], true);
     await server.server.join(person('carol'), 'sgood', 'e2');
     page.list(['sgood'], true);
     await settle();
     expect(page.sharing.isShared('n1')).toBe(true);
+  });
+
+  it('a clean-up leave that fails doesn’t let an old list reopen the board and say so again', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    page.ends.fail(new Error('unavailable'));
+    await settle();
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+    expect(page.leave).toHaveBeenCalledTimes(1);
+  });
+
+  it('after being removed, opening the old link (refused) doesn’t let an old list reopen the board', async () => {
+    const page = await drivenDevice();
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    await expect(page.sharing.join('sgood', 'goodkey')).rejects.toThrow();
+    page.list(['sgood'], true);
+    await settle();
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+    expect(page.leave).toHaveBeenCalledTimes(1);
   });
 });

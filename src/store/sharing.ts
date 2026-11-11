@@ -181,11 +181,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * naming it after that means they were added back), or its link is opened here.
    */
   const left = new Set<string>();
-  /**
-   * Shares whose clean-up leave (off this person's list after the share went) is on its way: until it
-   * answers, the server's list still names them, so the list doesn't open them again meanwhile.
-   */
-  const cleaning = new Map<string, Promise<void>>();
+  /** The shares the server's own list named last time (see sendLeave's clean-up). */
+  let listed = new Set<string>();
   let listLoaded = false;
   let readyFired = false;
   let applying = false;
@@ -583,19 +580,17 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * Every leave of share `id` sent from here. 'own': this person's own (the Share panel, a damaged
    * link), sent once (see `leaving`), with one retry if it fails after its boards have already gone
    * from here. 'retry': that retry. 'clean-up': off their list after the share went (removed or
-   * deleted); it joins their own leave if one is on its way, and is otherwise sent once, not retried,
-   * and kept only in `cleaning` until it answers (not as their own leave, which would hide a later
-   * "no longer shared with you" note or a board they are added back to).
+   * deleted); it joins their own leave if one is on its way, and is otherwise sent once and not
+   * retried. Not kept as their own leave (that would hide a later "no longer shared with you" note),
+   * but in `left` while the server's list still names it, so that list doesn't open it again (and say
+   * so twice), even if the clean-up fails; only then, so a board they are added back to still comes.
    */
   function sendLeave(id: string, kind: 'own' | 'retry' | 'clean-up' = 'own'): Promise<void> {
     const sent = leaving.get(id);
     if (sent) return sent;
     if (kind === 'clean-up') {
-      const cleanUp = backend.leave(id).finally(() => {
-        if (cleaning.get(id) === cleanUp) cleaning.delete(id);
-      });
-      cleaning.set(id, cleanUp);
-      return cleanUp;
+      if (listed.has(id)) left.add(id);
+      return backend.leave(id);
     }
     left.add(id);
     const leave = backend.leave(id).then(
@@ -762,7 +757,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {
       if (confirmed) for (const id of left) if (!ids.includes(id)) left.delete(id);
-      for (const id of ids) if (!leaving.has(id) && !left.has(id) && !cleaning.has(id)) open(id);
+      if (confirmed) listed = new Set(ids);
+      for (const id of ids) if (!leaving.has(id) && !left.has(id)) open(id);
       if (confirmed) {
         // Left on another device (only by the server's own list: the offline copy may be out of date).
         // One whose leave is on its way here waits for that leave: if it fails, nothing changes.
@@ -886,13 +882,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // removed) can still take it away again
       // once it answers, as before. Not waited for, since a leave can wait offline for the connection;
       // upgrade if people report a board they reopened going again.
-      left.delete(id);
-      cleaning.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
       // Not while their role isn't known yet (the People list hasn't answered): code review.
       if (here && role && role !== 'edit') backend.join(id, key).catch(() => {});
       const added = !here && (await backend.join(id, key));
+      // On it again (only once the join has worked): a list naming it opens it as usual.
+      left.delete(id);
       const s = open(id) ?? need(id);
       // (People arriving wake it too: it waits on until the board has, or the share has gone.)
       while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));

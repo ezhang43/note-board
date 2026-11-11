@@ -1911,7 +1911,10 @@ html[data-glide] .world {
   .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
   /* The strip's clock is the card's last button, so the grip's area runs the other way, over the end of the row's text, and stops at the clock's own edge. */
   .item-grip::before { top: -10px; bottom: -10px; left: -30px; right: 0; }
-  .todo-item > .estimate-chip.add::before { content: ''; position: absolute; top: -10px; bottom: -10px; left: 0; right: -18px; }
+  /* Where the row has a trash can beside the grip (not the phone layout), the grip's area stops at its own edge rather than cover it. */
+  .app:not(.phone) .item-grip::before { left: 0; }
+  /* (Its area reaches down rather than up, so it never covers the card header's buttons above the first item.) */
+  .todo-item > .estimate-chip.add::before { content: ''; position: absolute; top: -2px; bottom: -14px; left: 0; right: -18px; }
   /* Inside a container the card's right side is close to the container's width strip. */
   .card.in-column .todo-item > .estimate-chip.add::before { right: -12px; }
   .canvas[data-big-text] .item-grip::before { left: -2px; right: -28px; }
@@ -2516,7 +2519,6 @@ button.estimate-chip:active { transform: scale(0.97); }
   opacity: 0;
   transition: opacity 120ms, transform 100ms var(--ease-out);
 }
-.todo-item:hover > .estimate-chip.add { opacity: 1; }
 /* The row's other estimate-less case: the strip has no room for it at 225% and up (--clock is 0 there). */
 .canvas[data-big-text] .todo-item > .estimate-chip.add { display: none; }
 @media (hover: hover) {
@@ -2524,6 +2526,7 @@ button.estimate-chip:active { transform: scale(0.97); }
   .card-header > .estimate-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
   .estimate-chip.add:focus-visible { opacity: 1; }
+  .todo-item:hover > .estimate-chip.add { opacity: 1; }
 }
 /* Touch screens have no hover: the clock shows while the item is being typed in, like the grip and trash can. */
 @media (hover: none) {

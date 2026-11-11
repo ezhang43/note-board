@@ -2082,7 +2082,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
    untouchable (the drawing code sets it fully visible in the picture), and none of the controls
    (resize grips, trash cans, drag handles, guides) are in the picture. */
 .export-clone { position: fixed; left: 0; top: 0; opacity: 0; pointer-events: none; }
-.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .item-arrows, .list-clean-up, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
+.export-clone :is(.resize-grip, .resize-edge, .resize-corner, .card-header > .icon-button, .column-actions, .item-grip, .item-trash, .item-arrows, .estimate-chip.add, .list-clean-up, .align-guide, .landing-spot, .marquee, .size-label, .item-ghost, .empty-start, .confirm) { display: none; }
 
 /* ---------- File menu (owner request: backup, restore, import) ---------- */
 
@@ -2390,7 +2390,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
 /* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
-.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .list-clean-up) { display: none; }
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .estimate-chip.add, .list-clean-up) { display: none; }
 
 /*
  * Comments on cards (job 161, PR 4). The chip on a card's header, in the accent tint (smaller than the
@@ -2424,6 +2424,102 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header .comment-chip.add { opacity: 1; }
 }
 .comment-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-ink); box-shadow: 0 0 0 2px var(--card-bg); }
+
+/*
+ * Time estimates (job saved-estimate-doneon). A quiet chip with the estimate ("30m", "1h 30m"): on a note's header, and
+ * right after a checklist item's text, centered on its first line. With no estimate, a faint clock shows like the
+ * header's other buttons; on an item it floats over the end of the row (left of the trash can) on hover or while the
+ * item is being typed in, so it takes no room and hovering never re-wraps the text.
+ */
+.estimate-chip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 11px;
+  background: var(--hover);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 100ms var(--ease-out);
+}
+button.estimate-chip { cursor: pointer; }
+button.estimate-chip:active { transform: scale(0.97); }
+.estimate-chip svg { width: 14px; height: 14px; }
+.estimate-chip.add { width: 26px; padding: 0; background: transparent; color: var(--ink-faint); }
+.card-header > .estimate-chip { margin-right: 4px; }
+/* On an item: on the first line, after the text. */
+.todo-item > .estimate-chip { margin-top: calc(var(--line) / 2 + 4px - 11px); }
+.todo-item > .estimate-chip.add { position: absolute; z-index: 1; top: calc(var(--line) / 2 + 4px - 11px); right: calc(46px * var(--bb)); margin: 0; background: var(--card-bg); opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+@media (hover: hover) {
+  button.estimate-chip:hover { background: var(--hover); color: var(--ink); }
+  .card-header > .estimate-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
+  .todo-item:hover > .estimate-chip.add,
+  .estimate-chip.add:focus-visible { opacity: 1; }
+}
+@media (hover: none) {
+  .todo-item > .estimate-chip.add { visibility: hidden; right: calc(40px * var(--bb)); }
+  .todo-item:focus-within > .estimate-chip.add { visibility: visible; opacity: 1; }
+  .app.phone .todo-item > .estimate-chip.add { right: 24px; }
+}
+
+/* The box it opens: under its chip, over the board. */
+.estimate-picker {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.estimate-quick, .estimate-own { display: flex; gap: 4px; }
+.estimate-option {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 100ms var(--ease-out);
+}
+.estimate-option:active { transform: scale(0.97); }
+.estimate-option.current { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+.estimate-clear { color: var(--ink-soft); }
+@media (hover: hover) { .estimate-option:hover { background: var(--hover); } .estimate-option.current:hover { background: var(--accent-soft); } }
+.estimate-own input { width: 84px; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 7px; background: var(--card-bg); color: var(--ink); font: inherit; outline: none; }
+.estimate-own input[aria-invalid='true'] { border-color: var(--danger); }
+.estimate-hint { margin: 0; font-size: 12px; color: var(--danger); }
+/* Touch screens: 16px text, so iOS doesn't zoom in on the box, and bigger targets. */
+@media (max-width: 599px), (pointer: coarse) {
+  .estimate-picker { font-size: 16px; }
+  .estimate-option, .estimate-own input { height: 40px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .estimate-picker { transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out); transform-origin: top right; }
+  @starting-style { html:not([data-input='keys']) .estimate-picker { opacity: 0; transform: scale(0.98); } }
+}
 
 /* The thread: beside the card, over the board; on a phone, a sheet from the bottom over a light scrim. */
 .comment-thread {

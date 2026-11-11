@@ -234,7 +234,9 @@ export function enterItem(
   if (rest.startsWith(' ')) rest = rest.slice(1);
   else if (rest && before.endsWith(' ')) before = before.slice(0, -1);
   loc.item.text = before;
-  const added = { ...blank, text: rest, done: after !== '' && loc.item.done };
+  // A ticked half keeps the day it was ticked; the time estimate stays on the first half only.
+  const done = after !== '' && loc.item.done;
+  const added: TodoItem = { ...blank, text: rest, done, ...(done && loc.item.doneOn ? { doneOn: loc.item.doneOn } : {}) };
   if (loc.item.children.length && !isFolded(loc.item)) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
   reopenAbove(next, added); // e.g. Enter at the end of the last ticked sub-item: its new blank sibling unticks the parent

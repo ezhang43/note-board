@@ -828,4 +828,12 @@ describe('the day an item was ticked (job saved-estimate-doneon)', () => {
     expect(joined[0].done).toBe(false);
     expect('doneOn' in joined[0]).toBe(false);
   });
+
+  it('splitting a ticked item with Enter: both halves keep its day; the estimate stays on the first half', () => {
+    const ticked = C.setItemsDone([{ ...item('x'), text: 'one two', estimate: 30 }], ['x'], true, TODAY);
+    const split = C.enterItem(ticked, 'x', 4, 4, item('n'))!.items;
+    expect(split[0]).toMatchObject({ text: 'one', done: true, doneOn: TODAY, estimate: 30 });
+    expect(split[1]).toMatchObject({ text: 'two', done: true, doneOn: TODAY });
+    expect('estimate' in split[1]).toBe(false);
+  });
 });

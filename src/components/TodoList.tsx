@@ -16,6 +16,7 @@ import { followEdges } from './edgeFollow';
 import { marksOf } from '../model/wordRange';
 import { anchorOf, nearestPoint, offsetAt } from './wordPoint';
 import { leaveField } from './lostCursor';
+import { EstimateChip } from './Estimate';
 
 /** The rows drawn: a folded item's sub-items are not (owner request, 2026-11-09). */
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
@@ -241,6 +242,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           }
         }}
       />
+      {/* Its time estimate (job saved-estimate-doneon): after the text once set; until then a faint clock on hover, over the end of the row. */}
+      <EstimateChip cardId={cardId} itemId={item.id} estimate={item.estimate} />
       {/* Move up / down in a small pill over the free end of the row above (below the first row), on hover or keyboard focus, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18; the pill, 2026-10-22). */}
       {/* Faded (aria-disabled) at the end of its level; a list of one item has nothing to move, so no pill. The cursor goes into the item, as with the keyboard. */}
       {moves !== 0 && (

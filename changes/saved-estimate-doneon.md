@@ -1,0 +1,7 @@
+## Time estimates on notes and checklist items (2026-11-11)
+
+- A note or any checklist item can now carry a time estimate, from 1 minute to a day. It shows as a small gray pill such as "30m" or "1h 30m": at the right end of an item's row, or in a note's header.
+- With no estimate, a faint clock shows there when the pointer is over the item or note. Click it (or the pill) for quick choices (15m, 30m, 45m, 1h, 2h), a Minutes box, and Clear. Escape or a click elsewhere closes it without a change. Ctrl+Z undoes it like any other change.
+- Ticking an item now quietly saves the day it was ticked; unticking removes it. Nothing shows this in the app yet: it is there for later features (a weekly review). Items ticked before today have no day.
+- The Claude connector (version 1.7.0) can add items and notes with an estimate, change or clear an item's estimate, and shows estimates and ticked days when it reads a board.
+- **Behind the scenes:** boards are now saved as version 6. Boards saved before open unchanged and are written as version 6 on their next save. A copy of the app from before this change (an old tab or another device that hasn't reloaded) refuses them and asks for a reload instead of saving over them. The Claude connector needs its newest `busyants.mcpb` (version 1.7.0, built with `npm run mcp:pack`) to change your boards again; until then it says "Safe to edit: no" and changes nothing.

@@ -1,3 +1,4 @@
+import { MAX_ESTIMATE } from './estimate';
 import { IMPORT_MAX_CARDS } from './importFile';
 import { NOTE_NAME_MAX } from './journal';
 
@@ -14,7 +15,7 @@ export type Draft = {
 };
 
 /** The longest estimate read (a whole day): anything bigger is left in the title as text. */
-const MAX_MINUTES = 24 * 60;
+const MAX_MINUTES = MAX_ESTIMATE; // the same cap as a time estimate on a card
 
 // Hours ("1h", "2 hours", "1.5h", "1h30", "1h30m", "1h 30 min") or minutes ("30m", "45 min"),
 // standing alone: not glued into a word or number ("3mm", "a1h", "2.5.1h"), and "30 m" with a

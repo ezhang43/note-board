@@ -319,6 +319,8 @@ export function mergeNextItem(items: TodoItem[], id: string): { items: TodoItem[
   const below = findItem(next, nextId)!;
   const caret = cur.text.length;
   cur.text += below.item.text;
+  // One estimate is kept: the upper item's, or the lower one's when it has none (Enter at an item's start, then Backspace, gives it back).
+  if (cur.estimate === undefined && below.item.estimate !== undefined) cur.estimate = below.item.estimate;
   // Ticked only if both were (job 200: they can now be side by side), and never open under a ticked item (job 183).
   if (!below.item.done) untick(cur);
   below.list.splice(below.index, 1, ...below.item.children);
@@ -375,8 +377,9 @@ function tickCompleteParents(items: TodoItem[], parentIds: (string | null)[]) {
     if (!id || !findItem(items, id)) continue;
     const chain = [findItem(items, id)!.item, ...ancestorsOf(items, id).reverse()]; // innermost first
     for (const it of chain) {
-      if (it.children.length && it.children.every((c) => c.done)) it.done = true;
-      else break;
+      if (!(it.children.length && it.children.every((c) => c.done))) break;
+      if (!it.done) delete it.doneOn; // ticked again by a removal: no day (a day left from before would be stale)
+      it.done = true;
     }
   }
 }

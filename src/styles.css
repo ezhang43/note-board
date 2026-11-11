@@ -2468,6 +2468,8 @@ button.estimate-chip:active { transform: scale(0.97); }
   .todo-item:hover > .estimate-chip.add,
   .estimate-chip.add:focus-visible { opacity: 1; }
 }
+/* While its box is open, the chip stays shown (the box sits under it and the keyboard comes back to it). */
+.estimate-chip.add[aria-expanded='true'] { visibility: visible; opacity: 1; }
 @media (hover: none) {
   .todo-item > .estimate-chip.add { visibility: hidden; right: calc(40px * var(--bb)); }
   .todo-item:focus-within > .estimate-chip.add { visibility: visible; opacity: 1; }

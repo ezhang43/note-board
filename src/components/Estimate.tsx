@@ -12,7 +12,7 @@ import { BoardReadOnly } from './textBox';
 /** Quick choices, in minutes. */
 const QUICK = [15, 30, 45, 60, 120];
 
-type Target = { cardId: string; itemId: string | null; opener: HTMLElement };
+type Target = { cardId: string; itemId: string | null };
 /** Which estimate the box is open for (screen state only). */
 let open: Target | null = null;
 const listeners = new Set<() => void>();
@@ -25,12 +25,15 @@ function setOpen(next: Target | null) {
   listeners.forEach((l) => l());
 }
 const useOpen = () => useSyncExternalStore(subscribe, () => open);
+const keyOf = (cardId: string, itemId: string | null) => `${cardId}:${itemId ?? ''}`;
+/** The chip the box belongs to, as drawn now (a redraw can replace it; folded away, it is gone). */
+const chipOf = (t: Target) => document.querySelector<HTMLElement>(`[data-estimate-for="${CSS.escape(keyOf(t.cardId, t.itemId))}"]`);
 
 /** The chip on a note's header (`itemId` null) or at the end of a checklist item's row. */
 export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; itemId: string | null; estimate: number | undefined }) {
   const readOnly = use(BoardReadOnly);
-  const which = useOpen();
-  const shown = which?.cardId === cardId && which.itemId === itemId;
+  // Only this chip's own open state, so opening the box redraws two chips, not every one on the board.
+  const shown = useSyncExternalStore(subscribe, () => open?.cardId === cardId && open.itemId === itemId);
   const label = estimate ? estimateLabel(estimate) : null;
   // A read-only board shows the estimate but offers no way to change it.
   if (readOnly) return label ? <span className="estimate-chip" title="Time estimate">{label}</span> : null;
@@ -42,8 +45,9 @@ export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; ite
       title={label ? 'Time estimate' : 'Add a time estimate'}
       aria-haspopup="dialog"
       aria-expanded={shown}
+      data-estimate-for={keyOf(cardId, itemId)}
       onPointerDown={(e) => e.preventDefault()} // a press doesn't take the cursor out of a text box
-      onClick={(e) => setOpen(shown ? null : { cardId, itemId, opener: e.currentTarget })}
+      onClick={() => setOpen(shown ? null : { cardId, itemId })}
     >
       {label ?? <TimerIcon />}
     </button>
@@ -62,8 +66,8 @@ export function EstimatePicker() {
     const found = findItem(card.items, which.itemId);
     return found ? (found.item.estimate ?? null) : undefined;
   });
-  // Gone (deleted, another board opened, now read-only): closed.
-  const gone = Boolean(which && (estimate === undefined || readOnly || !which.opener.isConnected));
+  // Gone (deleted, another board opened, now read-only): closed. A chip no longer drawn closes it too (Picker).
+  const gone = Boolean(which && (estimate === undefined || readOnly));
   useEffect(() => {
     if (gone) setOpen(null);
   }, [gone]);
@@ -72,17 +76,18 @@ export function EstimatePicker() {
 }
 
 function Picker({ target, estimate }: { target: Target; estimate: number | null }) {
-  const { cardId, itemId, opener } = target;
+  const { cardId, itemId } = target;
   const ref = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(estimate ? String(estimate) : '');
   const [bad, setBad] = useState(false);
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
   const view = useAppState((s) => s.view);
+  const board = useAppState((s) => s.board);
 
   const close = () => {
     setOpen(null);
-    if (opener.isConnected) opener.focus({ preventScroll: true });
+    chipOf(target)?.focus({ preventScroll: true });
   };
   const set = (minutes: number | null) => {
     appStore.setEstimate(cardId, itemId, minutes);
@@ -90,8 +95,11 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
   };
 
   // Under its chip (above it when there is no room below), kept on screen, following it as the board moves.
+  // Measured again after every change to the board, which can draw the chip anew or fold it away (then it closes).
   useLayoutEffect(() => {
     const measure = () => {
+      const opener = chipOf(target);
+      if (!opener) return setOpen(null);
       if (!ref.current) return;
       const r = opener.getBoundingClientRect();
       const w = ref.current.offsetWidth;
@@ -103,7 +111,7 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [opener, view]);
+  }, [target, view, board]);
 
   // The keyboard starts in the Minutes box (not on a touch screen, where the phone's keyboard would cover the board).
   useEffect(() => {
@@ -118,11 +126,11 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
   useEffect(() => {
     const down = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (!ref.current?.contains(t) && !opener.contains(t)) setOpen(null);
+      if (!ref.current?.contains(t) && !chipOf(target)?.contains(t)) setOpen(null);
     };
     window.addEventListener('pointerdown', down, true);
     return () => window.removeEventListener('pointerdown', down, true);
-  }, [opener]);
+  }, [target]);
 
   const keys = (e: ReactKeyEvent) => {
     // The board's keys never act behind it (Delete, arrows…); undo and redo always do (rule 7).
@@ -148,6 +156,10 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
       className="estimate-picker"
       style={place ?? { left: 0, top: 0, opacity: 0 }} // measured before it is drawn; still focusable meanwhile
       onKeyDown={keys}
+      // Focus leaving the box (Tab, Shift+Tab, another window) closes it without a change.
+      onBlur={(e) => {
+        if (!ref.current?.contains(e.relatedTarget)) setOpen(null);
+      }}
     >
       <div className="estimate-quick">
         {QUICK.map((m) => (

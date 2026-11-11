@@ -829,6 +829,27 @@ describe('the day an item was ticked (job saved-estimate-doneon)', () => {
     expect('doneOn' in joined[0]).toBe(false);
   });
 
+  it('Enter at the start then Backspace gives the item back its estimate (the blank above takes it)', () => {
+    const ticked = C.setItemsDone([{ ...item('x'), text: 'Write report', estimate: 60 }], ['x'], true, TODAY);
+    const split = C.enterItem(ticked, 'x', 0, 0, { ...item('n'), text: '' })!.items;
+    expect(split.map((it) => it.id)).toEqual(['n', 'x']);
+    const back = C.mergePrevItem(split, 'x')!.items;
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ id: 'n', text: 'Write report', estimate: 60 });
+  });
+
+  it('joining two items keeps the upper estimate when both have one', () => {
+    const joined = C.mergeNextItem([{ ...item('x'), estimate: 15 }, { ...item('y'), estimate: 45 }], 'x')!.items;
+    expect(joined[0].estimate).toBe(15);
+  });
+
+  it('a parent ticked again because its open sub-item was removed gets no day, even a stale one', () => {
+    const stale: TodoItem[] = [{ ...item('p', [{ ...item('q'), done: true }, { ...item('blank'), text: '' }]), doneOn: '2026-01-01' }, item('other')];
+    const out = C.removeEmptyItem(stale, 'blank')!.items;
+    expect(C.findItem(out, 'p')!.item.done).toBe(true);
+    expect('doneOn' in C.findItem(out, 'p')!.item).toBe(false);
+  });
+
   it('splitting a ticked item with Enter: both halves keep its day; the estimate stays on the first half', () => {
     const ticked = C.setItemsDone([{ ...item('x'), text: 'one two', estimate: 30 }], ['x'], true, TODAY);
     const split = C.enterItem(ticked, 'x', 4, 4, item('n'))!.items;

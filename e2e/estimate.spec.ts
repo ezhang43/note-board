@@ -116,6 +116,29 @@ test('a click outside the box closes it', async ({ page }) => {
   await expect(picker(page)).toBeHidden();
 });
 
+test('Tab out of the box closes it', async ({ page }) => {
+  await note(page).hover();
+  await note(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await expect(picker(page).getByLabel('Minutes')).toBeFocused();
+  await page.keyboard.press('Tab'); // Set
+  await expect(picker(page)).toBeVisible();
+  await page.keyboard.press('Tab'); // out of the box
+  await expect(picker(page)).toBeHidden();
+});
+
+test('the box closes when its item is no longer shown (Ctrl+Z folds the list away)', async ({ page }) => {
+  const list = page.locator('[data-card-id="t1"]');
+  await list.hover();
+  await list.getByRole('button', { name: 'Collapse card' }).click();
+  await list.getByRole('button', { name: 'Expand card' }).click();
+  await row(page).hover();
+  await row(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await expect(picker(page)).toBeVisible();
+  await page.keyboard.press('Control+z'); // the list is folded again: the item and its button are gone
+  await expect(row(page)).toHaveCount(0);
+  await expect(picker(page)).toBeHidden();
+});
+
 test('ticking an item saves the day it was ticked; unticking clears it', async ({ page }) => {
   const today = await page.evaluate(() => {
     const d = new Date();

@@ -20,6 +20,8 @@ const RISKY = [
   /^src\/model\/merge\.ts$/,
   /^src\/model\/sharing\.ts$/,
   /^firestore\.rules$/,
+  // The Content Security Policy: a wrong line can break sign-in or sync on the live site.
+  /^scripts\/csp\.ts$/,
   // The Claude connector changes the owner's saved boards.
   /^mcp\//,
 ];

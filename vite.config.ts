@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import { devCollabPlugin } from './src/sync/devServer';
 import { devCalendarPlugin } from './src/calendar/devServer';
 import { goatcounter } from './scripts/goatcounter';
+import { csp } from './scripts/csp';
 
 export default defineConfig(({ command, isPreview, mode }) => ({
   // GitHub Pages serves the site from /note-board/; dev and tests stay at /.
@@ -14,6 +15,8 @@ export default defineConfig(({ command, isPreview, mode }) => ({
     devCollabPlugin(),
     devCalendarPlugin(),
     goatcounter(),
+    // The Content Security Policy on every page (job 11); runs last, so it sees GoatCounter's loader.
+    csp(),
     // The published site (VITE_SYNC=on) starts from mainPublished.tsx, so its sign-in screen doesn't carry the board's code; dev and the tests start from main.tsx.
     {
       name: 'published-entry',

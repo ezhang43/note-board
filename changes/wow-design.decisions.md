@@ -1,0 +1,6 @@
+- 2026-11-11, owner request: the three new planning features (brain dump to board to calendar to focus timer; weekly review; a day that re-plans itself) keep all AI inside Note Board. Each user brings their own Anthropic API key, and the browser calls Anthropic directly, with no server.
+- 2026-11-11, owner request: when the day changes, the app suggests a new plan. Nothing changes until the user taps Accept, and Undo reverses it.
+- 2026-11-11, owner request: the API key is forgotten when the browser closes, unless the user ticks "Remember on this device" (off by default). It is never synced, and is cleared on sign-out, on a change of user and on account delete.
+- 2026-11-11, owner request: the risk of keeping a key in the browser is accepted, with safeguards. A strict page security policy ships before any key can be entered, a warning is shown, and users are advised to use a key with a low spend limit and an expiry date.
+- 2026-11-11, owner request: time blocks are real events on the user's main Google Calendar, tagged so Note Board only ever moves its own. They have no guests and send no notifications.
+- 2026-11-11, owner request: time estimates are a new optional saved field on cards and checklist items. Older boards load unchanged.

@@ -476,7 +476,8 @@ test('words made Small or Large before the size box keep their look, and show as
   await expect(sizeBox(page)).toHaveText('14');
   await sizeBox(page).click();
   await expect(sizeList(page).locator('[aria-pressed="true"]')).toHaveText('14');
-  // A press in the note shuts the Aa menu, and the size list starts shut each time it opens.
+  // Escape shuts the Aa menu (it covers the first lines of the page, now the slim row is gone), and the size list starts shut each time it opens.
+  await page.keyboard.press('Escape');
   await editor(page).locator('[data-size="large"]').dblclick();
   await tool(page, 'Text style').click();
   await expect(sizeBox(page)).toHaveText('21');
@@ -529,6 +530,7 @@ test('normal Journal text is 14px, also in notes saved before; sized words and h
   await editor(page).locator('[data-size="20"]').dblclick();
   await tool(page, 'Text style').click();
   await expect(sizeBox(page)).toHaveText('20');
+  await page.keyboard.press('Escape'); // the menu covers the first lines of the page
   await blocks(page).nth(0).dblclick();
   await tool(page, 'Text style').click();
   await expect(sizeBox(page)).toHaveText('16');

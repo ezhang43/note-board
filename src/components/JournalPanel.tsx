@@ -9,6 +9,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
 import { CaretIcon, PlusIcon, TrashIcon } from './icons';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
+import { SidePanel } from './SidePanel';
 
 /** Which year, month and week groups are open: kept on this device only, never in the board's data (owner request, 2026-10-19). */
 const OPEN_KEY = 'note-board:journal-open';
@@ -26,7 +27,7 @@ const count = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`;
  * it, grouped Month > Week (Year too for other years), each day a row that shows its first line and
  * opens in place to edit. Only the groups holding today start open.
  */
-export function JournalPanel() {
+export function JournalPanel({ onClose }: { onClose: () => void }) {
   const board = useAppState((s) => {
     const id = s.ui.journalBoard;
     if (!id) return undefined;
@@ -96,7 +97,7 @@ export function JournalPanel() {
   // It doesn't take the cursor from a field outside the panel (one typed in while the note was gone).
   const renameField = useCallback((el: HTMLInputElement | null) => {
     const now = el?.ownerDocument.activeElement;
-    if (!el || (now && now !== el.ownerDocument.body && !el.closest('.journal-panel')?.contains(now))) return;
+    if (!el || (now && now !== el.ownerDocument.body && !el.closest('.side-panel')?.contains(now))) return;
     el.focus();
     el.select();
   }, []);
@@ -427,112 +428,113 @@ export function JournalPanel() {
         ];
   });
 
+  // The one + for all the general notes (owner request, 2026-11-11; moved into the panel's header, beside the ×, the same day):
+  // adds a note at the top of the list. Only with a Journal board to write into, like the days.
+  const addButton = board && (
+    <button
+      type="button"
+      className="icon-button jn-add"
+      aria-label="Add a general note"
+      title="Add a general note"
+      onClick={() => {
+        const added = appStore.addJournalNote(generals[0]);
+        if (added) setRenaming({ key: added, draft: UNTITLED_NOTE });
+      }}
+    >
+      <PlusIcon />
+    </button>
+  );
+
   return (
-    <div className="journal-panel" tabIndex={-1} ref={root}>
-      <div className="journal-tools" role="toolbar" aria-label="Formatting" ref={tools} onPointerDown={keep} onMouseDown={keep}>
-        {markButton('b', 'Bold', 'Ctrl+B', 'B')}
-        {markButton('i', 'Italic', 'Ctrl+I', 'I')}
-        {markButton('u', 'Underline', 'Ctrl+U', 'U')}
-        {markButton('s', 'Strikethrough', 'Ctrl+Shift+X', 'S')}
-        <span className="jt-sep" aria-hidden />
-        {listButton('bullet', 'Bulleted list', 'Ctrl+Shift+8', '•')}
-        {listButton('number', 'Numbered list', 'Ctrl+Shift+7', '1.')}
-        <button type="button" aria-label="Divider" title="Divider (Alt+I, then R)" onClick={() => act((h) => h.divider())}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
-            <path d="M2 8h12" />
-            <path d="M4 3.5h8M4 12.5h8" opacity="0.45" />
-          </svg>
-        </button>
-        <span className="jt-sep" aria-hidden />
-        <button type="button" className="jt-hl" aria-label="Highlight yellow" title="Highlight yellow" aria-pressed={is('hl', 'yellow')} onClick={() => act((h) => h.setMark('hl', is('hl', 'yellow') ? undefined : 'yellow'))}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 11.5l5.6-5.6 2.5 2.5L5.5 14H3zM9.2 5.3L11 3.5l2 2-1.8 1.8M3 14h3" />
-          </svg>
-        </button>
-        <button type="button" className="jt-aa" aria-label="Text style" title="Style, size, font and highlight" aria-haspopup="true" aria-expanded={styleOpen} onClick={() => {
-            setSizesOpen(false); // the size list starts shut each time the menu opens
-            setStyleOpen((o) => !o);
-          }}>
-          <span aria-hidden>
-            <b>A</b>
-            <small>a</small>
-          </span>
-          <CaretIcon />
-        </button>
-        {styleOpen && (
-          <div className="jt-menu" role="group" aria-label="Text style">
-            <div className="jt-row">
-              <span className="jt-label">Style</span>
-              <div className="jt-mini" role="group" aria-label="Style">
-                {choice('Normal', look.type === 'p', () => act((h) => h.setType('p')))}
-                {choice('Heading 1', look.type === 'h1', () => act((h) => h.setType('h1')))}
-                {choice('Heading 2', look.type === 'h2', () => act((h) => h.setType('h2')))}
-              </div>
-            </div>
-            <div className="jt-row">
-              <span className="jt-label">Size</span>
-              {/* aria-disabled, not disabled, at 10 and 36: a press on a disabled button may not reach the toolbar's keep in every browser, and would take the cursor out of the note. */}
-              <div className="jt-size" role="group" aria-label="Text size">
-                <button type="button" aria-label="Smaller" title="Smaller" aria-disabled={!mixedSize && px <= MIN_SIZE} onClick={() => (mixedSize || px > MIN_SIZE) && act((h) => h.stepSize(-1))}>
-                  −
-                </button>
-                <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${px}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
-                  {mixedSize ? '' : px}
-                </button>
-                <button type="button" aria-label="Larger" title="Larger" aria-disabled={!mixedSize && px >= MAX_SIZE} onClick={() => (mixedSize || px < MAX_SIZE) && act((h) => h.stepSize(1))}>
-                  +
-                </button>
-                {sizesOpen && (
-                  <div className="jt-sizes" role="group" aria-label="Sizes">
-                    {SIZE_STEPS.map((n) =>
-                      choice(String(n), !mixedSize && px === n, () => {
-                        act((h) => h.setSize(n));
-                        setSizesOpen(false);
-                      }),
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="jt-row">
-              <span className="jt-label">Font</span>
-              <div className="jt-fonts" role="group" aria-label="Font">
-                {FONTS.map((f) => choice(f.label, is('font', f.key === 'sans' ? '' : f.key), () => act((h) => h.setMark('font', f.key === 'sans' ? undefined : f.key)), { fontFamily: `var(--font${f.key === 'sans' ? '' : `-${f.key}`})` }))}
-              </div>
-            </div>
-            <div className="jt-row">
-              <span className="jt-label">Highlight</span>
-              <div className="jt-hls" role="group" aria-label="Highlight">
-                {HIGHLIGHTS.map((c) => (
-                  <button key={c} type="button" className="jt-dot" data-hl={c} aria-label={c[0].toUpperCase() + c.slice(1)} title={c[0].toUpperCase() + c.slice(1)} aria-pressed={is('hl', c)} onClick={() => act((h) => h.setMark('hl', c))} />
-                ))}
-                {choice('None', is('hl', ''), () => act((h) => h.setMark('hl', undefined)))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* Only with a Journal board to write into, like the days. */}
-      {board && (
-        // The one + for all the general notes (owner request, 2026-11-11): above the first, adding a note at the top of the list.
-        <div className="jn-bar">
-          <button
-            type="button"
-            className="jn-add"
-            aria-label="Add a general note"
-            title="Add a general note"
-            onClick={() => {
-              const added = appStore.addJournalNote(generals[0]);
-              if (added) setRenaming({ key: added, draft: UNTITLED_NOTE });
-            }}
-          >
-            <PlusIcon />
+    <SidePanel title="Journal" onClose={onClose} actions={addButton}>
+      <div className="journal-panel" tabIndex={-1} ref={root}>
+        <div className="journal-tools" role="toolbar" aria-label="Formatting" ref={tools} onPointerDown={keep} onMouseDown={keep}>
+          {markButton('b', 'Bold', 'Ctrl+B', 'B')}
+          {markButton('i', 'Italic', 'Ctrl+I', 'I')}
+          {markButton('u', 'Underline', 'Ctrl+U', 'U')}
+          {markButton('s', 'Strikethrough', 'Ctrl+Shift+X', 'S')}
+          <span className="jt-sep" aria-hidden />
+          {listButton('bullet', 'Bulleted list', 'Ctrl+Shift+8', '•')}
+          {listButton('number', 'Numbered list', 'Ctrl+Shift+7', '1.')}
+          <button type="button" aria-label="Divider" title="Divider (Alt+I, then R)" onClick={() => act((h) => h.divider())}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+              <path d="M2 8h12" />
+              <path d="M4 3.5h8M4 12.5h8" opacity="0.45" />
+            </svg>
           </button>
+          <span className="jt-sep" aria-hidden />
+          <button type="button" className="jt-hl" aria-label="Highlight yellow" title="Highlight yellow" aria-pressed={is('hl', 'yellow')} onClick={() => act((h) => h.setMark('hl', is('hl', 'yellow') ? undefined : 'yellow'))}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 11.5l5.6-5.6 2.5 2.5L5.5 14H3zM9.2 5.3L11 3.5l2 2-1.8 1.8M3 14h3" />
+            </svg>
+          </button>
+          <button type="button" className="jt-aa" aria-label="Text style" title="Style, size, font and highlight" aria-haspopup="true" aria-expanded={styleOpen} onClick={() => {
+              setSizesOpen(false); // the size list starts shut each time the menu opens
+              setStyleOpen((o) => !o);
+            }}>
+            <span aria-hidden>
+              <b>A</b>
+              <small>a</small>
+            </span>
+            <CaretIcon />
+          </button>
+          {styleOpen && (
+            <div className="jt-menu" role="group" aria-label="Text style">
+              <div className="jt-row">
+                <span className="jt-label">Style</span>
+                <div className="jt-mini" role="group" aria-label="Style">
+                  {choice('Normal', look.type === 'p', () => act((h) => h.setType('p')))}
+                  {choice('Heading 1', look.type === 'h1', () => act((h) => h.setType('h1')))}
+                  {choice('Heading 2', look.type === 'h2', () => act((h) => h.setType('h2')))}
+                </div>
+              </div>
+              <div className="jt-row">
+                <span className="jt-label">Size</span>
+                {/* aria-disabled, not disabled, at 10 and 36: a press on a disabled button may not reach the toolbar's keep in every browser, and would take the cursor out of the note. */}
+                <div className="jt-size" role="group" aria-label="Text size">
+                  <button type="button" aria-label="Smaller" title="Smaller" aria-disabled={!mixedSize && px <= MIN_SIZE} onClick={() => (mixedSize || px > MIN_SIZE) && act((h) => h.stepSize(-1))}>
+                    −
+                  </button>
+                  <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${px}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
+                    {mixedSize ? '' : px}
+                  </button>
+                  <button type="button" aria-label="Larger" title="Larger" aria-disabled={!mixedSize && px >= MAX_SIZE} onClick={() => (mixedSize || px < MAX_SIZE) && act((h) => h.stepSize(1))}>
+                    +
+                  </button>
+                  {sizesOpen && (
+                    <div className="jt-sizes" role="group" aria-label="Sizes">
+                      {SIZE_STEPS.map((n) =>
+                        choice(String(n), !mixedSize && px === n, () => {
+                          act((h) => h.setSize(n));
+                          setSizesOpen(false);
+                        }),
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="jt-row">
+                <span className="jt-label">Font</span>
+                <div className="jt-fonts" role="group" aria-label="Font">
+                  {FONTS.map((f) => choice(f.label, is('font', f.key === 'sans' ? '' : f.key), () => act((h) => h.setMark('font', f.key === 'sans' ? undefined : f.key)), { fontFamily: `var(--font${f.key === 'sans' ? '' : `-${f.key}`})` }))}
+                </div>
+              </div>
+              <div className="jt-row">
+                <span className="jt-label">Highlight</span>
+                <div className="jt-hls" role="group" aria-label="Highlight">
+                  {HIGHLIGHTS.map((c) => (
+                    <button key={c} type="button" className="jt-dot" data-hl={c} aria-label={c[0].toUpperCase() + c.slice(1)} title={c[0].toUpperCase() + c.slice(1)} aria-pressed={is('hl', c)} onClick={() => act((h) => h.setMark('hl', c))} />
+                  ))}
+                  {choice('None', is('hl', ''), () => act((h) => h.setMark('hl', undefined)))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      {board && generals.map((id) => generalSheet(id, generals.length))}
-      {todayEntry && entry(todayEntry, true)}
-      {timeline}
-    </div>
+        {board && generals.map((id) => generalSheet(id, generals.length))}
+        {todayEntry && entry(todayEntry, true)}
+        {timeline}
+      </div>
+    </SidePanel>
   );
 }

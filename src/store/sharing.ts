@@ -168,7 +168,7 @@ export interface SharingOptions {
 export function startSharing(store: Store, backend: CollabBackend, opts: SharingOptions) {
   const shares = new Map<string, Share>();
   /**
-   * Shares whose leave (this person's own, or the clean-up after one went) is on its way. The server saying they are off one can
+   * Shares whose leave (this person's own) is on its way. The server saying they are off one can
    * come before the leave answers: that is the same leave, so it isn't sent again or shown as
    * "no longer shared with you", and the list of shares doesn't open it again meanwhile. A second
    * leave of it meanwhile (a double click) waits for the same one, and the server's list leaving one out
@@ -574,10 +574,17 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     checkReady();
   }
 
-  /** This person's own leave of share `id`, sent once (see `leaving`). */
-  function sendLeave(id: string, retry = true): Promise<void> {
+  /**
+   * Every leave of share `id` sent from here. 'own': this person's own (the Share panel, a damaged
+   * link), sent once (see `leaving`), with one retry if it fails after its boards have already gone
+   * from here. 'retry': that retry. 'clean-up': off their list after the share went (removed or
+   * deleted); it joins their own leave if one is on its way, and is otherwise sent as it is (not
+   * remembered in `leaving` or `left`, so it never hides a later notice, list or join, and not retried).
+   */
+  function sendLeave(id: string, kind: 'own' | 'retry' | 'clean-up' = 'own'): Promise<void> {
     const sent = leaving.get(id);
     if (sent) return sent;
+    if (kind === 'clean-up') return backend.leave(id);
     left.add(id);
     const leave = backend.leave(id).then(
       () => {
@@ -588,7 +595,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         left.delete(id);
         // Its boards have already gone from here (gone() left the clean-up leave to this one, or a
         // damaged link's): try it once more (not after signing out).
-        if (retry && !shares.has(id) && !stopped) sendLeave(id, false).catch(() => {});
+        if (kind === 'own' && !shares.has(id) && !stopped) sendLeave(id, 'retry').catch(() => {});
         throw e;
       },
     );
@@ -628,8 +635,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     } else applyBoards(Object.fromEntries(ids.map((id) => [id, ws.boards[id]])), {});
     // Off this person's list of shares too (it may already be).
     const selfLeave = leaving.has(s.id);
-    // (Not retried: it was never retried, and nothing waits on it.)
-    if (why !== 'left') sendLeave(s.id, false).catch(() => {});
+    if (why !== 'left') sendLeave(s.id, 'clean-up').catch(() => {});
     if (why === 'removed' && !selfLeave) opts.onNotice?.(`“${name}” is no longer shared with you.`);
     if (why === 'deleted' && !s.owner) opts.onNotice?.(`“${name}” was deleted by the person who shared it.`);
     publish();
@@ -864,6 +870,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Opening a link to a board already here just opens it. The link is also tried online, not
       // waited for (offline, a save waits for the connection), when it may give a higher role (a
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
+      // simple: a leave of it still on its way here (clicked just before) can still take it away again
+      // once it answers, as before. Not waited for, since a leave can wait offline for the connection;
+      // upgrade if people report a board they reopened going again.
       left.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;

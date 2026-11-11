@@ -298,19 +298,6 @@ describe('leaving a share sends one leave', () => {
     expect(page.leave).toHaveBeenCalledTimes(1);
   });
 
-  it('the clean-up leave after being removed is guarded too: an old list doesn’t reopen the board or say so twice', async () => {
-    const page = await drivenDevice();
-    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
-    await settle();
-    expect(page.sharing.isShared('n1')).toBe(false);
-    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
-    // The server's list still names it until the clean-up leave lands.
-    page.list(['sgood'], true);
-    await settle();
-    expect(page.leave).toHaveBeenCalledTimes(1);
-    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
-  });
-
   it('a link to a damaged share whose leave fails gets the one retry too', async () => {
     await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
     const real = server.backendFor(person('carol'));
@@ -350,5 +337,20 @@ describe('leaving a share sends one leave', () => {
     await server.server.join(person('carol'), 'sgood', 'e2');
     await settle();
     expect(page.sharing.isShared('n1')).toBe(true);
+  });
+
+  it('removed again while the first clean-up leave is still on its way: still says so', async () => {
+    const page = await drivenDevice();
+    const owner = server.backendFor(dan);
+    await owner.removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    // Carol opens the new link while the clean-up leave hasn't answered; then she is removed again.
+    const joined = page.sharing.join('sgood', 'e2');
+    await settle();
+    expect(await joined).toBe('n1');
+    await owner.removePerson('sgood', 'carol', { edit: 'e3', comment: 'c3', view: 'v3' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.', '“Trip” is no longer shared with you.']);
   });
 });

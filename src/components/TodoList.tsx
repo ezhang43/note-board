@@ -66,7 +66,8 @@ export function TodoTitle({ card }: { card: TodoCard }) {
 export function TodoBody({ card }: { card: TodoCard }) {
   return (
     <div className="todo-body" data-todo-of={card.id}>
-      <div className="todo-items">
+      {/* A list with a top-level parent item has the left room for its fold arrow (styles.css). */}
+      <div className={card.items.some((it) => it.children.length > 0) ? 'todo-items has-fold' : 'todo-items'}>
         {flatten(card.items).map(({ item, depth }) => (
           <ItemRow key={item.id} cardId={card.id} item={item} depth={depth} />
         ))}

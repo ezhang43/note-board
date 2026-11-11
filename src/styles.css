@@ -958,35 +958,35 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 }
 /*
  * A parent item's fold arrow (owner request, 2026-11-09): just left of its tick box, in the indent (a top-level
- * item's sits in the card's padding), on the middle of the first line. Above the tick box's widened press area.
- * Its drawn chevron ends 4px (times --bf) left of the tick box's edge (owner request 2026-11-11: it touched the box's border).
- * The button is 12 units wide, the icon 10 units in the middle of it, and the open chevron's stroke ends 8.25 units into
- * the icon, so the button's right edge sits 1.25 units short of the box and the chevron 4 units short.
- * --bf is the item buttons' step held at 110%: 4 + 6.5 units of chevron must fit the card's 12px padding (13px with its border).
+ * item's sits in the list's own left room, below), on the middle of the first line. Above the tick box's widened press area.
+ * Owner request 2026-11-11: it touched the box's border (now 4px clear of it, times --bb), then "a bit bigger and darker":
+ * the icon is 13 units (30% over the old 10), its stroke 2.1 icon units (was 1.8), in the full ink color; it grows with the
+ * item buttons' step (--bb) again.
+ * The button is as wide as the icon. The open chevron's stroke ends 0.8375 of the icon in (10.05 of its 12 units), so the
+ * button's left edge sits 4 + 10.89 = 14.89 units from the box, its right edge 1.89 short of it. The chevron's left end
+ * is 12.78 units from the box.
  */
 .item-fold {
-  --bf: min(var(--bb), 1.1);
   position: absolute;
   z-index: 2;
-  top: calc(var(--line) / 2 + 4px - 8px * var(--bf));
-  left: calc(var(--inset) - 13.25px * var(--bf));
-  width: calc(12px * var(--bf));
-  height: calc(16px * var(--bf));
+  top: calc(var(--line) / 2 + 4px - 8px * var(--bb));
+  left: calc(var(--inset) - 14.89px * var(--bb));
+  width: calc(13px * var(--bb));
+  height: calc(16px * var(--bb));
   padding: 0;
   border: none;
   border-radius: 3px;
   background: transparent;
-  color: var(--ink-faint);
+  color: var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-.item-fold svg { width: calc(10px * var(--bf)); height: calc(10px * var(--bf)); }
+.item-fold svg { width: calc(13px * var(--bb)); height: calc(13px * var(--bb)); stroke-width: 2.1; }
+/* The room a top-level arrow needs left of the boxes (12.78 units, less the card's 12px padding, plus 2px kept clear of its border), given to a list that has one. */
+.todo-items.has-fold { --bb: min(var(--bs), 1.9); padding-left: calc(12.78px * var(--bb) - 10px); }
 .item-fold:disabled { cursor: default; }
-@media (hover: hover) {
-  .item-fold:not(:disabled):hover { color: var(--ink); }
-}
 .todo-item.find-target { outline: 3px solid var(--find-outline); outline-offset: 2px; }
 /* On a phone the buttons keep their size, and a line is never under 22px. */
 .app.phone .todo-item { --bs: 1; }

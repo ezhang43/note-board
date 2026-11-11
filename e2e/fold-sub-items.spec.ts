@@ -132,15 +132,6 @@ test('Ctrl+Up / Ctrl+Down are left to the browser when there is nothing to fold 
   expect(await blocked(page, 'Control+ArrowUp')).toBe(false);
 });
 
-test('the arrow darkens on hover', async ({ page }) => {
-  await seed(page, list());
-  const stroke = () => fold(page, 'trip').locator('svg').evaluate((el) => getComputedStyle(el).stroke);
-  await page.mouse.move(5, 5);
-  const resting = await stroke();
-  await fold(page, 'trip').hover();
-  await expect.poll(stroke).not.toBe(resting);
-});
-
 test('folding while typing in a sub-item puts the cursor on the folded item', async ({ page }) => {
   await seed(page, list());
   await text(page, 'ho').click();

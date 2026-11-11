@@ -304,14 +304,14 @@ export function blockActions(ctx: StoreContext) {
       addNewCard(ctx, kind, place, w);
     },
     /**
-     * A container's + button (owner request, 2026-11-10): a new card of `kind` as the last card of container `columnId`,
+     * A container's + button (owner request, 2026-11-10): a new card of `kind` as the FIRST card of container `columnId` (owner request, 2026-11-11: at the top),
      * selected, with the cursor in its first field. A collapsed container opens in the same step. One undo step.
      */
     addCardToColumn(columnId: string, kind: CardKind) {
       const col = ctx.state.board.columns[columnId];
       if (!col) return;
       if (col.collapsed) watchExpanding(ctx, columnId);
-      addNewCard(ctx, kind, { type: 'column', columnId, index: col.cardIds.length }, null, col.collapsed);
+      addNewCard(ctx, kind, { type: 'column', columnId, index: 0 }, null, col.collapsed);
     },
     /**
      * A web address pasted or dropped on the board (job 124): a selected link card, one undo step.

@@ -66,12 +66,15 @@ export interface Look {
 /** What typed on an empty plain line, then Enter, makes a divider. Not `DIVIDER`: that is the divider's saved plain text, and a typed `---` is words. */
 const DIVIDER_TYPED = '--';
 const TYPES: BlockType[] = ['p', 'h1', 'h2', 'bullet', 'number', 'hr'];
-/** The sizes in the size box's list, in px; 16 is the Journal's normal text. */
+/** The sizes in the size box's list, in px. */
 export const SIZE_STEPS = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36];
 export const MIN_SIZE = SIZE_STEPS[0];
 export const MAX_SIZE = SIZE_STEPS[SIZE_STEPS.length - 1];
-export const NORMAL_SIZE = 16;
-/** The old Small and Large were 0.85em and 1.3em of the 16px text. */
+/** The Journal's normal text, in px (owner request 2026-11-11; 16 before). */
+export const NORMAL_SIZE = 14;
+/** What a heading's own size counts as in the size box: still 16, so headings and their sized words look as before. */
+export const HEADING_SIZE = 16;
+/** The old Small and Large were 0.85em and 1.3em of the 16px text they were made in. */
 const OLD_SIZES: Record<string, number> = { small: 13.6, large: 20.8 };
 const RUN_FONTS: RunFont[] = ['serif', 'rounded', 'hand', 'mono'];
 export const HIGHLIGHTS: Highlight[] = ['yellow', 'green', 'blue', 'pink'];
@@ -133,23 +136,23 @@ function ordered(sel: Sel): Sel {
 }
 
 /** Applies `fn` to the runs inside the selection, block by block. */
-function mapSel(rich: Rich, sel: Sel, fn: (r: Run) => Run): Rich {
+function mapSel(rich: Rich, sel: Sel, fn: (r: Run, type: BlockType) => Run): Rich {
   const { start, end } = ordered(sel);
   return rich.map((blk, b) => {
     if (b < start.b || b > end.b) return blk;
     const from = b === start.b ? start.o : 0;
     const to = b === end.b ? end.o : Infinity;
-    return withRuns(blk, [...slice(blk.runs, 0, from), ...slice(blk.runs, from, to).map(fn), ...slice(blk.runs, to)]);
+    return withRuns(blk, [...slice(blk.runs, 0, from), ...slice(blk.runs, from, to).map((r) => fn(r, blk.type)), ...slice(blk.runs, to)]);
   });
 }
 
-/** The runs inside the selection (each block's share). */
-function selRuns(rich: Rich, sel: Sel): Run[] {
+/** The runs inside the selection (each block's share), each with its block's type. */
+function selRuns(rich: Rich, sel: Sel): { run: Run; type: BlockType }[] {
   const { start, end } = ordered(sel);
-  const out: Run[] = [];
+  const out: { run: Run; type: BlockType }[] = [];
   for (let b = start.b; b <= end.b && b < rich.length; b++) {
     if (isHr(rich[b])) continue; // a divider has no look of its own
-    out.push(...slice(rich[b].runs, b === start.b ? start.o : 0, b === end.b ? end.o : Infinity));
+    for (const run of slice(rich[b].runs, b === start.b ? start.o : 0, b === end.b ? end.o : Infinity)) out.push({ run, type: rich[b].type });
   }
   return out;
 }
@@ -250,7 +253,8 @@ function parseRun(v: unknown): Run | null {
   if (r.u === true) out.u = true;
   if (r.s === true) out.s = true;
   const size = r.size;
-  if (typeof size === 'number' ? size >= MIN_SIZE && size <= MAX_SIZE && size !== NORMAL_SIZE : size === 'small' || size === 'large') out.size = size as RunSize;
+  // Every size in range is kept as saved, 14 and 16 included: each line draws it at its own px (sizeEm).
+  if (typeof size === 'number' ? size >= MIN_SIZE && size <= MAX_SIZE : size === 'small' || size === 'large') out.size = size as RunSize;
   const font = pick(r.font, RUN_FONTS);
   if (font) out.font = font;
   const hl = pick(r.hl, HIGHLIGHTS);
@@ -480,16 +484,26 @@ export function marksAt(rich: Rich, sel: Sel): Look {
   const s = ordered(sel);
   const type = rich[s.start.b]?.type ?? 'p';
   const collapsed = s.start.b === s.end.b && s.start.o === s.end.o;
-  const runs: Run[] = collapsed ? [{ text: 'x', ...marksBefore(rich[s.start.b] ?? block('p', 0, []), s.start.o) }] : selRuns(rich, s);
+  const typed = collapsed ? [{ run: { text: 'x', ...marksBefore(rich[s.start.b] ?? block('p', 0, []), s.start.o) }, type }] : selRuns(rich, s);
+  const runs = typed.map((t) => t.run);
   const all = (k: (typeof MARK_KEYS)[number]) => (runs.length && runs.every((r) => r[k] === runs[0][k]) ? runs[0][k] : undefined);
   const out: Look = { type, b: !!all('b'), i: !!all('i'), u: !!all('u'), s: !!all('s') };
-  const size = all('size') as RunSize | undefined;
+  // Size by the px on screen, not by the saved mark: plain and a saved 14 are both 14px in a normal line, a
+  // plain heading is 16px, the old Small 13.6px. When all share one, it is the first run's mark (none when that
+  // is its line's plain size). The box reads it with the selection's first line type, so when the first run
+  // sits on a line of another plain size (a selection from the end of a heading), it is given as its px.
+  const shown = typed.map((t) => sizePx(t.run.size, t.type));
+  const sizeMixed = shown.some((px) => px !== shown[0]);
+  if (shown.length && !sizeMixed) {
+    const first = typed[0];
+    const size = shown[0] !== plainSize(first.type) ? first.run.size : plainSize(first.type) !== plainSize(type) ? shown[0] : undefined;
+    if (size !== undefined) out.size = size;
+  }
   const font = all('font') as RunFont | undefined;
   const hl = all('hl') as Highlight | undefined;
-  if (size) out.size = size;
   if (font) out.font = font;
   if (hl) out.hl = hl;
-  const mixed = (['size', 'font', 'hl'] as const).filter((k) => runs.some((r) => r[k] !== runs[0][k]));
+  const mixed = [...(sizeMixed ? ['size' as const] : []), ...(['font', 'hl'] as const).filter((k) => runs.some((r) => r[k] !== runs[0][k]))];
   if (mixed.length) out.mixed = mixed;
   return out;
 }
@@ -527,26 +541,41 @@ export function setMark<K extends 'size' | 'font' | 'hl'>(rich: Rich, sel: Sel, 
 
 // ---- the size box ----
 
-/** A size in px (no size is normal). */
-export const sizePx = (size: RunSize | undefined): number => (size === undefined ? NORMAL_SIZE : typeof size === 'number' ? size : OLD_SIZES[size]);
+/** What plain text counts as in the size box on a line of this kind: 14 in a normal line, 16 in a heading. */
+export const plainSize = (type: BlockType): number => (type === 'h1' || type === 'h2' ? HEADING_SIZE : NORMAL_SIZE);
 
-/** The mark for a size in px: normal is no mark, so plain text keeps its plain saved shape. */
-export const sizeMark = (px: number): RunSize | undefined => (px === NORMAL_SIZE ? undefined : px);
+/** A size in px, as the size box shows it on a line of this kind (no size is the line's plain size). */
+export const sizePx = (size: RunSize | undefined, type: BlockType = 'p'): number => (size === undefined ? plainSize(type) : typeof size === 'number' ? size : OLD_SIZES[size]);
+
+/** The mark for a size in px: the line's plain size is no mark, so plain text keeps its plain saved shape. */
+export const sizeMark = (px: number, type: BlockType = 'p'): RunSize | undefined => (px === plainSize(type) ? undefined : px);
+
+/**
+ * How large a size draws, as a share of its line's own size: in a normal line (14px) the px it says, so a
+ * word saved at 20 is still 20px; in a heading a share of 16, so headings' sized words look as they always did.
+ */
+export const sizeEm = (size: RunSize, type: BlockType): number => sizePx(size, type) / plainSize(type);
 
 /** − and +: the next size in the list below or above, stopping at the ends. */
-export function stepSize(size: RunSize | undefined, dir: 1 | -1): number {
-  const px = Math.round(sizePx(size)); // from the number the box shows (Small shows 14)
+export function stepSize(size: RunSize | undefined, dir: 1 | -1, type: BlockType = 'p'): number {
+  const px = Math.round(sizePx(size, type)); // from the number the box shows (Small shows 14)
   const next = dir > 0 ? SIZE_STEPS.find((s) => s > px) : [...SIZE_STEPS].reverse().find((s) => s < px);
   return next ?? (dir > 0 ? MAX_SIZE : MIN_SIZE);
 }
 
 /** − and + on a selection: each part steps from its own size, as in Google Docs. */
 export function stepSizes(rich: Rich, sel: Sel, dir: 1 | -1): Rich {
-  return mapSel(rich, sel, (r) => {
-    const { size: _old, ...rest } = r;
-    const size = sizeMark(stepSize(r.size, dir));
-    return size === undefined ? rest : { ...rest, size };
-  });
+  return mapSel(rich, sel, (r, type) => withSize(r, sizeMark(stepSize(r.size, dir, type), type)));
+}
+
+/** A size picked from the list, on every line of the selection, each saved in its own line's plain form. */
+export function setSize(rich: Rich, sel: Sel, px: number): Rich {
+  return mapSel(rich, sel, (r, type) => withSize(r, sizeMark(px, type)));
+}
+
+function withSize(r: Run, size: RunSize | undefined): Run {
+  const { size: _old, ...rest } = r;
+  return size === undefined ? rest : { ...rest, size };
 }
 
 /** Normal, Heading 1 or Heading 2 (or a list kind) on blocks b0..b1. */

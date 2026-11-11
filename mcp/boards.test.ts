@@ -164,6 +164,23 @@ describe('safe to edit (round trip)', () => {
     data.version = 3;
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
+  it('yes for boards the app saved as version 4, before Journal text became 14 (the edit saves them as 5)', () => {
+    const data = JSON.parse(ownRaw());
+    data.version = 4;
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('a Journal word sized 16 (version 5) is kept: safe to edit, nothing dropped', () => {
+    const data = JSON.parse(ownRaw());
+    expect(data.version).toBe(5);
+    data.boards.home.cards.noteIdea.text = 'big';
+    data.boards.home.cards.noteIdea.rich = [{ type: 'p', runs: [{ text: 'big', size: 16 }] }];
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('no for boards saved by a newer version (6)', () => {
+    const data = JSON.parse(ownRaw());
+    data.version = 6;
+    expect(safeToEdit(JSON.stringify(data)).ok).toBe(false);
+  });
   it('key order alone doesn’t matter', () => {
     const data = JSON.parse(ownRaw());
     const reordered = { boards: data.boards, home: data.home, version: data.version };

@@ -3,7 +3,7 @@ import { JOURNAL_KNOWN_KEY, JOURNAL_NOTES, NOTE_NAME_MAX, UNTITLED_NOTE, groupJo
 import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
-import { HIGHLIGHTS, journalRich, MAX_SIZE, MIN_SIZE, SIZE_STEPS, sizeMark, sizePx, type Look, type Toggle } from '../model/richText';
+import { HIGHLIGHTS, journalRich, MAX_SIZE, MIN_SIZE, SIZE_STEPS, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
@@ -176,7 +176,7 @@ export function JournalPanel() {
   const is = (key: 'font' | 'hl', value: string) => !look.mixed?.includes(key) && (look[key] ?? '') === value;
   // The size box: the selection's size in px as shown (the old Small and Large show as 14 and 21), empty when it has more than one.
   const mixedSize = !!look.mixed?.includes('size');
-  const px = Math.round(sizePx(look.size));
+  const px = Math.round(sizePx(look.size, look.type));
   const markButton = (mark: Toggle, label: string, keys: string, glyph: string) => (
     <button type="button" className={`jt-${mark}`} aria-label={label} title={`${label} (${keys})`} aria-pressed={look[mark]} onClick={() => act((h) => h.toggle(mark))}>
       {glyph}
@@ -486,7 +486,7 @@ export function JournalPanel() {
                   <div className="jt-sizes" role="group" aria-label="Sizes">
                     {SIZE_STEPS.map((n) =>
                       choice(String(n), !mixedSize && px === n, () => {
-                        act((h) => h.setMark('size', sizeMark(n)));
+                        act((h) => h.setSize(n));
                         setSizesOpen(false);
                       }),
                     )}

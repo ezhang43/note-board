@@ -243,6 +243,20 @@ const SAVED_SHAPES: Record<number, string[]> = {
   3: SHAPE_3,
   // Journal text sizes as numbers of px (owner pick, 2026-10-30): an older app would drop them.
   4: [...SHAPE_3, 'rich size: large small 10-36'],
+  // Journal plain text drawn at 14px and a size of 16 saved (owner request, 2026-11-11; owner pick B):
+  // an older app would read a saved 16 as plain and drop it on save. The fields recorded read-safe
+  // under 4 are ordinary fields here.
+  5: [
+    ...[
+      ...SHAPE_3.filter((s) => !s.includes(': ')),
+      'boards.*.cards.completed.groups[].entries[].item.folded',
+      'boards.*.cards.note.general',
+      'boards.*.cards.todo.items[].children[].folded',
+      'boards.*.cards.todo.items[].folded',
+    ].sort(),
+    ...SHAPE_3.filter((s) => s.includes(': ')).map((s) => (s.startsWith('rich type:') ? 'rich type: bullet h1 h2 hr number p' : s)),
+    'rich size: large small 10-36',
+  ],
 };
 /**
  * Values added under a version number without raising it, because every older copy of the app that

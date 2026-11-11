@@ -722,6 +722,144 @@ function draftOf(id: string) {
   return { title: id, allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] as string[] };
 }
 
+describe('dragging an event onto another day (owner request 2026-11-11)', () => {
+  const me = { email: 'me@example.com', self: true };
+  const sam = { email: 'sam@example.com' };
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const done = (cal: ReturnType<typeof createCalendar>) => cal.get().done;
+
+  it('moves a timed event to the new day, same time and length, then says “Event saved”', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('a', '2026-10-06', '2026-10-09');
+    expect(api.calls.slice(1)).toEqual(['update a a', 'list 2026-10-06 2026-10-13']);
+    expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-09T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-09T11:00:00', timeZone: zone } });
+    expect(done(cal)?.text).toBe('Event saved');
+  });
+
+  it('an all-day event keeps its number of days; a middle day can be the handle', async () => {
+    const api = fakeApi([ev('trip', { allDay: true, start: '2026-10-08', end: '2026-10-11' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('trip', '2026-10-09', '2026-10-14');
+    expect(api.bodies.at(-1)).toEqual({ summary: 'trip', start: { date: '2026-10-13' }, end: { date: '2026-10-16' } });
+  });
+
+  it('dropping on its own day, or a read-only or unknown event, asks Google for nothing', async () => {
+    const api = fakeApi([ev('a'), ev('r', { editable: false })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('a', '2026-10-06', '2026-10-06');
+    await cal.move('r', '2026-10-06', '2026-10-07');
+    await cal.move('nope', '2026-10-06', '2026-10-07');
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(done(cal)).toBeNull();
+  });
+
+  it('with guests, update emails follow the answer; without guests nothing about emails is sent', async () => {
+    const api = fakeApi([ev('lunch', { guests: [me, sam] }), ev('solo')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('lunch', '2026-10-06', '2026-10-07', { notify: true });
+    expect(api.calls).toContain('update lunch lunch (emails sent)');
+    await cal.move('lunch', '2026-10-06', '2026-10-07');
+    expect(api.calls).toContain('update lunch lunch (no emails)');
+    await cal.move('solo', '2026-10-06', '2026-10-07');
+    expect(api.calls).toContain('update solo solo');
+    // The guests are not sent again: only the time changed.
+    expect(api.bodies.every((b) => b.attendees === undefined)).toBe(true);
+  });
+
+  it('one event of a repeating series moves on its own; the series is not asked for or changed', async () => {
+    const api = fakeApi([ev('s~1', { series: 's', title: 'Stand-up' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('s~1', '2026-10-06', '2026-10-08');
+    expect(api.calls.slice(1)).toEqual(['update s~1 Stand-up', 'list 2026-10-06 2026-10-13']);
+  });
+
+  it('shows it on the new day at once, while Google is still answering', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    let release!: () => void;
+    const slow = api.update;
+    api.update = async (...args) => {
+      await new Promise<void>((r) => (release = r));
+      return slow(...args);
+    };
+    const moving = cal.move('a', '2026-10-06', '2026-10-09');
+    await vi.waitFor(() => expect(release).toBeDefined());
+    expect(cal.get().events?.[0]).toMatchObject({ id: 'a', start: '2026-10-09T10:00', end: '2026-10-09T11:00' });
+    release();
+    await moving;
+  });
+
+  it('when Google refuses, the event goes back to its old day and the usual note shows, with no Undo', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    api.fail = true;
+    await cal.move('a', '2026-10-06', '2026-10-09');
+    expect(cal.get().events?.[0]).toMatchObject({ id: 'a', start: '2026-10-06T10:00', end: '2026-10-06T11:00' });
+    expect(done(cal)).toMatchObject({ text: SAVE_FAILED, undo: null });
+  });
+
+  it('with two moves on their way, one that Google refuses puts back only its own event', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const release: Record<string, () => void> = {};
+    const slow = api.update;
+    api.update = async (...args) => {
+      await new Promise<void>((r) => (release[args[0]] = r));
+      if (args[0] === 'a') throw new Error('403');
+      return slow(...args);
+    };
+    const first = cal.move('a', '2026-10-06', '2026-10-09');
+    const second = cal.move('b', '2026-10-06', '2026-10-09');
+    await vi.waitFor(() => expect(release.a && release.b).toBeDefined());
+    release.a();
+    await first;
+    expect(cal.get().events).toMatchObject([
+      { id: 'a', start: '2026-10-06T10:00' },
+      { id: 'b', start: '2026-10-09T10:00' },
+    ]);
+    release.b();
+    await second;
+  });
+
+  it('an event already being moved is not moved again until Google has answered', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    let release!: () => void;
+    const slow = api.update;
+    api.update = async (...args) => {
+      await new Promise<void>((r) => (release = r));
+      return slow(...args);
+    };
+    const first = cal.move('a', '2026-10-06', '2026-10-09');
+    await vi.waitFor(() => expect(release).toBeDefined());
+    await cal.move('a', '2026-10-09', '2026-10-12');
+    release();
+    await first;
+    expect(api.calls.filter((c) => c.startsWith('update'))).toEqual(['update a a']);
+  });
+
+  it('Undo puts the old day back and never emails the guests', async () => {
+    const api = fakeApi([ev('lunch', { guests: [me, sam] })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('lunch', '2026-10-06', '2026-10-09', { notify: true });
+    await cal.undo();
+    expect(api.calls.at(-2)).toBe('update lunch lunch (no emails)');
+    expect(api.bodies.at(-1)).toEqual({ summary: 'lunch', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
+    expect(done(cal)).toBeNull();
+  });
+});
+
 describe('talking to the Calendar API', () => {
   function fakeFetch(status = 200, body: unknown = { items: [] }) {
     const calls: { url: string; init: RequestInit }[] = [];

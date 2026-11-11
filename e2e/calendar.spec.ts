@@ -1915,3 +1915,227 @@ test.describe('the Undo message after a change (job 217)', () => {
     expect(errors).toEqual([]);
   });
 });
+
+// Dragging an event onto another day (owner request, 2026-11-11): Week rows and Month cells are drop targets.
+test.describe('dragging an event onto another day', () => {
+  const toast = (page: Page) => page.locator('.undo-toast');
+  const centre = async (l: Locator) => {
+    const b = (await l.boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  /** Presses on `from`, moves to the middle of `to` in steps and, unless `hold`, lets go. */
+  async function drag(page: Page, from: Locator, to: Locator, hold = false) {
+    const a = await centre(from);
+    const b = await centre(to);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 8 });
+    if (!hold) await page.mouse.up();
+  }
+  const monthGrid = (page: Page) => panel(page).getByRole('grid');
+  const cell = (page: Page, d: Date) => monthGrid(page).getByRole('gridcell', { name: new RegExp(`^${label(d)}`) });
+  /** A day next to today that the month grid shows (tomorrow, else yesterday). */
+  async function neighbour(page: Page) {
+    for (const n of [1, -1]) if ((await cell(page, daysFromToday(n)).count()) === 1) return daysFromToday(n);
+    throw new Error('no neighbouring day in the grid');
+  }
+
+  test('Week: the dragged event follows the pointer, the day under it is highlighted, and dropping moves it with the same time; Undo puts it back', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const from = day(page, new Date());
+    const to = day(page, daysFromToday(2));
+    const dentist = from.getByRole('button', { name: '10 – 11am Dentist' });
+    await drag(page, dentist, to, true);
+    // The chip's copy is under the pointer and the target day is marked.
+    const ghost = page.locator('.cal-ghost');
+    await expect(ghost).toHaveCount(1);
+    const pointer = await centre(to);
+    const g = (await ghost.boundingBox())!;
+    expect(Math.abs(g.x + g.width / 2 - pointer.x)).toBeLessThan(2);
+    expect(Math.abs(g.y + g.height / 2 - pointer.y)).toBeLessThan(2);
+    await expect(to).toHaveAttribute('data-drop', '');
+    await expect(from).not.toHaveAttribute('data-drop', '');
+    expect(sent).toEqual([]);
+    await page.mouse.up();
+    await expect(ghost).toHaveCount(0);
+    await expect(to).not.toHaveAttribute('data-drop', '');
+    await expect(to.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(from.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    await expect(card(page)).toHaveCount(0);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatch(/^PATCH /);
+    expect(sent[0]).not.toContain('sendUpdates');
+    // Undo puts the old day back and never emails.
+    await toast(page).getByRole('button', { name: 'Undo' }).click();
+    await expect(from.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(to.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+    expect(errors).toEqual([]);
+  });
+
+  test('an all-day event moves to the new day and stays all-day', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const holiday = day(page, daysFromToday(3)).getByRole('button', { name: /All day Holiday/ });
+    await drag(page, holiday, day(page, daysFromToday(5)));
+    await expect(day(page, daysFromToday(5)).getByRole('button', { name: /All day Holiday/ })).toBeVisible();
+    await expect(day(page, daysFromToday(3)).getByRole('button', { name: /Holiday/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('Escape cancels the drag: nothing moves, nothing is sent, and letting go opens nothing', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const from = day(page, new Date());
+    await drag(page, from.getByRole('button', { name: /Dentist/ }), day(page, daysFromToday(2)), true);
+    await expect(page.locator('.cal-ghost')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.cal-ghost')).toHaveCount(0);
+    await expect(day(page, daysFromToday(2))).not.toHaveAttribute('data-drop', '');
+    // That Escape was the drag's: the panel is still open.
+    await expect(panel(page)).toBeVisible();
+    await page.mouse.up();
+    await expect(from.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(card(page)).toHaveCount(0);
+    await expect(toast(page)).toHaveCount(0);
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test('dropping on its own day, or outside any day, does nothing; a press and release with a little jiggle still opens the event', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const from = day(page, new Date());
+    const dentist = from.getByRole('button', { name: '10 – 11am Dentist' });
+    await drag(page, dentist, from.getByRole('button', { name: /Team stand-up/ }));
+    await expect(card(page)).toHaveCount(0);
+    await drag(page, dentist, panel(page).getByRole('heading', { name: /\d{4}/ }));
+    await expect(card(page)).toHaveCount(0);
+    await expect(from.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    const a = await centre(dentist);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(a.x + 2, a.y + 1);
+    await page.mouse.up();
+    await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test('someone else’s (read-only) event can’t be dragged', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const club = day(page, daysFromToday(2)).getByRole('button', { name: /Book club, read-only/ });
+    await drag(page, club, day(page, daysFromToday(4)), true);
+    await expect(page.locator('.cal-ghost')).toHaveCount(0);
+    await page.mouse.up();
+    await expect(day(page, daysFromToday(2)).getByRole('button', { name: /Book club/ })).toBeVisible();
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test('an event with guests asks “Send update emails to guests?” first; Escape cancels, Don’t send and Send say so to Google', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const lunch = day(page, daysFromToday(1));
+    const target = day(page, daysFromToday(4));
+    await drag(page, lunch.getByRole('button', { name: /Lunch with Sam/ }), target);
+    const q = asked(page, EMAILS);
+    await expect(q).toBeVisible();
+    await expect(q.getByRole('button', { name: 'Send', exact: true })).toBeFocused();
+    expect(sent).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(q).toHaveCount(0);
+    await expect(lunch.getByRole('button', { name: /Lunch with Sam/ })).toBeVisible();
+    expect(sent).toEqual([]);
+
+    await drag(page, lunch.getByRole('button', { name: /Lunch with Sam/ }), target);
+    await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
+    await expect(target.getByRole('button', { name: '12:30 – 1:30pm Lunch with Sam' })).toBeVisible();
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+
+    // And back the other way, this time emailing: Send.
+    await drag(page, target.getByRole('button', { name: /Lunch with Sam/ }), lunch);
+    await asked(page, EMAILS).getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(lunch.getByRole('button', { name: '12:30 – 1:30pm Lunch with Sam' })).toBeVisible();
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=all/);
+    // The guest is still on the event.
+    await lunch.getByRole('button', { name: /Lunch with Sam/ }).click();
+    await expect(card(page).getByText('sam@example.com')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('a repeating event moves on its own with no question; the other days keep theirs', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const standUp = (n: number) => day(page, daysFromToday(n)).getByRole('button', { name: /Team stand-up/ });
+    await drag(page, standUp(1), day(page, daysFromToday(4)));
+    await expect(asked(page, WHICH)).toHaveCount(0);
+    await expect(standUp(4)).toHaveCount(2);
+    await expect(standUp(1)).toHaveCount(0);
+    await expect(standUp(2)).toHaveCount(1);
+    expect(sent).toHaveLength(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('when Google refuses, the event goes back to its old day and the usual note shows, with no Undo', async ({ page }) => {
+    await openAs(page);
+    await button(page).click();
+    await page.route('**/__calendar/**', (route) =>
+      route.request().method() === 'PATCH' ? route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }) : route.continue(),
+    );
+    const from = day(page, new Date());
+    await drag(page, from.getByRole('button', { name: /Dentist/ }), day(page, daysFromToday(2)));
+    await expect(toast(page)).toHaveText('That change didn’t reach Google Calendar. Try again later.');
+    await expect(toast(page).getByRole('button')).toHaveCount(0);
+    await expect(from.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(day(page, daysFromToday(2)).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  });
+
+  test('Month: dragging a chip onto another day’s cell moves it there, and the drop picks or adds nothing', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+    const other = await neighbour(page);
+    const dentist = cell(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' });
+    await drag(page, dentist, cell(page, other), true);
+    await expect(cell(page, other)).toHaveAttribute('data-drop', '');
+    await page.mouse.up();
+    await expect(cell(page, other).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(cell(page, new Date()).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    await expect(card(page)).toHaveCount(0);
+    await expect(page.getByRole('form')).toHaveCount(0);
+    await expect(cell(page, other)).toHaveAttribute('aria-selected', 'false');
+    expect(sent).toHaveLength(1);
+    await toast(page).getByRole('button', { name: 'Undo' }).click();
+    await expect(cell(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('Month: a drop inside the same cell does nothing, and a click on the chip still opens it', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+    const now = cell(page, new Date());
+    const dentist = now.getByRole('button', { name: '10 – 11am Dentist' });
+    await drag(page, dentist, now.getByRole('button').first());
+    await expect(card(page)).toHaveCount(0);
+    await expect(page.getByRole('form')).toHaveCount(0);
+    await dentist.click();
+    await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});

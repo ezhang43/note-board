@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import {
   canChangeSeries,
   cellLines,
@@ -6,6 +6,7 @@ import {
   dayKey,
   dayLabel,
   draftBody,
+  dragDraft,
   draftFor,
   emailGuests,
   endTimeOptions,
@@ -32,6 +33,7 @@ import { isTextField, panelCovers } from './textField';
 import { keyboardCover } from './ItemBar';
 import { usePhone } from './usePhone';
 import { TimePicker, closeTimeList } from './TimePicker';
+import { beginEventDrag } from './eventDrag';
 
 const START_TIMES = startTimeOptions();
 
@@ -97,8 +99,20 @@ export function CalendarPanel() {
     else if (event.editable) edit(event, opener);
   };
   const add = (day: DayKey, opener: HTMLElement) => setEditing({ event: null, draft: newDraft(day), opener });
+  // Dragging an event onto another day (owner request, 2026-11-11): saved like an edit's Save, asking about the guests first.
+  const [moving, setMoving] = useState<{ event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement } | null>(null);
+  const drag: OnDrag = (down, event) => {
+    const opener = down.currentTarget;
+    beginEventDrag(down, (from, to) => {
+      const draft = dragDraft(event, from, to);
+      if (!draft) return;
+      setOpen(null);
+      if (emailGuests(event, draft)) setMoving({ event, from, to, opener });
+      else void calendar.move(event.id, from, to);
+    });
+  };
   const dayList = (day: DayKey, columns = false) => (
-    <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onAdd={(opener) => add(day, opener)} />
+    <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onDrag={drag} onAdd={(opener) => add(day, opener)} />
   );
 
   return (
@@ -145,7 +159,7 @@ export function CalendarPanel() {
           weekDays(s.day).map((d) => dayList(d, true))
         ) : (
           <>
-            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onAdd={add} />
+            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onDrag={drag} onAdd={add} />
             {dayList(s.day)}
           </>
         ))}
@@ -159,9 +173,13 @@ export function CalendarPanel() {
         />
       )}
       {editing && <EventForm event={editing.event} start={editing.draft} opener={editing.opener} onClose={() => setEditing(null)} />}
+      {moving && <MoveAsk key={moving.event.id} {...moving} onClose={() => setMoving(null)} />}
     </div>
   );
 }
+
+/** Starts a drag from an event's chip (see `eventDrag.ts`); given only for the person's own events. */
+type OnDrag = (down: ReactPointerEvent<HTMLElement>, event: CalEvent) => void;
 
 function DayEvents({
   day,
@@ -170,6 +188,7 @@ function DayEvents({
   events,
   reveal,
   onPick,
+  onDrag,
   onAdd,
 }: {
   day: DayKey;
@@ -179,6 +198,7 @@ function DayEvents({
   events: CalEvent[];
   reveal: RefObject<boolean>;
   onPick: (e: CalEvent, opener: HTMLElement) => void;
+  onDrag: OnDrag;
   onAdd: (opener: HTMLElement) => void;
 }) {
   const label = dayLabel(day);
@@ -191,7 +211,7 @@ function DayEvents({
     section.current?.scrollIntoView({ block: 'nearest' });
   });
   return (
-    <section ref={section} className={`cal-day${today ? ' today' : ''}${columns ? ' columns' : ''}`} aria-label={label} aria-current={today && columns ? 'date' : undefined}>
+    <section ref={section} data-day={day} className={`cal-day${today ? ' today' : ''}${columns ? ' columns' : ''}`} aria-label={label} aria-current={today && columns ? 'date' : undefined}>
       <h3>
         {/* The column is narrow: "Thu 15", the month is in the range above (a section's own name keeps "Thu 15 Oct"). */}
         {columns ? label.slice(0, label.lastIndexOf(' ')) : label}
@@ -208,6 +228,7 @@ function DayEvents({
           data-event={e.id}
           aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
+          onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
         >
           <span className="cal-time">{timeLabel(e)}</span>
           <span className="cal-title">{e.title}</span>
@@ -227,6 +248,7 @@ function MonthGrid({
   events,
   reveal,
   onPick,
+  onDrag,
   onAdd,
 }: {
   day: DayKey;
@@ -234,6 +256,7 @@ function MonthGrid({
   events: CalEvent[];
   reveal: RefObject<boolean>;
   onPick: (e: CalEvent, opener: HTMLElement) => void;
+  onDrag: OnDrag;
   onAdd: (day: DayKey, opener: HTMLElement) => void;
 }) {
   const month = day.slice(0, 7);
@@ -273,7 +296,7 @@ function MonthGrid({
             const clickDay = (opener: HTMLElement) => (d === day ? onAdd(d, opener) : pickDay());
             return (
               // The whole cell picks its day; the date is the button for the keyboard (buttons can't hold the event buttons).
-              <div key={d} role="gridcell" className={classes} aria-selected={d === day} aria-label={name} onClick={(e) => clickDay(e.currentTarget.querySelector<HTMLElement>('.cal-date')!)}>
+              <div key={d} role="gridcell" data-day={d} className={classes} aria-selected={d === day} aria-label={name} onClick={(e) => clickDay(e.currentTarget.querySelector<HTMLElement>('.cal-date')!)}>
                 <button type="button" className="cal-date" aria-label={`Show ${dayLabel(d)}`} onClick={(e) => (e.stopPropagation(), clickDay(e.currentTarget))}>
                   {Number(d.slice(8))}
                 </button>
@@ -291,6 +314,7 @@ function MonthGrid({
                         ev.stopPropagation();
                         onPick(e, ev.currentTarget);
                       }}
+                      onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
                     >
                       {!e.allDay && <span className="cal-chip-dot" aria-hidden="true" />}
                       <span>
@@ -745,6 +769,50 @@ function useKeyboardCover(phone: boolean) {
     };
   }, [phone]);
   return phone ? cover : 0;
+}
+
+/**
+ * The guest question for a drag-and-drop move (owner request, 2026-11-11), a small card by the chip that was
+ * dragged; the move itself waits for the answer. Escape, or a press anywhere else, drops it and the event stays.
+ */
+function MoveAsk({ event, from, to, opener, onClose }: { event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const draft = dragDraft(event, from, to)!;
+  const place = useCardPlace(ref, opener, []);
+  const cancel = () => {
+    onClose();
+    if (opener.isConnected) opener.focus();
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || panelCovers()) return;
+      e.stopImmediatePropagation();
+      cancel();
+    };
+    const down = (e: PointerEvent) => {
+      if (e.target instanceof Node && !ref.current?.contains(e.target)) onClose();
+    };
+    window.addEventListener('keydown', key, true);
+    document.addEventListener('pointerdown', down, true);
+    return () => {
+      window.removeEventListener('keydown', key, true);
+      document.removeEventListener('pointerdown', down, true);
+    };
+  });
+  return (
+    <div ref={ref} className="cal-card" style={place}>
+      <Question
+        event={event}
+        draft={draft}
+        ask={{ action: 'save', step: 'emails' }}
+        next={(_action, _d, choice) => {
+          onClose();
+          void calendar.move(event.id, from, to, choice);
+        }}
+        onCancel={cancel}
+      />
+    </div>
+  );
 }
 
 /** The question open before a save or delete goes ahead: which events, then whether to email the guests. */

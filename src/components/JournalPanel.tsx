@@ -81,7 +81,7 @@ export function JournalPanel() {
   );
   // The general notes (owner request, 2026-10-29; several, with names, 2026-11-10): each open every time the
   // panel opens (view state, like a day's fold). With none written yet, one "General notes" note is shown,
-  // under the id it gets when it is first written, renamed or added below, so its sheet stays the same.
+  // under the id it gets when it is first written, renamed, or has a note added above it, so its sheet stays the same.
   const [firstId] = useState(() => newId('k'));
   const generals = written.length ? written : [firstId];
   /** The notes shown now, for a name field that goes with its note (see finish). */

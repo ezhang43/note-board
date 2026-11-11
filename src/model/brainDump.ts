@@ -1,4 +1,6 @@
+import { createCard, type MakeId } from './cards';
 import { IMPORT_MAX_CARDS } from './importFile';
+import type { Card } from './types';
 import { NOTE_NAME_MAX } from './journal';
 
 // Brain dump (wow plan, job 1): messy pasted text → a list of card drafts. Model only. One line
@@ -79,4 +81,26 @@ export function parseBrainDump(text: string): Draft[] {
     if (drafts.length === IMPORT_MAX_CARDS) break;
   }
   return drafts;
+}
+
+/**
+ * The cards a list of drafts makes, in order: a note holding the line, or a checklist titled with it.
+ * simple: a draft's estimate (`minutes`) is shown in the dialog's preview only and is NOT put on the card,
+ * because the saved board has no estimate field yet. It gets saved here once that field lands.
+ */
+export function draftCards(drafts: Draft[], makeId?: MakeId): Card[] {
+  return drafts.map((d) => {
+    const card = createCard(d.kind === 'todo' ? 'todo' : 'note', makeId?.('k'));
+    if (card.kind === 'note') card.text = d.title;
+    else if (card.kind === 'todo') card.title = d.title;
+    return card;
+  });
+}
+
+/** An estimate as words for the preview: "30 min", "1 h", "1 h 30 min". */
+export function minutesLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }

@@ -151,6 +151,10 @@ export interface Ui {
   colourMenuOpen: boolean;
   /** The keyboard shortcuts panel (? button or ? key). */
   shortcutsOpen: boolean;
+  /** The Brain dump dialog (Add menu, ⋯ menu): typed lines become cards. */
+  brainDumpOpen: boolean;
+  /** What is typed in the Brain dump box (kept while it is closed; not saved). */
+  brainDumpText: string;
   confirm: ConfirmDelete | null;
   /** Ctrl+Shift+Backspace (owner request): asking "Delete N completed items?", or saying there are none. */
   deleteCompleted: 'ask' | 'none' | null;
@@ -247,6 +251,8 @@ export const emptyUi: Ui = {
   focusBlock: null,
   colourMenuOpen: false,
   shortcutsOpen: false,
+  brainDumpOpen: false,
+  brainDumpText: '',
   confirm: null,
   deleteCompleted: null,
   undoToast: null,

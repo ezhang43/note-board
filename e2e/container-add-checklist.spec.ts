@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { add, box, clickEmpty, columns, freshBoardEachTest } from './helpers';
 
 // A container's "+" button (owner request, 2026-11-10): "in a container, can you add a + button so that it
-// will automatically add in a new checklist".
+// will automatically add in a new checklist". The new checklist goes at the top (owner request, 2026-11-11).
 
 freshBoardEachTest();
 
@@ -16,7 +16,7 @@ async function containerWithNotes(page: import('@playwright/test').Page) {
   return col;
 }
 
-test('the + in a container adds a checklist as its last card, with the cursor in the title; one undo removes it', async ({ page }) => {
+test('the + in a container adds a checklist as its first card, at the top, with the cursor in the title; one undo removes it', async ({ page }) => {
   const col = await containerWithNotes(page);
   await col.hover();
   const plus = col.getByRole('button', { name: 'Add a checklist' });
@@ -24,15 +24,26 @@ test('the + in a container adds a checklist as its last card, with the cursor in
   const b = await box(plus);
   expect(b.width).toBeCloseTo(32, 0);
   expect(b.height).toBeCloseTo(32, 0);
+  const colBefore = await box(col);
+  const noteTop = await box(col.locator('[data-card-id]').first());
   await plus.click();
   const inside = col.locator('[data-card-id]');
   await expect(inside).toHaveCount(3);
-  const last = inside.last();
-  await expect(last).toHaveAttribute('data-kind', 'todo');
-  await expect(last).toHaveClass(/selected/);
-  await expect(last.getByLabel('List title')).toBeFocused();
+  const first = inside.first();
+  await expect(first).toHaveAttribute('data-kind', 'todo');
+  await expect(first).toHaveClass(/selected/);
+  await expect(first.getByLabel('List title')).toBeFocused();
+  // It sits where the first card was, and the two notes are now below it, in their old order; the container grew but did not move.
+  expect((await box(first)).y).toBeCloseTo(noteTop.y, 0);
+  await expect(inside.nth(1)).toHaveAttribute('data-kind', 'note');
+  await expect(inside.nth(2)).toHaveAttribute('data-kind', 'note');
+  expect((await box(inside.nth(1))).y).toBeGreaterThan((await box(first)).y + (await box(first)).height - 1);
+  const colAfter = await box(col);
+  expect(colAfter.x).toBeCloseTo(colBefore.x, 0);
+  expect(colAfter.y).toBeCloseTo(colBefore.y, 0);
+  expect(colAfter.height).toBeGreaterThan(colBefore.height);
   await page.keyboard.type('Groceries');
-  await expect(last.getByLabel('List title')).toHaveValue('Groceries');
+  await expect(first.getByLabel('List title')).toHaveValue('Groceries');
   await clickEmpty(page);
   // Undo takes back the typing and then the checklist itself (the adding is one step).
   for (let i = 0; i < 6 && (await inside.count()) > 2; i++) await page.keyboard.press('Control+z');
@@ -71,9 +82,10 @@ test('on a collapsed container the + opens it so the new checklist shows; one un
   await col.hover();
   await col.getByRole('button', { name: 'Add a checklist' }).click();
   await expect(col).not.toHaveClass(/collapsed/);
-  const last = col.locator('[data-card-id]').last();
+  const first = col.locator('[data-card-id]').first();
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
-  await expect(last.getByLabel('List title')).toBeFocused();
+  await expect(first).toHaveAttribute('data-kind', 'todo');
+  await expect(first.getByLabel('List title')).toBeFocused();
   await clickEmpty(page);
   await page.keyboard.press('Control+z');
   await expect(col).toHaveClass(/collapsed/);
@@ -93,7 +105,8 @@ test('the + has the usual keyboard focus ring and works with Enter', async ({ pa
   await expect(plus).toHaveCSS('opacity', '1'); // keyboard focus shows it, like the other header buttons
   await page.keyboard.press('Enter');
   await expect(col.locator('[data-card-id]')).toHaveCount(3);
-  await expect(col.locator('[data-card-id]').last().getByLabel('List title')).toBeFocused();
+  await expect(col.locator('[data-card-id]').first()).toHaveAttribute('data-kind', 'todo');
+  await expect(col.locator('[data-card-id]').first().getByLabel('List title')).toBeFocused();
 });
 
 test('at the biggest text a container keeps room for its title: its three buttons stop at (width - 84) / 96 times 32px', async ({ page }) => {

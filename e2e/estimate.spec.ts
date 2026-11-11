@@ -139,6 +139,16 @@ test('the box closes when its item is no longer shown (Ctrl+Z folds the list awa
   await expect(picker(page)).toBeHidden();
 });
 
+test('a collapsed note shows no clock to add an estimate (expand it first), so its preview keeps its room', async ({ page }) => {
+  await note(page).hover();
+  await note(page).getByRole('button', { name: 'Collapse card' }).click();
+  await note(page).hover();
+  await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeHidden();
+  await note(page).getByRole('button', { name: 'Expand card' }).click();
+  await note(page).hover();
+  await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeVisible();
+});
+
 test('ticking an item saves the day it was ticked; unticking clears it', async ({ page }) => {
   const today = await page.evaluate(() => {
     const d = new Date();

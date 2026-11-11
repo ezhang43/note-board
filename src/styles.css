@@ -3360,6 +3360,28 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
 .cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }
 .cal-chip.all-day.read-only { background: var(--hover); color: var(--ink); }
+/* Dragging an event onto another day (owner request, 2026-11-11): the chip's copy follows the pointer, the day under it is outlined, the chip left behind dims. Normal arrow cursor throughout (rule 6). */
+.cal-day[data-drop], .cal-cell[data-drop] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
+.cal-event[data-dragging], .cal-chip[data-dragging] { opacity: 0.45; }
+body.cal-dragging { user-select: none; -webkit-user-select: none; }
+.cal-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10; /* over the toolbar (8) and the comment scrim (9) */
+  box-sizing: border-box;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ink) 22%, transparent);
+  scale: 1.03;
+}
+.cal-ghost.cal-chip:not(.all-day) { background: var(--surface); }
+.cal-ghost.narrow .cal-chip-time, .cal-ghost.narrow .cal-chip-dot { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .cal-ghost { animation: cal-lift 120ms var(--ease-out); }
+  @keyframes cal-lift { from { scale: 1; box-shadow: none; } }
+  body.cal-dragging .cal-day, body.cal-dragging .cal-cell { transition: background-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out); }
+}
 .cal-more {
   min-width: 0;
   padding: 0 3px;

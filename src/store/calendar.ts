@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 import { announce } from './announce';
 import { deviceStorage } from './env';
@@ -156,7 +156,11 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     state = { ...state, ...patch };
     listeners.forEach((l) => l());
   };
+  /** A start / end as the panel keeps it ('YYYY-MM-DD' or local 'YYYY-MM-DDTHH:MM') after a change to Google's `when`. */
+  const whenKey = (when: EventBody['start']) => ('date' in when ? when.date : when.dateTime.slice(0, 16));
   const editable = (id: string) => state.events?.find((e) => e.id === id && e.editable);
+  // Events with a drag-and-drop move on its way to Google: dragged again only once it has answered.
+  const moving = new Set<string>();
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** Shows (and says aloud) the message after a change. */
   const tell = (text: string, undo: (() => Promise<unknown>) | null) => {
@@ -302,6 +306,35 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       await load();
       tell(event === null ? 'Event added' : 'Event saved', undo);
       return null;
+    },
+    /**
+     * Dragging an event onto another day (owner request, 2026-11-11): `from` is the day it was picked
+     * up on, `to` the day dropped on. Saved exactly as the form saves a change to its day, so it asks
+     * Google the same, answers with "Event saved" and its Undo, and emails guests only as `choice.notify`
+     * says. It shows on the new day at once; if Google refuses, it goes back and the usual note shows
+     * in the message with no Undo. A repeating event moves on its own ("All events" can't be offered
+     * for a new day, see canChangeSeries). Nothing happens for the same day or a read-only event.
+     */
+    async move(id: string, from: DayKey, to: DayKey, choice: Choice = {}): Promise<void> {
+      const event = editable(id);
+      const draft = event && dragDraft(event, from, to);
+      const body = draft && draftBody(draft, timeZone());
+      if (!api || !event || !draft || !body || moving.has(id)) return;
+      const moved = { ...event, start: whenKey(body.start), end: whenKey(body.end) };
+      set({ events: state.events?.map((e) => (e === event ? moved : e)) ?? null });
+      moving.add(id);
+      let problem: string | null;
+      try {
+        problem = await this.save(event, draft, { notify: choice.notify });
+      } finally {
+        moving.delete(id);
+      }
+      if (problem) {
+        // Back where it was; only this event, so another drag still on its way isn't undone with it, and
+        // not at all if the panel was loaded afresh since (it then shows what Google has).
+        set({ events: state.events?.map((e) => (e === moved ? event : e)) ?? null });
+        tell(problem, null);
+      }
     },
     /** Deletes an event, or its whole series (after the panel asked); its Undo brings it back (job 217). */
     async remove(id: string, choice: Choice = {}): Promise<string | null> {

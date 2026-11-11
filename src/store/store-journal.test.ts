@@ -660,6 +660,17 @@ describe('Journal general notes after an older app saved them', () => {
     expect(s.journalGeneralNotes()).toEqual([ids[0], 'n-d', ids[1], ids[2]]);
   });
 
+  it('a full list of remembered ids drops gone ones first, never the notes listed now', () => {
+    const storage = memoryStorage();
+    const { s, ids } = three(storage);
+    const gone = Array.from({ length: 600 }, (_, i) => `gone-${i}`);
+    storage.setItem('note-board:journal-notes', JSON.stringify([...ids, ...gone]));
+    s.renameJournalNote(ids[1], 'Recipes 3');
+    const kept = JSON.parse(storage.getItem('note-board:journal-notes')!) as string[];
+    expect(kept.length).toBeLessThanOrEqual(500);
+    expect(kept.slice(0, 3)).toEqual(ids);
+  });
+
   it('what another tab remembers is read again, not kept from when this page opened', () => {
     const storage = memoryStorage();
     const { s, ids } = three(storage);

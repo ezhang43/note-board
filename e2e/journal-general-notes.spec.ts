@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { cards, freshBoardEachTest } from './helpers';
 
-// Several general notes in the Journal panel, each with a name (owner request, 2026-11-10): a + in a
-// note's header adds an "Untitled note" below it, clicking the name renames it, and a trash deletes it
-// with Undo. Only the arrow folds a note.
+// Several general notes in the Journal panel, each with a name (owner request, 2026-11-10): one + at the
+// very top of the general notes (not in each note, owner request 2026-11-11) adds an "Untitled note" as
+// the first note, clicking a name renames it, and a trash deletes it with Undo. Only the arrow folds a note.
 
 freshBoardEachTest();
 
@@ -13,7 +13,7 @@ const sections = (page: Page) => panel(page).locator('section.journal-notes');
 const note = (page: Page, i: number) => sections(page).nth(i);
 const fold = (page: Page, i: number) => note(page, i).locator('.jg-notes');
 const nameBtn = (page: Page, i: number) => note(page, i).locator('.jn-name');
-const add = (page: Page, i: number) => note(page, i).getByRole('button', { name: 'Add a general note' });
+const add = (page: Page) => panel(page).locator('.jn-bar').getByRole('button', { name: 'Add a general note' });
 const trash = (page: Page, i: number) => note(page, i).locator('.jn-del');
 const rename = (page: Page) => panel(page).locator('input.jn-rename');
 const names = (page: Page) => sections(page).locator('.jn-name').allTextContents();
@@ -27,27 +27,74 @@ const savedNames = (page: Page) =>
       .map((c) => c.text.split('\n')[0]);
   });
 
-test('+ adds an "Untitled note" right below, with the cursor in its name and the name selected', async ({ page }) => {
+test('one + at the very top adds an "Untitled note" first, with the cursor in its name and the name selected', async ({ page }) => {
   await openJournal(page);
   await expect(sections(page)).toHaveCount(1);
-  await expect(add(page, 0)).toHaveAttribute('title', 'Add a general note');
-  await add(page, 0).click();
+  await expect(add(page)).toHaveAttribute('title', 'Add a general note');
+  await add(page).click();
   await expect(sections(page)).toHaveCount(2);
   await expect(rename(page)).toBeFocused();
   await expect(rename(page)).toHaveValue('Untitled note');
   expect(await rename(page).evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 'Untitled note'.length]);
+  expect(await names(page)).toEqual(['General notes']); // the new note shows a field, not a name button
   await page.keyboard.type('Recipes');
   await page.keyboard.press('Enter');
-  expect(await names(page)).toEqual(['General notes', 'Recipes']);
-  // A + on the first again adds between them.
-  await add(page, 0).click();
+  expect(await names(page)).toEqual(['Recipes', 'General notes']);
+  // The + again adds above both.
+  await add(page).click();
   await page.keyboard.press('Enter');
-  expect(await names(page)).toEqual(['General notes', 'Untitled note', 'Recipes']);
+  expect(await names(page)).toEqual(['Untitled note', 'Recipes', 'General notes']);
   // The new note takes typing as its own.
-  await note(page, 1).locator('.rich').click();
+  await note(page, 0).locator('.rich').click();
   await page.keyboard.type('flour');
   await page.waitForTimeout(400);
-  expect(await savedNames(page)).toEqual(['General notes', 'Untitled note', 'Recipes']);
+  expect(await savedNames(page)).toEqual(['Untitled note', 'Recipes', 'General notes']);
+  // And it is still first after a reload.
+  await page.reload();
+  await openJournal(page);
+  expect(await names(page)).toEqual(['Untitled note', 'Recipes', 'General notes']);
+  await expect(note(page, 0).locator('.rich')).toHaveText('flour');
+});
+
+test('there is a single + for all the general notes: none in a note\'s header, one in a slim row above the first, at its right end', async ({ page }) => {
+  await openJournal(page);
+  await add(page).click();
+  await page.keyboard.press('Enter');
+  await add(page).click();
+  await page.keyboard.press('Enter');
+  await expect(sections(page)).toHaveCount(3);
+  await expect(panel(page).getByRole('button', { name: 'Add a general note' })).toHaveCount(1);
+  await expect(sections(page).locator('.jn-add')).toHaveCount(0);
+  const bar = (await panel(page).locator('.jn-bar').boundingBox())!;
+  const button = (await add(page).boundingBox())!;
+  const first = (await note(page, 0).boundingBox())!;
+  const tools = (await panel(page).getByRole('toolbar', { name: 'Formatting' }).boundingBox())!;
+  expect(bar.y).toBeGreaterThanOrEqual(tools.y + tools.height - 1); // under the Formatting bar
+  expect(bar.y + bar.height).toBeLessThanOrEqual(first.y + 1); // above the first note
+  expect(button.x + button.width).toBeGreaterThan(first.x + first.width - 40); // at the right end
+  // ...lined up over the trash button, not past it.
+  const bin = (await trash(page, 0).boundingBox())!;
+  expect(Math.abs(button.x + button.width - (bin.x + bin.width))).toBeLessThanOrEqual(1);
+  // It works from the keyboard, with a visible focus ring.
+  await add(page).focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(add(page)).toBeFocused();
+  await expect(add(page)).toHaveCSS('outline-style', 'solid');
+  await expect(add(page)).toHaveCSS('outline-width', '2px');
+  await page.keyboard.press('Enter');
+  await expect(sections(page)).toHaveCount(4);
+});
+
+test('the new note goes above notes that already have words, which keep them', async ({ page }) => {
+  await openJournal(page);
+  await note(page, 0).locator('.rich').click();
+  await page.keyboard.type('old words');
+  await add(page).click();
+  await page.keyboard.press('Enter');
+  await expect(note(page, 1).locator('.rich')).toHaveText('old words');
+  await expect(note(page, 0).locator('.rich')).toHaveText('');
+  expect(await names(page)).toEqual(['Untitled note', 'General notes']);
 });
 
 test('clicking a name renames it: Enter or leaving saves and is kept after a reload, Escape puts it back, empty is "Untitled note"', async ({ page }) => {
@@ -84,53 +131,56 @@ test('the trash deletes a note with "Deleted 1 note"; Ctrl+Z brings it back; the
   await expect(trash(page, 0)).toHaveCount(0);
   await note(page, 0).locator('.rich').click();
   await page.keyboard.type('keep');
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.type('Second');
   await page.keyboard.press('Enter');
-  await note(page, 1).locator('.rich').click();
+  await note(page, 0).locator('.rich').click();
   await page.keyboard.type('words in it');
-  await expect(trash(page, 0)).toHaveAttribute('aria-label', 'Delete “General notes”');
-  await trash(page, 1).click();
+  await expect(trash(page, 1)).toHaveAttribute('aria-label', 'Delete “General notes”');
+  await trash(page, 0).click();
   await expect(sections(page)).toHaveCount(1);
   await expect(page.locator('.undo-toast')).toContainText('Deleted 1 note');
   await expect(trash(page, 0)).toHaveCount(0);
   await panel(page).focus();
   await page.keyboard.press('Control+z');
   await expect(sections(page)).toHaveCount(2);
-  expect(await names(page)).toEqual(['General notes', 'Second']);
-  await expect(note(page, 1).locator('.rich')).toHaveText('words in it');
-  await expect(note(page, 0).locator('.rich')).toHaveText('keep');
+  expect(await names(page)).toEqual(['Second', 'General notes']);
+  await expect(note(page, 0).locator('.rich')).toHaveText('words in it');
+  await expect(note(page, 1).locator('.rich')).toHaveText('keep');
   // The Undo button does the same.
-  await trash(page, 0).click();
+  await trash(page, 1).click();
   await page.locator('.undo-toast').getByRole('button', { name: 'Undo' }).click();
-  expect(await names(page)).toEqual(['General notes', 'Second']);
+  expect(await names(page)).toEqual(['Second', 'General notes']);
 });
 
 test('each note folds by its arrow only, showing its first line', async ({ page }) => {
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.press('Enter');
-  await note(page, 1).locator('.rich').click();
+  await note(page, 0).locator('.rich').click();
   await page.keyboard.type('Buy stamps\nmore');
-  await fold(page, 1).click();
-  await expect(fold(page, 1)).toHaveAttribute('aria-expanded', 'false');
-  await expect(note(page, 1).locator('.rich')).toHaveCount(0);
-  await expect(note(page, 1).locator('.jg-peek')).toHaveText('Buy stamps');
-  await expect(fold(page, 0)).toHaveAttribute('aria-expanded', 'true');
-  await fold(page, 1).press('Enter');
-  await expect(note(page, 1).locator('.rich')).toHaveText(/Buy stamps/);
+  await fold(page, 0).click();
+  await expect(fold(page, 0)).toHaveAttribute('aria-expanded', 'false');
+  await expect(note(page, 0).locator('.rich')).toHaveCount(0);
+  await expect(note(page, 0).locator('.jg-peek')).toHaveText('Buy stamps');
+  await expect(fold(page, 1)).toHaveAttribute('aria-expanded', 'true');
+  await fold(page, 0).press('Enter');
+  await expect(note(page, 0).locator('.rich')).toHaveText(/Buy stamps/);
 });
 
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
-  test('the arrow, name, + and trash are each at least 44px to press', async ({ page }) => {
+  test('the arrow, name, the top + and the trash are each at least 44px to press', async ({ page }) => {
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).locator('.phone-tiles').getByRole('button', { name: 'Journal', exact: true }).tap();
-    await add(page, 0).tap();
+    await add(page).tap();
     await expect(rename(page)).toBeFocused();
     await page.keyboard.press('Enter');
-    for (const el of [fold(page, 0), nameBtn(page, 0), add(page, 0), trash(page, 0)]) {
+    const bar = (await panel(page).locator('.jn-bar').boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(bar.x + bar.width).toBeLessThanOrEqual(view.width);
+    for (const el of [fold(page, 0), nameBtn(page, 0), add(page), trash(page, 0)]) {
       const box = (await el.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
       expect(box.width).toBeGreaterThanOrEqual(44);
@@ -142,6 +192,9 @@ test.describe('on a phone', () => {
     const sheet = (await note(page, 0).boundingBox())!;
     const bin = (await trash(page, 0).boundingBox())!;
     expect(bin.x + bin.width).toBeLessThanOrEqual(sheet.x + sheet.width);
+    // The top + lines up with the trash buttons below it.
+    const plus = (await add(page).boundingBox())!;
+    expect(Math.abs(plus.x + plus.width - (bin.x + bin.width))).toBeLessThanOrEqual(1);
     await trash(page, 1).tap();
     await expect(sections(page)).toHaveCount(1);
   });
@@ -163,10 +216,10 @@ test('Enter that picks a character in an input method (IME) does not save the na
 
 test('two tabs agree: the general notes another tab remembers show here at once (storage event)', async ({ page, context }) => {
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.type('Recipes');
   await page.keyboard.press('Enter');
-  await add(page, 1).click();
+  await add(page).click();
   await page.keyboard.type('Trips');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
@@ -178,7 +231,7 @@ test('two tabs agree: the general notes another tab remembers show here at once 
   });
   await page.reload();
   await openJournal(page);
-  expect(await names(page)).toEqual(['General notes', 'Recipes', 'Trips']);
+  expect(await names(page)).toEqual(['Trips', 'Recipes', 'General notes']);
   // Another tab remembers them in another order: this tab follows without a reload.
   const ids = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:journal-notes')!) as string[]);
   const other = await context.newPage();
@@ -186,7 +239,7 @@ test('two tabs agree: the general notes another tab remembers show here at once 
   await other.goto(new URL('/busyants-icon.svg', page.url()).href);
   await other.evaluate((ids) => localStorage.setItem('note-board:journal-notes', JSON.stringify([ids[0], ids[2], ids[1]])), ids);
   await other.close();
-  await expect.poll(() => names(page)).toEqual(['General notes', 'Trips', 'Recipes']);
+  await expect.poll(() => names(page)).toEqual(['Trips', 'General notes', 'Recipes']);
 });
 
 test('Escape during an input method (IME) does not throw the name away', async ({ page }) => {
@@ -202,7 +255,7 @@ test('Escape during an input method (IME) does not throw the name away', async (
 
 test('a name field that comes back does not take the cursor from a field outside the panel', async ({ page }) => {
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.type('Rec');
   const key = (k: string) => panel(page).dispatchEvent('keydown', { key: k, ctrlKey: true, bubbles: true });
   await key('z');
@@ -217,7 +270,7 @@ test('a name field that comes back does not take the cursor from a field outside
 
 test('a name being typed comes back, with the cursor, when its note goes and comes back (undo, redo)', async ({ page }) => {
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await expect(rename(page)).toBeFocused();
   await page.keyboard.type('Rec');
   // Undo and redo from outside the field (as another device or the toolbar would), so the field never loses focus first.
@@ -229,14 +282,14 @@ test('a name being typed comes back, with the cursor, when its note goes and com
   await expect(rename(page)).toBeFocused();
   await expect(rename(page)).toHaveValue('Rec');
   await page.keyboard.press('Enter');
-  expect(await names(page)).toEqual(['General notes', 'Rec']);
+  expect(await names(page)).toEqual(['Rec', 'General notes']);
 });
 
 test('+ on the note not yet written, with the Journal board open behind the panel, puts the two notes clear of each other', async ({ page }) => {
   await page.getByLabel('Board name').fill('Journal');
   await page.keyboard.press('Enter');
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.press('Enter');
   await expect(cards(page)).toHaveCount(3); // today's note and the two general notes
   await page.waitForTimeout(500); // drawn and tidied
@@ -251,14 +304,14 @@ test('+ on the note not yet written, with the Journal board open behind the pane
 
 test('after an older copy of the app drops their places, the panel still lists every general note, and the next rename writes them back', async ({ page }) => {
   await openJournal(page);
-  await add(page, 0).click();
+  await add(page).click();
   await page.keyboard.type('Recipes');
   await page.keyboard.press('Enter');
-  await add(page, 1).click();
+  await add(page).click();
   await page.keyboard.type('Trips');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
-  expect(await savedNames(page)).toEqual(['General notes', 'Recipes', 'Trips']);
+  expect(await savedNames(page)).toEqual(['Trips', 'Recipes', 'General notes']);
   // What an older app saves: the same notes and words, without their places.
   await page.evaluate(() => {
     const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
@@ -269,10 +322,10 @@ test('after an older copy of the app drops their places, the panel still lists e
   expect(await savedNames(page)).toEqual([]);
   await openJournal(page);
   await expect(sections(page)).toHaveCount(3);
-  expect(await names(page)).toEqual(['General notes', 'Recipes', 'Trips']);
-  await nameBtn(page, 2).click();
+  expect(await names(page)).toEqual(['Trips', 'Recipes', 'General notes']);
+  await nameBtn(page, 0).click();
   await page.keyboard.type('Trips 2026');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
-  expect(await savedNames(page)).toEqual(['General notes', 'Recipes', 'Trips 2026']);
+  expect(await savedNames(page)).toEqual(['Trips 2026', 'Recipes', 'General notes']);
 });

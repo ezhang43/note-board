@@ -286,7 +286,7 @@ export function JournalPanel() {
     );
   };
 
-  /** One general note's sheet: an arrow that folds it, its name (click to rename), + and the trash. */
+  /** One general note's sheet: an arrow that folds it, its name (click to rename) and the trash. */
   const generalSheet = (key: string, count: number) => {
     const card = board?.cards[key];
     const text = card?.kind === 'note' ? card.text : `${JOURNAL_NOTES}\n\n`;
@@ -351,18 +351,6 @@ export function JournalPanel() {
           )}
           {!open && !editing && peek && <span className="jg-peek">{peek}</span>}
           <span className="jn-tools">
-            <button
-              type="button"
-              className="jn-add"
-              aria-label="Add a general note"
-              title="Add a general note"
-              onClick={() => {
-                const added = appStore.addJournalNote(key);
-                if (added) setRenaming({ key: added, draft: UNTITLED_NOTE });
-              }}
-            >
-              <PlusIcon />
-            </button>
             {count > 1 && (
               <button
                 type="button"
@@ -525,6 +513,23 @@ export function JournalPanel() {
         )}
       </div>
       {/* Only with a Journal board to write into, like the days. */}
+      {board && (
+        // The one + for all the general notes (owner request, 2026-11-11): above the first, adding a note at the top of the list.
+        <div className="jn-bar">
+          <button
+            type="button"
+            className="jn-add"
+            aria-label="Add a general note"
+            title="Add a general note"
+            onClick={() => {
+              const added = appStore.addJournalNote(generals[0]);
+              if (added) setRenaming({ key: added, draft: UNTITLED_NOTE });
+            }}
+          >
+            <PlusIcon />
+          </button>
+        </div>
+      )}
       {board && generals.map((id) => generalSheet(id, generals.length))}
       {todayEntry && entry(todayEntry, true)}
       {timeline}

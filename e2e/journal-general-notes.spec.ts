@@ -161,6 +161,34 @@ test('Enter that picks a character in an input method (IME) does not save the na
   expect(await names(page)).toEqual(['日本']);
 });
 
+test('two tabs agree: the general notes another tab remembers show here at once (storage event)', async ({ page, context }) => {
+  await openJournal(page);
+  await add(page, 0).click();
+  await page.keyboard.type('Recipes');
+  await page.keyboard.press('Enter');
+  await add(page, 1).click();
+  await page.keyboard.type('Trips');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  // An older app drops the places; this tab lists them from what it remembers.
+  await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('note-board:v1')!);
+    for (const b of Object.values(raw.boards) as { cards: Record<string, { general?: number }> }[]) for (const c of Object.values(b.cards)) delete c.general;
+    localStorage.setItem('note-board:v1', JSON.stringify(raw));
+  });
+  await page.reload();
+  await openJournal(page);
+  expect(await names(page)).toEqual(['General notes', 'Recipes', 'Trips']);
+  // Another tab remembers them in another order: this tab follows without a reload.
+  const ids = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:journal-notes')!) as string[]);
+  const other = await context.newPage();
+  await other.goto('about:blank');
+  await other.goto(new URL('/', page.url()).href);
+  await other.evaluate((ids) => localStorage.setItem('note-board:journal-notes', JSON.stringify([ids[0], ids[2], ids[1]])), ids);
+  await other.close();
+  await expect.poll(() => names(page)).toEqual(['General notes', 'Trips', 'Recipes']);
+});
+
 test('Escape during an input method (IME) does not throw the name away', async ({ page }) => {
   await openJournal(page);
   await nameBtn(page, 0).click();

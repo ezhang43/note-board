@@ -115,8 +115,9 @@ export function generalNotes(board: Board, known: readonly string[] = []): strin
 export const noteName = (text: string): string => firstLine(text).trim();
 
 /** A name as typed, on one line and trimmed; an empty one is "Untitled note". */
+export const NOTE_NAME_MAX = 200;
 export function cleanNoteName(raw: string): string {
-  return raw.replace(/\s+/g, ' ').trim() || UNTITLED_NOTE;
+  return raw.replace(/\s+/g, ' ').trim().slice(0, NOTE_NAME_MAX).trim() || UNTITLED_NOTE;
 }
 
 /** `board` with the general notes `ids` numbered 1, 2, 3… in that order (only those whose number changes are touched). */

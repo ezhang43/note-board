@@ -589,6 +589,10 @@ describe('several general notes', () => {
     expect(cleanNoteName('')).toBe(UNTITLED_NOTE);
     expect(cleanNoteName(' a\r\n b ')).toBe('a b');
   });
+  it('cleanNoteName: at most 200 characters, as the name field allows (also from a paste or the connector)', () => {
+    expect(cleanNoteName('x'.repeat(300))).toBe('x'.repeat(200));
+    expect(cleanNoteName(`${'x'.repeat(199)}  y`)).toBe('x'.repeat(199));
+  });
   // An older app drops the places (2026-11-10 follow-up): the ids this device saw as general notes
   // (`known`) find them again, in their order, and the next add, rename or delete writes the places back.
   const stripped = () => {

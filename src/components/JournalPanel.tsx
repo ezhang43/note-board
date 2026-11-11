@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { JOURNAL_NOTES, UNTITLED_NOTE, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, noteName, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
+import { JOURNAL_KNOWN_KEY, JOURNAL_NOTES, NOTE_NAME_MAX, UNTITLED_NOTE, groupJournal, isGroupOpen, isoWeek, journalBody, journalDateLine, journalDayKey, journalEntries, journalLongDate, journalPeek, journalWords, noteName, openToday, parseJournalOpen, toggleGroup, type JournalOpen } from '../model/journal';
 import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
@@ -34,7 +34,16 @@ export function JournalPanel() {
   });
   // The general notes, with those this device remembers when an older app has dropped their places
   // (2026-11-10 follow-up; see generalNotes). They are never days, whatever their names.
-  const written = useMemo(() => (board ? appStore.journalGeneralNotes(board) : []), [board]);
+  // Another tab may remember them in another order (2026-11-10 follow-up): read again when it does.
+  const [otherTab, setOtherTab] = useState(0);
+  useEffect(() => {
+    const changed = (e: StorageEvent) => {
+      if (e.key === null || e.key.endsWith(JOURNAL_KNOWN_KEY)) setOtherTab((n) => n + 1);
+    };
+    window.addEventListener('storage', changed);
+    return () => window.removeEventListener('storage', changed);
+  }, []);
+  const written = useMemo(() => (board ? appStore.journalGeneralNotes(board) : []), [board, otherTab]);
   useEffect(() => appStore.rememberJournalNotes(), [board]);
   const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date()), written) : []), [board, written]);
   const today = dayKey(new Date());
@@ -319,7 +328,7 @@ export function JournalPanel() {
               className="jn-rename"
               aria-label="Name"
               value={editing.draft}
-              maxLength={200}
+              maxLength={NOTE_NAME_MAX}
               onChange={(ev) => setRenaming({ key, draft: ev.target.value })}
               onKeyDown={(ev) => {
                 // A key in an input method (IME), such as the Enter that picks a character, is part of the typing.

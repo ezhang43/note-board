@@ -334,20 +334,21 @@ describe('leaving a share sends one leave', () => {
     expect(page.leave).toHaveBeenCalledTimes(1);
   });
 
-  it('opening the link again while a leave is on its way waits for it, so the leave doesn’t undo the join', async () => {
-    const page = await drivenDevice();
-    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+  it('after being removed, being added back on another device still brings the board here (the clean-up leave doesn’t hold it back)', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const page = slowLeaveDevice(person('carol'), 'held');
     await settle();
-    // Carol is sent the new link and opens it before the clean-up leave has answered.
-    const joined = page.sharing.join('sgood', 'e2');
-    joined.catch(() => {});
+    const joined = page.sharing.join('sgood', 'goodkey');
     await settle();
-    page.ends.answer();
+    await joined;
+    await owner.removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
     await settle();
-    page.list(['sgood'], true);
+    expect(page.sharing.isShared('n1')).toBe(false);
+    // Carol opens the new link on her phone.
+    await server.server.join(person('carol'), 'sgood', 'e2');
     await settle();
-    expect(await joined).toBe('n1');
-    expect(server.shares.get('sgood')!.people.map((p) => p.uid)).toContain('carol');
     expect(page.sharing.isShared('n1')).toBe(true);
   });
 });

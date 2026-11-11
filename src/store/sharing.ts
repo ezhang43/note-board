@@ -168,10 +168,11 @@ export interface SharingOptions {
 export function startSharing(store: Store, backend: CollabBackend, opts: SharingOptions) {
   const shares = new Map<string, Share>();
   /**
-   * Shares whose leave (this person's own) is on its way. The server saying they are off one can
+   * Shares whose leave (this person's own, or the clean-up after one went) is on its way. The server saying they are off one can
    * come before the leave answers: that is the same leave, so it isn't sent again or shown as
    * "no longer shared with you", and the list of shares doesn't open it again meanwhile. A second
-   * leave of it meanwhile (a double click) waits for the same one.
+   * leave of it meanwhile (a double click) waits for the same one, and the server's list leaving one out
+   * doesn't close it before the leave has answered (if the leave fails, nothing changes).
    */
   const leaving = new Map<string, Promise<void>>();
   /**
@@ -863,8 +864,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Opening a link to a board already here just opens it. The link is also tried online, not
       // waited for (offline, a save waits for the connection), when it may give a higher role (a
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
-      // A leave of it still on its way here goes first, so it can't undo this join.
-      while (leaving.has(id)) await leaving.get(id)!.catch(() => {});
       left.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;

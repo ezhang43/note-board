@@ -182,8 +182,8 @@ test('two tabs agree: the general notes another tab remembers show here at once 
   // Another tab remembers them in another order: this tab follows without a reload.
   const ids = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:journal-notes')!) as string[]);
   const other = await context.newPage();
-  await other.goto('about:blank');
-  await other.goto(new URL('/', page.url()).href);
+  // A plain file of the same site, not the app, so nothing else in that tab writes to storage.
+  await other.goto(new URL('/busyants-icon.svg', page.url()).href);
   await other.evaluate((ids) => localStorage.setItem('note-board:journal-notes', JSON.stringify([ids[0], ids[2], ids[1]])), ids);
   await other.close();
   await expect.poll(() => names(page)).toEqual(['General notes', 'Trips', 'Recipes']);

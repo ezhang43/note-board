@@ -592,6 +592,18 @@ describe('several general notes', () => {
   it('cleanNoteName: at most 200 characters, as the name field allows (also from a paste or the connector)', () => {
     expect(cleanNoteName('x'.repeat(300))).toBe('x'.repeat(200));
     expect(cleanNoteName(`${'x'.repeat(199)}  y`)).toBe('x'.repeat(199));
+    // Counted in characters: an emoji is never cut in half.
+    expect(cleanNoteName(`${'x'.repeat(199)}😀😀`)).toBe(`${'x'.repeat(199)}😀`);
+  });
+
+  it('renaming to the name it has already changes nothing, even a name typed longer on the board', () => {
+    const { board, id } = legacy();
+    const two = addGeneralNote(board, id, untitled('n-b'), { x: 400, y: 300 });
+    const long = `${'L'.repeat(300)}`;
+    const b = { ...two, cards: { ...two.cards, 'n-b': { ...(two.cards['n-b'] as NoteCard), text: `${long}\n\nwords` } } };
+    expect(generalNotes(b)).toContain('n-b');
+    // The name field holds all of it; leaving it unchanged saves nothing.
+    expect(renameGeneralNote(b, 'n-b', long)).toBe(b);
   });
   // An older app drops the places (2026-11-10 follow-up): the ids this device saw as general notes
   // (`known`) find them again, in their order, and the next add, rename or delete writes the places back.

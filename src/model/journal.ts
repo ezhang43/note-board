@@ -117,7 +117,9 @@ export const noteName = (text: string): string => firstLine(text).trim();
 /** A name as typed, on one line and trimmed; an empty one is "Untitled note". */
 export const NOTE_NAME_MAX = 200;
 export function cleanNoteName(raw: string): string {
-  return raw.replace(/\s+/g, ' ').trim().slice(0, NOTE_NAME_MAX).trim() || UNTITLED_NOTE;
+  const one = raw.replace(/\s+/g, ' ').trim();
+  // Counted in characters, so an emoji is never cut in half.
+  return Array.from(one).slice(0, NOTE_NAME_MAX).join('').trim() || UNTITLED_NOTE;
 }
 
 /** `board` with the general notes `ids` numbered 1, 2, 3… in that order (only those whose number changes are touched). */
@@ -156,7 +158,8 @@ export function renameGeneralNote(board: Board, id: string, name: string, known:
   const c = board.cards[id];
   if (!ids.includes(id) || c?.kind !== 'note') return board;
   const next = cleanNoteName(name);
-  if (next === firstLine(c.text)) return board;
+  // The name it has (cleaned the same way): nothing to save, so a name made longer on the board isn't cut.
+  if (next === firstLine(c.text) || next === cleanNoteName(firstLine(c.text))) return board;
   const i = c.text.indexOf('\n');
   const text = `${next}${i < 0 ? '\n\n' : c.text.slice(i)}`;
   return numbered(updateCard(board, id, (card) => ({ ...card, text }) as NoteCard), ids);

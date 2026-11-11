@@ -11,3 +11,4 @@
 - The trash in a note's header deletes it, with "Deleted 1 note" and Undo; Ctrl+Z brings it back too. The last one can't be deleted, so there is always one. The existing "General notes" note keeps its name and words.
 - If an older copy of the app (one still open in another tab or on another device) saves the Journal, your extra general notes no longer drop out of the panel: this device remembers them and lists them again, and the next change puts them back in place everywhere.
 - Typing a name with a Japanese or Chinese keyboard: the Enter that picks a character no longer saves the name early.
+- Deleting your account also clears the general notes this device remembers. Two tabs open on the Journal now agree on the general notes straight away. A general note's name is at most 200 characters.

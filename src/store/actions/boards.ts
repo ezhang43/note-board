@@ -72,13 +72,18 @@ export function boardActions(ctx: StoreContext) {
    * The general notes this device last saw on the Journal board, by id, in order (2026-11-10 follow-up):
    * an older copy of the app drops their places, and these find them again (see generalNotes).
    * Kept in this browser only; the board's own data is never changed by them until the next change in the panel.
+   * Read again each time (another tab may have written it), and parsed again only when it has changed.
    */
-  let known: string[] | null = null;
+  const KNOWN_MAX = 500;
+  let knownRaw: string | null = null;
+  let known: string[] = [];
   const knownNotes = (): string[] => {
-    if (known) return known;
+    const raw = ctx.read(JOURNAL_KNOWN_KEY);
+    if (raw === knownRaw) return known;
+    knownRaw = raw;
     try {
-      const got: unknown = JSON.parse(ctx.read(JOURNAL_KNOWN_KEY) ?? '[]');
-      known = Array.isArray(got) ? got.filter((x): x is string => typeof x === 'string').slice(0, 500) : [];
+      const got: unknown = JSON.parse(raw ?? '[]');
+      known = Array.isArray(got) ? got.filter((x): x is string => typeof x === 'string').slice(0, KNOWN_MAX) : [];
     } catch {
       known = [];
     }
@@ -111,10 +116,20 @@ export function boardActions(ctx: StoreContext) {
   function remember() {
     const b = journalBoardNow();
     if (!b) return;
-    const ids = generalNotes(b);
-    if (!ids.some((k) => (b.cards[k] as NoteCard).general !== undefined) || deepEqual(ids, knownNotes())) return;
-    known = ids;
-    ctx.write(JOURNAL_KNOWN_KEY, JSON.stringify(ids));
+    const was = knownNotes();
+    const ids = generalNotes(b, was);
+    if (!ids.some((k) => (b.cards[k] as NoteCard).general !== undefined)) return;
+    // Ids no longer listed (a note deleted, which Undo can bring back without its place) stay where they were.
+    // simple: deleted notes' ids are kept up to KNOWN_MAX (oldest dropped); prune by board if that ever fills.
+    const next = [...ids];
+    was.forEach((k, i) => {
+      if (next.includes(k)) return;
+      const before = was.slice(0, i).reverse().find((p) => next.includes(p));
+      next.splice(before === undefined ? 0 : next.indexOf(before) + 1, 0, k);
+    });
+    const keep = next.slice(-KNOWN_MAX);
+    if (deepEqual(keep, was)) return;
+    ctx.write(JOURNAL_KNOWN_KEY, JSON.stringify(keep));
   }
 
   return {
@@ -263,9 +278,8 @@ export function boardActions(ctx: StoreContext) {
       remember();
     },
     /** The Journal panel's general notes, in order (see generalNotes), with what this device remembers of them. */
-    journalGeneralNotes(): string[] {
-      const b = journalBoardNow();
-      return b ? generalNotes(b, knownNotes()) : [];
+    journalGeneralNotes(board: Board | undefined = journalBoardNow()): string[] {
+      return board ? generalNotes(board, knownNotes()) : [];
     },
     /** The panel shows the general notes: this device remembers them (see remember). */
     rememberJournalNotes: remember,

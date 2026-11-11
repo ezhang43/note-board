@@ -34,7 +34,7 @@ export function JournalPanel() {
   });
   // The general notes, with those this device remembers when an older app has dropped their places
   // (2026-11-10 follow-up; see generalNotes). They are never days, whatever their names.
-  const written = useMemo(() => (board ? appStore.journalGeneralNotes() : []), [board]);
+  const written = useMemo(() => (board ? appStore.journalGeneralNotes(board) : []), [board]);
   useEffect(() => appStore.rememberJournalNotes(), [board]);
   const entries = useMemo(() => (board ? journalEntries(board, journalDateLine(new Date()), written) : []), [board, written]);
   const today = dayKey(new Date());
@@ -84,9 +84,12 @@ export function JournalPanel() {
   const [renaming, setRenaming] = useState<{ key: string; draft: string } | null>(null);
   // A name field has the cursor, with its text selected, each time it appears (owner decision, 2026-11-10):
   // when opened, and when its note comes back (redo, or from another device) with the name being typed.
+  // It doesn't take the cursor from a field outside the panel (one typed in while the note was gone).
   const renameField = useCallback((el: HTMLInputElement | null) => {
-    el?.focus();
-    el?.select();
+    const now = el?.ownerDocument.activeElement;
+    if (!el || (now && now !== el.ownerDocument.body && !el.closest('.journal-panel')?.contains(now))) return;
+    el.focus();
+    el.select();
   }, []);
   /** The general note whose name button takes the keyboard back once its name field goes (Enter or Escape). */
   const refocusName = useRef<string | null>(null);
@@ -319,8 +322,8 @@ export function JournalPanel() {
               maxLength={200}
               onChange={(ev) => setRenaming({ key, draft: ev.target.value })}
               onKeyDown={(ev) => {
-                // The Enter that picks a character in an input method (IME) is part of the typing.
-                if (ev.key === 'Enter' && (ev.nativeEvent.isComposing || ev.keyCode === 229)) return;
+                // A key in an input method (IME), such as the Enter that picks a character, is part of the typing.
+                if (ev.nativeEvent.isComposing || ev.keyCode === 229) return;
                 if (ev.key === 'Enter') {
                   ev.preventDefault();
                   refocusName.current = key;

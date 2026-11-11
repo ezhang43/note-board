@@ -623,6 +623,16 @@ describe('several general notes', () => {
     expect((placed.cards['n-c'] as NoteCard).text).toBe(`Tue 10 Nov 2026\n\n`);
   });
 
+  it('some with places (another device added one), the others only known: those known follow, and the next change places them all', () => {
+    const { old, ids, id } = stripped();
+    // A device that never saw them adds one below "General notes": only those two get places.
+    const other = addGeneralNote(old, id, untitled('n-d'), { x: 400, y: 900 });
+    expect(generalNotes(other)).toEqual([id, 'n-d']);
+    expect(generalNotes(other, ids)).toEqual([id, 'n-d', 'n-b', 'n-c']);
+    const renamed = renameGeneralNote(other, 'n-b', 'Recipes 2', ids);
+    expect(generalNotes(renamed)).toEqual([id, 'n-d', 'n-b', 'n-c']);
+  });
+
   it('adding and deleting with what was known write the places back too', () => {
     const { old, ids, id } = stripped();
     const added = addGeneralNote(old, 'n-c', untitled('n-d'), { x: 400, y: 900 }, ids);

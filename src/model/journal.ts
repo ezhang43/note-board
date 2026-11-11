@@ -91,20 +91,21 @@ function firstStyleNote(board: Board): string | null {
 }
 
 /**
- * The general notes on `board`, in the panel's order: those with a place, by place (ties by id). With
- * none (a Journal saved before there could be several, or by an older copy of the app, which drops the
- * places), the notes this device last saw as general notes (`known`: their ids, in order; 2026-11-10
- * follow-up), after the "General notes" note found by its first line (see firstStyleNote) if that isn't
- * one of them. Adding, renaming or deleting numbers them all again, so the places are written back, and
- * once any has a place, another note named "General notes" stays an ordinary note.
+ * The general notes on `board`, in the panel's order: those with a place, by place (ties by id), then
+ * the other notes this device last saw as general notes (`known`: their ids, in order; 2026-11-10
+ * follow-up), since an older copy of the app drops the places and another device may then have placed
+ * only some. With no place at all (a Journal saved before there could be several, or by an older copy),
+ * the "General notes" note found by its first line (see firstStyleNote) comes first if it isn't known.
+ * Adding, renaming or deleting numbers them all again, so the places are written back, and once any has
+ * a place, another note named "General notes" stays an ordinary note.
  */
 export function generalNotes(board: Board, known: readonly string[] = []): string[] {
   const placed = Object.values(board.cards)
     .filter((c): c is NoteCard => isGeneral(c))
     .sort((a, b) => a.general! - b.general! || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map((c) => c.id);
-  if (placed.length) return placed;
-  const found = [...new Set(known)].filter((id) => board.cards[id]?.kind === 'note');
+  const found = [...new Set(known)].filter((id) => board.cards[id]?.kind === 'note' && !placed.includes(id));
+  if (placed.length) return [...placed, ...found];
   const first = firstStyleNote(board);
   return first && !found.includes(first) ? [first, ...found] : found;
 }

@@ -161,6 +161,32 @@ test('Enter that picks a character in an input method (IME) does not save the na
   expect(await names(page)).toEqual(['日本']);
 });
 
+test('Escape during an input method (IME) does not throw the name away', async ({ page }) => {
+  await openJournal(page);
+  await nameBtn(page, 0).click();
+  await rename(page).fill('日本');
+  await rename(page).dispatchEvent('keydown', { key: 'Escape', isComposing: true, keyCode: 229, bubbles: true });
+  await expect(rename(page)).toBeFocused();
+  await expect(rename(page)).toHaveValue('日本');
+  await page.keyboard.press('Enter');
+  expect(await names(page)).toEqual(['日本']);
+});
+
+test('a name field that comes back does not take the cursor from a field outside the panel', async ({ page }) => {
+  await openJournal(page);
+  await add(page, 0).click();
+  await page.keyboard.type('Rec');
+  const key = (k: string) => panel(page).dispatchEvent('keydown', { key: k, ctrlKey: true, bubbles: true });
+  await key('z');
+  await expect(sections(page)).toHaveCount(1);
+  const boardName = page.getByLabel('Board name');
+  await boardName.evaluate((el: HTMLElement) => el.focus());
+  await key('y');
+  await expect(sections(page)).toHaveCount(2);
+  await expect(rename(page)).toHaveValue('Rec');
+  await expect(boardName).toBeFocused();
+});
+
 test('a name being typed comes back, with the cursor, when its note goes and comes back (undo, redo)', async ({ page }) => {
   await openJournal(page);
   await add(page, 0).click();

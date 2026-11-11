@@ -636,6 +636,39 @@ describe('Journal general notes after an older app saved them', () => {
     expect(again.journalGeneralNotes()).toEqual(ids);
   });
 
+  it('deleting one, then Undo, brings it back in its place in the list', () => {
+    const { s, ids } = three();
+    strip(s);
+    s.deleteJournalNote(ids[1]);
+    s.rememberJournalNotes();
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+    s.undoJournal();
+    expect(s.journalGeneralNotes()).toEqual(ids);
+  });
+
+  it('another device that never saw them adds a note: this device still lists the ones it remembers, after those with places', () => {
+    const { s, ids } = three();
+    strip(s);
+    // As another device would: "General notes" and a new note get places, the other two don't.
+    const ws = s.workspace();
+    const id = s.getState().ui.journalBoard!;
+    const b = ws.boards[id];
+    const d = { ...(b.cards[ids[1]] as NoteCard), id: 'n-d', text: 'From phone\n\n', general: 2 };
+    const first = { ...(b.cards[ids[0]] as NoteCard), general: 1 };
+    s.replaceWorkspace({ ...ws, boards: { ...ws.boards, [id]: { ...b, cards: { ...b.cards, [ids[0]]: first, 'n-d': d } } } });
+    s.rememberJournalNotes();
+    expect(s.journalGeneralNotes()).toEqual([ids[0], 'n-d', ids[1], ids[2]]);
+  });
+
+  it('what another tab remembers is read again, not kept from when this page opened', () => {
+    const storage = memoryStorage();
+    const { s, ids } = three(storage);
+    strip(s);
+    expect(s.journalGeneralNotes()).toEqual(ids);
+    storage.setItem('note-board:journal-notes', JSON.stringify([ids[0], ids[2]]));
+    expect(s.journalGeneralNotes()).toEqual([ids[0], ids[2]]);
+  });
+
   it('typing and deleting find them too; one named like a date is never taken for that day', () => {
     const { s, ids } = three();
     strip(s);

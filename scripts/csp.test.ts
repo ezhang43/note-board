@@ -47,12 +47,15 @@ describe('Content Security Policy', () => {
         'https://securetoken.googleapis.com',
         'https://firestore.googleapis.com',
         'https://www.googleapis.com/calendar/v3/',
-        'https://api.anthropic.com',
         'https://fonts.googleapis.com',
         'https://fonts.gstatic.com',
       ]),
     );
     expect(built['frame-src']).toContain('https://note-board-a672a.firebaseapp.com');
+    // Owner decision 2026-11-11: the Anthropic address is added with the AI feature that needs it, not before.
+    expect(built['connect-src'].join(' ')).not.toContain('anthropic');
+    // Owner decision 2026-11-11: pictures over https only.
+    expect(built['img-src']).not.toContain('http:');
   });
 
   it('the sign-in frame is the Firebase project the app signs in with (one place sets it)', () => {

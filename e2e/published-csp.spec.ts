@@ -67,7 +67,7 @@ test('Sign in with Google loads what Firebase needs for its window (Google’s g
   await expect.poll(() => asked.some((u) => u.startsWith('https://apis.google.com/js/api.js'))).toBe(true);
 });
 
-test('sign-in, sync, the calendar and the Anthropic API may be reached, and Firebase’s sign-in frame may open', async ({ page }) => {
+test('sign-in, sync and the calendar may be reached (the Anthropic API may not, yet), and Firebase’s sign-in frame may open', async ({ page }) => {
   await cspGuard(page);
   const hosts = [
     'https://identitytoolkit.googleapis.com/v1/accounts:lookup',
@@ -75,7 +75,6 @@ test('sign-in, sync, the calendar and the Anthropic API may be reached, and Fire
     'https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel',
     'https://www.googleapis.com/calendar/v3/calendars/primary/events',
     'https://accounts.google.com/gsi/status',
-    'https://api.anthropic.com/v1/messages',
     'https://fonts.googleapis.com/css2?family=Lora',
   ];
   for (const h of hosts) await page.route(`${new URL(h).origin}/**`, (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
@@ -86,12 +85,17 @@ test('sign-in, sync, the calendar and the Anthropic API may be reached, and Fire
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   const results = await page.evaluate(
-    (urls) => Promise.all(urls.map((u) => fetch(u, { method: u.includes('anthropic') ? 'POST' : 'GET' }).then((r) => `${u} ${r.status}`, () => `${u} refused`))),
+    (urls) => Promise.all(urls.map((u) => fetch(u).then((r) => `${u} ${r.status}`, () => `${u} refused`))),
     hosts,
   );
   // None refused (the fonts' stylesheet can come from the offline copy instead, with a 200).
   expect(results.filter((r) => r.endsWith('refused'))).toEqual([]);
   expect(results).toHaveLength(hosts.length);
+  // Owner decision 2026-11-11: the Anthropic address waits for the AI feature that needs it.
+  await page.route('https://api.anthropic.com/**', (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
+  expect(await page.evaluate(() => fetch('https://api.anthropic.com/v1/messages', { method: 'POST' }).then(() => 'reached', () => 'refused'))).toBe('refused');
+  await expect.poll(async () => (await violations(page)).some((v) => v.includes('connect-src https://api.anthropic.com'))).toBe(true);
+  await clearViolations(page);
   // Firebase's hidden sign-in frame (https://<authDomain>/__/auth/iframe) and the Calendar connection's script.
   await page.evaluate(() => {
     const f = document.createElement('iframe');

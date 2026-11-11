@@ -49,8 +49,7 @@ const BASE: Record<string, string[]> = {
     // The picture / PDF download reads the fonts' stylesheets and files to draw the board in its typefaces.
     'https://fonts.googleapis.com',
     'https://fonts.gstatic.com',
-    // The person's own Anthropic key is used only here (a later job).
-    'https://api.anthropic.com',
+    // Not api.anthropic.com yet: owner decision 2026-11-11, it is added with the AI feature that needs it.
   ],
   'frame-src': [
     // Firebase sign-in's hidden frame (@firebase/auth getIframeUrl: https://<authDomain>/__/auth/iframe).

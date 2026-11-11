@@ -167,6 +167,13 @@ export interface SharingOptions {
 
 export function startSharing(store: Store, backend: CollabBackend, opts: SharingOptions) {
   const shares = new Map<string, Share>();
+  /**
+   * Shares this person is leaving or has just left on this page. The server saying they are off one
+   * (it can come before the leave itself answers) is that same leave: it isn't sent again or shown
+   * as "no longer shared with you", and a list of shares from before the leave doesn't open it again.
+   * Cleared once a list of shares no longer names it, or when its link is opened again.
+   */
+  const leaving = new Set<string>();
   let listLoaded = false;
   let readyFired = false;
   let applying = false;
@@ -591,8 +598,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       }
     } else applyBoards(Object.fromEntries(ids.map((id) => [id, ws.boards[id]])), {});
     // Off this person's list of shares too (it may already be).
-    if (why !== 'left') backend.leave(s.id).catch(() => {});
-    if (why === 'removed') opts.onNotice?.(`“${name}” is no longer shared with you.`);
+    const own = leaving.has(s.id);
+    if (why !== 'left' && !own) backend.leave(s.id).catch(() => {});
+    if (why === 'removed' && !own) opts.onNotice?.(`“${name}” is no longer shared with you.`);
     if (why === 'deleted' && !s.owner) opts.onNotice?.(`“${name}” was deleted by the person who shared it.`);
     publish();
     checkReady();
@@ -705,7 +713,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   const stopList = backend.watchMyShares(
     (ids, confirmed) => {
-      for (const id of ids) open(id);
+      for (const id of leaving) if (!ids.includes(id)) leaving.delete(id);
+      for (const id of ids) if (!leaving.has(id)) open(id);
       if (confirmed) {
         // Left on another device (only by the server's own list: the offline copy may be out of date).
         for (const s of [...shares.values()]) if (!ids.includes(s.id) && s.ready && !s.deleting) gone(s, 'left');
@@ -823,6 +832,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       // Opening a link to a board already here just opens it. The link is also tried online, not
       // waited for (offline, a save waits for the connection), when it may give a higher role (a
       // viewer given the edit link, job 161); one that doesn't work (turned off since) changes nothing.
+      leaving.delete(id);
       const here = shares.get(id);
       const role = here?.people.find((p) => p.uid === backend.me.uid)?.role;
       // Not while their role isn't known yet (the People list hasn't answered): code review.
@@ -840,6 +850,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         // the app, which an updated app opens (job #91).
         // Not after signing out, or once it went (that already took them off).
         if (added && !s.owner && !s.unreadable && shares.has(id)) {
+          leaving.add(id);
           await backend.leave(id).catch(() => {});
           gone(s, 'left');
         }
@@ -864,7 +875,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     async leave(id: string) {
       const s = need(id);
       if (s.owner) throw new Error('The person who shared a board can’t leave it');
-      await backend.leave(id);
+      leaving.add(id);
+      try {
+        await backend.leave(id);
+      } catch (e) {
+        // Already gone from here (the server said they are off it): the leave took effect.
+        if (!shares.has(id)) return;
+        leaving.delete(id);
+        throw e;
+      }
       gone(s, 'left');
     },
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */

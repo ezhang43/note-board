@@ -1,0 +1,163 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StorageLike } from '../model/persist';
+import { memoryServer, type Person } from './collab';
+import { startSharing } from './sharing';
+import { createStore } from './store';
+
+// Leaving a share sends one leave, even when the server tells the page it is off the share before
+// the leave itself has answered (a flaky browser test on GitHub: join, leave, leave).
+
+function memoryStorage(): StorageLike {
+  const data = new Map<string, string>();
+  return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v) };
+}
+
+const person = (uid: string): Person => ({ uid, name: uid[0].toUpperCase() + uid.slice(1), photo: null });
+
+let server: ReturnType<typeof memoryServer>;
+beforeEach(() => {
+  vi.useFakeTimers();
+  server = memoryServer();
+});
+afterEach(() => vi.useRealTimers());
+
+async function settle() {
+  for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(1000);
+}
+
+/**
+ * `who`'s page, where the server's answer to a leave arrives late (after the share's own watch has
+ * already been refused). Its shared-boards list never loads, so only the share's watch can notice
+ * the person is off it (as when that stream's message beats the list's in the browser).
+ */
+function slowLeaveDevice(who: Person, list: 'never' | 'held' = 'never') {
+  const storage = memoryStorage();
+  const store = createStore(storage, (fn) => fn());
+  const real = server.backendFor(who);
+  // 'held': the shared-boards list answers, but once `hold` is on its messages wait until `release`.
+  const lists = { hold: false, held: [] as (() => void)[] };
+  const release = () => lists.held.splice(0).forEach((fn) => fn());
+  const watchMyShares: typeof real.watchMyShares =
+    list === 'never' ? () => () => {} : (onChange, onError) => real.watchMyShares((ids, confirmed) => (lists.hold ? lists.held.push(() => onChange(ids, confirmed)) : onChange(ids, confirmed)), onError);
+  const leave = vi.fn(async (id: string) => {
+    await real.leave(id);
+    await new Promise((done) => setTimeout(done, 2000));
+  });
+  const notices: string[] = [];
+  const sharing = startSharing(store, { ...real, leave, watchMyShares }, { client: `${who.uid}-page`, storage, onNotice: (t) => notices.push(t) });
+  return { store, sharing, leave, notices, lists, release };
+}
+
+describe('leaving a share sends one leave', () => {
+  const dan = person('dan');
+
+  it('a link to a damaged share: the newcomer is taken off it with one leave, and no notice that it was unshared', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    const page = slowLeaveDevice(person('carol'));
+    const joined = page.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow('This shared board can’t be opened');
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('leaving a board shared with you: one leave, its boards go, and no notice that it was unshared', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const page = slowLeaveDevice(person('carol'));
+    const joined = page.sharing.join('sgood', 'goodkey');
+    await settle();
+    expect(await joined).toBe('n1');
+    expect(page.store.workspace().boards.n1).toBeDefined();
+    const left = page.sharing.leave('sgood');
+    await settle();
+    await left;
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.store.workspace().boards.n1).toBeUndefined();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(server.shares.get('sgood')!.people.map((p) => p.uid)).toEqual(['dan']);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('a leave that fails leaves the share as it was, and a later removal is still reported', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const page = slowLeaveDevice(person('carol'));
+    const joined = page.sharing.join('sgood', 'goodkey');
+    await settle();
+    await joined;
+    server.control.offline = true;
+    await expect(page.sharing.leave('sgood')).rejects.toThrow();
+    server.control.offline = false;
+    expect(page.sharing.isShared('n1')).toBe(true);
+    await owner.removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
+  });
+
+  it('a late list of shares that still names the damaged share doesn’t open it again (no second leave, no notice)', async () => {
+    await server.server.createShare(dan, 'sbad', 'n1', 'badkey', 'not json {', 'dan-page');
+    const page = slowLeaveDevice(person('carol'), 'held');
+    await settle();
+    page.lists.hold = true;
+    const joined = page.sharing.join('sbad', 'badkey');
+    joined.catch(() => {});
+    await settle();
+    await expect(joined).rejects.toThrow('This shared board can’t be opened');
+    page.release();
+    await settle();
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(server.shares.get('sbad')!.people.map((p) => p.uid)).toEqual(['dan']);
+    expect(page.notices).toEqual([]);
+  });
+
+  it('after leaving, being added back on another device still brings the board here', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const page = slowLeaveDevice(person('carol'), 'held');
+    await settle();
+    const joined = page.sharing.join('sgood', 'goodkey');
+    await settle();
+    await joined;
+    const left = page.sharing.leave('sgood');
+    await settle();
+    await left;
+    expect(page.sharing.isShared('n1')).toBe(false);
+    // Carol opens the link again on her phone.
+    await server.server.join(person('carol'), 'sgood', 'goodkey');
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(true);
+    expect(page.leave).toHaveBeenCalledTimes(1);
+  });
+
+  it('the owner deleting it while the newcomer’s leave is on its way still says so, with one leave', async () => {
+    const owner = server.backendFor(dan);
+    const data = JSON.stringify({ version: 3, home: 'n1', boards: { n1: { name: 'Trip', snap: true, cards: {}, columns: {}, order: [] } } });
+    await owner.createShare('sgood', 'n1', 'goodkey', data, 'dan-page');
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const real = server.backendFor(person('carol'));
+    let answer = () => {};
+    // The leave hasn't reached the server yet when the owner deletes the board.
+    const leave = vi.fn(() => new Promise<void>((done) => (answer = done)));
+    const notices: string[] = [];
+    const sharing = startSharing(store, { ...real, leave, watchMyShares: () => () => {} }, { client: 'carol-page', storage, onNotice: (t) => notices.push(t) });
+    const joined = sharing.join('sgood', 'goodkey');
+    await settle();
+    await joined;
+    const left = sharing.leave('sgood');
+    await owner.deleteShare('sgood');
+    await settle();
+    answer();
+    await left;
+    expect(leave).toHaveBeenCalledTimes(1);
+    expect(sharing.isShared('n1')).toBe(false);
+    expect(notices).toEqual(['“Trip” was deleted by the person who shared it.']);
+  });
+});

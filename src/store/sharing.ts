@@ -170,9 +170,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   /**
    * Shares whose leave (this person's own) is on its way. The server saying they are off one can
    * come before the leave answers: that is the same leave, so it isn't sent again or shown as
-   * "no longer shared with you", and the list of shares doesn't open it again meanwhile.
+   * "no longer shared with you", and the list of shares doesn't open it again meanwhile. A second
+   * leave of it meanwhile (a double click) waits for the same one.
    */
-  const leaving = new Set<string>();
+  const leaving = new Map<string, Promise<void>>();
   /**
    * Shares left (or being left) here. A list of shares sent before the leave still names one, so it
    * isn't opened again until the server's list has stopped naming it (lists come in order, so one
@@ -573,19 +574,21 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   /** This person's own leave of share `id`, sent once (see `leaving`). */
-  async function sendLeave(id: string) {
-    leaving.add(id);
+  function sendLeave(id: string): Promise<void> {
+    const sent = leaving.get(id);
+    if (sent) return sent;
     left.add(id);
-    try {
-      await backend.leave(id);
-    } catch (e) {
-      left.delete(id);
-      // It went from here meanwhile, and gone() left the clean-up leave to this one: try it once more.
-      if (!shares.has(id)) backend.leave(id).catch(() => {});
-      throw e;
-    } finally {
-      leaving.delete(id);
-    }
+    const leave = backend
+      .leave(id)
+      .catch((e) => {
+        left.delete(id);
+        // It went from here meanwhile, and gone() left the clean-up leave to this one: try it once more.
+        if (!shares.has(id)) backend.leave(id).catch(() => {});
+        throw e;
+      })
+      .finally(() => leaving.delete(id));
+    leaving.set(id, leave);
+    return leave;
   }
 
   /** The share can't be opened any more (removed, deleted, or left): its boards go from here. */

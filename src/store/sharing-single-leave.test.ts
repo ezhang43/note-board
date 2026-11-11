@@ -228,4 +228,16 @@ describe('leaving a share sends one leave', () => {
     expect(page.sharing.isShared('n1')).toBe(true);
     expect(page.notices).toEqual([]);
   });
+
+  it('leaving twice at once (a double click) sends one leave', async () => {
+    const page = await drivenDevice();
+    const first = page.sharing.leave('sgood');
+    const second = page.sharing.leave('sgood');
+    page.ends.answer();
+    await settle();
+    await Promise.all([first, second]);
+    expect(page.leave).toHaveBeenCalledTimes(1);
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual([]);
+  });
 });

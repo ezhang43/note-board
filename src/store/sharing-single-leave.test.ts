@@ -411,4 +411,20 @@ describe('leaving a share sends one leave', () => {
     expect(notices).toEqual([]);
     expect(sharing.isShared('n1')).toBe(false);
   });
+
+  it('leaving a board reopened from a new link while the first leave is still on its way closes it when that leave answers', async () => {
+    const page = await drivenDevice();
+    const first = page.sharing.leave('sgood');
+    await server.backendFor(dan).removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    const joined = page.sharing.join('sgood', 'e2');
+    await settle();
+    expect(await joined).toBe('n1');
+    const second = page.sharing.leave('sgood');
+    page.ends.resolve();
+    await first;
+    await second;
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+  });
 });

@@ -590,8 +590,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       () => {
         // `share`'s boards go before the leave stops counting as on its way, so the server's word that
         // they are off it, arriving in between, isn't taken for a removal (a second leave and a note).
-        if (share) gone(share, 'left');
-        leaving.delete(id);
+        try {
+          if (share) gone(share, 'left');
+        } finally {
+          leaving.delete(id);
+        }
       },
       (e) => {
         leaving.delete(id);
@@ -923,8 +926,10 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     async leave(id: string) {
       const s = need(id);
       if (s.owner) throw new Error('The person who shared a board can’t leave it');
-      // Its boards go once the leave has answered (see sendLeave). A second click waits for the first.
+      // Its boards go once the leave has answered (see sendLeave). A second click waits for the first,
+      // and a copy opened again since (whose Leave joined the first one) goes after it.
       await sendLeave(id, 'own', s);
+      gone(s, 'left');
     },
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */
     async deleteShare(id: string) {

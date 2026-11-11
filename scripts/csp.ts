@@ -8,8 +8,10 @@ import type { Plugin } from 'vite';
 // built page (the app and the five website pages) right after <meta charset>, before any script or
 // stylesheet: a meta policy applies only from where it appears. A meta policy can't use
 // frame-ancestors, report-uri or sandbox (browsers ignore them there), so they are left out.
-// simple: <img> (any https site, for link-card pictures and avatars) can still carry data out in its
-// address; this policy blocks foreign scripts and direct requests, not every way out.
+// simple: this blocks foreign scripts and requests to sites not on the list, not every way out. A
+// picture's address (any https site, for link-card pictures) can still carry data, and an injected
+// script could still send data to an attacker's own account on a service listed here (their own
+// Firestore project or Anthropic key). Paths narrow Google's shared hosts where the app's use is known.
 
 /** The Firebase project's sign-in domain (src/sync/firebase.ts authDomain): sign-in's hidden frame comes from it. */
 const AUTH_DOMAIN = 'https://note-board-a672a.firebaseapp.com';
@@ -19,9 +21,11 @@ const BASE: Record<string, string[]> = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
-    // Firebase sign-in with a popup loads Google's gapi loader (and its iframe module, from the
-    // same host) to open its hidden frame: @firebase/auth `gapiScript` and `loadGapi`.
-    'https://apis.google.com',
+    // Firebase sign-in with a popup loads Google's gapi loader to open its hidden frame (@firebase/auth
+    // `gapiScript` and `loadGapi`), and api.js loads its iframe module from /_/scs/ on the same host
+    // (its own config). Only those paths: the host serves other scripts too.
+    'https://apis.google.com/js/api.js',
+    'https://apis.google.com/_/scs/',
     // Google Identity Services, for the Google Calendar connection (src/calendar/google.ts).
     'https://accounts.google.com/gsi/client',
   ],
@@ -40,7 +44,7 @@ const BASE: Record<string, string[]> = {
     'https://securetoken.googleapis.com',
     'https://firestore.googleapis.com',
     // Google Calendar's API (src/store/calendar.ts) and Google Identity Services' own calls.
-    'https://www.googleapis.com',
+    'https://www.googleapis.com/calendar/v3/',
     'https://accounts.google.com/gsi/',
     // The picture / PDF download reads the fonts' stylesheets and files to draw the board in its typefaces.
     'https://fonts.googleapis.com',
@@ -80,7 +84,7 @@ export const scriptHash = (code: string) => `'sha256-${createHash('sha256').upda
 
 /** The text of every inline <script> (one without src) in a page. */
 export function inlineScripts(html: string): string[] {
-  return [...html.matchAll(/<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  return [...html.matchAll(/<script\b(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
 }
 
 /**

@@ -34,13 +34,18 @@ describe('Content Security Policy', () => {
   });
 
   it('allows what sign-in, sync, the calendar, the fonts and the Anthropic API use', () => {
-    expect(built['script-src']).toEqual(expect.arrayContaining(['https://apis.google.com', 'https://accounts.google.com/gsi/client']));
+    expect(built['script-src']).toEqual(
+      expect.arrayContaining(['https://apis.google.com/js/api.js', 'https://apis.google.com/_/scs/', 'https://accounts.google.com/gsi/client']),
+    );
+    // Not the whole of Google's shared hosts (their other scripts and endpoints could run or be reached).
+    expect(built['script-src']).not.toContain('https://apis.google.com');
+    expect(built['connect-src']).not.toContain('https://www.googleapis.com');
     expect(built['connect-src']).toEqual(
       expect.arrayContaining([
         'https://identitytoolkit.googleapis.com',
         'https://securetoken.googleapis.com',
         'https://firestore.googleapis.com',
-        'https://www.googleapis.com',
+        'https://www.googleapis.com/calendar/v3/',
         'https://api.anthropic.com',
         'https://fonts.googleapis.com',
         'https://fonts.gstatic.com',
@@ -66,6 +71,8 @@ describe('Content Security Policy', () => {
   it('puts the tag right after <meta charset>, before any script or stylesheet, with the page’s inline scripts hashed', () => {
     const html = '<html><head><meta charset="utf-8" /><link rel="stylesheet" href="x.css"><script>a()</script></head><body><script type="module" src="/m.js"></script></body></html>';
     expect(inlineScripts(html)).toEqual(['a()']);
+    // Only a real src attribute makes a script external, not data-src.
+    expect(inlineScripts('<script data-src="x">b()</script><script async src="y.js"></script>')).toEqual(['b()']);
     const out = withCsp(html, false);
     const at = out.indexOf('http-equiv="Content-Security-Policy"');
     expect(at).toBeGreaterThan(out.indexOf('<meta charset'));

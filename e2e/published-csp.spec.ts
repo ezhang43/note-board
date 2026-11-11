@@ -81,6 +81,8 @@ test('sign-in, sync, the calendar and the Anthropic API may be reached, and Fire
   for (const h of hosts) await page.route(`${new URL(h).origin}/**`, (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
   await page.route('https://note-board-a672a.firebaseapp.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<p>auth</p>' }));
   await page.route('https://accounts.google.com/gsi/client', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.gsiLoaded = true;' }));
+  // gapi's iframe module, which api.js loads from this path on the same host (its own config: "/_/scs/abc-static/...").
+  await page.route('https://apis.google.com/_/scs/**', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.gapiModule = true;' }));
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   const results = await page.evaluate(
@@ -98,7 +100,31 @@ test('sign-in, sync, the calendar and the Anthropic API may be reached, and Fire
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
     document.head.append(s);
+    const m = document.createElement('script');
+    m.src = 'https://apis.google.com/_/scs/abc-static/_/js/k=gapi.lb.en.x/m=__features__';
+    document.head.append(m);
   });
   await expect(page.frameLocator('iframe[src*="firebaseapp.com"]').locator('p')).toHaveText('auth');
   await expect.poll(() => page.evaluate(() => (window as unknown as { gsiLoaded?: boolean }).gsiLoaded)).toBe(true);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { gapiModule?: boolean }).gapiModule)).toBe(true);
+});
+
+test('another script or address on Google’s shared hosts is still refused', async ({ page }) => {
+  await cspGuard(page);
+  await page.route('https://apis.google.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.otherGoogle = true;' }));
+  await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  expect(await page.evaluate(() => fetch('https://www.googleapis.com/upload/drive/v3/files').then(() => 'sent', () => 'refused'))).toBe('refused');
+  await page.evaluate(() => {
+    const s = document.createElement('script');
+    s.src = 'https://apis.google.com/js/other.js';
+    document.head.append(s);
+  });
+  await expect.poll(async () => (await violations(page)).filter((v) => !v.startsWith('console:'))).toEqual([
+    expect.stringContaining('connect-src https://www.googleapis.com/upload'),
+    expect.stringContaining('script-src-elem https://apis.google.com/js/other.js'),
+  ]);
+  expect(await page.evaluate(() => (window as unknown as { otherGoogle?: boolean }).otherGoogle)).toBeUndefined();
+  await clearViolations(page);
 });

@@ -165,9 +165,11 @@ test('a picture from another site that allows it is still drawn into the picture
     ctx.fillRect(0, 0, 400, 300);
     return c.toDataURL('image/png').split(',')[1];
   });
-  await page.route('https://pics.example.test/**', (r) =>
-    r.fulfill({ contentType: 'image/png', body: Buffer.from(red, 'base64'), headers: { 'Access-Control-Allow-Origin': '*' } }),
-  );
+  const referers: (string | undefined)[] = [];
+  await page.route('https://pics.example.test/**', (r) => {
+    referers.push(r.request().headers()['referer']);
+    return r.fulfill({ contentType: 'image/png', body: Buffer.from(red, 'base64'), headers: { 'Access-Control-Allow-Origin': '*' } });
+  });
   await paste(page, 'https://pics.example.test/red.png');
   await expect(page.locator('[data-kind="link"] img')).toHaveCount(1);
   const waiting = page.waitForEvent('download');
@@ -186,6 +188,22 @@ test('a picture from another site that allows it is still drawn into the picture
     return n;
   }, png.toString('base64'));
   expect(redPixels).toBeGreaterThan(1000);
+  // Copied in as the card shows it: without telling the picture's site which page asked (as the card's own picture).
+  expect(referers.length).toBeGreaterThanOrEqual(2);
+  expect(referers.filter(Boolean)).toEqual([]);
+});
+
+test('a picture whose site never answers doesn’t hold up the picture download', async ({ page }) => {
+  await open(page);
+  await page.route('https://slow.example.test/**', () => {}); // never answered
+  await paste(page, 'https://slow.example.test/never.png');
+  await expect(page.locator('[data-kind="link"]')).toHaveCount(1);
+  await page.mouse.click(5, 300);
+  await add(page, 'Note');
+  await page.keyboard.type('Still saved');
+  const waiting = page.waitForEvent('download', { timeout: 20_000 });
+  await fileMenu(page, 'Download as picture (PNG)');
+  await waiting;
 });
 
 test('the website pages', async ({ page }) => {

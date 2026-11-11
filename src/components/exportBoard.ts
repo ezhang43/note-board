@@ -10,36 +10,59 @@ const BLANK_PICTURE =
   'data:image/svg+xml,' +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#9a948a" fill-opacity="0.25"/></svg>');
 
+/** How long a picture's site gets to answer before the download goes on without it. */
+const PICTURE_WAIT_MS = 8000;
+
 /**
  * A picture from another site, as a data: address the drawing can use. html-to-image would fetch it,
  * which the Content Security Policy (job 11) refuses for sites not on its list; loading it as a
- * picture is allowed, and a site that sends a CORS header lets us read it back. Null when it won't.
+ * picture is allowed, and a site that sends a CORS header lets us read it back. Drawn no bigger than
+ * it is in the download (`maxW` x `maxH`). Null when it won't load, can't be read or takes too long.
  */
-function pictureData(src: string): Promise<string | null> {
+function pictureData(src: string, maxW: number, maxH: number): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image();
+    const timer = setTimeout(() => done(null), PICTURE_WAIT_MS);
+    function done(data: string | null) {
+      clearTimeout(timer);
+      img.onload = img.onerror = null;
+      resolve(data);
+    }
     img.crossOrigin = 'anonymous';
+    img.referrerPolicy = 'no-referrer'; // as the card's own picture: the site isn't told which page asked
     img.onload = () => {
+      const fit = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+      const w = Math.round(img.naturalWidth * fit);
+      const h = Math.round(img.naturalHeight * fit);
+      if (!(w > 0 && h > 0)) return done(null);
       try {
-        const c = Object.assign(document.createElement('canvas'), { width: img.naturalWidth, height: img.naturalHeight });
-        c.getContext('2d')!.drawImage(img, 0, 0);
-        resolve(c.toDataURL('image/png'));
+        const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+        c.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        const data = c.toDataURL('image/png');
+        done(data.length > 'data:,'.length ? data : null); // "data:," when the browser couldn't make it
       } catch {
-        resolve(null); // no CORS header: the canvas is "tainted"
+        done(null); // no CORS header: the canvas is "tainted"
       }
     };
-    img.onerror = () => resolve(null);
+    img.onerror = () => done(null);
     img.src = src;
   });
 }
 
 /** Swaps every picture in the copy that comes from another site for its data, or the blank panel. */
-async function inlineOtherSitePictures(copy: HTMLElement) {
+async function inlineOtherSitePictures(copy: HTMLElement, scale: number) {
   const others = [...copy.querySelectorAll('img')].filter((img) => /^https?:/.test(img.src) && new URL(img.src).origin !== location.origin);
+  const loads = new Map<string, Promise<string | null>>(); // each address loaded once
   await Promise.all(
     others.map(async (img) => {
+      const box = img.getBoundingClientRect();
+      // The copy is laid out unzoomed; the download is `scale` times that (2x on most boards).
+      const maxW = Math.max(1, Math.ceil((box.width || 320) * scale));
+      const maxH = Math.max(1, Math.ceil((box.height || 320) * scale));
+      const key = `${img.src} ${maxW}x${maxH}`;
+      if (!loads.has(key)) loads.set(key, pictureData(img.src, maxW, maxH));
       img.removeAttribute('srcset');
-      img.src = (await pictureData(img.src)) ?? BLANK_PICTURE;
+      img.src = (await loads.get(key)) ?? BLANK_PICTURE;
     }),
   );
 }
@@ -90,7 +113,7 @@ export async function boardPicture(kind: 'png' | 'pdf'): Promise<Blob | null> {
 
   document.body.append(copy);
   try {
-    await inlineOtherSitePictures(copy);
+    await inlineOtherSitePictures(copy, scale);
     await nextFrame();
     const { toCanvas } = await import('html-to-image'); // loaded only when someone downloads a picture
     const drawn = await toCanvas(copy, {

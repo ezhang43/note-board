@@ -163,6 +163,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       removeItemByKey(e, () => appStore.deleteTickedItem(cardId, item.id));
     } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
       if (appStore.itemBackspace(cardId, item.id)) e.preventDefault();
+    } else if (e.key === 'Backspace' && !e.shiftKey && atStart(e.currentTarget)) {
+      if (appStore.itemBackspaceAtStart(cardId, item.id)) e.preventDefault();
     } else if (e.key === 'Delete' && !e.shiftKey && atEnd(e.currentTarget)) {
       if (appStore.itemDeleteAtEnd(cardId, item.id)) e.preventDefault();
     }
@@ -292,6 +294,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
 function markParts(words: string): [number, number, boolean] {
   const [from, to, on] = words.split(',');
   return [Number(from), Number(to), on === 'true'];
+}
+
+/** The cursor is at the very start of the text, with nothing selected. */
+function atStart(el: HTMLTextAreaElement) {
+  return el.selectionStart === 0 && el.selectionEnd === 0;
 }
 
 /** The cursor is at the very end of the text, with nothing selected. */

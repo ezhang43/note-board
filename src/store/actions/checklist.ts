@@ -279,6 +279,15 @@ export function checklistActions(ctx: StoreContext) {
         return { board: C.editItems(b, cardId, () => result.items), ui: { focusItem: itemId, focusOffset: result.caret, itemSel: null } };
       });
     },
+    /** Backspace at the start of an item joins it onto the item shown above (mirror of Delete at the end). Returns whether it did. */
+    itemBackspaceAtStart(cardId: string, itemId: string): boolean {
+      return !!commit((b) => {
+        const card = b.cards[cardId];
+        const result = card?.kind === 'todo' ? C.mergePrevItem(card.items, itemId) : null;
+        if (!result) return null;
+        return { board: C.editItems(b, cardId, () => result.items), ui: { focusItem: result.focus, focusOffset: result.caret, itemSel: null } };
+      });
+    },
     /** Backspace in an empty item deletes it (not the list's last item). Returns whether it did. */
     itemBackspace(cardId: string, itemId: string): boolean {
       return !!commit((b) => {

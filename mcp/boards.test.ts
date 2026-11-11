@@ -4,7 +4,7 @@ import { editItems, toggleFold } from '../src/model/checklist';
 import { serializeBoard } from '../src/model/persist';
 import { fromPlain, insertDivider, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
 import { applyStyle, boxesOf, sizeStepChange } from '../src/model/textStyle';
-import type { Board, TodoCard } from '../src/model/types';
+import type { Board, NoteCard, TodoCard } from '../src/model/types';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit } from './boards';
 import { homeBoard, ownRaw, sampleSnapshot, workBoard } from './sample';
@@ -80,6 +80,21 @@ describe('finding a board', () => {
 describe('read_board outline', () => {
   const got = collectBoards(sampleSnapshot());
   const outline = (id: string) => boardOutline(got, got.entries.find((e) => e.id === id)!);
+
+  it('shows estimates on notes and items, and the day an item was ticked (job saved-estimate-doneon)', () => {
+    const snap = sampleSnapshot();
+    const own = collectBoards(snap);
+    const home = own.entries.find((e) => e.id === 'home')!;
+    const b = home.board;
+    const groceries = b.cards.listGroceries as TodoCard;
+    groceries.items[0] = { ...groceries.items[0], estimate: 90, done: true, doneOn: '2026-11-10' };
+    groceries.items[1] = { ...groceries.items[1], done: true }; // ticked with no day: shown with none
+    (b.cards.noteIdea as NoteCard).estimate = 30;
+    const text = boardOutline(own, home);
+    expect(text).toContain('- [x] Milk (id: iMilk) (estimate: 1h 30m) (ticked 2026-11-10)');
+    expect(text).toMatch(/- \[x\] Eggs \(id: iEggs\)\n/);
+    expect(text).toMatch(/### Note \(id: noteIdea\) \(estimate: 30m\)/);
+  });
 
   it('columns left to right, cards top to bottom, then loose cards top to bottom', () => {
     const text = outline('home');
@@ -171,14 +186,28 @@ describe('safe to edit (round trip)', () => {
   });
   it('a Journal word sized 16 (version 5) is kept: safe to edit, nothing dropped', () => {
     const data = JSON.parse(ownRaw());
-    expect(data.version).toBe(5);
+    data.version = 5;
     data.boards.home.cards.noteIdea.text = 'big';
     data.boards.home.cards.noteIdea.rich = [{ type: 'p', runs: [{ text: 'big', size: 16 }] }];
     expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
   });
-  it('no for boards saved by a newer version (6)', () => {
+  it('yes for boards the app saved as version 5, before estimates and ticked days (the edit saves them as 6)', () => {
     const data = JSON.parse(ownRaw());
-    data.version = 6;
+    data.version = 5;
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('estimates on notes and items, and the day an item was ticked (version 6), are kept: safe to edit', () => {
+    const data = JSON.parse(ownRaw());
+    expect(data.version).toBe(6);
+    data.boards.home.cards.noteIdea.estimate = 45;
+    const milk = data.boards.home.cards.listGroceries.items[0];
+    Object.assign(milk, { estimate: 30, done: true, doneOn: '2026-11-11' });
+    milk.children[0].estimate = 5;
+    expect(safeToEdit(JSON.stringify(data))).toEqual({ ok: true });
+  });
+  it('no for boards saved by a newer version (7)', () => {
+    const data = JSON.parse(ownRaw());
+    data.version = 7;
     expect(safeToEdit(JSON.stringify(data)).ok).toBe(false);
   });
   it('key order alone doesn’t matter', () => {

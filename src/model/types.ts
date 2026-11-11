@@ -49,6 +49,8 @@ export interface NoteCard extends CardBase {
    * "General notes" note of a Journal saved before there could be several (found by its first line).
    */
   general?: number;
+  /** How long it should take, in whole minutes from 1 to a day (MAX_ESTIMATE). Left out when not set. */
+  estimate?: number;
 }
 
 export interface TodoItem {
@@ -63,6 +65,13 @@ export interface TodoItem {
    * and one left with a single sub-item is kept as saved but shows open, so it is back when a second one comes.
    */
   folded?: true;
+  /** How long it should take, in whole minutes from 1 to a day (MAX_ESTIMATE). Left out when not set. */
+  estimate?: number;
+  /**
+   * The day it was ticked, "YYYY-MM-DD" in local time: set when it is ticked, left out when it is
+   * unticked. Only counts while `done` (read it with tickedOn); items ticked before days were saved have none.
+   */
+  doneOn?: string;
 }
 
 export interface TodoCard extends CardBase {

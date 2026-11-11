@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { shownName } from '../src/model/board';
 import { hrefOf } from '../src/model/cards';
+import { estimateLabel, tickedOn } from '../src/model/estimate';
 import { readShare } from '../src/model/sharing';
 import type { Board, Card, TodoItem } from '../src/model/types';
 import { boardTree, pathTo, readWorkspace, serializeWorkspace, WORKSPACE_VERSION, type Workspace } from '../src/model/workspace';
@@ -111,9 +112,12 @@ export function findBoard(entries: BoardEntry[], query: string): { entry: BoardE
   return { error: `No board called "${query.trim()}". The boards are:\n${choices(entries)}` };
 }
 
+/** " (estimate: 1h 30m) (ticked 2026-11-10)", each part only when there is one. */
+const extras = (estimate: number | undefined, ticked: string | null) => `${estimate ? ` (estimate: ${estimateLabel(estimate)})` : ''}${ticked ? ` (ticked ${ticked})` : ''}`;
+
 function itemLines(items: TodoItem[], depth = 0): string[] {
   return items.flatMap((it) => [
-    `${'  '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text} (id: ${it.id})`,
+    `${'  '.repeat(depth)}- [${it.done ? 'x' : ' '}] ${it.text} (id: ${it.id})${extras(it.estimate, tickedOn(it))}`,
     ...itemLines(it.children, depth + 1),
   ]);
 }
@@ -124,7 +128,7 @@ function cardLines(card: Card, nameOf: (boardId: string) => string | null): stri
       return [`### Checklist: ${card.title.trim() || 'Untitled list'} (id: ${card.id})`, ...itemLines(card.items)];
     }
     case 'note':
-      return [`### Note (id: ${card.id})`, ...(card.text.trim() ? card.text.split('\n').map((l) => `> ${l}`) : ['(empty)'])];
+      return [`### Note (id: ${card.id})${extras(card.estimate, null)}`, ...(card.text.trim() ? card.text.split('\n').map((l) => `> ${l}`) : ['(empty)'])];
     case 'link':
       return [`### Link: ${card.title.trim() || 'Untitled link'} (id: ${card.id})${hrefOf(card.url) ? ` ${hrefOf(card.url)}` : ''}`];
     case 'board': {

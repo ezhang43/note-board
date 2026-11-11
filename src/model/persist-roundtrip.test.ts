@@ -13,12 +13,12 @@ import { readWorkspace, serializeWorkspace, WORKSPACE_VERSION } from './workspac
 const style: Required<TextStyle> = { size: 'large', bold: true, italic: true, font: 'serif' };
 const base = { color: 'rose', collapsed: true, w: 300, h: 200, titleColor: 'tomato', collapsedH: 60, style } as const;
 
-const subItem: Required<TodoItem> = { id: 'i2', text: 'sub', done: true, children: [], style, folded: true };
-const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children: [subItem], style, folded: true };
+const subItem: Required<TodoItem> = { id: 'i2', text: 'sub', done: true, children: [], style, folded: true, estimate: 15, doneOn: '2026-11-10' };
+const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children: [subItem], style, folded: true, estimate: 90, doneOn: '2026-11-09' };
 
 const run: Required<Run> = { text: 'Hi', b: true, i: true, u: true, s: true, size: 'small', font: 'hand', hl: 'yellow' };
 const block: Required<Block> = { type: 'bullet', indent: 1, runs: [run, { text: ' there', size: 24 }] };
-const note: Required<NoteCard> = { ...base, id: 'n1', kind: 'note', x: 20, y: 40, text: 'Hi', rich: [block, { type: 'hr', runs: [{ text: '---' }] }], general: 1 };
+const note: Required<NoteCard> = { ...base, id: 'n1', kind: 'note', x: 20, y: 40, text: 'Hi', rich: [block, { type: 'hr', runs: [{ text: '---' }] }], general: 1, estimate: 30 };
 const todo: Required<TodoCard> = { ...base, id: 't1', kind: 'todo', x: 400, y: 80, title: 'List', items: [item], completedOpen: true };
 const link: Required<LinkCard> = { ...base, id: 'l1', kind: 'link', x: 400, y: 400, title: 'Docs', url: 'https://example.com' };
 const entry: Required<CompletedEntry> = { item: { ...subItem, id: 'i9' }, fromCardId: 't1', fromTitle: 'List', fromParentId: 'i1' };
@@ -258,6 +258,21 @@ const SAVED_SHAPES: Record<number, string[]> = {
     'rich size: large small 10-36',
   ],
 };
+// Time estimates on notes and checklist items, and the day an item was ticked (job saved-estimate-doneon):
+// raised so a copy of the app or connector made before them never saves over them and drops them.
+SAVED_SHAPES[6] = [
+  ...[
+    ...SAVED_SHAPES[5].filter((s) => !s.includes(': ')),
+    'boards.*.cards.completed.groups[].entries[].item.doneOn',
+    'boards.*.cards.completed.groups[].entries[].item.estimate',
+    'boards.*.cards.note.estimate',
+    'boards.*.cards.todo.items[].children[].doneOn',
+    'boards.*.cards.todo.items[].children[].estimate',
+    'boards.*.cards.todo.items[].doneOn',
+    'boards.*.cards.todo.items[].estimate',
+  ].sort(),
+  ...SAVED_SHAPES[5].filter((s) => s.includes(': ')),
+];
 /**
  * Values added under a version number without raising it, because every older copy of the app that
  * saves that number reads them without losing anything written, so its saving over them is safe (and

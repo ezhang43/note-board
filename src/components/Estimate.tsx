@@ -29,7 +29,7 @@ const keyOf = (cardId: string, itemId: string | null) => `${cardId}:${itemId ?? 
 /** The chip the box belongs to, as drawn now (a redraw can replace it; folded away, it is gone). */
 const chipOf = (t: Target) => document.querySelector<HTMLElement>(`[data-estimate-for="${CSS.escape(keyOf(t.cardId, t.itemId))}"]`);
 
-/** The chip on a note's header (`itemId` null) or at the end of a checklist item's row. */
+/** The chip on a note's header (`itemId` null), or after a checklist item's text once it has an estimate. */
 export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; itemId: string | null; estimate: number | undefined }) {
   const readOnly = use(BoardReadOnly);
   // Only this chip's own open state, so opening the box redraws two chips, not every one on the board.
@@ -37,6 +37,9 @@ export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; ite
   const label = estimate ? estimateLabel(estimate) : null;
   // A read-only board shows the estimate but offers no way to change it.
   if (readOnly) return label ? <span className="estimate-chip" title="Time estimate">{label}</span> : null;
+  // An item gets no clock to add one: every place for it would cover the end of the item's text, which is kept clear
+  // (2026-10-22), or narrow every item's text. Its estimate, once set (by the connector), shows and can be changed or cleared.
+  if (!label && itemId !== null) return null;
   return (
     <button
       type="button"

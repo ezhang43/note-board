@@ -2,25 +2,25 @@ import { expect, test, type Page } from '@playwright/test';
 import { fontsLoaded } from './helpers';
 
 // Time estimates and the day an item was ticked (job saved-estimate-doneon). A note and each checklist item can carry a
-// time estimate in whole minutes (1 to 24 hours), set or cleared from a small button: on an item at the end of its row,
-// on a note in its header. It opens a small box with a few quick choices, a Minutes box and Clear. Both are saved with the
+// time estimate in whole minutes (1 to 24 hours). A note sets or clears it from a small button in its header; an item
+// shows it after its text once set (by the connector) and changes or clears it from there (no clock to add one on an item). It opens a small box with a few quick choices, a Minutes box and Clear. Both are saved with the
 // board (format 6), so they are still there after a reload. Ticking an item saves the day it was ticked; unticking clears it.
 
-async function seed(page: Page) {
-  await page.evaluate(() => {
+async function seed(page: Page, estimate?: number) {
+  await page.evaluate((estimate) => {
     const base = { color: null, collapsed: false, h: null };
     const board = {
       name: 'T',
       snap: true,
       cards: {
-        t1: { ...base, id: 't1', kind: 'todo', title: 'Today', completedOpen: true, x: 100, y: 100, w: 320, items: [{ id: 'a', text: 'Write report', done: false, children: [] }] },
+        t1: { ...base, id: 't1', kind: 'todo', title: 'Today', completedOpen: true, x: 100, y: 100, w: 320, items: [{ id: 'a', text: 'Write report', done: false, children: [], ...(estimate ? { estimate } : {}) }] },
         n1: { ...base, id: 'n1', kind: 'note', text: 'Plan the week', x: 500, y: 100, w: 240 },
       },
       columns: {},
       order: ['t1', 'n1'],
     };
     localStorage.setItem('note-board:v1', JSON.stringify({ version: 2, board }));
-  });
+  }, estimate);
   await page.reload();
   await fontsLoaded(page);
 }
@@ -44,26 +44,27 @@ test.beforeEach(async ({ page }) => {
   await seed(page);
 });
 
-test('an item: a quick choice sets its estimate, it is saved, and Clear takes it off', async ({ page }) => {
-  await row(page).hover();
-  await row(page).getByRole('button', { name: 'Add a time estimate' }).click();
+test('an item with an estimate: its pill changes it with a quick choice, it is saved, and Clear takes it off', async ({ page }) => {
+  await seed(page, 45);
+  const pill = (label: string) => row(page).getByRole('button', { name: `Time estimate: ${label}` });
+  await pill('45m').click();
   await expect(picker(page)).toBeVisible();
   await picker(page).getByRole('button', { name: '30m' }).click();
   await expect(picker(page)).toBeHidden();
-  await expect(row(page).getByRole('button', { name: 'Time estimate: 30m' })).toHaveText('30m');
+  await expect(pill('30m')).toHaveText('30m');
   await expect.poll(async () => (await saved(page)).item?.estimate).toBe(30);
   expect((await saved(page)).version).toBe(6);
 
   await page.reload();
   await fontsLoaded(page);
-  await row(page).getByRole('button', { name: 'Time estimate: 30m' }).click();
+  await pill('30m').click();
   await picker(page).getByRole('button', { name: 'Clear' }).click();
   await expect(row(page).getByRole('button', { name: /^Time estimate:/ })).toHaveCount(0);
   await expect.poll(async () => 'estimate' in ((await saved(page)).item ?? {})).toBe(false);
 
   // Ctrl+Z brings it back, as with any change.
   await page.keyboard.press('Control+z');
-  await expect(row(page).getByRole('button', { name: 'Time estimate: 30m' })).toBeVisible();
+  await expect(pill('30m')).toBeVisible();
 });
 
 test('a note: minutes typed in the box, Enter sets them; Escape closes without a change', async ({ page }) => {
@@ -109,8 +110,8 @@ test('minutes outside 1 to 24 hours are not taken', async ({ page }) => {
 });
 
 test('a click outside the box closes it', async ({ page }) => {
-  await row(page).hover();
-  await row(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await seed(page, 45);
+  await row(page).getByRole('button', { name: 'Time estimate: 45m' }).click();
   await expect(picker(page)).toBeVisible();
   await page.mouse.click(900, 600);
   await expect(picker(page)).toBeHidden();
@@ -127,12 +128,12 @@ test('Tab out of the box closes it', async ({ page }) => {
 });
 
 test('the box closes when its item is no longer shown (Ctrl+Z folds the list away)', async ({ page }) => {
+  await seed(page, 45);
   const list = page.locator('[data-card-id="t1"]');
   await list.hover();
   await list.getByRole('button', { name: 'Collapse card' }).click();
   await list.getByRole('button', { name: 'Expand card' }).click();
-  await row(page).hover();
-  await row(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await row(page).getByRole('button', { name: 'Time estimate: 45m' }).click();
   await expect(picker(page)).toBeVisible();
   await page.keyboard.press('Control+z'); // the list is folded again: the item and its button are gone
   await expect(row(page)).toHaveCount(0);
@@ -168,6 +169,17 @@ test('at the biggest text a note keeps its two buttons on one line: no clock, an
   await picker(page).getByRole('button', { name: 'Clear' }).click();
   await note(page).hover();
   await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeHidden();
+});
+
+test('an item without an estimate has no clock, so nothing covers the end of its text', async ({ page }) => {
+  const text = row(page).getByLabel('Item text');
+  await row(page).hover();
+  await expect(row(page).getByRole('button', { name: 'Add a time estimate' })).toHaveCount(0);
+  // A click at the very end of the text lands in the text (Shift+click there picks items).
+  const t = (await text.boundingBox())!;
+  await page.mouse.click(t.x + t.width - 3, t.y + t.height / 2);
+  await expect(text).toBeFocused();
+  await expect(row(page).getByRole('button', { name: 'Add a time estimate' })).toHaveCount(0);
 });
 
 test('ticking an item saves the day it was ticked; unticking clears it', async ({ page }) => {

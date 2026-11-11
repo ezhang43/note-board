@@ -1885,7 +1885,8 @@ html[data-glide] .world {
   .icon-button { position: relative; }
   .icon-button::before { content: ''; position: absolute; inset: -6px; }
   .card-header > .icon-button::before { top: -12px; bottom: -2px; }
-  .card-header > .icon-button:first-of-type::before { left: -10px; right: -4px; }
+  /* The first icon button (not :first-of-type: a note's estimate clock is a button too and comes before it). */
+  .card-header > .icon-button:not(.icon-button ~ .icon-button)::before { left: -10px; right: -4px; }
   /* A comment chip before them keeps its own press area (job 161, PR 4). */
   .comment-slot + .icon-button::before { left: -4px; }
   /* Clean up (job 200): its press area reaches up like theirs. It comes later in the page order than the arrow and the comment chip, so where the areas overlap it wins and its drawn box is never taken by a neighbor. */
@@ -2489,20 +2490,17 @@ button.estimate-chip:active { transform: scale(0.97); }
 .canvas[data-big-text] .card:not(.collapsed) > .card-header > .estimate-chip { order: 1; }
 /* On an item: on the first line, after the text. */
 .todo-item > .estimate-chip { margin-top: calc(var(--line) / 2 + 4px - 11px); }
-.todo-item > .estimate-chip.add { position: absolute; z-index: 1; top: calc(var(--line) / 2 + 4px - 11px); right: calc(46px * var(--bb)); margin: 0; background: var(--card-bg); opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
 @media (hover: hover) {
   button.estimate-chip:hover { background: var(--hover); color: var(--ink); }
   .card-header > .estimate-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
-  .todo-item:hover > .estimate-chip.add,
   .estimate-chip.add:focus-visible { opacity: 1; }
 }
 /* While its box is open, the chip stays shown (the box sits under it and the keyboard comes back to it). */
 .estimate-chip.add[aria-expanded='true'] { visibility: visible; opacity: 1; }
 @media (hover: none) {
-  .todo-item > .estimate-chip.add { visibility: hidden; right: calc(40px * var(--bb)); }
-  .todo-item:focus-within > .estimate-chip.add { visibility: visible; opacity: 1; }
-  .app.phone .todo-item > .estimate-chip.add { right: 24px; }
+  /* A note's clock leaves a gap that collapse's wider press area fills, so that area never covers the clock. */
+  .card-header > .estimate-chip { margin-right: 10px; }
 }
 
 /* The box it opens: under its chip, over the board. */
@@ -3678,3 +3676,4 @@ a.cal-open { align-self: flex-start; }
   .phone-more .swatch { width: 44px; height: 44px; aspect-ratio: auto; }
   .phone-more .swatch-default { height: 44px; }
 }
+

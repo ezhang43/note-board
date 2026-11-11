@@ -901,6 +901,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   user-select: none;
 }
 .item-count { position: relative; top: 0.03em; margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
+/* A parent item's count takes no room in the text's wrapping (owner decision 2026-11-11): its slot is a zero-width box that the count spills out of, so the count can never drop to a line of its own or make the item taller. When the last line is full it reaches into the room the row keeps free at its right end for the hover buttons; the card and its width are untouched. */
+.tail-slot { display: inline-block; width: 0; white-space: nowrap; line-height: 0; }
 .title-count.all-done, .item-count.all-done { color: var(--checkbox); }
 /* The counts' digits sit with their middle on the middle of the lowercase letters of the text (owner requests 2026-11-10 and 2026-11-11: first on the capitals, then lowered); relative, in em of their own size, so it holds at every text step and moves nothing else. */
 /* A bold tint is too deep for the green: the count keeps the color's own text color, a little heavier. */

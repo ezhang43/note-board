@@ -420,11 +420,29 @@ describe('leaving a share sends one leave', () => {
     const joined = page.sharing.join('sgood', 'e2');
     await settle();
     expect(await joined).toBe('n1');
+    // Leaving the reopened copy is a leave of its own (the first one was sent before the re-join).
     const second = page.sharing.leave('sgood');
+    expect(page.leave).toHaveBeenCalledTimes(2);
     page.ends.resolve();
     await first;
     await second;
     await settle();
     expect(page.sharing.isShared('n1')).toBe(false);
+  });
+
+  it('removed again after re-joining while the first leave is still on its way: says so', async () => {
+    const page = await drivenDevice();
+    const first = page.sharing.leave('sgood');
+    first.catch(() => {});
+    const owner = server.backendFor(dan);
+    await owner.removePerson('sgood', 'carol', { edit: 'e2', comment: 'c2', view: 'v2' });
+    await settle();
+    const joined = page.sharing.join('sgood', 'e2');
+    await settle();
+    expect(await joined).toBe('n1');
+    await owner.removePerson('sgood', 'carol', { edit: 'e3', comment: 'c3', view: 'v3' });
+    await settle();
+    expect(page.sharing.isShared('n1')).toBe(false);
+    expect(page.notices).toEqual(['“Trip” is no longer shared with you.']);
   });
 });

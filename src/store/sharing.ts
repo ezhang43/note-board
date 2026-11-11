@@ -593,10 +593,12 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         try {
           if (share) gone(share, 'left');
         } finally {
-          leaving.delete(id);
+          if (leaving.get(id) === leave) leaving.delete(id);
         }
       },
       (e) => {
+        // A join since put them back on it (see join): what is here now isn't this leave's.
+        if (leaving.get(id) !== leave) throw e;
         leaving.delete(id);
         left.delete(id);
         // Its boards have already gone from here (gone() left the clean-up leave to this one, or a
@@ -888,7 +890,11 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       const added = !here && (await backend.join(id, key));
       // On it again (only once a join has worked, not while it is still here being left): a list
       // naming it opens it as usual.
-      if (!here) left.delete(id);
+      // A leave of it sent before this join belongs to the copy that went: this one isn't being left.
+      if (!here) {
+        left.delete(id);
+        leaving.delete(id);
+      }
       const s = open(id) ?? need(id);
       // (People arriving wake it too: it waits on until the board has, or the share has gone.)
       while (!s.ready && shares.has(id)) await new Promise<void>((done) => s.arrived.push(done));
@@ -926,10 +932,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     async leave(id: string) {
       const s = need(id);
       if (s.owner) throw new Error('The person who shared a board can’t leave it');
-      // Its boards go once the leave has answered (see sendLeave). A second click waits for the first,
-      // and a copy opened again since (whose Leave joined the first one) goes after it.
+      // Its boards go once the leave has answered (see sendLeave); a second click waits for the first.
       await sendLeave(id, 'own', s);
-      gone(s, 'left');
     },
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */
     async deleteShare(id: string) {

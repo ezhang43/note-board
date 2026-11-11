@@ -4,3 +4,8 @@
 - 2026-11-11, owner request: the risk of keeping a key in the browser is accepted, with safeguards. A strict page security policy ships before any key can be entered, a warning is shown, and users are advised to use a key with a low spend limit and an expiry date.
 - 2026-11-11, owner request: time blocks are real events on the user's main Google Calendar, tagged so Note Board only ever moves its own. They have no guests and send no notifications.
 - 2026-11-11, owner request: time estimates are a new optional saved field on cards and checklist items. Older boards load unchanged.
+- 2026-11-11, owner request: when an AI button is tapped, Note Board sends Anthropic the pasted text, card titles with time estimates, and free and busy times from Google Calendar, with no event names. Event names and Journal text are sent only if the user ticks a box for that request.
+- 2026-11-11, owner request: time estimates and "done on" dates arrive together in one save-format change (workspace version 6), with one connector update to reinstall. Older open copies show "saved by a newer version, Reload" instead of quietly dropping the new fields.
+- 2026-11-11, owner request: the page security policy change is marked high-risk. It waits for the owner to check sign-in and sync on the live site.
+- 2026-11-11, owner request: "done" applies only to checklist items. A checklist card counts as done when every item is ticked. Note cards get no "Done?" prompt.
+- 2026-11-11, owner request: re-plan suggestions and the focus timer's "Done?" prompt appear in a small card at the bottom of the screen, whichever panel is open. Its Undo stays until the card is closed.

@@ -33,10 +33,10 @@ const box = async (l: Locator) => (await l.boundingBox())!;
 /** The visible labels of the direct children, in order (accessible names for icon-only ones). */
 const names = (l: Locator) => l.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || (e.textContent ?? '').trim()));
 
-test('signed in, the top is eight tiles in a 4 x 2 grid (no empty ninth tile), each at least 44px', async ({ page }) => {
+test('signed in, the top is eight tiles in a 4 x 2 grid and a full-width Visualizer row (no empty tile), each at least 44px', async ({ page }) => {
   await openSignedIn(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits']);
+  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits', 'Visualizer']);
   await expect(t.nth(2)).toHaveText('History');
   await expect(t.nth(4)).toHaveText('Timer');
   await expect(t.nth(5)).toHaveText('Calendar');
@@ -59,7 +59,13 @@ test('signed in, the top is eight tiles in a 4 x 2 grid (no empty ninth tile), e
   const grid = await box(tiles(page));
   expect(Math.abs(b[7].x + b[7].width - (grid.x + grid.width))).toBeLessThan(1.5);
   // Every tile has an icon and a label.
-  for (let i = 0; i < 8; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
+  for (let i = 0; i < 9; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
+  // The Visualizer sits alone on a third row, as wide as the grid.
+  const v = await box(t.nth(8));
+  expect(v.y).toBeGreaterThan(b[4].y + b[4].height - 1);
+  expect(v.height).toBeGreaterThanOrEqual(44);
+  expect(Math.abs(v.x - grid.x)).toBeLessThan(1.5);
+  expect(Math.abs(v.width - grid.width)).toBeLessThan(1.5);
 });
 
 test('the sheet has a grab handle, the group over the text size is "Board" (no Hand / Select tools), and the sheet keeps its scroll', async ({ page }) => {
@@ -75,7 +81,7 @@ test('the sheet has a grab handle, the group over the text size is "Board" (no H
 
 test('signed out and not published: no Share, Calendar, Feedback or Sign out', async ({ page }) => {
   await openLocal(page);
-  expect(await names(tiles(page).locator('button'))).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits']);
+  expect(await names(tiles(page).locator('button'))).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits', 'Visualizer']);
   await expect(menu(page).getByRole('button', { name: 'Feedback' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Share' })).toHaveCount(0);

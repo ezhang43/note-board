@@ -232,6 +232,17 @@ export function CompletedIcon() {
   );
 }
 
+/** Visualizer: the tilted ring with a spark rising from its middle. */
+export function VisualizerIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <ellipse cx="12" cy="16" rx="8.5" ry="4" />
+      <path d="M12 16V6" />
+      <path d="M12 3v1.5M9.2 5.3l.9.9M14.8 5.3l-.9.9" />
+    </svg>
+  );
+}
+
 /** Version history: a clock with an arrow going back round it. */
 export function HistoryIcon() {
   return (

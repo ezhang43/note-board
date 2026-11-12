@@ -180,42 +180,46 @@ test('it is dark and glowing even in light mode, and the board keys stay off beh
   await expect(page.locator('.card.selected')).toHaveCount(0);
 });
 
-test('under reduced motion there is no beam and no trail, only the cell lighting up', async ({ page }) => {
+/** Whether the canvas has paint in its top rows: `away` true looks only away from the middle (where the pillar runs), false only at the middle. */
+const topRows = (page: Page, away: boolean) =>
+  dialog(page)
+    .locator('canvas')
+    .evaluate((c: HTMLCanvasElement, away) => {
+      const k = c.width / c.clientWidth;
+      const rows = Math.max(2, Math.round(6 * k));
+      const margin = Math.round(130 * k); // the pillar's glow is at most about 200px wide, at its fullest swell
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, rows).data;
+      for (let y = 0; y < rows; y++) for (let x = 0; x < c.width; x++) if ((Math.abs(x - c.width / 2) > margin) === away && d[(y * c.width + x) * 4 + 3] > 8) return true;
+      return false;
+    }, away);
+
+test('under reduced motion there is no beam and no trail, only the cell lighting up and a faint still pillar', async ({ page }) => {
   await seed(page);
   await openVisualizer(page);
   await expect(dialog(page).locator('.viz-feed li').first()).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(300);
-  const top = await dialog(page)
-    .locator('canvas')
-    .evaluate((c: HTMLCanvasElement) => {
-      const d = c.getContext('2d')!.getImageData(0, 0, c.width, Math.max(2, Math.round(6 * (c.width / c.clientWidth)))).data;
-      return d.some((v, i) => i % 4 === 3 && v > 8);
-    });
-  expect(top).toBe(false);
+  expect(await topRows(page, true)).toBe(false);
+  expect(await topRows(page, false)).toBe(true); // the pillar is there from the top of the canvas
 });
 
 test.describe('with motion on', () => {
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
 
-  /** Whether anything is painted in the top rows of the ring's canvas, away from the middle (where only an item's falling beam reaches). */
-  const topPainted = (page: Page) =>
-    dialog(page)
-      .locator('canvas')
-      .evaluate((c: HTMLCanvasElement) => {
-        const rows = Math.max(2, Math.round(6 * (c.width / c.clientWidth)));
-        const margin = Math.round(30 * (c.width / c.clientWidth));
-        const d = c.getContext('2d')!.getImageData(0, 0, c.width, rows).data;
-        for (let y = 0; y < rows; y++) for (let x = 0; x < c.width; x++) if (Math.abs(x - c.width / 2) > margin && d[(y * c.width + x) * 4 + 3] > 8) return true;
-        return false;
-      });
+  const topPainted = (page: Page) => topRows(page, true);
 
-  test('a light beam drops onto each item\'s cell from above, then a comet runs into the core', async ({ page }) => {
+  test('a light beam shoots in from above the canvas onto each item\'s cell, then a comet runs into the core', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await seed(page);
     await openVisualizer(page);
     await expect.poll(() => topPainted(page), { timeout: 6000, intervals: [30] }).toBe(true);
     expect(errors).toEqual([]);
+  });
+
+  test('the light pillar is there from the top of the canvas through the core before anything has landed', async ({ page }) => {
+    await seed(page);
+    await openVisualizer(page);
+    await expect.poll(() => topRows(page, false), { timeout: 3000, intervals: [30] }).toBe(true);
   });
 
   test('sparks fly and the ring is drawn, with no page error', async ({ page }) => {

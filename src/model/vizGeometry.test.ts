@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INNER, MAX_LABEL_CHARS, OUTER, cellArea, cellCentre, fitLabel, project, STRIKE, warpAt, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, INNER, MAX_LABEL_CHARS, OUTER, beamPoint, beamStart, beamTail, cellArea, cellCentre, fitLabel, pillarLevel, project, STRIKE, warpAt, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -167,10 +167,82 @@ describe('warpPhase', () => {
   it('keeps its numbers inside 0 to 1 whatever progress it is given', () => {
     for (const p of [-1, 0, 0.3, 1, 5]) {
       const w = warpPhase(p);
-      for (const v of [w.beam, w.beamAlpha, w.cometAlpha, w.flare]) {
+      for (const v of [w.beam, w.beamAlpha, w.cometAlpha, w.flare, w.flash]) {
         expect(v).toBeGreaterThanOrEqual(0);
         expect(v).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+// The incoming beam and the light pillar (owner request, 2026-11-12): each item's beam starts off the top
+// of the canvas and shoots into its cell with a flash; a pillar runs through the core and swells with the flare.
+
+describe('beamStart and beamPoint', () => {
+  const cell = { x: 120, y: 260 };
+
+  it('starts the beam above the top edge of the canvas, whatever cell it is for', () => {
+    for (const to of [cell, { x: 10, y: 5 }, { x: 600, y: 400 }]) {
+      expect(beamStart(to, 300).y).toBeLessThan(0);
+      expect(beamStart(to, 300).y).toBe(-BEAM_RISE);
+    }
+  });
+
+  it('leans outwards, so the light comes in from beyond the ring and a cell in the middle gets a straight beam', () => {
+    expect(beamStart(cell, 300).x).toBeLessThan(cell.x); // left of the middle: starts further left
+    expect(beamStart({ x: 480, y: 260 }, 300).x).toBeGreaterThan(480);
+    expect(beamStart({ x: 300, y: 260 }, 300).x).toBe(300);
+  });
+
+  it('runs from the start to the cell as the beam falls', () => {
+    const from = beamStart(cell, 300);
+    expect(beamPoint(from, cell, 0)).toEqual(from);
+    expect(beamPoint(from, cell, 1)).toEqual(cell);
+    const mid = beamPoint(from, cell, 0.5);
+    expect(mid.y).toBeGreaterThan(from.y);
+    expect(mid.y).toBeLessThan(cell.y);
+  });
+
+  it('keeps a tail behind the head that never goes before the start', () => {
+    expect(beamTail(0)).toBe(0);
+    expect(beamTail(0.1)).toBe(0);
+    expect(beamTail(1)).toBeGreaterThan(0);
+    expect(beamTail(1)).toBeLessThan(1);
+    for (const head of [0, 0.2, 0.7, 1]) expect(beamTail(head)).toBeLessThanOrEqual(head);
+  });
+});
+
+describe('warpPhase impact flash', () => {
+  it('flashes as the beam lands, brightest at the strike, and is spent soon after', () => {
+    expect(warpPhase(STRIKE - 0.01).flash).toBe(0);
+    expect(warpPhase(STRIKE).flash).toBe(1);
+    expect(warpPhase(STRIKE + 0.03).flash).toBeGreaterThan(0);
+    expect(warpPhase(STRIKE + 0.03).flash).toBeLessThan(1);
+    expect(warpPhase(STRIKE + 0.3).flash).toBe(0);
+  });
+});
+
+describe('pillarLevel', () => {
+  it('is always faintly there, even with no comet', () => {
+    const rest = pillarLevel(0);
+    expect(rest.alpha).toBeGreaterThan(0);
+    expect(rest.alpha).toBeLessThan(0.5);
+    expect(rest.width).toBeGreaterThan(0);
+  });
+
+  it('swells wider and brighter with the flare, up to full', () => {
+    const rest = pillarLevel(0);
+    const half = pillarLevel(0.5);
+    const full = pillarLevel(1);
+    expect(half.width).toBeGreaterThan(rest.width);
+    expect(full.width).toBeGreaterThan(half.width);
+    expect(half.alpha).toBeGreaterThan(rest.alpha);
+    expect(full.alpha).toBeGreaterThan(half.alpha);
+    expect(full.alpha).toBeLessThanOrEqual(1);
+  });
+
+  it('stays in range for any flare it is given', () => {
+    expect(pillarLevel(-3)).toEqual(pillarLevel(0));
+    expect(pillarLevel(7)).toEqual(pillarLevel(1));
   });
 });

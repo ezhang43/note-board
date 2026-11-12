@@ -50,7 +50,8 @@ const taken = (e: Event, mine: boolean) => {
  * is open on the right, anywhere else on the page; with one open there, Escape outside the Checklist closes that one.
  */
 export function escapeIsForChecklist(e: KeyboardEvent): boolean {
-  if (!escapeIsFree(e)) return false;
+  // Items selected in it: this Escape drops the selection (as on the board); the next one closes the panel.
+  if (!escapeIsFree(e) || document.querySelector('.checklist-panel .todo-item.picked')) return false;
   return taken(e, (e.target instanceof Element && e.target.closest('.checklist-panel') !== null) || !document.querySelector('.history-panel'));
 }
 

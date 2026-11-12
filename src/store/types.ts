@@ -133,6 +133,8 @@ export interface ItemDrag {
   lift?: { heights: Record<string, number>; width: number };
   /** With `lift`: how far (board px) each row slides to make room; rows that stay put have no entry. */
   slide?: Record<string, number>;
+  /** Dragged in the Checklist panel (`at` is then in page pixels, and its ghost is drawn there, not on the board). */
+  inPanel?: true;
 }
 
 /** What the side panel beside the board can show. */

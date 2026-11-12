@@ -354,8 +354,11 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .phone-grab { flex: none; align-self: center; width: 36px; height: 4px; margin: -2px 0 -2px; border-radius: 2px; background: var(--control-edge); }
 /* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
 .phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-/* Eight panels sit four across (two full rows), six three across (two full rows too): never an empty tile. */
-.phone-tiles:has(> :nth-child(8)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Never an empty tile: nine sit three across (three full rows), eight four across (two full rows), and seven four
+   across with the last one two wide (signed out: no Share or Calendar). */
+.phone-tiles:has(> :nth-child(7)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.phone-tiles:has(> :nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.phone-tiles > :nth-child(7):last-child { grid-column: span 2; }
 .phone-trio { margin-top: 6px; }
 .phone-more .share-wrap.phone { display: contents; }
 .phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }

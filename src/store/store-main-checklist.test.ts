@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { completedCardOf } from '../model/completed';
+import { CARD_W, GRID, NEW_BLOCK_H } from '../model/constants';
 import { CHECKLIST_NAME, checklistCardOf } from '../model/mainChecklist';
 import type { StorageLike } from '../model/persist';
 import type { TodoCard } from '../model/types';
@@ -196,5 +197,40 @@ describe('Checklist panel', () => {
     // On a phone it takes the screen, one panel at a time.
     s.openChecklistCompleted(true);
     expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: id, checklistOpen: false });
+  });
+
+  it('the Completed panel’s × (and Escape) closes it in one press, whichever record it shows', () => {
+    const s = setup();
+    s.openChecklist();
+    s.openChecklistCompleted();
+    s.closeCompleted();
+    expect(s.getState().ui).toMatchObject({ sidePanel: null, completedBoard: null, checklistOpen: true });
+    s.toggleSidePanel('completed');
+    s.closeCompleted();
+    expect(s.getState().ui.sidePanel).toBeNull();
+  });
+
+  it('a board someone named "Main checklist" without a list gets one clear of what is on it', () => {
+    const s = setup();
+    s.renameBoard(CHECKLIST_NAME);
+    s.addCard('note');
+    // Put the note at the board's top left corner, where a list placed without looking would land.
+    const placed = Object.values(s.getState().board.cards)[0];
+    s.select(placed.id);
+    s.nudgeSelection(-placed.x / GRID, -placed.y / GRID); // nudges are in grid steps
+    expect(s.getState().board.cards[placed.id]).toMatchObject({ x: 0, y: 0 });
+    const mine = s.getState().boards.open;
+    s.newBoard();
+    expect(s.getState().boards.open).not.toBe(mine);
+    s.openChecklist();
+    expect(s.checklistBoard()).toBe(mine);
+    const board = s.workspace().boards[mine];
+    const note = Object.values(board.cards).find((c) => c.kind === 'note')!;
+    const list = checklistCardOf(board)!;
+    expect(list.title).toBe('Checklist');
+    // Not on top of the note: the note's place is kept, and the list starts below or beside it.
+    expect(note).toMatchObject({ x: 0, y: 0 });
+    // (Blocks of their natural size: a card is CARD_W wide; a new note is taken as NEW_BLOCK_H.note tall.)
+    expect(list.x >= CARD_W || list.y >= NEW_BLOCK_H.note || list.x + CARD_W <= 0 || list.y + NEW_BLOCK_H.todo <= 0).toBe(true);
   });
 });

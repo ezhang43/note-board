@@ -215,6 +215,10 @@ export function blockActions(ctx: StoreContext) {
     /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history. The Completed panel shows the open board's record. */
     toggleSidePanel: (panel: SidePanelKind) =>
       updateUi(ctx.state.ui.sidePanel === panel && !ctx.state.ui.completedBoard ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null, completedBoard: null }),
+    /** The Completed panel's × and Escape: it closes, whichever record it shows (the open board's or the Checklist's). */
+    closeCompleted: () => {
+      if (ctx.state.ui.sidePanel === 'completed') updateUi({ sidePanel: null, completedBoard: null });
+    },
     /** Show an old version on the board, read-only (the real board is untouched); a drag, resize or box-select in progress ends. */
     previewVersion(meta: VersionMeta, board: Board) {
       updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null });

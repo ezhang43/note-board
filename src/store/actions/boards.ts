@@ -365,9 +365,11 @@ export function boardActions(ctx: StoreContext) {
         setOthers((o) => ({ ...o, [made]: newChecklistBoard() }));
         id = made;
       }
-      // Its checklist was deleted (on the board itself, opened from search): a new one, as one change on its undo.
+      // Its checklist was deleted (on the board itself, opened from search), or a board someone named "Main checklist"
+      // has none: a new one, as one change on its undo, in a free spot so it covers nothing already there (as Habits does).
       const board = ctx.workspace().boards[id];
-      if (board && !checklistCardOf(board)) ctx.commitTo(id, (b) => B.addCard(b, { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE }, { type: 'loose', x: 0, y: 0 }));
+      const card: TodoCard = { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE };
+      if (board && !checklistCardOf(board)) ctx.commitTo(id, (b) => B.addCard(b, card, { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, { x: 0, y: 0 }, () => undefined) }));
       // As the Journal opens with the cursor in today's page, the cursor goes to the end of the last item (not on a
       // phone, where the keyboard would cover the list before the person has looked at it).
       const last = checklistCardOf(ctx.workspace().boards[id])?.items.at(-1);

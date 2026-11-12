@@ -168,7 +168,7 @@ export function Canvas() {
   const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
   // An item dragged in the Checklist panel has its ghost drawn there (its list is on another board).
-  const itemDrag = useAppState((s) => (s.ui.itemDrag && s.board.cards[s.ui.itemDrag.cardId] ? s.ui.itemDrag : null));
+  const itemDrag = useAppState((s) => (s.ui.itemDrag && !s.ui.itemDrag.inPanel ? s.ui.itemDrag : null));
 
   // Touch screens (owner request): two fingers pinch to zoom and move together to pan, over cards
   // too. Listens before the blocks do; once a second finger lands, whatever the first one started

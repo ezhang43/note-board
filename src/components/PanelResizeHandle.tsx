@@ -6,7 +6,8 @@ import { clampPanelWidth, PANEL_MIN, PANEL_STEP } from '../model/calendar';
  * narrower; double-click puts the usual width back (owner request, 2026-10-16 for the calendar,
  * 2026-10-20 for every panel). Not part of the panel itself, which scrolls and would clip it.
  * `width` is the remembered width; `onSet` and `onReset` keep it. `side="left"` is the Checklist panel's,
- * on the left, whose strip is on its right edge (owner request, 2026-11-12).
+ * on the left, whose strip is on its right edge (owner request, 2026-11-12); `beside` is the width of a panel open
+ * on the right then, which it gives way to (300px of board stays between them), so it says and steps the width shown.
  */
 export function PanelResizeHandle({
   name,
@@ -14,12 +15,14 @@ export function PanelResizeHandle({
   onSet,
   onReset,
   side = 'right',
+  beside = 0,
 }: {
   name: string;
   width: number;
   onSet: (width: number) => void;
   onReset: () => void;
   side?: 'left' | 'right';
+  beside?: number;
 }) {
   const left = side === 'left';
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -28,8 +31,10 @@ export function PanelResizeHandle({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const set = (w: number) => onSet(clampPanelWidth(w, window.innerWidth));
-  const now = clampPanelWidth(width, windowWidth);
+  // The room it has: the window less 300px of board and the panel on the right (its own clamp, as App draws it).
+  const room = (win: number) => Math.max(PANEL_MIN, win - PANEL_MIN - (beside ? clampPanelWidth(beside, win) : 0));
+  const set = (w: number) => onSet(Math.min(clampPanelWidth(w, window.innerWidth), room(window.innerWidth)));
+  const now = Math.min(clampPanelWidth(width, windowWidth), room(windowWidth));
   return (
     <div
       className={left ? 'panel-resize left' : 'panel-resize'}
@@ -37,7 +42,7 @@ export function PanelResizeHandle({
       aria-orientation="vertical"
       aria-label={`Resize ${name}`}
       aria-valuemin={PANEL_MIN}
-      aria-valuemax={Math.max(PANEL_MIN, windowWidth - PANEL_MIN)}
+      aria-valuemax={room(windowWidth)}
       aria-valuenow={now}
       tabIndex={0}
       onPointerDown={(e) => {

@@ -121,12 +121,16 @@ test('the strip on its right edge resizes it, gives way to a panel on the right,
   await handle(page).focus();
   for (let i = 0; i < 20; i++) await page.keyboard.press('ArrowRight');
   await expect.poll(async () => (await box(panel(page))).width).toBe(1440 - 300 - 420);
+  // The strip says the width it shows, and stops there: presses past the room change nothing unseen.
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', String(1440 - 300 - 420));
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await box(panel(page))).width).toBe(1440 - 300 - 420 - 20);
   await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();
-  await expect.poll(async () => (await box(panel(page))).width).toBe(1000);
+  await expect.poll(async () => (await box(panel(page))).width).toBe(700);
   await page.reload();
   await fontsLoaded(page);
   await button(page).click();
-  await expect.poll(async () => (await box(panel(page))).width).toBe(1000);
+  await expect.poll(async () => (await box(panel(page))).width).toBe(700);
   await handle(page).dblclick();
   await expect.poll(async () => (await box(panel(page))).width).toBe(420);
 });
@@ -194,10 +198,12 @@ test('no key or drag in the panel changes the board: Backspace with a board bloc
   await expect(boardCards(page)).toContainText('precious');
   // An item dragged out of the panel onto the board stays in the panel; the board gets nothing.
   const row = panel(page).locator('[data-item-id]').first();
-  const r = await box(row);
-  await page.mouse.move(r.x + 4, r.y + r.height / 2);
+  await row.hover();
+  const r = await box(row.getByRole('button', { name: 'Drag item' }));
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
   await page.mouse.down();
   await page.mouse.move(r.x + 60, r.y + 40, { steps: 4 });
+  await expect(page.getByTestId('item-ghost')).toHaveCount(1);
   await page.mouse.move(900, 500, { steps: 8 });
   await page.mouse.up();
   await expect.poll(() => texts(panel(page))).toEqual(['a', 'b']);
@@ -228,6 +234,70 @@ test('an item dragged from a list on the board and let go over the panel stays i
   await page.mouse.up();
   expect(await texts(boardList)).toEqual(['stay here']);
   expect(await texts(panel(page))).toEqual(['panel item']);
+});
+
+test('“Completed: Checklist” closes with one press of its ×, and with one Escape', async ({ page }) => {
+  await openWith(page, ['a']);
+  const done = page.getByRole('complementary', { name: /^Completed/ });
+  await panel(page).getByRole('button', { name: 'Completed', exact: true }).click();
+  await expect(done).toHaveAccessibleName('Completed: Checklist');
+  await done.getByRole('button', { name: /Close/ }).click();
+  await expect(done).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  await panel(page).getByRole('button', { name: 'Completed', exact: true }).click();
+  await done.getByRole('heading').first().click();
+  await page.keyboard.press('Escape');
+  await expect(done).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+});
+
+test('Escape with items selected in the panel drops the selection first; a board note’s Ctrl+Z is the board’s', async ({ page }) => {
+  await noteOnBoard(page, 'note');
+  await openWith(page, ['a', 'b']);
+  const picked = panel(page).locator('.todo-item.picked');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+a');
+  await expect(picked).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(picked).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();
+  // Items still selected in the panel, typing in a note on the board: Ctrl+Z there undoes the note's typing.
+  await items(panel(page)).first().click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+a');
+  await expect(picked).toHaveCount(2);
+  const text = boardCards(page).first().getByRole('textbox').first();
+  await text.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' more');
+  await expect(text).toHaveValue('note more');
+  await page.keyboard.press('Control+z');
+  await expect(text).not.toHaveValue('note more');
+  expect(await texts(panel(page))).toEqual(['a', 'b']);
+});
+
+test('with the Main checklist board itself open, items still reorder by dragging in the panel', async ({ page }) => {
+  await openWith(page, ['zebra first', 'yak second']);
+  // Open its board from a search on every board.
+  await page.mouse.click(1000, 820);
+  await page.keyboard.press('Control+f');
+  await page.getByRole('searchbox', { name: 'Search the board' }).fill('zebra');
+  await page.getByRole('search').getByRole('button', { name: 'All boards', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search the board' }).press('Enter');
+  await expect(page.getByLabel('Board name')).toHaveValue('Main checklist');
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toBeVisible();
+  const rows = panel(page).locator('[data-item-id]');
+  await rows.first().hover();
+  const grip = await box(rows.first().getByRole('button', { name: 'Drag item' }));
+  const second = await box(rows.nth(1));
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x, grip.y + 20, { steps: 4 });
+  await page.mouse.move(grip.x, second.y + second.height - 3, { steps: 6 });
+  await expect(page.getByTestId('item-ghost')).toHaveCount(1);
+  await page.mouse.up();
+  await expect.poll(() => texts(panel(page))).toEqual(['yak second', 'zebra first']);
 });
 
 test.describe('on a phone', () => {

@@ -60,7 +60,9 @@ export function useShortcuts() {
       // In the Checklist panel on the left, its time picker, items selected there, or the Completed panel showing its
       // record, they step the checklist's own history (owner request, 2026-11-12), leaving the open board as it is.
       const sel = appStore.getState().ui.itemSel;
-      const selInChecklist = !!sel && storeOfCard(sel.cardId) !== appStore && !inAnyPanelBut(e, '.checklist-panel');
+      // Not while typing elsewhere or on the board: there the keys are that box's or the board's.
+      const elsewhere = e.target instanceof Element && !e.target.closest('.checklist-panel') && (isTextField(e.target) || e.target.closest('[data-testid="canvas"]') !== null);
+      const selInChecklist = !!sel && storeOfCard(sel.cardId) !== appStore && !inAnyPanelBut(e, '.checklist-panel') && !elsewhere;
       const inChecklist = (e.target instanceof Element && e.target.closest('.checklist-panel, [data-checklist-scope]') !== null) || selInChecklist;
       const checklistsRecord = inPanel && panel === 'completed' && appStore.getState().ui.completedBoard !== null;
       if ((inChecklist || checklistsRecord) && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoChecklist);

@@ -28,10 +28,10 @@ const CLOSING_MS = 1500;
 /** What a gesture shows while it lasts; cleared when it ends, even while an old version is shown. */
 const GESTURE_UI = new Set(['drag', 'newDrag', 'itemDrag', 'resize', 'marquee']);
 
-/** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
 /** What a scoped context shows for a board that isn't there (yet). */
 const EMPTY_BOARD: Board = createBoard();
 
+/** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
 type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
 
 export interface StoreContext {

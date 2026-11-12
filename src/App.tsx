@@ -42,7 +42,7 @@ import { useDropPaste } from './components/useDropPaste';
 const RESIZE_NAME = { history: 'version history', pomodoro: 'focus timer', completed: 'completed', journal: 'journal', habits: 'habits' } as const;
 const closeSidePanel = () => appStore.toggleSidePanel('pomodoro');
 const closeCalendar = () => appStore.toggleSidePanel('calendar');
-const closeCompleted = () => appStore.toggleSidePanel('completed');
+const closeCompleted = () => appStore.closeCompleted();
 const closeJournal = () => appStore.toggleSidePanel('journal');
 const closeHabits = () => appStore.toggleSidePanel('habits');
 
@@ -142,6 +142,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
           side="left"
           name="checklist"
           width={others.checklist}
+          beside={resize?.width ?? 0}
           onSet={(w) => panelWidths.set('checklist', w)}
           onReset={() => panelWidths.reset('checklist')}
         />

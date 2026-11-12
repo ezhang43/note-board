@@ -117,8 +117,9 @@ export function heldAfterRemoving(e: Key): boolean {
  * 2026-11-12), whose rows are drawn at full size and whose items never leave its list.
  */
 type DragPlace = { store: ReturnType<typeof storeOfCard>; zoom: number; panel: boolean };
-function placeOf(cardId: string): DragPlace {
-  const panel = !appStore.getState().board.cards[cardId];
+function placeOf(cardId: string, start: { x: number; y: number }): DragPlace {
+  // Where the press was, not which board the list is on: while the Main checklist board is itself open, its list is in both.
+  const panel = !!document.elementFromPoint(start.x, start.y)?.closest('.checklist-panel');
   return { store: storeOfCard(cardId), zoom: panel ? 1 : appStore.getState().view.zoom, panel };
 }
 
@@ -201,7 +202,7 @@ function measureLift(cardId: string, ids: string[], zoom: number) {
  */
 export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }) {
   let started = false;
-  const at = placeOf(cardId);
+  const at = placeOf(cardId, start);
   const st = at.store;
   // In the panel the ghost is drawn on the page itself (it would be under the panel on the board's layer).
   const point = (x: number, y: number) => (at.panel ? { x, y } : clientToCanvas(x, y));
@@ -209,7 +210,7 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
     if (!started) {
       if (!hold && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
       started = true;
-      st.startItemDrag(cardId, itemId, point(ev.clientX, ev.clientY), hold && ((ids) => measureLift(cardId, ids, at.zoom)));
+      st.startItemDrag(cardId, itemId, point(ev.clientX, ev.clientY), hold && ((ids) => measureLift(cardId, ids, at.zoom)), at.panel);
     }
     const d = st.getState().ui.itemDrag;
     if (d) st.moveItemDrag(point(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d, at));

@@ -87,7 +87,7 @@ export function ChecklistPanel() {
 
 /** The ghost of items dragged in the panel, drawn at the pointer (the board's own ghost is under the panel). */
 function PanelGhost({ cardId }: { cardId: string }) {
-  const drag = useAppState((s) => (s.ui.itemDrag?.cardId === cardId ? s.ui.itemDrag : null));
+  const drag = useAppState((s) => (s.ui.itemDrag?.cardId === cardId && s.ui.itemDrag.inPanel ? s.ui.itemDrag : null));
   if (!drag) return null;
   return (
     <div className={drag.lift ? 'item-ghost moving lifted panel-ghost' : 'item-ghost moving panel-ghost'} data-testid="item-ghost" style={ghostStyle(drag)}>

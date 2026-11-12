@@ -475,7 +475,7 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
 
     // ---------- dragging checklist items ----------
     /** Start dragging an item by its grip (or every selected item, if it is one of them). */
-    startItemDrag(cardId: string, itemId: string, at: Point, measure?: (ids: string[]) => NonNullable<ItemDrag['lift']>) {
+    startItemDrag(cardId: string, itemId: string, at: Point, measure?: (ids: string[]) => NonNullable<ItemDrag['lift']>, inPanel = false) {
       const card = ctx.state.board.cards[cardId];
       if (card?.kind !== 'todo' || ctx.viewOnly()) return;
       const loc = C.findItem(card.items, itemId);
@@ -488,7 +488,7 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
       const kids = allIds.length - 1;
       const label = roots.length > 1 ? `${allIds.length} items` : loc.item.text || 'Untitled item';
       const extra = roots.length > 1 || !kids ? '' : `+ ${kids} ${kids === 1 ? 'sub-item' : 'sub-items'}`;
-      const drag: ItemDrag = { cardId, roots, allIds, height, label, extra, at, hint: null };
+      const drag: ItemDrag = { cardId, roots, allIds, height, label, extra, at, hint: null, ...(inPanel && { inPanel }) };
       if (measure) drag.lift = measure(allIds);
       updateUi({ itemDrag: drag.lift ? { ...drag, slide: liftSlide(drag, null) } : drag, confirm: null });
     },

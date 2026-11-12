@@ -11,3 +11,7 @@
 - 2026-11-12 (main-checklist) The phone item bar's Undo is always enabled in the panel (it undoes the checklist's own history, whose undo state the bar doesn't track).
 - 2026-11-12 (main-checklist) While the Main checklist board is itself the open board, the panel and the board show the same list, on the board's own undo.
 - 2026-11-12 (main-checklist) If its board is deleted on another device, the panel closes; opening it again makes a new one.
+- 2026-11-12 (main-checklist; from the code review) With items selected in the Checklist panel, Escape drops the selection first (as on the board); the next Escape closes the panel. Items left selected there don't take the keys of a text box or block on the board: Ctrl+Z while typing in a note undoes the note.
+- 2026-11-12 (main-checklist; from the code review) With a panel open on the right, the Checklist strip's arrow keys and its read-out stop at the width shown, so presses never change the width unseen; the width kept is the one shown.
+- 2026-11-12 (main-checklist; from the code review) A board someone already named "Main checklist" that holds no checklist gets one in a free spot (as the Habits board does), not on top of its blocks.
+- 2026-11-12 Phone ⋯ tiles: the Checklist tile makes nine signed in, so they sit three across in three full rows; signed out there are seven, four across with the last (Checklist) two wide. Either way no row ends in an empty slot, as before.

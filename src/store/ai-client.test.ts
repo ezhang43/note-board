@@ -110,6 +110,56 @@ describe("askClaude", () => {
     expect(ai.usesThisMonth()).toBe(0);
   });
 
+  it("a cancel signal already set sends nothing and counts nothing; a timeout or a cancel with a reason says Stopped", async () => {
+    const { ai, fetch } = make();
+    const c = new AbortController();
+    c.abort();
+    expect(await ask(ai, { signal: c.signal })).toMatchObject({ ok: false, kind: "cancelled" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(ai.usesThisMonth()).toBe(0);
+
+    const late = new AbortController();
+    const timed = make(async () => {
+      late.abort(new Error("gave up"));
+      throw new Error("gave up");
+    });
+    expect(await ask(timed.ai, { signal: late.signal })).toMatchObject({ ok: false, kind: "cancelled" });
+  });
+
+  it("refuses to send when this browser won't let it count the use, so the monthly limit can't be skipped", async () => {
+    const device = memory();
+    const fetch = vi.fn(async () => ok());
+    const ai = createAiStore({
+      session: memory(),
+      device: {
+        ...device,
+        setItem: (k: string, v: string) => {
+          if (k.endsWith("ai-uses")) throw new Error("full");
+          device.setItem(k, v);
+        },
+      },
+      now: () => new Date(2026, 10, 12, 9),
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    });
+    ai.setKey(KEY, { remember: false, uid: "u1" });
+    const r = await ai.ask({ uid: "u1", system: "s", user: "u", schema, maxTokens: 100 });
+    expect(r).toMatchObject({ ok: false, kind: "cap" });
+    expect(!r.ok && r.message).toMatch(/count/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("a saved key with letters a header can't carry is refused before sending, not shown as a network failure", async () => {
+    const session = memory();
+    const fetch = vi.fn(async () => ok());
+    const ai = createAiStore({ session, device: memory(), now: () => new Date(), fetch: fetch as unknown as typeof globalThis.fetch });
+    // As an older version could have saved it.
+    session.setItem("note-board:ai-key", "sk-ant-api03-​abc");
+    session.setItem("note-board:ai-key-user", "u1");
+    expect(await ai.ask({ uid: "u1", system: "s", user: "u", schema, maxTokens: 100 })).toMatchObject({ ok: false, kind: "invalid-key" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(ai.usesThisMonth()).toBe(0);
+  });
+
   it("turns API errors into plain messages", async () => {
     const cases: [Response, string][] = [
       [apiError(401, "authentication_error", "invalid x-api-key"), "invalid-key"],

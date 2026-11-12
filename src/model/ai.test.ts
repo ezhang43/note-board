@@ -6,6 +6,7 @@ import {
   errorFor,
   readReply,
   toApiSchema,
+  usableKey,
   validate,
   type AiSchema,
 } from "./ai";
@@ -214,6 +215,32 @@ describe("plain messages for every failure", () => {
       expect(r.kind, `${s} ${m}`).toBe("limit");
       expect(r.message).toMatch(/limit/i);
     }
+  });
+
+  it("a 400 for an account out of credit is a billing limit, not 'needs an update'", () => {
+    const r = errorFor(
+      400,
+      err("invalid_request_error", "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."),
+    );
+    expect(r.kind).toBe("limit");
+    expect(r.message).toMatch(/credit/i);
+  });
+
+  it("a 400 for a prompt that is too long says there is too much text", () => {
+    const r = errorFor(400, err("invalid_request_error", "prompt is too long: 250000 tokens > 200000 maximum"));
+    expect(r.kind).toBe("too-big");
+  });
+
+  it("a 403 also says the key may not be allowed to do this", () => {
+    const r = errorFor(403, err("permission_error", "Your API key does not have permission to use the specified resource."));
+    expect(r.kind).toBe("limit");
+    expect(r.message).toMatch(/allowed/i);
+  });
+
+  it("only a key of plain printable letters can go in a request header", () => {
+    expect(usableKey("sk-ant-api03-abc_DEF-123")).toBe(true);
+    for (const bad of ["", "sk-ant-…1234", "sk-ant-​abc", "sk-ant-“abc”", "sk ant", "sk-ant-\tx", "sk-ant-é"])
+      expect(usableKey(bad), JSON.stringify(bad)).toBe(false);
   });
 
   it("529, overloaded, 500 and 504 mean Anthropic is busy: try again", () => {

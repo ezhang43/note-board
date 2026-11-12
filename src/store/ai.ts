@@ -8,6 +8,7 @@ import {
   buildRequest,
   errorFor,
   readReply,
+  usableKey,
   type AiFailure,
   type AiResult,
   type AiSchema,
@@ -155,7 +156,7 @@ export function createAiStore({
       { remember, uid }: { remember: boolean; uid: string | null },
     ): boolean {
       const k = key.trim();
-      if (!k || /\s/.test(k) || k.length > KEY_MAX) return false;
+      if (!usableKey(k) || k.length > KEY_MAX) return false;
       const [keep, other] = remember ? [device, session] : [session, device];
       // Each name with what it held, so putting back never relies on the order of any other list.
       const before = AI_KEY_NAMES.map((n) => [n, read(keep, n)] as const);
@@ -242,9 +243,9 @@ export function createAiStore({
       }
     },
     // simple: two tabs can both read the same count and add one, so the cap can be passed by a use or two. It is a safety stop beside the spend limit, not a meter; callers check canUse() before each request.
-    /** For the AI features to call once per request: counts one use this month. */
-    recordUse() {
-      write(
+    /** For the AI features to call once per request: counts one use this month. False when this device wouldn't save the count. */
+    recordUse(): boolean {
+      const saved = write(
         device,
         USES_NAME,
         JSON.stringify({
@@ -253,6 +254,7 @@ export function createAiStore({
         }),
       );
       changed();
+      return saved;
     },
     /** False once this month's uses reach the cap. */
     canUse: () => store.usesThisMonth() < store.getCap(),
@@ -279,6 +281,14 @@ export function createAiStore({
           kind: "no-key",
           message: "Add your Anthropic key in AI settings first.",
         };
+      if (signal?.aborted) return CANCELLED;
+      // A key an older version saved with letters a header can't carry would make fetch throw.
+      if (!usableKey(key))
+        return {
+          ok: false,
+          kind: "invalid-key",
+          message: "This key has letters a key can't have. Copy it again from the Anthropic Console and save it.",
+        };
       if (!store.canUse()) {
         const cap = store.getCap();
         return {
@@ -287,7 +297,13 @@ export function createAiStore({
           message: `You have used all ${cap} AI use${cap === 1 ? "" : "s"} for this month on this device. Raise the limit in AI settings, or wait for next month.`,
         };
       }
-      store.recordUse();
+      // A use that can't be counted is not sent, so the monthly limit can't be skipped.
+      if (!store.recordUse())
+        return {
+          ok: false,
+          kind: "cap",
+          message: "This browser won't let Note Board count AI uses, so nothing was sent. Free some space or allow site storage, then try again.",
+        };
       let res: Response;
       try {
         res = await send(ANTHROPIC_URL, {
@@ -315,13 +331,13 @@ export function createAiStore({
           credentials: "omit",
         });
       } catch (e) {
-        return isAbort(e) ? CANCELLED : NETWORK_FAILURE;
+        return isAbort(e) || signal?.aborted ? CANCELLED : NETWORK_FAILURE;
       }
       let body: unknown = null;
       try {
         body = await res.json();
       } catch (e) {
-        if (isAbort(e)) return CANCELLED;
+        if (isAbort(e) || signal?.aborted) return CANCELLED;
       }
       return res.ok ? readReply(body, schema) : errorFor(res.status, body);
     },

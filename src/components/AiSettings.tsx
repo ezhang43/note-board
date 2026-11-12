@@ -47,13 +47,20 @@ function Dialog() {
   const model = ai.getModel();
   const cap = ai.getCap();
 
+  // A test still running is stopped when the key changes, so its late answer can't overwrite the new note.
+  const stopTest = () => {
+    testing.current?.abort();
+    testing.current = null;
+    setBusy(false);
+  };
   const save = () => {
     if (ai.setKey(draft, { remember, uid })) {
+      stopTest();
       setDraft("");
       setNote({ text: "Key saved." });
     } else {
       setNote({
-        text: "That is not a usable key (it has spaces, or is empty), or this browser would not let the page save it.",
+        text: "That is not a usable key (it is empty, or has spaces or letters a key can't have), or this browser would not let the page save it.",
         bad: true,
       });
     }
@@ -203,6 +210,7 @@ function Dialog() {
               className="confirm-cancel ai-forget"
               disabled={!ai.hasAnyKey()}
               onClick={() => {
+                stopTest();
                 ai.forgetKey();
                 setDraft("");
                 setPending(false);

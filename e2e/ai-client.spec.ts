@@ -113,6 +113,28 @@ test.describe("Test key", () => {
     await expect(dialog(page).getByRole("alert")).toContainText("Zero Data Retention or Compliance API");
   });
 
+  test("a test still running when the key is forgotten is stopped, so its answer can't show afterwards", async ({ page }) => {
+    let answer: () => void = () => {};
+    const held = new Promise<void>((r) => (answer = r));
+    await page.route("https://api.anthropic.com/**", async (r: Route) => {
+      if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      await held;
+      return r
+        .fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(works) })
+        .catch(() => {});
+    });
+    await saveKey(page);
+    await testButton(page).click();
+    await expect(dialog(page).getByText("Testing…")).toBeVisible();
+    await dialog(page).getByRole("button", { name: "Forget key" }).click();
+    await expect(dialog(page).getByText("Key forgotten.")).toBeVisible();
+    answer();
+    // Give a late answer time to arrive; the note must stay.
+    await page.waitForTimeout(300);
+    await expect(dialog(page).getByText("Key forgotten.")).toBeVisible();
+    await expect(dialog(page).getByText("Key works.")).toHaveCount(0);
+  });
+
   test("once this month's limit is reached, nothing is sent", async ({ page }) => {
     const posts = await anthropic(page, 200, works);
     await saveKey(page);

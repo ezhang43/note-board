@@ -162,6 +162,12 @@ export function readReply(reply: unknown, schema: AiSchema): AiResult {
 
 const LIMIT =
   "Your Anthropic account hit a spend, billing or rate limit. Wait a little, or check the limits and credit in the Anthropic Console.";
+const NOT_ALLOWED =
+  "This key isn't allowed to do this, or your account hit a spend or billing limit. Check the key's permissions, limits and credit in the Anthropic Console.";
+const TOO_BIG = "That is too much text to send at once. Try with less.";
+
+/** True when the key is only plain printable letters (no spaces, smart quotes or hidden marks), so a request header can carry it. */
+export const usableKey = (key: string) => /^[\x21-\x7e]+$/.test(key);
 const BUSY = "Anthropic is busy right now. Try again in a minute.";
 
 /**
@@ -180,9 +186,11 @@ export function errorFor(status: number, body: unknown): AiFailure {
     );
   if (status === 401)
     return fail("invalid-key", "This key isn't valid. Check it in the Anthropic Console, then save it again.");
-  if (status === 402 || status === 403 || status === 429 || type === "rate_limit_error" || type === "billing_error")
+  if (status === 403) return fail("limit", NOT_ALLOWED);
+  if (status === 402 || status === 429 || type === "rate_limit_error" || type === "billing_error")
     return fail("limit", LIMIT);
-  if (status === 400 && /spend limit|usage limit/i.test(said)) return fail("limit", LIMIT);
+  if (status === 400 && /spend limit|usage limit|credit balance/i.test(said)) return fail("limit", LIMIT);
+  if (status === 400 && /prompt is too long/i.test(said)) return fail("too-big", TOO_BIG);
   if (status === 400 && said.startsWith("This API key is not scoped to a workspace"))
     return fail(
       "workspace",
@@ -195,8 +203,8 @@ export function errorFor(status: number, body: unknown): AiFailure {
     );
   if (status === 404)
     return fail("model", "This key can't use the chosen model. Pick another model in AI settings.");
-  if (status === 413) return fail("too-big", "That is too much text to send at once. Try with less.");
-  if (status === 529 || type === "overloaded_error" || status >= 500) return fail("busy", BUSY);
+  if (status === 413) return fail("too-big", TOO_BIG);
+  if (type === "overloaded_error" || status >= 500) return fail("busy", BUSY);
   return fail("other", `Anthropic couldn't answer (error ${status}). Try again later.`);
 }
 

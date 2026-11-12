@@ -48,6 +48,8 @@ test('Clean up fills the Completed panel, not the board; unticking there sends a
   await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
   await more(page);
   await expect(completedButton(page)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   await expect(panel(page).locator('.completed-date')).toHaveText([today]);
   await expect(panel(page).locator('.completed-text')).toHaveText(['milk']);

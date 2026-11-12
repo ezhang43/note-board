@@ -133,6 +133,8 @@ export interface ItemDrag {
   lift?: { heights: Record<string, number>; width: number };
   /** With `lift`: how far (board px) each row slides to make room; rows that stay put have no entry. */
   slide?: Record<string, number>;
+  /** Dragged in the Checklist panel (`at` is then in page pixels, and its ghost is drawn there, not on the board). */
+  inPanel?: true;
 }
 
 /** What the side panel beside the board can show. */
@@ -186,6 +188,13 @@ export interface Ui {
    * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.
    */
   sidePanel: SidePanelKind | null;
+  /**
+   * Whether the Checklist panel is open (owner request, 2026-11-12): the one panel on the left, open
+   * alongside any right-hand one.
+   */
+  checklistOpen: boolean;
+  /** The board whose Completed record the Completed panel shows: null for the open board (the Checklist panel's Completed button sets it). */
+  completedBoard: string | null;
   /** The board the Journal panel writes into (set when it opens). */
   journalBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
@@ -266,6 +275,8 @@ export const emptyUi: Ui = {
   preview: null,
   find: null,
   sidePanel: null,
+  checklistOpen: false,
+  completedBoard: null,
   journalBoard: null,
   shares: [],
   sharesKnown: true,

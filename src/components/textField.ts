@@ -33,6 +33,30 @@ export const panelCovers = () => document.querySelector('[aria-modal="true"], bo
  * `textBoxToo`: a text box doesn't answer it (the boxes in an old version shown read-only don't).
  */
 export function escapeIsForPanel(e: KeyboardEvent, textBoxToo = false): boolean {
+  // In the Checklist panel on the left, Escape is that panel's (escapeIsForChecklist): one press closes one panel.
+  return taken(e, escapeIsFree(e, textBoxToo) && !(e.target instanceof Element && e.target.closest('.checklist-panel')));
+}
+
+/** The Escape presses that already closed a panel: one press closes one panel, whichever listener hears it first. */
+const closedOne = new WeakSet<Event>();
+const taken = (e: Event, mine: boolean) => {
+  if (!mine || closedOne.has(e)) return false;
+  closedOne.add(e);
+  return true;
+};
+
+/**
+ * Whether this Escape closes the Checklist panel (owner request, 2026-11-12): pressed in it, or, while no panel
+ * is open on the right, anywhere else on the page; with one open there, Escape outside the Checklist closes that one.
+ */
+export function escapeIsForChecklist(e: KeyboardEvent): boolean {
+  // Items selected in it: this Escape drops the selection (as on the board); the next one closes the panel.
+  if (!escapeIsFree(e) || document.querySelector('.checklist-panel .todo-item.picked')) return false;
+  return taken(e, (e.target instanceof Element && e.target.closest('.checklist-panel') !== null) || !document.querySelector('.history-panel'));
+}
+
+/** Escape that nothing else answers first (escapeIsForPanel). */
+function escapeIsFree(e: KeyboardEvent, textBoxToo = false): boolean {
   if (e.key !== 'Escape' || (!textBoxToo && isTextField(e.target)) || panelCovers()) return false;
   const { shortcutsOpen, confirm, deleteCompleted, colourMenuOpen } = appStore.getState().ui;
   if (shortcutsOpen || confirm || deleteCompleted || colourMenuOpen) return false;

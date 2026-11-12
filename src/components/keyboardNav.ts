@@ -89,7 +89,8 @@ type Stop = { id: string; el: HTMLElement; field: Field | null };
 function stops(): Stop[] {
   const shown = (el: HTMLElement) => el.getClientRects().length > 0;
   const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-card-id]'))
-    .filter(shown)
+    // Not the Checklist panel's list: it isn't on the board.
+    .filter((card) => shown(card) && !card.closest('.checklist-panel'))
     .map((card) => ({ id: card.dataset.cardId!, el: card, field: fieldsOf(card)[0] ?? null }));
   const columns = Array.from(document.querySelectorAll<HTMLElement>('[data-col-id]'))
     .filter(shown)

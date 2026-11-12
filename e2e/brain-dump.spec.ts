@@ -118,10 +118,10 @@ test.describe('on a phone', () => {
     await expect(page.locator('.card.selected')).toHaveCount(5);
   });
 
-  test('opens from the ⋯ sheet, in the Board group, without a ninth tile', async ({ page }) => {
+  test('opens from the ⋯ sheet, in the Board group, without a tile of its own', async ({ page }) => {
     await bar(page).getByRole('button', { name: 'More', exact: true }).tap();
     const sheet = page.getByRole('dialog', { name: 'More' });
-    expect(await sheet.locator('.phone-tiles button').count()).toBeLessThanOrEqual(8);
+    await expect(sheet.locator('.phone-tiles').getByRole('button', { name: 'Brain dump' })).toHaveCount(0);
     await sheet.locator('.phone-arrange').getByRole('button', { name: 'Brain dump', exact: true }).tap();
     await expect(sheet).toHaveCount(0);
     await paste(page, 'one\ntwo');

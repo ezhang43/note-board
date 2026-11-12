@@ -4,7 +4,7 @@ import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canFold, canMoveItem, doneCount, hasFoldable, isFolded, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
-import { appStore, useAppState } from '../store/appStore';
+import { storeOfCard, useAppState } from '../store/appStore';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
@@ -42,11 +42,11 @@ export function TodoTitle({ card }: { card: TodoCard }) {
         find={`title:${card.id}`}
         placeholder="List title"
         value={card.title}
-        onChange={(text) => appStore.setCardTitle(card.id, text)}
+        onChange={(text) => storeOfCard(card.id).setCardTitle(card.id, text)}
         onKeyDown={(e) => {
           if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
           e.preventDefault();
-          appStore.focusFirstItem(card.id);
+          storeOfCard(card.id).focusFirstItem(card.id);
         }}
       />
       {total > 0 && (
@@ -127,7 +127,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     el.focus({ preventScroll: true });
     const [from, to] = Array.isArray(focusOffset) ? focusOffset : [focusOffset ?? el.value.length, focusOffset ?? el.value.length];
     el.setSelectionRange(from, to);
-    appStore.focusTaken(item.id);
+    storeOfCard(cardId).focusTaken(item.id);
   }, [wantsFocus, focusOffset, item.id]);
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -141,33 +141,33 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       // Ctrl+Enter (⌘+Enter): tick or untick, like the Done box (owner request, 2026-10-15).
       e.preventDefault();
       const el = e.currentTarget;
-      appStore.tickFromKeyboard(cardId, item.id, el.selectionStart);
+      storeOfCard(cardId).tickFromKeyboard(cardId, item.id, el.selectionStart);
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const el = e.currentTarget;
-      appStore.itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
+      storeOfCard(cardId).itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
     } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && canFold(item) && (e.key === 'ArrowUp') !== isFolded(item)) {
       // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy). With nothing
       // to fold or unfold, the key is left to the browser (jump by paragraph; on a Mac, to the start or end).
       e.preventDefault();
       e.stopPropagation(); // not the board's Ctrl+arrows
-      appStore.toggleFold(cardId, item.id);
+      storeOfCard(cardId).toggleFold(cardId, item.id);
     } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
       e.preventDefault();
       e.stopPropagation(); // not the board's Up / Down
-      appStore.moveItem(cardId, item.id, e.key === 'ArrowUp' ? -1 : 1, e.currentTarget.selectionStart);
+      storeOfCard(cardId).moveItem(cardId, item.id, e.key === 'ArrowUp' ? -1 : 1, e.currentTarget.selectionStart);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      appStore.itemTab(cardId, item.id, e.shiftKey);
+      storeOfCard(cardId).itemTab(cardId, item.id, e.shiftKey);
     } else if (e.key === 'Delete' && item.done && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
       // Delete in a ticked item removes it, like its trash can (owner request 2026-10-29, job 218); selected letters are still just deleted.
-      removeItemByKey(e, () => appStore.deleteTickedItem(cardId, item.id));
+      removeItemByKey(e, () => storeOfCard(cardId).deleteTickedItem(cardId, item.id));
     } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
-      if (appStore.itemBackspace(cardId, item.id)) e.preventDefault();
+      if (storeOfCard(cardId).itemBackspace(cardId, item.id)) e.preventDefault();
     } else if (e.key === 'Backspace' && !e.shiftKey && atStart(e.currentTarget)) {
-      if (appStore.itemBackspaceAtStart(cardId, item.id)) e.preventDefault();
+      if (storeOfCard(cardId).itemBackspaceAtStart(cardId, item.id)) e.preventDefault();
     } else if (e.key === 'Delete' && !e.shiftKey && atEnd(e.currentTarget)) {
-      if (appStore.itemDeleteAtEnd(cardId, item.id)) e.preventDefault();
+      if (storeOfCard(cardId).itemDeleteAtEnd(cardId, item.id)) e.preventDefault();
     }
     // Up / Down arrows are handled board-wide (keyboardNav.ts), across items and cards.
   }
@@ -207,13 +207,13 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           title={foldLabel}
           disabled={readOnly}
           onPointerDown={(e) => e.preventDefault()}
-          onClick={() => appStore.toggleFold(cardId, item.id)}
+          onClick={() => storeOfCard(cardId).toggleFold(cardId, item.id)}
         >
           <ChevronIcon collapsed={folded} color="currentColor" />
         </button>
       )}
       <label className="tick" {...tickBoxPress}>
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => appStore.toggleItem(cardId, item.id)} onClick={tickBoxClick} />
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => storeOfCard(cardId).toggleItem(cardId, item.id)} onClick={tickBoxClick} />
       </label>
       <GrowTextarea
         ref={ref}
@@ -225,7 +225,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         value={item.text}
         marks={words ? markParts(words) : null}
         tail={tail}
-        onChange={(text) => appStore.setItemText(cardId, item.id, text)}
+        onChange={(text) => storeOfCard(cardId).setItemText(cardId, item.id, text)}
         onKeyDown={onKeyDown}
         onClick={openLinkOnCtrlClick}
         onPaste={(e) => {
@@ -235,7 +235,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           plainPaste.current = false;
           // Lines copied from a Journal note (the same, with its marker) go in as items too: the marker holds them as JSON, so this works from another tab.
           const types = e.clipboardData.types;
-          const done = !plain && (types.includes(ITEMS_MARKER) ? appStore.pasteItemsInto(cardId, item.id) : types.includes(JOURNAL_MARKER) && appStore.pasteJournalInto(cardId, item.id, e.clipboardData.getData(JOURNAL_MARKER)));
+          const done = !plain && (types.includes(ITEMS_MARKER) ? storeOfCard(cardId).pasteItemsInto(cardId, item.id) : types.includes(JOURNAL_MARKER) && storeOfCard(cardId).pasteJournalInto(cardId, item.id, e.clipboardData.getData(JOURNAL_MARKER)));
           if (done) {
             e.preventDefault();
             leaveField(e.currentTarget); // the pasted items are highlighted, as after pasting with items selected
@@ -261,7 +261,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
                 aria-disabled={!can || undefined}
                 tabIndex={can ? undefined : -1}
                 onPointerDown={(e) => e.preventDefault()}
-                onClick={() => can && appStore.moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
+                onClick={() => can && storeOfCard(cardId).moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
               >
                 <ArrowIcon down={dir > 0} />
               </button>
@@ -277,11 +277,11 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         aria-label="Delete item"
         title="Delete item"
         onPointerDown={(e) => e.preventDefault()}
-        onClick={() => appStore.trashItem(cardId, item.id)}
+        onClick={() => storeOfCard(cardId).trashItem(cardId, item.id)}
         onKeyDown={(e) => {
           if (e.key !== 'Enter') return;
           if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) e.preventDefault(); // does nothing (the browser would press it)
-          else removeItemByKey(e, () => appStore.trashItem(cardId, item.id));
+          else removeItemByKey(e, () => storeOfCard(cardId).trashItem(cardId, item.id));
         }}
       >
         <TrashIcon />
@@ -319,48 +319,48 @@ function rowPointerDown(cardId: string, itemId: string) {
     e.stopPropagation(); // pressing a row never drags the card
     // By finger a bigger selection is kept for now, so holding the item moves the whole selection;
     // a quick tap narrows it to this card (blockHoldPointerDown).
-    const sel = appStore.getState().ui.selection;
-    if (!(e.pointerType === 'touch' && sel.length > 1 && sel.includes(cardId))) appStore.select(cardId);
+    const sel = storeOfCard(cardId).getState().ui.selection;
+    if (!(e.pointerType === 'touch' && sel.length > 1 && sel.includes(cardId))) storeOfCard(cardId).select(cardId);
     // Shift+click extends the selection, or starts one from the item being typed in.
     const typingEl = document.activeElement instanceof HTMLTextAreaElement ? document.activeElement : null;
     const typingIn = typingEl?.closest<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id]`)?.dataset.itemId;
     // Pressed on the item's text: the highlight is of letters, Word-style (owner request, 2026-11-01); elsewhere on the row, of whole items.
     const textEl = (e.target as Element).closest('.item-text') ? e.currentTarget.querySelector<HTMLTextAreaElement>('.item-text > textarea') : null;
     if (e.shiftKey) {
-      const sel = appStore.getState().ui.itemSel;
+      const sel = storeOfCard(cardId).getState().ui.itemSel;
       if (textEl && !sel?.lists && (sel ? !!sel.words : typingIn !== itemId)) {
         // In the item being typed in (with no highlight) the browser extends its own selection, letter by letter.
         const from = typingIn && typingEl ? { id: typingIn, offset: anchorOf(typingEl) } : null;
-        if (appStore.extendWords(cardId, { id: itemId, offset: offsetAt(textEl, e.clientX, e.clientY) }, from)) {
+        if (storeOfCard(cardId).extendWords(cardId, { id: itemId, offset: offsetAt(textEl, e.clientX, e.clientY) }, from)) {
           e.preventDefault();
           typingEl?.blur();
           return;
         }
       } else if (!textEl || sel) {
-        if (appStore.extendItemSelection(cardId, itemId, typingIn)) {
+        if (storeOfCard(cardId).extendItemSelection(cardId, itemId, typingIn)) {
           e.preventDefault();
           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
           return;
         }
       } else return; // Shift+click in the item being typed in: the browser's own
     }
-    appStore.clearItemSelection();
+    storeOfCard(cardId).clearItemSelection();
     // By finger, moving moves the board instead (owner request), so no range selection.
     if (e.pointerType === 'touch') return;
 
     const anchor = textEl ? { id: itemId, offset: offsetAt(textEl, e.clientX, e.clientY) } : null;
     let selecting = false;
     const onMove = (ev: { clientX: number; clientY: number }) => {
-      if (appStore.getState().ui.drag) return; // a long press turned this into dragging the card
+      if (storeOfCard(cardId).getState().ui.drag) return; // a long press turned this into dragging the card
       const over = rowUnder(ev.clientX, ev.clientY, cardId);
       // Into another card of the same column: the selection carries on across the cards (owner request), as whole items.
       const elsewhere = over ? null : rowAt(ev.clientX, ev.clientY);
-      const col = elsewhere && columnOf(appStore.getState().board, cardId);
-      if (elsewhere && col && col.id === columnOf(appStore.getState().board, elsewhere.cardId)?.id) {
+      const col = elsewhere && columnOf(storeOfCard(cardId).getState().board, cardId);
+      if (elsewhere && col && col.id === columnOf(storeOfCard(cardId).getState().board, elsewhere.cardId)?.id) {
         if (!selecting && document.activeElement instanceof HTMLElement) document.activeElement.blur();
         selecting = true;
         window.getSelection()?.removeAllRanges();
-        return appStore.selectAcross(col.id, { cardId, itemId }, elsewhere);
+        return storeOfCard(cardId).selectAcross(col.id, { cardId, itemId }, elsewhere);
       }
       if (anchor) {
         // From the text: letter to letter, at the nearest line of the nearest item (between rows, above or below the text too).
@@ -371,7 +371,7 @@ function rowPointerDown(cardId: string, itemId: string) {
           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         }
         window.getSelection()?.removeAllRanges();
-        if (to) appStore.selectWords(cardId, anchor, to);
+        if (to) storeOfCard(cardId).selectWords(cardId, anchor, to);
         return;
       }
       if (!selecting) {
@@ -381,7 +381,7 @@ function rowPointerDown(cardId: string, itemId: string) {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       }
       window.getSelection()?.removeAllRanges();
-      if (over) appStore.selectItemRange(cardId, itemId, over);
+      if (over) storeOfCard(cardId).selectItemRange(cardId, itemId, over);
     };
     // At the edge of the screen the board keeps moving and the selection keeps growing (owner request).
     const edges = followEdges((p) => selecting && onMove(p));
@@ -407,7 +407,7 @@ function gripPointerDown(cardId: string, itemId: string) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    appStore.select(cardId);
+    storeOfCard(cardId).select(cardId);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY }, e.pointerId);
   };

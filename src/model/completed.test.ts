@@ -126,6 +126,16 @@ describe('unticking in the Completed card', () => {
     expect(outline(items(b, r.cardId!))).toBe('milk');
   });
 
+  it('with its list gone, goes to the end of the list it is told to go into (the Checklist panel’s), making none', () => {
+    const b = B.deleteCard(cleaned(), 'g');
+    const r = restoreEntry(b, 'pears', here, makeId, 'c');
+    expect(r.cardId).toBe('c');
+    expect(Object.values(r.board.cards).filter((c) => c.kind === 'todo')).toHaveLength(1);
+    expect(outline(items(r.board, 'c'))).toBe('dust pears(seeds)');
+    // Told a list that isn't one: a new list, as before.
+    expect(restoreEntry(b, 'pears', here, makeId, 'nope').cardId).not.toBe('c');
+  });
+
   it('removes a day once its last item has gone back', () => {
     let b = cleaned();
     for (const id of ['milk', 'pears', 'sweep']) b = restoreEntry(b, id, here, makeId).board;

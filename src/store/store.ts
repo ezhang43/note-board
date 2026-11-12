@@ -41,7 +41,8 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     api[which]();
     if (ctx.state.board !== before) announce(which === 'undo' ? 'Undid the last change' : 'Redid the last change');
   };
-  return {
+  const itemClip = { items: null as import('../model/types').TodoItem[] | null };
+  const base = {
     ...api,
     undo: step('undo'),
     redo: step('redo'),
@@ -68,7 +69,38 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...gestureActions(ctx),
     ...templateActions(ctx),
     ...planActions(ctx),
-    ...checklistActions(ctx),
+    ...checklistActions(ctx, itemClip),
     ...formatActions(ctx),
+  };
+  type Scoped = typeof base;
+  const scopedStores = new Map<string, Scoped>();
+  return {
+    ...base,
+    /**
+     * The store as board `id` sees it, for the Checklist panel (owner request, 2026-11-12): the same
+     * actions, working on that board without opening it, each change an undo step on its own history.
+     * Anything it doesn't redo (boards, the view) is the app's own. The same object each time.
+     */
+    storeFor(id: string): Scoped {
+      if (id === ctx.state.boards.open) return base;
+      const had = scopedStores.get(id);
+      if (had) return had;
+      const s = ctx.scoped(id);
+      const made: Scoped = {
+        ...base,
+        getState: () => s.state,
+        undo: () => ctx.undoOn(id, 'undo'),
+        redo: () => ctx.undoOn(id, 'redo'),
+        ...blockActions(s),
+        ...gestureActions(s),
+        ...checklistActions(s, itemClip),
+        ...formatActions(s),
+        // The panel's one list is never deleted from it, whatever is selected (block keys stay on the open board).
+        deleteSelection: () => false,
+        deleteCard: () => {},
+      };
+      scopedStores.set(id, made);
+      return made;
+    },
   };
 }

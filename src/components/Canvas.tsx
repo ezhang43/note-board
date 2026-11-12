@@ -167,7 +167,8 @@ export function Canvas() {
   // The selection box keeps moving the board at the screen edge (owner request).
   const edges = useRef<ReturnType<typeof followEdges> | null>(null);
   const marquee = useAppState((s) => s.ui.marquee);
-  const itemDrag = useAppState((s) => s.ui.itemDrag);
+  // An item dragged in the Checklist panel has its ghost drawn there (its list is on another board).
+  const itemDrag = useAppState((s) => (s.ui.itemDrag && !s.ui.itemDrag.inPanel ? s.ui.itemDrag : null));
 
   // Touch screens (owner request): two fingers pinch to zoom and move together to pan, over cards
   // too. Listens before the blocks do; once a second finger lands, whatever the first one started

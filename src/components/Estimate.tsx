@@ -1,7 +1,7 @@
 import { use, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyEvent } from 'react';
 import { estimateLabel, MAX_ESTIMATE, readEstimate } from '../model/estimate';
 import { findItem } from '../model/checklist';
-import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { appStore, BoardScope, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
 import { TimerIcon } from './icons';
 import { BoardReadOnly } from './textBox';
 
@@ -60,9 +60,18 @@ export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; ite
   );
 }
 
-/** The open box; mounted once in the app. */
+/** The open box; mounted once in the app. For an item in the Checklist panel it reads and changes that panel's board. */
 export function EstimatePicker() {
   const which = useOpen();
+  const inPanel = !!which && storeOfCard(which.cardId) !== appStore;
+  return (
+    <BoardScope value={inPanel ? appStore.checklistBoard() : null}>
+      <OpenPicker which={which} />
+    </BoardScope>
+  );
+}
+
+function OpenPicker({ which }: { which: Target | null }) {
   const readOnly = useViewOnly();
   const estimate = useAppState((s) => {
     if (!which) return undefined;
@@ -94,7 +103,7 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
     (into ?? chipOf(target))?.focus({ preventScroll: true });
   };
   const set = (minutes: number | null) => {
-    appStore.setEstimate(cardId, itemId, minutes);
+    storeOfCard(cardId).setEstimate(cardId, itemId, minutes);
     // A cleared item has no pill left (and no clock), so the keyboard goes back into the item's text.
     const text =
       minutes === null && itemId !== null
@@ -191,6 +200,7 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
       aria-label="Time estimate"
       tabIndex={-1}
       className="estimate-picker"
+      data-checklist-scope={storeOfCard(cardId) !== appStore || undefined} // its undo keys step the Checklist panel's board (useShortcuts)
       style={place ?? { left: 0, top: 0, opacity: 0 }} // measured before it is drawn; still focusable meanwhile
       onKeyDown={keys}
       // Focus leaving the box (Tab, Shift+Tab, another window) closes it without a change.

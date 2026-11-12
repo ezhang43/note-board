@@ -158,10 +158,11 @@ export function cleanUp(
 /**
  * Unticking an item in the Completed card: it goes back, unticked, to the list it came from (under
  * the item it was nested in, if that is still there and the 6-level limit allows; otherwise at the
- * end of the list). If that list is gone, a new list with its old title is made at `place`.
+ * end of the list). If that list is gone, it goes to the end of the list `into` when that is one (the
+ * Checklist panel's list, so its board keeps one), else a new list with its old title is made at `place`.
  * Its sub-items keep their ticks. Returns the board and the list it went to.
  */
-export function restoreEntry(board: Board, itemId: string, place: Placement, makeId: MakeId = newId): { board: Board; cardId: string | null } {
+export function restoreEntry(board: Board, itemId: string, place: Placement, makeId: MakeId = newId, into?: string): { board: Board; cardId: string | null } {
   const folded = oneRecord(board);
   const done = completedCardOf(folded);
   const entry = done?.groups.flatMap((g) => g.entries).find((e) => e.item.id === itemId);
@@ -173,7 +174,8 @@ export function restoreEntry(board: Board, itemId: string, place: Placement, mak
   const item: TodoItem = structuredClone(entry.item);
   untick(item); // with the day it was ticked
 
-  const src = b.cards[entry.fromCardId];
+  const from = b.cards[entry.fromCardId];
+  const src = from?.kind === 'todo' ? from : into ? b.cards[into] : undefined;
   if (src?.kind === 'todo') {
     b = editItems(b, src.id, (items) => {
       const next = structuredClone(items);

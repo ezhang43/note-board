@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { createContext, use, useSyncExternalStore } from 'react';
 import { collab } from '../sync/collabSession';
 import { demoStorage, demoUser } from '../sync/demo';
 import { createStore, type AppState } from './store';
@@ -57,9 +57,29 @@ function shownState(): AppState {
   return shown!;
 }
 
+/**
+ * The board a part of the screen shows, when it isn't the open one (the Checklist panel shows the
+ * Main checklist board, owner request 2026-11-12): inside it, `useAppState` reads that board as
+ * `board`, and `storeOfCard` gives the store that changes it.
+ */
+export const BoardScope = createContext<string | null>(null);
+
 /** Read part of the app state in a component; re-renders when that part changes. */
 export function useAppState<T>(select: (s: AppState) => T): T {
-  return useSyncExternalStore(appStore.subscribe, () => select(shownState()));
+  const scope = use(BoardScope);
+  return useSyncExternalStore(appStore.subscribe, () => select(scope ? appStore.storeFor(scope).getState() : shownState()));
+}
+
+/**
+ * The store that changes card `cardId`: the app's own for a card on the open board (or none), the
+ * Checklist panel's for its checklist. Everything that acts on a checklist item by its card goes
+ * through here, so a key, a drag or a button in the panel never changes the open board instead.
+ */
+export function storeOfCard(cardId: string | null | undefined) {
+  const s = appStore.getState();
+  if (!cardId || s.board.cards[cardId]) return appStore;
+  const id = appStore.checklistBoard();
+  return id && s.boards.others[id]?.cards[cardId] ? appStore.storeFor(id) : appStore;
 }
 
 /** Whether the open board is shared with this person to view or comment on only (job 161): nothing on it can be changed. */
@@ -90,3 +110,9 @@ export const pomodoro = createPomodoro(
 );
 // With the board open in two tabs, each follows what the other does with the timer.
 if (typeof window !== 'undefined') window.addEventListener('storage', (e) => e.key === POMODORO_KEY && pomodoro.reload());
+
+/** The store for the board this part of the screen shows (BoardScope): the Checklist panel's, or the app's own. */
+export function useBoardStore() {
+  const scope = use(BoardScope);
+  return scope ? appStore.storeFor(scope) : appStore;
+}

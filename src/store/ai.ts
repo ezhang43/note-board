@@ -7,6 +7,8 @@ import {
   NETWORK_FAILURE,
   buildRequest,
   errorFor,
+  fail,
+  stoppedBy,
   readReply,
   usableKey,
   type AiFailure,
@@ -94,8 +96,11 @@ export function createAiStore({
 }) {
   let rev = 0;
   const listeners = new Set<() => void>();
+  // Test key requests running now, each stopped as soon as the key or model it started with changes.
+  const running = new Set<() => void>();
   const changed = () => {
     rev++;
+    running.forEach((stopIfChanged) => stopIfChanged());
     listeners.forEach((l) => l());
   };
   const read = (place: Place, name: string): string | null => {
@@ -191,6 +196,8 @@ export function createAiStore({
       changed();
       return true;
     },
+    /** For the page's storage event (another tab changed the key or a setting): tells the screen, and stops a Test key whose key or model went. */
+    reload: changed,
     /** Removes the key from this browser (both places). (Signing out and deleting an account clear the same names directly, job 12b.) */
     forgetKey() {
       wipeKey();
@@ -276,34 +283,27 @@ export function createAiStore({
     }: AskArgs): Promise<AiResult> {
       const key = store.getKey(uid);
       if (!key)
-        return {
-          ok: false,
-          kind: "no-key",
-          message: "Add your Anthropic key in AI settings first.",
-        };
-      if (signal?.aborted) return CANCELLED;
+        return fail("no-key", "Add your Anthropic key in AI settings first.");
+      if (signal?.aborted) return stoppedBy(signal);
       // A key an older version saved with letters a header can't carry would make fetch throw.
       if (!usableKey(key))
-        return {
-          ok: false,
-          kind: "invalid-key",
-          message: "This key has letters a key can't have. Copy it again from the Anthropic Console and save it.",
-        };
+        return fail(
+          "invalid-key",
+          "This key has letters a key can't have. Copy it again from the Anthropic Console and save it.",
+        );
       if (!store.canUse()) {
         const cap = store.getCap();
-        return {
-          ok: false,
-          kind: "cap",
-          message: `You have used all ${cap} AI use${cap === 1 ? "" : "s"} for this month on this device. Raise the limit in AI settings, or wait for next month.`,
-        };
+        return fail(
+          "cap",
+          `You have used all ${cap} AI use${cap === 1 ? "" : "s"} for this month on this device. Raise the limit in AI settings, or wait for next month.`,
+        );
       }
       // A use that can't be counted is not sent, so the monthly limit can't be skipped.
       if (!store.recordUse())
-        return {
-          ok: false,
-          kind: "cap",
-          message: "This browser won't let Note Board count AI uses, so nothing was sent. Free some space or allow site storage, then try again.",
-        };
+        return fail(
+          "storage",
+          "This browser won't let Note Board count AI uses, so nothing was sent. Free some space or allow site storage, then try again.",
+        );
       let res: Response;
       try {
         res = await send(ANTHROPIC_URL, {
@@ -331,13 +331,15 @@ export function createAiStore({
           credentials: "omit",
         });
       } catch (e) {
-        return isAbort(e) || signal?.aborted ? CANCELLED : NETWORK_FAILURE;
+        return isAbort(e) || signal?.aborted ? stoppedBy(signal) : NETWORK_FAILURE;
       }
       let body: unknown = null;
       try {
         body = await res.json();
       } catch (e) {
-        if (isAbort(e) || signal?.aborted) return CANCELLED;
+        if (isAbort(e) || signal?.aborted) return stoppedBy(signal);
+        // A 200 whose body broke on the way (or isn't JSON) is a connection problem; an error status still says what it says.
+        if (res.ok) return NETWORK_FAILURE;
       }
       return res.ok ? readReply(body, schema) : errorFor(res.status, body);
     },
@@ -347,14 +349,34 @@ export function createAiStore({
       uid: string | null,
       signal?: AbortSignal,
     ): Promise<{ ok: true } | AiFailure> {
-      const r = await store.ask({
-        uid,
-        system: "Reply with ok set to true.",
-        user: "Is this working?",
-        schema: { type: "object", properties: { ok: { type: "boolean" } } },
-        maxTokens: 256,
-        signal,
-      });
+      // Stopped, with its answer ignored, when the key or model it started with changes: forgotten (here or in
+      // another tab), replaced, signed out or another person signed in (the key is then gone), or the model picked.
+      const key = store.getKey(uid);
+      const model = store.getModel();
+      const own = new AbortController();
+      const outer = () => own.abort(signal?.reason);
+      if (signal?.aborted) outer();
+      else signal?.addEventListener("abort", outer);
+      const changedUnder = () =>
+        store.getKey(uid) !== key || store.getModel() !== model;
+      const stopIfChanged = () => changedUnder() && own.abort();
+      running.add(stopIfChanged);
+      let r: AiResult;
+      try {
+        r = await store.ask({
+          uid,
+          system: "Reply with ok set to true.",
+          user: "Is this working?",
+          schema: { type: "object", properties: { ok: { type: "boolean" } } },
+          maxTokens: 256,
+          signal: own.signal,
+        });
+      } finally {
+        running.delete(stopIfChanged);
+        signal?.removeEventListener("abort", outer);
+      }
+      // A sign-out clears storage without telling this store, so look again now.
+      if (changedUnder()) return CANCELLED;
       // These come only after Anthropic answered (200), so the key was accepted.
       return r.ok ||
         r.kind === "refusal" ||
@@ -380,6 +402,15 @@ export const ai = createAiStore({
   device: place(() => window.localStorage),
   now: () => new Date(),
 });
+
+// Another tab forgetting the key or changing the model reaches this tab as a storage event.
+if (typeof window !== "undefined")
+  window.addEventListener(
+    "storage",
+    (e) =>
+      (e.key === null || (AI_STORAGE_KEYS as readonly string[]).includes(e.key)) &&
+      ai.reload(),
+  );
 
 /** One request to Claude with the signed-in person's own key (see `ask` above). */
 export const askClaude = (args: AskArgs) => ai.ask(args);

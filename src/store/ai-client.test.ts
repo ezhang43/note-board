@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAiStore } from "./ai";
+import { dropAiKeyUnlessFor } from "../model/aiKey";
 import type { AiSchema } from "../model/ai";
 
 // askClaude (wow plan, job 13): the one place that sends a request to Anthropic, with the person's own key.
@@ -143,7 +144,7 @@ describe("askClaude", () => {
     });
     ai.setKey(KEY, { remember: false, uid: "u1" });
     const r = await ai.ask({ uid: "u1", system: "s", user: "u", schema, maxTokens: 100 });
-    expect(r).toMatchObject({ ok: false, kind: "cap" });
+    expect(r).toMatchObject({ ok: false, kind: "storage" });
     expect(!r.ok && r.message).toMatch(/count/i);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -164,7 +165,9 @@ describe("askClaude", () => {
     const cases: [Response, string][] = [
       [apiError(401, "authentication_error", "invalid x-api-key"), "invalid-key"],
       [apiError(401, "authentication_error", "CORS requests are not allowed for this Organization because of its settings."), "browser-blocked"],
-      [apiError(429, "rate_limit_error", "slow down"), "limit"],
+      [apiError(429, "rate_limit_error", "slow down"), "rate-limit"],
+      [apiError(403, "permission_error", "no"), "permission"],
+      [apiError(402, "billing_error", "pay"), "limit"],
       [apiError(400, "invalid_request_error", "bad"), "update"],
       [new Response("<html>gateway</html>", { status: 502 }), "busy"],
     ];
@@ -185,9 +188,54 @@ describe("askClaude", () => {
     expect(await ask(stop.ai)).toMatchObject({ ok: false, kind: "cancelled" });
   });
 
-  it("a 200 whose body is not JSON is a bad reply, not a crash", async () => {
+  it("a 200 whose body can't be downloaded or read is a network failure, not a crash", async () => {
     const { ai } = make(async () => new Response("not json", { status: 200 }));
+    expect(await ask(ai)).toMatchObject({ ok: false, kind: "network" });
+    const cut = make(async () => {
+      const res = ok();
+      res.json = async () => {
+        throw new TypeError("terminated");
+      };
+      return res;
+    });
+    expect(await ask(cut.ai)).toMatchObject({ ok: false, kind: "network" });
+    // An error status still says what the status says, whatever its body.
+    const bad = make(async () => new Response("<html>", { status: 429 }));
+    expect(await ask(bad.ai)).toMatchObject({ ok: false, kind: "rate-limit" });
+  });
+
+  it("a 200 that is JSON but not the expected shape is still a bad reply", async () => {
+    const { ai } = make(async () => new Response("null", { status: 200 }));
     expect(await ask(ai)).toMatchObject({ ok: false, kind: "bad-reply" });
+  });
+
+  it("a timeout is a timeout, not 'Stopped.'; only a cancel is Stopped", async () => {
+    const timeout = () => new DOMException("t", "TimeoutError");
+    const early = make();
+    expect(await ask(early.ai, { signal: AbortSignal.abort(timeout()) })).toMatchObject({
+      ok: false,
+      kind: "timeout",
+    });
+    expect(early.fetch).not.toHaveBeenCalled();
+    const c = new AbortController();
+    const late = make(async () => {
+      c.abort(timeout());
+      throw timeout();
+    });
+    const r = await ask(late.ai, { signal: c.signal });
+    expect(r).toMatchObject({ ok: false, kind: "timeout" });
+    expect(!r.ok && r.message).not.toBe("Stopped.");
+    const c2 = new AbortController();
+    const body = make(async () => {
+      const res = ok();
+      res.json = async () => {
+        c2.abort(timeout());
+        throw timeout();
+      };
+      return res;
+    });
+    expect(await ask(body.ai, { signal: c2.signal })).toMatchObject({ kind: "timeout" });
+    expect(await ask(make().ai, { signal: AbortSignal.abort() })).toMatchObject({ kind: "cancelled" });
   });
 });
 
@@ -213,6 +261,120 @@ describe("Test key", () => {
   it("gives the plain message when it fails", async () => {
     const { ai } = make(async () => apiError(401, "authentication_error", "invalid x-api-key"));
     expect(await ai.testKey("u1")).toMatchObject({ ok: false, kind: "invalid-key" });
+  });
+
+  it("a reply whose body fails to download or parse says it couldn't reach Anthropic, not 'works'", async () => {
+    const { ai } = make(async () => new Response('{"type":"mess', { status: 200 }));
+    const r = await ai.testKey("u1");
+    expect(r).toMatchObject({ ok: false, kind: "network" });
+    expect(!r.ok && r.message).toMatch(/couldn't reach anthropic/i);
+  });
+});
+
+describe("Test key stopped by a change while it runs", () => {
+  const started = () => new Promise<void>((r) => setTimeout(r, 0));
+  /** A request that stays open until `answer()`, and fails like fetch does if its signal fires first. */
+  function gated() {
+    let answer: () => void = () => {};
+    const gate = new Promise<void>((r) => (answer = r));
+    const session = memory();
+    const device = memory();
+    const ai = createAiStore({
+      session,
+      device,
+      now: () => new Date(2026, 10, 12, 9),
+      fetch: (async (_url: string, init: RequestInit) => {
+        await Promise.race([
+          gate,
+          new Promise((_, no) =>
+            init.signal?.addEventListener("abort", () => no(new DOMException("aborted", "AbortError"))),
+          ),
+        ]);
+        return ok('{"ok":true}');
+      }) as unknown as typeof globalThis.fetch,
+    });
+    return { ai, session, device, answer };
+  }
+
+  it("is stopped when the key is forgotten", async () => {
+    const { ai, answer } = gated();
+    ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t = ai.testKey("u1");
+    await started();
+    ai.forgetKey();
+    answer();
+    expect(await t).toMatchObject({ ok: false, kind: "cancelled" });
+  });
+
+  it("is stopped when the key is forgotten in another tab (its storage event)", async () => {
+    const { ai, device, answer } = gated();
+    ai.setKey(KEY, { remember: true, uid: "u1" });
+    const t = ai.testKey("u1");
+    await started();
+    // The other tab removed it from localStorage; this tab only hears the storage event.
+    delete device.data["note-board:ai-key"];
+    delete device.data["note-board:ai-key-user"];
+    ai.reload();
+    // Stopped at once, without waiting for an answer.
+    expect(await t).toMatchObject({ ok: false, kind: "cancelled" });
+    answer();
+  });
+
+  it("is stopped when the person signs out or someone else signs in (the sign-in watcher clears the key)", async () => {
+    const { ai, session, answer } = gated();
+    ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t = ai.testKey("u1");
+    await started();
+    // What src/sync/firebase.ts does: clears storage without telling the store.
+    dropAiKeyUnlessFor([() => session as unknown as Storage], "u2");
+    answer();
+    expect(await t).toMatchObject({ ok: false, kind: "cancelled" });
+  });
+
+  it("is stopped when the model is changed, and not when the same model is picked again", async () => {
+    const a = gated();
+    a.ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t = a.ai.testKey("u1");
+    await started();
+    a.ai.setModel(a.ai.getModel());
+    a.answer();
+    expect(await t).toEqual({ ok: true });
+
+    const b = gated();
+    b.ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t2 = b.ai.testKey("u1");
+    await started();
+    b.ai.setModel("claude-opus-5-5");
+    expect(await t2).toMatchObject({ ok: false, kind: "cancelled" });
+  });
+
+  it("is stopped when a different key is saved", async () => {
+    const { ai, answer } = gated();
+    ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t = ai.testKey("u1");
+    await started();
+    ai.setKey("sk-ant-api03-OTHER-wxyz9876", { remember: false, uid: "u1" });
+    answer();
+    expect(await t).toMatchObject({ ok: false, kind: "cancelled" });
+  });
+
+  it("still stops on its own cancel signal, and a quiet change elsewhere does not stop it", async () => {
+    const { ai } = gated();
+    ai.setKey(KEY, { remember: false, uid: "u1" });
+    const c = new AbortController();
+    const t = ai.testKey("u1", c.signal);
+    await started();
+    c.abort();
+    expect(await t).toMatchObject({ ok: false, kind: "cancelled" });
+
+    const q = gated();
+    q.ai.setKey(KEY, { remember: false, uid: "u1" });
+    const t2 = q.ai.testKey("u1");
+    await started();
+    q.ai.setCap(5);
+    q.ai.reload();
+    q.answer();
+    expect(await t2).toEqual({ ok: true });
   });
 });
 

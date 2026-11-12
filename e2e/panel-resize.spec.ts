@@ -13,7 +13,7 @@ const PANELS = [
   { name: 'Completed', button: 'Completed', handle: 'Resize completed', usual: 300 },
   { name: 'Focus timer', button: 'Focus timer', handle: 'Resize focus timer', usual: 300 },
   { name: 'Journal', button: 'Journal', handle: 'Resize journal', usual: 420 },
-  { name: 'Habits', button: 'Habits', handle: 'Resize habits', usual: 300 },
+  { name: 'Habits', button: 'Habits', handle: 'Resize habits', usual: 420 },
 ];
 type Spec = (typeof PANELS)[number];
 
@@ -89,7 +89,7 @@ test('each panel keeps its own width, remembered on this device across a reload'
   await dragTo(page, journal, 1440 - 640);
   await expect.poll(() => width(page, journal)).toBe(640);
   await open(page, habits);
-  await expect.poll(() => width(page, habits)).toBe(300);
+  await expect.poll(() => width(page, habits)).toBe(420);
   await dragTo(page, habits, 1440 - 380);
   await expect.poll(() => width(page, habits)).toBe(380);
   // Another panel is not affected.
@@ -115,5 +115,17 @@ test('a bad remembered width falls back to the usual one', async ({ page }) => {
   await open(page, journal);
   await expect.poll(() => width(page, journal)).toBe(420);
   await open(page, habits);
-  await expect.poll(() => width(page, habits)).toBe(300);
+  await expect.poll(() => width(page, habits)).toBe(420);
+});
+
+test('the Calendar (Week), the Journal and Habits all open the same width when never resized (owner request 2026-11-12)', async ({ page }) => {
+  await page.goto('/?demo-user=WidthCheck');
+  const calendar = { name: 'Google Calendar', button: 'Google Calendar', handle: 'Resize calendar', usual: 420 };
+  const [, , , journal, habits] = PANELS;
+  await open(page, calendar);
+  await expect.poll(() => width(page, calendar)).toBe(420);
+  await open(page, journal);
+  await expect.poll(() => width(page, journal)).toBe(420);
+  await open(page, habits);
+  await expect.poll(() => width(page, habits)).toBe(420);
 });

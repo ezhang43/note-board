@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, particleAt, particleSeed, pillarLevel, project, STRIKE, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, STRIKE, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -95,9 +95,26 @@ describe('fitLabel', () => {
     expect(fitLabel('y'.repeat(500), 100000, ruler().measure).length).toBeLessThanOrEqual(MAX_LABEL_CHARS + 1);
   });
 
-  it('gives just an ellipsis when nothing fits, and an empty name stays empty', () => {
-    expect(fitLabel('Garage', 5, ruler().measure)).toBe('…');
+  it('never gives an empty name or a lone ellipsis for a real name: it keeps at least the first word', () => {
+    expect(fitLabel('Garage', 5, ruler().measure)).toBe('Garage');
+    expect(fitLabel('Errands & shopping', 5, ruler().measure)).toBe('Errands…');
+    expect(fitLabel('Learning', 30, ruler().measure)).toBe('Learning');
     expect(fitLabel('', 100, ruler().measure)).toBe('');
+    for (const name of ['A', 'Calls & messages', 'Money & admin', 'x'.repeat(500), 'Social & family']) {
+      for (const room of [0, 5, 20, 60, 100, 400]) {
+        const t = fitLabel(name, room, ruler().measure);
+        expect(t.replace('…', '').trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps a long first word short rather than keeping all of it', () => {
+    expect(fitLabel('x'.repeat(500), 5, ruler().measure)).toBe(`${'x'.repeat(8)}…`);
+  });
+
+  it('shows the whole name whenever it fits, and cuts from the end when it does not', () => {
+    expect(fitLabel('Errands & shopping', 180, ruler().measure)).toBe('Errands & shopping');
+    expect(fitLabel('Errands & shopping', 120, ruler().measure)).toBe('Errands & s…');
   });
 });
 
@@ -305,5 +322,23 @@ describe('pillarLevel', () => {
   it('stays in range for any flare it is given', () => {
     expect(pillarLevel(-3)).toEqual(pillarLevel(0));
     expect(pillarLevel(7)).toEqual(pillarLevel(1));
+  });
+});
+
+describe('discRadius', () => {
+  it('leaves room beside the disc for the longest label, outside the dashed ring', () => {
+    const rx = discRadius(700, 600, 120);
+    expect(700 / 2 - LABEL_RADIUS * rx).toBeGreaterThanOrEqual(120 + 14 - 1e-9);
+  });
+
+  it('gives a bigger disc to a shorter label, never more than the height allows, never under 40', () => {
+    expect(discRadius(700, 600, 60)).toBeGreaterThan(discRadius(700, 600, 120));
+    expect(discRadius(2000, 300, 60)).toBeLessThanOrEqual((300 - 60) / 1.3);
+    expect(discRadius(100, 600, 120)).toBe(40);
+  });
+
+  it('reserves at most a fifth of the width for the label, so a phone keeps a usable disc', () => {
+    expect(discRadius(390, 780, 400)).toBeCloseTo(discRadius(390, 780, 390 * 0.2), 9);
+    expect(discRadius(390, 780, 400)).toBeGreaterThan(70);
   });
 });

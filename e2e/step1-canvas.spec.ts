@@ -53,6 +53,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'Backup file',
     'File to import',
     'Appearance',
+    'More',
   ]);
   await arrange(page); // Snap to grid, Collapse all, Same width and Clean up are in the Arrange menu
   await expect(page.getByRole('button', { name: 'Snap to grid' })).toHaveAttribute('aria-pressed', 'true');

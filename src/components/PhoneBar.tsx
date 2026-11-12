@@ -138,8 +138,8 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <div className="phone-rows">
               <FileMenu />
               <AppearanceMenu labelled />
-              <FeedbackButton onOpen={() => setOpen(null)} />
               <AiSettingsButton onOpen={() => setOpen(null)} />
+              <FeedbackButton onOpen={() => setOpen(null)} />
               <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
                 <InfoIcon />
                 About BusyAnts

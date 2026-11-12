@@ -49,12 +49,12 @@ for (const width of [600, 667, 768, 834, 1024, 1179]) {
 }
 
 for (const width of [1180, 1280]) {
-  test(`at ${width}px the whole toolbar shows and ⋯ holds only Version history, Completed and Visualizer`, async ({ page }) => {
+  test(`at ${width}px the whole toolbar shows and ⋯ holds only Version history, Completed, Visualizer and AI settings`, async ({ page }) => {
     await start(page, width);
     await expectFits(page, width);
     await expect(more(page)).toBeVisible();
     await more(page).click();
-    await expect(moreMenu(page).getByRole('button')).toHaveText([/Version history/, /Completed/, /Visualizer/]);
+    await expect(moreMenu(page).getByRole('button')).toHaveText([/Version history/, /Completed/, /Visualizer/, /AI settings/]);
     await page.keyboard.press('Escape');
     for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out', 'Share']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeVisible();
     await expect(toolbar(page).getByRole('button', { name: 'Note', exact: true }).locator('.tb-label')).toBeVisible();

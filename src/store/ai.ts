@@ -123,13 +123,12 @@ export function createAiStore({
       const k = key.trim();
       if (!k || /\s/.test(k) || k.length > KEY_MAX) return false;
       const [keep, other] = remember ? [device, session] : [session, device];
-      const before = [read(keep, KEY_NAME), read(keep, KEY_USER_NAME)];
+      // Each name with what it held, so putting back never relies on the order of any other list.
+      const before = AI_KEY_NAMES.map((n) => [n, read(keep, n)] as const);
       if (!write(keep, KEY_NAME, k) || !write(keep, KEY_USER_NAME, uid ?? "")) {
         // Put back what was there: never half a key, never a key with no owner, never a lost old key.
-        before.forEach((v, i) =>
-          v === null
-            ? remove(keep, AI_KEY_NAMES[i])
-            : write(keep, AI_KEY_NAMES[i], v),
+        before.forEach(([n, v]) =>
+          v === null ? remove(keep, n) : write(keep, n, v),
         );
         return false;
       }

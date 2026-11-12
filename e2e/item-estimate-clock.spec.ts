@@ -42,10 +42,7 @@ function check(layout: 'desktop' | 'phone') {
 
   // 'giant' (225%) is where the strip drops the clock: the count still must not leave its line.
   for (const size of ['normal', 'huge', 'giant'] as FontSize[]) {
-    // simple: a wide count ("0/12") is kept clear of the clock at Normal text on both layouts, but on a phone at Huge it can still reach
-    // 10px or so into it when typing in a full first line: the phone strip is a fixed 24px beside the clock while the count grows with the text.
-    // Widen the phone strip with the text size if that ever shows up.
-    for (const kids of size === 'normal' || layout === 'desktop' ? [1, 12] : [1]) {
+    for (const kids of [1, 12]) {
       test(`a parent's count and the clock never overlap, and the count stays on the text's last line, with ${kids} sub-items at ${size} text (${layout})`, async ({ page }) => {
         await seed(page, size, kids);
         const r = await page.evaluate((n) => {
@@ -78,6 +75,24 @@ function check(layout: 'desktop' | 'phone') {
         expect(r.some((x) => x.past)).toBe(true);
       });
     }
+  }
+
+  // Deterministic version of the sweep above (which only hits the worst case when a last word happens to end exactly at the
+  // text's edge, so it passed on one machine's fonts and failed on another's): however the text wraps, the last word can end
+  // at the text box's right edge, so the room between that edge and the clock must hold a whole count, whatever the font.
+  for (const size of ['normal', 'huge'] as FontSize[]) {
+    test(`the room before the clock holds a whole "0/12" count, so the count can never reach the clock at ${size} text (${layout})`, async ({ page }) => {
+      await seed(page, size, 12);
+      const r = await page.evaluate(() => {
+        const p = document.querySelector('[data-item-id="p5"]')!;
+        const edge = p.querySelector('textarea')!.getBoundingClientRect().right;
+        const clock = p.querySelector('.estimate-chip.add')!.getBoundingClientRect().left;
+        const c = p.querySelector('.item-count') as HTMLElement;
+        const scale = p.querySelector('textarea')!.getBoundingClientRect().width / (p.querySelector('textarea') as HTMLElement).offsetWidth;
+        return { room: clock - edge, need: c.getBoundingClientRect().width + parseFloat(getComputedStyle(c).marginLeft) * scale };
+      });
+      expect(r.room).toBeGreaterThanOrEqual(r.need);
+    });
   }
 
   test(`the strip's buttons do not overlap each other, and the clock is the last one (${layout})`, async ({ page }) => {

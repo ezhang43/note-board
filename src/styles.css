@@ -945,6 +945,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-item {
   /* The item's first line of text, and the item buttons' size step: they grow with A+ (never under today's, so Small keeps it). */
   --line: calc(20px * var(--fs, 1) * var(--ts, 1));
+  /* The item text's font size (see .item-text), for what has to be as wide as some of its letters. */
+  --tfs: calc(14px * var(--fs, 1) * var(--ts, 1));
   --bs: max(1, var(--fs, 1));
   --bh: calc(20px * var(--bs) + 8px);
   /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
@@ -1511,6 +1513,8 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 @media (hover: none) {
   .app.phone .item-trash { display: none; }
   .app.phone .todo-item { padding-right: calc(24px + var(--clock)); }
+  /* On every row that has the clock (all rows, so text wraps the same with or without a count), the room before it holds a whole parent count ("0/12" and its gap: 2.2em of the text's size, here 2.4em): the text can end at its right edge, so the count (which spills out of the text, see .tail-slot) must never reach the clock. The strip grows with the text, as the count does. */
+  .app.phone .canvas:not([data-big-text]) .todo-item { padding-right: calc(2.4 * var(--tfs) + var(--clock)); }
 }
 
 .item-ghost {
@@ -3673,7 +3677,7 @@ a.cal-open { align-self: flex-start; }
    */
   .note-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .card-title { font-size: max(16px, calc(15px * var(--fs, 1) * var(--ts, 1))); }
-  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); }
+  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); --tfs: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .column-title { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .pomodoro-length input { font-size: 16px; }

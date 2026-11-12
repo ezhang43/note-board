@@ -353,6 +353,7 @@ export function createAiStore({
       // another tab), replaced, signed out or another person signed in (the key is then gone), or the model picked.
       const key = store.getKey(uid);
       const model = store.getModel();
+      // simple: forwards the caller's signal by hand; AbortSignal.any would do it but needs iOS Safari 17.4+. Upgrade when older iPhones no longer matter.
       const own = new AbortController();
       const outer = () => own.abort(signal?.reason);
       if (signal?.aborted) outer();

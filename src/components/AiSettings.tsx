@@ -53,10 +53,9 @@ function Dialog() {
     testing.current = null;
     setBusy(false);
   };
-  // Whoever is signed in changed: the running test was for the other person's key.
+  // Whoever is signed in changed: a running test was for the other person's key, and any note about it is out of date.
   useEffect(() => {
-    if (!testing.current) return;
-    stopTest();
+    if (testing.current) stopTest();
     setNote(null);
   }, [uid]);
   const save = () => {

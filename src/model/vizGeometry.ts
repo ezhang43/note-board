@@ -174,10 +174,17 @@ export function particleAt(from: { x: number; y: number }, to: { x: number; y: n
 /** The most characters of a board name that are ever measured or drawn round the ring. */
 export const MAX_LABEL_CHARS = 60;
 
+/** How far out from the middle (a share of the disc's half width) the names stand: outside the rim and the dashed ring. */
+export const LABEL_RADIUS = OUTER + 0.17;
+/** The most of a first word that is kept when a name has to be cut right back. */
+const FIRST_WORD_KEEP = 8;
+
 /**
- * The board name cut to fit `room` pixels: at most MAX_LABEL_CHARS characters (so a huge pasted name
- * costs the same as a short one), then the longest start that fits followed by an ellipsis, found by
- * halving rather than one character at a time. `measure` is the canvas's measureText width.
+ * The name cut to fit `room` pixels: the whole name when it fits; otherwise at most MAX_LABEL_CHARS characters
+ * (so a huge pasted name costs the same as a short one), then the longest start that fits followed by an
+ * ellipsis, found by halving rather than one character at a time. It is never cut below the first word (at
+ * most FIRST_WORD_KEEP letters of it), so a real name is never empty or just an ellipsis, even in a tight
+ * spot. `measure` is the canvas's measureText width.
  */
 export function fitLabel(name: string, room: number, measure: (text: string) => number): string {
   const full = name.length > MAX_LABEL_CHARS ? `${name.slice(0, MAX_LABEL_CHARS)}…` : name;
@@ -189,5 +196,17 @@ export function fitLabel(name: string, room: number, measure: (text: string) => 
     if (measure(`${name.slice(0, mid)}…`) <= room) lo = mid;
     else hi = mid - 1;
   }
-  return `${name.slice(0, lo)}…`;
+  const first = name.trimStart().split(/\s/)[0].slice(0, FIRST_WORD_KEEP);
+  const keep = Math.max(lo, name.length - name.trimStart().length + first.length);
+  return keep >= name.trimEnd().length ? name.trimEnd() : `${name.slice(0, keep).trimEnd()}…`;
+}
+
+/**
+ * The disc's half width for a stage `w` by `h` pixels, when the longest name is `labelWidth` pixels wide: the
+ * most the height allows, shrunk so that name fits beside the dashed ring at the widest point (at most a fifth
+ * of the width is kept back for it, so a phone keeps a usable disc), never under 40.
+ */
+export function discRadius(w: number, h: number, labelWidth: number): number {
+  const reserve = Math.min(labelWidth, w * 0.2);
+  return Math.max(40, Math.min((h - 60) / 1.3, (w / 2 - reserve - 14) / LABEL_RADIUS));
 }

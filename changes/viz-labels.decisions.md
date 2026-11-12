@@ -1,0 +1,1 @@
+- 2026-11-12 Visualizer names: the disc shrinks so the longest name fits beside it (at most a fifth of the width reserved, so a phone keeps a usable disc); a cut name keeps at least its first word (up to 8 letters). The hub label may still be cut, since the hub is small.

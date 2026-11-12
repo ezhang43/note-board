@@ -1,4 +1,4 @@
-import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, particleAt, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
@@ -32,7 +32,7 @@ const SLOTS = 4;
 /** The small uppercase monospace of the labels (a system font: nothing to download). */
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 /** Room for a board name is rounded down to this many pixels when its cut is remembered. */
-const LABEL_STEP = 12;
+const LABEL_STEP = 4;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
@@ -166,6 +166,8 @@ export function startDisc(o: DiscOptions): () => void {
   let w = 0;
   let h = 0;
   let dpr = 1;
+  let labelW = 58; // the widest name round the rim, in pixels: the disc is sized so it fits beside the dashed ring
+  const labelFont = () => `500 ${w > 800 ? 11 : 10}px ${MONO}`;
   // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
   const labels = wedges.map(() => new Map<number, string>());
   const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
@@ -174,10 +176,10 @@ export function startDisc(o: DiscOptions): () => void {
 
   /** Where the disc and the core sit on the canvas, and how big the disc is. Sits low; when the stage is tall there is room to lift it so the core and the beams get their space above. */
   const layout = () => {
-    const rx = Math.max(40, Math.min((w - 2 * 72) / 2, (h - 60) / 1.3));
+    const rx = discRadius(w, h, labelW);
     const spare = Math.max(0, (h - (rx * 1.25 + 60)) / 2);
     const cx = w / 2;
-    const cy = h - rx * TILT * (OUTER + 0.17) - 34 - spare;
+    const cy = h - rx * TILT * LABEL_RADIUS - 34 - spare;
     return { rx, cx, cy, core: coreAt(cx, cy, rx) };
   };
 
@@ -251,7 +253,14 @@ export function startDisc(o: DiscOptions): () => void {
     canvas.height = Math.max(1, Math.round(h * dpr));
     labels.forEach((m) => m.clear());
     hubTexts.fill(undefined);
+    if (wedges.length > 0 && wedges.length <= MAX_LABELLED) {
+      ctx.font = labelFont();
+      labelW = Math.max(...wedges.map((wedge) => ctx.measureText(fitLabel(wedge.name.toUpperCase(), Infinity, (t) => ctx.measureText(t).width)).width));
+    }
     paintBase();
+    // The names as they read at the narrowest spot (beside the disc), for the browser tests to check.
+    const side = Math.min(labelW, w * 0.2);
+    canvas.dataset.rimLabels = wedges.length > MAX_LABELLED ? '' : wedges.map((wedge) => fitLabel(wedge.name.toUpperCase(), side, (t) => ctx.measureText(t).width)).join('|');
   };
   size();
   const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
@@ -340,13 +349,13 @@ export function startDisc(o: DiscOptions): () => void {
     });
 
     // Names around the rim, small uppercase monospace, evenly spaced; the name of the latest landing sits in the hub.
-    ctx.font = `500 ${rx > 200 ? 11 : 10}px ${MONO}`;
+    ctx.font = labelFont();
     ctx.textBaseline = 'middle';
     if (count > 0 && count <= MAX_LABELLED) {
       wedges.forEach((wedge, wi) => {
         const span = wedgeSpan(wi, count);
         const mid = (span.a0 + span.a1) / 2;
-        const p = project(mid, OUTER + 0.17, spin, cx, cy, rx);
+        const p = project(mid, LABEL_RADIUS, spin, cx, cy, rx);
         const side = Math.cos(mid + spin);
         ctx.textAlign = side > 0.25 ? 'left' : side < -0.25 ? 'right' : 'center';
         const front = (Math.sin(mid + spin) + 1) / 2;

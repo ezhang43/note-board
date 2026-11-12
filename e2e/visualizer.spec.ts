@@ -258,3 +258,52 @@ test.describe('on a phone', () => {
     await expect(dialog(page)).toHaveCount(0);
   });
 });
+
+// The names round the rim (canvas text, so the drawing publishes how they read beside the disc as `data-rim-labels`).
+const NAMES: [string, string][] = [['buy milk', 'Shopping'], ['project meeting', 'Work'], ['call the bank', 'Calls'], ['clean the kitchen', 'Home'], ['gym workout', 'Health'], ['pay rent', 'Money'], ['read a book', 'Learning'], ['family dinner', 'Social'], ['something else', 'Misc']];
+
+async function seedCategories(page: Page) {
+  await page.evaluate((names) => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const entries = names.map(([text, list], i) => ({ item: { id: `i${i}`, text, done: true, children: [] }, fromCardId: `l${i}`, fromTitle: list, fromParentId: null }));
+    localStorage.setItem('note-board:v1', JSON.stringify({ version: 6, home: 'home', boards: { home: { name: 'Home', snap: true, cards: { dn: { id: 'dn', kind: 'completed', color: 'stone', x: 0, y: 0, groups: [{ date, entries }] } }, columns: {}, order: ['dn'] } } }));
+  }, NAMES);
+  await page.reload();
+  await fontsLoaded(page);
+}
+
+const rimLabels = async (page: Page) => (await dialog(page).locator('canvas').getAttribute('data-rim-labels'))!.split('|');
+
+test('rim names: on a desktop window every name shows in full, none empty or just "…"', async ({ page }) => {
+  await seedCategories(page);
+  await openVisualizer(page);
+  const labels = await rimLabels(page);
+  expect(labels).toHaveLength(9);
+  expect(labels).toContain('ERRANDS & SHOPPING');
+  expect(labels).toContain('CALLS & MESSAGES');
+  expect(labels).toContain('LEARNING');
+  expect(labels).toContain('MONEY & ADMIN');
+  for (const l of labels) expect(l).not.toMatch(/^…?$/);
+});
+
+test.describe('rim names on a phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 780 } });
+
+  test('are cut from the end but always keep the first word, never empty or just "…"', async ({ page }) => {
+    await seedCategories(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Visualizer', exact: true }).tap();
+    await expect(dialog(page)).toBeVisible();
+    const labels = await rimLabels(page);
+    expect(labels).toHaveLength(9);
+    for (const l of labels) {
+      expect(l).not.toMatch(/^…?$/);
+      expect(l.length).toBeGreaterThanOrEqual(4); // WORK is a whole name
+    }
+    expect(labels.some((l) => l.startsWith('ERRANDS'))).toBe(true);
+    expect(labels.some((l) => l.startsWith('LEARNING'))).toBe(true);
+    expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  });
+});

@@ -49,11 +49,16 @@ describe('Content Security Policy', () => {
         'https://www.googleapis.com/calendar/v3/',
         'https://fonts.googleapis.com',
         'https://fonts.gstatic.com',
+        'https://api.anthropic.com',
       ]),
     );
     expect(built['frame-src']).toContain('https://note-board-a672a.firebaseapp.com');
-    // Owner decision 2026-11-11: the Anthropic address is added with the AI feature that needs it, not before.
-    expect(built['connect-src'].join(' ')).not.toContain('anthropic');
+    // Owner decision 2026-11-12: the person's own key calls Anthropic's API from the browser. Exactly that
+    // address, in requests only: no other Anthropic host, no wildcard, and nowhere else in the policy.
+    expect(built['connect-src'].filter((s: string) => s.includes('anthropic'))).toEqual(['https://api.anthropic.com']);
+    expect(dev['connect-src'].filter((s: string) => s.includes('anthropic'))).toEqual(['https://api.anthropic.com']);
+    for (const [name, sources] of Object.entries(built))
+      if (name !== 'connect-src') expect((sources as string[]).join(' '), name).not.toContain('anthropic');
     // Owner decision 2026-11-11: pictures over https only.
     expect(built['img-src']).not.toContain('http:');
   });

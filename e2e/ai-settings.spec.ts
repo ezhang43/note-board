@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { fontsLoaded, freshBoardEachTest } from "./helpers";
 
 // AI settings (wow plan, job 12a): a dialog in the ⋯ menu where the person keeps their own Anthropic key. The key stays in
-// this browser (sessionStorage, or localStorage with "Remember on this device"). Nothing uses it yet, and nothing here
-// talks to the network.
+// this browser (sessionStorage, or localStorage with "Remember on this device"). Only "Test key" (e2e/ai-client.spec.ts)
+// sends a request; nothing here talks to the network.
 
 const KEY = "sk-ant-api03-SECRET-abcd1234";
 const dialog = (page: Page) =>
@@ -32,7 +32,7 @@ async function openFromMore(page: Page) {
 test.describe("on a wide desktop", () => {
   freshBoardEachTest();
 
-  test("opens from ⋯, warns plainly, and asks for no network at all", async ({
+  test("opens from ⋯, warns plainly, and asks for no network just by opening", async ({
     page,
   }) => {
     const calls: string[] = [];
@@ -47,10 +47,13 @@ test.describe("on a wide desktop", () => {
     expect(text).toContain(
       "separate workspace with a low spend limit and a key that expires",
     );
-    expect(text).toContain("nothing uses your key yet");
+    expect(text).toContain(
+      "your key is used only when you press test key or an ai button",
+    );
+    expect(text).toContain("straight from this browser to anthropic");
     await expect(
-      dialog(page).getByRole("button", { name: /test key/i }),
-    ).toHaveCount(0);
+      dialog(page).getByRole("button", { name: "Test key" }),
+    ).toBeDisabled();
     await expect(keyBox(page)).toHaveAttribute("type", "password");
     await expect(keyBox(page)).toHaveAttribute("autocomplete", "off");
     await expect(keyBox(page)).toHaveAttribute("spellcheck", "false");

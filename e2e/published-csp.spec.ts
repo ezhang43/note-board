@@ -20,6 +20,9 @@ test('all six pages carry the policy, before any script or stylesheet, and break
     const p = await policy(page);
     expect(p, path).toContain("default-src 'self'");
     expect(p, path).not.toMatch(/script-src[^;]*'unsafe-(inline|eval)'/);
+    // Owner decision 2026-11-12: every page may reach Anthropic's API (the person's own key), and only that Anthropic address.
+    expect(p, path).toMatch(/connect-src [^;]*https:\/\/api\.anthropic\.com(;| )/);
+    expect(p!.match(/anthropic[^ ;]*/g), path).toEqual(['anthropic.com']);
     // Before any script, stylesheet or font link in the page's head.
     const first = await page.evaluate(() => [...document.head.children].findIndex((el) => el.matches('script, link[rel="stylesheet"], link[rel="preconnect"], style')));
     const at = await page.evaluate(() => [...document.head.children].findIndex((el) => el.matches('meta[http-equiv="Content-Security-Policy"]')));
@@ -67,7 +70,7 @@ test('Sign in with Google loads what Firebase needs for its window (Google’s g
   await expect.poll(() => asked.some((u) => u.startsWith('https://apis.google.com/js/api.js'))).toBe(true);
 });
 
-test('sign-in, sync and the calendar may be reached (the Anthropic API may not, yet), and Firebase’s sign-in frame may open', async ({ page }) => {
+test('sign-in, sync, the calendar and the Anthropic API may be reached, and Firebase’s sign-in frame may open', async ({ page }) => {
   await cspGuard(page);
   const hosts = [
     'https://identitytoolkit.googleapis.com/v1/accounts:lookup',
@@ -76,6 +79,8 @@ test('sign-in, sync and the calendar may be reached (the Anthropic API may not, 
     'https://www.googleapis.com/calendar/v3/calendars/primary/events',
     'https://accounts.google.com/gsi/status',
     'https://fonts.googleapis.com/css2?family=Lora',
+    // Owner decision 2026-11-12: the AI features call Anthropic's API with the person's own key.
+    'https://api.anthropic.com/v1/messages',
   ];
   for (const h of hosts) await page.route(`${new URL(h).origin}/**`, (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
   await page.route('https://note-board-a672a.firebaseapp.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<p>auth</p>' }));
@@ -91,10 +96,10 @@ test('sign-in, sync and the calendar may be reached (the Anthropic API may not, 
   // None refused (the fonts' stylesheet can come from the offline copy instead, with a 200).
   expect(results.filter((r) => r.endsWith('refused'))).toEqual([]);
   expect(results).toHaveLength(hosts.length);
-  // Owner decision 2026-11-11: the Anthropic address waits for the AI feature that needs it.
-  await page.route('https://api.anthropic.com/**', (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
-  expect(await page.evaluate(() => fetch('https://api.anthropic.com/v1/messages', { method: 'POST' }).then(() => 'reached', () => 'refused'))).toBe('refused');
-  await expect.poll(async () => (await violations(page)).some((v) => v.includes('connect-src https://api.anthropic.com'))).toBe(true);
+  // Only that Anthropic address: its other hosts stay refused.
+  await page.route('https://console.anthropic.com/**', (r) => r.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' } }));
+  expect(await page.evaluate(() => fetch('https://console.anthropic.com/').then(() => 'reached', () => 'refused'))).toBe('refused');
+  await expect.poll(async () => (await violations(page)).some((v) => v.includes('connect-src https://console.anthropic.com'))).toBe(true);
   await clearViolations(page);
   // Firebase's hidden sign-in frame (https://<authDomain>/__/auth/iframe) and the Calendar connection's script.
   await page.evaluate(() => {

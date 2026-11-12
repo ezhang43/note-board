@@ -7,9 +7,9 @@ import { useCoverBoard } from "./textField";
 import { usePhone } from "./usePhone";
 
 // AI settings (wow plan, job 12a): where the person keeps their own Anthropic key, picks the model and sets a
-// monthly cap. Opened from ⋯ (phone too). Nothing uses the key yet, and this dialog makes no network call:
-// "Test key" waits until the Content Security Policy allows api.anthropic.com. The key itself is never shown
-// again after saving, only its start and last four letters.
+// monthly cap. Opened from ⋯ (phone too). Its one network call is "Test key" (job 13): a tiny request to
+// api.anthropic.com with the saved key, counted as one use, showing "Key works." or a plain message. The key
+// itself is never shown again after saving, only its start and last four letters.
 
 export function AiSettingsDialog() {
   return useAppState((s) => s.ui.aiSettingsOpen) ? <Dialog /> : null;
@@ -29,6 +29,10 @@ function Dialog() {
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(
     null,
   );
+  // The running Test key request, stopped if the dialog closes.
+  const testing = useRef<AbortController | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => () => testing.current?.abort(), []);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) =>
@@ -60,6 +64,17 @@ function Dialog() {
     if (text.trim() !== "") ai.setCap(Number(text));
   };
   const leaveCap = () => setCapText(String(ai.getCap()));
+  const test = async () => {
+    const c = new AbortController();
+    testing.current = c;
+    setBusy(true);
+    setNote({ text: "Testing…" });
+    const r = await ai.testKey(uid, c.signal);
+    if (c.signal.aborted) return;
+    testing.current = null;
+    setBusy(false);
+    setNote(r.ok ? { text: "Key works." } : { text: r.message, bad: true });
+  };
 
   return (
     <div
@@ -86,8 +101,9 @@ function Dialog() {
           </button>
         </header>
         <p className="shortcuts-hint">
-          Nothing uses your key yet, and nothing is sent anywhere. These
-          settings are kept for when AI features arrive.
+          Your key is used only when you press Test key or an AI button. What
+          you chose is then sent straight from this browser to Anthropic, with
+          your key; it never goes through BusyAnts.
         </p>
 
         <div className="ai-warning" role="note">
@@ -172,19 +188,30 @@ function Dialog() {
           >
             {note?.text}
           </p>
-          <button
-            type="button"
-            className="confirm-cancel ai-forget"
-            disabled={!ai.hasAnyKey()}
-            onClick={() => {
-              ai.forgetKey();
-              setDraft("");
-              setPending(false);
-              setNote({ text: "Key forgotten." });
-            }}
-          >
-            Forget key
-          </button>
+          <div className="ai-key-actions">
+            <button
+              type="button"
+              className="confirm-cancel ai-forget"
+              disabled={!masked || busy}
+              title="Sends one tiny request to Anthropic (counts as one use)"
+              onClick={() => void test()}
+            >
+              Test key
+            </button>
+            <button
+              type="button"
+              className="confirm-cancel ai-forget"
+              disabled={!ai.hasAnyKey()}
+              onClick={() => {
+                ai.forgetKey();
+                setDraft("");
+                setPending(false);
+                setNote({ text: "Key forgotten." });
+              }}
+            >
+              Forget key
+            </button>
+          </div>
         </form>
 
         <fieldset className="ai-field ai-models">

@@ -547,6 +547,23 @@ test('the Privacy policy has a short, true section about the optional Claude con
   await expect(services).toContainText('Claude connector');
 });
 
+// Job 13 (owner decision 2026-11-12): the AI features send what the person chose straight to Anthropic with their own key.
+test('the Privacy policy says what an AI button sends, to whom, and with whose key', async ({ page }) => {
+  await page.goto('/privacy/');
+  const privacy = page.locator('main');
+  await expect(privacy).toContainText('Effective from November 12, 2026');
+  const section = privacy.locator('details:has(h2:text("An AI key you enter"))');
+  await section.locator('summary').click();
+  await expect(section).toContainText('used only when you press an AI button or Test key');
+  await expect(section).toContainText('the text you chose is sent straight from your browser to Anthropic, with your own key');
+  await expect(section).toContainText('never passes through BusyAnts');
+  await expect(section).not.toContainText('not sent anywhere else yet');
+  await expect(section.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://www.anthropic.com/legal/privacy');
+  const services = privacy.locator('details:has(h2:text("who helps run it"))');
+  await expect(services).toContainText('when you press an AI button with your own key');
+  await expect(services).not.toContainText('only if you use the optional Claude connector');
+});
+
 test('the app still opens at its own address, and a share link in the existing format still opens the app', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');

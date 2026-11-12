@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { add, box, fontsLoaded } from './helpers';
+import { add, box, fontsLoaded, toggleHistory } from './helpers';
 
 // Sharing a board and editing it together (owner request, 2026-10-05). Locally, `npm run dev` has
 // a pretend sharing server: ?demo-user=Alice and ?demo-user=Bob are two people, each in their own
@@ -325,7 +325,7 @@ test('someone a board is shared with can look at its old versions but not restor
   await add(bob, 'Note');
   await bob.keyboard.type('Bob’s note');
   await bob.keyboard.press('Escape');
-  await bob.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(bob);
   await historyPanel(bob).getByRole('button', { name: /card|Empty board/ }).first().click();
   await expect(previewBar(bob)).toContainText('Only the person who shared this board can restore it.');
   await expect(previewBar(bob).getByRole('button', { name: 'Restore this version' })).toHaveCount(0);
@@ -415,7 +415,7 @@ test('a shared board you leave can be brought back from Version history', async 
   await bob.getByRole('alertdialog', { name: 'Leave “Trip”?' }).getByRole('button', { name: 'Leave board' }).click();
   await expect(boardName(bob)).not.toHaveValue('Trip');
   await bob.keyboard.press('Escape');
-  await bob.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(bob);
   await historyPanel(bob).getByRole('button', { name: /card|Empty board/ }).first().click();
   await previewBar(bob).getByRole('button', { name: 'Restore this version' }).click();
   await bob.getByRole('button', { name: 'Boards', exact: true }).click();

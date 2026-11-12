@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, arrange, cards, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, cards, clickEmpty, freshBoardEachTest, toggleCompleted } from './helpers';
 
 freshBoardEachTest();
 
@@ -22,7 +22,7 @@ async function makeList(page: Page, title: string, items: string[]) {
 }
 
 const completedPanel = (page: Page) => page.getByRole('complementary', { name: 'Completed' });
-const openCompleted = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+const openCompleted = (page: Page) => toggleCompleted(page);
 
 test('Clean up moves ticked items into the Completed panel under today, and unticking sends one back', async ({ page }) => {
   await expect(await cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');

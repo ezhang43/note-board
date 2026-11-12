@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, arrange, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, clickEmpty, freshBoardEachTest, toggleCompleted } from './helpers';
 
 // Screen readers (job 165a, from the UX audit): every tick box is named for its item, and one
 // polite live region speaks what is otherwise only seen: deletes, undo and redo, items moving to Completed.
@@ -36,7 +36,7 @@ test('each tick box is named for its item, in the list and in the Completed pane
 
   await list.getByRole('checkbox', { name: 'Done: eggs', exact: true }).check();
   await (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true }).click();
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   await expect(page.getByRole('complementary', { name: 'Completed' }).getByRole('checkbox', { name: 'Done: eggs', exact: true })).toHaveCount(0); // its own box says "Send … back"
   await expect(page.getByRole('complementary', { name: 'Completed' }).getByRole('checkbox', { name: /Send "eggs" back/ })).toHaveCount(1);
 });

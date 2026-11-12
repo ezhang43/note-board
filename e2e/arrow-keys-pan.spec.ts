@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, clickEmpty, freshBoardEachTest, looseCards } from './helpers';
+import { add, box, clickEmpty, freshBoardEachTest, looseCards, toggleCompleted } from './helpers';
 
 // Owner request 2026-10-29: with nothing selected, the arrow keys pan the board (like scrolling).
 
@@ -94,7 +94,7 @@ test('a focused resize handle keeps its arrows: neither the card handles nor the
   expect(await pan(page)).toEqual(view);
 
   // The side panels' width strip only uses left / right.
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed' }).first().click();
+  await toggleCompleted(page);
   await page.getByRole('separator', { name: 'Resize completed' }).focus();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowDown');

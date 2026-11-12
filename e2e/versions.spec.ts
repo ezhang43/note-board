@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, clickEmpty } from './helpers';
+import { add, clickEmpty, toggleHistory } from './helpers';
 
 // Version history (owner request, like Google Docs): look back at earlier versions and restore one.
 
@@ -25,7 +25,7 @@ async function twoDrafts(page: Page, text: string, later: string) {
 
 test('the history lists earlier versions by day; one can be looked at, then restored (and undone)', async ({ page }) => {
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   await expect(panel.getByRole('button', { name: /Current version/ })).toBeVisible();
   await expect(panel.getByText('Today')).toBeVisible();
@@ -50,9 +50,9 @@ test('the history lists earlier versions by day; one can be looked at, then rest
   await banner.getByRole('button', { name: 'Restore this version' }).click();
   await expect(banner).toBeHidden();
   await expect(page.getByLabel('Note text').first()).toHaveValue('First draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await expect(panel.getByRole('button', { name: /card|Empty board/ })).toHaveCount(3);
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await page.keyboard.press('Control+z');
   await expect(page.getByLabel('Note text').first()).toHaveValue('Second draft');
 });
@@ -74,7 +74,7 @@ test('restoring a version brings back the Journal panel’s writing too (check o
   await page.getByLabel('Note text').first().fill('Home later');
   await clickEmpty(page);
 
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await page.getByRole('complementary', { name: 'Version history' }).getByRole('button', { name: /card/ }).first().click();
   await page.getByRole('region', { name: 'Looking at an earlier version' }).getByRole('button', { name: 'Restore this version' }).click();
   await expect(page.getByLabel('Note text').first()).toHaveValue('Home note');
@@ -85,7 +85,7 @@ test('restoring a version brings back the Journal panel’s writing too (check o
 test('versions are kept after the page is reloaded', async ({ page }) => {
   await twoDrafts(page, 'Keep me', 'Changed');
   await page.reload();
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await page.getByRole('complementary', { name: 'Version history' }).getByRole('button', { name: /card/ }).first().click();
   await expect(page.getByLabel('Note text').first()).toHaveValue('Keep me');
 });
@@ -94,7 +94,7 @@ test('a version that arrives while a card is being dragged does not crash the bo
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   const empty = panel.getByRole('button', { name: /Empty board/ });
   await expect(empty).toBeVisible();
@@ -116,7 +116,7 @@ test('a version that arrives while a card is being dragged does not crash the bo
 
 test('a version still loading when you go back, close, or press Escape does not switch the preview on', async ({ page }) => {
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   const row = panel.getByRole('button', { name: /First draft|1 card/ }).first();
   await expect(row).toBeVisible();
@@ -140,7 +140,7 @@ test('a version still loading when you go back, close, or press Escape does not 
   await expect(banner).toHaveCount(0);
   await expect(panel).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await expect(row).toBeVisible();
   await rowThen('close');
   await page.clock.runFor(300);
@@ -151,7 +151,7 @@ test('a version still loading when you go back, close, or press Escape does not 
 
 test('Escape goes back to the current board, then closes the history; one meant for something else leaves it open', async ({ page }) => {
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   const banner = page.getByRole('region', { name: 'Looking at an earlier version' });
   await panel.getByRole('button', { name: /card|Empty board/ }).first().click();
@@ -204,7 +204,7 @@ test('a version kept from just before changes from another device says so, and s
   await page.reload();
   await page.getByLabel('Note text').first().fill('Old copy from the phone');
   await clickEmpty(page);
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const row = page.getByRole('complementary', { name: 'Version history' }).getByRole('button', { name: /Before changes from another device · 1 card/ });
   await row.click();
   await expect(page.getByLabel('Note text').first()).toHaveValue('Work done here');
@@ -240,7 +240,7 @@ test.describe('on a phone', () => {
 // Job #144 (interface review): the bar's position with a wide panel, and a failed restore's message.
 test('the "Looking at an earlier version" bar stays clear of a widened history panel', async ({ page }) => {
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   const strip = (await page.getByRole('separator', { name: 'Resize version history' }).boundingBox())!;
   await page.mouse.move(strip.x + strip.width / 2, strip.y + 200);
@@ -256,7 +256,7 @@ test('the "Looking at an earlier version" bar stays clear of a widened history p
 
 test('"Couldn’t restore it" belongs to the version it failed on, not the next one looked at', async ({ page }) => {
   await twoDrafts(page, 'First draft', 'Second draft');
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   const versions = panel.getByRole('button', { name: /card|Empty board/ });
   await versions.first().click();

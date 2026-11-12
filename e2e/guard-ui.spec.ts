@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, clickEmpty, freshBoardEachTest, togglePanel } from './helpers';
 
 // Browser guards for the look and feel (review pass, job 156). Every test passes today and pins
 // something the spec promises that no other browser test checks: dark side panels, the focus ring on
@@ -21,7 +21,7 @@ test.describe('side panels on a computer set to dark mode', () => {
 
   for (const name of ['Journal', 'Habits', 'Completed', 'Focus timer', 'Version history']) {
     test(`${name}: dark background, nothing white or light-mode ink inside`, async ({ page }) => {
-      await dock(page).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+      await togglePanel(page, name);
       const panel = page.getByRole('complementary', { name, exact: true });
       await expect(panel).toBeVisible();
       expect(brightness(await panel.evaluate((el) => getComputedStyle(el).backgroundColor))).toBeLessThan(60);

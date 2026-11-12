@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded } from './helpers';
+import { fontsLoaded, toggleHistory } from './helpers';
 
 // The bottom-right bar beside an open side panel (owner request 2026-10-21, job #130: "when the side
 // bar is opened, I still want the main bottom bar items to all fit like search, completed, etc.").
@@ -25,7 +25,7 @@ async function openJournalAt(page: Page, x: number) {
   await expect.poll(async () => (await page.getByRole('complementary', { name: 'Journal' }).boundingBox())!.x).toBe(x);
 }
 
-const PILL = ['Search', 'Completed', 'Version history', 'Focus timer', 'Google Calendar', 'Journal', 'Habits'];
+const PILL = ['Search', 'Focus timer', 'Google Calendar', 'Journal', 'Habits'];
 const OTHERS = ['Keyboard shortcuts', 'Buy me a coffee', 'Smaller text', 'Larger text', 'Fit to screen', 'Zoom out', 'Reset zoom', 'Zoom in'];
 
 /** Every control is inside the window and left of the panel, and nothing sits on top of it. */
@@ -73,7 +73,7 @@ test('with room to spare the pill keeps its words, with or without a panel', asy
   await fontsLoaded(page);
   const search = dock(page).getByRole('button', { name: 'Search', exact: true });
   expect((await search.boundingBox())!.width).toBeGreaterThan(60);
-  await dock(page).getByRole('button', { name: 'Version history' }).click();
+  await toggleHistory(page);
   await expect(page.getByRole('complementary', { name: 'Version history' })).toBeVisible();
   expect((await search.boundingBox())!.width).toBeGreaterThan(60);
 });

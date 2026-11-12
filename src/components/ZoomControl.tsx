@@ -2,9 +2,8 @@ import { DONATE_URL, ZOOM_STEP } from '../model/constants';
 import { FONT_SIZES } from '../model/font';
 import { zoomLabel } from '../model/view';
 import { appStore, useAppState } from '../store/appStore';
-import { CoffeeIcon, FitIcon, HistoryIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
+import { CoffeeIcon, FitIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { usePhone } from './usePhone';
-import { CompletedButton } from './CompletedPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
 import { JournalButton } from './JournalButton';
@@ -12,12 +11,11 @@ import { HabitsButton } from './HabitsPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * labelled Search, Completed, History, Timer, Calendar (when signed in), Journal and Habits in one pill, the keyboard
+ * labelled Search, Timer, Calendar (when signed in), Journal and Habits in one pill, the keyboard
  * shortcuts (?) button, the Buy me a coffee link, text size (A− / A+) and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
   const zoom = useAppState((s) => s.view.zoom);
-  const historyOpen = useAppState((s) => s.ui.historyOpen);
   const findOpen = useAppState((s) => s.ui.find !== null);
   const note = saveNote && (
     <span className="save-note" role="status">
@@ -33,11 +31,6 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <button type="button" className="help-button dock-tool" aria-label="Search" title="Search the board (Ctrl+F)" aria-pressed={findOpen} onClick={() => (findOpen ? appStore.closeFind() : appStore.openFind())}>
         <SearchIcon />
         Search
-      </button>
-      <CompletedButton />
-      <button type="button" className="help-button dock-tool" aria-label="Version history" title="Version history" aria-pressed={historyOpen} onClick={appStore.toggleHistory}>
-        <HistoryIcon />
-        History
       </button>
       <PomodoroButton />
       <CalendarButton />

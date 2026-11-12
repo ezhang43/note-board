@@ -7,20 +7,24 @@ import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { FindMarks } from './FindMarks';
 import { CompletedIcon } from './icons';
 
-/**
- * Opens the Completed panel (Job #51): a round button by the zoom control, or a line in the ⋯ sheet
- * on a phone (`labelled`). While a search match is in the shut panel, the button is ringed.
- */
-export function CompletedButton({ labelled = false, onOpen }: { labelled?: boolean; onOpen?: () => void }) {
-  const open = useAppState((s) => s.ui.sidePanel === 'completed');
-  const findTarget = useAppState((s) => {
+/** True while the current search match is in the Completed panel and the panel is shut (the ⋯ button and the entry are ringed). */
+export const useCompletedFindTarget = () =>
+  useAppState((s) => {
     const at = s.ui.find?.current?.showInstead;
     return !!at && s.ui.sidePanel !== 'completed' && s.board.cards[at]?.kind === 'completed';
   });
+
+/**
+ * Opens the Completed panel (Job #51): a row in the ⋯ More menu on a computer, a tile in the ⋯ sheet
+ * on a phone (owner request 2026-11-12). While a search match is in the shut panel, it is ringed.
+ */
+export function CompletedButton({ onOpen }: { onOpen?: () => void }) {
+  const open = useAppState((s) => s.ui.sidePanel === 'completed');
+  const findTarget = useCompletedFindTarget();
   return (
     <button
       type="button"
-      className={[labelled ? 'tb-button' : 'help-button dock-tool', findTarget && 'find-target'].filter(Boolean).join(' ')}
+      className={['tb-button opens-panel', findTarget && 'find-target'].filter(Boolean).join(' ')}
       aria-label="Completed"
       title="Completed items"
       aria-pressed={open}

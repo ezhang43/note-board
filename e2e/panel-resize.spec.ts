@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { freshBoardEachTest } from './helpers';
+import { freshBoardEachTest, toggleCompleted, toggleHistory } from './helpers';
 
 // Every side panel can be resized like the calendar (owner request 2026-10-20, job #127): a thin
 // strip on its left edge, arrows 20px a press, double-click for the usual width, never under 300px
@@ -17,7 +17,8 @@ const PANELS = [
 ];
 type Spec = (typeof PANELS)[number];
 
-const open = (page: Page, p: Spec) => dock(page).getByRole('button', { name: p.button }).first().click();
+// Version history and Completed open from ⋯ More (owner request 2026-11-12); the others from the bottom-right pill.
+const open = (page: Page, p: Spec) => (p.name === 'Version history' ? toggleHistory(page) : p.name === 'Completed' ? toggleCompleted(page) : dock(page).getByRole('button', { name: p.button }).first().click());
 const panel = (page: Page, p: Spec) => page.getByRole('complementary', { name: p.name });
 const handle = (page: Page, p: Spec) => page.getByRole('separator', { name: p.handle });
 const width = async (page: Page, p: Spec) => (await panel(page, p).boundingBox())!.width;

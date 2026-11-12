@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, cards, fontsLoaded } from './helpers';
+import { add, box, cards, fontsLoaded, togglePanel } from './helpers';
 
 // Interface review 181 C-M1 and C-M2 (job 182): keys pressed while focus is in a toolbar menu, the
 // Share panel, the ⋯ menu or the Undo message never act on the board behind them (Delete, the arrows,
@@ -126,7 +126,7 @@ for (const name of ['Focus timer', 'Version history']) {
     await start(page);
     await add(page, 'Note');
     await page.keyboard.type('hello world');
-    await page.locator('.corner-controls').getByRole('button', { name, exact: true }).click();
+    await togglePanel(page, name);
     const panel = page.getByRole('complementary', { name });
     await expect(panel).toBeVisible();
     await page.getByLabel('Note text').focus();

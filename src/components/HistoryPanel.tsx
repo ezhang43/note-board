@@ -6,9 +6,32 @@ import { dayLabel, describeVersion, groupByDay, type VersionMeta } from '../mode
 import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion, TooBigError } from '../store/versions';
 import { collab } from '../sync/collabSession';
-import { CloseIcon } from './icons';
+import { CloseIcon, HistoryIcon } from './icons';
 import { escapeIsForPanel } from './textField';
 import { usePhone } from './usePhone';
+
+/**
+ * Opens or closes the Version history panel: a row in the ⋯ More menu on a computer, a tile in the
+ * ⋯ sheet on a phone (owner request 2026-11-12). `label` is the words shown; the name stays "Version history".
+ */
+export function HistoryButton({ label = 'Version history', onOpen }: { label?: string; onOpen?: () => void }) {
+  const open = useAppState((s) => s.ui.historyOpen);
+  return (
+    <button
+      type="button"
+      className="tb-button opens-panel"
+      aria-label="Version history"
+      aria-pressed={open}
+      onClick={() => {
+        appStore.toggleHistory();
+        onOpen?.();
+      }}
+    >
+      <HistoryIcon />
+      {label}
+    </button>
+  );
+}
 
 const timeOf = (savedAt: number) => new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 

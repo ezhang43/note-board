@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, arrange, box, cards, clickEmpty, freshBoardEachTest, grabPoint } from './helpers';
+import { add, arrange, box, cards, clickEmpty, freshBoardEachTest, grabPoint, toggleCompleted } from './helpers';
 
 // Fixes from the 2026-10-02 code review.
 
@@ -66,7 +66,7 @@ test.describe('with motion allowed', () => {
     await list.locator('[data-item-id]').first().getByLabel('Done').click();
     await (await arrange(page)).getByRole('button', { name: 'Clean up' }).click();
     await expect(list.getByLabel('Item text')).toHaveCount(1);
-    await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+    await toggleCompleted(page);
     await expect(page.getByRole('complementary', { name: 'Completed' }).getByText('first')).toBeVisible();
   });
 });

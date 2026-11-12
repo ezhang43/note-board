@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShareButton } from './SharePanel';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
-import { CoffeeIcon, HistoryIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
+import { CoffeeIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
 import {
   BrainDumpButton,
   CleanUpButton,
@@ -17,6 +17,7 @@ import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
 import { keepsBlockCursor } from './textField';
 import { CompletedButton } from './CompletedPanel';
+import { HistoryButton } from './HistoryPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
 import { JournalButton } from './JournalButton';
@@ -96,19 +97,8 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
               Search
             </button>
             <ShareButton phone />
-            <button
-              type="button"
-              className="tb-button"
-              aria-label="Version history"
-              onClick={() => {
-                setOpen(null);
-                appStore.toggleHistory();
-              }}
-            >
-              <HistoryIcon />
-              History
-            </button>
-            <CompletedButton labelled onOpen={() => setOpen(null)} />
+            <HistoryButton label="History" onOpen={() => setOpen(null)} />
+            <CompletedButton onOpen={() => setOpen(null)} />
             <PomodoroButton labelled onOpen={() => setOpen(null)} />
             <CalendarButton labelled onOpen={() => setOpen(null)} />
             <JournalButton labelled onOpen={() => setOpen(null)} />

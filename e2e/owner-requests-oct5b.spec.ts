@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, box, clickEmpty, fontsLoaded, freshBoardEachTest } from './helpers';
+import { add, box, clickEmpty, fontsLoaded, freshBoardEachTest, toggleCompleted } from './helpers';
 
 // Owner requests, 2026-10-05 (second batch): Sign out no longer cut off, "Checklist" instead of
 // "To-do list", and Clean up on each list (in its title row since job 200). (Its Miro-style arrows were removed, owner 2026-10-16.)
@@ -72,7 +72,7 @@ test('Clean up in a list’s title row moves only that list’s ticked items int
   expect(await texts(groceries)).toEqual(['eggs']);
   await expect(groceries.getByRole('button', { name: 'Clean up', exact: true })).toHaveCount(0);
   expect(await texts(chores)).toEqual(['sweep', 'dust']);
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   const done = page.getByRole('complementary', { name: 'Completed' });
   await expect(done.locator('.completed-text')).toHaveText(['bread', 'milk']);
 

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { parseWorkspace } from '../model/workspace';
+import { AI_KEY_NAMES } from '../store/ai';
 import { accountKeys } from '../store/account';
 import { sharesKey } from '../store/sharing';
 import type { Store } from '../store/store';
@@ -56,6 +57,12 @@ const DELETED_KEY = 'note-board:account-deleted';
 export function finishDeletion(store: Store, storage: Storage, uid: string, shareIds: string[], prefix = '') {
   store.replaceWorkspace(parseWorkspace(null));
   store.flush();
+  // The AI key may be kept for this tab instead (job 12b): on its own, so blocked device storage can't skip it.
+  try {
+    for (const name of AI_KEY_NAMES) sessionStorage.removeItem(name);
+  } catch {
+    // Storage blocked: no key kept for this tab.
+  }
   try {
     const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i) ?? '');
     for (const key of accountKeys(keys, uid, shareIds, storage.getItem(prefix + sharesKey(uid)), prefix)) storage.removeItem(key);

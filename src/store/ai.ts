@@ -7,7 +7,8 @@ import { useSyncExternalStore } from "react";
 // - By default it is in sessionStorage (gone when the tab or browser is closed). With "Remember on this
 //   device" it is in localStorage instead. It is saved with the id of the person it belongs to, and
 //   getKey only gives it back to that person, so a second account on this browser never sees it.
-// - Every storage name is in AI_STORAGE_KEYS, so signing out and deleting an account (job 12b) can clear them.
+// - Every storage name is in AI_STORAGE_KEYS. Signing out, a change of person (dropAiKeyUnlessFor) and deleting an
+//   account (AI_KEY_NAMES in accountKeys) clear the key and whose it is; the model, limit and count are device settings and stay (job 12b).
 // - Every read and write is wrapped: blocked or full storage means "no key", never a crash.
 
 const KEY_NAME = "note-board:ai-key";
@@ -24,6 +25,24 @@ export const AI_STORAGE_KEYS = [
   CAP_NAME,
   USES_NAME,
 ] as const;
+/** The secret part of AI_STORAGE_KEYS: the key and whose it is (cleared on sign-out, a change of person and account delete). */
+export const AI_KEY_NAMES: readonly string[] = [KEY_NAME, KEY_USER_NAME];
+
+/**
+ * For the sign-in watcher (src/sync/firebase.ts): removes the key and whose it is from `places` unless it is
+ * `uid`'s. Signed out (`uid` null) it always goes, even one saved with no one signed in. Blocked storage is skipped.
+ */
+export function dropAiKeyUnlessFor(places: (() => Storage)[], uid: string | null) {
+  for (const get of places) {
+    try {
+      const place = get();
+      if (uid === null || place.getItem(KEY_USER_NAME) !== uid)
+        AI_KEY_NAMES.forEach((n) => place.removeItem(n));
+    } catch {
+      // Blocked storage: nothing kept there to clear.
+    }
+  }
+}
 
 export const AI_MODELS = [
   { id: "claude-haiku-5-5", name: "Haiku 5.5", note: "Fast, cheapest" },
@@ -156,7 +175,7 @@ export function createAiStore({
       changed();
       return true;
     },
-    /** Removes the key from this browser (both places). Signing out and deleting an account call this too (job 12b). */
+    /** Removes the key from this browser (both places). (Signing out and deleting an account clear the same names directly, job 12b.) */
     forgetKey() {
       wipeKey();
       changed();

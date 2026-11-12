@@ -275,3 +275,65 @@ describe('the calendar access kept on this device (job 103, owner check of PR #9
     expect(fire(null)).toEqual([null]);
   });
 });
+
+describe('the AI key kept in this browser (wow plan, job 12b)', () => {
+  // The sign-in watcher clears the person's own Anthropic key, and whose it is, from both storages on
+  // sign-out and on a change of person; the device's AI choices (model, limit, count) stay.
+  const data = new Map<string, string>();
+  const tab = new Map<string, string>();
+  const fake = (m: Map<string, string>) => ({ getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
+  const SECRET = 'sk-ant-api03-SECRET-abcd1234';
+  const keyNames = ['note-board:ai-key', 'note-board:ai-key-user'];
+  const devicePrefs = ['note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses'];
+  beforeEach(() => {
+    data.clear();
+    tab.clear();
+    vi.stubGlobal('localStorage', fake(data));
+    vi.stubGlobal('sessionStorage', fake(tab));
+    for (const m of [data, tab]) {
+      m.set('note-board:ai-key', SECRET);
+      m.set('note-board:ai-key-user', 'u1');
+    }
+    data.set('note-board:ai-model', 'claude-sonnet-5-5');
+    data.set('note-board:ai-cap', '50');
+    data.set('note-board:ai-uses', JSON.stringify({ month: '2026-11', count: 3 }));
+  });
+  const fire = (u: { uid: string } | null) => {
+    const seen: unknown[] = [];
+    watchUser((x) => void seen.push(x));
+    (vi.mocked(auth.onAuthStateChanged).mock.calls.at(-1)![1] as (u: unknown) => void)(u);
+    return seen;
+  };
+
+  it('is kept, in both storages, when the same person is still signed in after a reload', () => {
+    fire({ uid: 'u1' });
+    for (const m of [data, tab]) expect(m.get('note-board:ai-key')).toBe(SECRET);
+    for (const m of [data, tab]) expect(m.get('note-board:ai-key-user')).toBe('u1');
+  });
+
+  it('is cleared from both storages on sign-out; the model, limit and count stay', () => {
+    expect(fire(null)).toEqual([null]);
+    for (const m of [data, tab]) for (const k of keyNames) expect(m.has(k)).toBe(false);
+    for (const k of devicePrefs) expect(data.has(k)).toBe(true);
+  });
+
+  it('is cleared from both storages when another person signs in', () => {
+    fire({ uid: 'u2' });
+    for (const m of [data, tab]) for (const k of keyNames) expect(m.has(k)).toBe(false);
+    for (const k of devicePrefs) expect(data.has(k)).toBe(true);
+  });
+
+  it('a key saved with no one signed in goes on sign-out too', () => {
+    for (const m of [data, tab]) m.set('note-board:ai-key-user', '');
+    fire(null);
+    for (const m of [data, tab]) expect(m.has('note-board:ai-key')).toBe(false);
+  });
+
+  it('blocked or missing storage never stops the sign-in watcher', () => {
+    const blocked = { getItem: () => { throw new Error('blocked'); }, setItem() {}, removeItem: () => { throw new Error('blocked'); } };
+    vi.stubGlobal('localStorage', blocked);
+    vi.stubGlobal('sessionStorage', blocked);
+    expect(fire({ uid: 'u2' })).toEqual([{ uid: 'u2' }]);
+    expect(fire(null)).toEqual([null]);
+  });
+});

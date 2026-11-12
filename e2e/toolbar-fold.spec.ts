@@ -145,6 +145,8 @@ test('Sign out from ⋯ does what the toolbar button does', async ({ page }) => 
   });
   await more(page).click();
   await moreMenu(page).getByRole('button', { name: 'Sign out', exact: true }).click();
+  // It asks first (owner request, 2026-11-12); confirming signs out.
+  await page.getByRole('alertdialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect.poll(() => said.join()).toContain('Sign out');
 });
 

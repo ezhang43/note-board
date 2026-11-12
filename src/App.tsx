@@ -3,7 +3,7 @@ import './appFonts';
 import { Canvas } from './components/Canvas';
 import { CommentThread } from './components/Comments';
 import { EstimatePicker } from './components/Estimate';
-import { ConfirmDialog } from './components/ConfirmDialog';
+import { ask, ConfirmDialog } from './components/ConfirmDialog';
 import { UndoToast } from './components/UndoToast';
 import { DeleteCompleted } from './components/DeleteCompleted';
 import { DeleteAccountPanel } from './components/DeleteAccountPanel';
@@ -47,7 +47,8 @@ const closeHabits = () => appStore.toggleSidePanel('habits');
 
 /**
  * `onSignOut` and `saveNote` ("Saving…" / "Saved" / offline) are given on the published site, where
- * the board is synced to its owner's account.
+ * the board is synced to its owner's account. Every Sign out on the board (toolbar, folded ⋯, phone ⋯)
+ * asks first (owner request, 2026-11-12); the ones on the sign-in screen's own error cards don't.
  */
 export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?: string | null }) {
   useShortcuts();
@@ -57,6 +58,13 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
     if (saveNote === null) announce('Couldn’t save online. Changes are on this device only.');
   }, [saveNote]);
   const phone = usePhone();
+  // Saved (or being saved: signing out sends those first) means the reassurance is true; any other
+  // note (offline, couldn't save, held) means some changes may not be online yet, and it says so.
+  const allSent = saveNote === 'Saved' || saveNote === 'Saving…' || saveNote === undefined;
+  const signOut = onSignOut && (async () => {
+    const body = allSent ? 'Your boards stay saved online. You can sign in again any time.' : 'Some of your latest changes haven’t been saved online yet, so they may be missing when you sign in again.';
+    if (await ask({ title: 'Sign out?', body, action: 'Sign out' })) onSignOut();
+  });
   const previewing = useAppState((s) => s.ui.preview !== null);
   const viewOnly = useViewOnly();
   const sidePanel = useAppState((s) => s.ui.sidePanel);
@@ -79,9 +87,9 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   return (
     <div className={classes} style={style}>
       <LiveRegion />
-      <Toolbar onSignOut={onSignOut} />
+      <Toolbar onSignOut={signOut} />
       <Canvas />
-      {phone && <PhoneBar onSignOut={onSignOut} />}
+      {phone && <PhoneBar onSignOut={signOut} />}
       {phone && <ItemBar />}
       <ZoomControl saveNote={saveNote} />
       <FindBar />

@@ -242,7 +242,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           }
         }}
       />
-      {/* Its time estimate (job saved-estimate-doneon), after the text once set (no clock to add one on an item: see Estimate.tsx). */}
+      {/* Its time estimate (job saved-estimate-doneon): the pill after the text once set, else the clock in the hover strip (job item-estimate-clock; see Estimate.tsx and the styles). */}
       <EstimateChip cardId={cardId} itemId={item.id} estimate={item.estimate} />
       {/* Move up / down in a small pill over the free end of the row above (below the first row), on hover or keyboard focus, like the phone's item bar and Ctrl+Shift+Up / Down (owner request, 2026-10-18; the pill, 2026-10-22). */}
       {/* Faded (aria-disabled) at the end of its level; a list of one item has nothing to move, so no pill. The cursor goes into the item, as with the keyboard. */}

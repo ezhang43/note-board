@@ -3,7 +3,8 @@ import { fontsLoaded } from './helpers';
 
 // Time estimates and the day an item was ticked (job saved-estimate-doneon). A note and each checklist item can carry a
 // time estimate in whole minutes (1 to 24 hours). A note sets or clears it from a small button in its header; an item
-// shows it after its text once set (by the connector) and changes or clears it from there (no clock to add one on an item). It opens a small box with a few quick choices, a Minutes box and Clear. Both are saved with the
+// from a faint clock in its hover strip (owner decision 2026-11-11), and once set shows the estimate after its text and
+// changes or clears it from there. It opens a small box with a few quick choices, a Minutes box and Clear. Both are saved with the
 // board (format 6), so they are still there after a reload. Ticking an item saves the day it was ticked; unticking clears it.
 
 async function seed(page: Page, estimate?: number) {
@@ -173,15 +174,110 @@ test('at the biggest text a note keeps its two buttons on one line: no clock, an
   await expect(note(page).getByRole('button', { name: 'Add a time estimate' })).toBeHidden();
 });
 
-test('an item without an estimate has no clock, so nothing covers the end of its text', async ({ page }) => {
+test('an item shows a faint clock in its hover strip; it sets an estimate in one undo step and the keyboard goes back to it', async ({ page }) => {
+  const text = row(page).getByLabel('Item text');
+  const clock = row(page).getByRole('button', { name: 'Add a time estimate' });
+  await expect(clock).toHaveCSS('opacity', '0'); // faint until the pointer is over the row
+  await row(page).hover();
+  await expect(clock).toHaveCSS('opacity', '1');
+  // It sits in the strip after the text, never over it.
+  const t = (await text.boundingBox())!;
+  const c = (await clock.boundingBox())!;
+  expect(c.x).toBeGreaterThanOrEqual(t.x + t.width - 0.5);
+  await clock.click();
+  await expect(picker(page)).toBeVisible();
+  await picker(page).getByRole('button', { name: '30m' }).click();
+  const pill = row(page).getByRole('button', { name: 'Time estimate: 30m' });
+  await expect(pill).toBeFocused();
+  await expect.poll(async () => (await saved(page)).item?.estimate).toBe(30);
+  await page.keyboard.press('Control+z'); // one step
+  await expect(row(page).getByRole('button', { name: /^Time estimate:/ })).toHaveCount(0);
+  await expect.poll(async () => 'estimate' in ((await saved(page)).item ?? {})).toBe(false);
+  await expect(clock).toBeVisible();
+});
+
+test('the end of an item\'s text still takes clicks: the clock is beside it, not over it', async ({ page }) => {
   const text = row(page).getByLabel('Item text');
   await row(page).hover();
-  await expect(row(page).getByRole('button', { name: 'Add a time estimate' })).toHaveCount(0);
-  // A click at the very end of the text lands in the text (Shift+click there picks items).
   const t = (await text.boundingBox())!;
   await page.mouse.click(t.x + t.width - 3, t.y + t.height / 2);
   await expect(text).toBeFocused();
+  await expect(picker(page)).toBeHidden();
+});
+
+test('an item with an estimate keeps the strip: its pill is in the row and the clock is gone', async ({ page }) => {
+  await seed(page, 45);
+  await row(page).hover();
   await expect(row(page).getByRole('button', { name: 'Add a time estimate' })).toHaveCount(0);
+  await expect(row(page).getByRole('button', { name: 'Time estimate: 45m' })).toBeVisible();
+});
+
+test('after Ctrl+Z in the Minutes box the box shows the undone value, so Enter does not put the old one back', async ({ page }) => {
+  await seed(page, 45);
+  await row(page).getByRole('button', { name: 'Time estimate: 45m' }).click();
+  await picker(page).getByRole('button', { name: '30m' }).click(); // 45 -> 30, one undo step
+  const pill = row(page).getByRole('button', { name: 'Time estimate: 30m' });
+  await pill.click();
+  const minutes = picker(page).getByLabel('Minutes');
+  await expect(minutes).toHaveValue('30');
+  await page.keyboard.press('Control+z'); // back to 45, with the box still open
+  await expect(row(page).getByRole('button', { name: 'Time estimate: 45m' })).toBeVisible();
+  await expect(minutes).toHaveValue('45');
+  await minutes.press('Enter');
+  await expect(row(page).getByRole('button', { name: 'Time estimate: 45m' })).toBeVisible();
+  await expect.poll(async () => (await saved(page)).item?.estimate).toBe(45);
+});
+
+test('clicking the open pill again closes the box and the keyboard goes back to the pill', async ({ page }) => {
+  await seed(page, 45);
+  const pill = row(page).getByRole('button', { name: 'Time estimate: 45m' });
+  await pill.click();
+  await expect(picker(page)).toBeVisible();
+  await expect(pill).toHaveAttribute('aria-expanded', 'true');
+  await pill.click();
+  await expect(picker(page)).toBeHidden();
+  await expect(pill).toHaveAttribute('aria-expanded', 'false');
+  await expect(pill).toBeFocused();
+  // The same on a note's clock.
+  await note(page).hover();
+  const clock = note(page).getByRole('button', { name: 'Add a time estimate' });
+  await clock.click();
+  await clock.click();
+  await expect(picker(page)).toBeHidden();
+  await expect(clock).toBeFocused();
+});
+
+test('the open box does not measure itself again for a board change that leaves its button where it was', async ({ page }) => {
+  await note(page).getByLabel('Note text').click();
+  await page.keyboard.type('x'); // an undo step to undo while the box is open
+  await row(page).hover();
+  await row(page).getByRole('button', { name: 'Add a time estimate' }).click();
+  await expect(picker(page)).toBeVisible();
+  await page.evaluate(() => {
+    const w = window as unknown as { sizeReads: number };
+    w.sizeReads = 0;
+    const box = document.querySelector('.estimate-picker')!;
+    const get = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!.get!;
+    Object.defineProperty(box, 'offsetWidth', { get() { w.sizeReads++; return get.call(this); } });
+  });
+  await page.keyboard.press('Control+z'); // the note's text changes; the item's button does not move
+  await expect(note(page).getByLabel('Note text')).not.toHaveValue(/x$/);
+  await expect(picker(page)).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sizeReads: number }).sizeReads)).toBe(0);
+});
+
+test('the open box follows its button when the board is moved', async ({ page }) => {
+  await seed(page, 45);
+  await row(page).getByRole('button', { name: 'Time estimate: 45m' }).click();
+  const gap = async () => {
+    const p = (await picker(page).boundingBox())!;
+    const c = (await row(page).getByRole('button', { name: 'Time estimate: 45m' }).boundingBox())!;
+    return { dx: Math.round(p.x + p.width - (c.x + c.width)), dy: Math.round(p.y - (c.y + c.height)) };
+  };
+  const before = await gap();
+  await page.mouse.move(900, 600);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(gap).toEqual(before);
 });
 
 test('ticking an item saves the day it was ticked; unticking clears it', async ({ page }) => {

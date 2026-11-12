@@ -8,7 +8,7 @@ import { add, clickEmpty, freshBoardEachTest, rowSpace } from './helpers';
 freshBoardEachTest();
 
 const SPLITWISE = 'Splitwise -- finish up credit card payment and check through and pay back and settle';
-const CHECK_UP = 'Check up on leatherworking again';
+const CHECK_UP = 'Check up on leather again'; // (short enough that "again" stays on the first line of the narrower text column, with the estimate clock's strip)
 
 async function makeList(page: Page, texts: string[]) {
   await clickEmpty(page);

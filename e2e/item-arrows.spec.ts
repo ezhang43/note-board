@@ -67,17 +67,17 @@ test('at the top or bottom of its level an arrow is faded and does nothing', asy
   await expect(row(list, 1).getByRole('button', { name: 'Move down' })).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('the text keeps the whole row but for a 46px strip, and nothing on hover covers or moves it', async ({ page }) => {
+test('the text keeps the whole row but for a 72px strip (46px, and 26px more for the estimate clock), and nothing on hover covers or moves it', async ({ page }) => {
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap', 'Second', 'Third']);
   await page.mouse.move(0, 0);
   const r = row(list, 1);
   const field = r.getByLabel('Item text');
   const rowBox = await box(r);
   const before = await box(field);
-  // Only the trash can and the grip keep room: 46px, so the text column is most of the row.
-  await expect(r).toHaveCSS('padding-right', '46px');
-  expect(Math.abs(before.x + before.width - (rowBox.x + rowBox.width - 46))).toBeLessThan(1);
-  expect(before.width).toBeGreaterThan(rowBox.width * 0.6);
+  // Only the trash can, the grip and the estimate clock keep room: 46px and 26px, so the text column is most of the row.
+  await expect(r).toHaveCSS('padding-right', '72px');
+  expect(Math.abs(before.x + before.width - (rowBox.x + rowBox.width - 72))).toBeLessThan(1);
+  expect(before.width).toBeGreaterThan(rowBox.width * 0.5); // (was 0.6 before the 26px clock room: 116px of a 214px row)
   await r.hover();
   const after = await box(field);
   expect(after.width).toBe(before.width);
@@ -86,7 +86,7 @@ test('the text keeps the whole row but for a 46px strip, and nothing on hover co
     expect(after.x + after.width).toBeLessThanOrEqual(b.x);
   }
   const g = await box(r.getByRole('button', { name: 'Drag item' }));
-  expect(g.x + g.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  expect(g.x + g.width).toBeLessThanOrEqual(rowBox.x + rowBox.width - 26); // (the clock is beyond it)
   // Move up / Move down are in a pill just above the row, over the free strip of the row above: clear of that row's text too.
   const pill = await box(r.locator('.item-arrows'));
   const above = await box(row(list, 0).getByLabel('Item text'));
@@ -185,17 +185,18 @@ async function checkControls(row: Locator, first: boolean) {
   [18, 18, 16, 10].forEach((w, i) => near(icons[i].w, w * sw));
   near(icons[3].h, 15 * sw);
   const r = await box(row);
-  // The trash can and the grip: one line, flush, the grip flush with the row's right end, inside the row.
+  const clock = fs >= 2.25 ? 0 : 26; // the estimate clock's room at the row's right end (none from 225% text up)
+  // The trash can and the grip: one line, flush, the grip flush with the clock's room at the row's right end, inside the row.
   expect(trash.y).toBe(grip.y);
   near(trash.x + trash.width, grip.x);
-  near(grip.x + grip.width, r.x + r.width);
+  near(grip.x + grip.width, r.x + r.width - clock);
   expect(trash.y).toBeGreaterThanOrEqual(r.y);
   expect(trash.y + trash.height).toBeLessThanOrEqual(r.y + r.height);
   // The pill: Move up beside Move down, over the strip (46px, grown with the text size) at the row's right end,
   // above the row (the first row: below it), touching it.
   expect(up.y).toBe(down.y);
   near(up.x + up.width, down.x);
-  expect(down.x + down.width).toBeLessThanOrEqual(r.x + r.width + 0.5);
+  expect(down.x + down.width).toBeLessThanOrEqual(r.x + r.width + 0.5); // (the pill stays at the row's end: it is above the row, not over the clock)
   expect(up.x).toBeGreaterThanOrEqual(r.x + r.width - 46 * sw - 0.5);
   if (first) expect(up.y).toBeGreaterThanOrEqual(r.y + r.height - 3);
   else expect(up.y + up.height).toBeLessThanOrEqual(r.y + 3);
@@ -279,8 +280,8 @@ test.describe('touch screen', () => {
     await expect(page.getByRole('toolbar', { name: 'Item actions' }).getByRole('button', { name: 'Move up' })).toBeVisible();
     await expect(list.getByRole('button', { name: 'Move up' })).toHaveCount(0);
     await expect(row(list, 1).locator('.item-arrow').first()).toBeHidden();
-    // No room is kept for buttons that never show here, nor for the trash can the phone layout has no row button for: the strip is the grip's 14px plus a gap.
-    await expect(row(list, 1)).toHaveCSS('padding-right', '24px');
+    // No room is kept for buttons that never show here, nor for the trash can the phone layout has no row button for: the strip is the estimate clock's 26px, and before it room for a parent's whole count (2.5 times the 16px text: 40px, job item-estimate-clock; the grip is 14px of it).
+    await expect(row(list, 1)).toHaveCSS('padding-right', '66px');
     // The bigger computer sizes do not reach a touch screen: the grip keeps its size.
     await expect(row(list, 1).getByRole('button', { name: 'Delete item' })).toBeHidden(); // phone layout: Delete is in the item bar
     const grip = row(list, 1).getByRole('button', { name: 'Drag item' });

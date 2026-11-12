@@ -2,10 +2,10 @@
 // the disc's half width (the core's edge is INNER, the rim OUTER), angles are in radians, and the disc
 // is seen tilted, so it shows as a squashed ellipse that turns slowly.
 
-export const INNER = 0.2;
+export const INNER = 0.27;
 export const OUTER = 1;
 /** How much the disc is squashed up and down by its tilt (1 is seen from straight above). */
-export const TILT = 0.42;
+export const TILT = 0.55;
 /** Empty space between wedges (radians, shrunk for many wedges) and between rings of cells (share of one ring). */
 const WEDGE_GAP = 0.035;
 const CELL_GAP = 0.12;
@@ -53,22 +53,32 @@ export function project(a: number, r: number, spin: number, cx: number, cy: numb
   return { x: cx + Math.cos(a + spin) * r * rx, y: cy + Math.sin(a + spin) * r * rx * TILT };
 }
 
+/** How far the core floats above the middle of the disc, as a share of the disc's half width. The pillar runs through it down to the hub. */
+export const CORE_LIFT = 0.3;
+
+/** Where the core is, for a disc centered at cx, cy with half width rx. */
+export function coreAt(cx: number, cy: number, rx: number): { x: number; y: number } {
+  return { x: cx, y: cy - CORE_LIFT * rx };
+}
+
 /**
- * Light warping into the core (owner request, 2026-11-12). One item's trip, `progress` 0 to 1: a bright
- * beam shoots in from beyond the top of the canvas onto its cell (until STRIKE), a flash and a ring burst
- * on the cell and it lights, a comet runs from the cell along an arc into the core (STRIKE to 1), and the
- * core flares as it arrives.
+ * Light warping into the core (owner request, 2026-11-12; reshaped the same day to match the video the
+ * owner sent). One item's trip, `progress` 0 to 1: a thin beam shoots in from beyond the top of the canvas
+ * onto its cell (until STRIKE), a white dot and a small ring show where it lands and the cell lights; the
+ * beam lingers a moment, then a burst of small particles fans out from the cell along curved paths into the
+ * core (COMET_START to 1), and the core flares as they arrive.
  */
 export const STRIKE = 0.25;
-/** How much of the trip the beam takes to fade after it lands, the ring to open, and the comet to fade into the core. */
-const BEAM_FADE = 0.1;
+/** The particles leave the cell this far into the trip, after the beam and its ring have lingered a moment. */
+export const COMET_START = 0.35;
+/** How much of the trip the beam takes to fade after it lands, the ring to open, and the particles to fade into the core. */
+const BEAM_FADE = 0.2;
 const PING_SPAN = 0.3;
 /** How much of the trip the impact flash lasts. */
 const FLASH_SPAN = 0.08;
-const COMET_FADE = 0.12;
-/** The core flares around this point of the trip, as the comet goes in. */
-const FLARE_AT = 0.9;
-const FLARE_WIDTH = 0.1; // FLARE_AT + FLARE_WIDTH is 1: the flare is spent as the trip ends
+/** The core flares up over FLARE_RISE of the trip and peaks at FLARE_AT, when the particles are nearly in; it is spent as the trip ends. */
+const FLARE_AT = 0.95;
+const FLARE_RISE = 0.3;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -78,9 +88,8 @@ export interface WarpPhase {
   beamAlpha: number;
   /** How far open the ring on the cell is (0 to 1), null when there is no ring. */
   ping: number | null;
-  /** How far along its arc the comet is (0 at the cell, 1 in the core), null before the beam has landed. */
+  /** How far along the burst of particles is (0 at the cell, 1 in the core), null until they leave the cell. */
   comet: number | null;
-  cometAlpha: number;
   /** How bright the flash where the beam lands is: 1 at the strike, gone FLASH_SPAN of the trip later. */
   flash: number;
   /** How hard the core is flaring from this item (0 to 1). */
@@ -92,15 +101,14 @@ export function warpPhase(progress: number): WarpPhase {
   const drop = clamp01(p / STRIKE);
   const struck = p >= STRIKE;
   const ping = struck && p - STRIKE <= PING_SPAN ? (p - STRIKE) / PING_SPAN : null;
-  const comet = struck ? (p - STRIKE) / (1 - STRIKE) : null;
+  const comet = p >= COMET_START ? (p - COMET_START) / (1 - COMET_START) : null;
   return {
     beam: drop * drop, // it falls, so it speeds up
     beamAlpha: struck ? clamp01(1 - (p - STRIKE) / BEAM_FADE) : 1,
     ping,
     comet,
-    cometAlpha: comet === null ? 0 : clamp01((1 - comet) / COMET_FADE),
     flash: struck ? clamp01(1 - (p - STRIKE) / FLASH_SPAN) : 0,
-    flare: clamp01(1 - Math.abs(p - FLARE_AT) / FLARE_WIDTH),
+    flare: p < FLARE_AT ? clamp01(1 - (FLARE_AT - p) / FLARE_RISE) : clamp01((1 - p) / (1 - FLARE_AT)),
   };
 }
 
@@ -108,8 +116,6 @@ export function warpPhase(progress: number): WarpPhase {
 export const BEAM_RISE = 60;
 /** How far a beam leans outwards: a share of its cell's distance from the middle column. */
 const BEAM_SLANT = 0.18;
-/** The length of a beam's tail behind its head, as a share of its whole fall. */
-const BEAM_TAIL = 0.55;
 
 /** Where a beam starts: above the canvas, leaning out from the middle column `cx`, so it shoots down and inwards onto its cell `to`. */
 export function beamStart(to: { x: number; y: number }, cx: number): { x: number; y: number } {
@@ -121,25 +127,48 @@ export function beamPoint(from: { x: number; y: number }, to: { x: number; y: nu
   return { x: from.x + (to.x - from.x) * p, y: from.y + (to.y - from.y) * p };
 }
 
-/** Where the tail of a beam whose head is `head` (0 to 1) of the way down ends, on the same scale (never before the start). */
-export function beamTail(head: number): number {
-  return Math.max(0, head - BEAM_TAIL);
-}
-
 /**
- * The light pillar through the core (owner request, 2026-11-12): always faintly there, wider and brighter
+ * The light pillar through the core (owner request, 2026-11-12): always there (so the core stays bright between arrivals), wider and brighter
  * as the core flares (`flare` 0 to 1). `width` is a multiple of its resting width, `alpha` how bright it is.
  */
 export function pillarLevel(flare: number): { width: number; alpha: number } {
   const f = clamp01(flare);
-  return { width: 1 + 1.4 * f, alpha: 0.4 + 0.6 * f };
+  return { width: 1 + 1.4 * f, alpha: 0.6 + 0.4 * f };
 }
 
-/** A comet `p` (0 to 1) of the way along its arc from a cell `from` into the core `to`: it climbs in a curve and speeds up as it is drawn in. */
-export function warpAt(from: { x: number; y: number }, to: { x: number; y: number }, p: number): { x: number; y: number } {
-  const lift = Math.hypot(to.x - from.x, to.y - from.y) * 0.4 + 16;
-  const e = p * p; // slow off the cell, quickest into the core
-  return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e - Math.sin(Math.PI * p) * lift };
+/** How many small lights make up the burst that runs from a cell into the core. */
+export const PARTICLES = 5;
+/** The most a particle may hold back, as a share of the burst's run (the first one never does). */
+export const PARTICLE_DELAY = 0.15;
+
+/**
+ * How particle `k` of item `item` fans out: `spread` (-1 to 1) is how far to the left or right its path
+ * bends, `delay` how long it holds back. Worked out from the two numbers alone, so the same item always
+ * looks the same and nothing is random while drawing. Particle 0 is the leader: nearly straight, no delay.
+ */
+export function particleSeed(item: number, k: number): { spread: number; delay: number } {
+  const h = Math.imul(item * 31 + k * 17 + 7, 2654435761) >>> 0;
+  const h2 = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; // a second round, so the delay does not follow the bend
+  const spread = ((h >>> 8) % 2001) / 1000 - 1;
+  const delay = (((h2 >>> 8) % 1000) / 1000) * PARTICLE_DELAY;
+  return k === 0 ? { spread: spread * 0.25, delay: 0 } : { spread, delay };
+}
+
+/**
+ * A particle `q` (0 to 1) of the way along its curve from a cell `from` into the core `to`: it climbs in an
+ * arc that leans to one side by `spread` and speeds up as it is drawn in. All the paths of a burst start on
+ * the cell and meet in the core, and fan out in between.
+ */
+export function particleAt(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number): { x: number; y: number } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  // A quadratic curve: the control point sits above the middle of the line, pushed sideways by the spread.
+  const cx = from.x + dx / 2 + (-dy / len) * spread * len * 0.3;
+  const cy = from.y + dy / 2 - len * 0.35 + (dx / len) * spread * len * 0.3;
+  const e = Math.pow(clamp01(q), 1.5); // slow off the cell, quickest into the core
+  const u = 1 - e;
+  return { x: u * u * from.x + 2 * u * e * cx + e * e * to.x, y: u * u * from.y + 2 * u * e * cy + e * e * to.y };
 }
 
 /** The most characters of a board name that are ever measured or drawn round the ring. */

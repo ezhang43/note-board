@@ -3,7 +3,7 @@ import { BOARD_KEY, OWNER_KEY, UNREADABLE_KEY, VIEW_KEY, type StorageLike } from
 import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } from '../model/workspace';
 import { ACCESS_KEY } from '../model/calendar';
 import { JOURNAL_KNOWN_KEY } from '../model/journal';
-import { AI_KEY_NAMES } from './ai';
+import { AI_KEY_NAMES } from '../model/aiKey';
 import { baseKey, commentsSeenKey, ownBoardsKey, sharesKey } from './sharing';
 import type { Store } from './store';
 import { dataKey, LIST_KEY } from './versions';

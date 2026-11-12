@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
 import { dropAccess, keepAccess, readAccess } from '../model/calendar';
-import { dropAiKeyUnlessFor } from '../store/ai';
+import { dropAiKeyUnlessFor } from '../model/aiKey';
 import { AUTH_DOMAIN } from './firebaseProject';
 
 // Sign-in only, so the sign-in screen downloads no more of Firebase than it needs (job 169); the

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { parseWorkspace } from '../model/workspace';
-import { AI_KEY_NAMES } from '../store/ai';
+import { AI_KEY_NAMES } from '../model/aiKey';
 import { accountKeys } from '../store/account';
 import { sharesKey } from '../store/sharing';
 import type { Store } from '../store/store';

@@ -3,6 +3,7 @@ import { ShareButton } from './SharePanel';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { CoffeeIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
 import {
+  AiSettingsButton,
   BrainDumpButton,
   CleanUpButton,
   CollapseAllButton,
@@ -138,6 +139,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
               <FileMenu />
               <AppearanceMenu labelled />
               <FeedbackButton onOpen={() => setOpen(null)} />
+              <AiSettingsButton onOpen={() => setOpen(null)} />
               <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
                 <InfoIcon />
                 About BusyAnts

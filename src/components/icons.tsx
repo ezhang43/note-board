@@ -444,6 +444,16 @@ export function FeedbackIcon() {
   );
 }
 
+/** A key: AI settings (the person's own Anthropic key). */
+export function KeyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l9-9M16 7l3 3M14 9l2 2" />
+    </svg>
+  );
+}
+
 /** The main checklist (owner request, 2026-11-12): a clipboard with two ticked lines (Add Checklist's icon is the bare lines). */
 export function ClipboardCheckIcon() {
   return (

@@ -2266,6 +2266,39 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   .brain-dump-preview ul { max-height: 28vh; }
   .brain-dump .confirm-actions button { height: 48px; font-size: 15px; }
 }
+/* AI settings (wow plan, job 12a): the shortcuts panel's frame; a bottom sheet on a phone. */
+.ai-settings { width: min(520px, 100%); }
+.ai-warning { margin: 12px 0; padding: 10px 12px; font-size: 13px; color: var(--ink); background: var(--accent-soft); border-radius: 8px; }
+.ai-warning ul { margin: 4px 0 0; padding-left: 18px; }
+.ai-warning li + li { margin-top: 2px; }
+.ai-field { display: block; min-width: 0; margin: 14px 0 0; padding: 0; border: 0; font-size: 14px; }
+.ai-field > label, .ai-field > legend { padding: 0; font-weight: 600; }
+.ai-saved { margin: 2px 0 6px; font-size: 13px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.ai-key-row { display: flex; gap: 8px; }
+.ai-key-row input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; }
+.ai-settings :is(.confirm-send, .ai-forget) { height: 36px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; }
+.ai-settings .ai-forget { border: 1px solid var(--control-edge); background: var(--surface); color: var(--ink); }
+.ai-settings .confirm-send { color: var(--on-accent); }
+.ai-settings :is(.confirm-send, .ai-forget):disabled { opacity: 0.5; cursor: default; }
+.ai-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; font-weight: 400; }
+.ai-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.ai-check-hint { margin: 2px 0 0 24px; }
+.ai-bad { color: var(--danger); }
+.ai-model { margin-top: 6px; }
+.ai-model-note { margin-left: auto; font-size: 12px; color: var(--ink-soft); }
+.ai-cap { display: block; width: 110px; height: 36px; margin-top: 6px; padding: 0 10px; box-sizing: border-box; }
+@media (max-width: 599px) {
+  .ai-settings-backdrop { align-items: flex-end; padding: 0; }
+  .ai-settings { width: 100%; max-height: 92vh; max-height: 92dvh; padding: 14px 16px max(16px, env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; transform-origin: bottom center; }
+  .ai-settings .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  /* 16px so the phone does not zoom the page when a box takes the cursor. */
+  .ai-settings .feedback-text { font-size: 16px; }
+  .ai-key-row input, .ai-cap { height: 44px; }
+  .ai-settings :is(.confirm-send, .ai-forget) { height: 48px; font-size: 15px; }
+  .ai-check { min-height: 44px; margin-top: 0; }
+  .ai-check input { width: 20px; height: 20px; }
+}
+
 .confirm-send { border: none; background: var(--accent); color: var(--on-accent); }
 
 /* Web addresses in a note, as links under its text (owner request). */

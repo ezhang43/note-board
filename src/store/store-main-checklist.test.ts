@@ -104,14 +104,18 @@ describe('Checklist panel', () => {
     const s = setup();
     s.addCard('note');
     const note = Object.keys(s.getState().board.cards)[0];
-    s.select([note]);
+    s.select(note);
     s.openChecklist();
     const { p, list } = panel(s);
-    s.select([note]); // still selected behind the panel
+    s.select(note); // still selected behind the panel
     expect(p.deleteSelection()).toBe(false);
     p.itemBackspace(list().id, list().items[0].id);
     expect(s.getState().board.cards[note]).toBeDefined();
     expect(list()).not.toBeNull(); // the panel's list is never deleted
+    p.select(list().id); // a press on its row selects it, as on the board
+    expect(p.deleteSelection()).toBe(false);
+    p.deleteCard(list().id);
+    expect(list()).not.toBeNull();
   });
 
   it('ticked items clean up into the checklist board’s own Completed record, and come back', () => {

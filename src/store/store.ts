@@ -95,6 +95,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
         ...gestureActions(s),
         ...checklistActions(s, itemClip),
         ...formatActions(s),
+        // The panel's one list is never deleted from it, whatever is selected (block keys stay on the open board).
+        deleteSelection: () => false,
+        deleteCard: () => {},
       };
       scopedStores.set(id, made);
       return made;

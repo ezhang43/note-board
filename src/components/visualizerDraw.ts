@@ -1,15 +1,18 @@
-import { INNER, OUTER, STRIKE, TILT, beamPoint, beamStart, beamTail, cellArea, cellCentre, fitLabel, pillarLevel, project, warpAt, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, particleAt, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 
-// Draws the Visualizer's ring on one canvas (owner request 2026-11-12). Nothing here touches React
-// state or the board: it is handed the pre-worked ring and loop, and calls `onLanded` when a beam lands.
-// Per-frame work stays in this file; only the feed and the chart's marker re-render, once per landing.
-// Each item is light warping into the middle: a bright beam shoots in from beyond the top of the canvas
-// onto its cell (which flashes and lights up), then a comet runs from the cell into the core, which
-// flares, and a pillar of light through the core swells with it (the timing is warpPhase in
-// model/vizGeometry). It is all drawn into this one canvas from cached sprites, stamped or stretched with
-// additive blending: no gradient is built and no shadowBlur is used per frame, and nothing here moves or
-// measures the page (no layout, no paint of other elements), so a busy loop costs only canvas work.
+// Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
+// look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
+// the pre-worked ring and loop, and calls `onLanded` when a beam lands.
+// Per-frame work stays in this file; only the feed re-renders, once per landing.
+// Each item is light warping into the middle: a thin beam shoots in from beyond the top of the canvas onto
+// its cell (a white dot and a small ring show where it lands and the cell lights), then a burst of small
+// glowing particles fans out from the cell along curved paths up into the core, which flares, and a thin
+// pillar of light through the core swells with it (the timing is warpPhase in model/vizGeometry). The
+// still parts of the picture (the floor, the track rings, the hub) are drawn once into one cached layer;
+// the glows and shafts are cached sprites stamped or stretched with additive blending: no gradient is
+// built and no shadowBlur is used per frame, and nothing here moves or measures the page (no layout, no
+// paint of other elements), so a busy loop costs only canvas work.
 
 /** How long one item's whole trip takes: the beam drops onto its cell, then the comet runs into the core. */
 export const FLIGHT_MS = 1400;
@@ -19,16 +22,31 @@ const FLASH_MS = 700;
 const SPIN_PER_MS = (Math.PI * 2) / 80000;
 /** The most a frame may move the clock, so a tab that was hidden does not jump the loop. */
 const MAX_DT_MS = 100;
-/** Past this many wedges, board names around the ring would run into each other, so only the picture is drawn. */
-const MAX_LABELLED = 10;
+/** Past this many wedges, board names around the ring would run into each other, so only the picture is drawn. (There are at most 16 boards plus the one for the rest.) */
+const MAX_LABELLED = 17;
+/** How many thin track rings the disc has between the hub and the rim, and about how many radial divisions it has all round. */
+const TRACKS = 14;
+const SPOKES = 36;
+/** How many short arcs a lit cell can show along each of its tracks. */
+const SLOTS = 4;
+/** The small uppercase monospace of the labels (a system font: nothing to download). */
+const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 /** Room for a board name is rounded down to this many pixels when its cut is remembered. */
 const LABEL_STEP = 12;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
   hues: string[];
+  /** The magenta of the core's glow, the pillar, the beams' halo and the lit cells. */
   core: string;
+  /** The white-hot color of the beams' line, the dots and the core's center. */
   spark: string;
+  /** The tint of the first particle of each burst. */
+  lead: string;
+  /** The tint of the other particles. */
+  pink: string;
+  /** The violet of the disc and the floor under it. */
+  disc: string;
   label: string;
   rim: string;
 }
@@ -38,7 +56,16 @@ export function readPalette(el: Element): Palette {
   const get = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
   const hues: string[] = [];
   for (let i = 0; i < 9; i++) hues.push(get(`--viz-hue-${i}`, i === 8 ? '#a79f90' : '#f2b62b'));
-  return { hues, core: get('--viz-core', '#f2b62b'), spark: get('--viz-spark', '#fff4d6'), label: get('--viz-soft', '#b9ae98'), rim: get('--viz-rim', '#8d8372') };
+  return {
+    hues,
+    core: get('--viz-core', '#d94ee8'),
+    spark: get('--viz-spark', '#fff3ff'),
+    lead: get('--viz-lead', '#9dffb8'),
+    pink: get('--viz-pink', '#ffc2f2'),
+    disc: get('--viz-disc', '#3a1c78'),
+    label: get('--viz-soft', '#b9a9e0'),
+    rim: get('--viz-rim', '#8a74d0'),
+  };
 }
 
 /** `#rrggbb` as an rgba() color. */
@@ -136,12 +163,86 @@ export function startDisc(o: DiscOptions): () => void {
   const total = loopMs(n, flight);
   let landedCount = wedges.map((w) => w.cells.map(() => 0));
   const flashAt = wedges.map((w) => w.cells.map(() => -Infinity));
-  const family = getComputedStyle(canvas).fontFamily;
   let w = 0;
   let h = 0;
   let dpr = 1;
   // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
   const labels = wedges.map(() => new Map<number, string>());
+  const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
+  // The still parts of the picture, drawn once per size (a canvas of the same size, stamped each frame).
+  const base = document.createElement('canvas');
+
+  /** Where the disc and the core sit on the canvas, and how big the disc is. Sits low; when the stage is tall there is room to lift it so the core and the beams get their space above. */
+  const layout = () => {
+    const rx = Math.max(40, Math.min((w - 2 * 72) / 2, (h - 60) / 1.3));
+    const spare = Math.max(0, (h - (rx * 1.25 + 60)) / 2);
+    const cx = w / 2;
+    const cy = h - rx * TILT * (OUTER + 0.17) - 34 - spare;
+    return { rx, cx, cy, core: coreAt(cx, cy, rx) };
+  };
+
+  /** An ellipse on the disc: radius `r` (a share of the half width) round the centre. */
+  const ring = (g: CanvasRenderingContext2D, cx: number, cy: number, rx: number, r: number) => {
+    g.beginPath();
+    g.ellipse(cx, cy, r * rx, r * rx * TILT, 0, 0, Math.PI * 2);
+  };
+
+  const paintBase = () => {
+    const g = base.getContext('2d');
+    if (!g) return;
+    base.width = canvas.width;
+    base.height = canvas.height;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { rx, cx, cy } = layout();
+    // The floor: a soft violet glow spreading past the rim, drawn as a circle squashed to the disc's tilt.
+    g.save();
+    g.translate(cx, cy);
+    g.scale(1, TILT);
+    const floor = g.createRadialGradient(0, 0, rx * 0.2, 0, 0, rx * 1.45);
+    floor.addColorStop(0, rgba(palette.disc, 0.5));
+    floor.addColorStop(0.7, rgba(palette.disc, 0.28));
+    floor.addColorStop(1, rgba(palette.disc, 0));
+    g.fillStyle = floor;
+    g.beginPath();
+    g.arc(0, 0, rx * 1.45, 0, Math.PI * 2);
+    g.fill();
+    // The disc itself, a dark violet.
+    const disc = g.createRadialGradient(0, 0, rx * INNER, 0, 0, rx * OUTER);
+    disc.addColorStop(0, rgba(palette.disc, 0.85));
+    disc.addColorStop(1, rgba(palette.disc, 0.6));
+    g.fillStyle = disc;
+    g.beginPath();
+    g.arc(0, 0, rx * OUTER, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+    // The track rings, many and thin, every fourth a little stronger.
+    g.lineWidth = 0.8;
+    for (let i = 1; i < TRACKS; i++) {
+      g.strokeStyle = rgba(palette.rim, i % 4 === 0 ? 0.3 : 0.16);
+      ring(g, cx, cy, rx, INNER + ((OUTER - INNER) * i) / TRACKS);
+      g.stroke();
+    }
+    // The rim, and a dashed ring just outside it.
+    g.strokeStyle = rgba(palette.rim, 0.5);
+    g.lineWidth = 1;
+    ring(g, cx, cy, rx, OUTER);
+    g.stroke();
+    g.strokeStyle = rgba(palette.rim, 0.4);
+    g.setLineDash([2, 5]);
+    ring(g, cx, cy, rx, OUTER + 0.07);
+    g.stroke();
+    g.setLineDash([]);
+    // The dark hub in the middle.
+    g.fillStyle = 'rgba(8, 4, 22, 0.92)';
+    g.strokeStyle = rgba(palette.rim, 0.45);
+    ring(g, cx, cy, rx, INNER);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = rgba(palette.rim, 0.18);
+    ring(g, cx, cy, rx, INNER * 0.82);
+    g.stroke();
+  };
+
   const size = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     w = canvas.clientWidth;
@@ -149,6 +250,8 @@ export function startDisc(o: DiscOptions): () => void {
     canvas.width = Math.max(1, Math.round(w * dpr));
     canvas.height = Math.max(1, Math.round(h * dpr));
     labels.forEach((m) => m.clear());
+    hubTexts.fill(undefined);
+    paintBase();
   };
   size();
   const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
@@ -158,6 +261,7 @@ export function startDisc(o: DiscOptions): () => void {
   let spin = -Math.PI / 2 + 0.3; // the first wedge starts at the front
   let last = 0;
   let landed = 0;
+  let latest = -1; // the wedge of the item that landed last, named in the hub
   let raf = 0;
 
   /** The patch of ring a cell covers, as a closed path. */
@@ -180,115 +284,126 @@ export function startDisc(o: DiscOptions): () => void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.lineJoin = 'round';
-    const rx = Math.max(40, Math.min((w - 2 * 64) / 2, (h - 44) / 1.35));
-    const cx = w / 2;
-    const room = rx * 0.55; // the space kept above the ring for the comets' arcs
-    // Sits low, but when the stage is tall there is room to lift it so the core's beam and the comets' arcs get their space above.
-    const spare = Math.max(0, (h - 84 - room - 2 * rx * TILT - 60) / 2);
-    const cy = h - rx * TILT - 28 - spare;
+    const { rx, cx, cy, core } = layout();
     const count = wedges.length;
+    ctx.drawImage(base, 0, 0, w, h);
 
-    // The floor under the ring.
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 1;
-    ctx.drawImage(glow(palette.core), cx - rx * 1.25, cy - rx * 1.25 * TILT, rx * 2.5, rx * 2.5 * TILT);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
+    // The radial divisions: the edges of the wedges a little stronger than the fine ones between.
+    const per = Math.max(1, Math.round(SPOKES / Math.max(1, count)));
+    ctx.lineWidth = 0.7;
+    for (const edge of [false, true]) {
+      ctx.strokeStyle = rgba(palette.rim, edge ? 0.3 : 0.14);
+      ctx.beginPath();
+      for (let wi = 0; wi < count; wi++) {
+        const span = wedgeSpan(wi, count);
+        for (let i = edge ? 0 : 1; i < (edge ? 1 : per); i++) {
+          const a = span.a0 + ((span.a1 - span.a0) * i) / per;
+          const p0 = project(a, INNER, spin, cx, cy, rx);
+          const p1 = project(a, OUTER, spin, cx, cy, rx);
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+        }
+      }
+      ctx.stroke();
+    }
 
-    // The cells: faint outlines until something lands, then they stay lit a little more for each item.
+    // The lit cells: short magenta arcs along the tracks, a little more of the cell for each item that has landed.
+    const track = (OUTER - INNER) / TRACKS;
     wedges.forEach((wedge, wi) => {
-      const hue = hueOf(wi);
       wedge.cells.forEach((cell, ci) => {
+        const done = landedCount[wi][ci];
+        const flash = Math.max(0, 1 - (now - flashAt[wi][ci]) / FLASH_MS);
+        if (!done && flash <= 0) return;
         const a = cellArea(wi, count, ci, wedge.cells.length);
         const front = (Math.sin((a.a0 + a.a1) / 2 + spin) + 1) / 2; // 1 at the front of the ring, 0 at the back
         const depth = 0.7 + 0.3 * front;
-        const done = landedCount[wi][ci];
-        const flash = Math.max(0, 1 - (now - flashAt[wi][ci]) / FLASH_MS);
-        const fill = (0.07 + (done ? 0.18 + 0.42 * Math.min(1, done / cell.count) : 0) + 0.35 * flash * flash) * depth;
-        patch(a.a0, a.a1, a.r0, a.r1, cx, cy, rx);
-        ctx.fillStyle = rgba(hue, Math.min(1, fill));
-        ctx.fill();
-        ctx.strokeStyle = rgba(hue, (done ? 0.55 : 0.28) * depth);
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        const tracks = Math.max(1, Math.floor((a.r1 - a.r0) / track));
+        const share = cell.count > 0 ? Math.min(1, done / cell.count) : 1;
+        const lit = Math.ceil(share * tracks * SLOTS);
+        ctx.fillStyle = rgba(palette.core, Math.min(1, (0.5 + 0.2 * share + 0.4 * flash * flash) * depth));
+        for (let row = 0; row < tracks; row++) {
+          const n = Math.min(SLOTS, lit - row * SLOTS);
+          if (n <= 0) break;
+          const r1 = a.r1 - row * track;
+          patch(a.a0, a.a0 + ((a.a1 - a.a0) * n) / SLOTS, r1 - track * 0.8, r1 - track * 0.1, cx, cy, rx);
+          ctx.fill();
+        }
         if (flash > 0) {
           const c = cellCentre(wi, count, ci, wedge.cells.length);
           const p = project(c.a, c.r, spin, cx, cy, rx);
           ctx.globalCompositeOperation = 'lighter';
-          stamp(ctx, hue, p.x, p.y, 26 + 22 * flash, flash);
+          stamp(ctx, palette.core, p.x, p.y, 16 + 14 * flash, 0.8 * flash);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
         }
       });
     });
 
-    // The rim and the hole in the middle.
-    ctx.strokeStyle = rgba(palette.rim, 0.45);
-    ctx.lineWidth = 1;
-    for (const r of [OUTER + 0.02, INNER - 0.02]) {
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, r * rx, r * rx * TILT, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Board names around the ring.
+    // Names around the rim, small uppercase monospace, evenly spaced; the name of the latest landing sits in the hub.
+    ctx.font = `500 ${rx > 200 ? 11 : 10}px ${MONO}`;
+    ctx.textBaseline = 'middle';
     if (count > 0 && count <= MAX_LABELLED) {
-      ctx.font = `500 12px ${family}`;
-      ctx.textBaseline = 'middle';
       wedges.forEach((wedge, wi) => {
         const span = wedgeSpan(wi, count);
         const mid = (span.a0 + span.a1) / 2;
-        const p = project(mid, OUTER + 0.1, spin, cx, cy, rx);
+        const p = project(mid, OUTER + 0.17, spin, cx, cy, rx);
         const side = Math.cos(mid + spin);
         ctx.textAlign = side > 0.25 ? 'left' : side < -0.25 ? 'right' : 'center';
         const front = (Math.sin(mid + spin) + 1) / 2;
-        ctx.fillStyle = rgba(hueOf(wi), 0.55 + 0.45 * front);
-        const room = side > 0.25 ? w - p.x - 8 : side < -0.25 ? p.x - 8 : 120;
+        const room = side > 0.25 ? w - p.x - 14 : side < -0.25 ? p.x - 14 : Math.min(150, (rx * Math.PI * 2 * 0.9) / count);
         const step = Math.max(0, Math.floor(room / LABEL_STEP));
         let text = labels[wi].get(step);
         if (text === undefined) {
-          text = fitLabel(wedge.name, step * LABEL_STEP, (t) => ctx.measureText(t).width);
+          text = fitLabel(wedge.name.toUpperCase(), step * LABEL_STEP, (t) => ctx.measureText(t).width);
           labels[wi].set(step, text);
         }
-        ctx.fillText(text, p.x + (side > 0.25 ? 4 : side < -0.25 ? -4 : 0), p.y + (Math.sin(mid + spin) > 0 ? 8 : -8));
+        const dx = side > 0.25 ? 8 : side < -0.25 ? -8 : 0;
+        ctx.fillStyle = rgba(palette.label, 0.55 + 0.45 * front);
+        ctx.fillText(text, p.x + dx, p.y);
+        // A small dot in the wedge's own color keeps what each name stands for.
+        ctx.fillStyle = rgba(hueOf(wi), 0.7 + 0.3 * front);
+        ctx.beginPath();
+        ctx.arc(p.x + (side > 0.25 ? 2 : side < -0.25 ? -2 : -ctx.measureText(text).width / 2 - 6), p.y, 1.8, 0, Math.PI * 2);
+        ctx.fill();
       });
     }
+    ctx.font = `500 ${rx > 200 ? 9 : 8}px ${MONO}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = rgba(palette.label, 0.55);
+    if (latest >= 0 && hubTexts[latest] === undefined) hubTexts[latest] = fitLabel(wedges[latest].name.toUpperCase(), rx * INNER * 1.5, (t) => ctx.measureText(t).width);
+    ctx.fillText(latest >= 0 ? hubTexts[latest] ?? '' : 'COMPLETED', cx, cy);
 
-    // How hard the core is flaring from comets going in (several can land at once).
+    // How hard the core is flaring from particles going in (several can land at once).
     let flare = 0;
     const phases = still ? [] : flying.map((f) => warpPhase(f.progress)); // once per frame, shared by the flare and the drawing below
     for (const ph of phases) flare += ph.flare;
     flare = Math.min(1, flare);
 
-    // The core's bloom and the pillar of light through it: faintly there always, swelling with the flare.
-    const pulse = still ? 1 : 1 + 0.08 * Math.sin(now / 600) + 0.3 * flare;
+    // The pillar of light through the core down to the hub, and the core's bloom: always there, swelling with the flare.
+    const pulse = still ? 1 : 1 + 0.05 * Math.sin(now / 600) + 0.25 * flare;
     const lv = pillarLevel(flare);
     const unit = Math.max(0.6, Math.min(1.2, rx / 260)); // the beams, flash and pillar follow the size of the stage, so on a phone a landing does not flood its neighbors
     ctx.globalCompositeOperation = 'lighter';
-    const pillarBottom = cy + rx * 0.3 * TILT;
     for (const [color, wide, a, swell] of [
-      [palette.core, 70, 0.5, lv.width],
-      [palette.core, 22, 0.75, lv.width],
-      [palette.spark, 3.5, 1, 1 + 0.5 * flare], // the white-hot line swells less than the glows
+      [palette.core, 16, 0.35, lv.width],
+      [palette.core, 5, 0.75, lv.width],
+      [palette.spark, 1.6, 1, 1 + 0.7 * flare], // the white-hot line swells less than the glows
     ] as const) {
       const pw = wide * unit * swell;
       ctx.globalAlpha = a * lv.alpha;
-      ctx.drawImage(shaft(color, 'pillar'), cx - pw / 2, 0, pw, pillarBottom);
+      ctx.drawImage(shaft(color, 'pillar'), cx - pw / 2, 0, pw, cy + 6);
     }
-    stamp(ctx, palette.core, cx, cy, rx * 0.5 * pulse, 0.6);
-    stamp(ctx, palette.core, cx, cy, rx * 0.3 * pulse, 0.9);
-    stamp(ctx, palette.spark, cx, cy, rx * 0.15 * pulse, 0.95);
+    stamp(ctx, palette.core, core.x, core.y, rx * 0.22 * pulse, 0.55);
+    stamp(ctx, palette.core, core.x, core.y, rx * 0.11 * pulse, 0.9);
+    stamp(ctx, palette.spark, core.x, core.y, rx * 0.06 * pulse, 0.95);
     if (flare > 0) {
-      stamp(ctx, palette.spark, cx, cy, rx * (0.2 + 0.28 * flare), 0.85 * flare);
-      ctx.globalAlpha = 0.8 * flare;
-      const sw = rx * (0.5 + 0.9 * flare); // a flat streak of light across the core
-      ctx.drawImage(glow(palette.spark), cx - sw, cy - rx * 0.05, sw * 2, rx * 0.1);
+      stamp(ctx, palette.core, core.x, core.y, rx * (0.22 + 0.16 * flare), 0.6 * flare);
+      stamp(ctx, palette.spark, core.x, core.y, rx * (0.07 + 0.1 * flare), 0.9 * flare);
     }
     ctx.globalAlpha = 1;
 
-    // Light warping in: each item's beam shoots in from beyond the top of the canvas onto its cell, a flash and rings burst on it, and a comet streaks from it into the core.
+    // Light warping in: each item's thin beam comes in from beyond the top of the canvas onto its cell, a white dot and a small ring show where it lands, and a burst of particles runs from the cell into the core.
     if (!still) {
-      ctx.lineCap = 'round';
       /** Stretches a cached shaft along the line from `a` (its tail) to `b` (its head), `width` pixels across. */
       const drawShaft = (sprite: HTMLCanvasElement, a: { x: number; y: number }, b: { x: number; y: number }, width: number, alpha: number) => {
         const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -301,56 +416,51 @@ export function startDisc(o: DiscOptions): () => void {
         ctx.drawImage(sprite, -width / 2, 0, width, len);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       };
+      // A loop with very many items has quick, crowded arrivals, so every burst is smaller (fixed for the whole loop, so no particle pops in or out), to stay inside the frame.
+      const bursts = slots.length > 250 ? 3 : PARTICLES;
       flying.forEach((f, fi) => {
         const ph = phases[fi];
         const s = slots[f.index];
         const c = cellCentre(s.wedge, count, s.cell, wedges[s.wedge].cells.length);
         const to = project(c.a, c.r, spin, cx, cy, rx);
-        const hue = hueOf(s.wedge);
         if (ph.beamAlpha > 0) {
           const from = beamStart(to, cx);
           const head = beamPoint(from, to, ph.beam);
-          const tail = beamPoint(from, to, beamTail(ph.beam));
           const a = ph.beamAlpha;
-          drawShaft(shaft(hue, 'beam'), tail, head, 70 * unit, 0.9 * a); // the wide soft glow
-          drawShaft(shaft(hue, 'beam'), tail, head, 26 * unit, a);
-          drawShaft(shaft(palette.spark, 'beam'), tail, head, 8 * unit, a); // the white-hot core
-          stamp(ctx, hue, head.x, head.y, 40 * unit, 0.7 * a);
-          stamp(ctx, palette.spark, head.x, head.y, 20 * unit, a);
+          drawShaft(shaft(palette.core, 'beam'), from, head, 9 * unit, 0.5 * a); // the faint halo
+          drawShaft(shaft(palette.spark, 'beam'), from, head, 2.2 * unit, 0.85 * a);
+          stamp(ctx, palette.core, head.x, head.y, 14 * unit, 0.7 * a);
+          stamp(ctx, palette.spark, head.x, head.y, 5 * unit, a); // the bright dot where it lands
         }
         if (ph.flash > 0) {
-          stamp(ctx, hue, to.x, to.y, (28 + 70 * ph.flash) * unit, 0.9 * ph.flash);
-          stamp(ctx, palette.spark, to.x, to.y, (12 + 30 * ph.flash) * unit, ph.flash);
+          stamp(ctx, palette.core, to.x, to.y, (12 + 36 * ph.flash) * unit, 0.8 * ph.flash);
+          stamp(ctx, palette.spark, to.x, to.y, (6 + 14 * ph.flash) * unit, ph.flash);
         }
-        if (ph.ping !== null) {
+        if (ph.ping !== null || ph.beamAlpha > 0) {
+          // The small ring on the disc: it is there while the beam is, and opens a little as the cell lights.
+          const open = ph.ping ?? 0;
           ctx.strokeStyle = palette.spark;
-          for (const [grow, width, a] of [
-            [46, 2.5, 1],
-            [26, 1.5, 0.7],
-          ] as const) {
-            ctx.globalAlpha = a * (1 - ph.ping);
-            ctx.lineWidth = width;
-            const r = 4 + grow * ph.ping;
-            ctx.beginPath();
-            ctx.ellipse(to.x, to.y, r, r * TILT, 0, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          ctx.lineWidth = 1.1;
+          ctx.globalAlpha = 0.85 * Math.min(ph.beamAlpha + 0.2, 1) * (1 - open * 0.6);
+          const r = (8 + 10 * open) * unit;
+          ctx.beginPath();
+          ctx.ellipse(to.x, to.y, r, r * TILT, 0, 0, Math.PI * 2);
+          ctx.stroke();
         }
-        if (ph.comet !== null && ph.cometAlpha > 0) {
-          // The comet: a white-hot head in a glow, a trail of fading lights behind it along the same arc, and a few bright dots beside the trail.
-          for (let k = 0; k < 9; k++) {
-            const q = ph.comet - k * 0.055;
-            if (q < 0) break;
-            const at = warpAt(to, { x: cx, y: cy }, q);
-            const fade = 1 - k / 9;
-            const alpha = ph.cometAlpha;
-            if (k === 0) {
-              stamp(ctx, hue, at.x, at.y, 30, 0.9 * alpha);
-              stamp(ctx, palette.spark, at.x, at.y, 15, alpha);
-            } else {
-              stamp(ctx, k < 3 ? palette.spark : hue, at.x, at.y, 4 + 11 * fade, (0.3 + 0.7 * fade) * alpha);
-              if (k % 2) stamp(ctx, palette.spark, at.x + (k % 4 === 1 ? 1 : -1) * (4 + k * 0.8), at.y + 2, 2.2, 0.95 * fade * alpha);
-            }
+        if (ph.comet !== null) {
+          // The burst: a few small lights with short fading tails, fanned out along curved paths from the cell into the core. The first is tinted green, the others white and pink.
+          for (let k = 0; k < bursts; k++) {
+            const seed = particleSeed(f.index, k);
+            const q = Math.min(1, (ph.comet - seed.delay) / (1 - PARTICLE_DELAY));
+            if (q <= 0) continue;
+            const alpha = Math.min(1, (1 - q) / 0.12);
+            if (alpha <= 0) continue;
+            const head = particleAt(to, core, seed.spread, q);
+            const tail = particleAt(to, core, seed.spread, Math.max(0, q - 0.16));
+            const tint = k === 0 ? palette.lead : palette.pink;
+            drawShaft(shaft(tint, 'beam'), tail, head, (k === 0 ? 3.2 : 2.4) * unit, 0.85 * alpha);
+            stamp(ctx, tint, head.x, head.y, (k === 0 ? 8 : 6) * unit, 0.8 * alpha);
+            stamp(ctx, palette.spark, head.x, head.y, 2.6 * unit, alpha);
           }
         }
       });
@@ -370,11 +480,13 @@ export function startDisc(o: DiscOptions): () => void {
       landed = 0;
       landedCount = wedges.map((x) => x.cells.map(() => 0));
       flashAt.forEach((row) => row.fill(-Infinity));
+      latest = -1;
       o.onLanded(0);
     }
     const ph = playhead(t, n, flight, strike);
     for (let k = landed; k < ph.landed; k++) {
       const s = slots[k];
+      latest = s.wedge;
       landedCount[s.wedge][s.cell]++;
       flashAt[s.wedge][s.cell] = now;
     }

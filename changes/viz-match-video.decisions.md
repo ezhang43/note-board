@@ -1,0 +1,5 @@
+- 2026-11-12 Visualizer look (owner request: "make it exactly like the video I sent"): matched a reference clip for look and motion only; no text, labels, data or code from it. Kept our own categories, board names and counts.
+- 2026-11-12 Lit cells are all the same magenta (the reference look) instead of each category's color; the category's color stays only as the small dot beside its name on the rim.
+- 2026-11-12 The disc keeps turning slowly (the reference disc turns) and the hub shows the name of the wedge that landed last; kept the hub text short rather than adding any data panel.
+- 2026-11-12 Particle paths are a pure function of the item's position (`particleSeed`/`particleAt` in `src/model/vizGeometry.ts`), so a loop always replays the same and the paths are unit-tested.
+- 2026-11-12 Static parts of the picture are painted once into a cached layer rebuilt only on resize, to keep the frame budget.

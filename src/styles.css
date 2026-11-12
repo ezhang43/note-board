@@ -3828,16 +3828,19 @@ a.cal-open { align-self: flex-start; }
  * ring's drawing makes see-through versions of them). The ring is a canvas; the rest is ordinary page.
  */
 .viz {
-  --viz-bg: #0d0b09;
-  --viz-ink: #f6efe0;
-  --viz-soft: #bdb29c;
-  --viz-faint: #968b78;
-  --viz-line: rgba(246, 239, 224, 0.12);
-  --viz-honey: #f2b62b;
-  --viz-core: #f2b62b;
-  --viz-spark: #fff4d6;
-  --viz-rim: #8d8372;
-  /* One hue per wedge: boards go round the first eight; each category keeps its own (Other is the ninth, neutral). */
+  --viz-bg: #0a0618;
+  --viz-ink: #f3eeff;
+  --viz-soft: #b9acd8;
+  --viz-faint: #8f82b4;
+  --viz-line: rgba(220, 205, 255, 0.13);
+  --viz-honey: #e48bff; /* the accent (pressed buttons, the chart): the core's light magenta */
+  --viz-core: #d94ee8; /* the glow of the core, the pillar, the beams and the lit cells */
+  --viz-spark: #fff3ff; /* white-hot */
+  --viz-lead: #9dffb8; /* the first particle of each burst */
+  --viz-pink: #ffc2f2; /* the other particles */
+  --viz-disc: #3a1c78; /* the disc and the floor under it */
+  --viz-rim: #8a74d0;
+  /* One small dot per wedge name: boards go round the first eight; each category keeps its own (Other is the ninth, neutral). */
   --viz-hue-0: #f2b62b;
   --viz-hue-1: #3fc1b0;
   --viz-hue-2: #ef7b62;
@@ -3854,7 +3857,11 @@ a.cal-open { align-self: flex-start; }
   inset: 0;
   z-index: 70;
   background-color: var(--viz-bg);
-  background-image: radial-gradient(60% 70% at 30% 55%, rgba(242, 182, 43, 0.1), transparent 70%);
+  /* Near-black deep purple with a violet haze and faint vertical streaks (three fine stripe patterns, none lining up with another). */
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 37px, rgba(190, 150, 255, 0.025) 37px 38px, transparent 38px 93px, rgba(190, 150, 255, 0.018) 93px 94px),
+    repeating-linear-gradient(90deg, transparent 0 151px, rgba(255, 150, 240, 0.02) 151px 153px),
+    radial-gradient(60% 70% at 30% 55%, rgba(110, 50, 200, 0.22), transparent 70%);
   color: var(--viz-ink);
   font-family: var(--font);
 }

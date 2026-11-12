@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, INNER, MAX_LABEL_CHARS, OUTER, beamPoint, beamStart, beamTail, cellArea, cellCentre, fitLabel, pillarLevel, project, STRIKE, warpAt, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, particleAt, particleSeed, pillarLevel, project, STRIKE, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -104,23 +104,80 @@ describe('fitLabel', () => {
 // Light warping into the middle (owner request, 2026-11-12): a beam drops onto the item's cell, the cell
 // lights, a comet runs along an arc from the cell into the core, and the core flares as it arrives.
 
-describe('warpAt', () => {
+describe('coreAt', () => {
+  it('floats the core above the middle of the disc, a share of the disc width, so the pillar runs through it down to the hub', () => {
+    const core = coreAt(400, 300, 200);
+    expect(core.x).toBe(400);
+    expect(core.y).toBeCloseTo(300 - CORE_LIFT * 200);
+    expect(core.y).toBeLessThan(300);
+  });
+});
+
+describe('the disc is seen from a low angle, wide and fairly flat, with a clear hub', () => {
+  it('is wider than tall but not a sliver, and leaves room for the hub', () => {
+    expect(TILT).toBeGreaterThan(0.45);
+    expect(TILT).toBeLessThan(0.7);
+    expect(INNER).toBeGreaterThan(0.2);
+    expect(INNER).toBeLessThan(0.4);
+  });
+});
+
+describe('particleSeed', () => {
+  it('is the same every time for the same item and particle (nothing random at draw time)', () => {
+    for (let item = 0; item < 5; item++) for (let k = 0; k < PARTICLES; k++) expect(particleSeed(item, k)).toEqual(particleSeed(item, k));
+  });
+
+  it('keeps every spread within -1 to 1 and every delay within its limit, and sends the first particle straight and first', () => {
+    for (let item = 0; item < 40; item++) {
+      for (let k = 0; k < PARTICLES; k++) {
+        const s = particleSeed(item, k);
+        expect(Math.abs(s.spread)).toBeLessThanOrEqual(1);
+        expect(s.delay).toBeGreaterThanOrEqual(0);
+        expect(s.delay).toBeLessThanOrEqual(PARTICLE_DELAY);
+      }
+      expect(particleSeed(item, 0).delay).toBe(0);
+      expect(Math.abs(particleSeed(item, 0).spread)).toBeLessThanOrEqual(0.25);
+    }
+  });
+
+  it('fans the particles of one item out, each on its own path', () => {
+    const spreads = new Set(Array.from({ length: PARTICLES }, (_, k) => particleSeed(3, k).spread));
+    expect(spreads.size).toBe(PARTICLES);
+  });
+});
+
+describe('particleAt', () => {
   const cell = { x: 100, y: 300 };
   const core = { x: 400, y: 260 };
 
   it('runs from the cell to the core, rising along an arc on the way', () => {
-    expect(warpAt(cell, core, 0)).toEqual(cell);
-    const end = warpAt(cell, core, 1);
+    expect(particleAt(cell, core, 0, 0)).toEqual(cell);
+    const end = particleAt(cell, core, 0.2, 1);
     expect(end.x).toBeCloseTo(core.x);
     expect(end.y).toBeCloseTo(core.y);
-    const mid = warpAt(cell, core, 0.5);
+    const mid = particleAt(cell, core, 0, 0.5);
     expect(mid.y).toBeLessThan(Math.min(cell.y, core.y) - 10); // above both ends
   });
 
   it('speeds up as it nears the core', () => {
-    const early = warpAt(cell, core, 0.2).x - warpAt(cell, core, 0.1).x;
-    const late = warpAt(cell, core, 0.9).x - warpAt(cell, core, 0.8).x;
+    const early = particleAt(cell, core, 0, 0.2).x - particleAt(cell, core, 0, 0.1).x;
+    const late = particleAt(cell, core, 0, 0.9).x - particleAt(cell, core, 0, 0.8).x;
     expect(late).toBeGreaterThan(early * 2);
+  });
+
+  it('bends further to one side or the other with the spread, but meets at the same two ends', () => {
+    const left = particleAt(cell, core, -1, 0.5);
+    const right = particleAt(cell, core, 1, 0.5);
+    expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThan(40);
+    for (const spread of [-1, 1]) {
+      expect(particleAt(cell, core, spread, 0)).toEqual(cell);
+      expect(particleAt(cell, core, spread, 1).x).toBeCloseTo(core.x);
+    }
+  });
+
+  it('stays put at the ends for any progress it is given', () => {
+    expect(particleAt(cell, core, 0.5, -3)).toEqual(cell);
+    expect(particleAt(cell, core, 0.5, 4).x).toBeCloseTo(core.x);
   });
 });
 
@@ -143,31 +200,36 @@ describe('warpPhase', () => {
     expect(warpPhase(0.9).ping).toBeNull();
   });
 
-  it('sends the comet only after the beam has landed, along the whole arc, and fades it into the core', () => {
-    expect(warpPhase(STRIKE - 0.01).comet).toBeNull();
-    expect(warpPhase(STRIKE).comet).toBe(0);
-    expect(warpPhase((STRIKE + 1) / 2).comet).toBeCloseTo(0.5);
+  it('lets the beam and its ring linger on the cell a moment, then sends the particles along the whole arc and fades them into the core', () => {
+    expect(COMET_START).toBeGreaterThan(STRIKE);
+    expect(warpPhase(COMET_START - 0.01).comet).toBeNull();
+    expect(warpPhase(STRIKE + 0.01).beamAlpha).toBeGreaterThan(0.5); // still there after landing
+    expect(warpPhase(COMET_START).comet).toBe(0);
+    expect(warpPhase((COMET_START + 1) / 2).comet).toBeCloseTo(0.5);
     expect(warpPhase(0.999).comet).toBeGreaterThan(0.99);
-    expect(warpPhase(STRIKE + 0.1).cometAlpha).toBe(1);
-    expect(warpPhase(0.999).cometAlpha).toBeLessThan(0.1);
   });
 
   it('flares the core as the comet arrives, not before', () => {
     expect(warpPhase(0).flare).toBe(0);
     expect(warpPhase(0.5).flare).toBe(0);
-    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
-    expect(warpPhase(0.999).flare).toBeLessThan(warpPhase(0.9).flare);
+    expect(warpPhase(0.95).flare).toBeGreaterThan(0.9);
+    expect(warpPhase(0.999).flare).toBeLessThan(warpPhase(0.95).flare);
+  });
+
+  it('peaks late, when the particles are nearly in the core, not before they get there', () => {
+    expect(warpPhase(0.95).flare).toBeGreaterThan(warpPhase(0.9).flare);
+    expect(warpPhase(0.95).flare).toBeGreaterThan(warpPhase(0.75).flare);
   });
 
   it('has finished flaring by the time the trip ends, so the core does not pop back', () => {
     expect(warpPhase(1).flare).toBeCloseTo(0, 9);
-    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
+    expect(warpPhase(0.95).flare).toBeGreaterThan(0.9);
   });
 
   it('keeps its numbers inside 0 to 1 whatever progress it is given', () => {
     for (const p of [-1, 0, 0.3, 1, 5]) {
       const w = warpPhase(p);
-      for (const v of [w.beam, w.beamAlpha, w.cometAlpha, w.flare, w.flash]) {
+      for (const v of [w.beam, w.beamAlpha, w.flare, w.flash]) {
         expect(v).toBeGreaterThanOrEqual(0);
         expect(v).toBeLessThanOrEqual(1);
       }
@@ -203,12 +265,10 @@ describe('beamStart and beamPoint', () => {
     expect(mid.y).toBeLessThan(cell.y);
   });
 
-  it('keeps a tail behind the head that never goes before the start', () => {
-    expect(beamTail(0)).toBe(0);
-    expect(beamTail(0.1)).toBe(0);
-    expect(beamTail(1)).toBeGreaterThan(0);
-    expect(beamTail(1)).toBeLessThan(1);
-    for (const head of [0, 0.2, 0.7, 1]) expect(beamTail(head)).toBeLessThanOrEqual(head);
+  it('is a thin line from the start all the way to its head: no short comet tail, so a landed beam reads as a line from outside the picture', () => {
+    const from = beamStart(cell, 300);
+    // the part of the line drawn is always from the start (0) to the head (p)
+    for (const head of [0.1, 0.5, 1]) expect(beamPoint(from, cell, head).y).toBeGreaterThan(from.y);
   });
 });
 
@@ -226,7 +286,8 @@ describe('pillarLevel', () => {
   it('is always faintly there, even with no comet', () => {
     const rest = pillarLevel(0);
     expect(rest.alpha).toBeGreaterThan(0);
-    expect(rest.alpha).toBeLessThan(0.5);
+    expect(rest.alpha).toBeGreaterThanOrEqual(0.5); // the core stays bright between arrivals
+    expect(rest.alpha).toBeLessThan(0.8);
     expect(rest.width).toBeGreaterThan(0);
   });
 

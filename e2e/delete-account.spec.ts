@@ -182,6 +182,52 @@ test('deleting also removes the Journal general notes this device remembers (202
   expect(alice.errors).toEqual([]);
 });
 
+// The person's own Anthropic key (wow plan, job 12b): kept in this browser only, never sent with
+// their boards, and gone with their account. The device's AI model choice stays (a setting).
+const AI_KEY = 'sk-ant-api03-SECRET-abcd1234';
+const aiDialog = (page: Page) => page.getByRole('dialog', { name: 'AI settings' });
+async function saveAiKey(page: Page, remember: boolean) {
+  await page.locator('header.toolbar').getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'AI settings', exact: true }).click();
+  await aiDialog(page).getByLabel('Anthropic API key').fill(AI_KEY);
+  if (remember) await aiDialog(page).getByLabel('Remember on this device').check();
+  await aiDialog(page).getByRole('radio', { name: /Sonnet 5\.5/ }).check();
+  await aiDialog(page).getByRole('button', { name: 'Save key' }).click();
+  await expect(aiDialog(page).getByText('sk-ant-…1234')).toBeVisible();
+  await page.keyboard.press('Escape');
+}
+const bothStorages = (page: Page) => page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+
+for (const remember of [false, true]) {
+  test(`deleting also removes the AI key kept ${remember ? 'on this device' : 'for this tab'}, and keeps the model chosen (job 12b)`, async ({ browser }) => {
+    const alice = await person(browser, `Alice${tag()}`);
+    await saveAiKey(alice, remember);
+    expect(await bothStorages(alice)).toContain('SECRET');
+
+    await openPanel(alice);
+    await panel(alice).getByLabel('Type DELETE to confirm').fill('DELETE');
+    await panel(alice).getByRole('button', { name: 'Delete my account' }).click();
+    await expect(alice.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 8000 });
+    expect(await bothStorages(alice)).not.toContain('SECRET');
+    expect(await alice.evaluate(() => localStorage.getItem('note-board:ai-model'))).toBe('claude-sonnet-5-5');
+    expect(alice.errors).toEqual([]);
+  });
+}
+
+test('the AI key is never sent to the sharing server, in what is saved or in any address (job 12b)', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  const sent: string[] = [];
+  alice.on('request', (r) => sent.push(`${r.url()}\n${r.postData() ?? ''}`));
+  await saveAiKey(alice, true);
+  await shareNewBoard(alice, 'Trip');
+  await add(alice, 'Note');
+  await alice.keyboard.type('more');
+  // Something did go to the pretend server (saves of the shared board), so the check below means something.
+  await expect.poll(() => sent.filter((s) => s.includes('__collab/call') && s.includes('more')).length, { timeout: 8000 }).toBeGreaterThan(0);
+  expect(sent.filter((s) => s.includes('SECRET'))).toEqual([]);
+  expect(alice.errors).toEqual([]);
+});
+
 test('if deleting fails, nothing is deleted on the device and the panel says to try again', async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`);

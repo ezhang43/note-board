@@ -243,6 +243,16 @@ describe('accountKeys', () => {
     );
   });
 
+  it('the AI key and whose it is go (job 12b); the device’s AI model, limit and count stay', () => {
+    const ai = ['note-board:ai-key', 'note-board:ai-key-user', 'note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses'];
+    const got = accountKeys([...keys, ...ai], 'me', [], null);
+    expect(got).toContain('note-board:ai-key');
+    expect(got).toContain('note-board:ai-key-user');
+    for (const k of ['note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses']) expect(got).not.toContain(k);
+    // Kept once for the browser, not per demo person: it goes for a demo person too.
+    expect(accountKeys(ai, 'demo-alice', [], null, 'demo-alice:').sort()).toEqual(['note-board:ai-key', 'note-board:ai-key-user']);
+  });
+
   it('copies kept of an unreadable save go too (job #160)', () => {
     const got = accountKeys(['note-board:v1:unreadable', 'note-board:v1:unreadable-2', 'note-board:view:v1'], 'me', [], null);
     expect(got).toEqual(['note-board:v1:unreadable', 'note-board:v1:unreadable-2', 'note-board:view:v1']);

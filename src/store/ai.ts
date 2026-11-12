@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { AI_KEY_NAME, AI_KEY_NAMES, AI_KEY_USER_NAME } from "../model/aiKey";
 
 // The person's own Anthropic API key and the AI settings (wow plan, job 12a), kept in this browser only.
 //
@@ -7,11 +8,12 @@ import { useSyncExternalStore } from "react";
 // - By default it is in sessionStorage (gone when the tab or browser is closed). With "Remember on this
 //   device" it is in localStorage instead. It is saved with the id of the person it belongs to, and
 //   getKey only gives it back to that person, so a second account on this browser never sees it.
-// - Every storage name is in AI_STORAGE_KEYS, so signing out and deleting an account (job 12b) can clear them.
+// - Every storage name is in AI_STORAGE_KEYS. Signing out, a change of person (dropAiKeyUnlessFor in src/model/aiKey.ts)
+//   and deleting an account (AI_KEY_NAMES in accountKeys) clear the key and whose it is; the model, limit and count are device settings and stay (job 12b).
 // - Every read and write is wrapped: blocked or full storage means "no key", never a crash.
 
-const KEY_NAME = "note-board:ai-key";
-const KEY_USER_NAME = "note-board:ai-key-user";
+const KEY_NAME = AI_KEY_NAME;
+const KEY_USER_NAME = AI_KEY_USER_NAME;
 const MODEL_NAME = "note-board:ai-model";
 const CAP_NAME = "note-board:ai-cap";
 const USES_NAME = "note-board:ai-uses";
@@ -24,7 +26,6 @@ export const AI_STORAGE_KEYS = [
   CAP_NAME,
   USES_NAME,
 ] as const;
-
 export const AI_MODELS = [
   { id: "claude-haiku-5-5", name: "Haiku 5.5", note: "Fast, cheapest" },
   { id: "claude-sonnet-5-5", name: "Sonnet 5.5", note: "Better" },
@@ -88,7 +89,7 @@ export function createAiStore({
   };
   const wipeKey = () =>
     [session, device].forEach((p) =>
-      [KEY_NAME, KEY_USER_NAME].forEach((n) => remove(p, n)),
+      AI_KEY_NAMES.forEach((n) => remove(p, n)),
     );
   /** The place the key is in: this browser session's first, then the device's. */
   const holder = (): Place =>
@@ -127,8 +128,8 @@ export function createAiStore({
         // Put back what was there: never half a key, never a key with no owner, never a lost old key.
         before.forEach((v, i) =>
           v === null
-            ? remove(keep, AI_STORAGE_KEYS[i])
-            : write(keep, AI_STORAGE_KEYS[i], v),
+            ? remove(keep, AI_KEY_NAMES[i])
+            : write(keep, AI_KEY_NAMES[i], v),
         );
         return false;
       }
@@ -156,7 +157,7 @@ export function createAiStore({
       changed();
       return true;
     },
-    /** Removes the key from this browser (both places). Signing out and deleting an account call this too (job 12b). */
+    /** Removes the key from this browser (both places). (Signing out and deleting an account clear the same names directly, job 12b.) */
     forgetKey() {
       wipeKey();
       changed();

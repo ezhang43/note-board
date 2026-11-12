@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithPopup, signInWithPopup, signOut, type User } from 'firebase/auth';
 import { dropAccess, keepAccess, readAccess } from '../model/calendar';
+import { dropAiKeyUnlessFor } from '../model/aiKey';
 import { AUTH_DOMAIN } from './firebaseProject';
 
 // Sign-in only, so the sign-in screen downloads no more of Firebase than it needs (job 169); the
@@ -33,6 +34,8 @@ export function watchUser(onChange: (user: User | null) => void) {
     const old = readAccess(() => sessionStorage, uid);
     dropAccess(() => sessionStorage);
     if (old) keepAccess(() => localStorage, old);
+    // The same for the person's own AI key (job 12b), in both storages; the device's AI model and limit stay.
+    dropAiKeyUnlessFor([() => localStorage, () => sessionStorage], uid);
     onChange(user);
   });
 }

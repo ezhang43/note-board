@@ -1513,8 +1513,12 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 @media (hover: none) {
   .app.phone .item-trash { display: none; }
   .app.phone .todo-item { padding-right: calc(24px + var(--clock)); }
-  /* On every row that has the clock (all rows, so text wraps the same with or without a count), the room before it holds a whole parent count ("0/12" and its gap: 2.2em of the text's size, here 2.4em): the text can end at its right edge, so the count (which spills out of the text, see .tail-slot) must never reach the clock. The strip grows with the text, as the count does. */
-  .app.phone .canvas:not([data-big-text]) .todo-item { padding-right: calc(2.4 * var(--tfs) + var(--clock)); }
+  /* On every row that has the clock (all rows, so text wraps the same with or without a count), the room before it holds a whole parent count ("0/12" and its gap come to 2.2em of the text's size; here 2.5em, 40px at Normal): the text can end at its right edge, so the count (which spills out of the text, see .tail-slot) must never reach the clock. The strip grows with the text, as the count does. The indent's limit (--inset) keeps its 32px of text when that is wider than the 46px it counts on. */
+  /* simple: a count of 100 or more sub-items ("0/100") is wider than 2.2em and can still touch the clock on a phone; widen the factor, or measure the count, if that ever matters. */
+  .app.phone .canvas:not([data-big-text]) .todo-item {
+    padding-right: calc(2.5 * var(--tfs) + var(--clock));
+    --inset: min(var(--indent, 0px), calc(100% - max(0px, 2.5 * var(--tfs) - 46px) - 52px * var(--bb) - var(--clock) - 20px * var(--bs) - 32px));
+  }
 }
 
 .item-ghost {

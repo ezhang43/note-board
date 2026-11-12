@@ -57,7 +57,8 @@ test.describe('on a phone', () => {
   check('phone');
 });
 
-for (const size of ['normal', 'large'] as FontSize[]) test(`in a narrow list the deepest levels keep a readable line (at least 32px of text) and stay inside the card (${size})`, async ({ page }) => {
+function narrow(layout: 'desktop' | 'phone') {
+for (const size of ['normal', 'large', 'huge'] as FontSize[]) test(`in a narrow list the deepest levels keep a readable line (at least 32px of text) and stay inside the card (${size}, ${layout})`, async ({ page }) => {
   await page.goto('/');
   await fontsLoaded(page);
   const deep = item('a', [item('b', [item('c', [item('d', [item('e', [item('f')])])])])]);
@@ -74,8 +75,9 @@ for (const size of ['normal', 'large'] as FontSize[]) test(`in a narrow list the
   await fontsLoaded(page);
   const rows = await page.evaluate(() => {
     const card = document.querySelector('[data-card-id="t1"]')!.getBoundingClientRect();
+    const scale = card.width / (document.querySelector('[data-card-id="t1"]') as HTMLElement).offsetWidth; // (a phone zooms the board)
     return [...document.querySelectorAll('.todo-item[data-item-id]')].map((r) => ({
-      text: r.querySelector('textarea')!.getBoundingClientRect().width,
+      text: r.querySelector('textarea')!.getBoundingClientRect().width / scale,
       boxInside: r.querySelector('input[type=checkbox]')!.getBoundingClientRect().right <= card.right,
       indent: parseFloat(getComputedStyle(r).paddingLeft),
     }));
@@ -85,8 +87,14 @@ for (const size of ['normal', 'large'] as FontSize[]) test(`in a narrow list the
     expect(r.boxInside, `level ${i} box inside the card`).toBe(true);
     // Never less deeper than the level above it, and a full 32px per level while there is room.
     if (i) expect(r.indent).toBeGreaterThanOrEqual(rows[i - 1].indent);
-    if (i <= 2 && size === 'normal') expect(r.indent).toBe(i * 32); // (the 4th level's 96px no longer fits a 240px card: the estimate clock's strip takes 26px more)
+    if (i <= 2 && size === 'normal' && layout === 'desktop') expect(r.indent).toBe(i * 32); // (the 4th level's 96px no longer fits a 240px card: the estimate clock's strip takes 26px more)
   }
+});
+}
+test.describe('desktop narrow', () => narrow('desktop'));
+test.describe('on a phone, narrow', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  narrow('phone');
 });
 
 test('dropping an item to the right of a row, in the lower half, nests it, one level in at 32px', async ({ page }) => {

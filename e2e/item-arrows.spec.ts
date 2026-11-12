@@ -280,8 +280,8 @@ test.describe('touch screen', () => {
     await expect(page.getByRole('toolbar', { name: 'Item actions' }).getByRole('button', { name: 'Move up' })).toBeVisible();
     await expect(list.getByRole('button', { name: 'Move up' })).toHaveCount(0);
     await expect(row(list, 1).locator('.item-arrow').first()).toBeHidden();
-    // No room is kept for buttons that never show here, nor for the trash can the phone layout has no row button for: the strip is the estimate clock's 26px, and before it room for a parent's whole count (2.4 times the 16px text: 38.4px, job item-estimate-clock; the grip is 14px of it).
-    await expect(row(list, 1)).toHaveCSS('padding-right', '64.4px');
+    // No room is kept for buttons that never show here, nor for the trash can the phone layout has no row button for: the strip is the estimate clock's 26px, and before it room for a parent's whole count (2.5 times the 16px text: 40px, job item-estimate-clock; the grip is 14px of it).
+    await expect(row(list, 1)).toHaveCSS('padding-right', '66px');
     // The bigger computer sizes do not reach a touch screen: the grip keeps its size.
     await expect(row(list, 1).getByRole('button', { name: 'Delete item' })).toBeHidden(); // phone layout: Delete is in the item bar
     const grip = row(list, 1).getByRole('button', { name: 'Drag item' });

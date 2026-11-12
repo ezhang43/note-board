@@ -572,6 +572,8 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
             {folded && <AppearanceMenu labelled />}
             {folded && onSignOut && (
               <button type="button" className="tb-button" onClick={() => {
+                  // The question gives focus back to ⋯ (this row goes with the menu), as Escape does.
+                  wrap.current?.querySelector('button')?.focus();
                   close();
                   onSignOut();
                 }}>

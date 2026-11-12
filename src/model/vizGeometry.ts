@@ -54,14 +54,17 @@ export function project(a: number, r: number, spin: number, cx: number, cy: numb
 }
 
 /**
- * Light warping into the core (owner request, 2026-11-12). One item's trip, `progress` 0 to 1: a thin beam
- * drops from above onto its cell (until STRIKE), a small ring pings on the cell and it lights, a comet runs
- * from the cell along an arc into the core (STRIKE to 1), and the core flares as it arrives.
+ * Light warping into the core (owner request, 2026-11-12). One item's trip, `progress` 0 to 1: a bright
+ * beam shoots in from beyond the top of the canvas onto its cell (until STRIKE), a flash and a ring burst
+ * on the cell and it lights, a comet runs from the cell along an arc into the core (STRIKE to 1), and the
+ * core flares as it arrives.
  */
-export const STRIKE = 0.2;
+export const STRIKE = 0.25;
 /** How much of the trip the beam takes to fade after it lands, the ring to open, and the comet to fade into the core. */
 const BEAM_FADE = 0.1;
 const PING_SPAN = 0.3;
+/** How much of the trip the impact flash lasts. */
+const FLASH_SPAN = 0.08;
 const COMET_FADE = 0.12;
 /** The core flares around this point of the trip, as the comet goes in. */
 const FLARE_AT = 0.9;
@@ -78,6 +81,8 @@ export interface WarpPhase {
   /** How far along its arc the comet is (0 at the cell, 1 in the core), null before the beam has landed. */
   comet: number | null;
   cometAlpha: number;
+  /** How bright the flash where the beam lands is: 1 at the strike, gone FLASH_SPAN of the trip later. */
+  flash: number;
   /** How hard the core is flaring from this item (0 to 1). */
   flare: number;
 }
@@ -94,8 +99,40 @@ export function warpPhase(progress: number): WarpPhase {
     ping,
     comet,
     cometAlpha: comet === null ? 0 : clamp01((1 - comet) / COMET_FADE),
+    flash: struck ? clamp01(1 - (p - STRIKE) / FLASH_SPAN) : 0,
     flare: clamp01(1 - Math.abs(p - FLARE_AT) / FLARE_WIDTH),
   };
+}
+
+/** How far above the top edge of the canvas (pixels) every beam starts, so the light arrives from outside the picture. */
+export const BEAM_RISE = 60;
+/** How far a beam leans outwards: a share of its cell's distance from the middle column. */
+const BEAM_SLANT = 0.18;
+/** The length of a beam's tail behind its head, as a share of its whole fall. */
+const BEAM_TAIL = 0.55;
+
+/** Where a beam starts: above the canvas, leaning out from the middle column `cx`, so it shoots down and inwards onto its cell `to`. */
+export function beamStart(to: { x: number; y: number }, cx: number): { x: number; y: number } {
+  return { x: to.x + (to.x - cx) * BEAM_SLANT, y: -BEAM_RISE };
+}
+
+/** The point `p` (0 at the start, 1 on the cell) of the way down a beam. */
+export function beamPoint(from: { x: number; y: number }, to: { x: number; y: number }, p: number): { x: number; y: number } {
+  return { x: from.x + (to.x - from.x) * p, y: from.y + (to.y - from.y) * p };
+}
+
+/** Where the tail of a beam whose head is `head` (0 to 1) of the way down ends, on the same scale (never before the start). */
+export function beamTail(head: number): number {
+  return Math.max(0, head - BEAM_TAIL);
+}
+
+/**
+ * The light pillar through the core (owner request, 2026-11-12): always faintly there, wider and brighter
+ * as the core flares (`flare` 0 to 1). `width` is a multiple of its resting width, `alpha` how bright it is.
+ */
+export function pillarLevel(flare: number): { width: number; alpha: number } {
+  const f = clamp01(flare);
+  return { width: 1 + 1.4 * f, alpha: 0.4 + 0.6 * f };
 }
 
 /** A comet `p` (0 to 1) of the way along its arc from a cell `from` into the core `to`: it climbs in a curve and speeds up as it is drawn in. */

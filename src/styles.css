@@ -3879,6 +3879,7 @@ a.cal-open { align-self: flex-start; }
   font-size: 15px;
   line-height: 1.45;
   color: var(--viz-soft);
+  text-shadow: 0 0 6px var(--viz-bg), 0 0 14px var(--viz-bg); /* keeps the words readable where the pillar of light runs behind them */
 }
 .viz-info {
   display: flex;

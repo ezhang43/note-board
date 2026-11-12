@@ -1,5 +1,3 @@
-import { addCard, createBoard } from './board';
-import { createCard } from './cards';
 import type { Board, TodoCard } from './types';
 import { boardTree, type Workspace } from './workspace';
 
@@ -12,12 +10,6 @@ import { boardTree, type Workspace } from './workspace';
 export const CHECKLIST_NAME = 'Main checklist';
 /** The title of the checklist card on it (the panel doesn't show it). */
 export const CHECKLIST_TITLE = 'Checklist';
-
-/** A new Main checklist board: one checklist with one blank item, made when the panel first opens. */
-export function newChecklistBoard(): Board {
-  const card: TodoCard = { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE };
-  return addCard({ ...createBoard(), name: CHECKLIST_NAME }, card, { type: 'loose', x: 0, y: 0 });
-}
 
 /** The first board named exactly "Main checklist" among the person's own boards (not one a share holds), or null. */
 export function findChecklistBoard(ws: Workspace, shared: string[]): string | null {

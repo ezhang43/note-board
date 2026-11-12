@@ -1,7 +1,7 @@
 import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
-import { CHECKLIST_TITLE, checklistCardOf, findChecklistBoard, hiddenChecklist, newChecklistBoard } from '../../model/mainChecklist';
+import { CHECKLIST_NAME, CHECKLIST_TITLE, checklistCardOf, findChecklistBoard, hiddenChecklist } from '../../model/mainChecklist';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
 import { JOURNAL_KNOWN_KEY, JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
@@ -347,9 +347,10 @@ export function boardActions(ctx: StoreContext) {
     /** The board the Checklist panel shows and changes, or null before it first opens. */
     checklistBoard: checklistId,
     /**
-     * Open or close the Checklist panel on the left (owner request, 2026-11-12). The first time, its
-     * board is made with its one checklist (not an undo step: there is nothing to undo back to). On a
-     * phone (`phone`) it takes the whole screen, so the right-hand panel closes.
+     * Open or close the Checklist panel on the left (owner request, 2026-11-12). Opening changes nothing, as with
+     * Habits, so a device holding an old offline copy has nothing of its own to upload over a newer online one: with
+     * no list yet the panel shows an empty one, and `startChecklist` makes it on the first typing. On a phone
+     * (`phone`) it takes the whole screen, so the right-hand panel closes.
      */
     openChecklist(phone = false): 'loading' | null {
       const { ui } = ctx.state;
@@ -359,26 +360,40 @@ export function boardActions(ctx: StoreContext) {
       }
       if (!ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null }); // an old version being looked at is put away first
-      let id = checklistId();
-      if (!id) {
-        const made = newId('b');
-        setOthers((o) => ({ ...o, [made]: newChecklistBoard() }));
-        id = made;
-      }
-      // Its checklist was deleted (on the board itself, opened from search), or a board someone named "Main checklist"
-      // has none: a new one, as one change on its undo, in a free spot so it covers nothing already there (as Habits does).
-      const board = ctx.workspace().boards[id];
-      const card: TodoCard = { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE };
-      if (board && !checklistCardOf(board)) ctx.commitTo(id, (b) => B.addCard(b, card, { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, { x: 0, y: 0 }, () => undefined) }));
+      const id = checklistId();
       // As the Journal opens with the cursor in today's page, the cursor goes to the end of the last item (not on a
       // phone, where the keyboard would cover the list before the person has looked at it).
-      const last = checklistCardOf(ctx.workspace().boards[id])?.items.at(-1);
+      const last = id ? checklistCardOf(ctx.workspace().boards[id])?.items.at(-1) : undefined;
       ctx.updateUi({
         checklistOpen: true,
         itemSel: null,
         ...(phone ? { sidePanel: null, historyOpen: false, completedBoard: null } : last && { focusItem: last.id, focusOffset: last.text.length }),
       });
       return null;
+    },
+    /**
+     * The first change in the panel's empty list (typing `text` into it). Makes the "Main checklist" board if there
+     * is none (not an undo step, as with Habits) and its one checklist holding `text`, as one change on that board's
+     * undo, in a free spot so it covers nothing already there. The cursor goes to the end of the text. Nothing (null)
+     * while an old version is shown, or when the list already exists.
+     */
+    startChecklist(text: string): { board: string; card: string; item: string } | null {
+      if (ctx.state.ui.preview) return null;
+      let id = checklistId();
+      if (id && checklistCardOf(ctx.workspace().boards[id])) return null;
+      if (!id) {
+        const made = newId('b');
+        setOthers((o) => ({ ...o, [made]: { ...blankBoard(), name: CHECKLIST_NAME } }));
+        id = made;
+      }
+      const blank = createCard('todo') as TodoCard;
+      const item = { ...blank.items[0], text };
+      const card: TodoCard = { ...blank, title: CHECKLIST_TITLE, items: [item] };
+      // Placed with guessed heights (the board isn't drawn), and tidied if that board is ever opened.
+      ctx.commitTo(id, (b) => B.addCard(b, card, { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, { x: 0, y: 0 }, () => undefined) }));
+      if (checklistCardOf(ctx.workspace().boards[id])?.id !== card.id) return null;
+      ctx.updateUi({ focusItem: item.id, focusOffset: text.length, itemSel: null });
+      return { board: id, card: card.id, item: item.id };
     },
     /**
      * The Checklist panel's Completed button: the Completed panel on the right, showing what Clean up moved off the

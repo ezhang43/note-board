@@ -2,28 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard, createColumn } from './cards';
 import { cleanUp } from './completed';
-import { CHECKLIST_NAME, checklistCardOf, findChecklistBoard, hiddenChecklist, newChecklistBoard } from './mainChecklist';
+import { CHECKLIST_NAME, CHECKLIST_TITLE, checklistCardOf, findChecklistBoard, hiddenChecklist } from './mainChecklist';
 import type { Board, TodoCard } from './types';
 import { readWorkspace, serializeWorkspace, type Workspace } from './workspace';
 
 // The main checklist (owner request, 2026-11-12): one checklist kept on an ordinary board called
 // "Main checklist", like the Journal and Habits, so saving, sync, undo and backups work as for any board.
 
+/** A Main checklist board as the panel's first typing leaves it: one checklist with one item. */
+function newChecklistBoard(): Board {
+  const card: TodoCard = { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE };
+  return addCard({ ...createBoard(), name: CHECKLIST_NAME }, card, { type: 'loose', x: 0, y: 0 });
+}
 const ws = (boards: Record<string, Board>, home = 'home'): Workspace => ({ home, boards: { home: { ...createBoard(), name: 'Home' }, ...boards } });
 
 describe('main checklist', () => {
-  it('a new checklist board holds one checklist card, titled Checklist, with one blank item', () => {
-    const b = newChecklistBoard();
-    expect(b.name).toBe(CHECKLIST_NAME);
-    const cards = Object.values(b.cards);
-    expect(cards).toHaveLength(1);
-    expect(cards[0].kind).toBe('todo');
-    expect((cards[0] as TodoCard).title).toBe('Checklist');
-    expect((cards[0] as TodoCard).items).toHaveLength(1);
-    expect(b.order).toEqual([cards[0].id]);
-    expect(checklistCardOf(b)?.id).toBe(cards[0].id);
-  });
-
+  // (What the first typing makes is tested in src/store/store-main-checklist.test.ts.)
   it('is found by its exact name among the person’s own boards, never a shared one', () => {
     const w = ws({ a: { ...createBoard(), name: 'Main checklist ' }, b: newChecklistBoard(), c: newChecklistBoard() });
     w.boards.home = addCard(addCard(addCard(w.boards.home, createBoardCard('a'), { type: 'loose', x: 0, y: 0 }), createBoardCard('b'), { type: 'loose', x: 0, y: 0 }), createBoardCard('c'), { type: 'loose', x: 0, y: 0 });

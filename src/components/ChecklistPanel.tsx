@@ -1,4 +1,7 @@
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties } from 'react';
+import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
+import { GrowTextarea } from './GrowTextarea';
+import { BoardReadOnly } from './textBox';
 import { doneCount, hasTicked } from '../model/checklist';
 import { checklistCardOf } from '../model/mainChecklist';
 import type { ItemDrag } from '../store/store';
@@ -17,18 +20,15 @@ import { usePhone } from './usePhone';
  * up like any board; every checklist feature works on it as on the board, with its own undo.
  */
 export function ChecklistPanel() {
-  const card = useAppState((s) => {
-    const id = appStore.checklistBoard();
-    const board = id && (id === s.boards.open ? s.board : s.boards.others[id]);
+  // The saved list, never an old version being looked at (shown in place of the board while its board is open).
+  const id = useAppState(() => appStore.checklistBoard());
+  const card = useAppState(() => {
+    const board = id && appStore.workspace().boards[id];
     return board ? checklistCardOf(board) : null;
   });
-  const id = appStore.checklistBoard();
   const close = () => appStore.openChecklist();
-  // Its board gone (deleted on another device): the panel closes; opening it again starts a new one.
-  const gone = !card || !id;
-  useEffect(() => {
-    if (gone) close();
-  }, [gone]);
+  // While Version history shows an old version nothing can be changed (as on the board), so the panel says so (PR 274 check).
+  const previewing = useAppState((s) => s.ui.preview !== null);
   useEffect(() => {
     // Escape in the panel closes it (one in a panel on the right closes that one: escapeIsForChecklist).
     const key = (e: KeyboardEvent) => escapeIsForChecklist(e) && close();
@@ -38,8 +38,7 @@ export function ChecklistPanel() {
   }, []);
   const completedOpen = useAppState((s) => s.ui.sidePanel === 'completed' && !!id && s.ui.completedBoard === id);
   const phone = usePhone();
-  if (gone) return null;
-  const { done, total } = doneCount(card.items);
+  const { done, total } = card ? doneCount(card.items) : { done: 0, total: 0 };
   return (
     // tabIndex -1: a click on its heading or blank space keeps the keyboard in the panel, so keys meant for it never reach the board.
     <aside className="checklist-panel" aria-label="Checklist" tabIndex={-1}>
@@ -50,7 +49,8 @@ export function ChecklistPanel() {
             {done}/{total}
           </span>
         )}
-        {hasTicked(card.items) && (
+        {previewing && <span className="role-badge checklist-old">Viewing an old version</span>}
+        {card && id && !previewing && hasTicked(card.items) && (
           <button
             type="button"
             className="list-clean-up"
@@ -66,6 +66,7 @@ export function ChecklistPanel() {
           aria-label="Completed"
           title="Items cleaned up from this checklist"
           aria-pressed={completedOpen}
+          disabled={!id}
           onClick={() => appStore.openChecklistCompleted(phone)}
         >
           <CompletedIcon />
@@ -74,14 +75,91 @@ export function ChecklistPanel() {
           <CloseIcon />
         </button>
       </header>
-      <BoardScope value={id}>
-        {/* The list's own box, so its rows, keys and drags work as in a list on the board (data-card-id). */}
-        <div className="card checklist-sheet" data-card-id={card.id} data-kind="todo">
-          <TodoBody card={card} />
-        </div>
-        <PanelGhost cardId={card.id} />
-      </BoardScope>
+      <BoardReadOnly value={previewing}>
+        {card && id ? (
+          <BoardScope value={id}>
+            {/* The list's own box, so its rows, keys and drags work as in a list on the board (data-card-id). */}
+            <div className="card checklist-sheet" data-card-id={card.id} data-kind="todo">
+              <TodoBody card={card} />
+            </div>
+            <PanelGhost cardId={card.id} />
+          </BoardScope>
+        ) : (
+          <EmptyList phone={phone} />
+        )}
+      </BoardReadOnly>
     </aside>
+  );
+}
+
+/**
+ * No list yet (never typed in, or its board deleted): an empty item to type in. Nothing is made until the first
+ * letter, so opening the panel changes nothing (PR 274 check: a device with an old offline copy would otherwise
+ * upload it over newer boards). Typing, pasting (copied items go in as items) or Enter there acts as in a list.
+ */
+function EmptyList({ phone }: { phone: boolean }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [draft, setDraft] = useState('');
+  const composing = useRef(false);
+  const plainPaste = useRef(false);
+  useEffect(() => {
+    // The cursor starts in it when the panel opens, as in a list (not on a phone), but never taken from a text box
+    // elsewhere, as when the list is deleted by another device while the person types on the board.
+    const at = document.activeElement;
+    if (!phone && !(at instanceof HTMLElement && at.closest('input, textarea, [contenteditable="true"]'))) ref.current?.focus({ preventScroll: true });
+  }, []);
+  // A word being composed (an input method, or a phone keyboard) starts the list once it is done, not halfway.
+  const start = (text: string) => {
+    if (text) appStore.startChecklist(text);
+  };
+  const paste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const types = e.clipboardData.types;
+    const journal = types.includes(JOURNAL_MARKER);
+    // Ctrl+Shift+V pastes plain text, as in a list.
+    if (plainPaste.current || (!types.includes(ITEMS_MARKER) && !journal)) return;
+    e.preventDefault();
+    const plain = e.clipboardData.getData('text/plain');
+    const made = appStore.startChecklist('');
+    if (!made) return;
+    const s = appStore.storeFor(made.board);
+    const done = journal ? s.pasteJournalInto(made.card, made.item, e.clipboardData.getData(JOURNAL_MARKER)) : s.pasteItemsInto(made.card, made.item);
+    if (!done) s.setItemText(made.card, made.item, plain);
+  };
+  return (
+    <div className="card checklist-sheet" data-kind="todo">
+      <div className="todo-body">
+        <div className="todo-items">
+          <div className="todo-item">
+            <label className="tick">
+              <input type="checkbox" aria-label="Done" checked={false} disabled readOnly />
+            </label>
+            {/* The first letter swaps this box for the new list's first item, which takes the cursor. */}
+            <GrowTextarea
+              ref={ref}
+              className="item-text"
+              aria-label="Item text"
+              placeholder="Add an item"
+              value={draft}
+              onChange={(text) => {
+                setDraft(text);
+                if (!composing.current) start(text);
+              }}
+              onCompositionStart={() => (composing.current = true)}
+              onCompositionEnd={(e) => {
+                composing.current = false;
+                start(e.currentTarget.value);
+              }}
+              // Enter in an empty item adds nothing, as in a list (and puts no line break in the first item).
+              onKeyDown={(e) => {
+                plainPaste.current = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v';
+                if (e.key === 'Enter') e.preventDefault();
+              }}
+              onPaste={paste}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

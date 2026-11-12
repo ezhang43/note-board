@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, clickEmpty, fontsLoaded, freshBoardEachTest, toggleCompleted } from './helpers';
+import { add, clickEmpty, fontsLoaded, freshBoardEachTest, toggleCompleted, toggleHistory } from './helpers';
 
 // The main checklist (owner request, 2026-11-12): one checklist, the same on every board, in the only panel on
 // the LEFT, opened from "Checklist" in the bottom pill (a tile in ⋯ on a phone). It can stay open beside the
@@ -300,6 +300,105 @@ test('with the Main checklist board itself open, items still reorder by dragging
   await expect.poll(() => texts(panel(page))).toEqual(['yak second', 'zebra first']);
 });
 
+const saved = (page: Page) => page.evaluate(() => localStorage.getItem('note-board:v1') ?? '');
+
+test('opening the panel saves nothing: it shows an empty list, and the first typing makes the list', async ({ page }) => {
+  await noteOnBoard(page, 'on home');
+  await expect.poll(() => saved(page)).toContain('on home');
+  const before = await saved(page);
+  await button(page).click();
+  await expect(panel(page)).toBeVisible();
+  const empty = items(panel(page));
+  await expect(empty).toHaveCount(1);
+  await expect(empty).toHaveAttribute('placeholder', 'Add an item');
+  await expect(empty).toBeFocused();
+  // Nothing is written by opening (so a device with an old offline copy has nothing to upload), nor by closing.
+  await page.waitForTimeout(800);
+  expect(await saved(page)).toBe(before);
+  await panel(page).getByRole('button', { name: 'Close checklist' }).click();
+  await button(page).click();
+  await page.waitForTimeout(800);
+  expect(await saved(page)).toBe(before);
+  // Typing makes it, and the typing carries on in the new list's item.
+  await page.keyboard.type('pay rent');
+  await expect.poll(() => saved(page)).toContain('Main checklist');
+  expect(await texts(panel(page))).toEqual(['pay rent']);
+  await expect(items(panel(page))).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('water plants');
+  expect(await texts(panel(page))).toEqual(['pay rent', 'water plants']);
+  await expect(boardCards(page)).toHaveCount(1);
+  await expect(boardCards(page)).toContainText('on home');
+});
+
+test('while Version history shows an old version, the panel is read-only, with a note saying so', async ({ page }) => {
+  await openWith(page, ['keep me']);
+  await noteOnBoard(page, 'later note');
+  await toggleHistory(page);
+  const history = page.getByRole('complementary', { name: 'Version history' });
+  await history.getByRole('region').getByRole('button').first().click();
+  const banner = page.getByRole('region', { name: 'Looking at an earlier version' });
+  await expect(banner).toBeVisible();
+  await expect(panel(page)).toBeVisible();
+  await expect(panel(page).getByText('Viewing an old version')).toBeVisible();
+  const item = items(panel(page)).first();
+  await expect(item).toHaveAttribute('readonly', '');
+  await expect(panel(page).getByLabel('Done: keep me')).toBeDisabled();
+  await item.click();
+  await page.keyboard.type('xyz');
+  expect(await texts(panel(page))).toEqual(['keep me']);
+  // Back to the current version: it can be changed again.
+  await banner.getByRole('button', { name: 'Back to current' }).click();
+  await expect(panel(page).getByText('Viewing an old version')).toHaveCount(0);
+  await expect(items(panel(page)).first()).not.toHaveAttribute('readonly', '');
+});
+
+test('the empty list acts as a list: Enter adds no line break, copied items paste in as items', async ({ page }) => {
+  // Two items copied from a list on the board.
+  await clickEmpty(page);
+  await add(page, 'Checklist');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('alpha');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('beta');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+a');
+  await expect(boardCards(page).locator('.todo-item.picked')).toHaveCount(2);
+  await page.keyboard.press('Control+c');
+  await button(page).click();
+  await expect(items(panel(page))).toBeFocused();
+  // Enter in the empty item does nothing (as in a list), so the first item gets no line break.
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('x');
+  expect(await texts(panel(page))).toEqual(['x']);
+  await page.keyboard.press('Control+z');
+  await expect(items(panel(page))).toHaveAttribute('placeholder', 'Add an item');
+  await expect.poll(() => texts(panel(page))).toEqual(['']);
+  // Ctrl+V: the items, with their level, not their text in one item.
+  await items(panel(page)).click();
+  await page.keyboard.press('Control+v');
+  await expect.poll(() => texts(panel(page))).toEqual(['alpha', 'beta']);
+  await expect(panel(page).locator('.todo-item').nth(1)).toHaveAttribute('style', /--indent: [1-9]/);
+});
+
+test('with the Main checklist board open, an old version of it leaves the panel showing the current list, read-only', async ({ page }) => {
+  await openWith(page, ['zebra now']);
+  await page.mouse.click(1000, 820);
+  await page.keyboard.press('Control+f');
+  await page.getByRole('searchbox', { name: 'Search the board' }).fill('zebra');
+  await page.getByRole('search').getByRole('button', { name: 'All boards', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search the board' }).press('Enter');
+  await expect(page.getByLabel('Board name')).toHaveValue('Main checklist');
+  await page.keyboard.press('Escape');
+  await toggleHistory(page);
+  // The oldest version, from before the list was made.
+  await page.getByRole('complementary', { name: 'Version history' }).getByRole('region').getByRole('button').last().click();
+  await expect(page.getByRole('region', { name: 'Looking at an earlier version' })).toBeVisible();
+  await expect(panel(page).getByText('Viewing an old version')).toBeVisible();
+  expect(await texts(panel(page))).toEqual(['zebra now']);
+});
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 
@@ -320,5 +419,16 @@ test.describe('on a phone', () => {
     await tile(page, 'Journal').tap();
     await expect(journal(page)).toBeVisible();
     await expect(panel(page)).toHaveCount(0);
+  });
+
+  test('typing in its empty list makes the list, without the keyboard being lost', async ({ page }) => {
+    await moreButton(page).tap();
+    await tile(page, 'Checklist').tap();
+    const empty = items(panel(page));
+    await expect(empty).not.toBeFocused(); // the keyboard doesn't cover the list before it has been seen
+    await empty.tap();
+    await page.keyboard.type('milk');
+    expect(await texts(panel(page))).toEqual(['milk']);
+    await expect(items(panel(page))).toBeFocused();
   });
 });

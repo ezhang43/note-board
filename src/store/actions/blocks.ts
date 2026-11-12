@@ -6,6 +6,7 @@ import { cleanUp, completedCardOf, dayKey, restoreEntry } from '../../model/comp
 import { CARD_W, COLUMN_W, GRID, NEW_BLOCK_H } from '../../model/constants';
 import { blockRect, blocksTouching, settle, snapAll, spotForNewBlock, topLevelRects } from '../../model/layout';
 import { readImport } from '../../model/importFile';
+import { checklistCardOf, findChecklistBoard } from '../../model/mainChecklist';
 import { webAddress } from '../../model/media';
 import { addImported, estimateHeight, packInLanes } from '../../model/milanote';
 import type { ColorKey } from '../../model/palette';
@@ -403,7 +404,10 @@ export function blockActions(ctx: StoreContext) {
         if (!completedCardOf(b)) return null;
         // If its list is gone, the new list goes at the free spot nearest the middle of the screen.
         const place = { type: 'loose', ...spotForNewBlock(b, CARD_W, NEW_BLOCK_H.todo, ctx.screenCentre(), measured) } as const;
-        const result = restoreEntry(b, itemId, place);
+        // On the Main checklist board, an item whose list is gone goes back into the panel's list (job 274 check).
+        const shared = ctx.state.ui.shares.flatMap((sh) => sh.boards);
+        const into = ctx.state.boards.open === findChecklistBoard(ctx.workspace(), shared) ? checklistCardOf(b)?.id : undefined;
+        const result = restoreEntry(b, itemId, place, undefined, into);
         cardId = result.cardId;
         return cardId ? result.board : null;
       });

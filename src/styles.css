@@ -1999,6 +1999,10 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .checklist-panel .history-head { gap: 6px; }
 .checklist-panel .history-head h2 { margin-right: 0; }
 .checklist-panel .checklist-count { margin-right: auto; font-size: 13px; }
+/* While Version history shows an old version (PR 274 check): read-only, like a read-only board, with its badge. */
+.checklist-panel .checklist-old { margin-right: auto; height: 24px; font-size: 12px; }
+.app.previewing .checklist-panel .checklist-count { margin-right: 0; }
+.app.previewing .checklist-panel :is(.item-arrows, .item-trash, .item-grip, .estimate-chip.add, .list-clean-up) { display: none; }
 /* The list itself: a checklist card without its frame, as wide as the panel. */
 .checklist-sheet.card { width: auto; padding: 0 2px 12px; background: transparent; border: none; box-shadow: none; }
 /* Its drag ghost is drawn on the page, above the panel. */

@@ -2283,6 +2283,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .ai-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; font-weight: 400; }
 .ai-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .ai-check-hint { margin: 2px 0 0 24px; }
+.ai-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }
 .ai-bad { color: var(--danger); }
 .ai-model { margin-top: 6px; }
 .ai-model-note { margin-left: auto; font-size: 12px; color: var(--ink-soft); }

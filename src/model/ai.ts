@@ -26,15 +26,19 @@ export type Effort = "low" | "medium" | "high";
 export type AiFailureKind =
   | "no-key"
   | "cap"
+  | "storage"
   | "invalid-key"
   | "browser-blocked"
   | "limit"
+  | "rate-limit"
+  | "permission"
   | "workspace"
   | "update"
   | "model"
   | "too-big"
   | "busy"
   | "network"
+  | "timeout"
   | "cancelled"
   | "refusal"
   | "too-long"
@@ -43,7 +47,7 @@ export type AiFailureKind =
 export type AiFailure = { ok: false; kind: AiFailureKind; message: string };
 export type AiResult<T = unknown> = { ok: true; value: T } | AiFailure;
 
-const fail = (kind: AiFailureKind, message: string): AiFailure => ({ ok: false, kind, message });
+export const fail = (kind: AiFailureKind, message: string): AiFailure => ({ ok: false, kind, message });
 
 /** The schema as the API takes it: closed objects, every field required unless the schema says, no length limits. */
 export function toApiSchema(s: AiSchema): Record<string, unknown> {
@@ -161,9 +165,10 @@ export function readReply(reply: unknown, schema: AiSchema): AiResult {
 }
 
 const LIMIT =
-  "Your Anthropic account hit a spend, billing or rate limit. Wait a little, or check the limits and credit in the Anthropic Console.";
+  "Your Anthropic account hit a spend or billing limit. Check the limits and credit in the Anthropic Console.";
+const RATE_LIMIT = "Anthropic says too many requests came from your account. Wait a minute, then try again.";
 const NOT_ALLOWED =
-  "This key isn't allowed to do this, or your account hit a spend or billing limit. Check the key's permissions, limits and credit in the Anthropic Console.";
+  "This key isn't allowed to do this. Check the key's permissions in the Anthropic Console.";
 const TOO_BIG = "That is too much text to send at once. Try with less.";
 
 /** True when the key is only plain printable letters (no spaces, smart quotes or hidden marks), so a request header can carry it. */
@@ -186,9 +191,9 @@ export function errorFor(status: number, body: unknown): AiFailure {
     );
   if (status === 401)
     return fail("invalid-key", "This key isn't valid. Check it in the Anthropic Console, then save it again.");
-  if (status === 403) return fail("limit", NOT_ALLOWED);
-  if (status === 402 || status === 429 || type === "rate_limit_error" || type === "billing_error")
-    return fail("limit", LIMIT);
+  if (status === 403) return fail("permission", NOT_ALLOWED);
+  if (status === 429 || type === "rate_limit_error") return fail("rate-limit", RATE_LIMIT);
+  if (status === 402 || type === "billing_error") return fail("limit", LIMIT);
   if (status === 400 && /spend limit|usage limit|credit balance/i.test(said)) return fail("limit", LIMIT);
   if (status === 400 && /prompt is too long/i.test(said)) return fail("too-big", TOO_BIG);
   if (status === 400 && said.startsWith("This API key is not scoped to a workspace"))
@@ -212,4 +217,12 @@ export const NETWORK_FAILURE: AiFailure = fail(
   "network",
   "Couldn't reach Anthropic. Check your internet connection; some networks and browser add-ons block it.",
 );
+export const TIMEOUT: AiFailure = fail(
+  "timeout",
+  "Anthropic took too long to answer. Try again in a minute.",
+);
 export const CANCELLED: AiFailure = fail("cancelled", "Stopped.");
+
+/** What an aborted request means: a timeout (the signal's reason is a TimeoutError, like AbortSignal.timeout) says so; any other stop is a cancel. */
+export const stoppedBy = (signal?: AbortSignal): AiFailure =>
+  (signal?.reason as { name?: unknown } | undefined)?.name === "TimeoutError" ? TIMEOUT : CANCELLED;

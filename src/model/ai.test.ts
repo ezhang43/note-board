@@ -203,11 +203,16 @@ describe("plain messages for every failure", () => {
     }
   });
 
-  it("402, 403 and 429 are a spend, billing or rate limit, and so is a 400 about a spend limit", () => {
+  it("429 is a rate limit of its own", () => {
+    const r = errorFor(429, err("rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit"));
+    expect(r.kind).toBe("rate-limit");
+    expect(r.message).toMatch(/too many requests/i);
+    expect(r.message).not.toMatch(/credit|billing/i);
+  });
+
+  it("402 and a 400 about a spend limit are a spend or billing limit", () => {
     for (const [s, t, m] of [
       [402, "billing_error", "Your credit balance is too low."],
-      [403, "permission_error", "Your API key does not have permission."],
-      [429, "rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit"],
       [400, "invalid_request_error", "You have reached your specified workspace API usage limits."],
       [400, "invalid_request_error", "This request would exceed your organization's spend limit."],
     ] as const) {
@@ -231,10 +236,11 @@ describe("plain messages for every failure", () => {
     expect(r.kind).toBe("too-big");
   });
 
-  it("a 403 also says the key may not be allowed to do this", () => {
+  it("a 403 says the key isn't allowed to do this, with nothing about limits", () => {
     const r = errorFor(403, err("permission_error", "Your API key does not have permission to use the specified resource."));
-    expect(r.kind).toBe("limit");
+    expect(r.kind).toBe("permission");
     expect(r.message).toMatch(/allowed/i);
+    expect(r.message).not.toMatch(/limit|credit|billing/i);
   });
 
   it("only a key of plain printable letters can go in a request header", () => {

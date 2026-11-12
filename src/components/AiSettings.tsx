@@ -53,6 +53,11 @@ function Dialog() {
     testing.current = null;
     setBusy(false);
   };
+  // Whoever is signed in changed: a running test was for the other person's key, and any note about it is out of date.
+  useEffect(() => {
+    if (testing.current) stopTest();
+    setNote(null);
+  }, [uid]);
   const save = () => {
     if (ai.setKey(draft, { remember, uid })) {
       stopTest();
@@ -80,7 +85,9 @@ function Dialog() {
     if (c.signal.aborted) return;
     testing.current = null;
     setBusy(false);
-    setNote(r.ok ? { text: "Key works." } : { text: r.message, bad: true });
+    // Stopped from outside (the key or model changed, or the person signed out): nothing to report.
+    if (!r.ok && r.kind === "cancelled") setNote(null);
+    else setNote(r.ok ? { text: "Key works." } : { text: r.message, bad: true });
   };
 
   return (
@@ -190,7 +197,7 @@ function Dialog() {
             until you forget it.
           </p>
           <p
-            className={`shortcuts-note${note?.bad ? " ai-bad" : ""}`}
+            className={`ai-note${note?.bad ? " ai-bad" : ""}`}
             role={note?.bad ? "alert" : "status"}
           >
             {note?.text}

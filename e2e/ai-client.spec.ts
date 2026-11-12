@@ -135,6 +135,68 @@ test.describe("Test key", () => {
     await expect(dialog(page).getByText("Key works.")).toHaveCount(0);
   });
 
+  test("a reply that breaks on the way says it couldn't reach Anthropic, not that the key works", async ({ page }) => {
+    await page.route("https://api.anthropic.com/**", (r: Route) =>
+      r.request().method() === "OPTIONS"
+        ? r.fulfill({ status: 204, headers: cors })
+        : r.fulfill({ status: 200, headers: cors, contentType: "application/json", body: '{"type":"mess' }),
+    );
+    await saveKey(page);
+    await testButton(page).click();
+    await expect(dialog(page).getByRole("alert")).toContainText("Couldn't reach Anthropic");
+    await expect(dialog(page).getByText("Key works.")).toHaveCount(0);
+  });
+
+  test("a test still running when the model is changed is stopped, with no message", async ({ page }) => {
+    let answer: () => void = () => {};
+    const held = new Promise<void>((r) => (answer = r));
+    await page.route("https://api.anthropic.com/**", async (r: Route) => {
+      if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      await held;
+      return r
+        .fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(works) })
+        .catch(() => {});
+    });
+    await saveKey(page);
+    await testButton(page).click();
+    await expect(dialog(page).getByText("Testing…")).toBeVisible();
+    await dialog(page).getByRole("radio", { name: /Sonnet 5\.5/ }).check();
+    answer();
+    await page.waitForTimeout(300);
+    await expect(dialog(page).getByText("Key works.")).toHaveCount(0);
+    await expect(dialog(page).getByText("Testing…")).toHaveCount(0);
+    await expect(testButton(page)).toBeEnabled();
+  });
+
+  test("a test still running when the key is forgotten in another tab is stopped, with no message", async ({ page, context }) => {
+    let answer: () => void = () => {};
+    const held = new Promise<void>((r) => (answer = r));
+    await page.route("https://api.anthropic.com/**", async (r: Route) => {
+      if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      await held;
+      return r
+        .fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(works) })
+        .catch(() => {});
+    });
+    await saveKey(page);
+    await dialog(page).getByLabel("Remember on this device").check();
+    await testButton(page).click();
+    await expect(dialog(page).getByText("Testing…")).toBeVisible();
+    // The same site in a second tab forgets the key; this tab hears the storage event.
+    const other = await context.newPage();
+    await other.goto("/");
+    await other.evaluate(() => {
+      localStorage.removeItem("note-board:ai-key");
+      localStorage.removeItem("note-board:ai-key-user");
+    });
+    await expect(dialog(page).getByText("No key saved.")).toBeVisible();
+    answer();
+    await page.waitForTimeout(300);
+    await expect(dialog(page).getByText("Key works.")).toHaveCount(0);
+    await expect(dialog(page).getByText("Testing…")).toHaveCount(0);
+    await other.close();
+  });
+
   test("once this month's limit is reached, nothing is sent", async ({ page }) => {
     const posts = await anthropic(page, 200, works);
     await saveKey(page);

@@ -17,6 +17,7 @@ import { LiveRegion } from './components/LiveRegion';
 import { PhoneBar } from './components/PhoneBar';
 import { NoticeBanner } from './components/SharePanel';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
+import { Visualizer } from './components/Visualizer';
 import { Tour } from './components/Tour';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
@@ -150,6 +151,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <PreviewBar />
       <FormatBar />
       <ShortcutsPanel />
+      <Visualizer />
       <DeleteCompleted />
       <NoticeBanner />
       <ViewOnlyNote />

@@ -355,10 +355,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
 .phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 /* Never an empty tile: nine sit three across (three full rows), eight four across (two full rows), and seven four
-   across with the last one two wide (signed out: no Share or Calendar). */
-.phone-tiles:has(> :nth-child(7)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.phone-tiles:has(> :nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.phone-tiles > :nth-child(7):last-child { grid-column: span 2; }
+   across with the last one two wide (signed out: no Share or Calendar). The Visualizer is not counted: it is a
+   full-width last row of its own (icon beside the label). */
+.phone-tiles:has(> :nth-child(7 of :not(.viz-open))) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.phone-tiles:has(> :nth-child(9 of :not(.viz-open))) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.phone-tiles > :nth-child(7 of :not(.viz-open)):nth-last-child(1 of :not(.viz-open)) { grid-column: span 2; }
+.phone-tiles > .tb-button.viz-open { grid-column: 1 / -1; flex-direction: row; min-height: 48px; gap: 8px; }
 .phone-trio { margin-top: 6px; }
 .phone-more .share-wrap.phone { display: contents; }
 .phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }
@@ -3786,3 +3788,136 @@ a.cal-open { align-self: flex-start; }
   .phone-more .swatch-default { height: 44px; }
 }
 
+
+/*
+ * Visualizer (owner request 2026-11-12): a full-screen, always dark, glowing replay of the Completed panels'
+ * items. Dark and honey whatever the light / dark choice, so its colors are defined once here (hex only: the
+ * ring's drawing makes see-through versions of them). The ring is a canvas; the rest is ordinary page.
+ */
+.viz {
+  --viz-bg: #0d0b09;
+  --viz-ink: #f6efe0;
+  --viz-soft: #bdb29c;
+  --viz-faint: #968b78;
+  --viz-line: rgba(246, 239, 224, 0.12);
+  --viz-honey: #f2b62b;
+  --viz-core: #f2b62b;
+  --viz-spark: #fff4d6;
+  --viz-rim: #8d8372;
+  /* One hue per board (wedge), repeating after eight. */
+  --viz-hue-0: #f2b62b;
+  --viz-hue-1: #3fc1b0;
+  --viz-hue-2: #ef7b62;
+  --viz-hue-3: #5aa9f0;
+  --viz-hue-4: #a98bf0;
+  --viz-hue-5: #9fcf4f;
+  --viz-hue-6: #ef6fa5;
+  --viz-hue-7: #d9c58f;
+  /* The app's own buttons and icons inside it take the dark look. */
+  --accent: var(--viz-honey);
+  --placeholder: var(--viz-soft);
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background-color: var(--viz-bg);
+  background-image: radial-gradient(60% 70% at 30% 55%, rgba(242, 182, 43, 0.1), transparent 70%);
+  color: var(--viz-ink);
+  font-family: var(--font);
+}
+.viz-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 400px);
+  overflow: hidden;
+}
+.viz-panel:focus { outline: none; }
+.viz-stage { position: relative; min-width: 0; min-height: 0; }
+.viz-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.viz-empty {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  width: min(320px, 80%);
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--viz-soft);
+}
+.viz-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  padding: 64px 28px 28px 8px;
+}
+.viz-range { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--viz-line); border-radius: 10px; align-self: flex-start; }
+.viz-range button {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--viz-soft);
+  font-size: 14px;
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-range button[aria-pressed='true'] { background: var(--viz-honey); color: var(--viz-bg); }
+.viz-range button:active, .viz-close:active { transform: scale(0.97); }
+.viz-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.viz-count { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }
+.viz-count-number { margin: 0; font-size: clamp(36px, 4.4vw, 56px); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--viz-ink); }
+.viz-count-label { font-size: 12px; color: var(--viz-soft); }
+.viz-chart h3, .viz-feed-wrap h3 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--viz-soft); }
+.viz-chart svg { display: block; width: 100%; height: 72px; overflow: visible; }
+.viz-chart-base { stroke: var(--viz-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.viz-chart-area { fill: var(--viz-honey); opacity: 0.16; }
+.viz-chart-line { fill: none; stroke: var(--viz-honey); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.viz-chart-now { stroke: var(--viz-spark); stroke-width: 1; opacity: 0.7; vector-effect: non-scaling-stroke; }
+.viz-chart-dates { display: flex; justify-content: space-between; margin: 4px 0 0; font-size: 12px; color: var(--viz-faint); }
+.viz-feed-wrap { flex: 1; min-height: 0; overflow: hidden; }
+.viz-feed { list-style: none; margin: 0; padding: 0; }
+.viz-feed li { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-top: 1px solid var(--viz-line); }
+.viz-feed li:first-child { border-top-color: transparent; }
+.viz-feed-text { font-size: 15px; color: var(--viz-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-feed-where { font-size: 12px; color: var(--viz-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-feed li:first-child .viz-feed-text { color: var(--viz-honey); }
+.viz-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--viz-line);
+  border-radius: 50%;
+  background: rgba(246, 239, 224, 0.05);
+  color: var(--viz-ink);
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-close svg { width: 14px; height: 14px; }
+@media (hover: hover) and (pointer: fine) {
+  .viz-range button:not([aria-pressed='true']):hover { background: rgba(246, 239, 224, 0.08); color: var(--viz-ink); }
+  .viz-close:hover { background: rgba(246, 239, 224, 0.12); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .viz { animation: viz-in 220ms var(--ease-out); }
+  .viz-feed li { animation: viz-feed-in 260ms var(--ease-out); }
+}
+@keyframes viz-in { from { opacity: 0; } }
+@keyframes viz-feed-in { from { opacity: 0; transform: translateY(-8px); } }
+/* A phone: the ring on top, the numbers, chart and feed under it, scrolling together. */
+@media (max-width: 599px) {
+  .viz-panel { display: block; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .viz-stage { height: clamp(250px, 40dvh, 340px); }
+  .viz-info { padding: 8px 16px 24px; gap: 20px; }
+  .viz-range button { height: 44px; padding: 0 16px; }
+  .viz-feed-wrap { flex: none; }
+  .viz-close { right: 8px; }
+}

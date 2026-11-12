@@ -17,6 +17,7 @@ import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
 import { keepsBlockCursor } from './textField';
 import { CompletedButton } from './CompletedPanel';
+import { VisualizerButton } from './Visualizer';
 import { HistoryButton } from './HistoryPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
@@ -105,6 +106,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <JournalButton labelled onOpen={() => setOpen(null)} />
             <HabitsButton labelled onOpen={() => setOpen(null)} />
             <ChecklistButton labelled onOpen={() => setOpen(null)} />
+            <VisualizerButton onOpen={() => setOpen(null)} />
           </div>
           <section className="phone-arrange" aria-labelledby="phone-arrange">
             <h2 id="phone-arrange" className="phone-label">

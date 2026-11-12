@@ -33,10 +33,10 @@ const box = async (l: Locator) => (await l.boundingBox())!;
 /** The visible labels of the direct children, in order (accessible names for icon-only ones). */
 const names = (l: Locator) => l.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || (e.textContent ?? '').trim()));
 
-test('signed in, the top is nine tiles in a 3 x 3 grid (no empty slot), each at least 44px', async ({ page }) => {
+test('signed in, the top is nine tiles in a 3 x 3 grid and a full-width Visualizer row (no empty slot), each at least 44px', async ({ page }) => {
   await openSignedIn(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits', 'Checklist']);
+  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits', 'Checklist', 'Visualizer']);
   await expect(t.nth(2)).toHaveText('History');
   await expect(t.nth(4)).toHaveText('Timer');
   await expect(t.nth(5)).toHaveText('Calendar');
@@ -61,6 +61,12 @@ test('signed in, the top is nine tiles in a 3 x 3 grid (no empty slot), each at 
   expect(Math.abs(b[8].x + b[8].width - (grid.x + grid.width))).toBeLessThan(1.5);
   // Every tile has an icon and a label.
   for (let i = 0; i < 9; i++) await expect(t.nth(i).locator('svg').first()).toBeVisible();
+  // The Visualizer sits alone on a third row, as wide as the grid.
+  const v = await box(t.nth(9));
+  expect(v.y).toBeGreaterThan(b[6].y + b[6].height - 1);
+  expect(v.height).toBeGreaterThanOrEqual(44);
+  expect(Math.abs(v.x - grid.x)).toBeLessThan(1.5);
+  expect(Math.abs(v.width - grid.width)).toBeLessThan(1.5);
 });
 
 test('the sheet has a grab handle, the group over the text size is "Board" (no Hand / Select tools), and the sheet keeps its scroll', async ({ page }) => {
@@ -77,7 +83,7 @@ test('the sheet has a grab handle, the group over the text size is "Board" (no H
 test('signed out and not published: no Share, Calendar, Feedback or Sign out', async ({ page }) => {
   await openLocal(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits', 'Checklist']);
+  expect(await names(t)).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits', 'Checklist', 'Visualizer']);
   // Seven: four across, then three with the last two wide, so no row ends in an empty slot.
   const b = await Promise.all([0, 3, 4, 6].map((i) => box(t.nth(i))));
   const grid = await box(tiles(page));
@@ -86,6 +92,10 @@ test('signed out and not published: no Share, Calendar, Feedback or Sign out', a
   expect(Math.abs(b[1].x + b[1].width - (grid.x + grid.width))).toBeLessThan(1.5);
   expect(Math.abs(b[3].x + b[3].width - (grid.x + grid.width))).toBeLessThan(1.5);
   expect(b[3].width).toBeGreaterThan(b[2].width * 1.5);
+  // The Visualizer is a full-width row under them.
+  const v = await box(t.nth(7));
+  expect(v.y).toBeGreaterThan(b[3].y + b[3].height - 1);
+  expect(Math.abs(v.width - grid.width)).toBeLessThan(1.5);
   await expect(menu(page).getByRole('button', { name: 'Feedback' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(menu(page).getByRole('button', { name: 'Share' })).toHaveCount(0);

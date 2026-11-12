@@ -122,12 +122,10 @@ test('cards have no title band: white with a bold title, and Color tints the hea
   await expect(list).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
 
-test('the panel buttons at the bottom right are labelled; the ? and zoom stay', async ({ page }) => {
+test('the panel buttons at the bottom right are labelled (Completed and Version history are in ⋯ More now); the ? and zoom stay', async ({ page }) => {
   const dock = page.locator('.corner-controls');
   for (const [name, text] of [
     ['Search', 'Search'],
-    ['Completed', 'Completed'],
-    ['Version history', 'History'],
     ['Focus timer', 'Timer'],
     ['Journal', 'Journal'],
   ])

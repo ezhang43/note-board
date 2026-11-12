@@ -384,7 +384,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .phone-rows .tb-button > svg:first-child { color: var(--ink-soft); }
 .phone-rows .colour-control > .tb-button svg:last-child, .phone-rows .appearance-wrap > .tb-button svg:last-child { margin-left: auto; }
 /* Snap to grid and Dark mode (in the Appearance menu) read as switches: a track and knob after the label, amber while on. */
-.phone-rows > .tb-button[aria-pressed]::after, .appearance-menu > .tb-button[aria-pressed]::after {
+.phone-rows > .tb-button[aria-pressed]:not(.opens-panel)::after, .appearance-menu > .tb-button[aria-pressed]::after {
   content: '';
   margin-left: auto;
   flex: none;
@@ -393,9 +393,11 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   border-radius: 99px;
   background: radial-gradient(circle 9px at 12px 12px, var(--surface) 97%, transparent) var(--control-edge);
 }
-.phone-rows > .tb-button[aria-pressed='true']::after, .appearance-menu > .tb-button[aria-pressed='true']::after {
+.phone-rows > .tb-button[aria-pressed='true']:not(.opens-panel)::after, .appearance-menu > .tb-button[aria-pressed='true']::after {
   background: radial-gradient(circle 9px at 28px 12px, var(--on-accent) 97%, transparent) var(--accent);
 }
+/* Version history and Completed in ⋯ open a panel and shut the menu, so they are no switch: while their panel is open the row says "Open". */
+.phone-rows > .tb-button.opens-panel[aria-pressed='true']::after { content: 'Open'; margin-left: auto; font-size: 13px; color: var(--ink-soft); }
 /* The color swatches and the File menu open inside the sheet, below their row. */
 .phone-more .colour-menu { position: static; padding: 10px 12px 12px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .phone-more .swatch { width: 100%; height: auto; aspect-ratio: 1; }

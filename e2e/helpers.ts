@@ -51,6 +51,30 @@ export async function arrange(page: Page) {
   return page.getByRole('group', { name: 'Arrange' });
 }
 
+/** The toolbar's ⋯ More popover (owner request 2026-11-12: Version history and Completed live here), opened unless it already is. */
+export async function more(page: Page) {
+  const toggle = page.locator('header.toolbar').getByRole('button', { name: 'More', exact: true });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  return page.getByRole('dialog', { name: 'More' });
+}
+
+/** Opens (or, if it is open, closes) the Version history panel from ⋯ More on a computer. */
+export async function toggleHistory(page: Page) {
+  await (await more(page)).getByRole('button', { name: 'Version history', exact: true }).click();
+}
+
+/** Opens (or, if it is open, closes) the Completed panel from ⋯ More on a computer. */
+export async function toggleCompleted(page: Page) {
+  await (await more(page)).getByRole('button', { name: 'Completed', exact: true }).click();
+}
+
+/** Opens or closes a side panel by its name: Version history and Completed through ⋯ More, the others from the bottom-right pill. */
+export async function togglePanel(page: Page, name: string) {
+  if (name === 'Version history') return toggleHistory(page);
+  if (name === 'Completed') return toggleCompleted(page);
+  await page.locator('.corner-controls').getByRole('button', { name: new RegExp(`^${name}`) }).click();
+}
+
 /**
  * Opens the toolbar's Appearance menu (the Dark mode switch and the color themes) unless it is already
  * open, and returns it. A click on the board or a card closes it again.

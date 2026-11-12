@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, arrange, cards, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, cards, clickEmpty, freshBoardEachTest, toggleCompleted, toggleHistory } from './helpers';
 
 // Keys pressed while the keyboard is in a side panel never act on the board behind it (job 165a,
 // from the interface review U1). Only the Journal and Habits panels were protected: with a note
@@ -36,7 +36,7 @@ test('Backspace on a Completed panel tick box leaves the selected note alone', a
   await (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true }).click();
   await clickEmpty(page);
   await selectedNote(page);
-  await dock(page, 'Completed').click();
+  await toggleCompleted(page);
   const back = page.getByRole('complementary', { name: 'Completed' }).getByRole('checkbox', { name: /^Send "milk" back/ });
   await back.focus();
   await page.keyboard.press('Backspace');
@@ -46,7 +46,7 @@ test('Backspace on a Completed panel tick box leaves the selected note alone', a
 
 test('Delete on a Version history button leaves the selected note alone', async ({ page }) => {
   await selectedNote(page);
-  await dock(page, 'Version history').click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   await panel.getByRole('button').first().focus();
   await page.keyboard.press('Delete');

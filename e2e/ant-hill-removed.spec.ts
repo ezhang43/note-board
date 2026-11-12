@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, arrange, clickEmpty, freshBoardEachTest } from './helpers';
+import { add, arrange, clickEmpty, freshBoardEachTest, toggleCompleted } from './helpers';
 
 freshBoardEachTest();
 
@@ -24,7 +24,7 @@ test('there is no ant hill on the board, and Clean up still fills the Completed 
   await list.getByLabel('Done').first().click();
   await (await cleanUpButton(page)).click();
 
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   const done = page.getByRole('complementary', { name: 'Completed' });
   await expect(done.locator('.completed-text')).toHaveText(['milk']);
   await expect(anyHill(page)).toHaveCount(0);

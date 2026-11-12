@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, clickEmpty, columns, freshBoardEachTest, toggleDark } from './helpers';
+import { add, clickEmpty, columns, freshBoardEachTest, toggleDark, togglePanel } from './helpers';
 
 // The rest of the interface review (job 144): keys and focus in the search box, Escape on menus and
 // the search bar, recording a hotkey, and a few things the browser tests never looked at.
@@ -99,11 +99,11 @@ test('a container with one card is read as "1 card", with none or two as "0 card
 test('the side panels and the search bar keep the dark colors', async ({ page }) => {
   await toggleDark(page);
   for (const name of ['Journal', 'Habits', 'Completed', 'Focus timer', 'Version history']) {
-    await dock(page, name).click();
+    await togglePanel(page, name);
     const panel = page.locator('aside.history-panel');
     await expect(panel).toBeVisible();
     expect(await panel.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(36, 34, 30)');
-    await dock(page, name).click();
+    await togglePanel(page, name);
   }
   await page.keyboard.press('Control+f');
   expect(await page.locator('.find-bar').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(36, 34, 30)');

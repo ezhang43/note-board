@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { arrange, fontsLoaded } from './helpers';
+import { arrange, fontsLoaded, toggleCompleted } from './helpers';
 import { FONT_KEY, type FontSize } from '../src/model/font';
 
 // Checklist indent (owner request 2026-10-29: "it is not always clear in which hierarchy a set of indented checkboxes are in";
@@ -121,7 +121,7 @@ test('the Completed panel indents sub-items the same 32px per level', async ({ p
   await seed(page, 'normal', 400);
   await page.getByLabel('Done: Item a').click(); // ticking the top item ticks the ones under it
   await arrange(page).then((menu) => menu.getByRole('button', { name: 'Clean up', exact: true }).click());
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   const boxes = await page.getByRole('complementary', { name: 'Completed' }).locator('input[type=checkbox]').evaluateAll((els) => {
     const lefts = els.map((e) => e.getBoundingClientRect().left);
     return lefts.map((l) => l - lefts[0]);

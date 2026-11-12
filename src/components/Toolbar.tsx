@@ -16,6 +16,8 @@ import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { RoleBadge } from './ViewOnly';
+import { CompletedButton, useCompletedFindTarget } from './CompletedPanel';
+import { HistoryButton } from './HistoryPanel';
 import { activeVersionStore, historyFull, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { account, useAccountRemover } from '../sync/account';
@@ -535,28 +537,42 @@ function BoardName() {
 }
 
 /**
- * ⋯ (owner pick, 2026-10-22): in windows under 1180px wide, Arrange, File, Feedback, Appearance and
- * Sign out fold into this menu, the same rows the phone's ⋯ sheet has. Share stays on the toolbar.
+ * ⋯ (owner pick, 2026-10-22): always on the toolbar, beside Share. It holds Version history and
+ * Completed (owner request, 2026-11-12), and in windows under 1180px wide Arrange, File, Feedback,
+ * Appearance and Sign out fold into it too, the same rows the phone's ⋯ sheet has.
  */
-function MoreMenu({ onSignOut }: { onSignOut?: () => void }) {
+function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => void }) {
   const { open, setOpen, wrap, onKeyDown } = usePopover();
   const viewOnly = useViewOnly();
+  // A search match in the shut Completed panel rings ⋯ too, so the way in is still pointed at while the menu is shut.
+  const findTarget = useCompletedFindTarget();
+  const close = () => setOpen(false);
   return (
     <div className="file-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
-      <button type="button" className="tb-button icon-only" aria-label="More" title="More: Brain dump, Arrange, File, Feedback, Appearance, Sign out" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className={`tb-button icon-only${findTarget ? ' find-target' : ''}`}
+        aria-label="More"
+        title={folded ? 'More: Version history, Completed, Brain dump, Arrange, File, Feedback, Appearance, Sign out' : 'More: Version history, Completed'}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         <MoreIcon />
       </button>
       {open && (
         <div className="toolbar-more phone-more" role="dialog" aria-label="More">
           <div className="phone-rows">
-            {!viewOnly && <BrainDumpButton labelled onOpen={() => setOpen(false)} />}
-            {!viewOnly && <ArrangeMenu />}
-            <FileMenu />
-            <FeedbackButton onOpen={() => setOpen(false)} />
-            <AppearanceMenu labelled />
-            {onSignOut && (
+            <HistoryButton onOpen={close} />
+            <CompletedButton onOpen={close} />
+            {folded && !viewOnly && <BrainDumpButton labelled onOpen={close} />}
+            {folded && !viewOnly && <ArrangeMenu />}
+            {folded && <FileMenu />}
+            {folded && <FeedbackButton onOpen={close} />}
+            {folded && <AppearanceMenu labelled />}
+            {folded && onSignOut && (
               <button type="button" className="tb-button" onClick={() => {
-                  setOpen(false);
+                  close();
                   onSignOut();
                 }}>
                 <SignOutIcon />
@@ -647,7 +663,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
       <div className="toolbar-divider" aria-hidden="true" />
       {!folded && <AppearanceMenu />}
       <ShareButton />
-      {folded && <MoreMenu onSignOut={onSignOut} />}
+      <MoreMenu folded={folded} onSignOut={onSignOut} />
 
       {onSignOut && !folded && (
         <>

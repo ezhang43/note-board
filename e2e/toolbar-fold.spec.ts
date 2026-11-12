@@ -5,6 +5,7 @@ import { box, cards, fontsLoaded } from './helpers';
 // The toolbar in medium windows (owner pick, 2026-10-22, job #165b): below 1180px wide, Arrange, File,
 // Feedback, Appearance and Sign out fold into a ⋯ menu (Share stays); at 880px and below the Add and
 // Color buttons show icons only. It has to fit, with nothing cut off, at tablet and small laptop widths.
+// ⋯ also shows at wider widths, holding Version history and Completed (owner request, 2026-11-12).
 
 const sample = fileURLToPath(new URL('./fixtures/milanote-sample.md', import.meta.url));
 const toolbar = (page: Page) => page.locator('header.toolbar');
@@ -48,10 +49,13 @@ for (const width of [600, 667, 768, 834, 1024, 1179]) {
 }
 
 for (const width of [1180, 1280]) {
-  test(`at ${width}px the whole toolbar shows and there is no ⋯`, async ({ page }) => {
+  test(`at ${width}px the whole toolbar shows and ⋯ holds only Version history and Completed`, async ({ page }) => {
     await start(page, width);
     await expectFits(page, width);
-    await expect(more(page)).toHaveCount(0);
+    await expect(more(page)).toBeVisible();
+    await more(page).click();
+    await expect(moreMenu(page).getByRole('button')).toHaveText([/Version history/, /Completed/]);
+    await page.keyboard.press('Escape');
     for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out', 'Share']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeVisible();
     await expect(toolbar(page).getByRole('button', { name: 'Note', exact: true }).locator('.tb-label')).toBeVisible();
   });
@@ -68,16 +72,20 @@ test('the Add buttons show their words down to 881px and only icons at 880px and
   await expectFits(page, 880);
 });
 
-test('resizing across 1180px swaps ⋯ for the full toolbar and back', async ({ page }) => {
+test('resizing across 1180px moves the folded rows between ⋯ and the full toolbar', async ({ page }) => {
   await start(page, 1024);
   await more(page).click();
-  await expect(moreMenu(page)).toBeVisible();
+  await expect(moreMenu(page).getByRole('button', { name: 'File', exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1300, height: 800 });
-  await expect(more(page)).toHaveCount(0);
+  await expect(more(page)).toBeVisible();
+  await expect(moreMenu(page).getByRole('button', { name: 'File', exact: true })).toHaveCount(0);
   await expect(toolbar(page).getByRole('button', { name: 'File', exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1024, height: 800 });
   await expect(more(page)).toBeVisible();
+  // ⋯ stays open across the resize, so shut it before looking for File on the toolbar itself.
+  await page.keyboard.press('Escape');
   await expect(moreMenu(page)).toHaveCount(0);
+  await expect(toolbar(page).getByRole('button', { name: 'File', exact: true })).toHaveCount(0);
 });
 
 test('⋯ opens and closes with a click, outside click and Escape (focus goes back to ⋯)', async ({ page }) => {

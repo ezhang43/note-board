@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, cards } from './helpers';
+import { add, cards, toggleHistory } from './helpers';
 
 // Guard (review pass, job 156): a deleted board comes back from Version history. SPEC "Several
 // boards": "Every board is saved in Version history first, so a deleted board can be brought back
@@ -41,7 +41,7 @@ test('a deleted sub-board, with its note, is brought back by restoring the versi
   await page.keyboard.press('Escape');
 
   // The version saved just before the delete still has it.
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   const panel = page.getByRole('complementary', { name: 'Version history' });
   await panel.getByRole('region').getByRole('button').first().click();
   const banner = page.getByRole('region', { name: 'Looking at an earlier version' });

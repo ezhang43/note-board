@@ -1,15 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, arrange, cards, clickEmpty, columns, freshBoardEachTest } from './helpers';
+import { add, arrange, cards, clickEmpty, columns, freshBoardEachTest, more, toggleCompleted } from './helpers';
 
 // Completed panel (Job #51, owner OK 2026-10-15): the board's Completed card is no longer drawn on
-// the board. Its contents show in a Completed panel, opened by a round button next to Version history (a line in
+// the board. Its contents show in a Completed panel, opened by an entry in the ⋯ More menu (a tile in
 // the ⋯ sheet on a phone), in the right-hand side panel spot.
 
 freshBoardEachTest();
 
 // The toolbar's Clean up, in the Arrange menu (opened first).
 const cleanUpButton = async (page: Page) => (await arrange(page)).getByRole('button', { name: 'Clean up', exact: true });
-const completedButton = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true });
+// Completed lives in the toolbar's ⋯ More menu (owner request 2026-11-12).
+const completedButton = (page: Page) => page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Completed', exact: true });
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Completed' });
 const texts = (list: Locator) => list.getByLabel('Item text').evaluateAll((els) => els.map((el) => (el as HTMLTextAreaElement).value));
 
@@ -41,11 +42,14 @@ test('Clean up fills the Completed panel, not the board; unticking there sends a
   await expect(page.locator('.completed-card-body')).toHaveCount(0);
   await expect(panel(page)).toHaveCount(0);
 
-  // The round button left of Version history opens it; it shares the side panel spot.
-  const history = page.locator('.corner-controls').getByRole('button', { name: 'Version history' });
-  await expect(history.locator('xpath=preceding-sibling::button[1]')).toHaveAccessibleName('Completed');
-  await completedButton(page).click();
+  // The Completed entry in ⋯ More opens it (and shuts the menu); it shares the side panel spot.
+  await expect(page.locator('.corner-controls').getByRole('button', { name: 'Completed' })).toHaveCount(0);
+  await toggleCompleted(page);
+  await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
+  await more(page);
   await expect(completedButton(page)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   await expect(panel(page).locator('.completed-date')).toHaveText([today]);
   await expect(panel(page).locator('.completed-text')).toHaveText(['milk']);
@@ -63,14 +67,14 @@ test('Clean up fills the Completed panel, not the board; unticking there sends a
 
   // Survives a reload.
   await page.reload();
-  await completedButton(page).click();
+  await toggleCompleted(page);
   await expect(panel(page).locator('.completed-text')).toHaveText(['milk']);
   await expect(cards(page)).toHaveCount(1);
 
   // Opening another panel closes it; × closes it.
   await page.locator('.corner-controls').getByRole('button', { name: 'Focus timer' }).click();
   await expect(panel(page)).toHaveCount(0);
-  await completedButton(page).click();
+  await toggleCompleted(page);
   await panel(page).getByRole('button', { name: 'Close completed' }).click();
   await expect(panel(page)).toHaveCount(0);
 });
@@ -82,12 +86,12 @@ test('sub-items show under their item, and the newest day comes first', async ({
   await page.keyboard.press('Tab');
   await tick(list, 'pack');
   await (await cleanUpButton(page)).click();
-  await completedButton(page).click();
+  await toggleCompleted(page);
   await expect(panel(page).locator('.completed-text')).toHaveText(['pack', 'socks']);
   await expect(panel(page).locator('.completed-from')).toHaveText(['Trip']);
 });
 
-test('Find points at the Completed button while the panel is shut, and marks the text when it is open', async ({ page }) => {
+test('Find points at ⋯ and the Completed entry while the panel is shut, and marks the text when it is open', async ({ page }) => {
   const list = await makeList(page, 'Shop', ['milk', 'bread']);
   await tick(list, 'milk');
   await (await cleanUpButton(page)).click();
@@ -95,9 +99,11 @@ test('Find points at the Completed button while the panel is shut, and marks the
   await page.getByRole('searchbox', { name: 'Search the board' }).fill('milk');
   const status = page.getByRole('search').getByRole('status');
   await expect(status).toHaveText('1 of 1 · in Completed');
+  await expect(page.locator('header.toolbar').getByRole('button', { name: 'More', exact: true })).toHaveClass(/find-target/);
+  await more(page);
   await expect(completedButton(page)).toHaveClass(/find-target/);
 
-  await completedButton(page).click();
+  await toggleCompleted(page);
   await expect(status).toHaveText('1 of 1');
   await expect(panel(page).locator('mark[data-current]')).toHaveText('milk');
 });
@@ -136,7 +142,7 @@ test('a Completed card saved in a column (an older board) is not drawn and not c
   const col = columns(page).first();
   await expect(col.locator('[data-card-id]')).toHaveCount(0);
   await expect(col.getByText('Drop cards here')).toBeVisible();
-  await completedButton(page).click();
+  await toggleCompleted(page);
   await expect(panel(page).locator('.completed-text')).toHaveText(['milk']);
 
   // A card dropped into the column still lands there.

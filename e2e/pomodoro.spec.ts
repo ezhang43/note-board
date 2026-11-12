@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { add, box, clickEmpty, fontsLoaded } from './helpers';
+import { add, box, clickEmpty, fontsLoaded, toggleHistory } from './helpers';
 
 // Focus timer (Pomodoro), owner request 2026-10-06: a toolbar button opens a side panel with a
 // 25 / 5 / 15 minute timer that keeps running when the panel is closed and across a reload.
@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await fontsLoaded(page);
 });
 
-// The toolbar is full at 1280px, so its button is by the zoom control, with Completed and Version history.
+// The toolbar is full at 1280px, so its button is by the zoom control.
 const button = (page: Page) => page.locator('.corner-controls').getByRole('button', { name: /^Focus timer/ });
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Focus timer' });
 const spy = (page: Page) => page.evaluate(() => (window as unknown as { spy: Spy }).spy);
@@ -119,7 +119,7 @@ test('the lengths and mute are remembered on this device, and a running timer su
 
 test('it shares the right-hand spot with Version history: one at a time; Escape closes it', async ({ page }) => {
   await button(page).click();
-  await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await toggleHistory(page);
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: 'Version history' })).toBeVisible();
   await button(page).click();
@@ -189,11 +189,11 @@ test('undo leaves the timer alone', async ({ page }) => {
   await expect(panel(page).getByRole('timer')).toHaveText('25:00');
 });
 
-test('its button sits by the zoom control, right of Version history, and widens to show the time', async ({ page }) => {
-  const history = await box(page.getByRole('button', { name: 'Version history', exact: true }));
+test('its button sits by the zoom control, right of Search, and widens to show the time', async ({ page }) => {
+  const search = await box(page.locator('.corner-controls').getByRole('button', { name: 'Search', exact: true }));
   const idle = await box(button(page));
-  expect(Math.abs(idle.y - history.y)).toBeLessThan(4);
-  expect(idle.x).toBeGreaterThan(history.x);
+  expect(Math.abs(idle.y - search.y)).toBeLessThan(4);
+  expect(idle.x).toBeGreaterThan(search.x);
   await button(page).click();
   await panel(page).getByRole('button', { name: 'Start' }).click();
   await panel(page).getByRole('button', { name: 'Close focus timer' }).click();

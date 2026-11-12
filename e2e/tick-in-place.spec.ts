@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { freshBoardEachTest } from './helpers';
+import { freshBoardEachTest, toggleCompleted } from './helpers';
 
 // Ticked items stay in place (owner request, 2026-10-23, job 200): a ticked item is struck through and
 // faded where it is, with no Completed section in the list and no Uncheck all. The list's Clean up sits
@@ -64,7 +64,7 @@ test('the title row shows Clean up only while something is ticked; it sends the 
   await cleanUp(page).click();
   expect(await texts(page)).toEqual(['Milk', 'Eggs']);
   await expect(cleanUp(page)).toHaveCount(0);
-  await page.locator('.corner-controls').getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   await expect(page.getByRole('complementary', { name: 'Completed' }).getByText('Bread')).toBeVisible();
   // One undo step brings it back, ticked, where it was.
   await page.keyboard.press('Control+z');

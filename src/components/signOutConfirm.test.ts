@@ -43,7 +43,7 @@ describe('the Sign out on a working board', () => {
     // A wide window, so the toolbar's own Sign out button shows (the other two are covered in e2e/sign-out-confirm.spec.ts).
     (window as unknown as { happyDOM: { setViewport: (v: { width: number; height: number }) => void } }).happyDOM.setViewport({ width: 1400, height: 900 });
     const onSignOut = vi.fn();
-    const { host, done } = await mount(createElement(App, { onSignOut }));
+    const { host, done } = await mount(createElement(App, { onSignOut, saveNote: 'Saved' }));
     await act(async () => signOutButton(host).click());
     expect(onSignOut).not.toHaveBeenCalled();
     const dialog = host.querySelector('dialog.ask')!;
@@ -60,12 +60,15 @@ describe('the Sign out on a working board', () => {
   // device is offline, which is exactly when the person most needs the warning.
   for (const [saveNote, says] of [
     ['Saved', 'Your boards stay saved online'],
-    ['Saving…', 'Your boards stay saved online'],
+    // Sign out sends the waiting changes but doesn't wait for them to arrive, so "Saving…" gets the warning too.
+    ['Saving…', 'haven’t been saved online yet'],
+    // No save note at all: the board isn't synced online (the dev / demo page), so nothing is promised.
+    [undefined, 'haven’t been saved online yet'],
     [null, 'haven’t been saved online yet'],
     ['Offline. Will save when you’re back online', 'haven’t been saved online yet'],
     ['Your account is being deleted on another device; changes here aren’t saved yet', 'haven’t been saved online yet'],
   ] as const) {
-    it(`with the save note ${JSON.stringify(saveNote)} the question says "${says}"`, async () => {
+    it(`with the save note ${String(JSON.stringify(saveNote))} the question says "${says}"`, async () => {
       HTMLDialogElement.prototype.showModal ??= function () {};
       HTMLDialogElement.prototype.close ??= function () {};
       (window as unknown as { happyDOM: { setViewport: (v: { width: number; height: number }) => void } }).happyDOM.setViewport({ width: 1400, height: 900 });

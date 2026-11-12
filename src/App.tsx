@@ -58,9 +58,9 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
     if (saveNote === null) announce('Couldn’t save online. Changes are on this device only.');
   }, [saveNote]);
   const phone = usePhone();
-  // Saved (or being saved: signing out sends those first) means the reassurance is true; any other
-  // note (offline, couldn't save, held) means some changes may not be online yet, and it says so.
-  const allSent = saveNote === 'Saved' || saveNote === 'Saving…' || saveNote === undefined;
+  // Only "Saved" makes the reassurance true. "Saving…" is not enough (signing out sends the waiting changes
+  // but doesn't wait for them to arrive), and no note at all means the board isn't synced online (the demo page).
+  const allSent = saveNote === 'Saved';
   const signOut = onSignOut && (async () => {
     const body = allSent ? 'Your boards stay saved online. You can sign in again any time.' : 'Some of your latest changes haven’t been saved online yet, so they may be missing when you sign in again.';
     if (await ask({ title: 'Sign out?', body, action: 'Sign out' })) onSignOut();

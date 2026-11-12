@@ -35,7 +35,7 @@ test.describe('desktop toolbar button', () => {
     const button = toolbar(page).getByRole('button', { name: 'Sign out', exact: true });
     await button.click();
     await expect(question(page)).toBeVisible();
-    await expect(question(page)).toContainText('Your boards stay saved online. You can sign in again any time.');
+    await expect(question(page)).toContainText('haven’t been saved online yet') // the demo page has no online saving, so no reassurance (the "Saved" wording is in src/components/signOutConfirm.test.ts);
     expect(said).toEqual([]);
     await cancel(page).click();
     await expect(question(page)).toHaveCount(0);

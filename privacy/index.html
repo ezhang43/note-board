@@ -4,6 +4,7 @@
   Written from what the code does (src/sync/firebase.ts, src/store/collab.ts, firestore.rules, public/sw.js) on 2026-10-06.
   Feedback (job #69) added on 2026-10-16.
   Claude connector section and Anthropic in the services list added on 2026-10-19 (job 123), written from mcp/.
+  What an AI button sends to Anthropic with the person's own key added on 2026-11-12 (job 13), written from src/store/ai.ts.
   The owner's details were filled in on 2026-10-07. Update this page whenever what is stored changes.
 -->
 <html lang="en">
@@ -74,7 +75,7 @@
 
       <details>
         <summary><h2>An AI key you enter</h2></summary>
-        <p>In ⋯ then AI settings you can type in your own Anthropic API key. It stays in your browser: for this tab only, or on this device if you tick "Remember on this device". It is not saved with your boards, not sent to BusyAnts's servers or your account, and not sent anywhere else yet, because no AI feature uses it so far. Anyone who uses your browser profile can use it, so keep a low spend limit on that key. You can remove it any time with Forget key, and it is removed when you sign out, when someone else signs in on this browser, or when you delete your account.</p>
+        <p>In ⋯ then AI settings you can type in your own Anthropic API key. It stays in your browser: for this tab only, or on this device if you tick "Remember on this device". It is not saved with your boards and not sent to BusyAnts's servers or your account. It is used only when you press an AI button or Test key: then the text you chose is sent straight from your browser to Anthropic, with your own key, and Anthropic's answer comes straight back. It never passes through BusyAnts. Anthropic handles it under its <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a> and your Anthropic account's terms, not this one, and the cost goes on your Anthropic account. Anyone who uses your browser profile can use it, so keep a low spend limit on that key. You can remove it any time with Forget key, and it is removed when you sign out, when someone else signs in on this browser, or when you delete your account.</p>
       </details>
 
       <details>
@@ -111,7 +112,7 @@
           <li><strong>Google Calendar</strong> (run by Google) holds your calendar events, if you use the calendar panel; BusyAnts reads and changes them there and keeps no copy.</li>
           <li><strong>Google Fonts</strong> supplies the typefaces, so Google also receives your IP address when the fonts load.</li>
           <li><strong>GoatCounter</strong> counts page visits (see “Counting visits” above).</li>
-          <li><strong>Anthropic</strong> (Claude), only if you use the optional Claude connector, receives what Claude reads from your boards when you ask it to (see “The Claude connector” above).</li>
+          <li><strong>Anthropic</strong> (Claude) receives what Claude reads from your boards if you use the optional Claude connector and ask it to (see “The Claude connector” above), and the text you chose when you press an AI button with your own key (see “An AI key you enter” above).</li>
         </ul>
         <p>Each of these follows its own privacy policy. BusyAnts uses no other services and no advertising.</p>
       </details>

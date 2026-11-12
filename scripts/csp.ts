@@ -5,7 +5,7 @@ import { AUTH_DOMAIN } from '../src/sync/firebaseProject';
 
 // Content Security Policy (job 11, high-risk): which sites the pages may load scripts, frames and
 // styles from and send requests to, so a script slipped into a page can't load more code from
-// elsewhere or post the person's data (a later feature keeps their own Anthropic key in the browser)
+// elsewhere or post the person's data (the AI features keep their own Anthropic key in the browser)
 // to a site of its own. GitHub Pages can't send headers, so it is a <meta http-equiv> tag, put on every
 // built page (the app and the five website pages) right after <meta charset>, before any script or
 // stylesheet: a meta policy applies only from where it appears. A meta policy can't use
@@ -49,7 +49,9 @@ const BASE: Record<string, string[]> = {
     // The picture / PDF download reads the fonts' stylesheets and files to draw the board in its typefaces.
     'https://fonts.googleapis.com',
     'https://fonts.gstatic.com',
-    // Not api.anthropic.com yet: owner decision 2026-11-11, it is added with the AI feature that needs it.
+    // Anthropic's API, which the AI features call with the person's own key (src/store/ai.ts, job 13).
+    // Owner decision 2026-11-12: this exact address only, on every page.
+    'https://api.anthropic.com',
   ],
   'frame-src': [
     // Firebase sign-in's hidden frame (@firebase/auth getIframeUrl: https://<authDomain>/__/auth/iframe).

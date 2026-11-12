@@ -1,10 +1,25 @@
 import { useSyncExternalStore } from "react";
 import { AI_KEY_NAME, AI_KEY_NAMES, AI_KEY_USER_NAME } from "../model/aiKey";
+import {
+  ANTHROPIC_URL,
+  ANTHROPIC_VERSION,
+  CANCELLED,
+  NETWORK_FAILURE,
+  buildRequest,
+  errorFor,
+  readReply,
+  usableKey,
+  type AiFailure,
+  type AiResult,
+  type AiSchema,
+  type Effort,
+} from "../model/ai";
 
 // The person's own Anthropic API key and the AI settings (wow plan, job 12a), kept in this browser only.
 //
 // - The key is NOT board data. It lives here, never in the store's state, a saved board, Version history,
-//   an export or the sync (so never in Firestore). Nothing in the app uses it yet.
+//   an export or the sync (so never in Firestore). Only `ask` (askClaude) reads it, right before each request,
+//   and puts it only in the x-api-key header of a request to api.anthropic.com (job 13).
 // - By default it is in sessionStorage (gone when the tab or browser is closed). With "Remember on this
 //   device" it is in localStorage instead. It is saved with the id of the person it belongs to, and
 //   getKey only gives it back to that person, so a second account on this browser never sees it.
@@ -48,14 +63,34 @@ export function maskKey(key: string): string {
 const monthOf = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
+export type AskArgs = {
+  /** The signed-in person's id (null when signed out): only their own key is used. */
+  uid: string | null;
+  system: string;
+  user: string;
+  schema: AiSchema;
+  /** A hard cap per use; thinking shares it, so AI features use about 16000 (wow plan, revisions). */
+  maxTokens: number;
+  effort?: Effort;
+  signal?: AbortSignal;
+};
+
+const isAbort = (e: unknown) =>
+  typeof e === "object" &&
+  e !== null &&
+  (e as { name?: unknown }).name === "AbortError";
+
 export function createAiStore({
   session,
   device,
   now,
+  fetch: send = (...a) => globalThis.fetch(...a),
 }: {
   session: Place;
   device: Place;
   now: () => Date;
+  /** Handed in so tests never reach the network. */
+  fetch?: typeof globalThis.fetch;
 }) {
   let rev = 0;
   const listeners = new Set<() => void>();
@@ -121,7 +156,7 @@ export function createAiStore({
       { remember, uid }: { remember: boolean; uid: string | null },
     ): boolean {
       const k = key.trim();
-      if (!k || /\s/.test(k) || k.length > KEY_MAX) return false;
+      if (!usableKey(k) || k.length > KEY_MAX) return false;
       const [keep, other] = remember ? [device, session] : [session, device];
       // Each name with what it held, so putting back never relies on the order of any other list.
       const before = AI_KEY_NAMES.map((n) => [n, read(keep, n)] as const);
@@ -208,9 +243,9 @@ export function createAiStore({
       }
     },
     // simple: two tabs can both read the same count and add one, so the cap can be passed by a use or two. It is a safety stop beside the spend limit, not a meter; callers check canUse() before each request.
-    /** For the AI features to call once per request: counts one use this month. */
-    recordUse() {
-      write(
+    /** For the AI features to call once per request: counts one use this month. False when this device wouldn't save the count. */
+    recordUse(): boolean {
+      const saved = write(
         device,
         USES_NAME,
         JSON.stringify({
@@ -219,9 +254,115 @@ export function createAiStore({
         }),
       );
       changed();
+      return saved;
     },
     /** False once this month's uses reach the cap. */
     canUse: () => store.usesThisMonth() < store.getCap(),
+
+    /**
+     * askClaude (job 13): one request to Anthropic's Messages API with the person's own key, the model from
+     * settings and structured output. Never throws: every failure is a plain message. Sends nothing (and counts
+     * nothing) without a key or once this month's limit is reached; each request sent counts one use.
+     * The key is read here, right before the request, and goes only in its x-api-key header. Nothing here logs.
+     */
+    async ask({
+      uid,
+      system,
+      user,
+      schema,
+      maxTokens,
+      effort,
+      signal,
+    }: AskArgs): Promise<AiResult> {
+      const key = store.getKey(uid);
+      if (!key)
+        return {
+          ok: false,
+          kind: "no-key",
+          message: "Add your Anthropic key in AI settings first.",
+        };
+      if (signal?.aborted) return CANCELLED;
+      // A key an older version saved with letters a header can't carry would make fetch throw.
+      if (!usableKey(key))
+        return {
+          ok: false,
+          kind: "invalid-key",
+          message: "This key has letters a key can't have. Copy it again from the Anthropic Console and save it.",
+        };
+      if (!store.canUse()) {
+        const cap = store.getCap();
+        return {
+          ok: false,
+          kind: "cap",
+          message: `You have used all ${cap} AI use${cap === 1 ? "" : "s"} for this month on this device. Raise the limit in AI settings, or wait for next month.`,
+        };
+      }
+      // A use that can't be counted is not sent, so the monthly limit can't be skipped.
+      if (!store.recordUse())
+        return {
+          ok: false,
+          kind: "cap",
+          message: "This browser won't let Note Board count AI uses, so nothing was sent. Free some space or allow site storage, then try again.",
+        };
+      let res: Response;
+      try {
+        res = await send(ANTHROPIC_URL, {
+          method: "POST",
+          headers: {
+            "x-api-key": key,
+            "anthropic-version": ANTHROPIC_VERSION,
+            "content-type": "application/json",
+            // Anthropic takes requests straight from a browser only with this (docs: "Browser-based applications").
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify(
+            buildRequest({
+              model: store.getModel(),
+              system,
+              user,
+              schema,
+              maxTokens,
+              effort,
+            }),
+          ),
+          signal,
+          // Never followed elsewhere, so the key can only go to api.anthropic.com; no cookies either.
+          redirect: "error",
+          credentials: "omit",
+        });
+      } catch (e) {
+        return isAbort(e) || signal?.aborted ? CANCELLED : NETWORK_FAILURE;
+      }
+      let body: unknown = null;
+      try {
+        body = await res.json();
+      } catch (e) {
+        if (isAbort(e) || signal?.aborted) return CANCELLED;
+      }
+      return res.ok ? readReply(body, schema) : errorFor(res.status, body);
+    },
+
+    /** "Test key": one tiny request (one use). Any answer from Anthropic proves the key works. */
+    async testKey(
+      uid: string | null,
+      signal?: AbortSignal,
+    ): Promise<{ ok: true } | AiFailure> {
+      const r = await store.ask({
+        uid,
+        system: "Reply with ok set to true.",
+        user: "Is this working?",
+        schema: { type: "object", properties: { ok: { type: "boolean" } } },
+        maxTokens: 256,
+        signal,
+      });
+      // These come only after Anthropic answered (200), so the key was accepted.
+      return r.ok ||
+        r.kind === "refusal" ||
+        r.kind === "too-long" ||
+        r.kind === "bad-reply"
+        ? { ok: true }
+        : r;
+    },
   };
   return store;
 }
@@ -239,6 +380,9 @@ export const ai = createAiStore({
   device: place(() => window.localStorage),
   now: () => new Date(),
 });
+
+/** One request to Claude with the signed-in person's own key (see `ask` above). */
+export const askClaude = (args: AskArgs) => ai.ask(args);
 
 /** Re-renders when anything in the AI settings changes. */
 export const useAiSettings = () => useSyncExternalStore(ai.subscribe, ai.rev);

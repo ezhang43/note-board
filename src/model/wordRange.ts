@@ -122,6 +122,8 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
   first.text = first.text.slice(0, o.start.offset) + insert + tail;
   // Ticked only if both were, when the last item's text joins on; a last item highlighted to its end goes whole.
   if (tail && !last.done) untick(first);
+  // One estimate is kept, as when two items are joined with Backspace or Delete: the first item's, else the last one's (its text joins on).
+  if (tail && first.estimate === undefined && last.estimate !== undefined) first.estimate = last.estimate;
   const kids = last.children;
   last.children = [];
   // A folded first item keeps its hidden sub-items (they come before the last item's in the list).

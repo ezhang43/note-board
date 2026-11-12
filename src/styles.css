@@ -945,6 +945,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .todo-item {
   /* The item's first line of text, and the item buttons' size step: they grow with A+ (never under today's, so Small keeps it). */
   --line: calc(20px * var(--fs, 1) * var(--ts, 1));
+  /* The item text's font size (see .item-text), for what has to be as wide as some of its letters. */
+  --tfs: calc(14px * var(--fs, 1) * var(--ts, 1));
   --bs: max(1, var(--fs, 1));
   --bh: calc(20px * var(--bs) + 8px);
   /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
@@ -958,8 +960,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   /* The gap from the tick box to the text grows with A+, by the item buttons' step. */
   gap: calc(6px * var(--bb));
   border-radius: 4px;
-  /* Each level is indented 32px (--indent, set by the row: 32px times its level), but in a narrow list the deepest levels stop short so the text keeps 32px: the row's width less the tick box, the gap and the buttons' strip (the widest, 46px). */
-  --inset: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - 20px * var(--bs) - 32px));
+  /* Each level is indented 32px (--indent, set by the row: 32px times its level), but in a narrow list the deepest levels stop short so the text keeps 32px: the row's width less the tick box, the gap and the buttons' strip (the widest, 46px, plus the clock's 26px). */
+  --inset: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - var(--clock) - 20px * var(--bs) - 32px));
   padding-left: var(--inset);
 }
 /*
@@ -1407,7 +1409,9 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  * Move up / Move down are not in that strip: they float in a small pill over the free end of the row above
  * (owner pick, 2026-10-22, replacing the 92px strip that held all four and left the text 97px of a 226px card).
  */
-.todo-item { padding-right: calc(40px * var(--bb)); }
+.todo-item { --clock: 26px; padding-right: calc(40px * var(--bb) + var(--clock)); }
+/* From 225% up the strip keeps no room for the clock (as a note's header shows none then). */
+.canvas[data-big-text] .todo-item { --clock: 0px; }
 .item-grip,
 .item-trash {
   position: absolute;
@@ -1427,9 +1431,9 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .item-grip:focus-visible,
 .item-trash:focus-visible { opacity: 1; }
 /* The buttons' widths and icons below multiply by --bb (the text size step, capped; see .todo-item); their height follows the item's first line. */
-.item-grip { top: 3px; right: 0; width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
+.item-grip { top: 3px; right: var(--clock); width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
 .item-grip svg { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
-.item-trash { top: 2px; right: calc(16px * var(--bb)); width: calc(24px * var(--bb)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-trash { top: 2px; right: calc(16px * var(--bb) + var(--clock)); width: calc(24px * var(--bb)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
 .item-trash svg { width: calc(14px * var(--bb)); height: calc(14px * var(--bb)); }
 @media (hover: hover) {
   .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
@@ -1441,11 +1445,11 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  * (no hover) keep the sizes above and have no arrows here.
  */
 @media (hover: hover) {
-  .todo-item { padding-right: calc(46px * var(--bb)); }
+  .todo-item { padding-right: calc(46px * var(--bb) + var(--clock)); }
   .item-grip, .item-trash { top: 0; height: var(--bh); }
   .item-grip { width: calc(18px * var(--bb)); }
   .item-grip svg { width: calc(10px * var(--bb)); height: calc(15px * var(--bb)); }
-  .item-trash { right: calc(18px * var(--bb)); width: calc(28px * var(--bb)); }
+  .item-trash { right: calc(18px * var(--bb) + var(--clock)); width: calc(28px * var(--bb)); }
   .item-trash svg { width: calc(16px * var(--bb)); height: calc(16px * var(--bb)); }
   /*
    * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
@@ -1499,7 +1503,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
   /* The phone already has Move up / Move down in the row above the keyboard, so the pill never shows and keeps no room. */
   .item-arrows { display: none; }
-  .todo-item { padding-right: calc(40px * var(--bb)); }
+  .todo-item { padding-right: calc(40px * var(--bb) + var(--clock)); }
 }
 /*
  * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the
@@ -1508,7 +1512,13 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
  */
 @media (hover: none) {
   .app.phone .item-trash { display: none; }
-  .app.phone .todo-item { padding-right: 24px; }
+  .app.phone .todo-item { padding-right: calc(24px + var(--clock)); }
+  /* On every row that has the clock (all rows, so text wraps the same with or without a count), the room before it holds a whole parent count ("0/12" and its gap come to 2.2em of the text's size; here 2.5em, 40px at Normal): the text can end at its right edge, so the count (which spills out of the text, see .tail-slot) must never reach the clock. The strip grows with the text, as the count does. The indent's limit (--inset) keeps its 32px of text when that is wider than the 46px it counts on. */
+  /* simple: a count of 100 or more sub-items ("0/100") is wider than 2.2em and can still touch the clock on a phone; widen the factor, or measure the count, if that ever matters. */
+  .app.phone .canvas:not([data-big-text]) .todo-item {
+    padding-right: calc(2.5 * var(--tfs) + var(--clock));
+    --inset: min(var(--indent, 0px), calc(100% - max(0px, 2.5 * var(--tfs) - 46px) - 52px * var(--bb) - var(--clock) - 20px * var(--bs) - 32px));
+  }
 }
 
 .item-ghost {
@@ -1907,9 +1917,16 @@ html[data-glide] .world {
   .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }
   .column.collapsed .column-actions > .block-trash::before { right: -3px; }
   .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
-  .item-grip::before { top: -10px; bottom: -10px; left: -2px; right: -28px; }
+  /* The strip's clock is the card's last button, so the grip's area runs the other way, over the end of the row's text, and stops at the clock's own edge. */
+  .item-grip::before { top: -10px; bottom: -10px; left: -30px; right: 0; }
+  /* Where the row has a trash can beside the grip (not the phone layout), the grip's area stops at its own edge rather than cover it. */
+  .app:not(.phone) .item-grip::before { left: 0; }
+  /* (Its area reaches down rather than up, so it never covers the card header's buttons above the first item.) */
+  .todo-item > .estimate-chip.add::before { content: ''; position: absolute; top: -2px; bottom: -14px; left: 0; right: -18px; }
   /* Inside a container the card's right side is close to the container's width strip. */
-  .card.in-column .item-grip::before { right: -22px; }
+  .card.in-column .todo-item > .estimate-chip.add::before { right: -12px; }
+  .canvas[data-big-text] .item-grip::before { left: -2px; right: -28px; }
+  .canvas[data-big-text] .card.in-column .item-grip::before { right: -22px; }
   /* Outwards, past the card's corner, so it never takes presses meant for the last item's grip. */
   .resize-corner::before { inset: 0 -26px -26px 0; }
   .resize-edge::before { top: 0; bottom: 0; left: 0; right: -34px; }
@@ -1917,6 +1934,9 @@ html[data-glide] .world {
 @media (pointer: coarse) and (hover: hover) {
   /* Nothing beside the trash can but the row's text, so its press area stops at its own edge rather than cover words. */
   .item-trash::before { left: 0; }
+  /* ...and the trash can sits beside the grip, so the grip's area doesn't run over it. */
+  .item-grip::before { left: -4px; }
+  .canvas[data-big-text] .item-grip::before { left: -2px; }
 }
 
 /*
@@ -2457,8 +2477,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 /*
  * Time estimates (job saved-estimate-doneon). A quiet chip with the estimate ("30m", "1h 30m"): on a note's header, and
  * right after a checklist item's text, centered on its first line. With no estimate, a faint clock shows like the
- * header's other buttons; on an item it floats over the end of the row (left of the trash can) on hover or while the
- * item is being typed in, so it takes no room and hovering never re-wraps the text.
+ * header's other buttons. On an item (owner decision 2026-11-11) it is the last button of the row's hover strip, at the
+ * card's edge beyond the drag grip and the trash can (the strip is 26px wider for it), so it takes no room from the text
+ * and hovering never re-wraps it. A parent's "0/2" count may reach into the strip (see .tail-slot) but not that far.
  */
 .estimate-chip {
   position: relative;
@@ -2494,13 +2515,33 @@ button.estimate-chip:active { transform: scale(0.97); }
 .canvas[data-big-text] .card.collapsed > .card-header > .estimate-chip { display: none; }
 /* From 225% up an open note's two buttons fill its header: a set pill goes after them, so it wraps below, at the right. */
 .canvas[data-big-text] .card:not(.collapsed) > .card-header > .estimate-chip { order: 1; }
-/* On an item: on the first line, after the text. */
-.todo-item > .estimate-chip { margin-top: calc(var(--line) / 2 + 4px - 11px); }
+/* On an item, once set: on the first line, after the text. */
+.todo-item > .estimate-chip:not(.add) { margin-top: calc(var(--line) / 2 + 4px - 11px); }
+/* On an item, to add one: in the strip, as tall as the item's first line like the grip and trash can; shown with them. */
+.todo-item > .estimate-chip.add {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: var(--clock);
+  height: var(--bh);
+  border-radius: 5px;
+  opacity: 0;
+  transition: opacity 120ms, transform 100ms var(--ease-out);
+}
+/* The row's other estimate-less case: the strip has no room for it at 225% and up (--clock is 0 there). */
+.canvas[data-big-text] .todo-item > .estimate-chip.add { display: none; }
 @media (hover: hover) {
   button.estimate-chip:hover { background: var(--hover); color: var(--ink); }
   .card-header > .estimate-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
   .estimate-chip.add:focus-visible { opacity: 1; }
+  .todo-item:hover > .estimate-chip.add { opacity: 1; }
+}
+/* Touch screens have no hover: the clock shows while the item is being typed in, like the grip and trash can. */
+@media (hover: none) {
+  .todo-item > .estimate-chip.add { visibility: hidden; }
+  .todo-item:focus-within > .estimate-chip.add { visibility: visible; opacity: 1; }
 }
 /* While its box is open, the chip stays shown (the box sits under it and the keyboard comes back to it). */
 .estimate-chip.add[aria-expanded='true'] { visibility: visible; opacity: 1; }
@@ -3640,7 +3681,7 @@ a.cal-open { align-self: flex-start; }
    */
   .note-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .card-title { font-size: max(16px, calc(15px * var(--fs, 1) * var(--ts, 1))); }
-  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); }
+  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); --tfs: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .column-title { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
   .pomodoro-length input { font-size: 16px; }

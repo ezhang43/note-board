@@ -93,6 +93,21 @@ describe('deleting a range (Delete, Backspace, typing over it, cut)', () => {
     expect(joined(false, false)).toBe(false);
   });
 
+  it('the joined item keeps the upper estimate, or the lower one when the upper has none (as Backspace and Delete at an edge)', () => {
+    const joined = (a?: number, b?: number) =>
+      W.deleteRange([item('x', 'one', [], a ? { estimate: a } : {}), item('y', 'two', [], b ? { estimate: b } : {})], { anchor: at('x', 1), focus: at('y', 1) })!.items[0].estimate;
+    expect(joined(15, 45)).toBe(15);
+    expect(joined(undefined, 45)).toBe(45);
+    expect(joined(15, undefined)).toBe(15);
+    expect(joined(undefined, undefined)).toBeUndefined();
+  });
+
+  it('a last item that goes whole takes its estimate with it; one that stays whole (highlight from letter 0 of the first) keeps its own', () => {
+    const list = () => [item('x', 'one', [], { estimate: 15 }), item('y', 'two', [], { estimate: 45 })];
+    expect(W.deleteRange(list(), { anchor: at('x', 1), focus: at('y', 3) })!.items).toMatchObject([{ id: 'x', estimate: 15 }]);
+    expect(W.deleteRange(list(), { anchor: at('x', 0), focus: at('y', 1) })!.items).toMatchObject([{ id: 'y', text: 'wo', estimate: 45 }]);
+  });
+
   it('a last item highlighted to its very end goes whole: its tick does not change the first one', () => {
     const two = () => [item('x', 'one', [], { done: true }), item('y', 'two', [], { done: false })];
     const r = W.deleteRange(two(), { anchor: at('x', 1), focus: at('y', 3) })!;

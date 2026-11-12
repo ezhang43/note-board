@@ -534,7 +534,7 @@ export function readWidths<K extends string>(raw: string | null, defaults: Recor
 }
 
 // The other side panels (owner request, job #127): each remembers its own width the same way, in
-// their own key. The Journal starts as wide as the calendar's Week view.
+// their own key. The Journal and Habits start as wide as the calendar's Week view (owner request 2026-11-12).
 export type SidePanelId = 'history' | 'pomodoro' | 'completed' | 'journal' | 'habits';
-export const SIDE_DEFAULT: Record<SidePanelId, number> = { history: 300, pomodoro: 300, completed: 300, journal: PANEL_DEFAULT.week, habits: 300 };
+export const SIDE_DEFAULT: Record<SidePanelId, number> = { history: 300, pomodoro: 300, completed: 300, journal: PANEL_DEFAULT.week, habits: PANEL_DEFAULT.week };
 

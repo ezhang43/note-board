@@ -17,6 +17,7 @@ import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { RoleBadge } from './ViewOnly';
 import { CompletedButton, useCompletedFindTarget } from './CompletedPanel';
+import { VisualizerButton } from './Visualizer';
 import { HistoryButton } from './HistoryPanel';
 import { activeVersionStore, historyFull, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';
@@ -553,7 +554,7 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
         type="button"
         className={`tb-button icon-only${findTarget ? ' find-target' : ''}`}
         aria-label="More"
-        title={folded ? 'More: Version history, Completed, Brain dump, Arrange, File, Feedback, Appearance, Sign out' : 'More: Version history, Completed'}
+        title={folded ? 'More: Version history, Completed, Visualizer, Brain dump, Arrange, File, Feedback, Appearance, Sign out' : 'More: Version history, Completed, Visualizer'}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -565,6 +566,7 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
           <div className="phone-rows">
             <HistoryButton onOpen={close} />
             <CompletedButton onOpen={close} />
+            <VisualizerButton onOpen={close} />
             {folded && !viewOnly && <BrainDumpButton labelled onOpen={close} />}
             {folded && !viewOnly && <ArrangeMenu />}
             {folded && <FileMenu />}

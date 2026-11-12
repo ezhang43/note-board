@@ -1,6 +1,7 @@
 import * as B from '../../model/board';
 import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
+import { CHECKLIST_TITLE, checklistCardOf, findChecklistBoard, hiddenChecklist, newChecklistBoard } from '../../model/mainChecklist';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
 import { JOURNAL_KNOWN_KEY, JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
@@ -27,11 +28,12 @@ export function boardActions(ctx: StoreContext) {
   };
   /** The Habits panel's board, found afresh each time, so one that arrives from another device is used and a shared one never is. */
   const habitsId = () => findHabitsBoard(ctx.workspace(), sharedIds());
+  const checklistId = () => findChecklistBoard(ctx.workspace(), sharedIds());
   /** The Journal and Habits boards left out of the Boards menu and Ctrl+arrows: never the open one, none until shares are known. */
   const hidden = (): string[] => {
     if (!ctx.state.ui.sharesKnown) return [];
     const ws = ctx.workspace();
-    return [hiddenJournal(ws, sharedIds()), hiddenHabits(ws, sharedIds())].filter((id): id is string => !!id && id !== ctx.state.boards.open);
+    return [hiddenJournal(ws, sharedIds()), hiddenHabits(ws, sharedIds()), hiddenChecklist(ws, sharedIds())].filter((id): id is string => !!id && id !== ctx.state.boards.open);
   };
   /** A change to one habit on the Habits board, as one change on that board's own undo. */
   const changeHabit = (cardId: string, change: (c: TodoCard) => TodoCard, merge?: string) => {
@@ -145,7 +147,7 @@ export function boardActions(ctx: StoreContext) {
     pathToOpen: () => pathTo(ctx.workspace(), ctx.state.boards.open),
     /** Ctrl+arrow keys: opens the next / previous / parent / first inner board and returns its id; null (nothing opens) at an end. */
     moveBoard(move: Parameters<typeof boardNeighbor>[2]): string | null {
-      // The hidden Journal and Habits boards are passed over, as in the Boards menu.
+      // The hidden Journal, Habits and Main checklist boards are passed over, as in the Boards menu.
       const ws = ctx.workspace();
       const skip = hidden();
       let id = boardNeighbor(ws, ctx.state.boards.open, move);
@@ -342,6 +344,42 @@ export function boardActions(ctx: StoreContext) {
     },
     /** The board the Habits panel shows and changes, or null before the first habit. */
     habitsBoard: habitsId,
+    /** The board the Checklist panel shows and changes, or null before it first opens. */
+    checklistBoard: checklistId,
+    /**
+     * Open or close the Checklist panel on the left (owner request, 2026-11-12). The first time, its
+     * board is made with its one checklist (not an undo step: there is nothing to undo back to). On a
+     * phone (`phone`) it takes the whole screen, so the right-hand panel closes.
+     */
+    openChecklist(phone = false): 'loading' | null {
+      const { ui } = ctx.state;
+      if (ui.checklistOpen) {
+        ctx.updateUi({ checklistOpen: false, ...(ui.completedBoard ? { completedBoard: null, sidePanel: ui.sidePanel === 'completed' ? null : ui.sidePanel } : {}) });
+        return null;
+      }
+      if (!ui.sharesKnown) return 'loading';
+      ctx.updateUi({ preview: null }); // an old version being looked at is put away first
+      let id = checklistId();
+      if (!id) {
+        const made = newId('b');
+        setOthers((o) => ({ ...o, [made]: newChecklistBoard() }));
+        id = made;
+      }
+      // Its checklist was deleted (on the board itself, opened from search): a new one, as one change on its undo.
+      const board = ctx.workspace().boards[id];
+      if (board && !checklistCardOf(board)) ctx.commitTo(id, (b) => B.addCard(b, { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE }, { type: 'loose', x: 0, y: 0 }));
+      ctx.updateUi({ checklistOpen: true, itemSel: null, ...(phone ? { sidePanel: null, historyOpen: false, completedBoard: null } : {}) });
+      return null;
+    },
+    /** Ctrl+Z / Ctrl+Y in the Checklist panel: on the Main checklist board's own history, whichever board is open. */
+    undoChecklist() {
+      const id = checklistId();
+      if (id) ctx.undoOn(id, 'undo');
+    },
+    redoChecklist() {
+      const id = checklistId();
+      if (id) ctx.undoOn(id, 'redo');
+    },
     /** Ctrl+Z / Ctrl+Y in the Habits panel: on the Habits board's own history, whichever board is open. */
     undoHabits() {
       const id = habitsId();
@@ -385,7 +423,7 @@ export function boardActions(ctx: StoreContext) {
     restoreVersion(ws: Workspace): string[] | 'loading' {
       if (!ctx.state.ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null });
-      // The hidden Journal and Habits boards can't be opened to restore them on their own, so they
+      // The hidden Journal, Habits and Main checklist boards can't be opened to restore them on their own, so they
       // come back too (check of PR #94), each as one change on its own undo; a version without one leaves it as it is.
       for (const id of hidden()) if (ws.boards[id]) ctx.commitTo(id, () => ws.boards[id]);
       const open = ctx.state.boards.open;

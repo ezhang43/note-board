@@ -15,10 +15,10 @@ import * as W from '../../model/wordRange';
 
 // Checklist actions: editing items, ticking, selecting several items, copying them, dragging them.
 
-export function checklistActions(ctx: StoreContext) {
+export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] | null } = { items: null }) {
   const { commit, updateUi, requestSettle } = ctx;
-  /** Copied checklist items. */
-  let itemClipboard: TodoItem[] | null = null;
+  /** Copied checklist items, shared with the Checklist panel's store so items copied there paste on the board and back. */
+  const clip = shared;
 
   /**
    * Press-and-hold lift: how far each row slides. The lifted rows' list closes up over them, and the
@@ -152,7 +152,7 @@ export function checklistActions(ctx: StoreContext) {
       if (W.isEmpty(card.items, words.words)) return false;
       const slice = W.sliceRange(card.items, words.words);
       if (!slice.length) return false;
-      itemClipboard = slice;
+      clip.items = slice;
       copyText(W.rangeAsText(card.items, words.words), ITEMS_MARKER, encodeItems(slice));
       return true;
     }
@@ -163,15 +163,15 @@ export function checklistActions(ctx: StoreContext) {
         return card?.kind === 'todo' ? C.copyItems(card.items, l.ids) : [];
       });
       // Text only, no marker: Ctrl+V does nothing for a copy across lists (SPEC), and the earlier copy is replaced.
-      itemClipboard = null;
+      clip.items = null;
       copyText(multiAsText(board, sel.lists));
       return copied.length > 0;
     }
     const card = sel && ctx.state.board.cards[sel.cardId];
     if (!sel || card?.kind !== 'todo') return false;
-    itemClipboard = C.copyItems(card.items, sel.ids);
-    if (!itemClipboard.length) return false;
-    copyText(C.selectionAsText(card.items, sel.ids), ITEMS_MARKER, encodeItems(itemClipboard));
+    clip.items = C.copyItems(card.items, sel.ids);
+    if (!clip.items.length) return false;
+    copyText(C.selectionAsText(card.items, sel.ids), ITEMS_MARKER, encodeItems(clip.items));
     return true;
   }
 
@@ -441,9 +441,9 @@ export function checklistActions(ctx: StoreContext) {
     pasteItems(): boolean {
       const sel = ctx.state.ui.itemSel;
       const card = sel && ctx.state.board.cards[sel.cardId];
-      if (!sel || sel.lists || asking() || card?.kind !== 'todo' || !itemClipboard?.length) return false;
+      if (!sel || sel.lists || asking() || card?.kind !== 'todo' || !clip.items?.length) return false;
       const order = C.flatIds(card.items).filter((id) => sel.ids.includes(id));
-      return pasteAndSelect(sel.cardId, itemClipboard, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
+      return pasteAndSelect(sel.cardId, clip.items, (items, fresh) => C.pasteItemsAfter(items, order[order.length - 1], fresh));
     },
 
     /**
@@ -454,8 +454,8 @@ export function checklistActions(ctx: StoreContext) {
      */
     pasteItemsInto(cardId: string, itemId: string): boolean {
       const card = ctx.state.board.cards[cardId];
-      if (card?.kind !== 'todo' || !itemClipboard?.length || asking() || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
-      return pasteAndSelect(cardId, itemClipboard, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
+      if (card?.kind !== 'todo' || !clip.items?.length || asking() || ctx.viewOnly() || !C.findItem(card.items, itemId)) return false;
+      return pasteAndSelect(cardId, clip.items, (items, fresh) => C.pasteItemsInto(items, itemId, fresh));
     },
 
     /**

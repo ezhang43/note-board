@@ -186,6 +186,13 @@ export interface Ui {
    * Version history also uses: one of them at a time. 'completed' is the board's Completed panel.
    */
   sidePanel: SidePanelKind | null;
+  /**
+   * Whether the Checklist panel is open (owner request, 2026-11-12): the one panel on the left, open
+   * alongside any right-hand one.
+   */
+  checklistOpen: boolean;
+  /** The board whose Completed record the Completed panel shows: null for the open board (the Checklist panel's Completed button sets it). */
+  completedBoard: string | null;
   /** The board the Journal panel writes into (set when it opens). */
   journalBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
@@ -266,6 +273,8 @@ export const emptyUi: Ui = {
   preview: null,
   find: null,
   sidePanel: null,
+  checklistOpen: false,
+  completedBoard: null,
   journalBoard: null,
   shares: [],
   sharesKnown: true,

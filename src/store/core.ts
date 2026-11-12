@@ -6,7 +6,7 @@ import { BOARD_KEY, OWNER_KEY, UNREADABLE_KEY, VIEW_KEY, parseView, serializeVie
 import { OPEN_BOARD_KEY, isLeftoverBoard, parseWorkspace, readWorkspace, serializeWorkspace, type Workspace } from '../model/workspace';
 import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
-import { blockOf, layoutSnapshot, type LayoutSnapshot } from '../model/board';
+import { blockOf, createBoard, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { caretAfterStep, cursorAfterStep, type TypingAt } from '../model/undoCursor';
 import { dropEmptyFolds } from '../model/checklist';
 import { FONT_KEY, startingFontSize } from '../model/font';
@@ -29,6 +29,9 @@ const CLOSING_MS = 1500;
 const GESTURE_UI = new Set(['drag', 'newDrag', 'itemDrag', 'resize', 'marquee']);
 
 /** What `commit`'s function returns: the new board, the new board with ui changes, or null for "nothing to do". */
+/** What a scoped context shows for a board that isn't there (yet). */
+const EMPTY_BOARD: Board = createBoard();
+
 type Change = Board | { board: Board; ui?: Partial<Ui> } | null;
 
 export interface StoreContext {
@@ -115,6 +118,13 @@ export interface StoreContext {
   deleting(text: string, run: () => unknown, board?: string): boolean;
   /** Whether board `id` (the open one by default) is shared with this person to view or comment on only (job 161): it can't be changed. */
   viewOnly(id?: string): boolean;
+  /**
+   * The same context, working on board `id` as if it were the open one, without opening it (the
+   * Checklist panel, owner request 2026-11-12): its changes are undo steps on that board's own
+   * history, the screen state (item selection, drags) is shared. Not drawn on the canvas, so nothing
+   * there is laid out or measured. Board `id` must exist (or be open) before its changes take effect.
+   */
+  scoped(id: string): StoreContext;
 }
 
 /** What is cleared on screen when a different board is shown. */
@@ -587,6 +597,74 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return t && !state.ui.preview && t.edits === edits && t.outside === outsideChanges ? t : null;
   }
 
+  /** The state as board `id` sees it (see StoreContext.scoped); the same object until the state changes. */
+  const projections = new Map<string, { from: AppState; to: AppState }>();
+  function projected(id: string): AppState {
+    if (id === state.boards.open) return state;
+    const was = projections.get(id);
+    if (was?.from === state) return was.to;
+    const board = state.boards.others[id] ?? EMPTY_BOARD;
+    const to: AppState = { ...state, board, boards: { ...state.boards, open: id } };
+    projections.set(id, { from: state, to });
+    return to;
+  }
+
+  /** A change to board `id` (open or not), with screen changes, as `commit` does for the open board. */
+  function commitOn(id: string, fn: (b: Board) => Change, opts: { ui?: Partial<Ui>; merge?: string } = {}): Board | null {
+    if (id === state.boards.open) return commit(fn, opts);
+    if (state.ui.preview) return refuse(opts.ui);
+    const before = state.boards.others[id];
+    if (!before) return refuse(opts.ui);
+    const result = fn(before);
+    if (!result) return null;
+    const { board: changed, ui } = 'board' in result ? result : { board: result, ui: undefined };
+    const board = changed === before ? before : dropEmptyFolds(before, changed); // as in commit
+    if (board !== before && locked(id)) {
+      announce('You can’t change this board.');
+      return refuse({ ...opts.ui, ...ui });
+    }
+    if (board !== before) {
+      histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, opts.merge ?? null, Date.now()));
+      edits++;
+    }
+    const others = board === before ? state.boards.others : { ...state.boards.others, [id]: board };
+    set({ ...state, boards: { ...state.boards, others }, ui: uiWith({ ...opts.ui, ...ui }) });
+    return board;
+  }
+
+  const scopes = new Map<string, StoreContext>();
+  function scoped(id: string): StoreContext {
+    if (id === state.boards.open) return ctx;
+    const had = scopes.get(id);
+    if (had) return had;
+    const none = new Map<string, number>();
+    const s: StoreContext = {
+      ...ctx,
+      get state() {
+        return id === state.boards.open ? state : projected(id);
+      },
+      set(next) {
+        // Only the screen state and the board's own change come back; the projection's board stays where it is.
+        if (id === state.boards.open) return set(next);
+        const others = next.board === projected(id).board ? next.boards.others : { ...next.boards.others, [id]: next.board };
+        set({ ...state, ui: next.ui, view: next.view, boards: { ...state.boards, others } });
+      },
+      commit: (fn, opts) => commitOn(id, fn, opts),
+      // simple: not drawn on the canvas, so no overlaps to clear and no gaps to close; upgrade if the panel ever shows several blocks.
+      requestSettle: () => (id === state.boards.open ? requestSettle() : undefined),
+      startClosing: (collapse) => collapse(),
+      heights: none,
+      measured: () => undefined,
+      screenCentre: () => ({ x: 0, y: 0 }),
+      layout: { pushedBy: new Map(), expanding: null, importLayout: null, collapseAll: null, closing: null, expandAllUntil: 0 },
+      deleting: (text, run, board = id) => deleting(text, run, board),
+      viewOnly: (on = id) => locked(on),
+      scoped,
+    };
+    scopes.set(id, s);
+    return s;
+  }
+
   const ctx: StoreContext = {
     get state() {
       return state;
@@ -613,6 +691,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     undoOn,
     deleting,
     viewOnly: locked,
+    scoped,
   };
 
   /** The store's own methods: reading, subscribing, saving on the way out, sizes, undo. */

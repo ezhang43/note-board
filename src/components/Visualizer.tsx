@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MONTHS, dayKey } from '../model/calendar';
-import { VIZ_DEFAULT_RANGE, VIZ_RANGES, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizRange } from '../model/visualizer';
+import { VIZ_DEFAULT_RANGE, VIZ_GROUPS, VIZ_RANGES, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizGroupBy, type VizRange } from '../model/visualizer';
 import { appStore } from '../store/appStore';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
 import { useMedia } from './usePhone';
-import { closeVisualizer, openVisualizer, useVisualizerOpen } from './visualizerState';
+import { closeVisualizer, openVisualizer, readGroupBy, saveGroupBy, useVisualizerOpen } from './visualizerState';
 import { readPalette, startDisc } from './visualizerDraw';
 
 /**
@@ -66,6 +66,7 @@ function Overlay() {
 
   const reduced = useMedia('(prefers-reduced-motion: reduce)');
   const [range, setRange] = useState<VizRange>(VIZ_DEFAULT_RANGE);
+  const [group, setGroup] = useState<VizGroupBy>(readGroupBy);
   // The real boards, even while Version history is showing an old one: this is a read, never a write.
   const ws = useSyncExternalStore(appStore.subscribe, appStore.workspace);
   const today = dayKey(new Date());
@@ -74,7 +75,7 @@ function Overlay() {
   const kept = useRef<DoneItem[] | undefined>(undefined);
   const items = useMemo(() => (kept.current = keepIfSame(kept.current, loopOrder(inRange(all, range, today)))), [all, range, today]);
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
-  const disc = useMemo(() => discOf(items), [items]);
+  const disc = useMemo(() => discOf(items, group), [items, group]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);
   const chart = useMemo(() => chartPath(days, CHART_W, CHART_H), [days]);
   const peak = useMemo(() => days.reduce((best, d) => (d.count > best.count ? d : best), { date: '', count: 0 }), [days]);
@@ -114,12 +115,29 @@ function Overlay() {
           {!items.length && <p className="viz-empty">Nothing cleaned up yet in this range. Tick items and press Clean up.</p>}
         </div>
         <div className="viz-info">
-          <div className="viz-range" role="group" aria-label="Range">
-            {VIZ_RANGES.map((r) => (
-              <button key={r.id} type="button" aria-pressed={range === r.id} onClick={() => setRange(r.id)}>
-                {r.label}
-              </button>
-            ))}
+          <div className="viz-controls">
+            <div className="viz-range" role="group" aria-label="Range">
+              {VIZ_RANGES.map((r) => (
+                <button key={r.id} type="button" aria-pressed={range === r.id} onClick={() => setRange(r.id)}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <div className="viz-range" role="group" aria-label="Group by">
+              {VIZ_GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  aria-pressed={group === g.id}
+                  onClick={() => {
+                    setGroup(g.id);
+                    saveGroupBy(g.id);
+                  }}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
           </div>
           <dl className="viz-counts">
             {(
@@ -161,7 +179,7 @@ function Overlay() {
                   <li key={`${at.loop}-${index}`}>
                     <span className="viz-feed-text">{item.text || 'Untitled item'}</span>
                     <span className="viz-feed-where">
-                      {item.list} · {item.boardName}
+                      {[group === 'category' ? disc.wedges[disc.slots[index]?.wedge]?.name : undefined, item.list, item.boardName].filter(Boolean).join(' · ')}
                     </span>
                   </li>
                 );

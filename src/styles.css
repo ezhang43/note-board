@@ -3804,7 +3804,7 @@ a.cal-open { align-self: flex-start; }
   --viz-core: #f2b62b;
   --viz-spark: #fff4d6;
   --viz-rim: #8d8372;
-  /* One hue per board (wedge), repeating after eight. */
+  /* One hue per wedge: boards go round the first eight; each category keeps its own (Other is the ninth, neutral). */
   --viz-hue-0: #f2b62b;
   --viz-hue-1: #3fc1b0;
   --viz-hue-2: #ef7b62;
@@ -3813,6 +3813,7 @@ a.cal-open { align-self: flex-start; }
   --viz-hue-5: #9fcf4f;
   --viz-hue-6: #ef6fa5;
   --viz-hue-7: #d9c58f;
+  --viz-hue-8: #a79f90; /* the neutral one: Other */
   /* The app's own buttons and icons inside it take the dark look. */
   --accent: var(--viz-honey);
   --placeholder: var(--viz-soft);
@@ -3853,6 +3854,7 @@ a.cal-open { align-self: flex-start; }
   min-height: 0;
   padding: 64px 28px 28px 8px;
 }
+.viz-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-self: flex-start; }
 .viz-range { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--viz-line); border-radius: 10px; align-self: flex-start; }
 .viz-range button {
   height: 32px;

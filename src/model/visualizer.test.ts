@@ -9,6 +9,9 @@ import {
   LOOP_REST_MS,
   OTHER_BOARDS,
   OTHER_LISTS,
+  VIZ_DEFAULT_GROUP,
+  VIZ_GROUPS,
+  VIZ_GROUP_KEY,
   chartPath,
   counts,
   discOf,
@@ -18,6 +21,7 @@ import {
   keepIfSame,
   loopMs,
   loopOrder,
+  parseGroupBy,
   perDay,
   playhead,
   rangeStart,
@@ -253,14 +257,14 @@ describe('discOf', () => {
   const items = loopOrder(doneItems(ws({ home, garage })));
 
   it('makes a wedge per board and a cell per list, the busiest list first', () => {
-    const { wedges } = discOf(items);
+    const { wedges } = discOf(items, 'board');
     expect(wedges.map((w) => [w.name, w.count])).toEqual([['Home', 4], ['Garage', 1]]);
     expect(wedges[0].cells).toEqual([{ list: 'Groceries', count: 3 }, { list: 'Chores', count: 1 }]);
     expect(wedges[1].cells).toEqual([{ list: 'Tools', count: 1 }]);
   });
 
   it('says for every item, in loop order, which wedge and cell it lands in', () => {
-    const { wedges, slots } = discOf(items);
+    const { wedges, slots } = discOf(items, 'board');
     expect(slots).toHaveLength(items.length);
     items.forEach((it, i) => {
       expect(wedges[slots[i].wedge].name).toBe(it.boardName);
@@ -269,28 +273,121 @@ describe('discOf', () => {
   });
 
   it('is empty for no items', () => {
-    expect(discOf([])).toEqual({ wedges: [], slots: [] });
+    expect(discOf([], 'board')).toEqual({ wedges: [], slots: [] });
+    expect(discOf([], 'category')).toEqual({ wedges: [], slots: [] });
+  });
+
+  it('colors board wedges one after another, round the eight hues', () => {
+    expect(discOf(items, 'board').wedges.map((w) => w.hue)).toEqual([0, 1]);
+    const boards: Record<string, Board> = {};
+    for (let i = 0; i < 10; i++) boards[`b${i}`] = cleaned(`B${i}`, [{ day: '2026-11-10', lists: [['L', [`x${i}`]]] }]);
+    expect(discOf(loopOrder(doneItems(ws(boards))), 'board').wedges.map((w) => w.hue)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 1]);
   });
 
   it('folds boards past the wedge limit into one "Other boards" wedge, and lists past the cell limit into "Other lists"', () => {
     const boards: Record<string, Board> = {};
     for (let i = 0; i < MAX_WEDGES + 4; i++) boards[`b${String(i).padStart(2, '0')}`] = cleaned(`Board ${i}`, [{ day: '2026-11-10', lists: [['L', Array.from({ length: i + 1 }, (_, k) => `b${i}i${k}`)]] }]);
-    const { wedges, slots } = discOf(loopOrder(doneItems(ws(boards))));
+    const { wedges, slots } = discOf(loopOrder(doneItems(ws(boards))), 'board');
     expect(wedges).toHaveLength(MAX_WEDGES);
     expect(wedges[MAX_WEDGES - 1].name).toBe(OTHER_BOARDS);
     expect(wedges.reduce((s, w) => s + w.count, 0)).toBe(slots.length);
     expect(wedges.slice(0, -1).some((w) => w.name === 'Board 0')).toBe(false); // the quietest boards are the ones folded
 
     const lists: [string, string[]][] = Array.from({ length: MAX_CELLS + 5 }, (_, i) => [`List ${i}`, [`x${i}`]]);
-    const wide = discOf(loopOrder(doneItems(ws({ w: cleaned('Wide', [{ day: '2026-11-10', lists }]) }))));
+    const wide = discOf(loopOrder(doneItems(ws({ w: cleaned('Wide', [{ day: '2026-11-10', lists }]) }))), 'board');
     expect(wide.wedges[0].cells).toHaveLength(MAX_CELLS);
     expect(wide.wedges[0].cells[MAX_CELLS - 1]).toEqual({ list: OTHER_LISTS, count: 6 });
   });
 
   it('describes it in words for a screen reader', () => {
-    expect(summaryOf(discOf(items).wedges, items.length)).toBe('5 items cleaned up: Home 4, Garage 1.');
+    expect(summaryOf(discOf(items, 'board').wedges, items.length)).toBe('5 items cleaned up: Home 4, Garage 1.');
     expect(summaryOf([], 0)).toBe('Nothing cleaned up in this range.');
-    expect(summaryOf([{ boardId: 'h', name: 'Home', count: 1, cells: [] }], 1)).toBe('1 item cleaned up: Home 1.');
+    expect(summaryOf([{ key: 'h', name: 'Home', count: 1, cells: [], hue: 0 }], 1)).toBe('1 item cleaned up: Home 1.');
+  });
+});
+
+describe('discOf by category', () => {
+  const home = cleaned('Home', [
+    { day: '2026-11-10', lists: [['Groceries', ['a', 'b']], ['Chores', ['c']]] },
+    { day: '2026-11-11', lists: [['Groceries', ['d']]] },
+  ]);
+  const garage = cleaned('Garage', [{ day: '2026-11-10', lists: [['Tools', ['e']], ['Groceries', ['f']]] }]);
+  const items = loopOrder(doneItems(ws({ home, garage })));
+
+  it('groups by category when not told otherwise, like the switch does', () => {
+    expect(discOf(items)).toEqual(discOf(items, 'category'));
+  });
+
+  it('makes a wedge per category that has items, in the categories\' own order, Other last', () => {
+    const { wedges } = discOf(items, 'category');
+    expect(wedges.map((w) => [w.key, w.name, w.count])).toEqual([
+      ['errands', 'Errands & shopping', 4],
+      ['home', 'Home & chores', 1],
+      ['other', 'Other', 1],
+    ]);
+  });
+
+  it('makes the cells the lists the items came from, from every board (same title, one cell), busiest first', () => {
+    const { wedges } = discOf(items, 'category');
+    expect(wedges[0].cells).toEqual([{ list: 'Groceries', count: 4 }]);
+    expect(wedges[1].cells).toEqual([{ list: 'Chores', count: 1 }]);
+    expect(wedges[2].cells).toEqual([{ list: 'Tools', count: 1 }]);
+  });
+
+  it('says for every item, in loop order, which wedge and cell it lands in', () => {
+    const { wedges, slots } = discOf(items, 'category');
+    items.forEach((it, i) => {
+      expect(wedges[slots[i].wedge].name).toBe({ a: 'Errands & shopping', b: 'Errands & shopping', c: 'Home & chores', d: 'Errands & shopping', e: 'Other', f: 'Errands & shopping' }[it.text]);
+      expect(wedges[slots[i].wedge].cells[slots[i].cell].list).toBe(it.list);
+    });
+  });
+
+  it('gives a category the same color whichever others have items, and Other the neutral ninth hue', () => {
+    expect(discOf(items, 'category').wedges.map((w) => w.hue)).toEqual([0, 3, 8]);
+    const onlyHome = items.filter((i) => i.text === 'c');
+    expect(discOf(onlyHome, 'category').wedges.map((w) => w.hue)).toEqual([3]);
+  });
+
+  it('asks the categorizer once per item, with its text and list title, and sends an id it does not know to Other', () => {
+    const asked: string[] = [];
+    const { wedges } = discOf(
+      items,
+      'category',
+      (item, title) => {
+        asked.push(`${item.text}|${title}`);
+        return item.text === 'a' ? 'work' : 'made-up';
+      },
+    );
+    expect(asked.sort()).toEqual(['a|Groceries', 'b|Groceries', 'c|Chores', 'd|Groceries', 'e|Tools', 'f|Groceries']);
+    expect(wedges.map((w) => [w.name, w.count])).toEqual([['Work', 1], ['Other', 5]]);
+  });
+
+  it('folds lists past the cell limit into "Other lists"', () => {
+    const lists: [string, string[]][] = Array.from({ length: MAX_CELLS + 3 }, (_, i) => [`List ${i}`, [`x${i}`]]);
+    const wide = discOf(loopOrder(doneItems(ws({ w: cleaned('Wide', [{ day: '2026-11-10', lists }]) }))), 'category');
+    expect(wide.wedges).toHaveLength(1);
+    expect(wide.wedges[0].cells).toHaveLength(MAX_CELLS);
+    expect(wide.wedges[0].cells[MAX_CELLS - 1]).toEqual({ list: OTHER_LISTS, count: 4 });
+  });
+
+  it('describes the categories in words for a screen reader', () => {
+    expect(summaryOf(discOf(items, 'category').wedges, items.length)).toBe('6 items cleaned up: Errands & shopping 4, Home & chores 1, Other 1.');
+  });
+});
+
+describe('the group-by switch', () => {
+  it('offers By category and By board, opening on By category', () => {
+    expect(VIZ_GROUPS.map((g) => g.label)).toEqual(['By category', 'By board']);
+    expect(VIZ_DEFAULT_GROUP).toBe('category');
+    expect(VIZ_GROUP_KEY).toBe('note-board:viz-group');
+  });
+
+  it('reads what this device saved, and falls back to By category for anything else', () => {
+    expect(parseGroupBy('board')).toBe('board');
+    expect(parseGroupBy('category')).toBe('category');
+    expect(parseGroupBy(null)).toBe('category');
+    expect(parseGroupBy('wedges')).toBe('category');
+    expect(parseGroupBy('')).toBe('category');
   });
 });
 
@@ -323,6 +420,19 @@ describe('pace', () => {
     expect(end.flying).toEqual([]);
     expect(end.wrapped).toBe(false);
     expect(playhead(loopMs(3, 900), 3, 900).wrapped).toBe(true);
+  });
+
+  it('can land an item part-way through its trip: the beam hits its cell, the comet is still on its way', () => {
+    // 1000 ms trip, the cell is hit 200 ms in.
+    expect(playhead(199, 3, 1000, 200).landed).toBe(0);
+    const hit = playhead(200, 3, 1000, 200);
+    expect(hit.landed).toBe(1);
+    expect(hit.flying).toEqual([{ index: 0, progress: 0.2 }]); // still animating after it landed
+    const next = playhead(1000 + 200, 3, 1000, 200); // item 1 starts at 1000 ms (gap 1000)
+    expect(next.landed).toBe(2);
+    expect(next.flying.map((f) => f.index)).toEqual([1]);
+    expect(playhead(2000 + 1000, 3, 1000, 200).flying).toEqual([]);
+    expect(playhead(2000 + 1000, 3, 1000, 200).landed).toBe(3);
   });
 
   it('has several in the air at once when the pace is quick', () => {

@@ -3,7 +3,7 @@ import { ITEM_INDENT } from '../model/checklist';
 import { completedCardOf, dayLabel } from '../model/completed';
 import { styleCss } from '../model/textStyle';
 import type { CompletedEntry, TodoItem } from '../model/types';
-import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { appStore, useAppState, useBoardStore, useViewOnly } from '../store/appStore';
 import { FindMarks } from './FindMarks';
 import { CompletedIcon } from './icons';
 
@@ -63,6 +63,7 @@ export function CompletedPanel() {
 /** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
 function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string }) {
   const readOnly = useViewOnly(); // nothing goes back on a read-only board (job 161)
+  const store = useBoardStore(); // the Checklist panel's record goes back to its own board
   return (
     <div className="completed-entry" data-entry-id={entry.item.id}>
       <div className="completed-row">
@@ -73,7 +74,7 @@ function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string
             title="Untick to send it back to its list"
             checked
             disabled={readOnly}
-            onChange={() => appStore.restoreCompleted(entry.item.id)}
+            onChange={() => store.restoreCompleted(entry.item.id)}
           />
         </label>
         <span className="completed-text" data-find={`done:${cardId}:${entry.item.id}`} style={styleCss(entry.item.style) as CSSProperties}>

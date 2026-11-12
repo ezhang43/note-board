@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { appStore, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
 import { panToShow } from '../model/view';
 import { canvasRect, isGliding } from './canvasDom';
 import { caretLine } from './caret';
@@ -44,7 +44,8 @@ export function ItemBar() {
     if (isGliding()) return follow();
     const field = typingIn()?.field;
     const canvas = canvasRect();
-    if (!field || !canvas) return;
+    // The Checklist panel scrolls itself (the browser keeps its cursor in view): the board stays put.
+    if (!field || !canvas || field.closest('.checklist-panel')) return;
     const v = window.visualViewport;
     // The page is pinched in: the person is looking around on purpose, so leave the board alone.
     if (v && v.scale > 1.01) return;
@@ -102,9 +103,13 @@ export function ItemBar() {
     if (typing) keepCaretClear();
   }, [typing, cover]);
 
-  if (!typing?.item || viewOnly) return null; // nothing to do to an item on a read-only board (job 161)
+  // Nothing to do to an item on a read-only board (job 161); the Checklist panel's board is always the person's own.
+  if (!typing?.item || (viewOnly && storeOfCard(typing.item.cardId) === appStore)) return null;
   const { field } = typing;
   const { cardId, itemId } = typing.item;
+  // An item in the Checklist panel is on its own board, with its own undo (owner request, 2026-11-12).
+  const st = storeOfCard(cardId);
+  const inPanel = st !== appStore;
   const button = (label: string, icon: ReactNode, act: () => void, disabled = false) => (
     <button
       type="button"
@@ -130,14 +135,14 @@ export function ItemBar() {
   const caret = () => field.selectionStart ?? 0;
   return (
     <div ref={bar} className="item-bar" role="toolbar" aria-label="Item actions" style={{ bottom: cover }}>
-      {button('Undo', <UndoIcon />, () => appStore.undoInItem(cardId, itemId, caret(), field.selectionEnd ?? caret()), !canUndo)}
-      {button('Outdent', <IndentIcon out />, () => appStore.itemTab(cardId, itemId, true))}
-      {button('Indent', <IndentIcon />, () => appStore.itemTab(cardId, itemId, false))}
-      {button('Move up', <ArrowIcon />, () => appStore.moveItem(cardId, itemId, -1, caret()))}
-      {button('Move down', <ArrowIcon down />, () => appStore.moveItem(cardId, itemId, 1, caret()))}
+      {button('Undo', <UndoIcon />, () => st.undoInItem(cardId, itemId, caret(), field.selectionEnd ?? caret()), !canUndo && !inPanel)}
+      {button('Outdent', <IndentIcon out />, () => st.itemTab(cardId, itemId, true))}
+      {button('Indent', <IndentIcon />, () => st.itemTab(cardId, itemId, false))}
+      {button('Move up', <ArrowIcon />, () => st.moveItem(cardId, itemId, -1, caret()))}
+      {button('Move down', <ArrowIcon down />, () => st.moveItem(cardId, itemId, 1, caret()))}
       {/* The cursor stays in the ticked item, as Ctrl+Enter does, so the keyboard stays up. */}
-      {button('Tick', <CheckIcon />, () => appStore.tickFromKeyboard(cardId, itemId, caret()))}
-      {button('Delete item', <TrashIcon />, () => appStore.trashItem(cardId, itemId))}
+      {button('Tick', <CheckIcon />, () => st.tickFromKeyboard(cardId, itemId, caret()))}
+      {button('Delete item', <TrashIcon />, () => st.trashItem(cardId, itemId))}
       {button('Done typing', 'Done', () => leaveField(field))}
     </div>
   );

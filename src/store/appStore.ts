@@ -110,3 +110,9 @@ export const pomodoro = createPomodoro(
 );
 // With the board open in two tabs, each follows what the other does with the timer.
 if (typeof window !== 'undefined') window.addEventListener('storage', (e) => e.key === POMODORO_KEY && pomodoro.reload());
+
+/** The store for the board this part of the screen shows (BoardScope): the Checklist panel's, or the app's own. */
+export function useBoardStore() {
+  const scope = use(BoardScope);
+  return scope ? appStore.storeFor(scope) : appStore;
+}

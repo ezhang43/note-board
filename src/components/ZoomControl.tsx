@@ -8,6 +8,7 @@ import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';
 import { JournalButton } from './JournalButton';
 import { HabitsButton } from './HabitsPanel';
+import { ChecklistButton } from './ChecklistPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
@@ -36,6 +37,7 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
       <CalendarButton />
       <JournalButton />
       <HabitsButton />
+      <ChecklistButton />
       </div>
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?

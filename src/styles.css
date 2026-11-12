@@ -1969,6 +1969,37 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   flex-direction: column;
   gap: 2px;
 }
+/*
+ * The Checklist panel (owner request, 2026-11-12): the one panel on the left, a mirror of the right-hand
+ * ones, open beside any of them. Its width is the person's own (inline, from App.tsx); with a panel open on
+ * the right it gives way first, so 300px of board stays between them while the window allows.
+ * No open or close motion, like the right-hand panels.
+ */
+.app { --left-width: 420px; }
+.app.checklist-open .corner-controls { left: calc(var(--left-width) + 12px); }
+.checklist-panel {
+  position: fixed;
+  top: var(--toolbar-height);
+  left: 0;
+  bottom: 0;
+  z-index: var(--z-side-panel);
+  width: var(--left-width);
+  overflow-y: auto;
+  padding: 8px 10px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  box-shadow: 6px 0 20px rgba(31, 29, 26, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.checklist-panel .history-head { gap: 6px; }
+.checklist-panel .history-head h2 { margin-right: 0; }
+.checklist-panel .checklist-count { margin-right: auto; font-size: 13px; }
+/* The list itself: a checklist card without its frame, as wide as the panel. */
+.checklist-sheet.card { width: auto; padding: 0 2px 12px; background: transparent; border: none; box-shadow: none; }
+/* Its drag ghost is drawn on the page, above the panel. */
+.item-ghost.panel-ghost { position: fixed; z-index: 45; }
 .history-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 8px; }
 .history-head h2 { margin: 0 auto 0 0; font-size: 16px; font-weight: 600; }
 /* A header button beside the × (the Journal's +) looks like it: the same faint stroke. */
@@ -2019,6 +2050,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .preview-actions { display: flex; gap: 6px; }
 .preview-error { color: var(--danger); }
 .app.phone .history-panel { top: 52px; left: 0; width: auto; border-left: none; box-shadow: none; z-index: 7; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+/* On a phone the Checklist panel fills the screen too, one panel at a time. */
+.app.phone .checklist-panel { top: 52px; right: 0; width: auto; border-right: none; box-shadow: none; z-index: 7; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.app.phone.checklist-open .corner-controls { left: 12px; }
 .app.phone .history-row { padding: 12px; }
 .app.phone .preview-bar {
   top: auto;
@@ -3583,6 +3617,8 @@ a.cal-open { align-self: flex-start; }
   .panel-resize:hover { background: var(--accent-soft); }
 }
 .panel-resize:focus-visible { background: var(--accent); opacity: 0.6; }
+/* The Checklist panel's strip is on its right edge. */
+.panel-resize.left { right: auto; left: calc(var(--left-width) - 4px); }
 
 /* Welcome tour (owner request, 2026-10-16): the dimmed board with one control lit up, and a small card. */
 .tour-shield { position: fixed; inset: 0; z-index: 60; }

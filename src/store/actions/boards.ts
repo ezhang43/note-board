@@ -368,8 +368,27 @@ export function boardActions(ctx: StoreContext) {
       // Its checklist was deleted (on the board itself, opened from search): a new one, as one change on its undo.
       const board = ctx.workspace().boards[id];
       if (board && !checklistCardOf(board)) ctx.commitTo(id, (b) => B.addCard(b, { ...(createCard('todo') as TodoCard), title: CHECKLIST_TITLE }, { type: 'loose', x: 0, y: 0 }));
-      ctx.updateUi({ checklistOpen: true, itemSel: null, ...(phone ? { sidePanel: null, historyOpen: false, completedBoard: null } : {}) });
+      // As the Journal opens with the cursor in today's page, the cursor goes to the end of the last item (not on a
+      // phone, where the keyboard would cover the list before the person has looked at it).
+      const last = checklistCardOf(ctx.workspace().boards[id])?.items.at(-1);
+      ctx.updateUi({
+        checklistOpen: true,
+        itemSel: null,
+        ...(phone ? { sidePanel: null, historyOpen: false, completedBoard: null } : last && { focusItem: last.id, focusOffset: last.text.length }),
+      });
       return null;
+    },
+    /**
+     * The Checklist panel's Completed button: the Completed panel on the right, showing what Clean up moved off the
+     * main checklist (its own board's record, not the open board's). Pressed again, it closes. On a phone, where one
+     * panel shows at a time, the Checklist panel makes way.
+     */
+    openChecklistCompleted(phone = false) {
+      const { ui } = ctx.state;
+      const id = checklistId();
+      if (!id) return;
+      if (ui.sidePanel === 'completed' && ui.completedBoard === id) return ctx.updateUi({ sidePanel: null, completedBoard: null });
+      ctx.updateUi({ sidePanel: 'completed', completedBoard: id, historyOpen: false, preview: null, ...(phone ? { checklistOpen: false } : {}) });
     },
     /** Ctrl+Z / Ctrl+Y in the Checklist panel: on the Main checklist board's own history, whichever board is open. */
     undoChecklist() {

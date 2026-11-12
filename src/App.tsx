@@ -21,7 +21,8 @@ import { Tour } from './components/Tour';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { usePhone } from './components/usePhone';
-import { appStore, useAppState, useViewOnly } from './store/appStore';
+import { appStore, BoardScope, useAppState, useViewOnly } from './store/appStore';
+import { ChecklistPanel } from './components/ChecklistPanel';
 import { ViewOnlyNote } from './components/ViewOnly';
 import { PomodoroPanel } from './components/PomodoroPanel';
 import { SidePanel } from './components/SidePanel';
@@ -82,8 +83,22 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         ? { name: 'calendar', width: calendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
         : { name: RESIZE_NAME[panel], width: others[panel], set: (w: number) => panelWidths.set(panel, w), reset: () => panelWidths.reset(panel) }
       : null;
-  const classes = ['app', phone && 'phone', previewing && 'previewing', viewOnly && 'view-only', historyOpen && 'history-open'].filter(Boolean).join(' ');
-  const style = resize ? ({ '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` } as CSSProperties) : undefined;
+  // The Checklist panel on the left (owner request, 2026-11-12), open beside any panel on the right. With one
+  // open there it gives way first, keeping 300px of board between the two while the window allows.
+  const checklistOpen = useAppState((s) => s.ui.checklistOpen);
+  const completedBoard = useAppState((s) => s.ui.completedBoard);
+  // A phone shows one panel at a time: a panel opened on the right closes the checklist.
+  useEffect(() => {
+    if (phone && checklistOpen && historyOpen) appStore.openChecklist();
+  }, [phone, checklistOpen, historyOpen]);
+  const classes = ['app', phone && 'phone', previewing && 'previewing', viewOnly && 'view-only', historyOpen && 'history-open', checklistOpen && 'checklist-open']
+    .filter(Boolean)
+    .join(' ');
+  const room = resize ? `max(${PANEL_MIN}px, 100vw - ${PANEL_MIN}px - var(--side-width))` : `100vw - ${PANEL_MIN}px`;
+  const style = {
+    ...(resize && { '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` }),
+    ...(checklistOpen && !phone && { '--left-width': `clamp(${PANEL_MIN}px, ${others.checklist}px, ${room})` }),
+  } as CSSProperties;
   return (
     <div className={classes} style={style}>
       <LiveRegion />
@@ -105,8 +120,11 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         </SidePanel>
       )}
       {sidePanel === 'completed' && (
-        <SidePanel title="Completed" onClose={closeCompleted}>
-          <CompletedPanel />
+        // Opened from the Checklist panel, it shows that checklist's record (completedBoard).
+        <SidePanel title={completedBoard ? 'Completed: Checklist' : 'Completed'} onClose={closeCompleted}>
+          <BoardScope value={completedBoard}>
+            <CompletedPanel />
+          </BoardScope>
         </SidePanel>
       )}
       {sidePanel === 'journal' && (
@@ -118,6 +136,16 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         </SidePanel>
       )}
       {resize && <PanelResizeHandle name={resize.name} width={resize.width} onSet={resize.set} onReset={resize.reset} />}
+      {checklistOpen && <ChecklistPanel />}
+      {checklistOpen && !phone && (
+        <PanelResizeHandle
+          side="left"
+          name="checklist"
+          width={others.checklist}
+          onSet={(w) => panelWidths.set('checklist', w)}
+          onReset={() => panelWidths.reset('checklist')}
+        />
+      )}
       <PreviewBar />
       <FormatBar />
       <ShortcutsPanel />

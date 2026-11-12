@@ -22,7 +22,7 @@ const inJournalOrHabits = () => {
 export function useDropPaste() {
   useEffect(() => {
     const free = (target: EventTarget | null) =>
-      !isTextField(target) && !panelCovers() && !(target instanceof Element && target.closest('.side-panel')) && !inJournalOrHabits();
+      !isTextField(target) && !panelCovers() && !(target instanceof Element && target.closest('.side-panel, .checklist-panel')) && !inJournalOrHabits();
     const get = (dt: DataTransfer) => (type: string) => dt.getData(type);
     const hasFile = (dt: DataTransfer) => dt.files.length > 0 || [...dt.items].some((i) => i.kind === 'file');
 

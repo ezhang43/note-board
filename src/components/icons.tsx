@@ -432,3 +432,14 @@ export function FeedbackIcon() {
     </svg>
   );
 }
+
+/** The main checklist (owner request, 2026-11-12): a clipboard with two ticked lines (Add Checklist's icon is the bare lines). */
+export function ClipboardCheckIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" strokeWidth="1.8" {...common}>
+      <path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="2.5" width="6" height="3" rx="1" />
+      <path d="M8.5 11l1.2 1.2 2.1-2.4M8.5 16l1.2 1.2 2.1-2.4M14 11h2M14 16h2" />
+    </svg>
+  );
+}

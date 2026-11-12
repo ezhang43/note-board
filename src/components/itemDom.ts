@@ -1,7 +1,7 @@
 import { dropOnRow } from '../model/checklist';
 import { DRAG_THRESHOLD } from '../model/constants';
 import type { ItemDrag, ItemHint } from '../store/store';
-import { appStore } from '../store/appStore';
+import { appStore, storeOfCard } from '../store/appStore';
 import { clientToBoard, clientToCanvas, isOverCanvas } from './canvasDom';
 import { followEdges } from './edgeFollow';
 import { isTextField } from './textField';
@@ -113,24 +113,36 @@ export function heldAfterRemoving(e: Key): boolean {
 }
 
 /**
+ * Where a drag happens: on the board (its rows scaled by the zoom), or in the Checklist panel (owner request,
+ * 2026-11-12), whose rows are drawn at full size and whose items never leave its list.
+ */
+type DragPlace = { store: ReturnType<typeof storeOfCard>; zoom: number; panel: boolean };
+function placeOf(cardId: string): DragPlace {
+  const panel = !appStore.getState().board.cards[cardId];
+  return { store: storeOfCard(cardId), zoom: panel ? 1 : appStore.getState().view.zoom, panel };
+}
+
+/**
  * Where dragged items would go if dropped at this point:
  * - on a row: before it (top half), after it (bottom half), or nested under it (bottom half, a bit to the right);
  * - anywhere else in a list's box (empty space under its items, title row, collapsed): at the end of that list;
  * - on empty board, a note, a link or a column: a new list there.
  * Null means "nowhere" (e.g. over the dragged items themselves, or off the board): dropping does nothing.
+ * Items dragged in the Checklist panel go nowhere outside it, and items dragged on the board nowhere over it.
  */
-function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | null {
-  const { board } = appStore.getState();
+function itemHintAt(clientX: number, clientY: number, d: ItemDrag, at: DragPlace): ItemHint | null {
+  const { board } = at.store.getState();
+  if (!!document.elementFromPoint(clientX, clientY)?.closest('.checklist-panel') !== at.panel) return null;
   let columnId: string | undefined;
   // A lifted item (phone) has the rows slid aside: use the row where it sits without the slide, or the gap would move the hint and back.
-  const slid = d.slide && rowWithoutSlide(clientX, clientY);
-  if (slid) return hintOnRow(slid.row, slid.rect, clientX, clientY, d);
+  const slid = d.slide && rowWithoutSlide(clientX, clientY, at.zoom);
+  if (slid) return hintOnRow(slid.row, slid.rect, clientX, clientY, d, at);
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
     const row = el.closest<HTMLElement>('[data-item-id]');
-    if (row && !d.slide) return hintOnRow(row, row.getBoundingClientRect(), clientX, clientY, d);
+    if (row && !d.slide) return hintOnRow(row, row.getBoundingClientRect(), clientX, clientY, d, at);
     const list = el.closest<HTMLElement>('[data-todo-of]');
-    if (list) return { cardId: list.dataset.todoOf!, drop: { mode: 'append' }, markId: null, markMode: null };
+    if (list) return board.cards[list.dataset.todoOf!] ? { cardId: list.dataset.todoOf!, drop: { mode: 'append' }, markId: null, markMode: null } : null;
     // Anywhere else inside a list's box (the empty space under its items too), or on a collapsed list, the items go in at its end
     // (owner requests); a collapsed column gets a new list at its end.
     const block = el.closest<HTMLElement>('[data-card-id], [data-col-id]');
@@ -142,25 +154,24 @@ function itemHintAt(clientX: number, clientY: number, d: ItemDrag): ItemHint | n
       break;
     }
   }
-  if (!isOverCanvas(clientX, clientY)) return null;
+  if (at.panel || !isOverCanvas(clientX, clientY)) return null; // the panel's list is never dragged out into a new one
   const p = clientToBoard(clientX, clientY);
   return { newList: { x: p.x - 20, y: p.y - 20 }, columnId };
 }
 
 /** The drop hint over one row of a list, from the row's box on screen. */
-function hintOnRow(row: HTMLElement, r: { left: number; top: number; height: number }, clientX: number, clientY: number, d: ItemDrag): ItemHint | null {
-  const { board, view } = appStore.getState();
+function hintOnRow(row: HTMLElement, r: { left: number; top: number; height: number }, clientX: number, clientY: number, d: ItemDrag, at: DragPlace): ItemHint | null {
+  const { board } = at.store.getState();
   const cardId = row.closest<HTMLElement>('[data-card-id]')!.dataset.cardId!;
   const card = board.cards[cardId];
   if (card?.kind !== 'todo') return null;
-  const at = { xInRow: (clientX - r.left) / view.zoom, lowerHalf: clientY >= r.top + r.height / 2, indent: parseFloat(getComputedStyle(row).paddingLeft) };
-  const result = dropOnRow(card.items, row.dataset.itemId!, at, { ids: d.allIds, height: d.height });
+  const where = { xInRow: (clientX - r.left) / at.zoom, lowerHalf: clientY >= r.top + r.height / 2, indent: parseFloat(getComputedStyle(row).paddingLeft) };
+  const result = dropOnRow(card.items, row.dataset.itemId!, where, { ids: d.allIds, height: d.height });
   return result && { cardId, ...result };
 }
 
 /** The row at this point of its list as it is laid out without the slide (rows may still be gliding, so each one's current shift is taken off). */
-function rowWithoutSlide(clientX: number, clientY: number) {
-  const { zoom } = appStore.getState().view;
+function rowWithoutSlide(clientX: number, clientY: number, zoom: number) {
   for (const el of document.elementsFromPoint(clientX, clientY)) {
     const card = el.closest<HTMLElement>('[data-card-id]');
     if (!card) continue;
@@ -175,8 +186,7 @@ function rowWithoutSlide(clientX: number, clientY: number) {
 }
 
 /** How tall (board px) and wide (screen px) the rows about to be lifted are. */
-function measureLift(cardId: string, ids: string[]) {
-  const { zoom } = appStore.getState().view;
+function measureLift(cardId: string, ids: string[], zoom: number) {
   const rows = ids.flatMap((id) => document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(cardId)}"] [data-item-id="${CSS.escape(id)}"]`) ?? []);
   return {
     heights: Object.fromEntries(rows.map((r) => [r.dataset.itemId!, r.getBoundingClientRect().height / zoom])),
@@ -191,17 +201,21 @@ function measureLift(cardId: string, ids: string[]) {
  */
 export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }) {
   let started = false;
+  const at = placeOf(cardId);
+  const st = at.store;
+  // In the panel the ghost is drawn on the page itself (it would be under the panel on the board's layer).
+  const point = (x: number, y: number) => (at.panel ? { x, y } : clientToCanvas(x, y));
   const onMove = (ev: { clientX: number; clientY: number }) => {
     if (!started) {
       if (!hold && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
       started = true;
-      appStore.startItemDrag(cardId, itemId, clientToCanvas(ev.clientX, ev.clientY), hold && ((ids) => measureLift(cardId, ids)));
+      st.startItemDrag(cardId, itemId, point(ev.clientX, ev.clientY), hold && ((ids) => measureLift(cardId, ids, at.zoom)));
     }
-    const d = appStore.getState().ui.itemDrag;
-    if (d) appStore.moveItemDrag(clientToCanvas(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d));
+    const d = st.getState().ui.itemDrag;
+    if (d) st.moveItemDrag(point(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d, at));
   };
-  // At the edge of the screen the board keeps moving, and the drag with it.
-  const edges = followEdges((p) => started && onMove(p));
+  // At the edge of the screen the board keeps moving, and the drag with it (not in the panel: the board stays put behind it).
+  const edges = at.panel ? { track: () => {}, stop: () => {} } : followEdges((p) => started && onMove(p));
   // Only the finger that pressed drags; a second one touching or lifting does not move or drop it.
   // (By id, not isPrimary: a pinch cancels this finger with a made-up event, which is not primary.)
   const onPointerMove = (ev: PointerEvent) => {
@@ -218,8 +232,8 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
     window.removeEventListener('pointercancel', finish);
     hold?.done();
     if (!started) return;
-    if (ev.type === 'pointercancel') appStore.cancelItemDrag();
-    else appStore.dropItems();
+    if (ev.type === 'pointercancel') st.cancelItemDrag();
+    else st.dropItems();
   };
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', finish);

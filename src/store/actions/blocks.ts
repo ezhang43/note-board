@@ -211,10 +211,10 @@ export function blockActions(ctx: StoreContext) {
     },
 
     // ---------- version history (owner request) ----------
-    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, sidePanel: null, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
-    /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history. */
+    toggleHistory: () => updateUi({ historyOpen: !ctx.state.ui.historyOpen, sidePanel: null, completedBoard: null, preview: null, selection: [], itemSel: null, colourMenuOpen: false }),
+    /** Opens or closes the side panel (owner request: focus timer); it takes the place of Version history. The Completed panel shows the open board's record. */
     toggleSidePanel: (panel: SidePanelKind) =>
-      updateUi(ctx.state.ui.sidePanel === panel ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null }),
+      updateUi(ctx.state.ui.sidePanel === panel && !ctx.state.ui.completedBoard ? { sidePanel: null } : { sidePanel: panel, historyOpen: false, preview: null, completedBoard: null }),
     /** Show an old version on the board, read-only (the real board is untouched); a drag, resize or box-select in progress ends. */
     previewVersion(meta: VersionMeta, board: Board) {
       updateUi({ preview: { meta, board }, selection: [], itemSel: null, confirm: null, deleteCompleted: null, drag: null, resize: null, itemDrag: null, newDrag: null, marquee: null });

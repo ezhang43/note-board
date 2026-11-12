@@ -2,7 +2,7 @@ import { flushSync } from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyEvent } from 'react';
 import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
-import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { appStore, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
 import { boxKey, focusedBox } from './textBox';
 import { isTextField, panelCovers } from './textField';
 
@@ -21,6 +21,9 @@ interface Target {
   bottom: number;
 }
 
+/** The card a text box is on (none for a column title): which board's store formats it. */
+const boxCard = (box: Box | undefined) => (box && 'cardId' in box ? box.cardId : null);
+
 /** What the bar would format right now, if anything. */
 function findTarget(): Target | null {
   const typing = focusedBox();
@@ -30,11 +33,12 @@ function findTarget(): Target | null {
     const r = field.closest('[data-box]')!.getBoundingClientRect();
     return { boxes: [box], left: r.left, top: r.top, bottom: r.bottom };
   }
-  if (!appStore.getState().ui.itemSel) return null;
+  const sel = appStore.getState().ui.itemSel;
+  if (!sel) return null;
   const rows = [...document.querySelectorAll('.todo-item.picked')].map((el) => el.getBoundingClientRect());
   if (!rows.length) return null;
   return {
-    boxes: appStore.selectedBoxes(),
+    boxes: storeOfCard(sel.cardId).selectedBoxes(), // items picked in the Checklist panel are on its board
     left: Math.min(...rows.map((r) => r.left)),
     top: Math.min(...rows.map((r) => r.top)),
     bottom: Math.max(...rows.map((r) => r.bottom)),
@@ -69,6 +73,7 @@ const SIZES: { key: TextSize; label: string; px: number }[] = [
 export function FormatBar() {
   // Redraw on any board, view or selection change, so the bar follows its text box.
   const board = useAppState((s) => s.board);
+  const others = useAppState((s) => s.boards.others); // the Checklist panel's board is one of these
   const view = useAppState((s) => s.view);
   const itemSel = useAppState((s) => s.ui.itemSel);
   const [target, setTarget] = useState<Target | null>(null);
@@ -85,7 +90,7 @@ export function FormatBar() {
 
   // After any board, view or selection change.
   const refresh = () => setTarget(focusInBar() ? (t) => t && refollow(t) : findTarget());
-  useEffect(refresh, [board, view, itemSel]); // simple: `refresh` is new each render but only uses setTarget (stable)
+  useEffect(refresh, [board, others, view, itemSel]); // simple: `refresh` is new each render but only uses setTarget (stable)
 
   const q = quiet.current;
   /** The bar is due after the pause (if the highlight still exists by then). */
@@ -204,7 +209,8 @@ export function FormatBar() {
     return () => els.forEach((el) => el.classList.remove('format-target'));
   }, [hovering, keys]);
 
-  const visible = shown && !!target && !viewOnly;
+  const inPanel = !!target && storeOfCard(boxCard(target.boxes[0])) !== appStore;
+  const visible = shown && !!target && (!viewOnly || inPanel);
   useEffect(() => {
     if (!target) setShown(false);
   }, [target]);
@@ -221,7 +227,7 @@ export function FormatBar() {
   }, [fontsOpen]);
 
   if (!visible) return null; // not yet (or no longer) due; nothing is formatted on a read-only board (job 161)
-  const now = styleOf(board, target.boxes[0]) ?? {};
+  const now = styleOf(storeOfCard(boxCard(target.boxes[0])).getState().board, target.boxes[0]) ?? {};
   const size: TextSize = now.size ?? 'normal';
   const font: TextFont = now.font ?? 'sans';
   // Above the text (below the toolbar); else below it if that fits on screen; the bar never covers the highlighted words.
@@ -230,7 +236,7 @@ export function FormatBar() {
   // Neither side fits (a very short window): below, held inside the window, and never up over the toolbar.
   const top = up ? above : Math.max(72, Math.min(target.bottom + 6, window.innerHeight - BAR_H - 8));
   const style: CSSProperties = { left: Math.max(8, target.left), top };
-  const apply = (ask: FormatAsk) => appStore.formatBoxes(target.boxes, ask);
+  const apply = (ask: FormatAsk) => storeOfCard(boxCard(target.boxes[0])).formatBoxes(target.boxes, ask);
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();
   // Keyboard inside the bar: Escape goes back to the text (or closes the open Font menu), Tab goes round, arrows walk along.

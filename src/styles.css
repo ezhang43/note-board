@@ -3822,7 +3822,7 @@ a.cal-open { align-self: flex-start; }
   touch-action: manipulation;
   transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
 }
-.viz-range button[aria-pressed='true'] { background: var(--viz-honey); color: #1f1d1a; }
+.viz-range button[aria-pressed='true'] { background: var(--viz-honey); color: var(--viz-bg); }
 .viz-range button:active, .viz-close:active { transform: scale(0.97); }
 .viz-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .viz-count { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }

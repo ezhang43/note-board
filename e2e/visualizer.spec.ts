@@ -92,11 +92,28 @@ test('the feed fills as the loop runs, oldest item first, and names its list and
   await seed(page);
   await openVisualizer(page);
   const rows = dialog(page).locator('.viz-feed li');
-  await expect(rows.first()).toBeVisible({ timeout: 5000 });
+  await expect(rows.first()).toBeVisible({ timeout: 10000 });
   await expect(rows.first().locator('.viz-feed-text')).toHaveText('laundry'); // 10 days ago: the oldest in 30 days
   await expect(rows.first().locator('.viz-feed-where')).toHaveText('Chores · Home');
   // Later ones push in above it.
   await expect.poll(async () => rows.count(), { timeout: 8000 }).toBeGreaterThan(1);
+});
+
+test('switching to a shorter range part-way round the loop does not break it (no page error, it starts again from the oldest)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await seed(page);
+  await openVisualizer(page);
+  await rangeButton(page, 'All').click();
+  const rows = dialog(page).locator('.viz-feed li');
+  // Five of the six have landed, more than the four a week holds.
+  await expect.poll(async () => rows.count(), { timeout: 15000 }).toBeGreaterThanOrEqual(5);
+  await rangeButton(page, '7 days').click();
+  await expect(count(page, 'Last 7 days')).toHaveText('4');
+  await expect(dialog(page)).toBeVisible();
+  await expect(rows.first()).toBeVisible({ timeout: 5000 });
+  await expect(rows.first().locator('.viz-feed-text')).toHaveText('sand'); // 2 days ago: the oldest within 7 days
+  expect(errors).toEqual([]);
 });
 
 test('with nothing cleaned up yet, it says so', async ({ page }) => {

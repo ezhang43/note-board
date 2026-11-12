@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INNER, OUTER, cellArea, cellCentre, project, sparkAt, wedgeSpan } from './vizGeometry';
+import { INNER, MAX_LABEL_CHARS, OUTER, cellArea, cellCentre, fitLabel, project, sparkAt, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -73,5 +73,42 @@ describe('sparkAt', () => {
     expect(end.x).toBeCloseTo(100);
     expect(end.y).toBeCloseTo(0);
     expect(sparkAt(from, to, 0.5).y).toBeLessThan(-10); // up the screen
+  });
+});
+
+describe('fitLabel', () => {
+  // A stand-in for measureText: 10 pixels a character, recording what it was asked to measure.
+  const ruler = () => {
+    const calls: string[] = [];
+    return { calls, measure: (s: string) => (calls.push(s), s.length * 10) };
+  };
+
+  it('keeps a name that fits, and measures it once', () => {
+    const r = ruler();
+    expect(fitLabel('Home', 100, r.measure)).toBe('Home');
+    expect(r.calls).toHaveLength(1);
+  });
+
+  it('cuts a long name to the longest start that fits, with an ellipsis', () => {
+    const text = fitLabel('Kitchen renovation', 100, ruler().measure);
+    expect(text).toBe('Kitchen r…');
+    expect(text.length * 10).toBeLessThanOrEqual(100);
+  });
+
+  it('cuts a huge name to the character cap first, then asks the ruler only a handful of times', () => {
+    const r = ruler();
+    const text = fitLabel('x'.repeat(100000), 200, r.measure);
+    expect(text).toBe(`${'x'.repeat(19)}…`);
+    expect(r.calls.length).toBeLessThanOrEqual(10);
+    expect(Math.max(...r.calls.map((c) => c.length))).toBeLessThanOrEqual(MAX_LABEL_CHARS + 1);
+  });
+
+  it('never returns more than the cap, even with room for it all', () => {
+    expect(fitLabel('y'.repeat(500), 100000, ruler().measure).length).toBeLessThanOrEqual(MAX_LABEL_CHARS + 1);
+  });
+
+  it('gives just an ellipsis when nothing fits, and an empty name stays empty', () => {
+    expect(fitLabel('Garage', 5, ruler().measure)).toBe('…');
+    expect(fitLabel('', 100, ruler().measure)).toBe('');
   });
 });

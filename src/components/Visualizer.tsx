@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MONTHS, dayKey } from '../model/calendar';
-import { VIZ_DEFAULT_RANGE, VIZ_RANGES, chartPath, counts, discOf, doneItems, inRange, loopOrder, perDay, summaryOf, type VizRange } from '../model/visualizer';
+import { VIZ_DEFAULT_RANGE, VIZ_RANGES, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizRange } from '../model/visualizer';
 import { appStore } from '../store/appStore';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
@@ -54,12 +54,14 @@ function Overlay() {
   useEffect(() => dialog.current?.focus({ preventScroll: true }), []);
   useEffect(() => {
     const close = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || e.isComposing) return;
       e.preventDefault();
+      e.stopPropagation();
       closeVisualizer();
     };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
+    // Captured first and kept to itself, so Escape closes only this and does not also reach the board behind it.
+    window.addEventListener('keydown', close, true);
+    return () => window.removeEventListener('keydown', close, true);
   }, []);
 
   const reduced = useMedia('(prefers-reduced-motion: reduce)');
@@ -68,7 +70,9 @@ function Overlay() {
   const ws = useSyncExternalStore(appStore.subscribe, appStore.workspace);
   const today = dayKey(new Date());
   const all = useMemo(() => doneItems(ws), [ws]);
-  const items = useMemo(() => loopOrder(inRange(all, range, today)), [all, range, today]);
+  // The same list again when a board change elsewhere (a synced edit) left the finished items as they were, so the loop does not start over.
+  const kept = useRef<DoneItem[] | undefined>(undefined);
+  const items = useMemo(() => (kept.current = keepIfSame(kept.current, loopOrder(inRange(all, range, today)))), [all, range, today]);
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
   const disc = useMemo(() => discOf(items), [items]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);
@@ -95,8 +99,10 @@ function Overlay() {
     });
   }, [disc, reduced]);
 
-  const feed = items.slice(Math.max(0, at.landed - FEED_ROWS), at.landed).reverse();
-  const nowDay = at.landed ? days.findIndex((d) => d.date === items[at.landed - 1].date) : -1;
+  // `at` is from the loop before when the range has just changed (the effect below resets it a moment later), so it can be past the end.
+  const landed = Math.min(at.landed, items.length);
+  const feed = items.slice(Math.max(0, landed - FEED_ROWS), landed).reverse();
+  const nowDay = landed ? days.findIndex((d) => d.date === items[landed - 1].date) : -1;
   const first = days[0];
   const last = days[days.length - 1];
 
@@ -150,7 +156,7 @@ function Overlay() {
             <h3>Just finished</h3>
             <ul className="viz-feed">
               {feed.map((item, i) => {
-                const index = at.landed - 1 - i;
+                const index = landed - 1 - i;
                 return (
                   <li key={`${at.loop}-${index}`}>
                     <span className="viz-feed-text">{item.text || 'Untitled item'}</span>

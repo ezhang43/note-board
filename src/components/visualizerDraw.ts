@@ -1,4 +1,4 @@
-import { INNER, OUTER, TILT, cellArea, cellCentre, project, sparkAt, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, TILT, cellArea, cellCentre, fitLabel, project, sparkAt, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12). Nothing here touches React
@@ -15,6 +15,8 @@ const SPIN_PER_MS = (Math.PI * 2) / 80000;
 const MAX_DT_MS = 100;
 /** Past this many wedges, board names around the ring would run into each other, so only the picture is drawn. */
 const MAX_LABELLED = 10;
+/** Room for a board name is rounded down to this many pixels when its cut is remembered. */
+const LABEL_STEP = 12;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
@@ -89,12 +91,15 @@ export function startDisc(o: DiscOptions): () => void {
   let w = 0;
   let h = 0;
   let dpr = 1;
+  // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
+  const labels = wedges.map(() => new Map<number, string>());
   const size = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     w = canvas.clientWidth;
     h = canvas.clientHeight;
     canvas.width = Math.max(1, Math.round(w * dpr));
     canvas.height = Math.max(1, Math.round(h * dpr));
+    labels.forEach((m) => m.clear());
   };
   size();
   const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
@@ -190,8 +195,12 @@ export function startDisc(o: DiscOptions): () => void {
         const front = (Math.sin(mid + spin) + 1) / 2;
         ctx.fillStyle = rgba(palette.hues[wi % palette.hues.length], 0.55 + 0.45 * front);
         const room = side > 0.25 ? w - p.x - 8 : side < -0.25 ? p.x - 8 : 120;
-        let text = wedge.name;
-        while (text.length > 1 && ctx.measureText(text).width > room) text = `${text.slice(0, -2)}…`;
+        const step = Math.max(0, Math.floor(room / LABEL_STEP));
+        let text = labels[wi].get(step);
+        if (text === undefined) {
+          text = fitLabel(wedge.name, step * LABEL_STEP, (t) => ctx.measureText(t).width);
+          labels[wi].set(step, text);
+        }
         ctx.fillText(text, p.x + (side > 0.25 ? 4 : side < -0.25 ? -4 : 0), p.y + (Math.sin(mid + spin) > 0 ? 8 : -8));
       });
     }

@@ -4,6 +4,7 @@ import { createCard } from './cards';
 import { cleanUp } from './completed';
 import {
   MAX_CELLS,
+  MAX_CHART_DAYS,
   MAX_WEDGES,
   LOOP_REST_MS,
   OTHER_BOARDS,
@@ -14,6 +15,7 @@ import {
   doneItems,
   gapMs,
   inRange,
+  keepIfSame,
   loopMs,
   loopOrder,
   perDay,
@@ -152,6 +154,25 @@ describe('loopOrder', () => {
   });
 });
 
+describe('keepIfSame', () => {
+  const home = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a', 'b']]] }]);
+  const items = doneItems(ws({ home }));
+
+  it('hands back the earlier list when the new one holds the same items, so the loop does not restart for nothing', () => {
+    const again = doneItems(ws({ home }));
+    expect(again).not.toBe(items);
+    expect(keepIfSame(items, again)).toBe(items);
+  });
+
+  it('hands back the new list when anything differs (text, list, board, day or count)', () => {
+    const edited = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a', 'c']]] }]);
+    const next = doneItems(ws({ home: edited }));
+    expect(keepIfSame(items, next)).toBe(next);
+    expect(keepIfSame(items, items.slice(1))).not.toBe(items);
+    expect(keepIfSame(undefined, items)).toBe(items);
+  });
+});
+
 describe('perDay', () => {
   const today = '2026-11-12';
   const home = cleaned('Home', [
@@ -175,6 +196,43 @@ describe('perDay', () => {
     expect(all.map((d) => d.date)).toEqual(['2026-11-10', '2026-11-11', '2026-11-12']);
     expect(all.map((d) => d.count)).toEqual([2, 0, 1]);
     expect(perDay([], 'all', today)).toEqual([]);
+  });
+
+  it('does not blow up on bad dates from a shared board or an imported backup: they are left out, and 0001 and 9999 stay small', () => {
+    const bad = cleaned('Bad', [
+      { day: 'soon', lists: [['A', ['a']]] },
+      { day: '2026-13-45', lists: [['A', ['b']]] },
+      { day: '', lists: [['A', ['c']]] },
+      { day: '2026-2-3', lists: [['A', ['d']]] },
+      { day: '0001-01-01', lists: [['A', ['e']]] },
+      { day: '9999-12-31', lists: [['A', ['f']]] },
+      { day: '2026-11-12', lists: [['A', ['g']]] },
+    ]);
+    const got = doneItems(ws({ bad }));
+    expect(got.map((i) => i.text)).toEqual(expect.arrayContaining(['f', 'g']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['a']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['b']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['c']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['d']));
+    const all = perDay(got, 'all', today);
+    expect(all.length).toBeLessThanOrEqual(MAX_CHART_DAYS);
+    expect(all[all.length - 1].date).toBe(today);
+    for (const range of ['7', '30', 'all'] as const) expect(perDay(inRange(got, range, today), range, today).length).toBeLessThanOrEqual(MAX_CHART_DAYS);
+    // Even a list handed in directly with a bad date (not through doneItems) cannot make a huge chart.
+    const direct = [{ ...got[0], date: '0001-01-01' }, { ...got[0], date: '9999-12-31' }, { ...got[0], date: 'soon' }];
+    expect(perDay(direct, 'all', today).length).toBeLessThanOrEqual(MAX_CHART_DAYS);
+  });
+
+  it('stays small whatever the dates: at most the last two years, ending today, even for a date in 1970 or 2099', () => {
+    const odd = cleaned('Odd', [
+      { day: '1970-01-01', lists: [['A', ['x']]] },
+      { day: '2099-01-01', lists: [['A', ['y']]] },
+      { day: '2026-11-12', lists: [['A', ['z']]] },
+    ]);
+    const all = perDay(doneItems(ws({ odd })), 'all', today);
+    expect(all).toHaveLength(MAX_CHART_DAYS);
+    expect(all[all.length - 1].date).toBe(today);
+    expect(all[all.length - 1].count).toBe(1);
   });
 
   it('draws a line and an area, taller days higher, and nothing for fewer than two days', () => {

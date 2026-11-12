@@ -59,3 +59,24 @@ export function sparkAt(from: { x: number; y: number }, to: { x: number; y: numb
   const e = 1 - (1 - p) * (1 - p); // fast off the core, settling into the cell
   return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e - Math.sin(Math.PI * p) * lift };
 }
+
+/** The most characters of a board name that are ever measured or drawn round the ring. */
+export const MAX_LABEL_CHARS = 60;
+
+/**
+ * The board name cut to fit `room` pixels: at most MAX_LABEL_CHARS characters (so a huge pasted name
+ * costs the same as a short one), then the longest start that fits followed by an ellipsis, found by
+ * halving rather than one character at a time. `measure` is the canvas's measureText width.
+ */
+export function fitLabel(name: string, room: number, measure: (text: string) => number): string {
+  const full = name.length > MAX_LABEL_CHARS ? `${name.slice(0, MAX_LABEL_CHARS)}…` : name;
+  if (measure(full) <= room) return full;
+  let lo = 0; // `lo` characters plus an ellipsis is the best known fit (just the ellipsis if nothing better)
+  let hi = Math.min(name.length, MAX_LABEL_CHARS) - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measure(`${name.slice(0, mid)}…`) <= room) lo = mid;
+    else hi = mid - 1;
+  }
+  return `${name.slice(0, lo)}…`;
+}

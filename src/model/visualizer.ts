@@ -31,6 +31,9 @@ export interface DoneItem {
   order: number;
 }
 
+/** A real day key: four-digit year, as `addDays` writes it back (so 2026-13-45, 0001-01-01 and "soon" are not). */
+export const isDay = (s: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(s) && addDays(s, 0) === s;
+
 export const UNTITLED_BOARD = 'Untitled board';
 export const UNTITLED_LIST = 'List';
 
@@ -45,6 +48,8 @@ export function doneItems(ws: Workspace): DoneItem[] {
     const board = ws.boards[boardId];
     let order = 0;
     for (const g of completedCardOf(board)?.groups ?? []) {
+      // A day that is not a real date (a shared board or an imported backup can hold anything) is left out.
+      if (!isDay(g.date)) continue;
       for (const e of g.entries) {
         out.push({ id: `${boardId}:${e.item.id}`, text: e.item.text.trim(), boardId, boardName: board.name.trim() || UNTITLED_BOARD, list: e.fromTitle.trim() || UNTITLED_LIST, date: g.date, boardRank, order: order++ });
       }
@@ -91,17 +96,28 @@ export interface DayCount {
   count: number;
 }
 
-/** Done per day for the chart: every day of the range, those with nothing as 0 (All starts on the first day anything was cleaned up). */
+/** The chart never shows more than this many days (a stray very old date must not make a huge chart). */
+// simple: the last two years, ending today. A longer history simply starts later on the chart; upgrade by bucketing weeks if that is missed.
+export const MAX_CHART_DAYS = 730;
+
+/** Done per day for the chart: every day of the range up to today, those with nothing as 0 (All starts on the first day anything was cleaned up, at most MAX_CHART_DAYS back). */
 export function perDay(items: DoneItem[], range: VizRange, today: string): DayCount[] {
   if (range !== 'all' && !items.length) return [];
   const by = new Map<string, number>();
-  for (const i of items) by.set(i.date, (by.get(i.date) ?? 0) + 1);
-  const first = rangeStart(range, today) ?? [...by.keys()].sort()[0];
-  if (first === undefined) return [];
-  const last = [...by.keys()].reduce((m, d) => (d > m ? d : m), today);
+  for (const i of items) if (isDay(i.date) && i.date <= today) by.set(i.date, (by.get(i.date) ?? 0) + 1);
+  const earliest = addDays(today, 1 - MAX_CHART_DAYS);
+  const oldest = rangeStart(range, today) ?? [...by.keys()].sort()[0];
+  if (oldest === undefined) return [];
   const days: DayCount[] = [];
-  for (let d = first; d <= last; d = addDays(d, 1)) days.push({ date: d, count: by.get(d) ?? 0 });
+  for (let d = oldest < earliest ? earliest : oldest; d <= today; d = addDays(d, 1)) days.push({ date: d, count: by.get(d) ?? 0 });
   return days;
+}
+
+/** `next` when it differs from `prev`, else `prev` itself, so a redraw from an unrelated board change keeps the same list and the loop does not start over. */
+export function keepIfSame(prev: DoneItem[] | undefined, next: DoneItem[]): DoneItem[] {
+  if (!prev || prev.length !== next.length) return next;
+  const same = prev.every((p, i) => p.id === next[i].id && p.text === next[i].text && p.list === next[i].list && p.boardName === next[i].boardName && p.date === next[i].date);
+  return same ? prev : next;
 }
 
 /** The chart as drawn in a `w` x `h` box: a line and a closed area under it (nothing when there are fewer than two days). */

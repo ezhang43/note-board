@@ -176,4 +176,25 @@ describe('Checklist panel', () => {
     expect(checklistCardOf(s.getState().board)!.items[0].text).toBe('here');
     expect(checklistIds(s)).toHaveLength(1);
   });
+
+  it('its Completed button shows the checklist’s record in the Completed panel; the board’s own Completed shows the board’s again', () => {
+    const s = setup();
+    s.openChecklist();
+    const { id } = panel(s);
+    s.openChecklistCompleted();
+    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: id, checklistOpen: true });
+    // The board's Completed (⋯ More) switches it to the board's record rather than closing it.
+    s.toggleSidePanel('completed');
+    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: null });
+    s.openChecklistCompleted();
+    s.openChecklistCompleted(); // a second press closes it
+    expect(s.getState().ui.sidePanel).toBeNull();
+    // Any other panel on the right shows the board's record next time.
+    s.openChecklistCompleted();
+    s.toggleSidePanel('journal');
+    expect(s.getState().ui.completedBoard).toBeNull();
+    // On a phone it takes the screen, one panel at a time.
+    s.openChecklistCompleted(true);
+    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: id, checklistOpen: false });
+  });
 });

@@ -1,12 +1,16 @@
-import { INNER, OUTER, TILT, cellArea, cellCentre, fitLabel, project, sparkAt, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, STRIKE, TILT, cellArea, cellCentre, fitLabel, project, warpAt, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12). Nothing here touches React
-// state or the board: it is handed the pre-worked ring and loop, and calls `onLanded` when sparks land.
+// state or the board: it is handed the pre-worked ring and loop, and calls `onLanded` when a beam lands.
 // Per-frame work stays in this file; only the feed and the chart's marker re-render, once per landing.
+// Each item is light warping into the middle: a beam drops onto its cell (which lights up), then a comet
+// runs from the cell into the core, which flares (the timing is warpPhase in model/vizGeometry). It is
+// all drawn into this one canvas from sprites and a few strokes, so nothing here moves or measures the
+// page (no layout, no paint of other elements) and a busy loop costs only canvas work.
 
-/** How long a spark takes from the core to its cell. */
-export const FLIGHT_MS = 900;
+/** How long one item's whole trip takes: the beam drops onto its cell, then the comet runs into the core. */
+export const FLIGHT_MS = 1400;
 /** A cell stays bright this long after a landing. */
 const FLASH_MS = 700;
 /** The ring turns once in about 80 seconds. */
@@ -31,7 +35,7 @@ export function readPalette(el: Element): Palette {
   const style = getComputedStyle(el);
   const get = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
   const hues: string[] = [];
-  for (let i = 0; i < 8; i++) hues.push(get(`--viz-hue-${i}`, '#f2b62b'));
+  for (let i = 0; i < 9; i++) hues.push(get(`--viz-hue-${i}`, i === 8 ? '#a79f90' : '#f2b62b'));
   return { hues, core: get('--viz-core', '#f2b62b'), spark: get('--viz-spark', '#fff4d6'), label: get('--viz-soft', '#b9ae98'), rim: get('--viz-rim', '#8d8372') };
 }
 
@@ -71,7 +75,7 @@ export interface DiscOptions {
   /** Where each item of the loop lands: its wedge and cell, in loop order. */
   slots: { wedge: number; cell: number }[];
   palette: Palette;
-  /** Reduced motion: no spinning, no flying sparks, no pulsing; cells just light up as items land. */
+  /** Reduced motion: no spinning, no beam, no trail, no pulsing; cells just light up as items land. */
   still: boolean;
   /** How many items have landed so far in this trip round the loop (0 when it starts again). Called when that changes. */
   onLanded(landed: number): void;
@@ -84,6 +88,8 @@ export function startDisc(o: DiscOptions): () => void {
   if (!ctx) return () => {};
   const n = slots.length;
   const flight = still ? 1 : FLIGHT_MS;
+  const strike = still ? 1 : FLIGHT_MS * STRIKE; // when the beam reaches its cell: it lands and lights up
+  const hueOf = (wi: number) => palette.hues[wedges[wi].hue % palette.hues.length];
   const total = loopMs(n, flight);
   let landedCount = wedges.map((w) => w.cells.map(() => 0));
   const flashAt = wedges.map((w) => w.cells.map(() => -Infinity));
@@ -134,7 +140,7 @@ export function startDisc(o: DiscOptions): () => void {
     const rx = Math.max(40, Math.min((w - 2 * 64) / 2, (h - 44) / 1.35));
     const cx = w / 2;
     const beam = rx * 0.55;
-    // Sits low, but when the stage is tall there is room to lift it so the beam and the sparks' arcs get their space above.
+    // Sits low, but when the stage is tall there is room to lift it so the core's beam and the comets' arcs get their space above.
     const spare = Math.max(0, (h - 84 - beam - 2 * rx * TILT - 60) / 2);
     const cy = h - rx * TILT - 28 - spare;
     const count = wedges.length;
@@ -148,7 +154,7 @@ export function startDisc(o: DiscOptions): () => void {
 
     // The cells: faint outlines until something lands, then they stay lit a little more for each item.
     wedges.forEach((wedge, wi) => {
-      const hue = palette.hues[wi % palette.hues.length];
+      const hue = hueOf(wi);
       wedge.cells.forEach((cell, ci) => {
         const a = cellArea(wi, count, ci, wedge.cells.length);
         const front = (Math.sin((a.a0 + a.a1) / 2 + spin) + 1) / 2; // 1 at the front of the ring, 0 at the back
@@ -193,7 +199,7 @@ export function startDisc(o: DiscOptions): () => void {
         const side = Math.cos(mid + spin);
         ctx.textAlign = side > 0.25 ? 'left' : side < -0.25 ? 'right' : 'center';
         const front = (Math.sin(mid + spin) + 1) / 2;
-        ctx.fillStyle = rgba(palette.hues[wi % palette.hues.length], 0.55 + 0.45 * front);
+        ctx.fillStyle = rgba(hueOf(wi), 0.55 + 0.45 * front);
         const room = side > 0.25 ? w - p.x - 8 : side < -0.25 ? p.x - 8 : 120;
         const step = Math.max(0, Math.floor(room / LABEL_STEP));
         let text = labels[wi].get(step);
@@ -205,8 +211,14 @@ export function startDisc(o: DiscOptions): () => void {
       });
     }
 
+    // How hard the core is flaring from comets going in (several can land at once).
+    let flare = 0;
+    const phases = still ? [] : flying.map((f) => warpPhase(f.progress)); // once per frame, shared by the flare and the drawing below
+    for (const ph of phases) flare += ph.flare;
+    flare = Math.min(1, flare);
+
     // The core and its beam.
-    const pulse = still ? 1 : 1 + 0.08 * Math.sin(now / 600);
+    const pulse = still ? 1 : 1 + 0.08 * Math.sin(now / 600) + 0.3 * flare;
     ctx.globalCompositeOperation = 'lighter';
     const beamFill = ctx.createLinearGradient(0, cy, 0, cy - beam);
     beamFill.addColorStop(0, rgba(palette.core, 0.85));
@@ -218,24 +230,53 @@ export function startDisc(o: DiscOptions): () => void {
     ctx.fillRect(cx - 1.5, cy - beam, 3, beam);
     stamp(ctx, palette.core, cx, cy, rx * 0.34 * pulse, 0.95);
     stamp(ctx, palette.spark, cx, cy, rx * 0.12 * pulse, 0.9);
+    if (flare > 0) stamp(ctx, palette.spark, cx, cy, rx * (0.16 + 0.14 * flare), 0.6 * flare);
     ctx.globalAlpha = 1;
 
-    // Sparks on their way.
+    // Light warping in: each item's beam drops onto its cell, a ping rings on it, and a comet streaks from it into the core.
     if (!still) {
-      const from = { x: cx, y: cy - beam };
-      for (const f of flying) {
+      ctx.lineCap = 'round';
+      flying.forEach((f, fi) => {
+        const ph = phases[fi];
         const s = slots[f.index];
         const c = cellCentre(s.wedge, count, s.cell, wedges[s.wedge].cells.length);
         const to = project(c.a, c.r, spin, cx, cy, rx);
-        const hue = palette.hues[s.wedge % palette.hues.length];
-        for (let k = 7; k >= 0; k--) {
-          const p = f.progress - k * 0.028;
-          if (p < 0) continue;
-          const at = sparkAt(from, to, p);
-          const fade = 1 - k / 8;
-          stamp(ctx, k === 0 ? palette.spark : hue, at.x, at.y, 3 + 9 * fade, 0.25 + 0.7 * fade);
+        const hue = hueOf(s.wedge);
+        if (ph.beamAlpha > 0) {
+          // A thin beam falling from the top of the stage: three pieces, brightest at the head, so it has a tail without a gradient per beam.
+          const head = to.y * ph.beam;
+          const tail = Math.max(0, head - to.y * 0.45);
+          ctx.strokeStyle = palette.spark;
+          ctx.lineWidth = 1.5;
+          for (let k = 0; k < 3; k++) {
+            ctx.globalAlpha = (0.25 + 0.3 * k) * ph.beamAlpha;
+            ctx.beginPath();
+            ctx.moveTo(to.x, tail + ((head - tail) * k) / 3);
+            ctx.lineTo(to.x, tail + ((head - tail) * (k + 1)) / 3);
+            ctx.stroke();
+          }
+          stamp(ctx, palette.spark, to.x, head, 7, ph.beamAlpha);
         }
-      }
+        if (ph.ping !== null) {
+          ctx.globalAlpha = 0.9 * (1 - ph.ping);
+          ctx.strokeStyle = palette.spark;
+          ctx.lineWidth = 1.2;
+          const r = 4 + 16 * ph.ping;
+          ctx.beginPath();
+          ctx.ellipse(to.x, to.y, r, r * TILT, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (ph.comet !== null && ph.cometAlpha > 0) {
+          // The comet: a bright head and smaller, fainter dots behind it along the same arc.
+          for (let k = 0; k < 7; k++) {
+            const q = ph.comet - k * 0.045;
+            if (q < 0) break;
+            const at = warpAt(to, { x: cx, y: cy }, q);
+            const fade = 1 - k / 7;
+            stamp(ctx, k === 0 ? palette.spark : hue, at.x, at.y, k === 0 ? 9 : 2.5 + 5 * fade, (0.2 + 0.75 * fade) * ph.cometAlpha);
+          }
+        }
+      });
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -254,7 +295,7 @@ export function startDisc(o: DiscOptions): () => void {
       flashAt.forEach((row) => row.fill(-Infinity));
       o.onLanded(0);
     }
-    const ph = playhead(t, n, flight);
+    const ph = playhead(t, n, flight, strike);
     for (let k = landed; k < ph.landed; k++) {
       const s = slots[k];
       landedCount[s.wedge][s.cell]++;

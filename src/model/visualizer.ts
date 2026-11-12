@@ -1,4 +1,5 @@
 import { addDays, weekStart } from './calendar';
+import { CATEGORIES, categoryIndex, categoryOf, type Categorizer } from './categorize';
 import { completedCardOf } from './completed';
 import { boardTree, type Workspace } from './workspace';
 
@@ -143,32 +144,41 @@ export interface Cell {
 }
 
 export interface Wedge {
-  boardId: string;
+  /** The board's id, or the category's id (empty for the "Other boards" wedge). */
+  key: string;
   name: string;
   count: number;
   cells: Cell[];
+  /** Which of the nine `--viz-hue-*` colors it is drawn in (the ninth is the neutral one, for Other). */
+  hue: number;
 }
 
+/** What the wedges are: the categories (the default), or the boards the items came from. */
+export type VizGroupBy = 'category' | 'board';
+export const VIZ_GROUPS: { id: VizGroupBy; label: string }[] = [
+  { id: 'category', label: 'By category' },
+  { id: 'board', label: 'By board' },
+];
+export const VIZ_DEFAULT_GROUP: VizGroupBy = 'category';
+/** Where this device remembers the switch (a per-device view choice, like the text size: not board data, not synced). */
+export const VIZ_GROUP_KEY = 'note-board:viz-group';
+
+/** The switch as saved on this device, or By category. */
+export const parseGroupBy = (saved: string | null): VizGroupBy => (saved === 'board' ? 'board' : VIZ_DEFAULT_GROUP);
+
+/** The eight colors a board wedge goes round; categories use a ninth for Other. */
+const BOARD_HUES = 8;
+
 /**
- * The disc for `items` (given in loop order): one wedge per board in menu order, the busiest boards
- * only past MAX_WEDGES (the rest share one "Other boards" wedge, last), and in a wedge one cell per list
- * title, the busiest first, past MAX_CELLS the rest share "Other lists". `slots[i]` says which wedge and
- * cell `items[i]` lands in.
+ * The disc for `items` (given in loop order). By board: one wedge per board in menu order, the busiest
+ * boards only past MAX_WEDGES (the rest share one "Other boards" wedge, last). By category: one wedge per
+ * category that has items, in the categories' own order (Other last), each in its own fixed color. In a
+ * wedge, one cell per list title (the busiest first, so the same title on two boards is one cell); past
+ * MAX_CELLS the rest share "Other lists". `slots[i]` says which wedge and cell `items[i]` lands in.
+ * `categorize` is asked once per item (see categorize.ts); an id it makes up is Other.
  */
-export function discOf(items: DoneItem[]): { wedges: Wedge[]; slots: { wedge: number; cell: number }[] } {
-  const boards = new Map<string, { name: string; rank: number; items: DoneItem[] }>();
-  for (const i of items) {
-    const b = boards.get(i.boardId) ?? { name: i.boardName, rank: i.boardRank, items: [] };
-    b.items.push(i);
-    boards.set(i.boardId, b);
-  }
-  const all = [...boards].map(([boardId, b]) => ({ boardId, ...b }));
-  const kept = all.length > MAX_WEDGES ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, MAX_WEDGES - 1) : all;
-  const groups: { boardId: string; name: string; rank: number; items: DoneItem[] }[] = kept.sort((a, b) => a.rank - b.rank);
-  if (kept.length < all.length) {
-    const rest = all.filter((b) => !kept.includes(b));
-    groups.push({ boardId: '', name: OTHER_BOARDS, rank: Infinity, items: rest.flatMap((b) => b.items) });
-  }
+export function discOf(items: DoneItem[], by: VizGroupBy = VIZ_DEFAULT_GROUP, categorize: Categorizer = categoryOf): { wedges: Wedge[]; slots: { wedge: number; cell: number }[] } {
+  const groups = by === 'category' ? categoryGroups(items, categorize) : boardGroups(items);
   const where = new Map<DoneItem, { wedge: number; cell: number }>();
   const wedges = groups.map((g, wedge): Wedge => {
     const byList = new Map<string, number>();
@@ -179,9 +189,39 @@ export function discOf(items: DoneItem[]): { wedges: Wedge[]; slots: { wedge: nu
     if (keptLists.length < ranked.length) cells.push({ list: OTHER_LISTS, count: ranked.slice(keptLists.length).reduce((n, [, c]) => n + c, 0) });
     const at = new Map(keptLists.map(([list], cell) => [list, cell]));
     for (const i of g.items) where.set(i, { wedge, cell: at.get(i.list) ?? cells.length - 1 });
-    return { boardId: g.boardId, name: g.name, count: g.items.length, cells };
+    return { key: g.key, name: g.name, count: g.items.length, cells, hue: g.hue ?? wedge % BOARD_HUES };
   });
   return { wedges, slots: items.map((i) => where.get(i)!) };
+}
+
+interface Group {
+  key: string;
+  name: string;
+  items: DoneItem[];
+  hue?: number;
+}
+
+function boardGroups(items: DoneItem[]): Group[] {
+  const boards = new Map<string, { name: string; rank: number; items: DoneItem[] }>();
+  for (const i of items) {
+    const b = boards.get(i.boardId) ?? { name: i.boardName, rank: i.boardRank, items: [] };
+    b.items.push(i);
+    boards.set(i.boardId, b);
+  }
+  const all = [...boards].map(([key, b]) => ({ key, ...b }));
+  const kept = all.length > MAX_WEDGES ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, MAX_WEDGES - 1) : all;
+  const groups: (Group & { rank: number })[] = kept.sort((a, b) => a.rank - b.rank);
+  if (kept.length < all.length) groups.push({ key: '', name: OTHER_BOARDS, rank: Infinity, items: all.filter((b) => !kept.includes(b)).flatMap((b) => b.items) });
+  return groups;
+}
+
+function categoryGroups(items: DoneItem[], categorize: Categorizer): Group[] {
+  const by = new Map<number, DoneItem[]>();
+  for (const i of items) {
+    const c = categoryIndex(categorize(i, i.list));
+    (by.get(c) ?? by.set(c, []).get(c)!).push(i);
+  }
+  return [...by].sort((a, b) => a[0] - b[0]).map(([c, list]) => ({ key: CATEGORIES[c].id, name: CATEGORIES[c].name, items: list, hue: c }));
 }
 
 /** A summary in words for a screen reader (the disc is a picture): "12 items: Home 8, Garage 4". */
@@ -206,13 +246,16 @@ export const gapMs = (n: number): number => Math.min(MAX_GAP_MS, Math.max(MIN_GA
 export const loopMs = (n: number, flight: number): number => (n ? (n - 1) * gapMs(n) + flight + LOOP_REST_MS : 0);
 
 /**
- * Where the loop is `t` ms after it started: how many items have landed, which are still flying (with
+ * Where the loop is `t` ms after it started: how many items have landed, which are still animating (with
  * how far along, 0 to 1), and whether `t` has gone past the end (the caller starts again at `t - loop`).
+ * An item has "landed" `strike` ms into its `flight` ms trip (by default at the end of it): that is when
+ * its cell lights and its row joins the feed, while its comet may still be on the way to the core.
  */
-export function playhead(t: number, n: number, flight: number): { landed: number; flying: { index: number; progress: number }[]; wrapped: boolean } {
+export function playhead(t: number, n: number, flight: number, strike: number = flight): { landed: number; flying: { index: number; progress: number }[]; wrapped: boolean } {
   const gap = gapMs(n);
-  const landed = t < flight ? 0 : Math.min(n, Math.floor((t - flight) / gap) + 1);
+  const landed = t < strike ? 0 : Math.min(n, Math.floor((t - strike) / gap) + 1);
+  const done = t < flight ? 0 : Math.min(n, Math.floor((t - flight) / gap) + 1); // whose whole trip is over
   const flying: { index: number; progress: number }[] = [];
-  for (let i = landed; i < n && t - i * gap >= 0; i++) flying.push({ index: i, progress: (t - i * gap) / flight });
+  for (let i = done; i < n && t - i * gap >= 0; i++) flying.push({ index: i, progress: (t - i * gap) / flight });
   return { landed, flying, wrapped: t >= loopMs(n, flight) };
 }

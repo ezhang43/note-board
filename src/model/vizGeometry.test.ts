@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INNER, MAX_LABEL_CHARS, OUTER, cellArea, cellCentre, fitLabel, project, sparkAt, wedgeSpan } from './vizGeometry';
+import { INNER, MAX_LABEL_CHARS, OUTER, cellArea, cellCentre, fitLabel, project, STRIKE, warpAt, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -64,18 +64,6 @@ describe('cellCentre', () => {
   });
 });
 
-describe('sparkAt', () => {
-  const from = { x: 0, y: 0 };
-  const to = { x: 100, y: 0 };
-  it('starts at the core, ends in the cell, and arcs up in between', () => {
-    expect(sparkAt(from, to, 0)).toEqual({ x: 0, y: 0 });
-    const end = sparkAt(from, to, 1);
-    expect(end.x).toBeCloseTo(100);
-    expect(end.y).toBeCloseTo(0);
-    expect(sparkAt(from, to, 0.5).y).toBeLessThan(-10); // up the screen
-  });
-});
-
 describe('fitLabel', () => {
   // A stand-in for measureText: 10 pixels a character, recording what it was asked to measure.
   const ruler = () => {
@@ -110,5 +98,79 @@ describe('fitLabel', () => {
   it('gives just an ellipsis when nothing fits, and an empty name stays empty', () => {
     expect(fitLabel('Garage', 5, ruler().measure)).toBe('…');
     expect(fitLabel('', 100, ruler().measure)).toBe('');
+  });
+});
+
+// Light warping into the middle (owner request, 2026-11-12): a beam drops onto the item's cell, the cell
+// lights, a comet runs along an arc from the cell into the core, and the core flares as it arrives.
+
+describe('warpAt', () => {
+  const cell = { x: 100, y: 300 };
+  const core = { x: 400, y: 260 };
+
+  it('runs from the cell to the core, rising along an arc on the way', () => {
+    expect(warpAt(cell, core, 0)).toEqual(cell);
+    const end = warpAt(cell, core, 1);
+    expect(end.x).toBeCloseTo(core.x);
+    expect(end.y).toBeCloseTo(core.y);
+    const mid = warpAt(cell, core, 0.5);
+    expect(mid.y).toBeLessThan(Math.min(cell.y, core.y) - 10); // above both ends
+  });
+
+  it('speeds up as it nears the core', () => {
+    const early = warpAt(cell, core, 0.2).x - warpAt(cell, core, 0.1).x;
+    const late = warpAt(cell, core, 0.9).x - warpAt(cell, core, 0.8).x;
+    expect(late).toBeGreaterThan(early * 2);
+  });
+});
+
+describe('warpPhase', () => {
+  it('drops the beam first: it starts at the top and reaches the cell at STRIKE', () => {
+    expect(warpPhase(0).beam).toBe(0);
+    expect(warpPhase(STRIKE / 2).beam).toBeGreaterThan(0);
+    expect(warpPhase(STRIKE / 2).beam).toBeLessThan(1);
+    expect(warpPhase(STRIKE).beam).toBe(1);
+    expect(warpPhase(0.1).beamAlpha).toBe(1);
+    expect(warpPhase(STRIKE + 0.2).beamAlpha).toBe(0); // gone soon after it lands
+  });
+
+  it('rings a ping on the cell when the beam lands, then lets it go', () => {
+    expect(warpPhase(STRIKE - 0.01).ping).toBeNull();
+    expect(warpPhase(STRIKE).ping).toBe(0);
+    const mid = warpPhase(STRIKE + 0.1).ping!;
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    expect(warpPhase(0.9).ping).toBeNull();
+  });
+
+  it('sends the comet only after the beam has landed, along the whole arc, and fades it into the core', () => {
+    expect(warpPhase(STRIKE - 0.01).comet).toBeNull();
+    expect(warpPhase(STRIKE).comet).toBe(0);
+    expect(warpPhase((STRIKE + 1) / 2).comet).toBeCloseTo(0.5);
+    expect(warpPhase(0.999).comet).toBeGreaterThan(0.99);
+    expect(warpPhase(STRIKE + 0.1).cometAlpha).toBe(1);
+    expect(warpPhase(0.999).cometAlpha).toBeLessThan(0.1);
+  });
+
+  it('flares the core as the comet arrives, not before', () => {
+    expect(warpPhase(0).flare).toBe(0);
+    expect(warpPhase(0.5).flare).toBe(0);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
+    expect(warpPhase(0.999).flare).toBeLessThan(warpPhase(0.9).flare);
+  });
+
+  it('has finished flaring by the time the trip ends, so the core does not pop back', () => {
+    expect(warpPhase(1).flare).toBeCloseTo(0, 9);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
+  });
+
+  it('keeps its numbers inside 0 to 1 whatever progress it is given', () => {
+    for (const p of [-1, 0, 0.3, 1, 5]) {
+      const w = warpPhase(p);
+      for (const v of [w.beam, w.beamAlpha, w.cometAlpha, w.flare]) {
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+      }
+    }
   });
 });

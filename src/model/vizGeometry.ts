@@ -53,10 +53,55 @@ export function project(a: number, r: number, spin: number, cx: number, cy: numb
   return { x: cx + Math.cos(a + spin) * r * rx, y: cy + Math.sin(a + spin) * r * rx * TILT };
 }
 
-/** A spark `p` (0 to 1) of the way along its arc from the core `from` to the cell `to`: it rises first, then comes down into the cell. */
-export function sparkAt(from: { x: number; y: number }, to: { x: number; y: number }, p: number): { x: number; y: number } {
+/**
+ * Light warping into the core (owner request, 2026-11-12). One item's trip, `progress` 0 to 1: a thin beam
+ * drops from above onto its cell (until STRIKE), a small ring pings on the cell and it lights, a comet runs
+ * from the cell along an arc into the core (STRIKE to 1), and the core flares as it arrives.
+ */
+export const STRIKE = 0.2;
+/** How much of the trip the beam takes to fade after it lands, the ring to open, and the comet to fade into the core. */
+const BEAM_FADE = 0.1;
+const PING_SPAN = 0.3;
+const COMET_FADE = 0.12;
+/** The core flares around this point of the trip, as the comet goes in. */
+const FLARE_AT = 0.9;
+const FLARE_WIDTH = 0.1; // FLARE_AT + FLARE_WIDTH is 1: the flare is spent as the trip ends
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+export interface WarpPhase {
+  /** How far down its drop the beam's head is: 0 at the top, 1 on the cell. */
+  beam: number;
+  beamAlpha: number;
+  /** How far open the ring on the cell is (0 to 1), null when there is no ring. */
+  ping: number | null;
+  /** How far along its arc the comet is (0 at the cell, 1 in the core), null before the beam has landed. */
+  comet: number | null;
+  cometAlpha: number;
+  /** How hard the core is flaring from this item (0 to 1). */
+  flare: number;
+}
+
+export function warpPhase(progress: number): WarpPhase {
+  const p = clamp01(progress);
+  const drop = clamp01(p / STRIKE);
+  const struck = p >= STRIKE;
+  const ping = struck && p - STRIKE <= PING_SPAN ? (p - STRIKE) / PING_SPAN : null;
+  const comet = struck ? (p - STRIKE) / (1 - STRIKE) : null;
+  return {
+    beam: drop * drop, // it falls, so it speeds up
+    beamAlpha: struck ? clamp01(1 - (p - STRIKE) / BEAM_FADE) : 1,
+    ping,
+    comet,
+    cometAlpha: comet === null ? 0 : clamp01((1 - comet) / COMET_FADE),
+    flare: clamp01(1 - Math.abs(p - FLARE_AT) / FLARE_WIDTH),
+  };
+}
+
+/** A comet `p` (0 to 1) of the way along its arc from a cell `from` into the core `to`: it climbs in a curve and speeds up as it is drawn in. */
+export function warpAt(from: { x: number; y: number }, to: { x: number; y: number }, p: number): { x: number; y: number } {
   const lift = Math.hypot(to.x - from.x, to.y - from.y) * 0.4 + 16;
-  const e = 1 - (1 - p) * (1 - p); // fast off the core, settling into the cell
+  const e = p * p; // slow off the cell, quickest into the core
   return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e - Math.sin(Math.PI * p) * lift };
 }
 

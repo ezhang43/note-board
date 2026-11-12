@@ -85,7 +85,8 @@ test('counts every board: done today, this week and in the range; the switch ope
   // Today and this week do not follow the switch.
   await expect(count(page, 'Done today')).toHaveText('2');
   // The picture is described in words for a screen reader.
-  await expect(dialog(page).getByRole('img', { name: /6 items cleaned up: Home 4, Garage 2/ })).toBeVisible();
+  // By category is the default: the lists' items sort by their words, then by the list title.
+  await expect(dialog(page).getByRole('img', { name: /6 items cleaned up: Errands & shopping 3, Home & chores 1, Other 2\./ })).toBeVisible();
 });
 
 test('the feed fills as the loop runs, oldest item first, and names its list and board', async ({ page }) => {
@@ -94,7 +95,7 @@ test('the feed fills as the loop runs, oldest item first, and names its list and
   const rows = dialog(page).locator('.viz-feed li');
   await expect(rows.first()).toBeVisible({ timeout: 10000 });
   await expect(rows.first().locator('.viz-feed-text')).toHaveText('laundry'); // 10 days ago: the oldest in 30 days
-  await expect(rows.first().locator('.viz-feed-where')).toHaveText('Chores · Home');
+  await expect(rows.first().locator('.viz-feed-where')).toHaveText('Home & chores · Chores · Home'); // category, list, board
   // Later ones push in above it.
   await expect.poll(async () => rows.count(), { timeout: 8000 }).toBeGreaterThan(1);
 });
@@ -114,6 +115,40 @@ test('switching to a shorter range part-way round the loop does not break it (no
   await expect(rows.first()).toBeVisible({ timeout: 5000 });
   await expect(rows.first().locator('.viz-feed-text')).toHaveText('sand'); // 2 days ago: the oldest within 7 days
   expect(errors).toEqual([]);
+});
+
+const groupButton = (page: Page, name: string) => dialog(page).getByRole('group', { name: 'Group by' }).getByRole('button', { name, exact: true });
+
+test('wedges are categories by default; By board switches to boards, and the choice is remembered on this device', async ({ page }) => {
+  await seed(page);
+  await openVisualizer(page);
+  await expect(groupButton(page, 'By category')).toHaveAttribute('aria-pressed', 'true');
+  await expect(groupButton(page, 'By board')).toHaveAttribute('aria-pressed', 'false');
+
+  await groupButton(page, 'By board').click();
+  await expect(groupButton(page, 'By board')).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog(page).getByRole('img', { name: /5 items cleaned up: Home 4, Garage 1/ })).toBeVisible();
+  // The feed rows go back to list and board.
+  await expect(dialog(page).locator('.viz-feed li').first().locator('.viz-feed-where')).toHaveText('Chores · Home', { timeout: 10000 });
+  // The range is unchanged by it.
+  await expect(rangeButton(page, '30 days')).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-group'))).toBe('board');
+
+  // A reload (and a fresh open) keeps it.
+  await page.reload();
+  await fontsLoaded(page);
+  await openVisualizer(page);
+  await expect(groupButton(page, 'By board')).toHaveAttribute('aria-pressed', 'true');
+
+  await groupButton(page, 'By category').click();
+  await expect(dialog(page).getByRole('img', { name: /Errands & shopping 3/ })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-group'))).toBe('category');
+});
+
+test('a saved choice that is not one of the two falls back to By category', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('note-board:viz-group', 'wedges'));
+  await openVisualizer(page);
+  await expect(groupButton(page, 'By category')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('with nothing cleaned up yet, it says so', async ({ page }) => {
@@ -145,8 +180,43 @@ test('it is dark and glowing even in light mode, and the board keys stay off beh
   await expect(page.locator('.card.selected')).toHaveCount(0);
 });
 
+test('under reduced motion there is no beam and no trail, only the cell lighting up', async ({ page }) => {
+  await seed(page);
+  await openVisualizer(page);
+  await expect(dialog(page).locator('.viz-feed li').first()).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(300);
+  const top = await dialog(page)
+    .locator('canvas')
+    .evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, Math.max(2, Math.round(6 * (c.width / c.clientWidth)))).data;
+      return d.some((v, i) => i % 4 === 3 && v > 8);
+    });
+  expect(top).toBe(false);
+});
+
 test.describe('with motion on', () => {
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+  /** Whether anything is painted in the top rows of the ring's canvas, away from the middle (where only an item's falling beam reaches). */
+  const topPainted = (page: Page) =>
+    dialog(page)
+      .locator('canvas')
+      .evaluate((c: HTMLCanvasElement) => {
+        const rows = Math.max(2, Math.round(6 * (c.width / c.clientWidth)));
+        const margin = Math.round(30 * (c.width / c.clientWidth));
+        const d = c.getContext('2d')!.getImageData(0, 0, c.width, rows).data;
+        for (let y = 0; y < rows; y++) for (let x = 0; x < c.width; x++) if (Math.abs(x - c.width / 2) > margin && d[(y * c.width + x) * 4 + 3] > 8) return true;
+        return false;
+      });
+
+  test('a light beam drops onto each item\'s cell from above, then a comet runs into the core', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await seed(page);
+    await openVisualizer(page);
+    await expect.poll(() => topPainted(page), { timeout: 6000, intervals: [30] }).toBe(true);
+    expect(errors).toEqual([]);
+  });
 
   test('sparks fly and the ring is drawn, with no page error', async ({ page }) => {
     await seed(page);

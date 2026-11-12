@@ -122,9 +122,9 @@ test('the Board group: text size, Snap to grid, Color, then Collapse all · Same
   expect(colour.y).toBeLessThan(three[0].y);
 });
 
-test('the More group, in order: File, Appearance, Feedback, About, Buy me a coffee, Sign out', async ({ page }) => {
+test('the More group, in order: File, Appearance, AI settings, Feedback, About, Buy me a coffee, Sign out', async ({ page }) => {
   await openSignedIn(page);
-  expect(await names(rest(page).locator('button, a'))).toEqual(['File', 'Appearance', 'Feedback', 'About BusyAnts', 'Buy me a coffee', 'Sign out']);
+  expect(await names(rest(page).locator('button, a'))).toEqual(['File', 'Appearance', 'AI settings', 'Feedback', 'About BusyAnts', 'Buy me a coffee', 'Sign out']);
   // Feedback is a row of its own, right before About (owner decision, 2026-10-16).
   const fb = await box(rest(page).getByRole('button', { name: 'Feedback', exact: true }));
   const about = await box(rest(page).getByRole('link', { name: 'About BusyAnts' }));

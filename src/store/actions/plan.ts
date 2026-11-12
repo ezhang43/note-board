@@ -15,6 +15,13 @@ export function planActions(ctx: StoreContext) {
     closeBrainDump() {
       ctx.updateUi({ brainDumpOpen: false });
     },
+    /** Opens the AI settings (the person's own key, model and monthly cap). Open to anyone, also on a board that may only be viewed: it changes no board. */
+    openAiSettings() {
+      ctx.updateUi({ aiSettingsOpen: true });
+    },
+    closeAiSettings() {
+      ctx.updateUi({ aiSettingsOpen: false });
+    },
     /** What is typed in the box. Kept while the dialog is closed (so a stray Escape loses nothing), and gone with this person's session. */
     setBrainDumpText(text: string) {
       ctx.updateUi({ brainDumpText: text });

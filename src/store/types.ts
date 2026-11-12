@@ -157,6 +157,8 @@ export interface Ui {
   brainDumpOpen: boolean;
   /** What is typed in the Brain dump box (kept while it is closed; not saved). */
   brainDumpText: string;
+  /** The AI settings dialog (⋯ menu): the person's own key, model and monthly cap. Never holds the key itself. */
+  aiSettingsOpen: boolean;
   confirm: ConfirmDelete | null;
   /** Ctrl+Shift+Backspace (owner request): asking "Delete N completed items?", or saying there are none. */
   deleteCompleted: 'ask' | 'none' | null;
@@ -262,6 +264,7 @@ export const emptyUi: Ui = {
   shortcutsOpen: false,
   brainDumpOpen: false,
   brainDumpText: '',
+  aiSettingsOpen: false,
   confirm: null,
   deleteCompleted: null,
   undoToast: null,

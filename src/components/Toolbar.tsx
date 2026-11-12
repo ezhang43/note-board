@@ -28,7 +28,7 @@ import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
 import { arrowThroughMenu } from './menuArrows';
 import { keepsBlockCursor } from './textField';
-import { AppearanceIcon, ArrangeIcon, BrainDumpIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
+import { AppearanceIcon, ArrangeIcon, BrainDumpIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, KeyIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
 function AddCardButton({ kind, label }: { kind: CardKind; label: string }) {
@@ -269,6 +269,24 @@ export function FeedbackButton({ onOpen }: { onOpen?: () => void }) {
     >
       <FeedbackIcon />
       Feedback
+    </button>
+  );
+}
+
+/** AI settings (wow plan, job 12a): a row in ⋯ (on the toolbar and on a phone) that opens the dialog for the person's own AI key. */
+export function AiSettingsButton({ onOpen }: { onOpen?: () => void }) {
+  return (
+    <button
+      type="button"
+      className="tb-button quiet"
+      title="AI settings: your own Anthropic key, model and monthly limit"
+      onClick={() => {
+        onOpen?.();
+        appStore.openAiSettings();
+      }}
+    >
+      <KeyIcon />
+      AI settings
     </button>
   );
 }
@@ -554,7 +572,7 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
         type="button"
         className={`tb-button icon-only${findTarget ? ' find-target' : ''}`}
         aria-label="More"
-        title={folded ? 'More: Version history, Completed, Visualizer, Brain dump, Arrange, File, Feedback, Appearance, Sign out' : 'More: Version history, Completed, Visualizer'}
+        title={folded ? 'More: Version history, Completed, Visualizer, Brain dump, Arrange, File, Feedback, AI settings, Appearance, Sign out' : 'More: Version history, Completed, Visualizer, AI settings'}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -571,6 +589,7 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
             {folded && !viewOnly && <ArrangeMenu />}
             {folded && <FileMenu />}
             {folded && <FeedbackButton onOpen={close} />}
+            <AiSettingsButton onOpen={close} />
             {folded && <AppearanceMenu labelled />}
             {folded && onSignOut && (
               <button type="button" className="tb-button" onClick={() => {

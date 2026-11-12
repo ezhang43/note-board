@@ -7,6 +7,7 @@ import { ask, ConfirmDialog } from './components/ConfirmDialog';
 import { UndoToast } from './components/UndoToast';
 import { DeleteCompleted } from './components/DeleteCompleted';
 import { DeleteAccountPanel } from './components/DeleteAccountPanel';
+import { AiSettingsDialog } from './components/AiSettings';
 import { BrainDumpDialog } from './components/BrainDumpDialog';
 import { FeedbackPanel } from './components/FeedbackPanel';
 import { FindBar } from './components/FindBar';
@@ -159,6 +160,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       <DeleteAccountPanel />
       <FeedbackPanel />
       <BrainDumpDialog />
+      <AiSettingsDialog />
       <Tour />
       <CommentThread />
       <EstimatePicker />

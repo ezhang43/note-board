@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { finishDeletion } from './account';
 import type { Store } from '../store/store';
 
@@ -28,6 +28,7 @@ beforeEach(() => {
   reload = vi.fn();
   vi.stubGlobal('location', { reload });
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('finishDeletion', () => {
   it('clears this person’s boards from the device as before, and keeps the device’s settings', () => {

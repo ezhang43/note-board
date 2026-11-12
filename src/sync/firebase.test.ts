@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ONLINE_LIMIT } from '../store/sync';
 
 // Leaving a shared board online (main session check, 2026-10-06): all or nothing. Firebase itself
@@ -298,6 +298,7 @@ describe('the AI key kept in this browser (wow plan, job 12b)', () => {
     data.set('note-board:ai-cap', '50');
     data.set('note-board:ai-uses', JSON.stringify({ month: '2026-11', count: 3 }));
   });
+  afterEach(() => vi.unstubAllGlobals());
   const fire = (u: { uid: string } | null) => {
     const seen: unknown[] = [];
     watchUser((x) => void seen.push(x));

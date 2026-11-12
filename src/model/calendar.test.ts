@@ -596,9 +596,11 @@ describe('the calendar panel’s width', () => {
 });
 
 describe('the widths of the other side panels (job #127)', () => {
-  const usual = { history: 300, pomodoro: 300, completed: 300, journal: 420, habits: 300 };
+  const usual = { history: 300, pomodoro: 300, completed: 300, journal: 420, habits: 420 };
 
-  it('start at 300px, the Journal at 420px', () => {
+  it('start at 300px; the Journal and Habits at 420px, the calendar’s Week width (owner decision 2026-11-12)', () => {
+    expect(SIDE_DEFAULT.journal).toBe(PANEL_DEFAULT.week);
+    expect(SIDE_DEFAULT.habits).toBe(PANEL_DEFAULT.week);
     expect(SIDE_DEFAULT).toEqual(usual);
     expect(readWidths(null, SIDE_DEFAULT)).toEqual(usual);
   });

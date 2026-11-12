@@ -513,8 +513,10 @@ test('Ledger: names sit beside the ticks when the panel is wide, above them when
   await todayBox(page, 0).click();
   const name = row(page, 0).getByRole('textbox', { name: 'Habit name' });
   const firstDay = days(page, 0).first();
-  expect((await name.boundingBox())!.y).toBeLessThan((await firstDay.boundingBox())!.y - 10); // narrow: stacked
+  // It opens 420px wide (owner request 2026-11-12), already wide enough for names beside the ticks.
   await page.getByRole('separator', { name: 'Resize habits' }).focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight'); // 420px to 300px
+  expect((await name.boundingBox())!.y).toBeLessThan((await firstDay.boundingBox())!.y - 10); // narrow: stacked
   for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowLeft'); // 300px to 440px
   const n = (await name.boundingBox())!;
   const d = (await firstDay.boundingBox())!;

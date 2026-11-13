@@ -26,8 +26,8 @@ export function completedPanelActions(ctx: StoreContext, { checklist, restoreOn,
    * and its undo history is just as the panel left it. Judged by the history, not the board, so the automatic layout
    * tidy (which moves blocks outside undo) never makes a step look changed since; any edit, undo or sync makes a new history.
    */
-  const current = (s: CompletedSteps, id: string) =>
-    (id === ctx.state.boards.open || id === checklist()) && ctx.historyOf(id) !== undefined && ctx.historyOf(id) === s.seen[id];
+  const current = (s: CompletedSteps, id: string, list: string | null) =>
+    (id === ctx.state.boards.open || id === list) && ctx.historyOf(id) !== undefined && ctx.historyOf(id) === s.seen[id];
   const readOnly = () => ctx.state.ui.preview !== null || ctx.viewOnly();
 
   /**
@@ -38,13 +38,16 @@ export function completedPanelActions(ctx: StoreContext, { checklist, restoreOn,
   function step(back: boolean) {
     const s = ctx.state.ui.completedSteps ?? none;
     const from = [...(back ? s.undo : s.redo)];
-    while (from.length && !current(s, from.at(-1)!)) from.pop();
+    const list = checklist();
+    while (from.length && !current(s, from.at(-1)!, list)) from.pop();
     const id = from.pop();
     const before = id ? ctx.historyOf(id) : undefined;
     if (id === ctx.state.boards.open) (back ? undo : redo)();
     else if (id) ctx.undoOn(id, back ? 'undo' : 'redo');
     const after = id ? ctx.historyOf(id) : undefined;
     const changed = !!id && !!after && after !== before;
+    // One that couldn't run (the board turned view-only) stays for later.
+    if (id && !changed) from.push(id);
     if (!changed) announce(back ? 'Nothing to undo here' : 'Nothing to redo here');
     else if (id !== ctx.state.boards.open) announce(back ? 'Undid the last change' : 'Redid the last change');
     if (!panelOpen()) return;

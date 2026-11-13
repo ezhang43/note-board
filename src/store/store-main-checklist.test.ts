@@ -554,6 +554,19 @@ describe('Ctrl+Z in the Completed panel keeps its order (owner, 2026-11-13: "Fix
     expect(texts()).toEqual(['keep']);
   });
 
+  it('a Ctrl+Z that can’t run (the board turned view-only) keeps the untick for later', () => {
+    const { s, boardTexts, boardItem } = mixed();
+    s.untickCompleted(boardItem, false);
+    const open = s.getState().boards.open;
+    const share = { id: 'sh', root: open, boards: [open], owner: false, ownerUid: 'x', people: [], links: { view: null, comment: null, edit: null }, role: 'view' };
+    s.setShares([share] as never, true);
+    s.undoCompleted();
+    expect(boardTexts()).toEqual(['', 'board done']);
+    s.setShares([], true);
+    s.undoCompleted();
+    expect(boardTexts()).toEqual(['']);
+  });
+
   it('with nothing remembered, Ctrl+Z and Ctrl+Y there never reach the open board', () => {
     const { s, boardTexts } = mixed();
     const board = s.getState().board;

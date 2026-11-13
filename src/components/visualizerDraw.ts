@@ -1,5 +1,6 @@
-import { INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, burstSize, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, burstSize, cellArea, cellCentre, coreAt, fitLabel, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
+import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
 import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
@@ -33,8 +34,8 @@ const CARD_PAD = 11;
 /** The small uppercase monospace of the labels (a system font: nothing to download). */
 const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
-/** Room for a board name is rounded down to this many pixels when its cut is remembered. */
-const LABEL_STEP = 4;
+/** The room a name's dot takes at its left, in pixels. */
+const DOT_W = 12;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
@@ -218,10 +219,12 @@ export function startDisc(o: DiscOptions): () => void {
   let w = 0;
   let h = 0;
   let dpr = 1;
-  let labelW = 58; // the widest name round the rim, in pixels: the disc is sized so it fits beside the dashed ring
   const labelFont = () => `500 ${w > 800 ? 11 : 10}px ${MONO}`;
-  // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
-  const labels = wedges.map(() => new Map<number, string>());
+  // Each board's name (cut only if it is wider than the stage) and how wide its box is with the dot, measured once per size.
+  let nameTexts: string[] = [];
+  let nameWidths: number[] = [];
+  // Where the disc sits and how big it is: as big as the stage's width allows with the names fitting round it. Worked out per size.
+  let fit = { rx: 40, cx: 0, cy: 0 };
   const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
   // The cards' lines as cut to fit (and their width), by item, measured when first shown. Emptied on resize.
   const cardText = new Map<number, { title: string; sub: string; width: number }>();
@@ -230,10 +233,7 @@ export function startDisc(o: DiscOptions): () => void {
 
   /** Where the disc and the core sit on the canvas, and how big the disc is. Sits low; when the stage is tall there is room to lift it so the core and the beams get their space above. */
   const layout = () => {
-    const rx = discRadius(w, h, labelW);
-    const spare = Math.max(0, (h - (rx * 1.4 + 60)) / 2);
-    const cx = w / 2;
-    const cy = h - rx * TILT * LABEL_RADIUS - 34 - spare;
+    const { rx, cx, cy } = fit;
     return { rx, cx, cy, core: coreAt(cx, cy, rx) };
   };
 
@@ -306,17 +306,17 @@ export function startDisc(o: DiscOptions): () => void {
     h = canvas.clientHeight;
     canvas.width = Math.max(1, Math.round(w * dpr));
     canvas.height = Math.max(1, Math.round(h * dpr));
-    labels.forEach((m) => m.clear());
     hubTexts.fill(undefined);
     cardText.clear();
-    if (wedges.length > 0 && wedges.length <= MAX_LABELLED) {
-      ctx.font = labelFont();
-      labelW = Math.max(...wedges.map((wedge) => ctx.measureText(fitLabel(wedge.name.toUpperCase(), Infinity, (t) => ctx.measureText(t).width)).width));
-    }
+    ctx.font = labelFont();
+    nameTexts = wedges.length > MAX_LABELLED ? [] : wedges.map((wedge) => fitLabel(wedge.name.toUpperCase(), Math.max(20, w - 2 * NAME_MARGIN - DOT_W), (t) => ctx.measureText(t).width));
+    nameWidths = nameTexts.map((text) => ctx.measureText(text).width + DOT_W);
+    fit = fitDisc(w, h, nameWidths);
     paintBase();
-    // The names as they read at the narrowest spot (beside the disc), for the browser tests to check.
-    const side = Math.min(labelW, w * 0.2);
-    canvas.dataset.rimLabels = wedges.length > MAX_LABELLED ? '' : wedges.map((wedge) => fitLabel(wedge.name.toUpperCase(), side, (t) => ctx.measureText(t).width)).join('|');
+    // The names as they read (cut only if wider than the stage), for the browser tests to check.
+    canvas.dataset.rimLabels = nameTexts.join('|');
+    // The disc's middle and half width, and the stage's size, in pixels (for the browser tests to check how much of the stage the disc fills).
+    canvas.dataset.disc = [fit.cx, fit.cy, fit.rx, w, h].map(Math.round).join(',');
   };
   size();
   const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
@@ -408,31 +408,25 @@ export function startDisc(o: DiscOptions): () => void {
       });
     });
 
-    // Names around the rim, small uppercase monospace, evenly spaced; the name of the latest landing sits in the hub.
+    // Names round the disc, outside its dashed ring (above and below it where there is no room beside it), small uppercase monospace; the name of the latest landing sits in the hub.
     ctx.font = labelFont();
     ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
     if (count > 0 && count <= MAX_LABELLED) {
-      wedges.forEach((wedge, wi) => {
+      const phis = wedges.map((_, wi) => {
         const span = wedgeSpan(wi, count);
-        const mid = (span.a0 + span.a1) / 2;
-        const p = project(mid, LABEL_RADIUS, spin, cx, cy, rx);
-        const side = Math.cos(mid + spin);
-        ctx.textAlign = side > 0.25 ? 'left' : side < -0.25 ? 'right' : 'center';
-        const front = (Math.sin(mid + spin) + 1) / 2;
-        const room = side > 0.25 ? w - p.x - 14 : side < -0.25 ? p.x - 14 : Math.min(150, (rx * Math.PI * 2 * 0.9) / count);
-        const step = Math.max(0, Math.floor(room / LABEL_STEP));
-        let text = labels[wi].get(step);
-        if (text === undefined) {
-          text = fitLabel(wedge.name.toUpperCase(), step * LABEL_STEP, (t) => ctx.measureText(t).width);
-          labels[wi].set(step, text);
-        }
-        const dx = side > 0.25 ? 8 : side < -0.25 ? -8 : 0;
-        ctx.fillStyle = rgba(palette.label, 0.55 + 0.45 * front);
-        ctx.fillText(text, p.x + dx, p.y);
+        return (span.a0 + span.a1) / 2 + spin;
+      });
+      placeNames(nameWidths, phis, { w, h, cx, cy, rx }).forEach((box, wi) => {
+        if (box.fade <= 0.02) return;
+        const front = (Math.sin(phis[wi]) + 1) / 2;
+        const alpha = (0.55 + 0.45 * front) * box.fade;
+        ctx.fillStyle = rgba(palette.label, alpha);
+        ctx.fillText(nameTexts[wi], box.x + DOT_W, box.y + NAME_H / 2);
         // A small dot in the wedge's own color keeps what each name stands for.
-        ctx.fillStyle = rgba(hueOf(wi), 0.7 + 0.3 * front);
+        ctx.fillStyle = rgba(hueOf(wi), (0.7 + 0.3 * front) * box.fade);
         ctx.beginPath();
-        ctx.arc(p.x + (side > 0.25 ? 2 : side < -0.25 ? -2 : -ctx.measureText(text).width / 2 - 6), p.y, 1.8, 0, Math.PI * 2);
+        ctx.arc(box.x + 3, box.y + NAME_H / 2, 1.8, 0, Math.PI * 2);
         ctx.fill();
       });
     }

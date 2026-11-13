@@ -1,46 +1,57 @@
-import type { Board } from '../../model/types';
+import { announce } from '../announce';
 import type { StoreContext } from '../core';
-import type { CompletedStep } from '../types';
+import type { CompletedSteps } from '../types';
 
 // The Completed panel mixes the Main checklist's cleaned-up items in with the open board's (owner, 2026-11-13).
 // Each record stays on its own board: an untick goes back to the board its row came from, as one undo step on
-// that board's history, and Ctrl+Z / Ctrl+Y in the panel step whichever board the panel's last untick changed.
+// that board's history, and Ctrl+Z / Ctrl+Y in the panel step back through the panel's own unticks, newest first,
+// each on its own board. They never reach past them to other changes (owner, 2026-11-13: "Fix both, then ship").
 
 interface Deps {
   /** The Main checklist board the panel mixes in (null: none, or it is the open board). */
   checklist: () => string | null;
   /** Unticks the entry `itemId` in the record of board `boardId` (restoreCompleted on that board). */
   restoreOn: (boardId: string, itemId: string) => void;
-  /** Ctrl+Z / Ctrl+Y on the open board, as everywhere else. */
+  /** Ctrl+Z / Ctrl+Y on the open board, as everywhere else (they tell screen readers). */
   undo: () => void;
   redo: () => void;
 }
 
+const none: CompletedSteps = { undo: [], redo: [], seen: {} };
+
 export function completedPanelActions(ctx: StoreContext, { checklist, restoreOn, undo, redo }: Deps) {
-  const board = (id: string): Board | undefined => (id === ctx.state.boards.open ? ctx.state.board : ctx.state.boards.others[id]);
   const panelOpen = () => ctx.state.ui.sidePanel === 'completed';
-  /** Whether a remembered step can still be taken back here: its board is the open one or the Main checklist, just as the step left it. */
-  const current = (s: CompletedStep) => (s.board === ctx.state.boards.open || s.board === checklist()) && board(s.board) === s.after;
+  /**
+   * Whether board `id`'s remembered steps can still be taken back here: it is the open board or the Main checklist,
+   * and its undo history is just as the panel left it. Judged by the history, not the board, so the automatic layout
+   * tidy (which moves blocks outside undo) never makes a step look changed since; any edit, undo or sync makes a new history.
+   */
+  const current = (s: CompletedSteps, id: string) =>
+    (id === ctx.state.boards.open || id === checklist()) && ctx.historyOf(id) !== undefined && ctx.historyOf(id) === s.seen[id];
   const readOnly = () => ctx.state.ui.preview !== null || ctx.viewOnly();
 
   /**
-   * One Ctrl+Z (`back`) or Ctrl+Y in the Completed panel. The newest remembered step that is still current says
-   * which board (steps whose board changed since, here or by sync, are passed over and forgotten), so nothing
-   * done elsewhere since is ever taken back from here; with none, it is the open board's, as everywhere else.
-   * Only a step that changed a board is remembered, for the way back.
+   * One Ctrl+Z (`back`) or Ctrl+Y in the Completed panel: the newest remembered step whose board is still as the panel
+   * left it (steps on a board changed since are passed over and forgotten). With none, nothing happens, so a change
+   * made elsewhere is never undone from here. Only a step that changed something is remembered for the way back.
    */
   function step(back: boolean) {
-    const s = ctx.state.ui.completedSteps ?? { undo: [], redo: [] };
+    const s = ctx.state.ui.completedSteps ?? none;
     const from = [...(back ? s.undo : s.redo)];
-    while (from.length && !current(from.at(-1)!)) from.pop();
-    const id = from.pop()?.board ?? ctx.state.boards.open;
-    const before = board(id);
+    while (from.length && !current(s, from.at(-1)!)) from.pop();
+    const id = from.pop();
+    const before = id ? ctx.historyOf(id) : undefined;
     if (id === ctx.state.boards.open) (back ? undo : redo)();
-    else ctx.undoOn(id, back ? 'undo' : 'redo');
-    const after = board(id);
+    else if (id) ctx.undoOn(id, back ? 'undo' : 'redo');
+    const after = id ? ctx.historyOf(id) : undefined;
+    const changed = !!id && !!after && after !== before;
+    if (!changed) announce(back ? 'Nothing to undo here' : 'Nothing to redo here');
+    else if (id !== ctx.state.boards.open) announce(back ? 'Undid the last change' : 'Redid the last change');
+    if (!panelOpen()) return;
     const other = back ? s.redo : s.undo;
-    const moved = after && after !== before ? [...other, { board: id, after }] : other;
-    if (panelOpen()) ctx.updateUi({ completedSteps: back ? { undo: from, redo: moved } : { undo: moved, redo: from } });
+    const moved = changed ? [...other, id] : other;
+    const seen = changed ? { ...s.seen, [id]: after } : s.seen;
+    ctx.updateUi({ completedSteps: back ? { undo: from, redo: moved, seen } : { undo: moved, redo: from, seen } });
   }
 
   return {
@@ -54,15 +65,17 @@ export function completedPanelActions(ctx: StoreContext, { checklist, restoreOn,
       if (readOnly()) return;
       const id = fromChecklist ? checklist() : ctx.state.boards.open;
       if (!id) return;
-      const before = board(id);
+      const before = ctx.historyOf(id);
       restoreOn(id, itemId);
-      const after = board(id);
+      const after = ctx.historyOf(id);
       if (!after || after === before || !panelOpen()) return;
-      const s = ctx.state.ui.completedSteps ?? { undo: [], redo: [] };
-      ctx.updateUi({ completedSteps: { undo: [...s.undo, { board: id, after }], redo: [] } });
+      const s = ctx.state.ui.completedSteps ?? none;
+      // This board's older steps, from before a change made elsewhere, can't be taken back from here any more.
+      const undo = s.seen[id] === before ? s.undo : s.undo.filter((b) => b !== id);
+      ctx.updateUi({ completedSteps: { undo: [...undo, id], redo: [], seen: { ...s.seen, [id]: after } } });
     },
     /**
-     * Ctrl+Z in the Completed panel.
+     * Ctrl+Z in the Completed panel (see step).
      * simple: the toolbar's Undo (and a phone's bottom bar) still act on the open board only, so a checklist untick
      * is taken back only with Ctrl+Z here; give those buttons this route too if the owner asks.
      */

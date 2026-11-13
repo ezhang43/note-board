@@ -57,8 +57,8 @@ export function useShortcuts() {
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
       const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && e.target.closest('.weight-new') !== null;
       if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new, .jn-rename')) return;
-      // In the Completed panel they step whichever board its last untick changed (owner, 2026-11-13: it mixes in the
-      // Main checklist's items), then the open board's.
+      // In the Completed panel they step back through the panel's own unticks, each on the board it changed (owner,
+      // 2026-11-13: it mixes in the Main checklist's items), and with none left do nothing, never the open board's.
       if (inPanel && panel === 'completed' && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoCompleted);
       if (inPanel && panel === 'completed' && mod && key === 'y') return run(e, appStore.redoCompleted);
       // In the Checklist panel on the left, its time picker or items selected there, they step the checklist's own history (owner request, 2026-11-12), leaving the open board as it is.

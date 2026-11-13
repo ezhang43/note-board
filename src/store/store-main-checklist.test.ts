@@ -7,6 +7,7 @@ import type { TodoCard } from '../model/types';
 import { createBoard } from '../model/board';
 import { serializeWorkspace } from '../model/workspace';
 import { createStore } from './store';
+import { spoken } from './announce';
 import { startSync, SYNC_DELAY, type Remote, type RemoteDoc } from './sync';
 
 // The main checklist (owner request, 2026-11-12): a Checklist panel on the left, open beside any
@@ -331,7 +332,7 @@ describe('the Completed panel with the Main checklist’s items mixed in (owner,
     expect(s.getState().board).toBe(open);
   });
 
-  it('Ctrl+Z there steps back through the panel’s own unticks, newest first, then acts on the open board as before', () => {
+  it('Ctrl+Z there steps back through the panel’s own unticks, newest first, and then does nothing (owner, 2026-11-13)', () => {
     const { s, texts, boardTexts, listItem, boardItem } = mixed();
     s.untickCompleted(listItem, true);
     s.untickCompleted(boardItem, false);
@@ -341,32 +342,39 @@ describe('the Completed panel with the Main checklist’s items mixed in (owner,
     expect(texts()).toEqual(['keep', 'list done']);
     s.undoCompleted(); // then the checklist's
     expect(texts()).toEqual(['keep']);
-    // No more unticks to take back: the next goes to the open board (its Clean up), never further back on the checklist.
+    // No more unticks to take back: nothing happens, never the open board's Clean up or further back on the checklist.
     s.undoCompleted();
     expect(texts()).toEqual(['keep']);
-    expect(boardTexts()).toEqual(['board done']);
-    // Redo walks forward the same way.
-    s.redoCompleted(); // the board's Clean up again (as Ctrl+Y on the board)
+    expect(boardTexts()).toEqual(['']);
+    expect(spoken()).toBe('Nothing to undo here');
+    // Redo walks forward the same way: the checklist's untick, then the board's, then nothing.
     s.redoCompleted();
     expect(texts()).toEqual(['keep', 'list done']);
+    expect(boardTexts()).toEqual(['']);
+    s.redoCompleted();
+    expect(boardTexts()).toEqual(['', 'board done']);
+    s.redoCompleted();
+    expect(boardTexts()).toEqual(['', 'board done']);
+    expect(spoken()).toBe('Nothing to redo here');
   });
 
-  it('once the checklist has changed since the untick, Ctrl+Z there leaves it alone and acts on the open board', () => {
+  it('once the checklist has changed since the untick, Ctrl+Z there leaves it alone, and the open board too', () => {
     const { s, p, list, texts, boardTexts, listItem } = mixed();
     s.untickCompleted(listItem, true);
     p.setItemText(list().id, list().items[0].id, 'keep it'); // typed in the Checklist panel afterwards
     s.undoCompleted();
     expect(texts()).toEqual(['keep it', 'list done']);
-    expect(boardTexts()).toEqual(['board done']); // the open board's Clean up undone, as Ctrl+Z there did before
+    expect(boardTexts()).toEqual(['']); // never reaching past the panel to the open board's Clean up
   });
 
-  it('reopening the panel starts afresh: Ctrl+Z there is the open board’s', () => {
-    const { s, texts, listItem } = mixed();
+  it('reopening the panel starts afresh: Ctrl+Z there then does nothing', () => {
+    const { s, texts, boardTexts, listItem } = mixed();
     s.untickCompleted(listItem, true);
     s.closeCompleted();
     s.toggleSidePanel('completed');
     s.undoCompleted();
     expect(texts()).toEqual(['keep', 'list done']);
+    expect(boardTexts()).toEqual(['']);
   });
 
   it('nothing goes back while the open board is read-only or an old version is shown', () => {
@@ -427,7 +435,7 @@ describe('Ctrl+Z in the Completed panel never takes back the wrong thing (code r
     expect(list().items.map((i) => i.text)).toEqual(['', 'list done']);
   });
 
-  it('opening another board forgets the panel’s unticks: Ctrl+Z there is that board’s', () => {
+  it('opening another board forgets the panel’s unticks: Ctrl+Z there then does nothing', () => {
     const { s, id, texts, boardTexts, listItem } = mixed();
     const home = s.getState().boards.open;
     s.untickCompleted(listItem, true);
@@ -436,7 +444,7 @@ describe('Ctrl+Z in the Completed panel never takes back the wrong thing (code r
     s.openBoard(home);
     s.undoCompleted();
     expect(texts()).toEqual(['keep', 'list done']);
-    expect(boardTexts()).toEqual(['board done']);
+    expect(boardTexts()).toEqual(['']);
   });
 
   it('an untick made while the panel is shut is not remembered for it', () => {
@@ -451,6 +459,113 @@ describe('Ctrl+Z in the Completed panel never takes back the wrong thing (code r
     expect(s.completedReadOnly()).toBe(false);
     s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
     expect(s.completedReadOnly()).toBe(true);
+  });
+});
+
+describe('Ctrl+Z in the Completed panel keeps its order (owner, 2026-11-13: "Fix both, then ship")', () => {
+  it('the layout tidy after an untick on the open board does not make that untick look changed since', () => {
+    const { s, texts, boardTexts, listItem, boardItem } = mixed();
+    // A note just above the board's list (where a new note goes); a block that grows pushes the other out of its way.
+    const listId = s.getState().board.order.find((id) => s.getState().board.cards[id]?.kind === 'todo')!;
+    s.addCard('note');
+    const note = s.getState().ui.selection[0];
+    s.setMeasuredHeight(listId, 60);
+    s.setMeasuredHeight(note, 60);
+    s.untickCompleted(listItem, true);
+    s.untickCompleted(boardItem, false);
+    const untidied = s.getState().board;
+    // Drawn after the untick, a block grows over the list: the automatic tidy moves the list, outside undo.
+    s.setMeasuredHeight(note, 300);
+    expect(s.getState().board.cards[listId]).not.toEqual(untidied.cards[listId]);
+    s.undoCompleted();
+    expect(boardTexts()).toEqual(['']); // the board's untick first, as the newest
+    expect(texts()).toEqual(['keep', 'list done']);
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep']);
+  });
+
+  it('two unticks on the same board come back one at a time, and go forward again', () => {
+    const s = setup();
+    s.addCard('todo');
+    const listId = s.getState().ui.selection[0];
+    const first = (s.getState().board.cards[listId] as TodoCard).items[0].id;
+    s.setItemText(listId, first, 'one');
+    s.itemEnter(listId, first);
+    s.setItemText(listId, s.getState().ui.focusItem!, 'two');
+    const second = s.getState().ui.focusItem!;
+    s.toggleItem(listId, first);
+    s.toggleItem(listId, second);
+    s.cleanUp();
+    s.toggleSidePanel('completed');
+    const names = () => (s.getState().board.cards[listId] as TodoCard).items.map((i) => i.text);
+    const start = names();
+    s.untickCompleted(first, false);
+    s.untickCompleted(second, false);
+    const both = names();
+    s.undoCompleted();
+    s.undoCompleted();
+    expect(names()).toEqual(start);
+    s.redoCompleted();
+    s.redoCompleted();
+    expect(names()).toEqual(both);
+    s.undoCompleted();
+    s.undoCompleted();
+    expect(names()).toEqual(start);
+  });
+
+  it('two checklist unticks come back one at a time too', () => {
+    const s = setup();
+    s.openChecklist();
+    const { p, list } = panel(s);
+    const a = list().items[0].id;
+    p.setItemText(list().id, a, 'a');
+    p.itemEnter(list().id, a);
+    const b = s.getState().ui.focusItem!;
+    p.setItemText(list().id, b, 'b');
+    p.itemEnter(list().id, b);
+    p.setItemText(list().id, s.getState().ui.focusItem!, 'c');
+    p.toggleItem(list().id, a);
+    p.toggleItem(list().id, b);
+    p.cleanUpList(list().id);
+    s.toggleSidePanel('completed');
+    const texts = () => list().items.map((i) => i.text);
+    s.untickCompleted(a, true);
+    s.untickCompleted(b, true);
+    expect(texts()).toEqual(['c', 'a', 'b']);
+    s.undoCompleted();
+    expect(texts()).toEqual(['c', 'a']);
+    expect(spoken()).toBe('Undid the last change');
+    s.undoCompleted();
+    expect(texts()).toEqual(['c']);
+    s.redoCompleted();
+    expect(texts()).toEqual(['c', 'a']);
+    expect(spoken()).toBe('Redid the last change');
+  });
+
+  it('an untick undone with the toolbar, then another change on that board: Ctrl+Z in the panel does nothing', () => {
+    const { s, texts, boardTexts, boardItem } = mixed();
+    s.untickCompleted(boardItem, false);
+    s.undo(); // the toolbar's Undo
+    s.addCard('note'); // another change on the open board
+    const board = s.getState().board;
+    s.undoCompleted();
+    expect(s.getState().board).toBe(board);
+    expect(boardTexts()).toEqual(['']);
+    expect(texts()).toEqual(['keep']);
+  });
+
+  it('with nothing remembered, Ctrl+Z and Ctrl+Y there never reach the open board', () => {
+    const { s, boardTexts } = mixed();
+    const board = s.getState().board;
+    s.undoCompleted();
+    expect(s.getState().board).toBe(board);
+    expect(spoken()).toBe('Nothing to undo here');
+    s.undo(); // the board's own Clean up, undone on the board
+    expect(boardTexts()).toEqual(['board done']);
+    const undone = s.getState().board;
+    s.redoCompleted();
+    expect(s.getState().board).toBe(undone);
+    expect(spoken()).toBe('Nothing to redo here');
   });
 });
 

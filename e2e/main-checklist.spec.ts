@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { add, clickEmpty, fontsLoaded, freshBoardEachTest, toggleCompleted, toggleHistory } from './helpers';
+import { add, clickEmpty, dragBy, fontsLoaded, freshBoardEachTest, toggleCompleted, toggleHistory } from './helpers';
 
 // The main checklist (owner request, 2026-11-12): one checklist, the same on every board, in the only panel on
 // the LEFT, opened from "Checklist" in the bottom pill (a tile in ⋯ on a phone). It can stay open beside the
@@ -206,6 +206,36 @@ test('ticking and Clean up work as on a card; the board’s Completed panel show
   await page.keyboard.press('Control+z');
   await expect.poll(() => texts(boardCards(page).first())).not.toContain('board item');
   expect(await texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
+});
+
+test('Ctrl+Z in the Completed panel takes back its unticks newest first, also after the board tidies, then does nothing', async ({ page }) => {
+  await cleanedUpBoth(page);
+  // A note just under the board's list: when the list grows back, the note is moved out of its way (outside undo).
+  await noteOnBoard(page, 'below');
+  const list = boardCards(page).first();
+  const note = boardCards(page).filter({ hasText: 'below' });
+  const l = await box(list);
+  const n = await box(note);
+  await dragBy(page, note, l.x - n.x, l.y + l.height + 4 - n.y);
+  await toggleCompleted(page);
+  const done = completed(page);
+  await done.getByRole('checkbox', { name: 'Send "milk" back to Checklist' }).click();
+  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
+  const noteAt = (await box(note)).y;
+  await done.getByRole('checkbox', { name: /Send "board item" back/ }).click();
+  await expect.poll(() => texts(list)).toContain('board item');
+  await expect.poll(async () => (await box(note)).y).toBeGreaterThan(noteAt); // the tidy moved it
+  // The board's untick is the newest: Ctrl+Z takes it back first, then the checklist's.
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => texts(list)).not.toContain('board item');
+  expect(await texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs']);
+  // Nothing more of the panel's: Ctrl+Z there leaves the board as it is (its Clean up and the note stay).
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('announcer')).toHaveText(/Nothing to undo here/);
+  await expect(done).toContainText('board item');
+  await expect(note).toContainText('below');
 });
 
 test('undo in the panel steps its own list only; undo on the board leaves the panel as it is', async ({ page }) => {

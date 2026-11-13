@@ -3915,6 +3915,25 @@ a.cal-open { align-self: flex-start; }
 }
 .viz-range button[aria-pressed='true'] { background: var(--viz-honey); color: var(--viz-bg); }
 .viz-range button:active, .viz-close:active { transform: scale(0.97); }
+/* Sort with AI (shown only while a key is saved): one button, a status, and the line saying what is sent. */
+.viz-ai { display: flex; flex-direction: column; gap: 6px; margin-top: -12px; }
+.viz-ai-row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.viz-ai-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--viz-line);
+  border-radius: 8px;
+  background: rgba(246, 239, 224, 0.05);
+  color: var(--viz-ink);
+  font-size: 14px;
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-ai-button:active:not(:disabled) { transform: scale(0.97); }
+.viz-ai-button:disabled { color: var(--viz-faint); cursor: default; }
+.viz-ai-status { margin: 0; font-size: 13px; color: var(--viz-soft); font-variant-numeric: tabular-nums; }
+.viz-ai-hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--viz-faint); }
+.viz-ai-error { margin: 0; font-size: 13px; line-height: 1.4; color: var(--viz-hue-2); }
 .viz-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .viz-count { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }
 .viz-count-number { margin: 0; font-size: clamp(36px, 4.4vw, 56px); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--viz-ink); }
@@ -3952,7 +3971,7 @@ a.cal-open { align-self: flex-start; }
 .viz-close svg { width: 14px; height: 14px; }
 @media (hover: hover) and (pointer: fine) {
   .viz-range button:not([aria-pressed='true']):hover { background: rgba(246, 239, 224, 0.08); color: var(--viz-ink); }
-  .viz-close:hover { background: rgba(246, 239, 224, 0.12); }
+  .viz-close:hover, .viz-ai-button:not(:disabled):hover { background: rgba(246, 239, 224, 0.12); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .viz { animation: viz-in 220ms var(--ease-out); }
@@ -3966,6 +3985,8 @@ a.cal-open { align-self: flex-start; }
   .viz-stage { height: clamp(250px, 40dvh, 340px); }
   .viz-info { padding: 8px 16px 24px; gap: 20px; }
   .viz-range button { height: 44px; padding: 0 16px; }
+  .viz-ai { margin-top: -8px; }
+  .viz-ai-button { height: 44px; padding: 0 16px; }
   .viz-feed-wrap { flex: none; }
   .viz-close { right: 8px; }
 }

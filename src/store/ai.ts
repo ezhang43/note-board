@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { AI_KEY_NAME, AI_KEY_NAMES, AI_KEY_USER_NAME } from "../model/aiKey";
+import { AI_LABELS_NAME } from "../model/aiCategories";
 import {
   ANTHROPIC_URL,
   ANTHROPIC_VERSION,
@@ -35,7 +36,7 @@ const MODEL_NAME = "note-board:ai-model";
 const CAP_NAME = "note-board:ai-cap";
 const USES_NAME = "note-board:ai-uses";
 
-/** Every storage name this file uses, in either storage. The first two are the secret (the key and whose it is). */
+/** Every storage name this file uses, in either storage. The first two are the secret (the key and whose it is). Forget key also removes the Sort with AI labels (AI_LABELS_NAME, not a setting, so not watched here). */
 export const AI_STORAGE_KEYS = [
   KEY_NAME,
   KEY_USER_NAME,
@@ -198,9 +199,10 @@ export function createAiStore({
     },
     /** For the page's storage event (another tab changed the key or a setting): tells the screen, and stops a Test key whose key or model went. */
     reload: changed,
-    /** Removes the key from this browser (both places). (Signing out and deleting an account clear the same names directly, job 12b.) */
+    /** Removes the key from this browser (both places), and the Sort with AI labels with it. (Signing out and deleting an account clear the key's names directly, job 12b; the labels are then unused, see aiLabels.ts.) */
     forgetKey() {
       wipeKey();
+      remove(device, AI_LABELS_NAME);
       changed();
     },
     /** Whether any key is saved at all, whoever's it is. */

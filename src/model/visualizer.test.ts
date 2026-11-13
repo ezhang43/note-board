@@ -33,6 +33,7 @@ import {
   rangeStart,
   summaryOf,
 } from './visualizer';
+import { categoryOf } from './categorize';
 import type { Board, TodoCard, TodoItem } from './types';
 import type { Workspace } from './workspace';
 
@@ -366,6 +367,17 @@ describe('discOf by category', () => {
     );
     expect(asked.sort()).toEqual(['a|Groceries', 'b|Groceries', 'c|Chores', 'd|Groceries', 'e|Tools', 'f|Groceries']);
     expect(wedges.map((w) => [w.name, w.count])).toEqual([['Work', 1], ['Other', 5]]);
+  });
+
+  it('makes a wedge per named label (Sort with AI), busiest first, then the built-in categories, Other last and neutral', () => {
+    const named: Record<string, string> = { a: 'Snacks', b: 'Snacks', c: 'Tidying' };
+    const { wedges } = discOf(items, 'category', (item, title) => (named[item.text] ? { name: named[item.text] } : categoryOf(item, title)));
+    expect(wedges.map((w) => [w.key, w.name, w.count, w.hue])).toEqual([
+      ['ai:Snacks', 'Snacks', 2, 0],
+      ['ai:Tidying', 'Tidying', 1, 1],
+      ['errands', 'Errands & shopping', 2, 2],
+      ['other', 'Other', 1, 8],
+    ]);
   });
 
   it('folds lists past the cell limit into "Other lists"', () => {

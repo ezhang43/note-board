@@ -18,6 +18,10 @@ import type { AskArgs } from "./ai";
 // of the item text (and, for a sub-item, its parent's text) and the model, with whose they are (a different person signed in sees none of them).
 // Forget key removes them (src/store/ai.ts), and the Visualizer only uses them while a key is saved.
 
+/** Saved for an item Claude was asked about and gave no label: never read as a name (cleanLabel gives null), but
+ * the item counts as asked, so Sort automatically does not send and bill the same text again (coordinator, 2026-11-13). */
+const NO_LABEL = "";
+
 /** At most this many labels are kept; the oldest go first. */
 export const LABELS_MAX = 2000;
 
@@ -43,6 +47,11 @@ export function createLabelCache(device: Place) {
     reader(model: string, owner: string | null): (text: string, parent?: string) => string | null {
       const entries = load(owner);
       return (text, parent) => cleanLabel(entries[labelKey(text, model, parent)]);
+    },
+    /** Whether `text` (under `parent`) was already asked about with `model`: a label or no label came back. */
+    asked(model: string, owner: string | null): (text: string, parent?: string) => boolean {
+      const entries = load(owner);
+      return (text, parent) => Object.prototype.hasOwnProperty.call(entries, labelKey(text, model, parent));
     },
     /** Removes labels saved by anyone but `owner` (after a sign-out or a change of person), or damaged ones. */
     dropUnlessFor(owner: string | null) {
@@ -161,14 +170,14 @@ export async function sortWithAi({
     const labels = readLabels(r.value, batch.length);
     const pairs: [text: string, label: string, parent?: string][] = [];
     labels.forEach((l, i) => {
-      if (!l) return;
+      if (!l) return void pairs.push([batch[i].text, NO_LABEL, batch[i].parent]);
       // A name already chosen keeps its first spelling, so "errands" joins the "Errands" wedge.
       const same = names.find((n) => n.toLowerCase() === l.toLowerCase());
       if (!same && names.length < AI_MAX_CATEGORIES) names.push(l);
       pairs.push([batch[i].text, same ?? l, batch[i].parent]);
     });
     cache.putAll(pairs, model, uid);
-    sorted += pairs.length;
+    sorted += pairs.filter((p) => p[1] !== NO_LABEL).length;
     asked += batch.length;
     onProgress(asked);
   }

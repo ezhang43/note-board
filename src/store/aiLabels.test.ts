@@ -160,6 +160,35 @@ describe("sortWithAi", () => {
     expect(cache.get("Mystery", M, null)).toBeNull();
   });
 
+  it("remembers an item Claude gave no label (per model, hashed), so it is not sent and billed again", async () => {
+    const device = memory();
+    const cache = createLabelCache(device);
+    const ask = async (): Promise<AiResult> => ({ ok: true, value: { categories: ["Errands"], labels: [{ i: 0, c: 0 }, { i: 2, c: 7 }] } });
+    const entries = [{ text: "Buy milk" }, { text: "Mystery" }, { text: "Odd one", parent: "Elden Ring" }];
+    const r = await sortWithAi({ ask, cache, uid: "u1", model: M, entries, known: [], onProgress: () => {} });
+    expect(r).toEqual({ ok: true, sorted: 1 });
+    const asked = cache.asked(M, "u1");
+    expect(asked("Buy milk")).toBe(true);
+    expect(asked("Mystery")).toBe(true);
+    // A number out of range is no label either.
+    expect(asked("Odd one", "Elden Ring")).toBe(true);
+    // No label still shows the built-in category: nothing is read back as a name.
+    expect(cache.get("Mystery", M, "u1")).toBeNull();
+    expect(cache.reader(M, "u1")("Odd one", "Elden Ring")).toBeNull();
+    // Another model, another person or another parent was never asked.
+    expect(cache.asked("claude-opus-5-5", "u1")("Mystery")).toBe(false);
+    expect(cache.asked(M, "u2")("Mystery")).toBe(false);
+    expect(asked("Odd one")).toBe(false);
+    expect(asked("Never sent")).toBe(false);
+    expect(device.data[AI_LABELS_NAME]).not.toMatch(/Mystery|Odd/);
+  });
+
+  it("a failed or cancelled batch is not remembered as no label", async () => {
+    const cache = createLabelCache(memory());
+    await sortWithAi({ ask: async () => ({ ok: false, kind: "network", message: "x" }) as AiResult, cache, uid: null, model: M, entries: [{ text: "Mystery" }], known: [], onProgress: () => {} });
+    expect(cache.asked(M, null)("Mystery")).toBe(false);
+  });
+
   it("saves a sub-item's label under its text and its parent, so the same text under another parent has none", async () => {
     const device = memory();
     const cache = createLabelCache(device);

@@ -108,8 +108,9 @@ test('sorting sends only the item texts, changes the categories, and a reload re
   for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(sent).toContain(text);
   for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'home_0', 'b2_', 'secret note']) expect(sent).not.toContain(never);
   expect(sent).not.toContain('SECRET');
-  // The one item with no label is the only one left to send.
-  await expect(dialog(page).getByText(/Sends the text of 1 finished item from your own boards to Anthropic/)).toBeVisible();
+  // The one item Claude gave no label is remembered as asked, so it is not sent (and billed) again.
+  await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
+  await expect(sortButton(page)).toBeDisabled();
 
   await page.reload();
   await fontsLoaded(page);
@@ -156,12 +157,13 @@ test('Sort automatically is on by default and sorts as soon as the Visualizer op
   expect(bodies).toHaveLength(1);
   for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(bodies[0]).toContain(text);
   for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'secret note', 'SECRET']) expect(bodies[0]).not.toContain(never);
-  // The hint says it is automatic; "sand the door" got no label, so it is still waiting for a press, and is not asked about again in this open.
-  await expect(
-    dialog(page).getByText(
-      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
-    ),
-  ).toBeVisible();
+  // "sand the door" got no label: that is remembered too, so nothing is left to send, now or on the next open.
+  await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', '4 items cleaned up: Food 2, Housework 1, Other 1.');
   await page.waitForTimeout(500);
   expect(bodies).toHaveLength(1);
 });
@@ -191,8 +193,8 @@ test('the Sort automatically choice is remembered on this device', async ({ page
   await fontsLoaded(page);
   await openVisualizer(page);
   await expect(autoBox(page)).not.toBeChecked();
-  // "sand the door" still has no label, but with the box off nothing goes until Sort with AI is pressed.
-  await expect(dialog(page).getByText(/^Sends the text of 1 finished item/)).toBeVisible();
+  // With the box off nothing goes by itself (and "sand the door" was already asked about, so nothing is waiting).
+  await expect(dialog(page).getByText(/^Nothing left to sort/)).toBeVisible();
   await page.waitForTimeout(500);
   expect(bodies).toHaveLength(1);
   await autoBox(page).check();

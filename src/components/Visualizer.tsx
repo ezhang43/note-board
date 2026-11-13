@@ -99,7 +99,9 @@ function Overlay() {
   const isOwn = useMemo(() => ownBoards(shares, sharesKnown), [shares, sharesKnown]);
   const categorize = useMemo(() => (lookup ? makeAiCategorizer(items, lookup, isOwn) : categoryOf), [items, lookup, isOwn]);
   const disc = useMemo(() => discOf(items, group, categorize), [items, group, categorize]);
-  const pending = useMemo(() => (lookup ? toSend(items, (e) => lookup(e.text, e.parent) !== null, isOwn) : null), [items, lookup, isOwn]);
+  // Asked before counts too (a label or no label came back), so the same text is not sent and billed again.
+  const asked = useMemo(() => (hasKey ? aiLabels.asked(model, uid) : null), [hasKey, model, uid, labelsRev]);
+  const pending = useMemo(() => (lookup && asked ? toSend(items, (e) => asked(e.text, e.parent), isOwn) : null), [items, lookup, asked, isOwn]);
   // The two lines of the small card for each item as it lands (plain text, drawn on the canvas).
   const cards = useMemo(() => items.map((item, i) => cardLines(item, disc.wedges[disc.slots[i]?.wedge]?.name, group)), [items, disc, group]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);

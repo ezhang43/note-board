@@ -69,17 +69,31 @@ export function coreAt(cx: number, cy: number, rx: number): { x: number; y: numb
  * onto its cell (until STRIKE), a white dot and a small ring show where it lands and the cell lights; the
  * beam lingers a moment, then a burst of five sparks (shooting-star streaks) fans out from the cell along curved paths into the
  * core (COMET_START to 1), and the core flares as they arrive.
+ *
+ * Owner requests 2026-11-13, "slow down the speed at which the particles travel" and "make the beams come in
+ * slower too": the beam's drop and the sparks' flight each take twice as long as they first did (350ms and 910ms).
+ * The strike and everything that follows it (the lit cell, the ripples, the column, the sparks leaving) shift
+ * later together; the flash, ripples and column keep their own lengths in ms (worked out on `since`, in shares
+ * of the first 1400ms trip).
  */
-export const STRIKE = 0.25;
+/** The beam's drop from above the canvas to its cell, in ms. */
+export const DROP_MS = 700;
+/** After the strike: the beam's linger, ripples and column last as long as they did in a 1400ms trip, then the sparks fly for 1820ms. */
+export const TRIP_MS = 2660;
+const FIRST_TRIP_MS = 1400;
+/** The beam lands on its cell this far into the trip: the cell lights and its row joins the feed. */
+export const STRIKE = DROP_MS / TRIP_MS;
 /** The particles leave the cell this far into the trip, after the beam and its ring have lingered a moment. */
-export const COMET_START = 0.35;
+export const COMET_START = (DROP_MS + 140) / TRIP_MS;
 /** How much of the trip the beam takes to fade after it lands, the ring to open, and the particles to fade into the core. */
 const BEAM_FADE = 0.2;
 /** How much of the trip the impact flash lasts. */
 const FLASH_SPAN = 0.08;
 /** The core flares up over FLARE_RISE of the trip and peaks at FLARE_AT, when the particles are nearly in; it is spent as the trip ends. */
-const FLARE_AT = 0.95;
-const FLARE_RISE = 0.3;
+/** The most the core's flare may reach when drawn (it was 1): about half the extra brightness it had above rest. */
+export const FLARE_MAX = 0.5;
+const FLARE_AT = 0.9;
+const FLARE_RISE = 0.4; // a gentler rise and a longer fade than at first (0.95 and 0.3)
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -118,20 +132,22 @@ const COLUMN_SPAN = 0.3;
 
 export function warpPhase(progress: number): WarpPhase {
   const p = clamp01(progress);
-  const drop = clamp01(p / STRIKE);
-  const struck = p >= STRIKE;
+  const t = p * TRIP_MS;
+  const since = (t - DROP_MS) / FIRST_TRIP_MS; // a share of the first 1400ms trip, counted from the strike
+  const drop = clamp01(t / DROP_MS);
+  const struck = t >= DROP_MS;
   const comet = p >= COMET_START ? (p - COMET_START) / (1 - COMET_START) : null;
   return {
     beam: drop * drop, // it falls, so it speeds up
-    beamAlpha: struck ? clamp01(1 - (p - STRIKE) / BEAM_FADE) : 1,
+    beamAlpha: struck ? clamp01(1 - (since) / BEAM_FADE) : 1,
     comet,
-    flash: struck ? clamp01(1 - (p - STRIKE) / FLASH_SPAN) : 0,
+    flash: struck ? clamp01(1 - (since) / FLASH_SPAN) : 0,
     flare: p < FLARE_AT ? clamp01(1 - (FLARE_AT - p) / FLARE_RISE) : clamp01((1 - p) / (1 - FLARE_AT)),
     ripples: Array.from({ length: RIPPLES }, (_, i) => {
-      const q = (p - STRIKE - i * RIPPLE_STAGGER) / RIPPLE_SPAN; // 0 when this ring starts, 1 when it is gone
+      const q = (since - i * RIPPLE_STAGGER) / RIPPLE_SPAN; // 0 when this ring starts, 1 when it is gone
       return q < 0 || q >= 1 ? { open: 0, alpha: 0 } : { open: q, alpha: Math.min(1, (1 - q) * 1.6) * Math.min(1, q * 8 + 0.4) };
     }),
-    column: columnLevel(p - STRIKE),
+    column: columnLevel(since),
   };
 }
 
@@ -154,15 +170,16 @@ export function beamPoint(from: { x: number; y: number }, to: { x: number; y: nu
  * How wide a beam is drawn on a stage whose disc has half width `rx` (owner request 2026-11-13, "make the beams
  * thicker like the video"): a wide pink glow with a thin bright core inside it, as sprite widths in pixels. The
  * reference's beam is a pink band about 0.0055 of the disc's width across at half its brightness; a sprite is half
- * as bright at about 0.38 of its width, so the glow is 0.029 of rx wide. Never under a few pixels, so a beam
+ * as bright at about 0.38 of its width, so the glow is 0.029 of rx wide; made 1.5x thicker the same day ("make the beams thicker too"): 0.0435 of rx, a band about 0.008 of the disc width at half brightness, the phone minimums kept. Never under a few pixels, so a beam
  * is still seen on a phone. Before this the glow was 7 * unit (3.2px at half brightness, 0.0034 of the disc's width on a big window) and the core 1.8 * unit.
  */
 export function beamWidths(rx: number): { glow: number; core: number } {
-  return { glow: Math.max(8, 0.029 * rx), core: Math.max(2.4, 0.011 * rx) };
+  return { glow: Math.max(8, 0.0435 * rx), core: Math.max(2.4, 0.0165 * rx) };
 }
 
 /** How bright a beam's pink glow and its white-hot core are drawn (the glow was 0.5, so it read faint beside the reference's solid pink band). */
-export const BEAM_ALPHA = { glow: 0.75, core: 0.9 };
+export const BEAM_ALPHA = { glow: 1, core: 1 }; // about 1.4x the first 0.75 and 0.9 (owner, 2026-11-13, "make the beams brighter"); a draw cannot pass 1, so the core line is drawn once more at BEAM_EXTRA
+export const BEAM_EXTRA = 0.26;
 
 /**
  * The light pillar through the core (owner request, 2026-11-12): always there (so the core stays bright between arrivals), wider and brighter
@@ -176,7 +193,7 @@ export function pillarLevel(flare: number): { width: number; alpha: number } {
 /** How many sparks make up a fountain that runs from a cell into the core (owner request 2026-11-13: eight to fifteen in the reference; ten here, fewer when many land together). */
 export const PARTICLES = 10;
 /** About how many sparks may be in the air at once, all fountains together: the frame's budget. */
-export const BURST_BUDGET = 60;
+export const BURST_BUDGET = 100;
 /** How many sparks one fountain has when `overlap` items are landing together: ten alone, fewer in a crowd, never under four. */
 export const burstSize = (overlap: number): number => Math.max(4, Math.min(PARTICLES, Math.round(BURST_BUDGET / Math.max(1, overlap))));
 /** How high a spark's arc may bend up (a share of its run): low ones skim the disc, high ones shoot up before curving in. */
@@ -207,11 +224,13 @@ export interface FlowView {
   rx: number;
 }
 
-/** How high a spark's arc stands above the disc at its top, as a share of the disc's half width: `ARC_BASE` plus `ARC_PER_LIFT` times its lift. Together they put the middle of every path 0.07 to 0.14 of the disc's width off the straight line to the core, like the reference clip. */
-const ARC_BASE = 0.2;
-const ARC_PER_LIFT = 0.3;
+/** How high a spark's arc stands above the disc at its top, as a share of the disc's half width: `ARC_BASE` plus `ARC_PER_LIFT` times its lift. Together they put the middle of every path 0.10 to 0.21 of the disc's width off the straight line to the core (owner request 2026-11-13, "make the fountains arc even higher": 1.5x the 0.07 to 0.14 of the reference clip). */
+const ARC_BASE = 0.3;
+const ARC_PER_LIFT = 0.45;
 /** How soon the arc peaks: under 1 it climbs steeply at first (the top at about two fifths of the way along). */
 const ARC_RISE = 0.8;
+/** The least y (pixels from the top of the canvas) a spark may reach. */
+const ARC_TOP_MARGIN = 4;
 
 /** The most (radians) a spark's path may swing sideways: a lone wedge is a whole circle wide, and its sparks must not spiral. */
 const FLOW_SWING_MAX = 0.5;
@@ -230,7 +249,7 @@ export function flowAt(cell: { a: number; r: number }, halfSpan: number, spread:
   const core = coreAt(v.cx, v.cy, v.rx);
   const up = e * e; // the share of the way from the disc to the core: little at first, all of it at the end
   const arc = (lift > 0 ? ARC_BASE + ARC_PER_LIFT * lift : 0) * v.rx * Math.sin(Math.PI * Math.pow(clamp01(q), ARC_RISE)); // up steeply off the cell, over the top early, then down onto the core
-  return { x: onDisc.x + (core.x - onDisc.x) * up, y: onDisc.y + (core.y - onDisc.y) * up - arc };
+  return { x: onDisc.x + (core.x - onDisc.x) * up, y: Math.max(ARC_TOP_MARGIN, onDisc.y + (core.y - onDisc.y) * up - arc) }; // never above the canvas, so on a short window or a phone a tall arc is flattened at the top edge
 }
 
 /**
@@ -276,4 +295,18 @@ export function fitLabel(name: string, room: number, measure: (text: string) => 
   const first = name.trimStart().split(/\s/)[0].slice(0, FIRST_WORD_KEEP);
   const keep = Math.max(lo, name.length - name.trimStart().length + first.length);
   return keep >= name.trimEnd().length ? name.trimEnd() : `${name.slice(0, keep).trimEnd()}…`;
+}
+
+/** Each beam landing on its cell gives the core a quick soft pulse (owner request 2026-11-13, "make the core glow pulse with the beams"). */
+export const PULSE_RISE_MS = 150;
+export const PULSE_FALL_MS = 400;
+/** How much one pulse adds to the flare before the shared soft cap (FLARE_MAX); a lone pulse peaks near a quarter of the cap's range. */
+export const PULSE_PEAK = 0.25;
+
+/** How strong the pulse of one landing is, 0 to PULSE_PEAK, `sinceMs` after the beam hit its cell (before that or after it has faded: 0). */
+export function pulseAt(sinceMs: number): number {
+  if (sinceMs <= 0 || sinceMs >= PULSE_RISE_MS + PULSE_FALL_MS) return 0;
+  if (sinceMs < PULSE_RISE_MS) return PULSE_PEAK * Math.sin((sinceMs / PULSE_RISE_MS) * (Math.PI / 2));
+  const k = (sinceMs - PULSE_RISE_MS) / PULSE_FALL_MS;
+  return PULSE_PEAK * (1 - k) * (1 - k); // eases back
 }

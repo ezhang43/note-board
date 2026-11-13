@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_BUMP_MS, CARD_FADE_IN, CARD_GAP_MS, CARD_LIFE_MS, DASH_MAX_FILL, MAX_CARDS, SMALL_LIST, cardBox, cardDrift, cardRoom, cardSlotsFor, cardsAt, dashCapacity, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from './vizBurst';
+import { CARD_BUMP_MS, CARD_FADE_IN, CARD_GAP_MS, CARD_LIFE_MS, DASH_MAX_FILL, MAX_CARDS, SMALL_LIST, CARD_SCALE_MAX, cardBox, cardDrift, cardLayout, cardRoom, cardSlotsFor, cardsAt, dashCapacity, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from './vizBurst';
 import { CORE_LIFT, INNER, OUTER, TRACKS, cellArea, coreAt } from './vizGeometry';
 import { keepOut } from './vizNames';
 
@@ -273,5 +273,40 @@ describe('a small list gets a card for every item, even landing together', () =>
       shown.forEach((c) => seen.add(c.index));
     }
     expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+});
+
+describe('bigger cards (owner, 2026-11-13)', () => {
+  type Box = { x: number; y: number; w: number; h: number };
+  const hit = (p: Box, q: Box) => p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h;
+  for (const st of STAGES) {
+    const core = coreFor(st.w, st.rx);
+    const first = cardSlotsFor(core, st.rx, st.w, CARD_H);
+    const { scale, slots } = cardLayout(core, st.rx, st.w, CARD_H);
+
+    it(`${st.label}: at most 1.4x, at least the first size, and never fewer places than at the first size`, () => {
+      expect(scale).toBeGreaterThanOrEqual(1);
+      expect(scale).toBeLessThanOrEqual(CARD_SCALE_MAX + 1e-9);
+      expect(slots.length).toBeGreaterThanOrEqual(first.length);
+    });
+
+    it(`${st.label}: the bigger cards stay inside the ring and off the core, the canvas and each other`, () => {
+      const { a, b } = keepOut(st.rx);
+      const cy = core.y + CORE_LIFT * st.rx;
+      const h = CARD_H * scale;
+      const boxes = slots.flatMap((s) => [0, 0.5, 1].map((r) => ({ s, box: cardBox(s, core, st.rx, st.w, 240 * scale, h, r, 240 * scale) })));
+      for (const { box } of boxes) {
+        expect(box.x).toBeGreaterThanOrEqual(8 - 1e-9);
+        expect(box.x + box.w).toBeLessThanOrEqual(st.w - 8 + 1e-9);
+        for (const x of [box.x, box.x + box.w]) for (const y of [box.y, box.y + box.h]) expect(((x - core.x) / a) ** 2 + ((y - cy) / b) ** 2).toBeLessThanOrEqual(1 + 1e-9);
+        expect(box.x <= core.x && core.x <= box.x + box.w && box.y <= core.y && core.y <= box.y + box.h).toBe(false);
+      }
+      for (const p of boxes) for (const q of boxes) if (p.s < q.s) expect(hit(p.box, q.box)).toBe(false);
+    });
+  }
+
+  it('a big desktop window gets the full 1.4x', () => {
+    const st = STAGES.find((s) => s.w > 900)!;
+    expect(cardLayout(coreFor(st.w, st.rx), st.rx, st.w, CARD_H).scale).toBeCloseTo(CARD_SCALE_MAX, 1);
   });
 });

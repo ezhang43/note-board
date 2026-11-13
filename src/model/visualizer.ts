@@ -163,6 +163,11 @@ export const VIZ_DEFAULT_GROUP: VizGroupBy = 'category';
 /** Where this device remembers the switch (a per-device view choice, like the text size: not board data, not synced). */
 export const VIZ_GROUP_KEY = 'note-board:viz-group';
 
+/** Where this device remembers the Calm button (owner, 2026-11-13: the Visualizer always plays full motion unless Calm is on). */
+export const VIZ_CALM_KEY = 'note-board:viz-calm';
+/** Calm as saved on this device: on only for "1"; anything else, or nothing, is off. */
+export const parseCalm = (saved: string | null): boolean => saved === '1';
+
 /** The switch as saved on this device, or By category. */
 export const parseGroupBy = (saved: string | null): VizGroupBy => (saved === 'board' ? 'board' : VIZ_DEFAULT_GROUP);
 
@@ -258,14 +263,14 @@ export const LOOP_REST_MS = 2500;
 export const gapMs = (n: number): number => Math.min(MAX_GAP_MS, Math.max(MIN_GAP_MS, LOOP_TARGET_MS / Math.max(1, n)));
 
 /** Items land in waves (owner request 2026-11-13, "many arrivals overlap"): up to this many together, a moment apart. */
-export const WAVE_MAX = 8;
+export const WAVE_MAX = 16;
 /** The gap between the items of one wave (never more than the loop's own gap). */
-export const WAVE_GAP_MS = 120;
+export const WAVE_GAP_MS = 60;
 /** The most beams and fountains drawn at once, so a very busy loop stays inside the frame (the oldest are cut short). */
-export const MAX_FLYING = 8;
+export const MAX_FLYING = 16;
 
-/** How many items land together: one at a time for a handful, up to WAVE_MAX for a long list (about a sixth of the items). */
-export const waveSize = (n: number): number => Math.min(WAVE_MAX, Math.max(1, Math.round(n / 6)));
+/** How many items land together: one at a time for a handful, up to WAVE_MAX for a long list (about a third of the items (owner request 2026-11-13, "more concurrent beams... dazzling and hectic": it was a sixth, up to 8, 120ms apart)). */
+export const waveSize = (n: number): number => Math.min(WAVE_MAX, Math.max(1, Math.round(n / 3)));
 
 /** When item `i` of `n` starts its trip, in ms from the start of the loop: a wave starts each `waveSize * gapMs`, its items WAVE_GAP_MS apart. */
 export function startOf(i: number, n: number): number {

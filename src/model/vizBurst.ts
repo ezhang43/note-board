@@ -137,9 +137,9 @@ const rowTop = (slot: CardSlot, core: { x: number; y: number }, rx: number, h: n
 
 /**
  * How wide a card in `slot` can be: it stays wholly inside the ring the rim names stay outside of (so it can never
- * touch one), on the canvas (8px in from each side), and no wider than 240. 0 when it does not fit at all.
+ * touch one), on the canvas (8px in from each side), and no wider than `maxW` (240 at the first size). 0 when it does not fit at all.
  */
-export function cardRoom(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, h: number): number {
+export function cardRoom(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, h: number, maxW = 240): number {
   const { a, b } = keepOut(rx);
   const cy = core.y + CORE_LIFT * rx; // the middle of the disc, which is the middle of that ring
   const top = rowTop(slot, core, rx, h) - cardDrift(rx);
@@ -148,7 +148,7 @@ export function cardRoom(slot: CardSlot, core: { x: number; y: number }, rx: num
   const gap = cardGap(rx);
   const reach = a * Math.sqrt(1 - (far / b) ** 2) - gap; // from the core's side of the card to the ring, at the farthest row
   const canvas = onRight(slot) ? canvasW - 8 - (core.x + gap) : core.x - gap - 8;
-  return Math.max(0, Math.min(240, reach, canvas));
+  return Math.max(0, Math.min(maxW, reach, canvas));
 }
 
 /** A card narrower than this is not worth showing in a place. */
@@ -158,8 +158,8 @@ const MIN_ROOM = 80;
  * The places that have room for a card: all four on a stage wide enough, else at most two, the lower pair first
  * (on a phone the upper row does not fit inside the ring). None on a stage too small for any: then no card is shown.
  */
-export function cardSlotsFor(core: { x: number; y: number }, rx: number, canvasW: number, h: number): CardSlot[] {
-  const fits = (s: CardSlot) => cardRoom(s, core, rx, canvasW, h) >= MIN_ROOM;
+export function cardSlotsFor(core: { x: number; y: number }, rx: number, canvasW: number, h: number, scale = 1): CardSlot[] {
+  const fits = (s: CardSlot) => cardRoom(s, core, rx, canvasW, h, 240 * scale) >= MIN_ROOM * scale;
   const all: CardSlot[] = [0, 1, 2, 3];
   if (all.every(fits)) return all;
   const some = ([1, 3, 0, 2] as CardSlot[]).filter(fits).slice(0, 2);
@@ -170,8 +170,26 @@ export function cardSlotsFor(core: { x: number; y: number }, rx: number, canvasW
  * Where a card `w` by `h` pixels goes in `slot`: beside the core on the slot's side, cut to the room it has, drifted
  * up by `rise`.
  */
-export function cardBox(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, w: number, h: number, rise: number): { x: number; y: number; w: number; h: number } {
-  const width = Math.min(w, cardRoom(slot, core, rx, canvasW, h));
+export function cardBox(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, w: number, h: number, rise: number, maxW = 240): { x: number; y: number; w: number; h: number } {
+  const width = Math.min(w, cardRoom(slot, core, rx, canvasW, h, maxW));
   const gap = cardGap(rx);
   return { x: onRight(slot) ? core.x + gap : core.x - gap - width, y: Math.max(0, rowTop(slot, core, rx, h) - rise * cardDrift(rx)), w: width, h };
+}
+
+/** The cards are drawn up to this much bigger than at first (owner request 2026-11-13, "make the name cards bigger"). */
+export const CARD_SCALE_MAX = 1.4;
+
+/**
+ * How big the cards are on this stage and where they stand: the biggest size, from 1 up to CARD_SCALE_MAX, at which
+ * as many places still fit inside the ring as fit at the first size (four on a desktop window, the lower two on a
+ * phone), so a smaller window shrinks the cards toward the first size instead of letting them overlap.
+ * `h` is the card's height at the first size.
+ */
+export function cardLayout(core: { x: number; y: number }, rx: number, canvasW: number, h: number): { scale: number; slots: CardSlot[] } {
+  const base = cardSlotsFor(core, rx, canvasW, h);
+  for (let scale = CARD_SCALE_MAX; scale > 1.001; scale -= 0.05) {
+    const slots = cardSlotsFor(core, rx, canvasW, h * scale, scale);
+    if (slots.length >= base.length && slots.length > 0) return { scale, slots };
+  }
+  return { scale: 1, slots: base };
 }

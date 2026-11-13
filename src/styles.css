@@ -3981,12 +3981,20 @@ a.cal-open { align-self: flex-start; }
 @keyframes viz-feed-in { from { opacity: 0; transform: translateY(-8px); } }
 /* A phone: the ring on top, the numbers, chart and feed under it, scrolling together. */
 @media (max-width: 599px) {
-  .viz-panel { display: block; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .viz-stage { height: clamp(250px, 40dvh, 340px); }
-  .viz-info { padding: 8px 16px 24px; gap: 20px; }
-  .viz-range button { height: 44px; padding: 0 16px; }
-  .viz-ai { margin-top: -8px; }
+  /* The ring is the thing (owner request 2026-11-13): a slim row of switches on top, the ring taking about 70% of the screen's height, and the numbers, chart and feed below it, scrolled to. */
+  .viz-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .viz-info { display: contents; } /* its parts are the panel's own rows, so the switches can come before the ring */
+  .viz-controls { order: -1; flex: none; align-self: stretch; gap: 6px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 64px 0 calc(env(safe-area-inset-left, 0px) + 12px); } /* the right side is left clear for the × */
+  .viz-stage { flex: none; height: clamp(300px, 70dvh, 700px); }
+  .viz-info > :not(.viz-controls) { margin-inline: 16px; }
+  .viz-panel > :last-child { margin-bottom: 24px; }
+  .viz-panel { gap: 16px; }
+  .viz-range { padding: 2px; }
+  .viz-range button { height: 44px; padding: 0 12px; }
+  .viz-counts { gap: 8px; }
+  .viz-count-number { font-size: 28px; }
+  .viz-ai { margin-top: 0; }
   .viz-ai-button { height: 44px; padding: 0 16px; }
-  .viz-feed-wrap { flex: none; }
-  .viz-close { right: 8px; }
+  .viz-feed-wrap { flex: none; overflow: visible; }
+  .viz-close { position: fixed; right: 8px; } /* stays in reach while the numbers are scrolled to */
 }

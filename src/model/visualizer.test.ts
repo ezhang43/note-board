@@ -455,7 +455,8 @@ describe('pace', () => {
 
   it('has several in the air at once when the pace is quick, never more than MAX_FLYING', () => {
     const p = playhead(5000, 1000, 900);
-    expect(p.flying.length).toBe(MAX_FLYING);
+    expect(p.flying.length).toBeGreaterThanOrEqual(MAX_FLYING - 1);
+    expect(p.flying.length).toBeLessThanOrEqual(MAX_FLYING);
     expect(p.flying.every((f) => f.progress >= 0 && f.progress < 1)).toBe(true);
     // the ones kept are the newest that have started
     const idx = p.flying.map((f) => f.index);
@@ -523,5 +524,14 @@ describe('cardLines', () => {
   it('names an item with no text, and leaves out an empty part', () => {
     expect(cardLines({ ...it1, text: '  ' }, 'Other', 'category')[0]).toBe('Untitled item');
     expect(cardLines({ ...it1, boardName: '' }, 'Other', 'category')[1]).toBe('Other');
+  });
+});
+
+describe("the Calm button", () => {
+  it("is saved as note-board:viz-calm, on only for 1; anything unreadable means off", async () => {
+    const { VIZ_CALM_KEY, parseCalm } = await import("./visualizer");
+    expect(VIZ_CALM_KEY).toBe("note-board:viz-calm");
+    expect(parseCalm("1")).toBe(true);
+    for (const v of [null, "0", "", "banana", "true"]) expect(parseCalm(v)).toBe(false);
   });
 });

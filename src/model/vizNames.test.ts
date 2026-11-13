@@ -15,6 +15,8 @@ const STAGES = [
   { label: 'a short wide window', w: 1280, h: 520 },
   { label: 'a phone', w: 390, h: 560 },
   { label: 'a small phone', w: 320, h: 480 },
+  { label: 'a tall phone (70% of the screen)', w: 360, h: 518 },
+  { label: 'a tall 390 phone', w: 390, h: 590 },
 ];
 
 describe('fitDisc and placeNames', () => {

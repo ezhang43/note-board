@@ -1,7 +1,7 @@
-import { BEAM_ALPHA, INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { BEAM_ALPHA, BEAM_EXTRA, INNER, OUTER, PARTICLE_DELAY, FLARE_MAX, STRIKE, pulseAt, TILT, TRIP_MS, DROP_MS, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
-import { CARD_LIFE_MS, cardBox, cardRoom, cardSlotsFor, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
+import { CARD_LIFE_MS, cardBox, cardLayout, cardRoom, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
 // look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
@@ -18,7 +18,10 @@ import { CARD_LIFE_MS, cardBox, cardRoom, cardSlotsFor, cardsAt, dashCount, dash
 // paint of other elements), so a busy loop costs only canvas work.
 
 /** How long one item's whole trip takes: the beam drops onto its cell, then the comet runs into the core. */
-export const FLIGHT_MS = 1400;
+export const FLIGHT_MS = TRIP_MS;
+/** Sparks are drawn this much bigger (head, glow and tail width; owner, 2026-11-13: "a bit thicker and fatter"). The tail length is unchanged. */
+const SPARK_SCALE = 1.5;
+const GLOW_BOOST = 1.4;
 /** A cell stays bright this long after a landing. */
 const FLASH_MS = 700;
 /** The ring turns once in about 80 seconds. */
@@ -36,7 +39,7 @@ const CARD_PAD = 11;
 const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 /** The room a name's dot takes at its left, in pixels. */
-const DOT_W = 12;
+const DOT_W = 16;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
@@ -220,7 +223,7 @@ export function startDisc(o: DiscOptions): () => void {
   let w = 0;
   let h = 0;
   let dpr = 1;
-  const labelFont = () => `500 ${w > 800 ? 11 : 10}px ${MONO}`;
+  const labelFont = () => `500 ${w > 800 ? 14 : 13}px ${MONO}`;
   // Each board's name (cut only if it is wider than the stage) and how wide its box is with the dot, measured once per size.
   let nameTexts: string[] = [];
   let nameWidths: number[] = [];
@@ -426,7 +429,7 @@ export function startDisc(o: DiscOptions): () => void {
         // A small dot in the wedge's own color keeps what each name stands for.
         ctx.fillStyle = rgba(hueOf(wi), (0.7 + 0.3 * front) * box.fade);
         ctx.beginPath();
-        ctx.arc(box.x + 3, box.y + NAME_H / 2, 1.8, 0, Math.PI * 2);
+        ctx.arc(box.x + 4, box.y + NAME_H / 2, 2.3, 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -440,7 +443,8 @@ export function startDisc(o: DiscOptions): () => void {
     let flare = 0;
     const phases = still ? [] : flying.map((f) => warpPhase(f.progress)); // once per frame, shared by the flare and the drawing below
     for (const ph of phases) flare += ph.flare;
-    flare = Math.min(1, flare);
+    if (!still) for (const f of flying) flare += pulseAt(f.progress * TRIP_MS - DROP_MS); // a soft pulse as each beam lands on its cell; it goes through the same cap, so pulses never stack past it
+    flare = FLARE_MAX * Math.tanh(flare); // soft cap (owner, 2026-11-13, "too bright when the particles come in"): one fountain gives about 0.38, many together never pass 0.5, so a crowd stays a pink-white glow and never blows out to solid white
 
     // The pillar of light through the core down to the hub, and the core's bloom: always there, swelling with the flare.
     const pulse = still ? 1 : 1 + 0.05 * Math.sin(now / 600) + 0.25 * flare;
@@ -497,13 +501,15 @@ export function startDisc(o: DiscOptions): () => void {
           const a = ph.beamAlpha;
           drawShaft(shaft(palette.core, 'beam'), from, head, beam.glow, BEAM_ALPHA.glow * a); // the wide pink glow
           drawShaft(shaft(palette.spark, 'beam'), from, head, beam.core, BEAM_ALPHA.core * a); // the thin bright core
-          stamp(ctx, palette.core, head.x, head.y, 12 * unit, 0.7 * a);
+          drawShaft(shaft(palette.spark, 'beam'), from, head, beam.core, BEAM_EXTRA * a); // a second pass: brighter than one draw can be
+          stamp(ctx, palette.core, head.x, head.y, 12 * unit, 0.98 * a);
           stamp(ctx, palette.spark, head.x, head.y, 4.5 * unit, a); // the bright dot where it lands
+          stamp(ctx, palette.spark, head.x, head.y, 4.5 * unit, 0.4 * a);
           if (ph.beam < 1) {
             // A small ring marks the cell the beam is heading for.
             ctx.strokeStyle = palette.spark;
             ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.7 * a;
+            ctx.globalAlpha = 0.98 * a;
             ctx.beginPath();
             ctx.ellipse(to.x, to.y, 8 * unit, 8 * unit * TILT, 0, 0, Math.PI * 2);
             ctx.stroke();
@@ -514,16 +520,21 @@ export function startDisc(o: DiscOptions): () => void {
           stamp(ctx, palette.spark, to.x, to.y, (6 + 14 * ph.flash) * unit, ph.flash);
         }
         // The ripples: rings on the disc opening out from the landing spot, one after another.
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx * OUTER, rx * OUTER * TILT, 0, 0, Math.PI * 2);
+        ctx.clip(); // the wider rings never spill past the disc's rim
         ctx.strokeStyle = palette.spark;
         for (const rp of ph.ripples) {
           if (rp.alpha <= 0) continue;
-          const r = (6 + 44 * rp.open) * unit;
-          ctx.lineWidth = 1.4 - 0.8 * rp.open;
+          const r = (6 + 66 * rp.open) * unit; // 1.5x wider than at first (owner, 2026-11-13)
+          ctx.lineWidth = 2 - 1.1 * rp.open; // and a little thicker
           ctx.globalAlpha = 0.85 * rp.alpha;
           ctx.beginPath();
           ctx.ellipse(to.x, to.y, r, r * TILT, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+        ctx.restore();
         if (ph.column.alpha > 0) {
           // A thick bright column rises from the landing spot for a moment, brightest at the foot and thinning out above.
           const up = rx * 0.6 * ph.column.height;
@@ -548,11 +559,12 @@ export function startDisc(o: DiscOptions): () => void {
             const pts = flowTail(c, half, seed.spread, q, crowded ? 4 : 7, seed.lift, view);
             const head = pts[pts.length - 1];
             const tint = k % 4 === 0 ? palette.lead : k % 2 ? palette.pink : palette.spark;
-            const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the fountain stays a few crisp streaks
-            drawStreak(streak(tint), pts, 7 * lead, 0.8 * alpha); // the glowing streak
-            drawStreak(streak(palette.spark), pts, 2.8 * lead, alpha); // its white-hot core
-            if (!crowded) stamp(ctx, tint, head.x, head.y, 15 * lead, 0.7 * alpha); // the halo round the head
-            stamp(ctx, palette.spark, head.x, head.y, 7 * lead, alpha);
+            const lead = SPARK_SCALE * (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the fountain stays a few crisp streaks
+            const glow = (a: number) => Math.min(1, GLOW_BOOST * a); // brighter spark glow (owner, 2026-11-13: about 1.4x), kept under full white
+            drawStreak(streak(tint), pts, 7 * lead, glow(0.8 * alpha)); // the glowing streak
+            drawStreak(streak(palette.spark), pts, 2.8 * lead, glow(alpha)); // its white-hot core
+            if (!crowded) stamp(ctx, tint, head.x, head.y, 15 * lead, glow(0.7 * alpha)); // the halo round the head
+            stamp(ctx, palette.spark, head.x, head.y, 7 * lead, glow(alpha));
           }
         }
       });
@@ -563,40 +575,50 @@ export function startDisc(o: DiscOptions): () => void {
     // The small cards by the core, for the items that just landed (none for reduced motion).
     if (!still) {
       const titlePx = rx > 200 ? 12 : rx > 150 ? 11 : 10; // the card follows the size of the stage, so on a phone it stays small beside the disc
-      const subPx = titlePx - 2;
-      const places = cardSlotsFor(core, rx, w, CARD_H); // after a resize a live card may be in a place that no longer fits: it is skipped
+      const { scale: cs, slots: places } = cardLayout(core, rx, w, CARD_H); // bigger when the stage has room (up to 1.4x), back toward the first size when it has not; after a resize a live card may be in a place that no longer fits: it is skipped
+      const tPx = titlePx * cs;
+      const subPx = (titlePx - 2) * cs;
+      const pad = CARD_PAD * cs;
+      const cardH = CARD_H * cs;
+      const maxW = 240 * cs;
       for (const card of cardsAt(cardArrivals, now)) {
         const lines = o.cards[card.index];
         if (!lines || !places.includes(card.slot)) continue;
         const textKey = `${card.index}:${card.slot}`;
         let text = cardText.get(textKey);
         if (!text) {
-          const room = cardRoom(card.slot, core, rx, w, CARD_H) - CARD_PAD * 2; // the place's own room, so the text is cut to fit it
-          ctx.font = `600 ${titlePx}px ${SANS}`;
+          const room = cardRoom(card.slot, core, rx, w, cardH, maxW) - pad * 2; // the place's own room, so the text is cut to fit it
+          ctx.font = `600 ${tPx}px ${SANS}`;
           const title = fitLabel(lines[0], room, (t) => ctx.measureText(t).width);
           const titleW = ctx.measureText(title).width;
           ctx.font = `400 ${subPx}px ${SANS}`;
           const sub = fitLabel(lines[1], room, (t) => ctx.measureText(t).width);
-          text = { title, sub, width: Math.ceil(Math.max(titleW, ctx.measureText(sub).width)) + CARD_PAD * 2 };
+          text = { title, sub, width: Math.ceil(Math.max(titleW, ctx.measureText(sub).width)) + pad * 2 };
           cardText.set(textKey, text);
         }
-        const box = cardBox(card.slot, core, rx, w, text.width, CARD_H, card.rise);
+        const box = cardBox(card.slot, core, rx, w, text.width, cardH, card.rise, maxW);
         ctx.globalAlpha = card.alpha;
-        ctx.fillStyle = 'rgba(10, 6, 28, 0.9)';
-        ctx.strokeStyle = rgba(palette.lead, 0.75);
-        ctx.lineWidth = 1;
+        // A soft green glow round the card (owner, 2026-11-13, "glow brighter"): the cached glow sprite stamped along the card, behind it, so it fades with the card and costs no shadowBlur.
+        const gr = box.h * 1.1;
+        const gy = box.y + box.h / 2;
+        const gAlpha = 0.45 * card.alpha;
+        for (const gx of [box.x + box.h * 0.4, box.x + box.w / 2, box.x + box.w - box.h * 0.4]) stamp(ctx, palette.lead, gx, gy, gr, gAlpha);
+        ctx.globalAlpha = card.alpha;
+        ctx.fillStyle = 'rgba(10, 6, 28, 0.92)';
+        ctx.strokeStyle = rgba(palette.lead, 1);
+        ctx.lineWidth = 1.25;
         ctx.beginPath();
-        ctx.roundRect(box.x, box.y, box.w, box.h, 9);
+        ctx.roundRect(box.x, box.y, box.w, box.h, 9 * cs);
         ctx.fill();
         ctx.stroke();
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = palette.spark;
-        ctx.font = `600 ${titlePx}px ${SANS}`;
-        ctx.fillText(text.title, box.x + CARD_PAD, box.y + 15);
-        ctx.fillStyle = rgba(palette.label, 0.9);
+        ctx.font = `600 ${tPx}px ${SANS}`;
+        ctx.fillText(text.title, box.x + pad, box.y + 15 * cs);
+        ctx.fillStyle = rgba(palette.label, 1);
         ctx.font = `400 ${subPx}px ${SANS}`;
-        ctx.fillText(text.sub, box.x + CARD_PAD, box.y + 29);
+        ctx.fillText(text.sub, box.x + pad, box.y + 29 * cs);
       }
       ctx.globalAlpha = 1;
     }
@@ -627,7 +649,7 @@ export function startDisc(o: DiscOptions): () => void {
       if (!still && shouldShowCard(lastCard, now, n)) {
         lastCard = now;
         const { rx, core } = layout();
-        const places = cardSlotsFor(core, rx, w, CARD_H);
+        const places = cardLayout(core, rx, w, CARD_H).slots;
         if (places.length) cardArrivals.push({ index: k, at: now, slot: pickSlot(cardArrivals, places, now) });
       }
     }

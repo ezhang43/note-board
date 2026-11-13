@@ -77,14 +77,14 @@ export function coreAt(cx: number, cy: number, rx: number): { x: number; y: numb
  * of the first 1400ms trip).
  */
 /** The beam's drop from above the canvas to its cell, in ms. */
-export const DROP_MS = 700;
-/** After the strike: the beam's linger, ripples and column last as long as they did in a 1400ms trip, then the sparks fly for 1820ms. */
-export const TRIP_MS = 2660;
+export const DROP_MS = 1050;
+/** After the strike: the beam's linger, ripples and column last as long as they did in a 1400ms trip, then the sparks fly for 2730ms (owner 2026-11-13, "can make it slower": every duration of the trip 1.5x longer, about 4.0s in all; the ripples and the column keep their lengths). */
+export const TRIP_MS = 3990;
 const FIRST_TRIP_MS = 1400;
 /** The beam lands on its cell this far into the trip: the cell lights and its row joins the feed. */
 export const STRIKE = DROP_MS / TRIP_MS;
 /** The particles leave the cell this far into the trip, after the beam and its ring have lingered a moment. */
-export const COMET_START = (DROP_MS + 140) / TRIP_MS;
+export const COMET_START = (DROP_MS + 210) / TRIP_MS;
 /** How much of the trip the beam takes to fade after it lands, the ring to open, and the particles to fade into the core. */
 const BEAM_FADE = 0.2;
 /** How much of the trip the impact flash lasts. */
@@ -193,7 +193,7 @@ export function pillarLevel(flare: number): { width: number; alpha: number } {
 /** How many sparks make up a fountain that runs from a cell into the core (owner request 2026-11-13: eight to fifteen in the reference; ten here, fewer when many land together). */
 export const PARTICLES = 10;
 /** About how many sparks may be in the air at once, all fountains together: the frame's budget. */
-export const BURST_BUDGET = 100;
+export const BURST_BUDGET = 200;
 /** How many sparks one fountain has when `overlap` items are landing together: ten alone, fewer in a crowd, never under four. */
 export const burstSize = (overlap: number): number => Math.max(4, Math.min(PARTICLES, Math.round(BURST_BUDGET / Math.max(1, overlap))));
 /** How high a spark's arc may bend up (a share of its run): low ones skim the disc, high ones shoot up before curving in. */

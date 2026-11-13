@@ -21,7 +21,7 @@ const SEED: [string, string, string, number][] = [
 ];
 
 /** Saves two boards (Home and Garage) with the items above already cleaned up, then reloads. Returns how many of them fall in this calendar week. */
-async function seed(page: Page) {
+async function seed(page: Page, rows: [string, string, string, number][] = SEED) {
   const inWeek = await page.evaluate((seed) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     const key = (ago: number) => {
@@ -43,7 +43,7 @@ async function seed(page: Page) {
     localStorage.setItem('note-board:v1', JSON.stringify({ version: 6, home: 'home', boards }));
     const sinceMonday = (new Date().getDay() + 6) % 7;
     return seed.filter((s) => s[3] <= sinceMonday).length;
-  }, SEED);
+  }, rows);
   await page.reload();
   await fontsLoaded(page);
   return inWeek;
@@ -220,6 +220,18 @@ test.describe('with motion on', () => {
     await seed(page);
     await openVisualizer(page);
     await expect.poll(() => topRows(page, false), { timeout: 3000, intervals: [30] }).toBe(true);
+  });
+
+  test('a long list lands in waves: several items arrive within the first two seconds, with no page error', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    const many: [string, string, string, number][] = Array.from({ length: 36 }, (_, i) => ['home', ['Groceries', 'Chores', 'Calls'][i % 3], `item ${i}`, i % 20]);
+    await seed(page, many);
+    await openVisualizer(page);
+    // One at a time it would be one or two rows by now; in waves of about six it is several.
+    await expect.poll(async () => dialog(page).locator('.viz-feed li').count(), { timeout: 3000 }).toBeGreaterThanOrEqual(4);
+    await page.waitForTimeout(1500);
+    expect(errors).toEqual([]);
   });
 
   test('sparks fly and the ring is drawn, with no page error', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MONTHS, dayKey } from '../model/calendar';
-import { VIZ_DEFAULT_RANGE, VIZ_GROUPS, VIZ_RANGES, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizGroupBy, type VizRange } from '../model/visualizer';
+import { VIZ_DEFAULT_RANGE, VIZ_GROUPS, VIZ_RANGES, cardLines, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizGroupBy, type VizRange } from '../model/visualizer';
 import { appStore } from '../store/appStore';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
@@ -76,6 +76,8 @@ function Overlay() {
   const items = useMemo(() => (kept.current = keepIfSame(kept.current, loopOrder(inRange(all, range, today)))), [all, range, today]);
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
   const disc = useMemo(() => discOf(items, group), [items, group]);
+  // The two lines of the small card for each item as it lands (plain text, drawn on the canvas).
+  const cards = useMemo(() => items.map((item, i) => cardLines(item, disc.wedges[disc.slots[i]?.wedge]?.name, group)), [items, disc, group]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);
   const chart = useMemo(() => chartPath(days, CHART_W, CHART_H), [days]);
   const peak = useMemo(() => days.reduce((best, d) => (d.count > best.count ? d : best), { date: '', count: 0 }), [days]);
@@ -93,12 +95,13 @@ function Overlay() {
       slots: disc.slots,
       palette: readPalette(el),
       still: reduced,
+      cards,
       onLanded: (landed) => {
         if (!landed) loop++;
         setAt({ landed, loop });
       },
     });
-  }, [disc, reduced]);
+  }, [disc, cards, reduced]);
 
   // `at` is from the loop before when the range has just changed (the effect below resets it a moment later), so it can be past the end.
   const landed = Math.min(at.landed, items.length);

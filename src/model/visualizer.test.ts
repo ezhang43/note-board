@@ -4,6 +4,12 @@ import { createCard } from './cards';
 import { cleanUp } from './completed';
 import {
   MAX_CELLS,
+  MAX_FLYING,
+  WAVE_GAP_MS,
+  WAVE_MAX,
+  cardLines,
+  startOf,
+  waveSize,
   MAX_CHART_DAYS,
   MAX_WEDGES,
   LOOP_REST_MS,
@@ -435,10 +441,75 @@ describe('pace', () => {
     expect(playhead(2000 + 1000, 3, 1000, 200).landed).toBe(3);
   });
 
-  it('has several in the air at once when the pace is quick', () => {
+  it('has several in the air at once when the pace is quick, never more than MAX_FLYING', () => {
     const p = playhead(5000, 1000, 900);
-    expect(p.flying.length).toBeGreaterThan(5);
+    expect(p.flying.length).toBe(MAX_FLYING);
     expect(p.flying.every((f) => f.progress >= 0 && f.progress < 1)).toBe(true);
-    expect(p.landed + p.flying.length).toBe(Math.floor(5000 / 60) + 1);
+    // the ones kept are the newest that have started
+    const idx = p.flying.map((f) => f.index);
+    expect(idx).toEqual([...idx].sort((a, b) => a - b));
+    expect(Math.max(...idx)).toBeGreaterThanOrEqual(p.landed - 1);
+    // landing is not capped: every item still lands
+    expect(p.landed).toBeGreaterThan(50);
+  });
+});
+
+describe('waves (owner request 2026-11-13: many arrivals overlap)', () => {
+  it('lands one at a time for a few items, in waves of several for more, up to WAVE_MAX', () => {
+    expect(waveSize(1)).toBe(1);
+    expect(waveSize(3)).toBe(1);
+    expect(waveSize(30)).toBeGreaterThanOrEqual(4);
+    expect(waveSize(30)).toBeLessThanOrEqual(WAVE_MAX);
+    expect(waveSize(100000)).toBe(WAVE_MAX);
+    expect(waveSize(0)).toBe(1);
+  });
+
+  it('starts the items of one wave a moment apart and the next wave one wave-gap later', () => {
+    const n = 30;
+    const wave = waveSize(n);
+    expect(startOf(0, n)).toBe(0);
+    expect(startOf(1, n)).toBe(Math.min(WAVE_GAP_MS, gapMs(n)));
+    expect(startOf(wave, n)).toBe(wave * gapMs(n));
+    for (let i = 1; i < n; i++) expect(startOf(i, n)).toBeGreaterThan(startOf(i - 1, n)); // always in order
+  });
+
+  it('has several beams in the air together for 30 items, then settles down to one at the end', () => {
+    const n = 30;
+    const flight = 1400;
+    let most = 0;
+    for (let t = 0; t < loopMs(n, flight); t += 50) most = Math.max(most, playhead(t, n, flight).flying.length);
+    expect(most).toBeGreaterThanOrEqual(4);
+    expect(most).toBeLessThanOrEqual(MAX_FLYING);
+    const calm = startOf(n - 1, n) + flight + 100;
+    expect(playhead(calm, n, flight).flying).toEqual([]);
+    expect(playhead(calm, n, flight).landed).toBe(n);
+  });
+
+  it('lands every item once, in order, and finishes within the loop, for any count', () => {
+    for (const n of [1, 2, 7, 30, 100, 750]) {
+      const flight = 1400;
+      let seen = 0;
+      for (let t = 0; t <= loopMs(n, flight); t += 37) {
+        const p = playhead(t, n, flight, flight * 0.25);
+        expect(p.landed).toBeGreaterThanOrEqual(seen);
+        seen = p.landed;
+      }
+      expect(seen).toBe(n);
+      expect(loopMs(n, flight)).toBe(startOf(n - 1, n) + flight + LOOP_REST_MS);
+    }
+  });
+});
+
+describe('cardLines', () => {
+  const it1 = { id: 'a', text: 'Buy milk', boardId: 'b', boardName: 'Home', list: 'Groceries', date: '2026-11-01', boardRank: 0, order: 0 };
+
+  it('reads the item, then "category · board" (or "list · board" By board)', () => {
+    expect(cardLines(it1, 'Errands & shopping', 'category')).toEqual(['Buy milk', 'Errands & shopping · Home']);
+    expect(cardLines(it1, 'Home', 'board')).toEqual(['Buy milk', 'Groceries · Home']);
+  });
+
+  it('names an item with no text, and leaves out an empty part', () => {
+    expect(cardLines({ ...it1, text: '  ' }, 'Other', 'category')[0]).toBe('Untitled item');
+    expect(cardLines({ ...it1, boardName: '' }, 'Other', 'category')[1]).toBe('Other');
   });
 });

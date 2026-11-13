@@ -4,8 +4,10 @@
 
 export const INNER = 0.27;
 export const OUTER = 1;
+/** How many thin track rings the disc has between the hub and the rim. */
+export const TRACKS = 14;
 /** How much the disc is squashed up and down by its tilt (1 is seen from straight above). */
-export const TILT = 0.55;
+export const TILT = 0.62;
 /** Empty space between wedges (radians, shrunk for many wedges) and between rings of cells (share of one ring). */
 const WEDGE_GAP = 0.035;
 const CELL_GAP = 0.12;
@@ -73,7 +75,6 @@ export const STRIKE = 0.25;
 export const COMET_START = 0.35;
 /** How much of the trip the beam takes to fade after it lands, the ring to open, and the particles to fade into the core. */
 const BEAM_FADE = 0.2;
-const PING_SPAN = 0.3;
 /** How much of the trip the impact flash lasts. */
 const FLASH_SPAN = 0.08;
 /** The core flares up over FLARE_RISE of the trip and peaks at FLARE_AT, when the particles are nearly in; it is spent as the trip ends. */
@@ -82,33 +83,55 @@ const FLARE_RISE = 0.3;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
+/** The column's height and brightness `since` (a share of the trip) after the strike: it shoots up, holds, then fades while it keeps its height. */
+function columnLevel(since: number): { height: number; alpha: number } {
+  if (since < 0 || since >= COLUMN_SPAN) return { height: 0, alpha: 0 };
+  const height = 1 - Math.pow(1 - clamp01(since / COLUMN_RISE), 2);
+  const hold = COLUMN_SPAN * 0.4;
+  const alpha = since < hold ? 1 : clamp01(1 - (since - hold) / (COLUMN_SPAN - hold));
+  return { height: Math.max(0.05, height), alpha };
+}
+
 export interface WarpPhase {
   /** How far down its drop the beam's head is: 0 at the top, 1 on the cell. */
   beam: number;
   beamAlpha: number;
-  /** How far open the ring on the cell is (0 to 1), null when there is no ring. */
-  ping: number | null;
   /** How far along the burst of particles is (0 at the cell, 1 in the core), null until they leave the cell. */
   comet: number | null;
   /** How bright the flash where the beam lands is: 1 at the strike, gone FLASH_SPAN of the trip later. */
   flash: number;
   /** How hard the core is flaring from this item (0 to 1). */
   flare: number;
+  /** The ripple rings on the disc round the landing spot: how far open each is (0 to 1) and how bright. */
+  ripples: { open: number; alpha: number }[];
+  /** The bright white column rising from the landing spot: how tall (0 to 1 of its full height) and how bright. */
+  column: { height: number; alpha: number };
 }
+
+/** How many ripple rings a landing sends out across the disc, each starting a little after the one before. */
+export const RIPPLES = 3;
+const RIPPLE_STAGGER = 0.06;
+const RIPPLE_SPAN = 0.32;
+/** The column rises over COLUMN_RISE of the trip from the strike, holds a moment, and is gone by COLUMN_SPAN. */
+const COLUMN_RISE = 0.05;
+const COLUMN_SPAN = 0.3;
 
 export function warpPhase(progress: number): WarpPhase {
   const p = clamp01(progress);
   const drop = clamp01(p / STRIKE);
   const struck = p >= STRIKE;
-  const ping = struck && p - STRIKE <= PING_SPAN ? (p - STRIKE) / PING_SPAN : null;
   const comet = p >= COMET_START ? (p - COMET_START) / (1 - COMET_START) : null;
   return {
     beam: drop * drop, // it falls, so it speeds up
     beamAlpha: struck ? clamp01(1 - (p - STRIKE) / BEAM_FADE) : 1,
-    ping,
     comet,
     flash: struck ? clamp01(1 - (p - STRIKE) / FLASH_SPAN) : 0,
     flare: p < FLARE_AT ? clamp01(1 - (FLARE_AT - p) / FLARE_RISE) : clamp01((1 - p) / (1 - FLARE_AT)),
+    ripples: Array.from({ length: RIPPLES }, (_, i) => {
+      const q = (p - STRIKE - i * RIPPLE_STAGGER) / RIPPLE_SPAN; // 0 when this ring starts, 1 when it is gone
+      return q < 0 || q >= 1 ? { open: 0, alpha: 0 } : { open: q, alpha: Math.min(1, (1 - q) * 1.6) * Math.min(1, q * 8 + 0.4) };
+    }),
+    column: columnLevel(p - STRIKE),
   };
 }
 
@@ -136,8 +159,15 @@ export function pillarLevel(flare: number): { width: number; alpha: number } {
   return { width: 1 + 1.4 * f, alpha: 0.6 + 0.4 * f };
 }
 
-/** How many sparks make up the burst that runs from a cell into the core. */
-export const PARTICLES = 5;
+/** How many sparks make up a fountain that runs from a cell into the core (owner request 2026-11-13: eight to fifteen in the reference; ten here, fewer when many land together). */
+export const PARTICLES = 10;
+/** About how many sparks may be in the air at once, all fountains together: the frame's budget. */
+export const BURST_BUDGET = 60;
+/** How many sparks one fountain has when `overlap` items are landing together: ten alone, fewer in a crowd, never under four. */
+export const burstSize = (overlap: number): number => Math.max(4, Math.min(PARTICLES, Math.round(BURST_BUDGET / Math.max(1, overlap))));
+/** How high a spark's arc may bend up (a share of its run): low ones skim the disc, high ones shoot up before curving in. */
+export const LIFT_MIN = 0.2;
+export const LIFT_MAX = 0.75;
 /** The most a spark may hold back, as a share of the burst's run (the first one never does). */
 export const PARTICLE_DELAY = 0.22;
 
@@ -146,12 +176,13 @@ export const PARTICLE_DELAY = 0.22;
  * bends, `delay` how long it holds back. Worked out from the two numbers alone, so the same item always
  * looks the same and nothing is random while drawing. Particle 0 is the leader: nearly straight, no delay.
  */
-export function particleSeed(item: number, k: number): { spread: number; delay: number } {
+export function particleSeed(item: number, k: number): { spread: number; delay: number; lift: number } {
   const h = Math.imul(item * 31 + k * 17 + 7, 2654435761) >>> 0;
   const h2 = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; // a second round, so the delay does not follow the bend
   const spread = ((h >>> 8) % 2001) / 1000 - 1;
   const delay = (((h2 >>> 8) % 1000) / 1000) * PARTICLE_DELAY;
-  return k === 0 ? { spread: spread * 0.25, delay: 0 } : { spread, delay };
+  const lift = LIFT_MIN + ((Math.imul(h2 ^ (h2 >>> 13), 3266489917) >>> 8) % 1000) / 1000 * (LIFT_MAX - LIFT_MIN);
+  return k === 0 ? { spread: spread * 0.25, delay: 0, lift: (LIFT_MIN + LIFT_MAX) / 2 } : { spread, delay, lift };
 }
 
 /**
@@ -159,13 +190,13 @@ export function particleSeed(item: number, k: number): { spread: number; delay: 
  * arc that leans to one side by `spread` and speeds up as it is drawn in. All the paths of a burst start on
  * the cell and meet in the core, and fan out in between.
  */
-export function particleAt(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number): { x: number; y: number } {
+export function particleAt(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, lift = 0.35): { x: number; y: number } {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
   // A quadratic curve: the control point sits above the middle of the line, pushed sideways by the spread.
   const cx = from.x + dx / 2 + (-dy / len) * spread * len * 0.3;
-  const cy = from.y + dy / 2 - len * 0.35 + (dx / len) * spread * len * 0.3;
+  const cy = from.y + dy / 2 - len * lift + (dx / len) * spread * len * 0.3;
   const e = Math.pow(clamp01(q), 1.5); // slow off the cell, quickest into the core
   const u = 1 - e;
   return { x: u * u * from.x + 2 * u * e * cx + e * e * to.x, y: u * u * from.y + 2 * u * e * cy + e * e * to.y };
@@ -183,9 +214,9 @@ export function tailSpan(q: number): number {
  * Points along the particle's own recent path, from the end of its tail (first) to its head (last), `segments + 1`
  * of them, evenly spread in `q`. The tail never starts before the cell, so it grows out of it.
  */
-export function tailPoints(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, segments: number): { x: number; y: number }[] {
+export function tailPoints(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, segments: number, lift = 0.35): { x: number; y: number }[] {
   const tailQ = Math.max(0, q - tailSpan(q));
-  return Array.from({ length: segments + 1 }, (_, i) => particleAt(from, to, spread, tailQ + ((q - tailQ) * i) / segments));
+  return Array.from({ length: segments + 1 }, (_, i) => particleAt(from, to, spread, tailQ + ((q - tailQ) * i) / segments, lift));
 }
 
 /** The most characters of a board name that are ever measured or drawn round the ring. */
@@ -225,5 +256,5 @@ export function fitLabel(name: string, room: number, measure: (text: string) => 
  */
 export function discRadius(w: number, h: number, labelWidth: number): number {
   const reserve = Math.min(labelWidth, w * 0.2);
-  return Math.max(40, Math.min((h - 60) / 1.3, (w / 2 - reserve - 14) / LABEL_RADIUS));
+  return Math.max(40, Math.min((h - 60) / 1.45, (w / 2 - reserve - 14) / LABEL_RADIUS));
 }

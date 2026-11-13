@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, categoryIndex, type CategoryId } from './categorize';
+import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, parentCategory, parentFirst, categoryIndex, type CategoryId } from './categorize';
 
 // The Visualizer's categories (owner request, 2026-11-12): built-in word rules behind one function,
 // categoryOf(item, listTitle), so a later AI categorizer can stand in for it.
@@ -130,19 +130,39 @@ describe('categoryOf: the list title as a fallback', () => {
   });
 });
 
-describe('categoryOf: a sub-item takes its parents\' context', () => {
-  it('own words first, then the parents\' words (nearest first), then the list title, else Other', () => {
-    expect(categoryOf({ text: 'call Sam', context: ['Clean the garage'] }, 'Groceries')).toBe('calls');
-    expect(categoryOf({ text: 'boxes', context: ['Clean the garage'] }, 'Groceries')).toBe('home');
-    expect(categoryOf({ text: 'boxes', context: ['Today', 'Pay rent'] }, '')).toBe('money');
+describe('categoryOf: a sub-item and its parents', () => {
+  it('a parent that gives a real category wins for all its sub-items, even over their own words', () => {
+    expect(categoryOf({ text: 'Buy milk', context: ['Clean the garage'] }, 'Groceries')).toBe('home');
+    expect(categoryOf({ text: 'call Sam', context: ['Clean the garage'] }, '')).toBe('home');
+  });
+  it('a parent like Today or Now gives nothing, so the sub-item goes by its own words', () => {
+    expect(categoryOf({ text: 'Buy milk', context: ['Today'] }, '')).toBe('errands');
+    expect(categoryOf({ text: 'walk the dog', context: ['Now'] }, 'Groceries')).toBe('health');
+  });
+  it('then the list title, then Other', () => {
     expect(categoryOf({ text: 'boxes', context: ['Today'] }, 'Groceries')).toBe('errands');
     expect(categoryOf({ text: 'boxes', context: ['Today'] }, 'Stuff')).toBe('other');
   });
-  it('a parent like Today or Now matches nothing, so each sub-item goes by its own words', () => {
-    expect(categoryOf({ text: 'pay the bill', context: ['Today'] }, 'Now')).toBe('money');
-    expect(categoryOf({ text: 'walk the dog', context: ['Now'] }, '')).toBe('health');
+  it('nested: the nearest ancestor that gives a real category', () => {
+    expect(categoryOf({ text: 'x', context: ['Today', 'Pay rent', 'Clean up'] }, '')).toBe('money');
+    expect(categoryOf({ text: 'x', context: ['Call Sam', 'Pay rent'] }, '')).toBe('calls');
   });
   it('an item with no context works as before', () => {
     expect(categoryOf({ text: 'boxes' }, 'Groceries')).toBe('errands');
+    expect(categoryOf({ text: 'Buy milk' }, 'Stuff')).toBe('errands');
+  });
+  it('parentCategory is the context part alone: null when no parent gives one', () => {
+    expect(parentCategory({ context: ['Today', 'Clean the garage'] })).toBe('home');
+    expect(parentCategory({ context: ['Today'] })).toBeNull();
+    expect(parentCategory({})).toBeNull();
+  });
+});
+
+describe("parentFirst", () => {
+  const ai = () => ({ name: "Gaming" });
+  it("a descriptive parent beats the AI label; otherwise the AI label stands", () => {
+    expect(parentFirst(ai)({ text: "Buy milk", context: ["Clean the garage"] }, "")).toBe("home");
+    expect(parentFirst(ai)({ text: "Buy milk", context: ["Today"] }, "")).toEqual({ name: "Gaming" });
+    expect(parentFirst(ai)({ text: "Buy milk" }, "")).toEqual({ name: "Gaming" });
   });
 });

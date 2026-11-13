@@ -54,18 +54,29 @@ function byWords(text: string): CategoryId {
  */
 export type Categorizer = (item: { text: string; /** The words of the items a sub-item sits under, nearest first. */ context?: string[]; /** The board it is on, where known (the Visualizer's items). */ boardId?: string }, listTitle: string) => CategoryId | { name: string };
 
-/**
- * The built-in rules: the item text first; for a sub-item, then the words of the items it was nested under (`context`,
- * nearest first: a parent like "Clean the garage" gives its sub-items a category, "Today" matches nothing); then the list
- * title as a fallback (a list titled "Groceries" makes its items Errands & shopping).
- */
-export const categoryOf = (item: { text: string; context?: string[] }, listTitle: string): CategoryId => {
-  for (const text of [item.text, ...(item.context ?? []), listTitle]) {
+/** The category a sub-item takes from the items it sits under: the nearest one (`context` is nearest first) whose words give a real category, else null. A parent like "Today" or "Now" gives none. */
+export const parentCategory = (item: { context?: string[] }): CategoryId | null => {
+  for (const text of item.context ?? []) {
     const c = byWords(text);
     if (c !== OTHER_CATEGORY) return c;
   }
-  return OTHER_CATEGORY;
+  return null;
 };
+
+/**
+ * The built-in rules (owner 2026-11-13): for a sub-item, a parent whose words give a category decides for all its
+ * sub-items; otherwise (and for any other item) the item's own text; then the list title as a fallback (a list titled
+ * "Groceries" makes its items Errands & shopping); then Other.
+ */
+export const categoryOf = (item: { text: string; context?: string[] }, listTitle: string): CategoryId => {
+  const parent = parentCategory(item);
+  if (parent) return parent;
+  const own = byWords(item.text);
+  return own !== OTHER_CATEGORY ? own : byWords(listTitle);
+};
+
+/** `inner` (Sort with AI) with a descriptive parent's built-in category in front: it wins over the sub-item's AI label. Items with no such parent go to `inner` unchanged. */
+export const parentFirst = (inner: Categorizer): Categorizer => (item, listTitle) => parentCategory(item) ?? inner(item, listTitle);
 
 /** Where a category sits in CATEGORIES (an id nobody knows is Other, the last). */
 export function categoryIndex(id: CategoryId): number {

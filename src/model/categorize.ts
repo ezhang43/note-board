@@ -52,13 +52,44 @@ function byWords(text: string): CategoryId {
  * Works out which category an item is in: from its own text, else from the title of the list it came from.
  * It gives a built-in category's id, or a category of its own by name (Sort with AI, see aiCategories.ts).
  */
-export type Categorizer = (item: { text: string; /** The board it is on, where known (the Visualizer's items). */ boardId?: string }, listTitle: string) => CategoryId | { name: string };
+export type Categorizer = (item: { text: string; /** The words of the items a sub-item sits under, nearest first. */ context?: string[]; /** The board it is on, where known (the Visualizer's items). */ boardId?: string }, listTitle: string) => CategoryId | { name: string };
 
-/** The built-in rules: the item text first, then the list title as a fallback (a list titled "Groceries" makes its items Errands & shopping). */
-export const categoryOf = (item: { text: string }, listTitle: string): CategoryId => {
+/** Time words and phrases (owner 2026-11-13): an item that is only one of these is never a Visualizer item, and as a parent it gives its sub-items no category. */
+const TIME_WORDS = new Set([
+  'today', 'tonight', 'now', 'right now', 'daily', 'tomorrow', 'this morning', 'morning', 'this afternoon', 'afternoon', 'this evening', 'evening',
+  'this week', 'weekly', 'this weekend', 'weekend', 'later', 'soon', 'asap', 'todo', 'to do', 'to-do', 'next week',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+]);
+
+/** True when the whole text (case, extra spaces and trailing punctuation or emoji ignored) is just a time word or phrase. "Daily stretch" is not. */
+export const isTimeWord = (text: string): boolean =>
+  text.length <= 40 && // no phrase on the list is longer; also keeps the patterns below from backtracking on a very long run of spaces or marks
+  TIME_WORDS.has(text.toLowerCase().replace(/[\s\p{P}\p{S}\p{Extended_Pictographic}‍️]+$/u, '').replace(/^\s+/, '').replace(/\s+/g, ' '));
+
+/** The category a sub-item takes from the items it sits under: the nearest one (`context` is nearest first) whose words give a real category, else null. A parent like "Today" or "Now" gives none. */
+export const parentCategory = (item: { context?: string[] }): CategoryId | null => {
+  for (const text of item.context ?? []) {
+    if (isTimeWord(text)) continue;
+    const c = byWords(text);
+    if (c !== OTHER_CATEGORY) return c;
+  }
+  return null;
+};
+
+/**
+ * The built-in rules (owner 2026-11-13): for a sub-item, a parent whose words give a category decides for all its
+ * sub-items; otherwise (and for any other item) the item's own text; then the list title as a fallback (a list titled
+ * "Groceries" makes its items Errands & shopping); then Other.
+ */
+export const categoryOf = (item: { text: string; context?: string[] }, listTitle: string): CategoryId => {
+  const parent = parentCategory(item);
+  if (parent) return parent;
   const own = byWords(item.text);
   return own !== OTHER_CATEGORY ? own : byWords(listTitle);
 };
+
+/** `inner` (Sort with AI) with a descriptive parent's built-in category in front: it wins over the sub-item's AI label. Items with no such parent go to `inner` unchanged. */
+export const parentFirst = (inner: Categorizer): Categorizer => (item, listTitle) => parentCategory(item) ?? inner(item, listTitle);
 
 /** Where a category sits in CATEGORIES (an id nobody knows is Other, the last). */
 export function categoryIndex(id: CategoryId): number {

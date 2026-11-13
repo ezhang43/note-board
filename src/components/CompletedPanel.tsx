@@ -3,7 +3,7 @@ import { ITEM_INDENT } from '../model/checklist';
 import { completedCardOf, dayLabel, mergeCompleted, type CompletedRow as CompletedRowData } from '../model/completed';
 import { styleCss } from '../model/textStyle';
 import type { TodoItem } from '../model/types';
-import { appStore, useAppState, useViewOnly } from '../store/appStore';
+import { appStore, useAppState } from '../store/appStore';
 import { FindMarks } from './FindMarks';
 import { CompletedIcon } from './icons';
 
@@ -54,9 +54,7 @@ export function CompletedPanel() {
   const days = useMemo(() => mergeCompleted(own, list), [own, list]);
   const ref = useRef<HTMLDivElement>(null);
   // Nothing goes back on a read-only board (job 161) or while an old version is shown.
-  const viewOnly = useViewOnly();
-  const previewing = useAppState((s) => s.ui.preview !== null);
-  const readOnly = viewOnly || previewing;
+  const readOnly = useAppState(() => appStore.completedReadOnly());
   const untick = (row: CompletedRowData) => {
     // The ticked row goes away: the keyboard stays in the panel, so Ctrl+Z there takes the untick back.
     ref.current?.focus({ preventScroll: true });

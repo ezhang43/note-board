@@ -389,11 +389,68 @@ describe('the Completed panel with the Main checklist’s items mixed in (owner,
   it('while the Main checklist is the open board, its items untick as the board’s own', () => {
     const { s, id, texts, listItem } = mixed();
     s.openBoard(id);
-    s.toggleSidePanel('completed');
+    expect(s.getState().ui.sidePanel).toBe('completed'); // it stays open
     s.untickCompleted(listItem, false);
     expect(texts()).toEqual(['keep', 'list done']);
     s.undoCompleted();
     expect(texts()).toEqual(['keep']);
+  });
+});
+
+describe('Ctrl+Z in the Completed panel never takes back the wrong thing (code review, 2026-11-13)', () => {
+  it('an untick already undone another way (the toolbar Undo) is passed over, and the one before it is taken back', () => {
+    const { s, texts, boardTexts, listItem, boardItem } = mixed();
+    s.untickCompleted(listItem, true);
+    s.untickCompleted(boardItem, false);
+    s.undo(); // the toolbar's Undo: the board's untick
+    expect(boardTexts()).toEqual(['']);
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep']); // the checklist's untick
+    expect(boardTexts()).toEqual(['']); // and not the board's Clean up as well
+  });
+
+  it('a Ctrl+Z that changes nothing is not remembered, so the next Ctrl+Y redoes the untick', () => {
+    const s = setup();
+    s.openChecklist();
+    const { p, list } = panel(s);
+    const first = list().items[0].id;
+    p.setItemText(list().id, first, 'list done');
+    p.toggleItem(list().id, first);
+    p.cleanUpList(list().id);
+    s.toggleSidePanel('completed');
+    s.untickCompleted(first, true);
+    s.undoCompleted();
+    expect(list().items.map((i) => i.text)).toEqual(['']);
+    s.undoCompleted(); // the open board has nothing to undo
+    s.undoCompleted();
+    s.redoCompleted();
+    expect(list().items.map((i) => i.text)).toEqual(['', 'list done']);
+  });
+
+  it('opening another board forgets the panel’s unticks: Ctrl+Z there is that board’s', () => {
+    const { s, id, texts, boardTexts, listItem } = mixed();
+    const home = s.getState().boards.open;
+    s.untickCompleted(listItem, true);
+    s.openBoard(id);
+    expect(s.getState().ui.completedSteps).toBeNull();
+    s.openBoard(home);
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep', 'list done']);
+    expect(boardTexts()).toEqual(['board done']);
+  });
+
+  it('an untick made while the panel is shut is not remembered for it', () => {
+    const { s, listItem } = mixed();
+    s.closeCompleted();
+    s.untickCompleted(listItem, true);
+    expect(s.getState().ui.completedSteps).toBeNull();
+  });
+
+  it('says when its rows are read-only: a view-only board, or an old version shown', () => {
+    const { s } = mixed();
+    expect(s.completedReadOnly()).toBe(false);
+    s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
+    expect(s.completedReadOnly()).toBe(true);
   });
 });
 

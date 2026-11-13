@@ -207,7 +207,7 @@ export function boardActions(ctx: StoreContext) {
       ctx.commitTo(id, (b) => (todaysNote(b, line, knownNotes()) ? b : B.addCard(b, note, { type: 'loose', ...journalSpot(b, ...at, knownNotes()) })));
       settle(id, [note.id]);
       // Nothing stays selected behind the panel, so a key meant for the journal can't delete it.
-      ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false, selection: [], itemSel: null });
+      ctx.updateUi({ sidePanel: 'journal', journalBoard: id, historyOpen: false, selection: [], itemSel: null, completedSteps: null });
       return null;
     },
     setJournal,
@@ -313,7 +313,7 @@ export function boardActions(ctx: StoreContext) {
       if (!ui.sharesKnown) return 'loading';
       ctx.updateUi({ preview: null }); // an old version being looked at is put away first
       // Nothing stays selected behind the panel, so a key meant for it can't delete it.
-      ctx.updateUi({ sidePanel: 'habits', historyOpen: false, selection: [], itemSel: null });
+      ctx.updateUi({ sidePanel: 'habits', historyOpen: false, selection: [], itemSel: null, completedSteps: null });
       return null;
     },
     /** A new habit at the end of the list, named `name` (trimmed; nothing for a blank name). Returns its id. */

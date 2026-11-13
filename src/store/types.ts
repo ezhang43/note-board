@@ -140,6 +140,12 @@ export interface ItemDrag {
 /** What the side panel beside the board can show. */
 export type SidePanelKind = 'pomodoro' | 'calendar' | 'completed' | 'journal' | 'habits';
 
+/** A step taken in the Completed panel: the board it changed, and that board just after (it can be stepped back only while unchanged since). */
+export interface CompletedStep {
+  board: string;
+  after: Board;
+}
+
 /** Things on screen that are not board data: never saved, never undoable. */
 export interface Ui {
   selection: string[];
@@ -197,11 +203,10 @@ export interface Ui {
   checklistOpen: boolean;
   /**
    * The unticks made in the Completed panel since it opened (owner, 2026-11-13: it mixes in the Main checklist's
-   * items), so Ctrl+Z / Ctrl+Y there step the board each one changed: `undo` and `redo` hold board ids, newest
-   * last; `checklist` is the Main checklist board as the panel last left it (the panel never steps it once it has
-   * changed since). Null while the panel is shut.
+   * items), and the Ctrl+Z / Ctrl+Y steps taken there, newest last, so those keys step the board each one changed.
+   * Null while the panel is shut, and cleared when another board is shown.
    */
-  completedSteps: { undo: string[]; redo: string[]; checklist: Board | null } | null;
+  completedSteps: { undo: CompletedStep[]; redo: CompletedStep[] } | null;
   /** The board the Journal panel writes into (set when it opens). */
   journalBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */

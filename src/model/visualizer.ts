@@ -251,63 +251,39 @@ export function summaryOf(wedges: Wedge[], total: number): string {
 }
 
 // ---- Pace ----
+// A steady stream (owner request 2026-11-13, "I don't want there to be really any pauses. essentially things should
+// always be flowing in"): items launch one after another at an even beat, round and round the list, so there is
+// never a moment with nothing in the air. No loop length, no wave, no rest at the end.
 
-export const MIN_GAP_MS = 60;
-export const MAX_GAP_MS = 1000;
-/** A loop with plenty of items lasts about this long. */
-export const LOOP_TARGET_MS = 45000;
-/** After the last item lands, the disc rests this long before the loop starts again. */
-export const LOOP_REST_MS = 2500;
-
-/** Time between one item and the next: about a second each, quicker when there are many so a loop lasts about 45 seconds. */
-export const gapMs = (n: number): number => Math.min(MAX_GAP_MS, Math.max(MIN_GAP_MS, LOOP_TARGET_MS / Math.max(1, n)));
-
-/** Items land in waves (owner request 2026-11-13, "many arrivals overlap"): up to this many together, a moment apart. */
-export const WAVE_MAX = 16;
-/** The gap between the items of one wave (never more than the loop's own gap). */
-export const WAVE_GAP_MS = 60;
-/** The most beams and fountains drawn at once, so a very busy loop stays inside the frame (the oldest are cut short). */
+/** How many trips are in the air together once the stream is going (below MAX_FLYING, so none is cut short). */
+export const STREAM_FLYING = 10;
+/** Launches are never further apart than this, however long a trip is. */
+export const MAX_LAUNCH_GAP_MS = 1000;
+/** The most beams and fountains drawn at once, so a very busy stream stays inside the frame (the oldest are cut short). */
 export const MAX_FLYING = 16;
 
-/** How many items land together: one at a time for a handful, up to WAVE_MAX for a long list (about a third of the items (owner request 2026-11-13, "more concurrent beams... dazzling and hectic": it was a sixth, up to 8, 120ms apart)). */
-export const waveSize = (n: number): number => Math.min(WAVE_MAX, Math.max(1, Math.round(n / 3)));
+/** Time between one launch and the next: a trip shared out over STREAM_FLYING launches (about 266ms for a 2.66s trip), at most a second. */
+export const launchGapMs = (flight: number): number => Math.min(MAX_LAUNCH_GAP_MS, flight / STREAM_FLYING);
 
-/** When item `i` of `n` starts its trip, in ms from the start of the loop: a wave starts each `waveSize * gapMs`, its items WAVE_GAP_MS apart. */
-export function startOf(i: number, n: number): number {
-  const wave = waveSize(n);
-  const gap = gapMs(n);
-  return Math.floor(i / wave) * wave * gap + (i % wave) * Math.min(WAVE_GAP_MS, gap);
-}
-
-/** How long one trip around the loop takes, rest included (flight is how long a spark takes to land). */
-export const loopMs = (n: number, flight: number): number => (n ? startOf(n - 1, n) + flight + LOOP_REST_MS : 0);
-
-/** How many of the `n` items have a start time (plus `offset`) at or before `t` ms; `startOf` only grows with `i`, so this halves the range each step. */
-function startedBy(t: number, n: number, offset: number): number {
-  let lo = 0;
-  let hi = n;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (startOf(mid, n) + offset <= t) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
-}
+/** When launch number `k` (0, 1, 2, ... counted round and round the list, so item `k % n`) starts, in ms from the start. */
+export const startOf = (k: number, flight: number): number => k * launchGapMs(flight);
 
 /**
- * Where the loop is `t` ms after it started: how many items have landed, which are still animating (with
- * how far along, 0 to 1; at most MAX_FLYING, the newest), and whether `t` has gone past the end (the caller
- * starts again at `t - loop`). An item has "landed" `strike` ms into its `flight` ms trip (by default at the
- * end of it): that is when its cell lights and its row joins the feed, while its fountain may still be on the
- * way to the core. Every item still lands when the loop is busy; only the drawing of the oldest is cut short.
+ * Where the stream is `t` ms after it started: how many launches have landed so far (counted without end; launch
+ * `k` is item `k % n`), and which trips are still animating (with how far along, 0 to 1; at most MAX_FLYING, the
+ * newest). A launch has "landed" `strike` ms into its `flight` ms trip (by default at the end of it): that is
+ * when its cell lights and its row joins the feed, while its fountain may still be on the way to the core.
+ * Every launch still lands when the stream is busy; only the drawing of the oldest is cut short.
  */
-export function playhead(t: number, n: number, flight: number, strike: number = flight): { landed: number; flying: { index: number; progress: number }[]; wrapped: boolean } {
-  const landed = startedBy(t, n, strike);
-  const done = startedBy(t, n, flight); // whose whole trip is over
-  const started = startedBy(t, n, 0);
+export function playhead(t: number, n: number, flight: number, strike: number = flight): { landed: number; flying: { index: number; progress: number }[] } {
+  if (n <= 0 || t < 0) return { landed: 0, flying: [] };
+  const gap = launchGapMs(flight);
+  const startedBy = (offset: number) => (t < offset ? 0 : Math.floor((t - offset) / gap) + 1); // launches whose start plus `offset` is at or before t
+  const started = startedBy(0);
+  const done = startedBy(flight);
   const flying: { index: number; progress: number }[] = [];
-  for (let i = Math.max(done, started - MAX_FLYING); i < started; i++) flying.push({ index: i, progress: (t - startOf(i, n)) / flight });
-  return { landed, flying, wrapped: t >= loopMs(n, flight) };
+  for (let k = Math.max(done, started - MAX_FLYING); k < started; k++) flying.push({ index: k % n, progress: (t - startOf(k, flight)) / flight });
+  return { landed: startedBy(strike), flying };
 }
 
 /** The two lines on the small card that floats by the core for an item that just landed: its text, then "category · board" (or "list · board" By board). Plain text only. */

@@ -5,14 +5,11 @@ import { cleanUp } from './completed';
 import {
   MAX_CELLS,
   MAX_FLYING,
-  WAVE_GAP_MS,
-  WAVE_MAX,
   cardLines,
   startOf,
-  waveSize,
+  launchGapMs,
   MAX_CHART_DAYS,
   MAX_WEDGES,
-  LOOP_REST_MS,
   OTHER_BOARDS,
   OTHER_LISTS,
   VIZ_DEFAULT_GROUP,
@@ -22,10 +19,8 @@ import {
   counts,
   discOf,
   doneItems,
-  gapMs,
   inRange,
   keepIfSame,
-  loopMs,
   loopOrder,
   parseGroupBy,
   perDay,
@@ -409,107 +404,57 @@ describe('the group-by switch', () => {
   });
 });
 
-describe('pace', () => {
-  it('is about a second an item for a short loop, quicker for many, never under 60 ms', () => {
-    expect(gapMs(3)).toBe(1000);
-    expect(gapMs(45)).toBe(1000);
-    expect(gapMs(90)).toBe(500);
-    expect(gapMs(100000)).toBe(60);
-    expect(gapMs(0)).toBe(1000);
+describe('pace: a steady stream, never a pause (owner request 2026-11-13, "things should always be flowing in")', () => {
+  const FLIGHT = 2660; // the real trip
+  const STRIKE_MS = 700; // the beam lands this far in
+
+  it('launches an item at least every second, and several trips overlap', () => {
+    expect(launchGapMs(FLIGHT)).toBeLessThanOrEqual(1000);
+    expect(launchGapMs(FLIGHT)).toBeGreaterThan(0);
+    expect(FLIGHT / launchGapMs(FLIGHT)).toBeGreaterThanOrEqual(4); // several in flight
+    expect(FLIGHT / launchGapMs(FLIGHT)).toBeLessThanOrEqual(MAX_FLYING);
+    expect(startOf(0, FLIGHT)).toBe(0);
+    expect(startOf(3, FLIGHT) - startOf(2, FLIGHT)).toBe(launchGapMs(FLIGHT));
   });
 
-  it('lasts about 45 seconds for 45 to 750 items, and a short loop rests at the end', () => {
-    for (const n of [45, 100, 300, 750]) {
-      expect(loopMs(n, 900)).toBeGreaterThan(30000);
-      expect(loopMs(n, 900)).toBeLessThan(60000);
-    }
-    expect(loopMs(0, 900)).toBe(0);
-    expect(loopMs(1, 900)).toBe(900 + LOOP_REST_MS);
-  });
-
-  it('lands items one after another and says when to start again', () => {
-    expect(playhead(0, 3, 900)).toEqual({ landed: 0, flying: [{ index: 0, progress: 0 }], wrapped: false });
-    expect(playhead(450, 3, 900).flying).toEqual([{ index: 0, progress: 0.5 }]);
-    const mid = playhead(1450, 3, 900);
-    expect(mid.landed).toBe(1);
-    expect(mid.flying).toEqual([{ index: 1, progress: 0.5 }]);
-    const end = playhead(2000 + 900, 3, 900);
-    expect(end.landed).toBe(3);
-    expect(end.flying).toEqual([]);
-    expect(end.wrapped).toBe(false);
-    expect(playhead(loopMs(3, 900), 3, 900).wrapped).toBe(true);
-  });
-
-  it('can land an item part-way through its trip: the beam hits its cell, the comet is still on its way', () => {
-    // 1000 ms trip, the cell is hit 200 ms in.
-    expect(playhead(199, 3, 1000, 200).landed).toBe(0);
-    const hit = playhead(200, 3, 1000, 200);
-    expect(hit.landed).toBe(1);
-    expect(hit.flying).toEqual([{ index: 0, progress: 0.2 }]); // still animating after it landed
-    const next = playhead(1000 + 200, 3, 1000, 200); // item 1 starts at 1000 ms (gap 1000)
-    expect(next.landed).toBe(2);
-    expect(next.flying.map((f) => f.index)).toEqual([1]);
-    expect(playhead(2000 + 1000, 3, 1000, 200).flying).toEqual([]);
-    expect(playhead(2000 + 1000, 3, 1000, 200).landed).toBe(3);
-  });
-
-  it('has several in the air at once when the pace is quick, never more than MAX_FLYING', () => {
-    const p = playhead(5000, 1000, 900);
-    expect(p.flying.length).toBeGreaterThanOrEqual(MAX_FLYING - 1);
-    expect(p.flying.length).toBeLessThanOrEqual(MAX_FLYING);
-    expect(p.flying.every((f) => f.progress >= 0 && f.progress < 1)).toBe(true);
-    // the ones kept are the newest that have started
-    const idx = p.flying.map((f) => f.index);
-    expect(idx).toEqual([...idx].sort((a, b) => a - b));
-    expect(Math.max(...idx)).toBeGreaterThanOrEqual(p.landed - 1);
-    // landing is not capped: every item still lands
-    expect(p.landed).toBeGreaterThan(50);
-  });
-});
-
-describe('waves (owner request 2026-11-13: many arrivals overlap)', () => {
-  it('lands one at a time for a few items, in waves of several for more, up to WAVE_MAX', () => {
-    expect(waveSize(1)).toBe(1);
-    expect(waveSize(3)).toBe(1);
-    expect(waveSize(30)).toBeGreaterThanOrEqual(4);
-    expect(waveSize(30)).toBeLessThanOrEqual(WAVE_MAX);
-    expect(waveSize(100000)).toBe(WAVE_MAX);
-    expect(waveSize(0)).toBe(1);
-  });
-
-  it('starts the items of one wave a moment apart and the next wave one wave-gap later', () => {
-    const n = 30;
-    const wave = waveSize(n);
-    expect(startOf(0, n)).toBe(0);
-    expect(startOf(1, n)).toBe(Math.min(WAVE_GAP_MS, gapMs(n)));
-    expect(startOf(wave, n)).toBe(wave * gapMs(n));
-    for (let i = 1; i < n; i++) expect(startOf(i, n)).toBeGreaterThan(startOf(i - 1, n)); // always in order
-  });
-
-  it('has several beams in the air together for 30 items, then settles down to one at the end', () => {
-    const n = 30;
-    const flight = 1400;
-    let most = 0;
-    for (let t = 0; t < loopMs(n, flight); t += 50) most = Math.max(most, playhead(t, n, flight).flying.length);
-    expect(most).toBeGreaterThanOrEqual(4);
-    expect(most).toBeLessThanOrEqual(MAX_FLYING);
-    const calm = startOf(n - 1, n) + flight + 100;
-    expect(playhead(calm, n, flight).flying).toEqual([]);
-    expect(playhead(calm, n, flight).landed).toBe(n);
-  });
-
-  it('lands every item once, in order, and finishes within the loop, for any count', () => {
-    for (const n of [1, 2, 7, 30, 100, 750]) {
-      const flight = 1400;
-      let seen = 0;
-      for (let t = 0; t <= loopMs(n, flight); t += 37) {
-        const p = playhead(t, n, flight, flight * 0.25);
-        expect(p.landed).toBeGreaterThanOrEqual(seen);
-        seen = p.landed;
+  for (const n of [1, 5, 36, 200]) {
+    it(`with ${n} item${n === 1 ? '' : 's'}: never a gap over 1s between launches, never none in flight, never over MAX_FLYING`, () => {
+      let landedMost = 0;
+      for (let t = 0; t <= 120_000; t += 20) {
+        const p = playhead(t, n, FLIGHT, STRIKE_MS);
+        expect(p.flying.length).toBeGreaterThan(0); // also during warm-up: the first beam leaves at 0
+        expect(p.flying.length).toBeLessThanOrEqual(MAX_FLYING);
+        expect(p.flying.every((f) => f.progress >= 0 && f.progress < 1 && f.index >= 0 && f.index < n)).toBe(true);
+        // the newest launch is never older than a second
+        expect(Math.min(...p.flying.map((f) => f.progress)) * FLIGHT).toBeLessThanOrEqual(1000);
+        landedMost = p.landed;
       }
-      expect(seen).toBe(n);
-      expect(loopMs(n, flight)).toBe(startOf(n - 1, n) + flight + LOOP_REST_MS);
+      for (let k = 1; k < 400; k++) expect(startOf(k, FLIGHT) - startOf(k - 1, FLIGHT)).toBeLessThanOrEqual(1000);
+      expect(landedMost).toBeGreaterThan(n); // it went round the list at least once
+    });
+  }
+
+  it('goes round the list again when it runs out: item 0 follows the last item', () => {
+    const n = 5;
+    const seen: number[] = [];
+    for (let t = 0; t < 20_000; t += 10) {
+      for (const f of playhead(t, n, FLIGHT, STRIKE_MS).flying) if (f.progress < 0.01 && seen[seen.length - 1] !== f.index) seen.push(f.index);
     }
+    expect(seen.slice(0, 12)).toEqual([0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1]);
+  });
+
+  it('counts landings in a row, one per launch, and the count keeps growing', () => {
+    expect(playhead(STRIKE_MS - 1, 3, FLIGHT, STRIKE_MS).landed).toBe(0);
+    expect(playhead(STRIKE_MS, 3, FLIGHT, STRIKE_MS).landed).toBe(1);
+    const g = launchGapMs(FLIGHT);
+    expect(playhead(STRIKE_MS + g, 3, FLIGHT, STRIKE_MS).landed).toBe(2);
+    expect(playhead(STRIKE_MS + 10 * g, 3, FLIGHT, STRIKE_MS).landed).toBe(11);
+  });
+
+  it('keeps the newest trips when more than MAX_FLYING have started, and does nothing with no items', () => {
+    const p = playhead(30_000, 100, 20_000, 0); // a very long trip: 20 launches in the air: far more than MAX_FLYING in the air
+    expect(p.flying.length).toBe(MAX_FLYING);
+    expect(playhead(5000, 0, FLIGHT, STRIKE_MS)).toEqual({ landed: 0, flying: [] });
   });
 });
 

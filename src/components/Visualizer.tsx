@@ -109,8 +109,7 @@ function Overlay() {
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
-    let loop = 0;
-    setAt({ landed: 0, loop });
+    setAt({ landed: 0, loop: 0 });
     return startDisc({
       canvas: el,
       wedges: disc.wedges,
@@ -118,10 +117,7 @@ function Overlay() {
       palette: readPalette(el),
       still: calm,
       cards,
-      onLanded: (landed) => {
-        if (!landed) loop++;
-        setAt({ landed, loop });
-      },
+      onLanded: (landed, loop) => setAt({ landed, loop }),
     });
   }, [disc, cards, calm]);
 

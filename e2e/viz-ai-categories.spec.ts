@@ -241,8 +241,8 @@ test('a press counts as the run for that range: ticking Sort automatically after
   expect(bodies).toHaveLength(1);
 });
 
-test('an automatic sort cut short by switching to By board runs again on coming back to By category', async ({ page }) => {
-  await autoDefault(page);
+/** Holds every Anthropic request until `answer()`; `asked()` is how many came. */
+async function heldAnthropic(page: Page) {
   let answer: () => void = () => {};
   const held = new Promise<void>((r) => (answer = r));
   let asked = 0;
@@ -252,14 +252,76 @@ test('an automatic sort cut short by switching to By board runs again on coming 
     await held;
     return r.fulfill({ status: 500, headers: cors, body: '{}' }).catch(() => {});
   });
+  return { answer: () => answer(), asked: () => asked };
+}
+
+test('an automatic sort cut short by switching to By board counts as run: coming back to By category sends nothing more', async ({ page }) => {
+  await autoDefault(page);
+  const held = await heldAnthropic(page);
   await saveKey(page);
   await openVisualizer(page);
   await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
   await dialog(page).getByRole('button', { name: 'By board' }).click();
   await dialog(page).getByRole('button', { name: 'By category' }).click();
+  // Not a second run: the button is there for another try.
+  await expect(sortButton(page)).toBeEnabled();
+  await page.waitForTimeout(500);
+  expect(held.asked()).toBe(1);
+  held.answer();
+});
+
+test('unticking Sort automatically stops an automatic sort still running, as Cancel does', async ({ page }) => {
+  await autoDefault(page);
+  const held = await heldAnthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
   await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
-  await expect.poll(() => asked).toBe(2);
-  answer();
+  await autoBox(page).uncheck();
+  await expect(dialog(page).getByText('Stopped.')).toBeVisible();
+  await expect(sortButton(page)).toBeEnabled();
+  held.answer();
+  await page.waitForTimeout(300);
+  expect(held.asked()).toBe(1);
+});
+
+test('where the labels cannot be saved, Sort automatically sends nothing and says so; a press still works', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  // This browser's storage is full for the labels (the boards still save).
+  await page.evaluate(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (k.startsWith('note-board:ai-categories')) throw new DOMException('full', 'QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  await openVisualizer(page);
+  await expect(dialog(page).getByText("Can't save sorted labels on this device, so Sort automatically is paused.", { exact: false })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await sortButton(page).click();
+  await expect(dialog(page).getByRole('alert')).toHaveText("Can't save sorted labels on this device.");
+  expect(bodies).toHaveLength(1);
+});
+
+test('with the labels kept on this device full, Sort automatically pauses instead of pushing older ones out', async ({ page }) => {
+  await autoDefault(page);
+  // 2,000 labels kept already (the most), for nobody signed in.
+  await page.evaluate(() => {
+    const entries: Record<string, string> = {};
+    for (let i = 0; i < 2000; i++) entries[`hx${i}`] = 'Stuff';
+    localStorage.setItem('note-board:ai-categories', JSON.stringify({ v: 1, owner: '', entries }));
+  });
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText(/^Sort automatically is paused: this device keeps at most 2,000 sorted labels\./)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
 });
 
 test('Cancel stops a sort that is still running', async ({ page }) => {

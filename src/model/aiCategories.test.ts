@@ -175,6 +175,11 @@ describe('sub-items: the parent goes along as context (owner request 2026-11-13)
     expect(toSend([sub('Beat the boss', ['Tonight', 'Elden Ring'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss', parent: 'Elden Ring' }]);
   });
 
+  it('skips a parent whose tidied text is empty, as it skips a time word: the next one up counts', () => {
+    expect(toSend([sub('Beat the boss', ['   ', 'Elden Ring'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss', parent: 'Elden Ring' }]);
+    expect(toSend([sub('Beat the boss', [' ', 'Today'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss' }]);
+  });
+
   it('a sub-item whose parent already gives a built-in category is not sent: the parent decides (no label would show)', () => {
     expect(toSend([sub('Box up the tools', ['Clean the garage'])], () => false, allOwn)).toEqual({ entries: [], total: 0 });
   });
@@ -242,15 +247,13 @@ describe('the disc with AI labels', () => {
 });
 
 describe('autoSortDue (Sort automatically, owner request 2026-11-13)', () => {
-  const base = { auto: true, hasKey: true, byCategory: true, loading: false, running: false, total: 3, range: '30', tried: new Set<string>() };
+  const base = { auto: true, loading: false, running: false, total: 3, run: '30', tried: new Set<string>() };
 
-  it('runs on its own with a key saved, By category, the box on and items with no label yet', () => {
+  it('runs on its own with the box on and items with no label yet', () => {
     expect(autoSortDue(base)).toBe(true);
   });
 
-  it('does not run without a key, By board, with the box off, or with nothing left to sort', () => {
-    expect(autoSortDue({ ...base, hasKey: false })).toBe(false);
-    expect(autoSortDue({ ...base, byCategory: false })).toBe(false);
+  it('does not run with the box off, or with nothing left to sort', () => {
     expect(autoSortDue({ ...base, auto: false })).toBe(false);
     expect(autoSortDue({ ...base, total: 0 })).toBe(false);
   });
@@ -262,7 +265,7 @@ describe('autoSortDue (Sort automatically, owner request 2026-11-13)', () => {
 
   it('runs at most once per open per range, so a failure is never retried by itself', () => {
     const tried = new Set<string>();
-    const at = (range: string) => ({ ...base, range, tried });
+    const at = (run: string) => ({ ...base, run, tried });
     expect(autoSortDue(at('30'))).toBe(true);
     tried.add('30'); // the run starts (and then fails, or is stopped)
     expect(autoSortDue(at('30'))).toBe(false); // the error shows; no second request

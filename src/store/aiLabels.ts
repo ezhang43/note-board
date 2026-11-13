@@ -1,4 +1,4 @@
-import { stoppedBy, CANCELLED, type AiFailure, type AiResult } from "../model/ai";
+import { fail, stoppedBy, CANCELLED, type AiFailure, type AiResult } from "../model/ai";
 import {
   AI_BATCH,
   AI_LABELS_NAME,
@@ -22,13 +22,23 @@ import type { AskArgs } from "./ai";
  * the item counts as asked, so Sort automatically does not send and bill the same text again (coordinator, 2026-11-13). */
 const NO_LABEL = "";
 
-/** At most this many labels are kept; the oldest go first. */
+/** At most this many labels are kept; the oldest go first (a press only: Sort automatically never pushes one out, see `room`). */
 export const LABELS_MAX = 2000;
+
+/** What a sort says when a batch's labels could not be saved; it stops there, so no more are sent and billed. */
+export const SAVE_FAILED = "Can't save sorted labels on this device.";
+
+/** Where `room` writes a test the size of the labels to come, and removes it at once. */
+const PROBE_NAME = `${AI_LABELS_NAME}:room`;
+/** Letters one saved label takes, at most: its key (about 12), the name (at most 24) and the JSON around them. */
+const LETTERS_PER_LABEL = 48;
 
 type Place = Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
 type Saved = { v: 1; owner: string; entries: Record<string, string> };
 
 export function createLabelCache(device: Place) {
+  /** A save failed in this page (storage full or blocked): Sort automatically waits until one works again. */
+  let failed = false;
   const load = (owner: string | null): Record<string, string> => {
     try {
       const s = JSON.parse(device?.getItem(AI_LABELS_NAME) ?? "null") as Partial<Saved> | null;
@@ -43,15 +53,46 @@ export function createLabelCache(device: Place) {
     get(text: string, model: string, owner: string | null, parent?: string): string | null {
       return cleanLabel(load(owner)[labelKey(text, model, parent)]);
     },
-    /** Like `get`, for many texts: reads the saved labels once. */
-    reader(model: string, owner: string | null): (text: string, parent?: string) => string | null {
+    /**
+     * Reads the saved labels once, for many texts: `label` is like `get`; `asked` is whether `text` (under `parent`)
+     * was already asked about with `model` (a label or no label came back). A saved value that is neither (damaged
+     * on this device) is asked about again.
+     */
+    view(model: string, owner: string | null) {
       const entries = load(owner);
-      return (text, parent) => cleanLabel(entries[labelKey(text, model, parent)]);
+      const at = (text: string, parent?: string): unknown => entries[labelKey(text, model, parent)];
+      return {
+        label: (text: string, parent?: string) => cleanLabel(at(text, parent)),
+        asked: (text: string, parent?: string) => {
+          const v = at(text, parent);
+          return v === NO_LABEL || cleanLabel(v) !== null;
+        },
+      };
     },
-    /** Whether `text` (under `parent`) was already asked about with `model`: a label or no label came back. */
-    asked(model: string, owner: string | null): (text: string, parent?: string) => boolean {
-      const entries = load(owner);
-      return (text, parent) => Object.prototype.hasOwnProperty.call(entries, labelKey(text, model, parent));
+    reader: (model: string, owner: string | null) => store.view(model, owner).label,
+    asked: (model: string, owner: string | null) => store.view(model, owner).asked,
+    /**
+     * Whether Sort automatically may send `count` more items for `owner` (job viz-ai-autosort, owner 2026-11-13):
+     * "cant-save" when their labels could not be saved (no storage, blocked, or too full for a test write their
+     * size, or a save already failed in this page), so the same items would be sent and billed again on every
+     * open; "full" when saving them would push out labels kept already (LABELS_MAX), which would then be sent
+     * again. A press does not ask.
+     */
+    room(count: number, owner: string | null): "ok" | "full" | "cant-save" {
+      if (failed || !device) return "cant-save";
+      if (Object.keys(load(owner)).length + count > LABELS_MAX) return "full";
+      try {
+        device.setItem(PROBE_NAME, "x".repeat(count * LETTERS_PER_LABEL));
+        return "ok";
+      } catch {
+        return "cant-save";
+      } finally {
+        try {
+          device.removeItem(PROBE_NAME);
+        } catch {
+          // Blocked: nothing was written.
+        }
+      }
     },
     /** Removes labels saved by anyone but `owner` (after a sign-out or a change of person), or damaged ones. */
     dropUnlessFor(owner: string | null) {
@@ -77,10 +118,12 @@ export function createLabelCache(device: Place) {
       const keys = Object.keys(entries);
       for (const k of keys.slice(0, Math.max(0, keys.length - LABELS_MAX))) delete entries[k];
       try {
-        if (!device) return false;
+        if (!device) throw new Error("no storage");
         device.setItem(AI_LABELS_NAME, JSON.stringify({ v: 1, owner: owner ?? "", entries } satisfies Saved));
+        failed = false;
         return true;
       } catch {
+        failed = true;
         return false;
       }
     },
@@ -176,7 +219,8 @@ export async function sortWithAi({
       if (!same && names.length < AI_MAX_CATEGORIES) names.push(l);
       pairs.push([batch[i].text, same ?? l, batch[i].parent]);
     });
-    cache.putAll(pairs, model, uid);
+    // Not saved (storage full or blocked): stop, so the rest are not sent and billed for labels that would be lost.
+    if (!cache.putAll(pairs, model, uid)) return fail("storage", SAVE_FAILED);
     sorted += pairs.filter((p) => p[1] !== NO_LABEL).length;
     asked += batch.length;
     onProgress(asked);

@@ -92,7 +92,8 @@ function Overlay() {
   const autoTried = useRef(new Set<string>());
   // Labels someone else saved (before a sign-out or a change of person) are of no use here: drop them.
   useEffect(() => aiLabels.dropUnlessFor(uid), [uid]);
-  const lookup = useMemo(() => (hasKey ? aiLabels.reader(model, uid) : null), [hasKey, model, uid, labelsRev]); // labelsRev: read again once a press ends
+  const saved = useMemo(() => (hasKey ? aiLabels.view(model, uid) : null), [hasKey, model, uid, labelsRev]); // labelsRev: read again once a press ends
+  const lookup = saved?.label ?? null;
   // Only the person's own boards (owner, 2026-11-13): nothing from a board someone else shared with them is sent or labeled.
   const shares = useAppState((s) => s.ui.shares);
   const sharesKnown = useAppState((s) => s.ui.sharesKnown);
@@ -100,8 +101,7 @@ function Overlay() {
   const categorize = useMemo(() => (lookup ? makeAiCategorizer(items, lookup, isOwn) : categoryOf), [items, lookup, isOwn]);
   const disc = useMemo(() => discOf(items, group, categorize), [items, group, categorize]);
   // Asked before counts too (a label or no label came back), so the same text is not sent and billed again.
-  const asked = useMemo(() => (hasKey ? aiLabels.asked(model, uid) : null), [hasKey, model, uid, labelsRev]);
-  const pending = useMemo(() => (lookup && asked ? toSend(items, (e) => asked(e.text, e.parent), isOwn) : null), [items, lookup, asked, isOwn]);
+  const pending = useMemo(() => (saved ? toSend(items, (e) => saved.asked(e.text, e.parent), isOwn) : null), [items, saved, isOwn]);
   // The two lines of the small card for each item as it lands (plain text, drawn on the canvas).
   const cards = useMemo(() => items.map((item, i) => cardLines(item, disc.wedges[disc.slots[i]?.wedge]?.name, group)), [items, disc, group]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);
@@ -184,8 +184,6 @@ function Overlay() {
               entries={pending.entries}
               total={pending.total}
               loading={!sharesKnown}
-              hasKey={hasKey}
-              byCategory={group === 'category'}
               range={range}
               tried={autoTried}
               known={disc.wedges.filter((w) => w.key.startsWith('ai:')).map((w) => w.name)}

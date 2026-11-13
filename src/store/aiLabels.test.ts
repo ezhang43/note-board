@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { CANCELLED, type AiResult } from "../model/ai";
-import { AI_BATCH, AI_LABELS_NAME, LABELS_SCHEMA } from "../model/aiCategories";
+import { AI_BATCH, AI_LABELS_NAME, LABELS_SCHEMA, labelKey, toSend } from "../model/aiCategories";
 import { AI_STORAGE_KEYS, createAiStore } from "./ai";
 import type { AskArgs } from "./ai";
-import { LABELS_MAX, createLabelCache, sortWithAi } from "./aiLabels";
+import { LABELS_MAX, SAVE_FAILED, createLabelCache, sortWithAi } from "./aiLabels";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave are kept on this device only, keyed by a
 // hash of the item text and the model, so the same items are not asked about again.
@@ -120,6 +120,94 @@ describe("the label cache", () => {
   });
 });
 
+/** Storage that takes small writes but is full for anything longer than `room` letters. */
+const nearlyFull = (room: number) => {
+  const m = memory();
+  return {
+    ...m,
+    setItem: (k: string, v: string) => {
+      if (v.length > room) throw new DOMException("full", "QuotaExceededError");
+      m.setItem(k, v);
+    },
+  };
+};
+const texts = (a: AskArgs) => JSON.parse(a.user.slice(a.user.lastIndexOf("["))) as string[];
+
+describe("whether Sort automatically may send (job viz-ai-autosort, owner 2026-11-13)", () => {
+  it("only when the labels it would bring back can be saved", () => {
+    expect(createLabelCache(memory()).room(50, "u1")).toBe("ok");
+    expect(createLabelCache(null).room(50, "u1")).toBe("cant-save");
+    expect(createLabelCache(blocked()).room(50, "u1")).toBe("cant-save");
+    // Full: what is there already can be written again, but there is no room for 50 more labels.
+    expect(createLabelCache(nearlyFull(200)).room(50, "u1")).toBe("cant-save");
+    // The test write is gone afterwards.
+    const device = memory();
+    createLabelCache(device).room(50, "u1");
+    expect(Object.keys(device.data)).toEqual([]);
+  });
+
+  it("not once a save has failed in this page, until one works again", () => {
+    let full = true;
+    const m = memory();
+    const device = {
+      ...m,
+      setItem: (k: string, v: string) => {
+        if (k === AI_LABELS_NAME && full) throw new DOMException("full", "QuotaExceededError");
+        m.setItem(k, v);
+      },
+    };
+    const cache = createLabelCache(device);
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe(false);
+    expect(cache.room(1, "u1")).toBe("cant-save");
+    full = false;
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe(true);
+    expect(cache.room(1, "u1")).toBe("ok");
+  });
+
+  it("not when saving would push out labels kept already (LABELS_MAX)", () => {
+    const cache = createLabelCache(memory());
+    cache.putAll(Array.from({ length: LABELS_MAX - 10 }, (_, i): [string, string] => [`item ${i}`, "L"]), M, "u1");
+    expect(cache.room(10, "u1")).toBe("ok");
+    expect(cache.room(11, "u1")).toBe("full");
+    // Someone else's labels are replaced on their next save, so for them there is room.
+    expect(cache.room(11, "u2")).toBe("ok");
+  });
+
+  it("2,500 finished items are never sent twice across many opens: it stops once the labels kept are full", async () => {
+    const cache = createLabelCache(memory());
+    const items = Array.from({ length: 2500 }, (_, i) => ({ text: `item ${i}`, boardId: "home" }));
+    const sent = new Map<string, number>();
+    const ask = async (a: AskArgs): Promise<AiResult> => {
+      for (const t of texts(a)) sent.set(t, (sent.get(t) ?? 0) + 1);
+      return { ok: true, value: { categories: ["Stuff"], labels: texts(a).map((_, i) => ({ i, c: 0 })) } };
+    };
+    // Each open runs Sort automatically once, as the Visualizer does: what toSend picks, if there is room.
+    for (let open = 0; open < 40; open++) {
+      const asked = cache.asked(M, "u1");
+      const { entries } = toSend(items, (e) => asked(e.text, e.parent), () => true);
+      if (!entries.length || cache.room(entries.length, "u1") !== "ok") continue;
+      await sortWithAi({ ask, cache, uid: "u1", model: M, entries, known: [], onProgress: () => {} });
+    }
+    expect(Math.max(...sent.values())).toBe(1);
+    expect(sent.size).toBe(LABELS_MAX);
+    expect(cache.room(1, "u1")).toBe("full");
+  });
+
+  it("a saved value that cleans to nothing counts as not asked (asked again); no label still counts as asked", () => {
+    const device = memory();
+    const cache = createLabelCache(device);
+    cache.putAll([["Mystery", ""]], M, "u1");
+    const saved = JSON.parse(device.data[AI_LABELS_NAME]);
+    saved.entries[labelKey("Damaged", M)] = "​ ";
+    saved.entries[labelKey("Not text", M)] = 7;
+    device.setItem(AI_LABELS_NAME, JSON.stringify(saved));
+    const asked = cache.asked(M, "u1");
+    expect(asked("Mystery")).toBe(true);
+    expect(asked("Damaged")).toBe(false);
+    expect(asked("Not text")).toBe(false);
+  });
+});
+
 describe("sortWithAi", () => {
   const reply = (args: AskArgs, name = "Stuff"): AiResult => {
     const texts = JSON.parse(args.user.slice(args.user.lastIndexOf("["))) as string[];
@@ -215,6 +303,16 @@ describe("sortWithAi", () => {
     expect(n).toBe(2);
     expect(cache.get("item 0", M, null)).toBe("Stuff");
     expect(cache.get(`item ${AI_BATCH}`, M, null)).toBeNull();
+  });
+
+  it("stops after the first batch it cannot save, with a plain message, so no more are sent and billed", async () => {
+    const device = { ...memory(), setItem: () => { throw new DOMException("full", "QuotaExceededError"); } };
+    let n = 0;
+    const many = Array.from({ length: AI_BATCH * 3 }, (_, i) => ({ text: `item ${i}` }));
+    const r = await sortWithAi({ ask: async (a) => (n++, reply(a)), cache: createLabelCache(device), uid: null, model: M, entries: many, known: [], onProgress: () => {} });
+    expect(r).toEqual({ ok: false, kind: "storage", message: SAVE_FAILED });
+    expect(SAVE_FAILED).toBe("Can't save sorted labels on this device.");
+    expect(n).toBe(1);
   });
 
   it("Cancel stops it and saves nothing from the batch that was running", async () => {

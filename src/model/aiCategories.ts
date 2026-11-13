@@ -71,15 +71,15 @@ export interface AiEntry {
  * The one rule for what Sort with AI asks about (owner 2026-11-13), used for sending, for saving and for drawing:
  * - an item whose whole text is only a time word ("Today", "Now") is never asked about;
  * - a sub-item whose parent already gives a built-in category is not either: the parent decides, as without AI;
- * - otherwise a sub-item goes with its nearest parent that is not a time word (a time-word parent is vague, so
- *   the sub-item is sorted by its own words), and Claude decides whether that parent names a topic.
+ * - otherwise a sub-item goes with its nearest parent that is not a time word or empty once tidied (a time-word
+ *   parent is vague, so the sub-item is sorted by its own words), and Claude decides whether that parent names a topic.
  * Null when the item is not asked about.
  */
 export function aiEntry(item: { text: string; context?: string[] }): AiEntry | null {
   const text = normalizeText(item.text);
   if (!text || isTimeWord(text) || parentCategory(item) !== null) return null;
-  const above = item.context?.find((t) => !isTimeWord(t));
-  const parent = above === undefined ? '' : normalizeText(above);
+  // An item above with no words left once tidied is skipped too, like a time word.
+  const parent = item.context?.map(normalizeText).find((t) => t && !isTimeWord(t));
   return parent ? { text, parent } : { text };
 }
 
@@ -104,23 +104,16 @@ export function toSend(items: AiItem[], labeled: (entry: AiEntry) => boolean, is
 }
 
 /**
- * Whether Sort with AI runs by itself now (owner request 2026-11-13, job "viz-ai-autosort"): only with this
- * person's key saved, By category showing, the "Sort automatically" box on, the shares known, no sort running
- * and items left with no label (`total`, from toSend). At most once per open per range (`tried`, the ranges
- * already run in this open, kept by the caller), so a failure or a Cancel is never retried by itself; the
- * button stays for a second try and for the rest past AI_MAX_PER_PRESS.
+ * Whether Sort with AI runs by itself now (owner request 2026-11-13, job "viz-ai-autosort"). The Visualizer
+ * shows Sort with AI only with this person's key saved and By category showing; then it runs with the "Sort
+ * automatically" box on, the shares known, no sort running and items left with no label (`total`, from toSend).
+ * At most once per open per person, model and range (`run`, a key of the three; `tried`, the keys already run
+ * in this open, kept by the caller), so a failure, a Cancel or a run cut short is never retried by itself; the
+ * button stays for a second try and for the rest past AI_MAX_PER_PRESS. (The caller also checks the labels can
+ * be kept: LabelCache.room.)
  */
-export function autoSortDue(s: {
-  auto: boolean;
-  hasKey: boolean;
-  byCategory: boolean;
-  loading: boolean;
-  running: boolean;
-  total: number;
-  range: string;
-  tried: ReadonlySet<string>;
-}): boolean {
-  return s.auto && s.hasKey && s.byCategory && !s.loading && !s.running && s.total > 0 && !s.tried.has(s.range);
+export function autoSortDue(s: { auto: boolean; loading: boolean; running: boolean; total: number; run: string; tried: ReadonlySet<string> }): boolean {
+  return s.auto && !s.loading && !s.running && s.total > 0 && !s.tried.has(s.run);
 }
 
 export const LABELS_SCHEMA: AiSchema = {

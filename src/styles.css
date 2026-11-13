@@ -357,12 +357,12 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
 .phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 /* Never an empty tile: nine sit three across (three full rows), eight four across (two full rows), and seven four
-   across with the last one two wide (signed out: no Share or Calendar). The Visualizer is not counted: it is a
+   across with the last one two wide (signed out: no Share or Calendar). Feedback (signed in) is not counted: it is a
    full-width last row of its own (icon beside the label). */
-.phone-tiles:has(> :nth-child(7 of :not(.viz-open))) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.phone-tiles:has(> :nth-child(9 of :not(.viz-open))) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.phone-tiles > :nth-child(7 of :not(.viz-open)):nth-last-child(1 of :not(.viz-open)) { grid-column: span 2; }
-.phone-tiles > .tb-button.viz-open { grid-column: 1 / -1; flex-direction: row; min-height: 48px; gap: 8px; }
+.phone-tiles:has(> :nth-child(7 of :not(.tile-wide))) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.phone-tiles:has(> :nth-child(9 of :not(.tile-wide))) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.phone-tiles > :nth-child(7 of :not(.tile-wide)):nth-last-child(1 of :not(.tile-wide)) { grid-column: span 2; }
+.phone-tiles > .tb-button.tile-wide { grid-column: 1 / -1; flex-direction: row; min-height: 48px; gap: 8px; }
 .phone-trio { margin-top: 6px; }
 .phone-more .share-wrap.phone { display: contents; }
 .phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }

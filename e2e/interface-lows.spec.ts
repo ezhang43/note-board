@@ -78,17 +78,17 @@ test('C-L4: Escape and × in the Share panel give focus back to the Share button
   await expect(share).toBeFocused();
 });
 
-test('C-L4: closing Send feedback gives focus back to the Feedback button', async ({ page }) => {
+// C-L4 for Send feedback: it now opens from a row in ⋯ More (owner request 2026-11-13), which closes on the
+// way in, so there is no button left to give focus back to (the same as the other ⋯ rows). Escape still closes it.
+test('C-L4: Escape closes Send feedback opened from ⋯ More', async ({ page }) => {
   await page.goto(`/?demo-user=Focus${Math.random().toString(36).slice(2, 8)}`);
   await fontsLoaded(page);
-  const button = toolbar(page).getByRole('button', { name: 'Feedback', exact: true });
-  await button.focus();
-  await page.keyboard.press('Enter');
+  await toolbar(page).getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Feedback', exact: true }).click();
   const panel = page.getByRole('dialog', { name: 'Send feedback' });
   await expect(panel).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-  await expect(button).toBeFocused();
 });
 
 test('C-L11: the card count, the zoom button and the item grip say what they are to a screen reader', async ({ page }) => {

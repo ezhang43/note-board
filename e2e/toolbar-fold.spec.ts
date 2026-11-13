@@ -35,7 +35,7 @@ for (const width of [600, 667, 768, 834, 1024, 1179]) {
     const errors = await start(page, width);
     await expectFits(page, width);
     await expect(toolbar(page).getByRole('button', { name: 'Share', exact: true })).toBeVisible();
-    for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toHaveCount(0);
+    for (const name of ['Arrange', 'File', 'Visualizer', 'Appearance', 'Sign out']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toHaveCount(0);
     await expect(more(page)).toBeVisible();
     // The Add buttons keep their names (and tooltips) whether or not their words show.
     for (const name of ['Note', 'Checklist', 'New container']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeVisible();
@@ -49,14 +49,14 @@ for (const width of [600, 667, 768, 834, 1024, 1179]) {
 }
 
 for (const width of [1180, 1280]) {
-  test(`at ${width}px the whole toolbar shows and ⋯ holds only Version history, Completed, Visualizer and AI settings`, async ({ page }) => {
+  test(`at ${width}px the whole toolbar shows and ⋯ holds only Version history, Completed, Feedback and AI settings`, async ({ page }) => {
     await start(page, width);
     await expectFits(page, width);
     await expect(more(page)).toBeVisible();
     await more(page).click();
-    await expect(moreMenu(page).getByRole('button')).toHaveText([/Version history/, /Completed/, /Visualizer/, /AI settings/]);
+    await expect(moreMenu(page).getByRole('button')).toHaveText([/Version history/, /Completed/, /Feedback/, /AI settings/]);
     await page.keyboard.press('Escape');
-    for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out', 'Share']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeVisible();
+    for (const name of ['Arrange', 'File', 'Visualizer', 'Appearance', 'Sign out', 'Share']) await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeVisible();
     await expect(toolbar(page).getByRole('button', { name: 'Note', exact: true }).locator('.tb-label')).toBeVisible();
   });
 }
@@ -93,7 +93,7 @@ test('⋯ opens and closes with a click, outside click and Escape (focus goes ba
   await expect(more(page)).toHaveAttribute('aria-expanded', 'false');
   await more(page).click();
   await expect(more(page)).toHaveAttribute('aria-expanded', 'true');
-  for (const name of ['Arrange', 'File', 'Feedback', 'Appearance', 'Sign out']) await expect(moreMenu(page).getByRole('button', { name, exact: true })).toBeVisible();
+  for (const name of ['Arrange', 'File', 'Visualizer', 'Feedback', 'Appearance', 'Sign out']) await expect(moreMenu(page).getByRole('button', { name, exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(moreMenu(page)).toHaveCount(0);
   await expect(more(page)).toBeFocused();

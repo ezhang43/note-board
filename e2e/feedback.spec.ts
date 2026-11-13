@@ -5,16 +5,19 @@ import { add, fontsLoaded } from './helpers';
 // person's email; here it is tried with a demo person (?demo-user=), whose note goes to the dev
 // server instead. Running locally without a demo person there is no account, so it isn't offered
 // (on the published site, signed-out people only see the sign-in screen).
-// Its own Feedback button (owner decision, 2026-10-16) sits next to File on a computer, and is a
-// Feedback row in ⋯ More on a phone, above About BusyAnts. The File menu no longer lists it.
+// Feedback is a row in ⋯ More on a computer (it swapped places with Visualizer, owner request
+// 2026-11-13) and a full-width row under the tiles in the phone's ⋯ sheet. The File menu doesn't list it.
 
 const fileMenu = (page: Page) => page.getByRole('menu', { name: 'File' });
 const panel = (page: Page) => page.getByRole('dialog', { name: 'Send feedback' });
 const box = (page: Page) => panel(page).getByLabel('Your feedback');
 const send = (page: Page) => panel(page).getByRole('button', { name: /^(Send|Sending…)$/ });
-const feedbackButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'Feedback', exact: true });
+const moreMenu = (page: Page) => page.getByRole('dialog', { name: 'More' });
+const moreButton = (page: Page) => page.locator('header.toolbar').getByRole('button', { name: 'More', exact: true });
+const feedbackButton = (page: Page) => moreMenu(page).getByRole('button', { name: 'Feedback', exact: true });
 
 async function openPanel(page: Page) {
+  await moreButton(page).click();
   await feedbackButton(page).click();
   await expect(panel(page)).toBeVisible();
 }
@@ -26,22 +29,33 @@ async function demo(page: Page) {
 
 test('running locally without an account, Send feedback isn’t offered', async ({ page }) => {
   await page.goto('/');
+  await moreButton(page).click();
   await expect(feedbackButton(page)).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await page.locator('header.toolbar').getByRole('button', { name: 'File' }).click();
   await expect(fileMenu(page)).toBeVisible();
   await expect(fileMenu(page).getByRole('menuitem', { name: 'Send feedback…' })).toHaveCount(0);
 });
 
-test('signed in, Feedback is its own toolbar button next to File, and File no longer lists it', async ({ page }) => {
+test('signed in, Feedback is a row in ⋯ More and Visualizer has the toolbar button next to File; File no longer lists Feedback', async ({ page }) => {
   await demo(page);
-  const button = feedbackButton(page);
-  await expect(button).toHaveText('Feedback');
-  await expect(button.locator('svg')).toHaveCount(1);
-  // Right after File.
-  const file = page.locator('header.toolbar').getByRole('button', { name: 'File' });
-  const [f, b] = [(await file.boundingBox())!, (await button.boundingBox())!];
+  const toolbarButtons = page.locator('header.toolbar');
+  await expect(toolbarButtons.getByRole('button', { name: 'Feedback', exact: true })).toHaveCount(0);
+  // Visualizer sits right after File, in the slot Feedback had, and opens the Visualizer.
+  const viz = toolbarButtons.getByRole('button', { name: 'Visualizer', exact: true });
+  await expect(viz).toHaveText('Visualizer');
+  await expect(viz.locator('svg')).toHaveCount(1);
+  const file = toolbarButtons.getByRole('button', { name: 'File' });
+  const [f, b] = [(await file.boundingBox())!, (await viz.boundingBox())!];
   expect(b.x).toBeGreaterThan(f.x + f.width - 1);
   expect(b.x - (f.x + f.width)).toBeLessThan(20);
+  await viz.click();
+  await expect(page.getByRole('dialog', { name: 'Visualizer' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Feedback is in ⋯ More.
+  await moreButton(page).click();
+  await expect(feedbackButton(page)).toHaveText('Feedback');
+  await page.keyboard.press('Escape');
   await file.click();
   await expect(fileMenu(page)).toBeVisible();
   await expect(fileMenu(page).getByRole('menuitem', { name: 'Send feedback…' })).toHaveCount(0);
@@ -207,7 +221,7 @@ test('offline, Send is off and says why', async ({ page }) => {
   await expect(send(page)).toBeEnabled();
 });
 
-test('on a phone, ⋯ More has a Feedback row above About BusyAnts, and File no longer lists it', async ({ browser }) => {
+test('on a phone, ⋯ More has a Feedback row under the tiles, Visualizer sits above About BusyAnts, and File no longer lists Feedback', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await demo(page);
@@ -218,9 +232,11 @@ test('on a phone, ⋯ More has a Feedback row above About BusyAnts, and File no 
   await expect(fileMenu(page).getByRole('menuitem', { name: 'Send feedback…' })).toHaveCount(0);
   await more.getByRole('button', { name: 'File' }).click();
   const row = more.getByRole('button', { name: 'Feedback', exact: true });
+  const viz = more.getByRole('button', { name: 'Visualizer', exact: true });
   const about = more.getByRole('link', { name: 'About BusyAnts' });
-  // The row just before About BusyAnts.
-  expect(await row.evaluate((el, a) => el.nextElementSibling === a, await about.elementHandle())).toBe(true);
+  // Visualizer is the row just before About BusyAnts; Feedback ends the tiles.
+  expect(await viz.evaluate((el, a) => el.nextElementSibling === a, await about.elementHandle())).toBe(true);
+  await expect(more.locator('.phone-tiles').getByRole('button', { name: 'Feedback', exact: true })).toBeVisible();
   await row.click();
   await expect(panel(page)).toBeVisible();
   const box = (await panel(page).boundingBox())!;

@@ -239,7 +239,9 @@ function boardGroups(items: DoneItem[]): Group[] {
     boards.set(i.boardId, b);
   }
   const all = [...boards].map(([key, b]) => ({ key, ...b }));
-  const kept = all.length > MAX_WEDGES ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, MAX_WEDGES - 1) : all;
+  // Leave room for the Calendar wedge (if any events) so the disc never goes past MAX_WEDGES.
+  const room = MAX_WEDGES - (events.length ? 1 : 0);
+  const kept = all.length > room ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, room - 1) : all;
   const groups: (Group & { rank: number })[] = kept.sort((a, b) => a.rank - b.rank);
   if (kept.length < all.length) groups.push({ key: '', name: OTHER_BOARDS, rank: Infinity, items: all.filter((b) => !kept.includes(b)).flatMap((b) => b.items) });
   if (events.length) groups.push({ key: events[0].boardId, name: events[0].boardName, rank: Infinity, items: events });

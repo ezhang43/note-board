@@ -434,7 +434,8 @@ export type VizCalendar =
 
 // One fetch per open and range, paged. The window never exceeds the chart's two years, so one page of 2500
 // almost always covers it; a few pages are read at most, then it stops.
-// simple: at most 5 pages (12,500 events). A busier two years would simply miss the oldest; upgrade the cap if that shows up.
+// simple: at most 5 pages (12,500 events). Events come oldest-first (orderBy=startTime), so a busier two years would
+// miss the NEWEST events (the recent days that matter most); raise the cap if a calendar that full ever shows up.
 const VIZ_MAX_PAGES = 5;
 
 /**

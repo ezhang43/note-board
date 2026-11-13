@@ -98,6 +98,8 @@ test('after opening the Calendar once, past and deleted events are counted, show
   // A shorter range keeps the loop short, so the deleted/past events reliably cycle through the feed with their mark.
   await dialog(page).getByRole('button', { name: '7 days' }).click();
   await expect(dialog(page).locator('.viz-feed-mark').first()).toBeVisible({ timeout: 20000 });
+  // The mark is exposed to screen readers as a labelled image, so the calendar cue is actually read.
+  await expect(dialog(page).getByRole('img', { name: 'Calendar event' }).first()).toBeAttached();
   await expect(feed(page).getByText('Kayaking lesson', { exact: true })).toBeVisible({ timeout: 20000 });
   await expect(feed(page).getByText('Pottery workshop', { exact: true })).toBeVisible({ timeout: 20000 });
   await page.context().close();

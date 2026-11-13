@@ -81,24 +81,22 @@ function Overlay() {
   const uid = collab.me()?.uid ?? null;
   // Past and deleted calendar events (owner, 2026-11-13): fetched off the animation path, one fetch per open
   // and range, using only access already kept on this device (never a Google window). They are not board data.
-  const [calEvents, setCalEvents] = useState<DoneItem[]>([]);
-  // The small line under the controls: "Open Calendar once" when there is no fresh access, a quiet note when a fetch failed.
-  const [calNote, setCalNote] = useState<'none' | 'no-access' | 'error'>('none');
+  // Tagged with the person it was fetched for, so one person's events never show next to another's across a sign-in change.
+  const [cal, setCal] = useState<{ uid: string | null; events: DoneItem[]; note: 'none' | 'no-access' | 'error' }>({ uid, events: [], note: 'none' });
   useEffect(() => {
     const ac = new AbortController();
     let live = true;
     fetchCalendarDone(uid, range, today, ac.signal)
-      .then((r) => {
-        if (!live) return;
-        setCalEvents(r.status === 'ok' ? r.items : []);
-        setCalNote(r.status === 'no-access' ? 'no-access' : r.status === 'error' ? 'error' : 'none');
-      })
-      .catch(() => live && setCalNote('error'));
+      .then((r) => live && setCal({ uid, events: r.status === 'ok' ? r.items : [], note: r.status === 'no-access' ? 'no-access' : r.status === 'error' ? 'error' : 'none' }))
+      .catch(() => live && setCal({ uid, events: [], note: 'error' }));
     return () => {
       live = false;
       ac.abort();
     };
   }, [uid, range, today]);
+  // Ignore events still in state from a previous person (the fetch for the new one has not landed yet).
+  const calEvents = cal.uid === uid ? cal.events : [];
+  const calNote = cal.uid === uid ? cal.note : 'none';
   const board = useMemo(() => doneItems(ws), [ws]);
   const all = useMemo(() => (calEvents.length ? [...board, ...calEvents] : board), [board, calEvents]);
   // The same list again when a board change elsewhere (a synced edit) left the finished items as they were, so the loop does not start over.
@@ -255,7 +253,7 @@ function Overlay() {
                   <li key={`${at.loop}-${index}`}>
                     <span className="viz-feed-text">
                       {item.event && (
-                        <svg className="viz-feed-mark" viewBox="0 0 16 16" width="12" height="12" aria-label="Calendar event">
+                        <svg className="viz-feed-mark" viewBox="0 0 16 16" width="12" height="12" role="img" aria-label="Calendar event">
                           <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
                           <line x1="1.5" y1="5.5" x2="14.5" y2="5.5" stroke="currentColor" strokeWidth="1.3" />
                           <line x1="4.5" y1="1" x2="4.5" y2="3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />

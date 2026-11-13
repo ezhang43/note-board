@@ -80,16 +80,19 @@ function parse(raw: unknown, range: VizRange, today: string, now: number): Parse
   const end = readWhen(e.end);
   if (!start) return null; // no usable time
   const summary = typeof e.summary === 'string' ? e.summary.trim() : '';
-  const day = end ? endDay(end) : dayOf(start);
 
+  let day: string;
   if (e.status === 'cancelled') {
     // Deleted: needs a title and a deletion time, and must have been deleted after it started.
     const updated = typeof e.updated === 'string' ? Date.parse(e.updated) : NaN;
     if (!summary || !Number.isFinite(updated)) return null; // no usable title or deletion time: do not guess
     if (updated < whenMs(start)) return null; // deleted before it started: a cancellation, not a done thing
+    // It was deleted mid-run, so it lands on the day it started (a multi-day one may never have fully ended).
+    day = dayOf(start);
   } else {
-    // Passed: a confirmed event counts once it has ended.
+    // Passed: a confirmed event counts once it has ended, and lands on its end day.
     if (!end || whenMs(end) > now) return null;
+    day = endDay(end);
   }
 
   const from = rangeStart(range, today);
@@ -97,8 +100,14 @@ function parse(raw: unknown, range: VizRange, today: string, now: number): Parse
   return { id: `${CAL_BOARD_ID}:${e.id}`, text: summary, date: day, start: whenMs(start) };
 }
 
-/** An all-day event's last day is the day before Google's exclusive end; a timed event's is its end's day. */
-const endDay = (end: { allDay: boolean; at: string }) => (end.allDay ? addDays(end.at, -1) : end.at.slice(0, 10));
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** An all-day event's last day is the day before Google's exclusive end; a timed event's is its end's day — and an end exactly at midnight belongs to the day before, not the new day. */
+const endDay = (end: { allDay: boolean; at: string }): string => {
+  if (end.allDay) return addDays(end.at, -1);
+  const t = new Date(whenMs(end) - 1);
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+};
 
 /** The raw events Google sent, as DoneItem entries within `range` (ending on `today`), oldest first, ranked after board items. */
 export function calendarDoneItems(raw: unknown[], range: VizRange, today: string, now = Date.now()): DoneItem[] {

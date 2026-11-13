@@ -54,6 +54,13 @@ describe('calendarDoneItems — which events count', () => {
     expect(out[0].date).toBe(TODAY);
   });
 
+  it('lands a timed event that ends exactly at midnight on the day it was happening, not the next day', () => {
+    // Last night 22:00 to 00:00: it belongs to yesterday, not today.
+    const out = only({ ...mine, id: 'late', summary: 'Night shift', start: timed(ago(-1), 22, 0), end: timed(TODAY, 0, 0) });
+    expect(out).toHaveLength(1);
+    expect(out[0].date).toBe(ago(-1));
+  });
+
   it('counts own events and accepted invites, skips declined and no-reply invites', () => {
     const base = { id: 'x', summary: 'Meeting', start: timed(ago(-1), 10, 0), end: timed(ago(-1), 11, 0) };
     const guest = (status: string) => ({ ...base, organizer: { email: 'boss@x.com' }, attendees: [{ email: 'boss@x.com', organizer: true, responseStatus: 'accepted' }, { email: 'me@x.com', self: true, responseStatus: status }] });
@@ -82,6 +89,13 @@ describe('calendarDoneItems — deleted events', () => {
 
   it('skips a deleted event deleted before it started (a cancellation, not a done thing)', () => {
     expect(only(deleted({ updated: iso(ago(-3), 9, 0) }))).toHaveLength(0);
+  });
+
+  it('counts a multi-day event deleted mid-run, on the day it started', () => {
+    // A 3-day all-day event started yesterday, deleted today: it was happening, so it counts, on its start day.
+    const out = only({ ...mine, id: 'trip', status: 'cancelled', summary: 'Conference', start: allDay(ago(-1)), end: allDay(ago(2)), updated: iso(TODAY, 10, 0) });
+    expect(out).toHaveLength(1);
+    expect(out[0].date).toBe(ago(-1));
   });
 
   it('skips a deleted event with no usable title or deletion time, rather than guessing', () => {

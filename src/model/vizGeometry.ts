@@ -151,6 +151,20 @@ export function beamPoint(from: { x: number; y: number }, to: { x: number; y: nu
 }
 
 /**
+ * How wide a beam is drawn on a stage whose disc has half width `rx` (owner request 2026-11-13, "make the beams
+ * thicker like the video"): a wide pink glow with a thin bright core inside it, as sprite widths in pixels. The
+ * reference's beam is a pink band about 0.0055 of the disc's width across at half its brightness; a sprite is half
+ * as bright at about 0.38 of its width, so the glow is 0.029 of rx wide. Never under a few pixels, so a beam
+ * is still seen on a phone. Before this the glow was 7 * unit (3.2px at half brightness, 0.0034 of the disc's width on a big window) and the core 1.8 * unit.
+ */
+export function beamWidths(rx: number): { glow: number; core: number } {
+  return { glow: Math.max(8, 0.029 * rx), core: Math.max(2.4, 0.011 * rx) };
+}
+
+/** How bright a beam's pink glow and its white-hot core are drawn (the glow was 0.5, so it read faint beside the reference's solid pink band). */
+export const BEAM_ALPHA = { glow: 0.75, core: 0.9 };
+
+/**
  * The light pillar through the core (owner request, 2026-11-12): always there (so the core stays bright between arrivals), wider and brighter
  * as the core flares (`flare` 0 to 1). `width` is a multiple of its resting width, `alpha` how bright it is.
  */
@@ -185,21 +199,38 @@ export function particleSeed(item: number, k: number): { spread: number; delay: 
   return k === 0 ? { spread: spread * 0.25, delay: 0, lift: (LIFT_MIN + LIFT_MAX) / 2 } : { spread, delay, lift };
 }
 
+/** What a flow needs to know about the picture: how far the disc has turned, and where it is and how big. */
+export interface FlowView {
+  spin: number;
+  cx: number;
+  cy: number;
+  rx: number;
+}
+
+/** How high a spark's arc stands above the disc at its top, as a share of the disc's half width: `ARC_BASE` plus `ARC_PER_LIFT` times its lift. Together they put the middle of every path 0.07 to 0.14 of the disc's width off the straight line to the core, like the reference clip. */
+const ARC_BASE = 0.2;
+const ARC_PER_LIFT = 0.3;
+/** How soon the arc peaks: under 1 it climbs steeply at first (the top at about two fifths of the way along). */
+const ARC_RISE = 0.8;
+
+/** The most (radians) a spark's path may swing sideways: a lone wedge is a whole circle wide, and its sparks must not spiral. */
+const FLOW_SWING_MAX = 0.5;
+
 /**
- * A particle `q` (0 to 1) of the way along its curve from a cell `from` into the core `to`: it climbs in an
- * arc that leans to one side by `spread` and speeds up as it is drawn in. All the paths of a burst start on
- * the cell and meet in the core, and fan out in between.
+ * A spark `q` (0 to 1) of the way along its flow (owner request 2026-11-13, "viz-disc-bigger": "flowing from the
+ * categories into the center"): it leaves `cell` (angle and radius on the disc), runs inward along the disc on its
+ * tilt, swinging to one side by `spread` (-1 to 1) of its wedge's half width `halfSpan` (radians) but never out of the
+ * wedge, then in the last stretch lifts off the hub into the core. `lift` is how high it arcs above the disc on the way.
+ * It speeds up as it is drawn in, and is turned with the disc by `v.spin`. It starts on the cell and ends in the core.
  */
-export function particleAt(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, lift = 0.35): { x: number; y: number } {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  // A quadratic curve: the control point sits above the middle of the line, pushed sideways by the spread.
-  const cx = from.x + dx / 2 + (-dy / len) * spread * len * 0.3;
-  const cy = from.y + dy / 2 - len * lift + (dx / len) * spread * len * 0.3;
+export function flowAt(cell: { a: number; r: number }, halfSpan: number, spread: number, q: number, lift: number, v: FlowView): { x: number; y: number } {
   const e = Math.pow(clamp01(q), 1.5); // slow off the cell, quickest into the core
-  const u = 1 - e;
-  return { x: u * u * from.x + 2 * u * e * cx + e * e * to.x, y: u * u * from.y + 2 * u * e * cy + e * e * to.y };
+  const swing = Math.min(halfSpan, FLOW_SWING_MAX) * 0.8;
+  const onDisc = project(cell.a + spread * swing * Math.sin(Math.PI * e), cell.r + (INNER * 0.85 - cell.r) * e, v.spin, v.cx, v.cy, v.rx);
+  const core = coreAt(v.cx, v.cy, v.rx);
+  const up = e * e; // the share of the way from the disc to the core: little at first, all of it at the end
+  const arc = (lift > 0 ? ARC_BASE + ARC_PER_LIFT * lift : 0) * v.rx * Math.sin(Math.PI * Math.pow(clamp01(q), ARC_RISE)); // up steeply off the cell, over the top early, then down onto the core
+  return { x: onDisc.x + (core.x - onDisc.x) * up, y: onDisc.y + (core.y - onDisc.y) * up - arc };
 }
 
 /**
@@ -211,12 +242,12 @@ export function tailSpan(q: number): number {
 }
 
 /**
- * Points along the particle's own recent path, from the end of its tail (first) to its head (last), `segments + 1`
+ * Points along the spark's own recent path, from the end of its tail (first) to its head (last), `segments + 1`
  * of them, evenly spread in `q`. The tail never starts before the cell, so it grows out of it.
  */
-export function tailPoints(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, segments: number, lift = 0.35): { x: number; y: number }[] {
+export function flowTail(cell: { a: number; r: number }, halfSpan: number, spread: number, q: number, segments: number, lift: number, v: FlowView): { x: number; y: number }[] {
   const tailQ = Math.max(0, q - tailSpan(q));
-  return Array.from({ length: segments + 1 }, (_, i) => particleAt(from, to, spread, tailQ + ((q - tailQ) * i) / segments, lift));
+  return Array.from({ length: segments + 1 }, (_, i) => flowAt(cell, halfSpan, spread, tailQ + ((q - tailQ) * i) / segments, lift, v));
 }
 
 /** The most characters of a board name that are ever measured or drawn round the ring. */

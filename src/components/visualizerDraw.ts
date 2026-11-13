@@ -1,7 +1,7 @@
-import { INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, burstSize, cellArea, cellCentre, coreAt, fitLabel, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { BEAM_ALPHA, INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
-import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } from '../model/vizBurst';
+import { CARD_LIFE_MS, cardBox, cardRoom, cardSlotsFor, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
 // look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
@@ -9,8 +9,9 @@ import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } fr
 // Per-frame work stays in this file; only the feed re-renders, once per landing.
 // Each item is light warping into the middle: a thin beam shoots in from beyond the top of the canvas onto
 // its cell (a white dot and a small ring show where it lands and the cell lights), then a burst of small
-// glowing particles fans out from the cell along curved paths up into the core, which flares, and a thin
-// pillar of light through the core swells with it (the timing is warpPhase in model/vizGeometry). The
+// glowing particles rises from the cell in a tall arc and streams along its wedge, curving in on the disc's tilt, then up
+// into the core, which flares, and a thin pillar of light through the core swells with it (the timing is warpPhase in
+// model/vizGeometry). The
 // still parts of the picture (the floor, the track rings, the hub) are drawn once into one cached layer;
 // the glows and shafts are cached sprites stamped or stretched with additive blending: no gradient is
 // built and no shadowBlur is used per frame, and nothing here moves or measures the page (no layout, no
@@ -226,8 +227,8 @@ export function startDisc(o: DiscOptions): () => void {
   // Where the disc sits and how big it is: as big as the stage's width allows with the names fitting round it. Worked out per size.
   let fit = { rx: 40, cx: 0, cy: 0 };
   const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
-  // The cards' lines as cut to fit (and their width), by item, measured when first shown. Emptied on resize.
-  const cardText = new Map<number, { title: string; sub: string; width: number }>();
+  // The cards' lines as cut to fit (and their width), by item and place, measured when first shown. Emptied on resize.
+  const cardText = new Map<string, { title: string; sub: string; width: number }>();
   // The still parts of the picture, drawn once per size (a canvas of the same size, stamped each frame).
   const base = document.createElement('canvas');
 
@@ -328,8 +329,7 @@ export function startDisc(o: DiscOptions): () => void {
   let landed = 0;
   let latest = -1; // the wedge of the item that landed last, named in the hub
   // The items that got a card (when they landed, on the animation clock), oldest first, and when the last was shown.
-  let cardArrivals: { index: number; at: number; slot: 0 | 1 }[] = [];
-  let cardCount = 0; // how many cards this trip, so they take the two places by turns
+  let cardArrivals: { index: number; at: number; slot: CardSlot }[] = [];
   let lastCard = -Infinity;
   let raf = 0;
 
@@ -445,6 +445,7 @@ export function startDisc(o: DiscOptions): () => void {
     // The pillar of light through the core down to the hub, and the core's bloom: always there, swelling with the flare.
     const pulse = still ? 1 : 1 + 0.05 * Math.sin(now / 600) + 0.25 * flare;
     const lv = pillarLevel(flare);
+    const beam = beamWidths(rx); // how wide a beam is drawn: wider on a bigger stage, never thinner than a few pixels
     const unit = Math.max(0.6, Math.min(1.2, rx / 260)); // the beams, flash and pillar follow the size of the stage, so on a phone a landing does not flood its neighbors
     ctx.globalCompositeOperation = 'lighter';
     for (const [color, wide, a, swell] of [
@@ -494,8 +495,8 @@ export function startDisc(o: DiscOptions): () => void {
           const from = beamStart(to, cx);
           const head = beamPoint(from, to, ph.beam);
           const a = ph.beamAlpha;
-          drawShaft(shaft(palette.core, 'beam'), from, head, 7 * unit, 0.5 * a); // the faint halo
-          drawShaft(shaft(palette.spark, 'beam'), from, head, 1.8 * unit, 0.85 * a); // a thin bright line
+          drawShaft(shaft(palette.core, 'beam'), from, head, beam.glow, BEAM_ALPHA.glow * a); // the wide pink glow
+          drawShaft(shaft(palette.spark, 'beam'), from, head, beam.core, BEAM_ALPHA.core * a); // the thin bright core
           stamp(ctx, palette.core, head.x, head.y, 12 * unit, 0.7 * a);
           stamp(ctx, palette.spark, head.x, head.y, 4.5 * unit, a); // the bright dot where it lands
           if (ph.beam < 1) {
@@ -533,14 +534,18 @@ export function startDisc(o: DiscOptions): () => void {
           stamp(ctx, palette.spark, to.x, to.y, 16 * unit, 0.8 * ph.column.alpha);
         }
         if (ph.comet !== null) {
-          // The fountain: shooting stars fanned out along curved paths from the cell into the core, each rising to its own height. Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). Some are tinted green, the rest white and lavender.
+          // The fountain: shooting stars that stream from the cell along its wedge, curving in on the disc's tilt, then lift into the core (the flow paths are `flowTail`).
+          const sp = wedgeSpan(s.wedge, count);
+          const half = (sp.a1 - sp.a0) / 2;
+          const view = { spin, cx, cy, rx };
+          // Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). Some are tinted green, the rest white and lavender.
           for (let k = 0; k < bursts; k++) {
             const seed = particleSeed(f.index, k);
             const q = Math.min(1, (ph.comet - seed.delay) / (1 - PARTICLE_DELAY));
             if (q <= 0) continue;
             const alpha = Math.min(1, (1 - q) / 0.12);
             if (alpha <= 0) continue;
-            const pts = tailPoints(to, core, seed.spread, q, crowded ? 2 : 3, seed.lift);
+            const pts = flowTail(c, half, seed.spread, q, crowded ? 4 : 7, seed.lift, view);
             const head = pts[pts.length - 1];
             const tint = k % 4 === 0 ? palette.lead : k % 2 ? palette.pink : palette.spark;
             const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the fountain stays a few crisp streaks
@@ -559,19 +564,21 @@ export function startDisc(o: DiscOptions): () => void {
     if (!still) {
       const titlePx = rx > 200 ? 12 : rx > 150 ? 11 : 10; // the card follows the size of the stage, so on a phone it stays small beside the disc
       const subPx = titlePx - 2;
+      const places = cardSlotsFor(core, rx, w, CARD_H); // after a resize a live card may be in a place that no longer fits: it is skipped
       for (const card of cardsAt(cardArrivals, now)) {
         const lines = o.cards[card.index];
-        if (!lines) continue;
-        let text = cardText.get(card.index);
+        if (!lines || !places.includes(card.slot)) continue;
+        const textKey = `${card.index}:${card.slot}`;
+        let text = cardText.get(textKey);
         if (!text) {
-          const room = Math.min(240, w - 16) - CARD_PAD * 2;
+          const room = cardRoom(card.slot, core, rx, w, CARD_H) - CARD_PAD * 2; // the place's own room, so the text is cut to fit it
           ctx.font = `600 ${titlePx}px ${SANS}`;
           const title = fitLabel(lines[0], room, (t) => ctx.measureText(t).width);
           const titleW = ctx.measureText(title).width;
           ctx.font = `400 ${subPx}px ${SANS}`;
           const sub = fitLabel(lines[1], room, (t) => ctx.measureText(t).width);
           text = { title, sub, width: Math.ceil(Math.max(titleW, ctx.measureText(sub).width)) + CARD_PAD * 2 };
-          cardText.set(card.index, text);
+          cardText.set(textKey, text);
         }
         const box = cardBox(card.slot, core, rx, w, text.width, CARD_H, card.rise);
         ctx.globalAlpha = card.alpha;
@@ -608,7 +615,6 @@ export function startDisc(o: DiscOptions): () => void {
       flashAt.forEach((row) => row.fill(-Infinity));
       latest = -1;
       cardArrivals = [];
-      cardCount = 0;
       lastCard = -Infinity;
       o.onLanded(0);
     }
@@ -618,9 +624,11 @@ export function startDisc(o: DiscOptions): () => void {
       latest = s.wedge;
       landedCount[s.wedge][s.cell]++;
       flashAt[s.wedge][s.cell] = now;
-      if (!still && shouldShowCard(lastCard, now)) {
+      if (!still && shouldShowCard(lastCard, now, n)) {
         lastCard = now;
-        cardArrivals.push({ index: k, at: now, slot: (cardCount++ % 2) as 0 | 1 });
+        const { rx, core } = layout();
+        const places = cardSlotsFor(core, rx, w, CARD_H);
+        if (places.length) cardArrivals.push({ index: k, at: now, slot: pickSlot(cardArrivals, places, now) });
       }
     }
     while (cardArrivals.length && now - cardArrivals[0].at >= CARD_LIFE_MS) cardArrivals.shift();

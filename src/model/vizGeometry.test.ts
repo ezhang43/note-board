@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, BURST_BUDGET, COMET_START, LIFT_MAX, LIFT_MIN, RIPPLES, burstSize,CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, particleAt, particleSeed, pillarLevel, project, STRIKE, tailPoints, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, BEAM_ALPHA, beamWidths, BURST_BUDGET, COMET_START, LIFT_MAX, LIFT_MIN, RIPPLES, burstSize,CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, flowAt, flowTail, particleSeed, pillarLevel, project, STRIKE, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -163,38 +163,95 @@ describe('particleSeed', () => {
   });
 });
 
-describe('particleAt', () => {
-  const cell = { x: 100, y: 300 };
-  const core = { x: 400, y: 260 };
+const VIEW = { spin: 0.4, cx: 500, cy: 400, rx: 300 };
+/** Where a screen point sits on the disc: its angle (turned back by the spin) and its radius as a share of the half width. */
+const onDisc = (p: { x: number; y: number }, v = VIEW) => {
+  const dx = p.x - v.cx;
+  const dy = (p.y - v.cy) / TILT;
+  return { a: Math.atan2(dy, dx) - v.spin, r: Math.hypot(dx, dy) / v.rx };
+};
+const turn = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
-  it('runs from the cell to the core, rising along an arc on the way', () => {
-    expect(particleAt(cell, core, 0, 0)).toEqual(cell);
-    const end = particleAt(cell, core, 0.2, 1);
+// The flow of an item's sparks (owner request 2026-11-13, "viz-disc-bigger": "flowing from the categories into the center"):
+// out of the cell, inward along its own wedge on the disc's tilt, then up into the core.
+describe('flowAt', () => {
+  const cell = { a: 1.1, r: 0.8 };
+  const half = 0.3;
+  const core = coreAt(VIEW.cx, VIEW.cy, VIEW.rx);
+
+  it('starts exactly on the cell (turned with the disc) and ends in the core', () => {
+    const start = flowAt(cell, half, 0.7, 0, 0.4, VIEW);
+    const at = project(cell.a, cell.r, VIEW.spin, VIEW.cx, VIEW.cy, VIEW.rx);
+    expect(start.x).toBeCloseTo(at.x);
+    expect(start.y).toBeCloseTo(at.y);
+    const end = flowAt(cell, half, 0.7, 1, 0.4, VIEW);
     expect(end.x).toBeCloseTo(core.x);
     expect(end.y).toBeCloseTo(core.y);
-    const mid = particleAt(cell, core, 0, 0.5);
-    expect(mid.y).toBeLessThan(Math.min(cell.y, core.y) - 10); // above both ends
   });
 
-  it('speeds up as it nears the core', () => {
-    const early = particleAt(cell, core, 0, 0.2).x - particleAt(cell, core, 0, 0.1).x;
-    const late = particleAt(cell, core, 0, 0.9).x - particleAt(cell, core, 0, 0.8).x;
-    expect(late).toBeGreaterThan(early * 2);
-  });
-
-  it('bends further to one side or the other with the spread, but meets at the same two ends', () => {
-    const left = particleAt(cell, core, -1, 0.5);
-    const right = particleAt(cell, core, 1, 0.5);
-    expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThan(40);
-    for (const spread of [-1, 1]) {
-      expect(particleAt(cell, core, spread, 0)).toEqual(cell);
-      expect(particleAt(cell, core, spread, 1).x).toBeCloseTo(core.x);
+  it('moves in along the disc first: its radius shrinks steadily, and it stays inside its own wedge', () => {
+    for (const spread of [-1, -0.4, 0, 0.6, 1]) {
+      let prev = cell.r + 1e-9;
+      for (let q = 0; q <= 0.4001; q += 0.05) {
+        const d = onDisc(flowAt(cell, half, spread, q, 0, VIEW));
+        expect(d.r).toBeLessThan(prev);
+        prev = d.r;
+        expect(turn(d.a, cell.a)).toBeLessThanOrEqual(half + 0.03);
+      }
     }
   });
 
+  it('stays down on the disc (it follows the tilt) before it lifts into the core', () => {
+    // No lift: a cell at the front runs back toward the middle, up the picture, never above the core before the end.
+    const front = { a: Math.PI / 2, r: 0.85 };
+    const from = flowAt(front, half, 0, 0, 0, VIEW);
+    const mid = flowAt(front, half, 0, 0.45, 0, VIEW);
+    expect(mid.y).toBeLessThan(from.y);
+    expect(mid.y).toBeGreaterThan(core.y);
+    expect(Math.abs(mid.x - from.x)).toBeLessThan(Math.abs(mid.y - from.y));
+  });
+
+  it('bends further to one side or the other with the spread, but meets at the same two ends', () => {
+    const left = flowAt(cell, half, -1, 0.4, 0.4, VIEW);
+    const right = flowAt(cell, half, 1, 0.4, 0.4, VIEW);
+    expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThan(8);
+    for (const spread of [-1, 1]) {
+      expect(flowAt(cell, half, spread, 0, 0.4, VIEW)).toEqual(flowAt(cell, half, 0, 0, 0.4, VIEW));
+      expect(flowAt(cell, half, spread, 1, 0.4, VIEW).x).toBeCloseTo(core.x);
+    }
+  });
+
+  it('never swings more than a narrow wedge allows, and a lone wedge does not make it spiral', () => {
+    const wide = onDisc(flowAt(cell, Math.PI, 1, 0.45, 0, VIEW));
+    expect(turn(wide.a, cell.a)).toBeLessThanOrEqual(0.5);
+  });
+
+  it('speeds up as it nears the core (along the disc and into the hub, apart from its arc)', () => {
+    const d = (q0: number, q1: number) => {
+      const a = flowAt(cell, half, 0, q0, 0, VIEW);
+      const b = flowAt(cell, half, 0, q1, 0, VIEW);
+      return Math.hypot(b.x - a.x, b.y - a.y);
+    };
+    expect(d(0.8, 0.9)).toBeGreaterThan(d(0.1, 0.2) * 2);
+  });
+
+  it('shoots up higher with a bigger lift, still starting on the cell and ending in the core', () => {
+    expect(flowAt(cell, half, 0, 0.5, LIFT_MAX, VIEW).y).toBeLessThan(flowAt(cell, half, 0, 0.5, LIFT_MIN, VIEW).y);
+    for (const lift of [LIFT_MIN, LIFT_MAX]) {
+      expect(flowAt(cell, half, 0.3, 0, lift, VIEW)).toEqual(flowAt(cell, half, 0.3, 0, 0, VIEW));
+      expect(flowAt(cell, half, 0.3, 1, lift, VIEW).y).toBeCloseTo(core.y);
+    }
+  });
+
+  it('turns with the disc: the same flow a little later has moved round with the spin', () => {
+    const a = flowAt(cell, half, 0, 0.3, 0.4, VIEW);
+    const b = flowAt(cell, half, 0, 0.3, 0.4, { ...VIEW, spin: VIEW.spin + 0.5 });
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(20);
+  });
+
   it('stays put at the ends for any progress it is given', () => {
-    expect(particleAt(cell, core, 0.5, -3)).toEqual(cell);
-    expect(particleAt(cell, core, 0.5, 4).x).toBeCloseTo(core.x);
+    expect(flowAt(cell, half, 0.5, -3, 0.4, VIEW)).toEqual(flowAt(cell, half, 0.5, 0, 0.4, VIEW));
+    expect(flowAt(cell, half, 0.5, 4, 0.4, VIEW).x).toBeCloseTo(core.x);
   });
 });
 
@@ -209,35 +266,85 @@ describe('tailSpan', () => {
   });
 
   it('gives a tail several times as long as the head is wide once the particle is moving (a streak, not a dot)', () => {
-    const cell = { x: 100, y: 300 };
-    const core = { x: 400, y: 260 };
-    const pts = tailPoints(cell, core, 0, 0.6, 4);
+    const pts = flowTail({ a: 1.1, r: 0.8 }, 0.3, 0, 0.6, 4, 0.4, VIEW);
     const length = pts.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
-    expect(length).toBeGreaterThan(60);
+    expect(length).toBeGreaterThan(40);
   });
 });
 
-describe('tailPoints', () => {
-  const cell = { x: 100, y: 300 };
-  const core = { x: 400, y: 260 };
+// How high the fountains arc (owner request 2026-11-13, "make the fountains arc higher like the video"). In the
+// reference clip a spark rises steeply from its cell, bends over well above the disc and drops onto the core:
+// the middle of its path stands about a tenth of the disc's width (0.07 to 0.14) off the straight line from the
+// cell to the core. The first version of this app was 0.02 to 0.08 on average, the flow before this change 0.01 to 0.03.
+describe('how high the sparks arc', () => {
+  /** The most the path strays from the straight line from its start to its end, as a share of the disc's width. */
+  const bulge = (cell: { a: number; r: number }, half: number, lift: number, v = VIEW) => {
+    const a = flowAt(cell, half, 0, 0, lift, v);
+    const b = flowAt(cell, half, 0, 1, lift, v);
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    let best = 0;
+    for (let i = 0; i <= 100; i++) {
+      const p = flowAt(cell, half, 0, i / 100, lift, v);
+      best = Math.max(best, Math.abs(-(p.y - a.y) * (b.x - a.x) + (p.x - a.x) * (b.y - a.y)) / len);
+    }
+    return best / (2 * v.rx);
+  };
+  const cells = Array.from({ length: 9 }, (_, w) => ({ cell: cellCentre(w, 9, 2, 6), half: Math.PI / 9 }));
+  const average = (lift: number) => cells.reduce((s, c) => s + bulge(c.cell, c.half, lift), 0) / cells.length;
+
+  it('bends 0.07 to 0.14 of the disc width off the straight line, from the lowest lift to the highest', () => {
+    expect(average(LIFT_MIN)).toBeGreaterThan(0.07);
+    expect(average(LIFT_MAX)).toBeLessThan(0.14);
+    expect(average(LIFT_MAX)).toBeGreaterThan(average(LIFT_MIN));
+  });
+
+  it('even the highest spark of a cell next to the core stays inside the stage above it (not more than a disc width up)', () => {
+    for (const { cell, half } of cells) {
+      for (let i = 0; i <= 50; i++) expect(flowAt(cell, half, 0, i / 50, LIFT_MAX, VIEW).y).toBeGreaterThan(VIEW.cy - 2 * VIEW.rx);
+    }
+  });
+
+  it('leaves the cell mostly straight up: in its first moves it climbs more than it moves sideways', () => {
+    for (const { cell, half } of cells) {
+      const a = flowAt(cell, half, 0, 0, 0.5, VIEW);
+      const b = flowAt(cell, half, 0, 0.1, 0.5, VIEW);
+      expect(a.y - b.y).toBeGreaterThan(Math.abs(b.x - a.x));
+    }
+  });
+
+  it('is still one path into the core: the highest spark of a cell crosses no more than once through its own height before it ends (it rises, then comes down onto the core)', () => {
+    const { cell, half } = cells[0];
+    let peak = Infinity;
+    let atPeak = 0;
+    for (let i = 0; i <= 100; i++) {
+      const y = flowAt(cell, half, 0, i / 100, LIFT_MAX, VIEW).y;
+      if (y < peak) { peak = y; atPeak = i; }
+    }
+    expect(atPeak).toBeGreaterThan(5);
+    expect(atPeak).toBeLessThan(100);
+  });
+});
+
+describe('flowTail', () => {
+  const cell = { a: 1.1, r: 0.8 };
 
   it('runs from the tail to the head along the particle\'s own path, with the head where the particle is', () => {
-    const pts = tailPoints(cell, core, 0.4, 0.7, 3);
+    const pts = flowTail(cell, 0.3, 0.4, 0.7, 3, 0.4, VIEW);
     expect(pts).toHaveLength(4);
-    expect(pts[3]).toEqual(particleAt(cell, core, 0.4, 0.7));
-    expect(pts[0]).toEqual(particleAt(cell, core, 0.4, 0.7 - tailSpan(0.7)));
+    expect(pts[3]).toEqual(flowAt(cell, 0.3, 0.4, 0.7, 0.4, VIEW));
+    expect(pts[0]).toEqual(flowAt(cell, 0.3, 0.4, 0.7 - tailSpan(0.7), 0.4, VIEW));
     for (let i = 1; i < pts.length; i++) expect(pts[i]).not.toEqual(pts[i - 1]);
   });
 
   it('starts on the cell at the beginning, so the tail grows out of it', () => {
-    const pts = tailPoints(cell, core, 0.4, 0.05, 3);
-    expect(pts[0]).toEqual(cell);
-    expect(Math.hypot(pts[3].x - cell.x, pts[3].y - cell.y)).toBeLessThan(25);
+    const pts = flowTail(cell, 0.3, 0.4, 0.02, 3, 0.4, VIEW);
+    expect(pts[0]).toEqual(flowAt(cell, 0.3, 0.4, 0, 0.4, VIEW));
+    expect(Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y)).toBeLessThan(25);
   });
 
   it('keeps the tail short when it is slow and long when it is fast', () => {
     const len = (q: number) => {
-      const pts = tailPoints(cell, core, 0, q, 3);
+      const pts = flowTail(cell, 0.3, 0, q, 3, 0, VIEW); // the part of the path that is not the arc
       return Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y);
     };
     expect(len(0.9)).toBeGreaterThan(len(0.25) * 1.5);
@@ -387,18 +494,6 @@ describe('fountain', () => {
     const lifts = new Set(Array.from({ length: PARTICLES }, (_, k) => particleSeed(7, k).lift));
     expect(lifts.size).toBeGreaterThan(PARTICLES / 2);
   });
-
-  it('shoots up higher with a bigger lift, but still starts on the cell and ends in the core', () => {
-    const cell = { x: 100, y: 300 };
-    const core = { x: 300, y: 150 };
-    expect(particleAt(cell, core, 0, 0.5, LIFT_MAX).y).toBeLessThan(particleAt(cell, core, 0, 0.5, LIFT_MIN).y);
-    for (const lift of [LIFT_MIN, LIFT_MAX]) {
-      expect(particleAt(cell, core, 0.3, 0, lift)).toEqual(cell);
-      expect(particleAt(cell, core, 0.3, 1, lift).x).toBeCloseTo(core.x);
-      expect(particleAt(cell, core, 0.3, 1, lift).y).toBeCloseTo(core.y);
-    }
-    expect(tailPoints(cell, core, 0.3, 0.7, 3, LIFT_MAX)[3]).toEqual(particleAt(cell, core, 0.3, 0.7, LIFT_MAX));
-  });
 });
 
 describe('ripples and column', () => {
@@ -432,5 +527,41 @@ describe('ripples and column', () => {
         expect(v).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('beamWidths', () => {
+  // Measured in the reference stills (owner request 2026-11-13, "make the beams thicker like the video"): the pink
+  // band of a beam is about 0.0055 of the disc's width across at half its brightness (5 to 6px on a disc about 930px wide).
+  // A sprite's brightness halves at about 0.38 of its width.
+  const HALF = 0.38;
+  const old = (rx: number) => ({ glow: 7 * Math.max(0.6, Math.min(1.2, rx / 260)), core: 1.8 * Math.max(0.6, Math.min(1.2, rx / 260)) });
+
+  it('makes the pink glow about 0.0055 of the disc width across at half brightness on a big stage', () => {
+    for (const rx of [330, 400, 469, 600]) {
+      const share = (beamWidths(rx).glow * HALF) / (2 * rx);
+      expect(share).toBeGreaterThan(0.0045);
+      expect(share).toBeLessThan(0.0065);
+    }
+  });
+
+  it('keeps a thin bright core inside a wider glow, both wider than before', () => {
+    for (const rx of [60, 100, 122, 200, 260, 330, 469, 600]) {
+      const w = beamWidths(rx);
+      expect(w.core).toBeLessThan(w.glow);
+      expect(w.glow).toBeGreaterThan(old(rx).glow);
+      expect(w.core).toBeGreaterThan(old(rx).core);
+    }
+  });
+
+  it('grows with the stage but never goes thinner than a few pixels, so a beam stays visible on a phone', () => {
+    expect(beamWidths(600).glow).toBeGreaterThan(beamWidths(122).glow);
+    expect(beamWidths(122).glow).toBeGreaterThanOrEqual(8);
+    expect(beamWidths(122).core).toBeGreaterThanOrEqual(2.4);
+  });
+
+  it('draws the glow bright enough to read as pink, not faint', () => {
+    expect(BEAM_ALPHA.glow).toBeGreaterThanOrEqual(0.7);
+    expect(BEAM_ALPHA.core).toBeGreaterThanOrEqual(0.85);
   });
 });

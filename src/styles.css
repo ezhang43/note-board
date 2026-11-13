@@ -1046,6 +1046,18 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 /* Ticked: a softer strike line, and the text faded. */
 .todo-item.done .item-text { opacity: 0.55; }
 .todo-item.done .item-text > textarea { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
+/* The tick animation (owner request, 2026-11-13): only on the row the person just ticked (.tick-pop, set in TodoList.tsx).
+   The box presses and settles (transform) while its tick grows in; the strike and the fade ease in. About 200ms, ease-out,
+   nothing moves. It plays with reduced motion too (owner request, 2026-11-13), so there is no prefers-reduced-motion rule here. */
+.todo-item.tick-pop input[type='checkbox'] { animation: tick-press 200ms var(--ease-out); }
+.todo-item.tick-pop .item-text { animation: tick-fade 200ms var(--ease-out); }
+.todo-item.tick-pop .item-text > textarea { animation: tick-strike 200ms var(--ease-out); }
+@keyframes tick-press {
+  from { transform: scale(0.85); background-size: 0% 0%; }
+  to { transform: scale(1); background-size: 100% 100%; }
+}
+@keyframes tick-fade { from { opacity: 1; } }
+@keyframes tick-strike { from { text-decoration-color: transparent; } }
 
 .link-url {
   height: calc(30px * var(--bs, 1));

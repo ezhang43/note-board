@@ -62,8 +62,8 @@ async function measure(page: Page) {
           width: (p.width + 2 * half) / scale,
           stroke: parseFloat(getComputedStyle(path).strokeWidth),
           contrast: (l1 + 0.05) / (l2 + 0.05),
-          // the glyph's middle against the middle of the item's first line, which the box sits 7.5% of a line below
-          midOff: ((b.top + b.bottom) / 2 - (p.top + p.bottom) / 2) / scale - 0.075 * line,
+          // the glyph's middle against the middle of the item's first line, which the box sits 2.5% of a line below
+          midOff: ((b.top + b.bottom) / 2 - (p.top + p.bottom) / 2) / scale - 0.025 * line,
           gap: (b.left - (p.right + half)) / scale,
           glyphToCard: (p.left - half - cardBox.left) / scale,
           // a sub-item's indent starts at its parent's tick box, 32 card px to the left of its own

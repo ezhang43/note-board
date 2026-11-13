@@ -31,9 +31,9 @@ async function checkTicks(list: Locator) {
   for (const n of [0, 1, 2]) {
     const row = list.locator('[data-item-id]').nth(n);
     const { tick, line } = await centers(row);
-    // The box sits 7.5% of the line below the middle of the first line (1.5px at Normal, 3px at 200%; 5% before owner request 2026-11-10): the middle of lowercase text is lower than that of capitals (owner request, 2026-10-23).
-    const nudge = (await row.getByLabel('Item text').evaluate((el) => parseFloat(getComputedStyle(el).lineHeight))) * 0.075;
-    expect(Math.abs(tick - line - nudge), `item ${n}`).toBeLessThanOrEqual(0.75);
+    // The box sits 2.5% of the line below the middle of the first line (0.5px at Normal, 1px at 200%; 7.5% from 2026-11-10 to 2026-11-13, 5% before): the middle of lowercase text is lower than that of capitals (owner request, 2026-10-23).
+    const nudge = (await row.getByLabel('Item text').evaluate((el) => parseFloat(getComputedStyle(el).lineHeight))) * 0.025;
+    expect(Math.abs(tick - line - nudge), `item ${n}`).toBeLessThanOrEqual(0.25);
   }
 }
 
@@ -49,7 +49,7 @@ async function atEveryStep(page: Page, check: (scale: number) => Promise<void>) 
   }
 }
 
-test("a tick box is centered on its item's first line (nudged down 7.5% of the line) at every text size, for items and sub-items, light and dark", async ({ page }) => {
+test("a tick box is centered on its item's first line (nudged down 2.5% of the line) at every text size, for items and sub-items, light and dark", async ({ page }) => {
   test.slow(); // twelve text sizes, light and dark
   const list = await checklist(page, ['Call the plumber about the leaking kitchen tap and the bathroom sink', 'sub item', 'Second']);
   await list.locator('[data-item-id]').nth(1).getByLabel('Item text').click();

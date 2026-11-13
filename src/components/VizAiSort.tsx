@@ -92,7 +92,8 @@ export function VizAiSort({
     off();
     if (stop.current?.run !== run) return;
     stop.current = null;
-    if (!r.ok && r.kind === 'storage') setPaused({ run: runKey, why: 'cant-save' });
+    // A save that failed pauses Sort automatically; one that worked (a press, after room was made) ends the pause.
+    setPaused((p) => (!r.ok && r.kind === 'storage' ? { run: runKey, why: 'cant-save' } : r.ok ? null : p));
     setStatus(r.ok ? { kind: 'done', sorted: r.sorted } : r.kind === 'cancelled' ? { kind: 'stopped' } : { kind: 'error', message: r.message });
     onSorted();
   };
@@ -100,9 +101,11 @@ export function VizAiSort({
   const running = status.kind === 'running';
   // Sort automatically: the same start as a press, once the labels it brings back can be kept. Started on the
   // next tick (start marks it tried), so React's development double run (mount, unmount, mount) neither stops it
-  // nor skips it. Not marked tried when paused, so a later open (or this row shown again) checks again.
+  // nor skips it. Not marked tried when paused, so a later open (or this row shown again) checks again; checked
+  // once while this row shows, not again on every change to the items.
+  const pausedHere = paused?.run === runKey;
   useEffect(() => {
-    if (!autoSortDue({ auto, loading, running, total, run: runKey, tried: tried.current })) return;
+    if (pausedHere || !autoSortDue({ auto, loading, running, total, run: runKey, tried: tried.current })) return;
     const t = setTimeout(() => {
       const room = aiLabels.room(entries.length, uid);
       if (room !== 'ok') return setPaused({ run: runKey, why: room });
@@ -111,12 +114,12 @@ export function VizAiSort({
     });
     return () => clearTimeout(t);
     // start and entries are left out on purpose: new each render; these are what decide a run.
-  }, [auto, loading, running, total, runKey, tried]);
+  }, [auto, loading, running, total, runKey, tried, pausedHere]);
 
   // Said only when a sub-item is among what goes, so the hint stays exact.
   const withParent = entries.some((e) => e.parent !== undefined) ? WITH_PARENT : '';
   const rest = total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : '';
-  const pausedWhy = auto && paused?.run === runKey ? paused.why : null;
+  const pausedWhy = auto && pausedHere ? paused.why : null;
   const hint = loading
     ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
     : !total

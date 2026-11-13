@@ -162,6 +162,12 @@ describe("whether Sort automatically may send (job viz-ai-autosort, owner 2026-1
     full = false;
     expect(cache.putAll([["a", "A"]], M, "u1")).toBe(true);
     expect(cache.room(1, "u1")).toBe("ok");
+    // Clearing the labels (a change of person) frees their room too.
+    full = true;
+    cache.putAll([["b", "B"]], M, "u1");
+    full = false;
+    cache.clear();
+    expect(cache.room(1, "u1")).toBe("ok");
   });
 
   it("not when saving would push out labels kept already (LABELS_MAX)", () => {

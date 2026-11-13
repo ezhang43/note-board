@@ -30,14 +30,16 @@ export const SAVE_FAILED = "Can't save sorted labels on this device.";
 
 /** Where `room` writes a test the size of the labels to come, and removes it at once. */
 const PROBE_NAME = `${AI_LABELS_NAME}:room`;
-/** Letters one saved label takes, at most: its key (about 12), the name (at most 24) and the JSON around them. */
-const LETTERS_PER_LABEL = 48;
+/** Letters one saved label takes, at most: its key and the JSON around it (about 16), and the name (24 letters, up to 96 storage characters for emoji and escaped quotes). */
+// simple: a fixed worst case rather than the real size, which is only known once Claude answers. If a save still
+// fails, the sort stops at that batch and Sort automatically waits until a save works (`failed`).
+const LETTERS_PER_LABEL = 112;
 
 type Place = Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
 type Saved = { v: 1; owner: string; entries: Record<string, string> };
 
 export function createLabelCache(device: Place) {
-  /** A save failed in this page (storage full or blocked): Sort automatically waits until one works again. */
+  /** A save failed in this page (storage full or blocked): Sort automatically waits until one works again (a press) or the labels are cleared. */
   let failed = false;
   const load = (owner: string | null): Record<string, string> => {
     try {
@@ -90,7 +92,7 @@ export function createLabelCache(device: Place) {
         try {
           device.removeItem(PROBE_NAME);
         } catch {
-          // Blocked: nothing was written.
+          // Blocked: nothing was written (or, if storage was blocked between the two calls, the test stays, unread).
         }
       }
     },
@@ -136,6 +138,7 @@ export function createLabelCache(device: Place) {
       }
     },
     clear() {
+      failed = false; // their room is free again
       try {
         device?.removeItem(AI_LABELS_NAME);
       } catch {

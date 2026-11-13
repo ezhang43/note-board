@@ -290,19 +290,27 @@ test('where the labels cannot be saved, Sort automatically sends nothing and say
   await saveKey(page);
   // This browser's storage is full for the labels (the boards still save).
   await page.evaluate(() => {
+    const w = window as unknown as { full: boolean };
+    w.full = true;
     const set = Storage.prototype.setItem;
     Storage.prototype.setItem = function (k: string, v: string) {
-      if (k.startsWith('note-board:ai-categories')) throw new DOMException('full', 'QuotaExceededError');
+      if (w.full && k.startsWith('note-board:ai-categories')) throw new DOMException('full', 'QuotaExceededError');
       return set.call(this, k, v);
     };
   });
+  const paused = dialog(page).getByText("Can't save sorted labels on this device, so Sort automatically is paused.", { exact: false });
   await openVisualizer(page);
-  await expect(dialog(page).getByText("Can't save sorted labels on this device, so Sort automatically is paused.", { exact: false })).toBeVisible();
+  await expect(paused).toBeVisible();
   await page.waitForTimeout(500);
   expect(bodies).toEqual([]);
   await sortButton(page).click();
   await expect(dialog(page).getByRole('alert')).toHaveText("Can't save sorted labels on this device.");
   expect(bodies).toHaveLength(1);
+  // Room again: a press saves, and the paused line goes.
+  await page.evaluate(() => ((window as unknown as { full: boolean }).full = false));
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  await expect(paused).toHaveCount(0);
 });
 
 test('with the labels kept on this device full, Sort automatically pauses instead of pushing older ones out', async ({ page }) => {

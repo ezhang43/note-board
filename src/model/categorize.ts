@@ -63,6 +63,7 @@ const TIME_WORDS = new Set([
 
 /** True when the whole text (case, extra spaces and trailing punctuation or emoji ignored) is just a time word or phrase. "Daily stretch" is not. */
 export const isTimeWord = (text: string): boolean =>
+  text.length <= 40 && // no phrase on the list is longer; also keeps the patterns below from backtracking on a very long run of spaces or marks
   TIME_WORDS.has(text.toLowerCase().replace(/[\s\p{P}\p{S}\p{Extended_Pictographic}‍️]+$/u, '').replace(/^\s+/, '').replace(/\s+/g, ' '));
 
 /** The category a sub-item takes from the items it sits under: the nearest one (`context` is nearest first) whose words give a real category, else null. A parent like "Today" or "Now" gives none. */

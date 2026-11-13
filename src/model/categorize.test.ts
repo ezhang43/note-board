@@ -167,6 +167,12 @@ describe('isTimeWord', () => {
     for (const t of ["Today's groceries", 'Daily stretch', 'Call Sam today', 'Monday meeting', '', '   ', 'Gaming', 'next month'])
       expect(isTimeWord(t), t).toBe(false);
   });
+  it('a very long text is answered at once (no slow pattern matching)', () => {
+    const start = performance.now();
+    expect(isTimeWord(' '.repeat(50000) + 'x')).toBe(false);
+    expect(isTimeWord('!'.repeat(50000) + 'x')).toBe(false);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
   it('such a parent gives no category', () => {
     expect(parentCategory({ context: ['Weekend', 'Now'] })).toBeNull();
   });

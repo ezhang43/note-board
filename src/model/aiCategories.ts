@@ -3,6 +3,9 @@
 // checked, how a label is found again, and how the disc mixes the labels with the built-in rules.
 //
 // - Only item texts are sent: no board names, list titles, ids or notes.
+// - Only items from the person's own boards (owner, 2026-11-13): never from a board someone else shared with
+//   them. toSend is where every send picks its texts, so it checks; items on those boards keep the built-in
+//   categories, even with a label saved earlier (makeAiCategorizer checks too).
 // - Claude's answer is untrusted: it gives category names and, per item, the number of its category. Names
 //   are cleaned (no control or direction marks, short), at most AI_MAX_CATEGORIES are kept, and the
 //   Visualizer only ever draws them as canvas text or React text, never as HTML.
@@ -30,15 +33,42 @@ export const AI_LABELS_NAME = 'note-board:ai-categories';
 export const normalizeText = (text: string) =>
   Array.from(text.normalize('NFC').replace(/\s+/g, ' ').trim()).slice(0, AI_ITEM_MAX).join('').trim();
 
+/** A share as the store knows it (Ui['shares']): only what says whose a board is. */
+export interface ShareOf {
+  root: string;
+  boards: string[];
+  owner: boolean;
+}
+
 /**
- * The texts one press sends: tidied, each once, skipping empty ones and ones already labeled, cut to
- * AI_ITEM_MAX letters and to AI_MAX_PER_PRESS items. `total` is how many needed a label before the cut.
+ * Which boards are this person's own for Sort with AI: every board but those of a share someone else shared
+ * with them (its starting board and every board in it; the same test as restorable in sharing.ts). A board
+ * they shared with others stays their own. While the shares are not known yet (`known` false) no board
+ * counts as own, so nothing is sent and no label is used until they are.
  */
-export function toSend(texts: string[], labeled: (text: string) => boolean): { texts: string[]; total: number } {
+export function ownBoards(shares: ShareOf[], known: boolean): (boardId: string) => boolean {
+  if (!known) return () => false;
+  const theirs = new Set(shares.filter((s) => !s.owner).flatMap((s) => [s.root, ...s.boards]));
+  return (boardId) => !theirs.has(boardId);
+}
+
+/** A finished item as Sort with AI sees it: its text and the board it is on. */
+export interface AiItem {
+  text: string;
+  boardId: string;
+}
+
+/**
+ * The texts one press sends: from the items on the person's own boards only (`isOwn`, see ownBoards), tidied,
+ * each once, skipping empty ones and ones already labeled, cut to AI_ITEM_MAX letters and to AI_MAX_PER_PRESS
+ * items. `total` is how many needed a label before the cut.
+ */
+export function toSend(items: AiItem[], labeled: (text: string) => boolean, isOwn: (boardId: string) => boolean): { texts: string[]; total: number } {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const t of texts) {
-    const n = normalizeText(t);
+  for (const { text, boardId } of items) {
+    if (!isOwn(boardId)) continue;
+    const n = normalizeText(text);
     if (!n || seen.has(n) || labeled(n)) continue;
     seen.add(n);
     out.push(n);
@@ -129,19 +159,22 @@ export const labelKey = (text: string, model: string) => `h${hash(`${model}\u000
 const builtIn = new Map(CATEGORIES.map((c) => [c.name.toLowerCase(), c.id] as const));
 
 /**
- * The Visualizer's categorizer with AI labels (`lookup` gives an item text's label, or null). The busiest
- * AI_MAX_CATEGORIES labels among `texts` (the items on the disc) are used; any other item, labeled or not,
- * goes by the built-in rules.
+ * The Visualizer's categorizer with AI labels (`lookup` gives an item text's label, or null). Labels are used
+ * only for items on the person's own boards (`isOwn`); an item on a board shared with them keeps the built-in
+ * rules, even when a label was saved for its text. The busiest AI_MAX_CATEGORIES labels among the own items
+ * in `items` (the items on the disc) are used; any other item, labeled or not, goes by the built-in rules.
  */
-export function makeAiCategorizer(texts: string[], lookup: (text: string) => string | null): Categorizer {
+export function makeAiCategorizer(items: AiItem[], lookup: (text: string) => string | null, isOwn: (boardId: string) => boolean): Categorizer {
+  // An item with no board given (none on the disc) is not known to be own, so it gets no label.
+  const labelOf = (item: { text: string; boardId?: string }) => (item.boardId !== undefined && isOwn(item.boardId) ? lookup(item.text) : null);
   const counts = new Map<string, number>();
-  for (const t of texts) {
-    const l = lookup(t);
+  for (const i of items) {
+    const l = labelOf(i);
     if (l && !builtIn.has(l.toLowerCase())) counts.set(l, (counts.get(l) ?? 0) + 1);
   }
   const top = new Set([...counts].sort((a, b) => b[1] - a[1]).slice(0, AI_MAX_CATEGORIES).map(([l]) => l));
   return (item, listTitle): CategoryId | { name: string } => {
-    const l = lookup(item.text);
+    const l = labelOf(item);
     const id = l && builtIn.get(l.toLowerCase());
     if (id) return id;
     return l && top.has(l) ? { name: l } : categoryOf(item, listTitle);

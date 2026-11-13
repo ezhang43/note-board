@@ -12,6 +12,7 @@ import {
   labelKey,
   makeAiCategorizer,
   normalizeText,
+  ownBoards,
   readLabels,
   toSend,
 } from './aiCategories';
@@ -19,6 +20,10 @@ import { categoryOf } from './categorize';
 
 // "Sort with AI" in the Visualizer (owner request, 2026-11-13): the pure part. What is sent, how Claude's
 // answer is checked, how labels are found again, and how the disc falls back to the built-in rules.
+
+/** Items on board `boardId` (own by default) with these texts. */
+const on = (texts: string[], boardId = 'home') => texts.map((text) => ({ text, boardId }));
+const allOwn = () => true;
 
 describe('what is sent', () => {
   it('sends only the item texts, numbered by their place, plus the categories chosen so far', () => {
@@ -31,24 +36,47 @@ describe('what is sent', () => {
 
   it('picks the texts to send: tidied, each once, none already labeled, none empty, cut to the per-press limit', () => {
     const labeled = new Set(['Done before']);
-    const picked = toSend(['  Buy   milk ', 'Buy milk', '', '   ', 'Done before', 'Call mom'], (t) => labeled.has(t));
+    const picked = toSend(on(['  Buy   milk ', 'Buy milk', '', '   ', 'Done before', 'Call mom']), (t) => labeled.has(t), allOwn);
     expect(picked).toEqual({ texts: ['Buy milk', 'Call mom'], total: 2 });
     const many = Array.from({ length: AI_MAX_PER_PRESS + 5 }, (_, i) => `Item ${i}`);
-    const cut = toSend(many, () => false);
+    const cut = toSend(on(many), () => false, allOwn);
     expect(cut.texts).toHaveLength(AI_MAX_PER_PRESS);
     expect(cut.total).toBe(AI_MAX_PER_PRESS + 5);
   });
 
   it('cuts a very long item before sending it', () => {
-    expect(toSend(['x'.repeat(AI_ITEM_MAX + 50)], () => false).texts[0]).toHaveLength(AI_ITEM_MAX);
+    expect(toSend(on(['x'.repeat(AI_ITEM_MAX + 50)]), () => false, allOwn).texts[0]).toHaveLength(AI_ITEM_MAX);
   });
 
   it('a long item sent cut is found again by its full text, so it is not sent twice', () => {
     const long = 'x'.repeat(AI_ITEM_MAX + 50);
-    const [sent] = toSend([long], () => false).texts;
+    const [sent] = toSend(on([long]), () => false, allOwn).texts;
     expect(labelKey(sent, 'm')).toBe(labelKey(long, 'm'));
     const saved = new Set([labelKey(sent, 'm')]);
-    expect(toSend([long], (t) => saved.has(labelKey(t, 'm'))).total).toBe(0);
+    expect(toSend(on([long]), (t) => saved.has(labelKey(t, 'm')), allOwn).total).toBe(0);
+  });
+
+  it('never sends an item from a board someone else shared with this person (owner, 2026-11-13)', () => {
+    const isOwn = ownBoards([{ root: 'trip', boards: ['trip', 'trip-sub'], owner: false }], true);
+    const items = [...on(['Buy milk']), ...on(['Pack the tent'], 'trip'), ...on(['Fix the stove'], 'trip-sub')];
+    expect(toSend(items, () => false, isOwn)).toEqual({ texts: ['Buy milk'], total: 1 });
+  });
+
+  it('a text on both an own and a shared board is sent once, for the own one', () => {
+    const isOwn = ownBoards([{ root: 'trip', boards: ['trip'], owner: false }], true);
+    expect(toSend([...on(['Buy milk'], 'trip'), ...on(['Buy milk'])], () => false, isOwn)).toEqual({ texts: ['Buy milk'], total: 1 });
+    expect(toSend(on(['Buy milk'], 'trip'), () => false, isOwn)).toEqual({ texts: [], total: 0 });
+  });
+
+  it('a board this person shared with others is still their own', () => {
+    const isOwn = ownBoards([{ root: 'mine', boards: ['mine'], owner: true }], true);
+    expect(toSend(on(['Plan the party'], 'mine'), () => false, isOwn).texts).toEqual(['Plan the party']);
+  });
+
+  it('while the shares are not known yet, no board counts as own, so nothing is sent', () => {
+    const isOwn = ownBoards([], false);
+    expect(isOwn('home')).toBe(false);
+    expect(toSend(on(['Buy milk']), () => false, isOwn)).toEqual({ texts: [], total: 0 });
   });
 
   it('keeps batches and the limit in proportion', () => {
@@ -107,17 +135,17 @@ describe('finding labels again', () => {
 });
 
 describe('the disc with AI labels', () => {
-  const item = (text: string) => ({ text });
+  const item = (text: string, boardId = 'home') => ({ text, boardId });
 
   it('uses the label when there is one, and the built-in rules when not', () => {
     const labels: Record<string, string> = { 'Fix the bike': 'Bikes' };
-    const cat = makeAiCategorizer(['Fix the bike', 'Buy milk'], (t) => labels[t] ?? null);
+    const cat = makeAiCategorizer(on(['Fix the bike', 'Buy milk']), (t) => labels[t] ?? null, allOwn);
     expect(cat(item('Fix the bike'), 'List')).toEqual({ name: 'Bikes' });
     expect(cat(item('Buy milk'), 'List')).toBe(categoryOf(item('Buy milk'), 'List'));
   });
 
   it('a label that is a built-in category name joins that category', () => {
-    const cat = makeAiCategorizer(['a', 'b'], (t) => (t === 'a' ? 'work' : 'Other'));
+    const cat = makeAiCategorizer(on(['a', 'b']), (t) => (t === 'a' ? 'work' : 'Other'), allOwn);
     expect(cat(item('a'), '')).toBe('work');
     expect(cat(item('b'), '')).toBe('other');
   });
@@ -126,9 +154,20 @@ describe('the disc with AI labels', () => {
     const texts = Array.from({ length: AI_MAX_CATEGORIES + 2 }, (_, i) => `t${i}`);
     // t0 and t1 share a label, so it is the busiest; every other text has its own.
     const label = (t: string) => (t === 't1' ? 'L0' : `L${t.slice(1)}`);
-    const cat = makeAiCategorizer([...texts, 't0'], label);
+    const cat = makeAiCategorizer(on([...texts, 't0']), label, allOwn);
     const named = texts.map((t) => cat(item(t), '')).filter((c) => typeof c === 'object');
     expect(new Set(named.map((c) => (c as { name: string }).name)).size).toBe(AI_MAX_CATEGORIES);
     expect(cat(item('t1'), '')).toEqual({ name: 'L0' });
+  });
+
+  it('a label saved earlier is not used for an item on a board shared with this person: it keeps the built-in category', () => {
+    const isOwn = ownBoards([{ root: 'trip', boards: ['trip'], owner: false }], true);
+    const lookup = (t: string) => (t === 'Fix the bike' ? 'Bikes' : null);
+    const cat = makeAiCategorizer([item('Fix the bike'), item('Fix the bike', 'trip')], lookup, isOwn);
+    expect(cat(item('Fix the bike'), 'List')).toEqual({ name: 'Bikes' });
+    expect(cat(item('Fix the bike', 'trip'), 'List')).toBe(categoryOf(item('Fix the bike'), 'List'));
+    // Only own items count towards the busiest labels.
+    const shared = makeAiCategorizer([item('Fix the bike', 'trip')], lookup, isOwn);
+    expect(shared(item('Fix the bike'), 'List')).toBe(categoryOf(item('Fix the bike'), 'List'));
   });
 });

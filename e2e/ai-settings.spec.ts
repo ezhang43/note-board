@@ -51,6 +51,10 @@ test.describe("on a wide desktop", () => {
       "your key is used only when you press test key or an ai button",
     );
     expect(text).toContain("straight from this browser to anthropic");
+    // Owner, 2026-11-13: only items from your own boards, never from boards shared with you.
+    expect(text).toContain(
+      "the text of finished checklist items from your own boards, never from boards shared with you",
+    );
     await expect(
       dialog(page).getByRole("button", { name: "Test key" }),
     ).toBeDisabled();

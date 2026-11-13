@@ -52,7 +52,7 @@ function byWords(text: string): CategoryId {
  * Works out which category an item is in: from its own text, else from the title of the list it came from.
  * It gives a built-in category's id, or a category of its own by name (Sort with AI, see aiCategories.ts).
  */
-export type Categorizer = (item: { text: string }, listTitle: string) => CategoryId | { name: string };
+export type Categorizer = (item: { text: string; /** The board it is on, where known (the Visualizer's items). */ boardId?: string }, listTitle: string) => CategoryId | { name: string };
 
 /** The built-in rules: the item text first, then the list title as a fallback (a list titled "Groceries" makes its items Errands & shopping). */
 export const categoryOf = (item: { text: string }, listTitle: string): CategoryId => {

@@ -1,6 +1,6 @@
 # Play Console: Data safety form (draft answers)
 
-Worked out from the code and `SPEC.md` on 2026-10-16. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
+Worked out from the code and `SPEC.md` on 2026-10-16; the AI part (Anthropic) updated on 2026-11-13. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
 
 Files checked:
 - `src/sync/firebase.ts` (Google sign-in with Firebase Authentication) and `src/sync/database.ts` (Cloud Firestore, offline cache; `sendFeedback`: Send feedback saves the note with the person's email and account number, job #69)
@@ -12,6 +12,7 @@ Files checked:
 - `package.json` and a search of `src/` and `index.html` (no advertising, crash-reporting or tracking library; since 2026-10-19 the published pages load GoatCounter, a cookie-free page-visit counter, see Analytics below)
 - `privacy/index.html` (what the policy promises)
 - `mcp/` (the Claude connector; see below, it is not part of the app)
+- `src/store/ai.ts`, `src/model/aiCategories.ts`, `src/components/VizAiSort.tsx` (the AI buttons: what is sent to Anthropic with the person's own key, see "Sharing with third parties")
 
 ## Summary answers
 
@@ -20,12 +21,12 @@ Files checked:
 | Does your app collect or share any of the required user data types? | Yes |
 | Is all of the user data collected by your app encrypted in transit? | Yes (everything goes over HTTPS: Firebase, Google sign-in, the website) |
 | Do you provide a way for users to request that their data is deleted? | Yes. Say so once job #63 is live: the in-app Delete account button and the website "Delete your account" page. Until then the policy says "email ezhang43@gmail.com, deleted within 30 days". |
-| Data shared with third parties? | No (see "Sharing" below). OWNER CHECK. |
+| Data shared with third parties? | Yes (owner decision, 2026-11-13: "Yes, to be safe"; see "Sharing with third parties" below). What leaves: if the person uses an AI button, the text of finished checklist items from their own boards (never from boards shared with them) is sent to Anthropic only when they press it, using their own Anthropic key, straight from their browser, and never through BusyAnts. |
 | Independent security review / "Committed to Play Families policy" | Leave "No" / not applicable. The app is not designed for children (privacy policy: not meant for children under 13). |
 
 ## Data types collected
 
-For each type: Collected = yes. Shared = no. Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no advertising, personalization or fraud prevention; the page-visit counter is covered under Analytics below).
+For each type: Collected = yes. Shared = no, except "Other user-generated content", which is declared shared: the text of finished checklist items sent to Anthropic when the person presses an AI button (see "Sharing with third parties"). Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no advertising, personalization or fraud prevention; the page-visit counter is covered under Analytics below).
 
 | Play category | Data type | Collected? | Why / where it comes from | Purposes |
 | --- | --- | --- | --- | --- |
@@ -33,7 +34,7 @@ For each type: Collected = yes. Shared = no. Processed ephemerally = no. Require
 | Personal info | Email address | Yes | Google account email, kept by Firebase Authentication; used to sign in and saved with feedback the person sends, so the owner can reply; never shown to others | Account management, plus OWNER CHECK: Developer communications (for replying to feedback) |
 | Personal info | User IDs | Yes | The Firebase / Google account number, used to store your boards, to tell who has a shared board, and saved with feedback the person sends | App functionality, Account management |
 | Photos and videos | Photos | OWNER CHECK, recommended: tick "Photos" | Only the web address of the Google profile picture is stored and shown to people you share a board with; the app does not read your photo library or camera. Google's form has no "profile picture" type. Ticking Photos is the cautious, honest choice. | App functionality |
-| App activity | Other user-generated content | Yes | Everything on the boards: names, notes, checklist items, links, colors, positions, plus version history and shared-board lists; and the text of feedback the person chooses to send (the Feedback button) | App functionality, plus OWNER CHECK for feedback: Developer communications (or App functionality) |
+| App activity | Other user-generated content | Yes | Everything on the boards: names, notes, checklist items, links, colors, positions, plus version history and shared-board lists; and the text of feedback the person chooses to send (the Feedback button). Shared: yes, optional, only the text of finished checklist items sent to Anthropic when the person presses an AI button with their own key | App functionality, plus OWNER CHECK for feedback: Developer communications (or App functionality) |
 | Calendar | Calendar events | No (OWNER CHECK) | If the person connects Google Calendar, events go from Google straight to the device and are kept in memory only; BusyAnts keeps no copy and nothing is sent to BusyAnts's own storage. Google counts data as "collected" when it is sent off the device to you or a third party, so this is likely "not collected". If you want to be extra cautious, tick Calendar events as collected, optional, App functionality, not shared. | (App functionality, if ticked) |
 
 Types that are **not** collected (as far as the code shows): approximate or precise location, physical address, phone number, race, political or religious beliefs, financial info, health and fitness, messages (emails, SMS), contacts, audio or video files, files and docs other than the boards, web browsing history, installed apps, app interactions / analytics, crash logs, diagnostics, device or other IDs (advertising ID). The app has no analytics or crash-reporting library.
@@ -42,10 +43,15 @@ OWNER CHECK: servers like Firebase and GitHub Pages receive an IP address whenev
 
 ## Sharing with third parties
 
-Recommended answer: **No data is shared.** Reasoning, using Google's definitions:
+What happens, as built: BusyAnts itself shares nothing. The one thing that leaves for a third party is this: the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. The person types in their own key in AI settings and presses the button themselves; the hint next to it says what goes. No board names, list names, notes or ids are sent, and nothing reaches BusyAnts's servers.
+
+Answer (owner decision, 2026-11-13: "Yes, to be safe"): **Data shared with third parties: Yes.** Type: App activity > **Other user-generated content** (the text of finished checklist items). Shared: yes, optional, purpose App functionality. Note: sent only when the user presses an AI button, with their own Anthropic key, straight from their browser to Anthropic, never through BusyAnts. Google's form may not count a transfer the user starts themselves as "shared", but declaring it is the cautious choice. Keep the same answer as the privacy policy.
+
+Reasoning for the rest, using Google's definitions:
 - Google Firebase (Authentication and Cloud Firestore) stores the data on BusyAnts's behalf. Google says that transferring data to a "service provider" that processes it on the developer's behalf is not "sharing". Firebase is that kind of processor, so it is declared as collected but not shared.
 - GitHub Pages only serves the site's files.
 - Google Fonts and Google Calendar are Google services used directly by the person's device.
+- Anthropic (the AI buttons): the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. Declared as shared, to be safe (see above).
 - Sharing a board with another person is an action the user takes themselves, and Google says transfers the user starts in the app (with a clear prompt) are not "sharing" either. The panel shows the people who have it.
 
 OWNER CHECK: if you read it more strictly, you could answer "Yes" for Name and Photos (shown to people the user shares a board with). The recommended answer stays "No" because it is user-initiated and in-app. Pick the one you are comfortable with, and keep it the same as the privacy policy.

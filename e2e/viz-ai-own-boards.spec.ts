@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page, type Route } from '@playwright/test';
+import { labelKey } from '../src/model/aiCategories';
 import { fontsLoaded, more } from './helpers';
 
 // Sort with AI sends only items from the person's own boards (owner, 2026-11-13): never from a board someone
@@ -72,7 +73,10 @@ test('Sort with AI never sends an item from a board shared with you, and that it
   await settings.getByLabel('Anthropic API key').fill(KEY);
   await settings.getByRole('button', { name: 'Save key' }).click();
   await expect(settings.getByText('sk-ant-…1234')).toBeVisible();
+  const model = await settings.locator('input[name="ai-model"]:checked').inputValue();
   await bob.keyboard.press('Escape');
+  // A label saved earlier on this device for the shared item's text (as before this change) is not used for it.
+  await bob.evaluate(([owner, key]) => localStorage.setItem('note-board:ai-categories', JSON.stringify({ v: 1, owner, entries: { [key]: 'Camping' } })), [`demo-bob${t}`, labelKey(SHARED_TEXT, model)] as const);
 
   await (await more(bob)).getByRole('button', { name: 'Visualizer', exact: true }).click();
   const canvas = dialog(bob).locator('canvas.viz-canvas');
@@ -81,14 +85,14 @@ test('Sort with AI never sends an item from a board shared with you, and that it
   await expect(dialog(bob).getByText('Sends the text of 1 finished item from your own boards to Anthropic', { exact: false })).toBeVisible();
   await expect(dialog(bob).getByText(/shared with you/)).toBeVisible();
 
+  await expect(canvas).toHaveAttribute('aria-label', '2 items cleaned up: Errands & shopping 1, Other 1.');
   await dialog(bob).getByRole('button', { name: 'Sort with AI' }).click();
-  await expect(canvas).toHaveAttribute('aria-label', /Camping 1/);
+  // Bob's own item is in Camping; the shared one keeps its built-in category (Other), despite the saved label.
+  await expect(canvas).toHaveAttribute('aria-label', '2 items cleaned up: Camping 1, Other 1.');
   expect(bodies).toHaveLength(1);
   expect(bodies[0]).toContain(OWN_TEXT);
   expect(bodies[0]).not.toContain('striped tent');
-  // The shared item keeps a built-in category.
-  await expect(canvas).not.toHaveAttribute('aria-label', /Camping 2/);
-  await expect(dialog(bob).getByText(/Every item from your own boards is sorted/)).toBeVisible();
+  await expect(dialog(bob).getByText(/Nothing left to sort from your own boards/)).toBeVisible();
   await alice.context().close();
   await bob.context().close();
 });

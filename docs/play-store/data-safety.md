@@ -21,7 +21,7 @@ Files checked:
 | Does your app collect or share any of the required user data types? | Yes |
 | Is all of the user data collected by your app encrypted in transit? | Yes (everything goes over HTTPS: Firebase, Google sign-in, the website) |
 | Do you provide a way for users to request that their data is deleted? | Yes. Say so once job #63 is live: the in-app Delete account button and the website "Delete your account" page. Until then the policy says "email ezhang43@gmail.com, deleted within 30 days". |
-| Data shared with third parties? | Only if the person uses an AI button: the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. BusyAnts itself shares nothing (see "Sharing with third parties" below for how to answer). OWNER CHECK. |
+| Data shared with third parties? | Recommended: No (see "Sharing with third parties" below). OWNER CHECK. What actually leaves: if the person uses an AI button, the text of finished checklist items from their own boards (never from boards shared with them) is sent to Anthropic only when they press it, using their own Anthropic key, straight from their browser, and never through BusyAnts. |
 | Independent security review / "Committed to Play Families policy" | Leave "No" / not applicable. The app is not designed for children (privacy policy: not meant for children under 13). |
 
 ## Data types collected

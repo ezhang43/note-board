@@ -73,7 +73,7 @@ export function VizAiSort({
   const hint = loading
     ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
     : !total
-      ? 'Every item from your own boards is sorted. The labels stay on this device.'
+      ? 'Nothing left to sort from your own boards. The labels stay on this device.'
       : `Sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
 
   return (

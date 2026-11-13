@@ -48,8 +48,8 @@ export interface ShareOf {
  */
 export function ownBoards(shares: ShareOf[], known: boolean): (boardId: string) => boolean {
   if (!known) return () => false;
-  const theirs = shares.filter((s) => !s.owner);
-  return (boardId) => !theirs.some((s) => s.root === boardId || s.boards.includes(boardId));
+  const theirs = new Set(shares.filter((s) => !s.owner).flatMap((s) => [s.root, ...s.boards]));
+  return (boardId) => !theirs.has(boardId);
 }
 
 /** A finished item as Sort with AI sees it: its text and the board it is on. */

@@ -68,6 +68,27 @@ test('Checklist opens on the left, 420px wide; its items are kept, on every boar
   await expect(boardCards(page)).toHaveCount(1);
 });
 
+test('in the bottom pill Checklist comes right after Search and Timer, in sight order and in Tab order', async ({ page }) => {
+  await page.goto(`/?demo-user=Chk${Math.random().toString(36).slice(2, 8)}`);
+  await fontsLoaded(page);
+  const names = ['Search', 'Focus timer', 'Checklist', 'Google Calendar', 'Journal', 'Habits'];
+  const pill = dock(page).locator('.dock-tools button');
+  // Left to right on screen...
+  const seen = await pill.evaluateAll((els) =>
+    els
+      .map((el) => ({ name: el.getAttribute('aria-label') ?? '', x: el.getBoundingClientRect().x }))
+      .sort((a, b) => a.x - b.x)
+      .map((b) => b.name),
+  );
+  expect(seen).toEqual(names);
+  // ...and the keyboard walks the same way.
+  await dock(page).getByRole('button', { name: 'Search', exact: true }).focus();
+  for (const name of names.slice(1)) {
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveAttribute('aria-label', name);
+  }
+});
+
 test('open beside the Journal: Checklist on the left, Journal on the right; Escape closes one panel at a time', async ({ page }) => {
   await openWith(page, ['one']);
   await dock(page).getByRole('button', { name: 'Journal', exact: true }).click();

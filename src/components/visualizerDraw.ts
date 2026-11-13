@@ -1,5 +1,6 @@
-import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, burstSize, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
+import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
 // look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
@@ -24,12 +25,13 @@ const SPIN_PER_MS = (Math.PI * 2) / 80000;
 const MAX_DT_MS = 100;
 /** Past this many wedges, board names around the ring would run into each other, so only the picture is drawn. (There are at most 16 boards plus the one for the rest.) */
 const MAX_LABELLED = 17;
-/** How many thin track rings the disc has between the hub and the rim, and about how many radial divisions it has all round. */
-const TRACKS = 14;
+/** About how many radial divisions the disc has all round. */
 const SPOKES = 36;
-/** How many short arcs a lit cell can show along each of its tracks. */
-const SLOTS = 4;
+/** The size of the small card for an item that just landed. */
+const CARD_H = 40;
+const CARD_PAD = 11;
 /** The small uppercase monospace of the labels (a system font: nothing to download). */
+const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 /** Room for a board name is rounded down to this many pixels when its cut is remembered. */
 const LABEL_STEP = 4;
@@ -189,6 +191,8 @@ export interface DiscOptions {
   palette: Palette;
   /** Reduced motion: no spinning, no beam, no trail, no pulsing; cells just light up as items land. */
   still: boolean;
+  /** The two lines of the small card shown for each item of the loop (its text, then "category · board"), in loop order. Plain text. */
+  cards: [string, string][];
   /** How many items have landed so far in this trip round the loop (0 when it starts again). Called when that changes. */
   onLanded(landed: number): void;
 }
@@ -203,6 +207,12 @@ export function startDisc(o: DiscOptions): () => void {
   const strike = still ? 1 : FLIGHT_MS * STRIKE; // when the beam reaches its cell: it lands and lights up
   const hueOf = (wi: number) => palette.hues[wedges[wi].hue % palette.hues.length];
   const total = loopMs(n, flight);
+  // The most fountains in the air together over this loop sets how many sparks each has; the same for the whole loop, so none pops in or out. A narrow stage (a phone) gets a few fewer.
+  let overlap = 1;
+  if (!still) for (let at = 0; at < total; at += 50) overlap = Math.max(overlap, playhead(at, n, flight, strike).flying.length);
+  const sparks = burstSize(overlap);
+  const crowded = overlap > 4; // fixed for the whole loop too, so a fountain never changes look in flight
+  let bursts = sparks;
   let landedCount = wedges.map((w) => w.cells.map(() => 0));
   const flashAt = wedges.map((w) => w.cells.map(() => -Infinity));
   let w = 0;
@@ -213,13 +223,15 @@ export function startDisc(o: DiscOptions): () => void {
   // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
   const labels = wedges.map(() => new Map<number, string>());
   const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
+  // The cards' lines as cut to fit (and their width), by item, measured when first shown. Emptied on resize.
+  const cardText = new Map<number, { title: string; sub: string; width: number }>();
   // The still parts of the picture, drawn once per size (a canvas of the same size, stamped each frame).
   const base = document.createElement('canvas');
 
   /** Where the disc and the core sit on the canvas, and how big the disc is. Sits low; when the stage is tall there is room to lift it so the core and the beams get their space above. */
   const layout = () => {
     const rx = discRadius(w, h, labelW);
-    const spare = Math.max(0, (h - (rx * 1.25 + 60)) / 2);
+    const spare = Math.max(0, (h - (rx * 1.4 + 60)) / 2);
     const cx = w / 2;
     const cy = h - rx * TILT * LABEL_RADIUS - 34 - spare;
     return { rx, cx, cy, core: coreAt(cx, cy, rx) };
@@ -290,11 +302,13 @@ export function startDisc(o: DiscOptions): () => void {
   const size = () => {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     w = canvas.clientWidth;
+    bursts = w < 520 ? Math.max(4, Math.round(sparks * 0.7)) : sparks;
     h = canvas.clientHeight;
     canvas.width = Math.max(1, Math.round(w * dpr));
     canvas.height = Math.max(1, Math.round(h * dpr));
     labels.forEach((m) => m.clear());
     hubTexts.fill(undefined);
+    cardText.clear();
     if (wedges.length > 0 && wedges.length <= MAX_LABELLED) {
       ctx.font = labelFont();
       labelW = Math.max(...wedges.map((wedge) => ctx.measureText(fitLabel(wedge.name.toUpperCase(), Infinity, (t) => ctx.measureText(t).width)).width));
@@ -313,12 +327,15 @@ export function startDisc(o: DiscOptions): () => void {
   let last = 0;
   let landed = 0;
   let latest = -1; // the wedge of the item that landed last, named in the hub
+  // The items that got a card (when they landed, on the animation clock), oldest first, and when the last was shown.
+  let cardArrivals: { index: number; at: number; slot: 0 | 1 }[] = [];
+  let cardCount = 0; // how many cards this trip, so they take the two places by turns
+  let lastCard = -Infinity;
   let raf = 0;
 
-  /** The patch of ring a cell covers, as a closed path. */
+  /** Adds the patch of ring between two angles and two radii to the current path, as a closed shape. */
   const patch = (a0: number, a1: number, r0: number, r1: number, cx: number, cy: number, rx: number) => {
-    const steps = Math.max(2, Math.ceil((a1 - a0) / 0.12));
-    ctx.beginPath();
+    const steps = Math.max(1, Math.ceil((a1 - a0) / 0.12));
     for (let i = 0; i <= steps; i++) {
       const p = project(a0 + ((a1 - a0) * i) / steps, r1, spin, cx, cy, rx);
       if (i) ctx.lineTo(p.x, p.y);
@@ -358,32 +375,33 @@ export function startDisc(o: DiscOptions): () => void {
       ctx.stroke();
     }
 
-    // The lit cells: short magenta arcs along the tracks, a little more of the cell for each item that has landed.
-    const track = (OUTER - INNER) / TRACKS;
+    // The lit cells: one short magenta dash for each finished item, each at its own place in its cell (never a solid band). The newest flashes.
     wedges.forEach((wedge, wi) => {
-      wedge.cells.forEach((cell, ci) => {
+      wedge.cells.forEach((_, ci) => {
         const done = landedCount[wi][ci];
         const flash = Math.max(0, 1 - (now - flashAt[wi][ci]) / FLASH_MS);
-        if (!done && flash <= 0) return;
+        if (!done) return;
         const a = cellArea(wi, count, ci, wedge.cells.length);
         const front = (Math.sin((a.a0 + a.a1) / 2 + spin) + 1) / 2; // 1 at the front of the ring, 0 at the back
-        const depth = 0.7 + 0.3 * front;
-        const tracks = Math.max(1, Math.floor((a.r1 - a.r0) / track));
-        const share = cell.count > 0 ? Math.min(1, done / cell.count) : 1;
-        const lit = Math.ceil(share * tracks * SLOTS);
-        ctx.fillStyle = rgba(palette.core, Math.min(1, (0.5 + 0.2 * share + 0.4 * flash * flash) * depth));
-        for (let row = 0; row < tracks; row++) {
-          const n = Math.min(SLOTS, lit - row * SLOTS);
-          if (n <= 0) break;
-          const r1 = a.r1 - row * track;
-          patch(a.a0, a.a0 + ((a.a1 - a.a0) * n) / SLOTS, r1 - track * 0.8, r1 - track * 0.1, cx, cy, rx);
-          ctx.fill();
+        const seed = wi * 131 + ci;
+        const shown = dashCount(a, done);
+        ctx.fillStyle = rgba(palette.core, (0.62 + 0.3 * front) * (still ? 1 : 0.9));
+        ctx.beginPath();
+        for (let k = 0; k < shown; k++) {
+          const d = dashFor(a, k, seed);
+          patch(d.a0, d.a1, d.r0, d.r1, cx, cy, rx);
         }
+        ctx.fill();
         if (flash > 0) {
-          const c = cellCentre(wi, count, ci, wedge.cells.length);
-          const p = project(c.a, c.r, spin, cx, cy, rx);
+          // simple: past DASH_MAX_FILL of a cell's places the newest item shares an earlier dash, so that one glows; upgrade if cells should show every item.
+          const d = dashFor(a, (done - 1) % shown, seed); // the newest dash is the one that glows
+          ctx.fillStyle = rgba(palette.spark, Math.min(1, flash * 1.2));
+          ctx.beginPath();
+          patch(d.a0, d.a1, d.r0, d.r1, cx, cy, rx);
+          ctx.fill();
+          const c = project((d.a0 + d.a1) / 2, (d.r0 + d.r1) / 2, spin, cx, cy, rx);
           ctx.globalCompositeOperation = 'lighter';
-          stamp(ctx, palette.core, p.x, p.y, 16 + 14 * flash, 0.8 * flash);
+          stamp(ctx, palette.core, c.x, c.y, 14 + 12 * flash, 0.7 * flash);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
         }
@@ -473,8 +491,6 @@ export function startDisc(o: DiscOptions): () => void {
         const pieces = pts.length - 1;
         for (let i = 0; i < pieces; i++) drawShaft(sprite, pts[i], pts[i + 1], width, alpha, i / pieces, (i + 1) / pieces);
       };
-      // A loop with very many items has quick, crowded arrivals, so every burst is smaller (fixed for the whole loop, so no particle pops in or out), to stay inside the frame.
-      const bursts = slots.length > 250 ? 3 : PARTICLES;
       flying.forEach((f, fi) => {
         const ph = phases[fi];
         const s = slots[f.index];
@@ -484,49 +500,105 @@ export function startDisc(o: DiscOptions): () => void {
           const from = beamStart(to, cx);
           const head = beamPoint(from, to, ph.beam);
           const a = ph.beamAlpha;
-          drawShaft(shaft(palette.core, 'beam'), from, head, 9 * unit, 0.5 * a); // the faint halo
-          drawShaft(shaft(palette.spark, 'beam'), from, head, 2.2 * unit, 0.85 * a);
-          stamp(ctx, palette.core, head.x, head.y, 14 * unit, 0.7 * a);
-          stamp(ctx, palette.spark, head.x, head.y, 5 * unit, a); // the bright dot where it lands
+          drawShaft(shaft(palette.core, 'beam'), from, head, 7 * unit, 0.5 * a); // the faint halo
+          drawShaft(shaft(palette.spark, 'beam'), from, head, 1.8 * unit, 0.85 * a); // a thin bright line
+          stamp(ctx, palette.core, head.x, head.y, 12 * unit, 0.7 * a);
+          stamp(ctx, palette.spark, head.x, head.y, 4.5 * unit, a); // the bright dot where it lands
+          if (ph.beam < 1) {
+            // A small ring marks the cell the beam is heading for.
+            ctx.strokeStyle = palette.spark;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.7 * a;
+            ctx.beginPath();
+            ctx.ellipse(to.x, to.y, 8 * unit, 8 * unit * TILT, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
         if (ph.flash > 0) {
           stamp(ctx, palette.core, to.x, to.y, (12 + 36 * ph.flash) * unit, 0.8 * ph.flash);
           stamp(ctx, palette.spark, to.x, to.y, (6 + 14 * ph.flash) * unit, ph.flash);
         }
-        if (ph.ping !== null || ph.beamAlpha > 0) {
-          // The small ring on the disc: it is there while the beam is, and opens a little as the cell lights.
-          const open = ph.ping ?? 0;
-          ctx.strokeStyle = palette.spark;
-          ctx.lineWidth = 1.1;
-          ctx.globalAlpha = 0.85 * Math.min(ph.beamAlpha + 0.2, 1) * (1 - open * 0.6);
-          const r = (8 + 10 * open) * unit;
+        // The ripples: rings on the disc opening out from the landing spot, one after another.
+        ctx.strokeStyle = palette.spark;
+        for (const rp of ph.ripples) {
+          if (rp.alpha <= 0) continue;
+          const r = (6 + 44 * rp.open) * unit;
+          ctx.lineWidth = 1.4 - 0.8 * rp.open;
+          ctx.globalAlpha = 0.85 * rp.alpha;
           ctx.beginPath();
           ctx.ellipse(to.x, to.y, r, r * TILT, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+        if (ph.column.alpha > 0) {
+          // A thick bright column rises from the landing spot for a moment, brightest at the foot and thinning out above.
+          const up = rx * 0.6 * ph.column.height;
+          ctx.globalAlpha = 0.55 * ph.column.alpha;
+          ctx.drawImage(shaft(palette.core, 'beam'), to.x - 13 * unit, to.y - up, 26 * unit, up);
+          ctx.globalAlpha = 0.95 * ph.column.alpha;
+          ctx.drawImage(shaft(palette.spark, 'beam'), to.x - 5 * unit, to.y - up, 10 * unit, up);
+          stamp(ctx, palette.spark, to.x, to.y, 16 * unit, 0.8 * ph.column.alpha);
+        }
         if (ph.comet !== null) {
-          // The burst: a few shooting stars fanned out along curved paths from the cell into the core. Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). The first is tinted green, the others white and pink.
+          // The fountain: shooting stars fanned out along curved paths from the cell into the core, each rising to its own height. Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). Some are tinted green, the rest white and lavender.
           for (let k = 0; k < bursts; k++) {
             const seed = particleSeed(f.index, k);
             const q = Math.min(1, (ph.comet - seed.delay) / (1 - PARTICLE_DELAY));
             if (q <= 0) continue;
             const alpha = Math.min(1, (1 - q) / 0.12);
             if (alpha <= 0) continue;
-            const pts = tailPoints(to, core, seed.spread, q, bursts === PARTICLES ? 3 : 2);
+            const pts = tailPoints(to, core, seed.spread, q, crowded ? 2 : 3, seed.lift);
             const head = pts[pts.length - 1];
-            const tint = k === 0 ? palette.lead : palette.pink;
-            const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the burst stays a few crisp streaks
-            drawStreak(streak(tint), pts, 8 * lead, 0.8 * alpha); // the glowing streak
-            drawStreak(streak(palette.spark), pts, 3.2 * lead, alpha); // its white-hot core
-            stamp(ctx, tint, head.x, head.y, 17 * lead, 0.7 * alpha); // the halo round the head
-            stamp(ctx, palette.spark, head.x, head.y, 9 * lead, alpha);
-            stamp(ctx, palette.spark, head.x, head.y, 4.2 * lead, alpha);
+            const tint = k % 4 === 0 ? palette.lead : k % 2 ? palette.pink : palette.spark;
+            const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the fountain stays a few crisp streaks
+            drawStreak(streak(tint), pts, 7 * lead, 0.8 * alpha); // the glowing streak
+            drawStreak(streak(palette.spark), pts, 2.8 * lead, alpha); // its white-hot core
+            if (!crowded) stamp(ctx, tint, head.x, head.y, 15 * lead, 0.7 * alpha); // the halo round the head
+            stamp(ctx, palette.spark, head.x, head.y, 7 * lead, alpha);
           }
         }
       });
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+
+    // The small cards by the core, for the items that just landed (none for reduced motion).
+    if (!still) {
+      const titlePx = rx > 200 ? 12 : rx > 150 ? 11 : 10; // the card follows the size of the stage, so on a phone it stays small beside the disc
+      const subPx = titlePx - 2;
+      for (const card of cardsAt(cardArrivals, now)) {
+        const lines = o.cards[card.index];
+        if (!lines) continue;
+        let text = cardText.get(card.index);
+        if (!text) {
+          const room = Math.min(240, w - 16) - CARD_PAD * 2;
+          ctx.font = `600 ${titlePx}px ${SANS}`;
+          const title = fitLabel(lines[0], room, (t) => ctx.measureText(t).width);
+          const titleW = ctx.measureText(title).width;
+          ctx.font = `400 ${subPx}px ${SANS}`;
+          const sub = fitLabel(lines[1], room, (t) => ctx.measureText(t).width);
+          text = { title, sub, width: Math.ceil(Math.max(titleW, ctx.measureText(sub).width)) + CARD_PAD * 2 };
+          cardText.set(card.index, text);
+        }
+        const box = cardBox(card.slot, core, rx, w, text.width, CARD_H, card.rise);
+        ctx.globalAlpha = card.alpha;
+        ctx.fillStyle = 'rgba(10, 6, 28, 0.9)';
+        ctx.strokeStyle = rgba(palette.lead, 0.75);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(box.x, box.y, box.w, box.h, 9);
+        ctx.fill();
+        ctx.stroke();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = palette.spark;
+        ctx.font = `600 ${titlePx}px ${SANS}`;
+        ctx.fillText(text.title, box.x + CARD_PAD, box.y + 15);
+        ctx.fillStyle = rgba(palette.label, 0.9);
+        ctx.font = `400 ${subPx}px ${SANS}`;
+        ctx.fillText(text.sub, box.x + CARD_PAD, box.y + 29);
+      }
+      ctx.globalAlpha = 1;
+    }
   };
 
   const frame = (now: number) => {
@@ -541,6 +613,9 @@ export function startDisc(o: DiscOptions): () => void {
       landedCount = wedges.map((x) => x.cells.map(() => 0));
       flashAt.forEach((row) => row.fill(-Infinity));
       latest = -1;
+      cardArrivals = [];
+      cardCount = 0;
+      lastCard = -Infinity;
       o.onLanded(0);
     }
     const ph = playhead(t, n, flight, strike);
@@ -549,7 +624,12 @@ export function startDisc(o: DiscOptions): () => void {
       latest = s.wedge;
       landedCount[s.wedge][s.cell]++;
       flashAt[s.wedge][s.cell] = now;
+      if (!still && shouldShowCard(lastCard, now)) {
+        lastCard = now;
+        cardArrivals.push({ index: k, at: now, slot: (cardCount++ % 2) as 0 | 1 });
+      }
     }
+    while (cardArrivals.length && now - cardArrivals[0].at >= CARD_LIFE_MS) cardArrivals.shift();
     if (ph.landed !== landed) {
       landed = ph.landed;
       o.onLanded(landed);

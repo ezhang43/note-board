@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, STRIKE, tailPoints, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, BURST_BUDGET, COMET_START, LIFT_MAX, LIFT_MIN, RIPPLES, burstSize,CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, STRIKE, tailPoints, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -254,15 +254,6 @@ describe('warpPhase', () => {
     expect(warpPhase(STRIKE + 0.2).beamAlpha).toBe(0); // gone soon after it lands
   });
 
-  it('rings a ping on the cell when the beam lands, then lets it go', () => {
-    expect(warpPhase(STRIKE - 0.01).ping).toBeNull();
-    expect(warpPhase(STRIKE).ping).toBe(0);
-    const mid = warpPhase(STRIKE + 0.1).ping!;
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(1);
-    expect(warpPhase(0.9).ping).toBeNull();
-  });
-
   it('lets the beam and its ring linger on the cell a moment, then sends the particles along the whole arc and fades them into the core', () => {
     expect(COMET_START).toBeGreaterThan(STRIKE);
     expect(warpPhase(COMET_START - 0.01).comet).toBeNull();
@@ -386,5 +377,80 @@ describe('discRadius', () => {
   it('reserves at most a fifth of the width for the label, so a phone keeps a usable disc', () => {
     expect(discRadius(390, 780, 400)).toBeCloseTo(discRadius(390, 780, 390 * 0.2), 9);
     expect(discRadius(390, 780, 400)).toBeGreaterThan(70);
+  });
+});
+
+// The fountain, ripples and column (owner request, 2026-11-13, "viz-burst").
+
+describe('fountain', () => {
+  it('is a burst of ten sparks, fewer when many arrive together (a fixed budget for the frame)', () => {
+    expect(PARTICLES).toBe(10);
+    expect(burstSize(1)).toBe(PARTICLES);
+    expect(burstSize(5)).toBeGreaterThanOrEqual(8);
+    for (let o = 1; o < 60; o++) {
+      expect(burstSize(o)).toBeGreaterThanOrEqual(4);
+      expect(burstSize(o)).toBeLessThanOrEqual(PARTICLES);
+    }
+    expect(burstSize(8)).toBeLessThan(burstSize(2));
+    expect(burstSize(8) * 8).toBeLessThanOrEqual(BURST_BUDGET + 8); // all that can be in the air at once stay near the budget
+  });
+
+  it('arcs each spark up to its own height, within limits, the same every time', () => {
+    for (let item = 0; item < 20; item++) {
+      for (let k = 0; k < PARTICLES; k++) {
+        const s = particleSeed(item, k);
+        expect(s.lift).toBeGreaterThanOrEqual(LIFT_MIN);
+        expect(s.lift).toBeLessThanOrEqual(LIFT_MAX);
+        expect(particleSeed(item, k)).toEqual(s);
+      }
+    }
+    const lifts = new Set(Array.from({ length: PARTICLES }, (_, k) => particleSeed(7, k).lift));
+    expect(lifts.size).toBeGreaterThan(PARTICLES / 2);
+  });
+
+  it('shoots up higher with a bigger lift, but still starts on the cell and ends in the core', () => {
+    const cell = { x: 100, y: 300 };
+    const core = { x: 300, y: 150 };
+    expect(particleAt(cell, core, 0, 0.5, LIFT_MAX).y).toBeLessThan(particleAt(cell, core, 0, 0.5, LIFT_MIN).y);
+    for (const lift of [LIFT_MIN, LIFT_MAX]) {
+      expect(particleAt(cell, core, 0.3, 0, lift)).toEqual(cell);
+      expect(particleAt(cell, core, 0.3, 1, lift).x).toBeCloseTo(core.x);
+      expect(particleAt(cell, core, 0.3, 1, lift).y).toBeCloseTo(core.y);
+    }
+    expect(tailPoints(cell, core, 0.3, 0.7, 3, LIFT_MAX)[3]).toEqual(particleAt(cell, core, 0.3, 0.7, LIFT_MAX));
+  });
+});
+
+describe('ripples and column', () => {
+  it('rings three ripples out from the landing, one after another, each opening and fading', () => {
+    const none = warpPhase(STRIKE - 0.01).ripples;
+    expect(none).toHaveLength(RIPPLES);
+    expect(none.every((r) => r.alpha === 0)).toBe(true);
+    const early = warpPhase(STRIKE + 0.02).ripples;
+    expect(early[0].alpha).toBeGreaterThan(0);
+    expect(early[RIPPLES - 1].alpha).toBe(0); // the last has not started
+    const later = warpPhase(STRIKE + 0.2).ripples;
+    expect(later.filter((r) => r.alpha > 0).length).toBe(RIPPLES);
+    expect(later[0].open).toBeGreaterThan(later[RIPPLES - 1].open); // the first has opened further
+    expect(warpPhase(0.95).ripples.every((r) => r.alpha === 0)).toBe(true);
+  });
+
+  it('raises a bright column from the landing for a moment, then lets it go', () => {
+    expect(warpPhase(STRIKE - 0.01).column).toEqual({ height: 0, alpha: 0 });
+    expect(warpPhase(STRIKE).column.alpha).toBeGreaterThan(0);
+    const peak = warpPhase(STRIKE + 0.06).column;
+    expect(peak.alpha).toBeGreaterThan(0.8);
+    expect(peak.height).toBeGreaterThan(warpPhase(STRIKE + 0.01).column.height);
+    expect(warpPhase(STRIKE + 0.4).column.alpha).toBe(0);
+  });
+
+  it('keeps ripples and column inside 0 to 1', () => {
+    for (const p of [-1, 0, STRIKE, STRIKE + 0.1, 0.6, 1, 5]) {
+      const w = warpPhase(p);
+      for (const v of [w.column.height, w.column.alpha, ...w.ripples.flatMap((r) => [r.open, r.alpha])]) {
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+      }
+    }
   });
 });

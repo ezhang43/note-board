@@ -511,6 +511,9 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
   // The Google Calendar panel asks for calendar access, so the policy says what it does with it.
   await expect(privacy.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
   await expect(privacy).toContainText('never saved with your boards');
+  // The Visualizer reads past and deleted events to count them, keeping no copy and sending no titles (job viz-calendar-events).
+  await expect(privacy).toContainText('reads your past and deleted events');
+  await expect(privacy).toContainText('their titles are never sent to Anthropic');
   // Feedback (job #69): stored with your email so the maker can reply; deleted on request. Its section folds open.
   await page.locator('details:has(h3:text("Feedback you send")) > summary').click();
   await expect(privacy.getByRole('heading', { name: 'Feedback you send' })).toBeVisible();

@@ -65,7 +65,7 @@ export function coreAt(cx: number, cy: number, rx: number): { x: number; y: numb
  * Light warping into the core (owner request, 2026-11-12; reshaped the same day to match the video the
  * owner sent). One item's trip, `progress` 0 to 1: a thin beam shoots in from beyond the top of the canvas
  * onto its cell (until STRIKE), a white dot and a small ring show where it lands and the cell lights; the
- * beam lingers a moment, then a burst of small particles fans out from the cell along curved paths into the
+ * beam lingers a moment, then a burst of five sparks (shooting-star streaks) fans out from the cell along curved paths into the
  * core (COMET_START to 1), and the core flares as they arrive.
  */
 export const STRIKE = 0.25;
@@ -136,10 +136,10 @@ export function pillarLevel(flare: number): { width: number; alpha: number } {
   return { width: 1 + 1.4 * f, alpha: 0.6 + 0.4 * f };
 }
 
-/** How many small lights make up the burst that runs from a cell into the core. */
+/** How many sparks make up the burst that runs from a cell into the core. */
 export const PARTICLES = 5;
-/** The most a particle may hold back, as a share of the burst's run (the first one never does). */
-export const PARTICLE_DELAY = 0.15;
+/** The most a spark may hold back, as a share of the burst's run (the first one never does). */
+export const PARTICLE_DELAY = 0.22;
 
 /**
  * How particle `k` of item `item` fans out: `spread` (-1 to 1) is how far to the left or right its path
@@ -169,6 +169,23 @@ export function particleAt(from: { x: number; y: number }, to: { x: number; y: n
   const e = Math.pow(clamp01(q), 1.5); // slow off the cell, quickest into the core
   const u = 1 - e;
   return { x: u * u * from.x + 2 * u * e * cx + e * e * to.x, y: u * u * from.y + 2 * u * e * cy + e * e * to.y };
+}
+
+/**
+ * How much of its run (a share of `q`) a particle's streaky tail covers when it is `q` of the way along:
+ * short as it leaves the cell, long once it is moving fast, so the tail length follows the speed.
+ */
+export function tailSpan(q: number): number {
+  return 0.12 + 0.34 * Math.sqrt(clamp01(q));
+}
+
+/**
+ * Points along the particle's own recent path, from the end of its tail (first) to its head (last), `segments + 1`
+ * of them, evenly spread in `q`. The tail never starts before the cell, so it grows out of it.
+ */
+export function tailPoints(from: { x: number; y: number }, to: { x: number; y: number }, spread: number, q: number, segments: number): { x: number; y: number }[] {
+  const tailQ = Math.max(0, q - tailSpan(q));
+  return Array.from({ length: segments + 1 }, (_, i) => particleAt(from, to, spread, tailQ + ((q - tailQ) * i) / segments));
 }
 
 /** The most characters of a board name that are ever measured or drawn round the ring. */

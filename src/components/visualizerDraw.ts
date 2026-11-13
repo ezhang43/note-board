@@ -1,4 +1,4 @@
-import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { INNER, OUTER, PARTICLES, PARTICLE_DELAY, STRIKE, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
@@ -130,6 +130,48 @@ function shaft(color: string, kind: 'beam' | 'pillar'): HTMLCanvasElement {
     g.fillStyle = along;
     g.fillRect(0, 0, 32, 128);
     shafts.set(key, s);
+  }
+  return s;
+}
+
+/**
+ * A tapering streak of light in one color, drawn once: a sharp bright head at the bottom and a soft, thin tail
+ * fading to nothing at the top (a shooting star). Drawn in slices along a curved tail (see `drawStreak`), so there
+ * is no gradient made per frame.
+ */
+const streaks = new Map<string, HTMLCanvasElement>();
+const STREAK_W = 32;
+const STREAK_H = 192;
+function streak(color: string): HTMLCanvasElement {
+  let s = streaks.get(color);
+  if (!s) {
+    s = document.createElement('canvas');
+    s.width = STREAK_W;
+    s.height = STREAK_H;
+    const g = s.getContext('2d')!;
+    const across = g.createLinearGradient(0, 0, STREAK_W, 0);
+    across.addColorStop(0, rgba(color, 0));
+    across.addColorStop(0.3, rgba(color, 0.45));
+    across.addColorStop(0.5, rgba(color, 1));
+    across.addColorStop(0.7, rgba(color, 0.45));
+    across.addColorStop(1, rgba(color, 0));
+    g.fillStyle = across;
+    g.fillRect(0, 0, STREAK_W, STREAK_H);
+    // The outline narrows towards the tail, and the brightness grows towards the head.
+    const along = g.createLinearGradient(0, 0, 0, STREAK_H);
+    along.addColorStop(0, 'rgba(0,0,0,0)');
+    along.addColorStop(0.5, 'rgba(0,0,0,0.35)');
+    along.addColorStop(0.85, 'rgba(0,0,0,0.85)');
+    along.addColorStop(1, 'rgba(0,0,0,1)');
+    g.globalCompositeOperation = 'destination-in';
+    g.fillStyle = along;
+    g.beginPath();
+    g.moveTo(STREAK_W / 2, 0);
+    for (let i = 1; i <= 24; i++) g.lineTo(STREAK_W / 2 + (STREAK_W / 2) * Math.pow(i / 24, 0.7), (i / 24) * STREAK_H);
+    for (let i = 24; i >= 1; i--) g.lineTo(STREAK_W / 2 - (STREAK_W / 2) * Math.pow(i / 24, 0.7), (i / 24) * STREAK_H);
+    g.closePath();
+    g.fill();
+    streaks.set(color, s);
   }
   return s;
 }
@@ -414,16 +456,22 @@ export function startDisc(o: DiscOptions): () => void {
     // Light warping in: each item's thin beam comes in from beyond the top of the canvas onto its cell, a white dot and a small ring show where it lands, and a burst of particles runs from the cell into the core.
     if (!still) {
       /** Stretches a cached shaft along the line from `a` (its tail) to `b` (its head), `width` pixels across. */
-      const drawShaft = (sprite: HTMLCanvasElement, a: { x: number; y: number }, b: { x: number; y: number }, width: number, alpha: number) => {
+      const drawShaft = (sprite: HTMLCanvasElement, a: { x: number; y: number }, b: { x: number; y: number }, width: number, alpha: number, from = 0, to = 1) => {
         const len = Math.hypot(b.x - a.x, b.y - a.y);
-        if (len < 1) return;
+        if (len < 0.5) return;
         const th = Math.atan2(a.x - b.x, b.y - a.y); // turns the sprite's down (its head end) onto the line
         const cs = Math.cos(th) * dpr;
         const sn = Math.sin(th) * dpr;
         ctx.setTransform(cs, sn, -sn, cs, a.x * dpr, a.y * dpr);
         ctx.globalAlpha = alpha;
-        ctx.drawImage(sprite, -width / 2, 0, width, len);
+        // `from` to `to` (0 to 1) is the slice of the sprite that goes onto this line (all of it unless the line is one piece of a curved streak).
+        ctx.drawImage(sprite, 0, sprite.height * from, sprite.width, sprite.height * (to - from), -width / 2, 0, width, len);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+      /** A streak along the curved path `pts` (tail first), as one slice of the cached sprite per piece. */
+      const drawStreak = (sprite: HTMLCanvasElement, pts: { x: number; y: number }[], width: number, alpha: number) => {
+        const pieces = pts.length - 1;
+        for (let i = 0; i < pieces; i++) drawShaft(sprite, pts[i], pts[i + 1], width, alpha, i / pieces, (i + 1) / pieces);
       };
       // A loop with very many items has quick, crowded arrivals, so every burst is smaller (fixed for the whole loop, so no particle pops in or out), to stay inside the frame.
       const bursts = slots.length > 250 ? 3 : PARTICLES;
@@ -457,19 +505,22 @@ export function startDisc(o: DiscOptions): () => void {
           ctx.stroke();
         }
         if (ph.comet !== null) {
-          // The burst: a few small lights with short fading tails, fanned out along curved paths from the cell into the core. The first is tinted green, the others white and pink.
+          // The burst: a few shooting stars fanned out along curved paths from the cell into the core. Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). The first is tinted green, the others white and pink.
           for (let k = 0; k < bursts; k++) {
             const seed = particleSeed(f.index, k);
             const q = Math.min(1, (ph.comet - seed.delay) / (1 - PARTICLE_DELAY));
             if (q <= 0) continue;
             const alpha = Math.min(1, (1 - q) / 0.12);
             if (alpha <= 0) continue;
-            const head = particleAt(to, core, seed.spread, q);
-            const tail = particleAt(to, core, seed.spread, Math.max(0, q - 0.16));
+            const pts = tailPoints(to, core, seed.spread, q, bursts === PARTICLES ? 3 : 2);
+            const head = pts[pts.length - 1];
             const tint = k === 0 ? palette.lead : palette.pink;
-            drawShaft(shaft(tint, 'beam'), tail, head, (k === 0 ? 3.2 : 2.4) * unit, 0.85 * alpha);
-            stamp(ctx, tint, head.x, head.y, (k === 0 ? 8 : 6) * unit, 0.8 * alpha);
-            stamp(ctx, palette.spark, head.x, head.y, 2.6 * unit, alpha);
+            const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the burst stays a few crisp streaks
+            drawStreak(streak(tint), pts, 8 * lead, 0.8 * alpha); // the glowing streak
+            drawStreak(streak(palette.spark), pts, 3.2 * lead, alpha); // its white-hot core
+            stamp(ctx, tint, head.x, head.y, 17 * lead, 0.7 * alpha); // the halo round the head
+            stamp(ctx, palette.spark, head.x, head.y, 9 * lead, alpha);
+            stamp(ctx, palette.spark, head.x, head.y, 4.2 * lead, alpha);
           }
         }
       });

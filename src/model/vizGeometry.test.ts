@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, STRIKE, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, COMET_START, CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleAt, particleSeed, pillarLevel, project, STRIKE, tailPoints, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -195,6 +195,52 @@ describe('particleAt', () => {
   it('stays put at the ends for any progress it is given', () => {
     expect(particleAt(cell, core, 0.5, -3)).toEqual(cell);
     expect(particleAt(cell, core, 0.5, 4).x).toBeCloseTo(core.x);
+  });
+});
+
+describe('tailSpan', () => {
+  it('is never zero or more than the whole run, and grows as the particle speeds up', () => {
+    for (let q = 0; q <= 1.0001; q += 0.05) {
+      expect(tailSpan(q)).toBeGreaterThan(0);
+      expect(tailSpan(q)).toBeLessThanOrEqual(0.5);
+    }
+    expect(tailSpan(0.9)).toBeGreaterThan(tailSpan(0.3));
+    expect(tailSpan(0.3)).toBeGreaterThan(tailSpan(0.02));
+  });
+
+  it('gives a tail several times as long as the head is wide once the particle is moving (a streak, not a dot)', () => {
+    const cell = { x: 100, y: 300 };
+    const core = { x: 400, y: 260 };
+    const pts = tailPoints(cell, core, 0, 0.6, 4);
+    const length = pts.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
+    expect(length).toBeGreaterThan(60);
+  });
+});
+
+describe('tailPoints', () => {
+  const cell = { x: 100, y: 300 };
+  const core = { x: 400, y: 260 };
+
+  it('runs from the tail to the head along the particle\'s own path, with the head where the particle is', () => {
+    const pts = tailPoints(cell, core, 0.4, 0.7, 3);
+    expect(pts).toHaveLength(4);
+    expect(pts[3]).toEqual(particleAt(cell, core, 0.4, 0.7));
+    expect(pts[0]).toEqual(particleAt(cell, core, 0.4, 0.7 - tailSpan(0.7)));
+    for (let i = 1; i < pts.length; i++) expect(pts[i]).not.toEqual(pts[i - 1]);
+  });
+
+  it('starts on the cell at the beginning, so the tail grows out of it', () => {
+    const pts = tailPoints(cell, core, 0.4, 0.05, 3);
+    expect(pts[0]).toEqual(cell);
+    expect(Math.hypot(pts[3].x - cell.x, pts[3].y - cell.y)).toBeLessThan(25);
+  });
+
+  it('keeps the tail short when it is slow and long when it is fast', () => {
+    const len = (q: number) => {
+      const pts = tailPoints(cell, core, 0, q, 3);
+      return Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y);
+    };
+    expect(len(0.9)).toBeGreaterThan(len(0.25) * 1.5);
   });
 });
 

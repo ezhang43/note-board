@@ -129,3 +129,20 @@ describe('categoryOf: the list title as a fallback', () => {
     expect(categoryOf({ text: 'Sand the table' }, '')).toBe('other');
   });
 });
+
+describe('categoryOf: a sub-item takes its parents\' context', () => {
+  it('own words first, then the parents\' words (nearest first), then the list title, else Other', () => {
+    expect(categoryOf({ text: 'call Sam', context: ['Clean the garage'] }, 'Groceries')).toBe('calls');
+    expect(categoryOf({ text: 'boxes', context: ['Clean the garage'] }, 'Groceries')).toBe('home');
+    expect(categoryOf({ text: 'boxes', context: ['Today', 'Pay rent'] }, '')).toBe('money');
+    expect(categoryOf({ text: 'boxes', context: ['Today'] }, 'Groceries')).toBe('errands');
+    expect(categoryOf({ text: 'boxes', context: ['Today'] }, 'Stuff')).toBe('other');
+  });
+  it('a parent like Today or Now matches nothing, so each sub-item goes by its own words', () => {
+    expect(categoryOf({ text: 'pay the bill', context: ['Today'] }, 'Now')).toBe('money');
+    expect(categoryOf({ text: 'walk the dog', context: ['Now'] }, '')).toBe('health');
+  });
+  it('an item with no context works as before', () => {
+    expect(categoryOf({ text: 'boxes' }, 'Groceries')).toBe('errands');
+  });
+});

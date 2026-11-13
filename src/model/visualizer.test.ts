@@ -29,6 +29,7 @@ import {
   summaryOf,
 } from './visualizer';
 import { categoryOf } from './categorize';
+import type { DoneItem } from './visualizer';
 import type { Board, TodoCard, TodoItem } from './types';
 import type { Workspace } from './workspace';
 
@@ -52,6 +53,34 @@ function cleaned(name: string, runs: { day: string; lists: [string, string[]][] 
 }
 
 const ws = (boards: Record<string, Board>, home = Object.keys(boards)[0]): Workspace => ({ home, boards });
+
+describe('doneItems: an entry with completed sub-items', () => {
+  const run = (parent: TodoItem, list = 'Tasks'): DoneItem[] => {
+    let b: Board = { ...B.createBoard(), name: 'Home' };
+    b = B.addCard(b, { ...(createCard('todo', 'c1') as TodoCard), title: list, items: [parent, item('solo')] }, { type: 'loose', x: 0, y: 0 });
+    b = cleanUp(b, '2026-11-10', { type: 'loose', x: 0, y: 0 }, makeId).board;
+    return doneItems(ws({ b }));
+  };
+  it('is replaced by its sub-items, nested ones too: the parent itself is not an item', () => {
+    const got = run({ id: 'p', text: 'Today', done: true, children: [{ ...item('a'), children: [item('a1')] }, item('b')] });
+    expect(got.map((i) => i.text)).toEqual(['a', 'a1', 'b', 'solo']);
+    expect(got.map((i) => i.list)).toEqual(['Tasks', 'Tasks', 'Tasks', 'Tasks']); // the cell is still the entry's list title
+    expect(new Set(got.map((i) => i.id)).size).toBe(4);
+  });
+  it('gives each sub-item its parents\' words as context, nearest first', () => {
+    const got = run({ id: 'p', text: 'Clean the garage', done: true, children: [{ ...item('a'), children: [item('a1')] }] });
+    expect(got.map((i) => [i.text, i.context])).toEqual([['a', ['Clean the garage']], ['a1', ['a', 'Clean the garage']], ['solo', []]]);
+  });
+  it('stays one item when no sub-item is done', () => {
+    const got = run({ id: 'p', text: 'p', done: true, children: [{ ...item('a'), done: false }] });
+    expect(got.map((i) => i.text)).toEqual(['p', 'solo']);
+  });
+  it('keepIfSame sees a change in sub-items', () => {
+    const a = run({ id: 'p', text: 'p', done: true, children: [item('x')] });
+    const b = run({ id: 'p', text: 'p', done: true, children: [item('y')] });
+    expect(keepIfSame(a, b)).toBe(b);
+  });
+});
 
 describe('doneItems', () => {
   it('reads every board, in the Boards menu order, with its list and day', () => {
@@ -77,12 +106,12 @@ describe('doneItems', () => {
     ]);
   });
 
-  it('counts a ticked item with sub-items once, and a board with nothing cleaned up not at all', () => {
+  it('counts the completed sub-items of a ticked item (not the parent), and a board with nothing cleaned up not at all', () => {
     let b: Board = { ...B.createBoard(), name: 'Home' };
     const parent: TodoItem = { ...item('p'), children: [item('c1'), item('c2')] };
     b = B.addCard(b, { ...list('l', 'Chores', []), items: [parent] }, { type: 'loose', x: 0, y: 0 });
     b = cleanUp(b, '2026-11-10', { type: 'loose', x: 0, y: 0 }, makeId).board;
-    expect(doneItems(ws({ home: b, other: B.createBoard() })).map((i) => i.text)).toEqual(['p']);
+    expect(doneItems(ws({ home: b, other: B.createBoard() })).map((i) => i.text)).toEqual(['c1', 'c2']);
   });
 
   it('changes nothing and leaves frozen boards alone', () => {

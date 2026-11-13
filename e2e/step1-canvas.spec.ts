@@ -52,6 +52,7 @@ test('first visit shows the toolbar in spec order and a 100% board', async ({ pa
     'File',
     'Backup file',
     'File to import',
+    'Visualizer',
     'Appearance',
     'More',
   ]);

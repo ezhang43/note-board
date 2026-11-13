@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page, type Route } from '@playwright/test';
 import { labelKey } from '../src/model/aiCategories';
-import { fontsLoaded, more } from './helpers';
+import { fontsLoaded } from './helpers';
 
 // Sort with AI sends only items from the person's own boards (owner, 2026-11-13): never from a board someone
 // else shared with them. Two demo people on the pretend sharing server (as in sharing.spec.ts): Alice shares
@@ -78,7 +78,7 @@ test('Sort with AI never sends an item from a board shared with you, and that it
   // A label saved earlier on this device for the shared item's text (as before this change) is not used for it.
   await bob.evaluate(([owner, key]) => localStorage.setItem('note-board:ai-categories', JSON.stringify({ v: 1, owner, entries: { [key]: 'Camping' } })), [`demo-bob${t}`, labelKey(SHARED_TEXT, model)] as const);
 
-  await (await more(bob)).getByRole('button', { name: 'Visualizer', exact: true }).click();
+  await bob.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
   const canvas = dialog(bob).locator('canvas.viz-canvas');
   // Both items are on the disc; only Bob's own one would be sent, and the hint says so.
   await expect(canvas).toHaveAttribute('aria-label', /^2 items cleaned up/);

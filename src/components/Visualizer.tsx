@@ -24,7 +24,7 @@ export function VisualizerButton({ onOpen }: { onOpen?: () => void }) {
   return (
     <button
       type="button"
-      className="tb-button viz-open"
+      className="tb-button"
       aria-label="Visualizer"
       title="Visualizer: completed items, replayed"
       onClick={() => {

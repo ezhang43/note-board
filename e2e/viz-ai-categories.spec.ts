@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { cspGuard, violations } from './csp-guard';
-import { fontsLoaded, freshBoardEachTest, more } from './helpers';
+import { fontsLoaded, freshBoardEachTest } from './helpers';
 
 // "Sort with AI" in the Visualizer (owner request, 2026-11-13): with the person's own key, Claude sorts the
 // finished items into its own categories. Anthropic is never reached here: a stand-in answers every request.
@@ -70,7 +70,7 @@ async function saveKey(page: Page) {
 }
 
 async function openVisualizer(page: Page) {
-  await (await more(page)).getByRole('button', { name: 'Visualizer', exact: true }).click();
+  await page.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
   await expect(dialog(page)).toBeVisible();
 }
 

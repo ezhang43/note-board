@@ -107,7 +107,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <CalendarButton labelled onOpen={() => setOpen(null)} />
             <JournalButton labelled onOpen={() => setOpen(null)} />
             <HabitsButton labelled onOpen={() => setOpen(null)} />
-            <VisualizerButton onOpen={() => setOpen(null)} />
+            <FeedbackButton tile onOpen={() => setOpen(null)} />
           </div>
           <section className="phone-arrange" aria-labelledby="phone-arrange">
             <h2 id="phone-arrange" className="phone-label">
@@ -139,7 +139,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
               <FileMenu />
               <AppearanceMenu labelled />
               <AiSettingsButton onOpen={() => setOpen(null)} />
-              <FeedbackButton onOpen={() => setOpen(null)} />
+              <VisualizerButton onOpen={() => setOpen(null)} />
               <a className="tb-button" href={`${import.meta.env.BASE_URL}about/`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)}>
                 <InfoIcon />
                 About BusyAnts

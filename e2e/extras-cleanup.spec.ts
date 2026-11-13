@@ -31,6 +31,7 @@ test('Clean up moves ticked items into the Completed panel under today, and unti
   await expect(await cleanUpButton(page)).not.toHaveAttribute('aria-disabled');
 
   await (await cleanUpButton(page)).click();
+  await page.keyboard.press('Escape'); // shut the Arrange menu: with the Visualizer button on the toolbar it sits over the panel
   expect(await texts(groceries)).toEqual(['bread', 'eggs']);
   await expect(cards(page)).toHaveCount(1); // nothing new on the board
   await openCompleted(page);
@@ -41,6 +42,7 @@ test('Clean up moves ticked items into the Completed panel under today, and unti
   await expect(done.locator('.completed-text')).toHaveText(['milk']);
   await expect(done.locator('.completed-from')).toHaveText(['Groceries']);
   await expect(await cleanUpButton(page)).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
 
   // Untick: back to Groceries, unticked.
   await done.getByLabel('Send "milk" back to Groceries').click();

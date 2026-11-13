@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { fontsLoaded, freshBoardEachTest, more } from './helpers';
+import { fontsLoaded, freshBoardEachTest } from './helpers';
 
 // Visualizer (owner request 2026-11-12): a full-screen, looping, read-only view of what Clean up moved
 // into the Completed panels. Boards are wedges, the lists items came from are cells, each item is a spark.
@@ -50,7 +50,7 @@ async function seed(page: Page, rows: [string, string, string, number][] = SEED)
 }
 
 async function openVisualizer(page: Page) {
-  await (await more(page)).getByRole('button', { name: 'Visualizer', exact: true }).click();
+  await page.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
   await expect(dialog(page)).toBeVisible();
 }
 

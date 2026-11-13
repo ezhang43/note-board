@@ -252,15 +252,15 @@ export function FileMenu() {
 }
 
 /**
- * Feedback (owner decision 2026-10-16): its own button, next to File on a computer and a row in
- * ⋯ More on a phone. It opens Send feedback (job #69), offered only when signed in.
+ * Feedback (owner decision 2026-10-16): a row in ⋯ More (on a computer and on a phone; it
+ * swapped places with Visualizer, owner request 2026-11-13). It opens Send feedback (job #69), offered only when signed in.
  */
-export function FeedbackButton({ onOpen }: { onOpen?: () => void }) {
+export function FeedbackButton({ onOpen, tile }: { onOpen?: () => void; tile?: boolean }) {
   if (useFeedbackSender() === null) return null;
   return (
     <button
       type="button"
-      className="tb-button quiet"
+      className={tile ? 'tb-button tile-wide' : 'tb-button quiet'}
       title="Send feedback"
       onClick={() => {
         onOpen?.();
@@ -557,7 +557,7 @@ function BoardName() {
 
 /**
  * ⋯ (owner pick, 2026-10-22): always on the toolbar, beside Share. It holds Version history and
- * Completed (owner request, 2026-11-12), and in windows under 1180px wide Arrange, File, Feedback,
+ * Completed (owner request, 2026-11-12) and Feedback (swapped with Visualizer, 2026-11-13), and in windows under 1180px wide Arrange, File, Visualizer,
  * Appearance and Sign out fold into it too, the same rows the phone's ⋯ sheet has.
  */
 function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => void }) {
@@ -572,7 +572,7 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
         type="button"
         className={`tb-button icon-only${findTarget ? ' find-target' : ''}`}
         aria-label="More"
-        title={folded ? 'More: Version history, Completed, Visualizer, Brain dump, Arrange, File, Feedback, AI settings, Appearance, Sign out' : 'More: Version history, Completed, Visualizer, AI settings'}
+        title={folded ? 'More: Version history, Completed, Feedback, Brain dump, Arrange, File, Visualizer, AI settings, Appearance, Sign out' : 'More: Version history, Completed, Feedback, AI settings'}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -584,11 +584,11 @@ function MoreMenu({ folded, onSignOut }: { folded: boolean; onSignOut?: () => vo
           <div className="phone-rows">
             <HistoryButton onOpen={close} />
             <CompletedButton onOpen={close} />
-            <VisualizerButton onOpen={close} />
+            <FeedbackButton onOpen={close} />
             {folded && !viewOnly && <BrainDumpButton labelled onOpen={close} />}
             {folded && !viewOnly && <ArrangeMenu />}
             {folded && <FileMenu />}
-            {folded && <FeedbackButton onOpen={close} />}
+            {folded && <VisualizerButton onOpen={close} />}
             <AiSettingsButton onOpen={close} />
             {folded && <AppearanceMenu labelled />}
             {folded && onSignOut && (
@@ -679,7 +679,7 @@ export function Toolbar({ onSignOut }: { onSignOut?: () => void }) {
         <>
           {!viewOnly && <ArrangeMenu />}
           <FileMenu />
-          <FeedbackButton />
+          <VisualizerButton />
         </>
       )}
 

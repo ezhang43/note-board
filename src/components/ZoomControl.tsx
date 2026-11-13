@@ -12,7 +12,7 @@ import { ChecklistButton } from './ChecklistPanel';
 
 /**
  * Bottom-right corner: on the published site a small "Saving…" / "Saved" note, then text size
- * labelled Search, Timer, Calendar (when signed in), Journal and Habits in one pill, the keyboard
+ * labelled Search, Timer, Checklist, Calendar (when signed in), Journal and Habits in one pill, the keyboard
  * shortcuts (?) button, the Buy me a coffee link, text size (A− / A+) and the zoom control.
  */
 export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
@@ -34,10 +34,10 @@ export function ZoomControl({ saveNote }: { saveNote?: string | null }) {
         Search
       </button>
       <PomodoroButton />
+      <ChecklistButton />
       <CalendarButton />
       <JournalButton />
       <HabitsButton />
-      <ChecklistButton />
       </div>
       <button type="button" className="help-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={appStore.toggleShortcuts}>
         ?

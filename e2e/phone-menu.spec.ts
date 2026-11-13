@@ -36,12 +36,13 @@ const names = (l: Locator) => l.evaluateAll((els) => els.map((e) => e.getAttribu
 test('signed in, the top is nine tiles in a 3 x 3 grid and a full-width Visualizer row (no empty slot), each at least 44px', async ({ page }) => {
   await openSignedIn(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Google Calendar', 'Journal', 'Habits', 'Checklist', 'Visualizer']);
+  expect(await names(t)).toEqual(['Search', 'Share', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Checklist', 'Google Calendar', 'Journal', 'Habits', 'Visualizer']);
   await expect(t.nth(2)).toHaveText('History');
   await expect(t.nth(4)).toHaveText('Timer');
-  await expect(t.nth(5)).toHaveText('Calendar');
-  await expect(t.nth(6)).toHaveText('Journal');
-  await expect(t.nth(8)).toHaveText('Checklist');
+  await expect(t.nth(5)).toHaveText('Checklist');
+  await expect(t.nth(6)).toHaveText('Calendar');
+  await expect(t.nth(7)).toHaveText('Journal');
+  await expect(t.nth(8)).toHaveText('Habits');
   const b = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => box(t.nth(i))));
   for (const x of b) {
     expect(x.height).toBeGreaterThanOrEqual(44);
@@ -83,7 +84,7 @@ test('the sheet has a grab handle, the group over the text size is "Board" (no H
 test('signed out and not published: no Share, Calendar, Feedback or Sign out', async ({ page }) => {
   await openLocal(page);
   const t = tiles(page).locator('button');
-  expect(await names(t)).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Journal', 'Habits', 'Checklist', 'Visualizer']);
+  expect(await names(t)).toEqual(['Search', 'Version history', 'Completed', expect.stringMatching(/^Focus timer/), 'Checklist', 'Journal', 'Habits', 'Visualizer']);
   // Seven: four across, then three with the last two wide, so no row ends in an empty slot.
   const b = await Promise.all([0, 3, 4, 6].map((i) => box(t.nth(i))));
   const grid = await box(tiles(page));

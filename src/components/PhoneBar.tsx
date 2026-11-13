@@ -103,10 +103,10 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
             <HistoryButton label="History" onOpen={() => setOpen(null)} />
             <CompletedButton onOpen={() => setOpen(null)} />
             <PomodoroButton labelled onOpen={() => setOpen(null)} />
+            <ChecklistButton labelled onOpen={() => setOpen(null)} />
             <CalendarButton labelled onOpen={() => setOpen(null)} />
             <JournalButton labelled onOpen={() => setOpen(null)} />
             <HabitsButton labelled onOpen={() => setOpen(null)} />
-            <ChecklistButton labelled onOpen={() => setOpen(null)} />
             <VisualizerButton onOpen={() => setOpen(null)} />
           </div>
           <section className="phone-arrange" aria-labelledby="phone-arrange">

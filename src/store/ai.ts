@@ -36,14 +36,13 @@ const MODEL_NAME = "note-board:ai-model";
 const CAP_NAME = "note-board:ai-cap";
 const USES_NAME = "note-board:ai-uses";
 
-/** Every storage name this file uses, in either storage, and the Sort with AI labels (aiLabels.ts). The first two are the secret (the key and whose it is). */
+/** Every storage name this file uses, in either storage. The first two are the secret (the key and whose it is). Forget key also removes the Sort with AI labels (AI_LABELS_NAME, not a setting, so not watched here). */
 export const AI_STORAGE_KEYS = [
   KEY_NAME,
   KEY_USER_NAME,
   MODEL_NAME,
   CAP_NAME,
   USES_NAME,
-  AI_LABELS_NAME,
 ] as const;
 export const AI_MODELS = [
   { id: "claude-haiku-5-5", name: "Haiku 5.5", note: "Fast, cheapest" },

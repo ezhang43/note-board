@@ -45,6 +45,8 @@ export function createLabelCache(device: Place) {
     },
     /** Removes labels saved by anyone but `owner` (after a sign-out or a change of person), or damaged ones. */
     dropUnlessFor(owner: string | null) {
+      // Nobody signed in (or sign-in still loading): keep them; reader() gives nothing to the wrong person anyway.
+      if (!owner) return;
       let mine = false;
       try {
         const s = JSON.parse(device?.getItem(AI_LABELS_NAME) ?? "null") as Partial<Saved> | null;
@@ -137,6 +139,7 @@ export async function sortWithAi({
 }): Promise<{ ok: true; sorted: number } | AiFailure> {
   const names = [...known].slice(0, AI_MAX_CATEGORIES);
   let sorted = 0;
+  let asked = 0;
   for (let at = 0; at < texts.length; at += AI_BATCH) {
     if (signal?.aborted) return stoppedBy(signal);
     const batch = texts.slice(at, at + AI_BATCH);
@@ -158,12 +161,15 @@ export async function sortWithAi({
     const pairs: [string, string][] = [];
     labels.forEach((l, i) => {
       if (!l) return;
-      pairs.push([batch[i], l]);
-      if (names.length < AI_MAX_CATEGORIES && !names.some((n) => n.toLowerCase() === l.toLowerCase())) names.push(l);
+      // A name already chosen keeps its first spelling, so "errands" joins the "Errands" wedge.
+      const same = names.find((n) => n.toLowerCase() === l.toLowerCase());
+      if (!same && names.length < AI_MAX_CATEGORIES) names.push(l);
+      pairs.push([batch[i], same ?? l]);
     });
     cache.putAll(pairs, model, uid);
-    sorted += batch.length;
-    onProgress(sorted);
+    sorted += pairs.length;
+    asked += batch.length;
+    onProgress(asked);
   }
   return { ok: true, sorted };
 }

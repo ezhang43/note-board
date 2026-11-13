@@ -235,6 +235,7 @@ function categoryGroups(items: DoneItem[], categorize: Categorizer): Group[] {
   if (!named.size) return builtIn;
   const own = [...named].sort((a, b) => b[1].length - a[1].length).map(([name, list]): Group => ({ key: `ai:${name}`, name, items: list }));
   const other = CATEGORIES.length - 1;
+  // simple: eight colors take turns, so with 8 AI wedges a leftover built-in wedge repeats a color (its name still tells it apart). Upgrade with more hues if that shows up often.
   return [...own, ...builtIn].map((g, k) => ({ ...g, hue: g.hue === other ? other : k % BOARD_HUES }));
 }
 

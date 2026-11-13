@@ -43,6 +43,14 @@ describe('what is sent', () => {
     expect(toSend(['x'.repeat(AI_ITEM_MAX + 50)], () => false).texts[0]).toHaveLength(AI_ITEM_MAX);
   });
 
+  it('a long item sent cut is found again by its full text, so it is not sent twice', () => {
+    const long = 'x'.repeat(AI_ITEM_MAX + 50);
+    const [sent] = toSend([long], () => false).texts;
+    expect(labelKey(sent, 'm')).toBe(labelKey(long, 'm'));
+    const saved = new Set([labelKey(sent, 'm')]);
+    expect(toSend([long], (t) => saved.has(labelKey(t, 'm'))).total).toBe(0);
+  });
+
   it('keeps batches and the limit in proportion', () => {
     expect(AI_MAX_PER_PRESS % AI_BATCH).toBe(0);
   });

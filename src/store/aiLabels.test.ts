@@ -63,7 +63,11 @@ describe("the label cache", () => {
     expect(cache.reader(M, "u2")("Buy milk")).toBeNull();
     cache.dropUnlessFor("u1");
     expect(cache.get("Buy milk", M, "u1")).toBe("Errands");
+    // Nobody signed in (or sign-in still loading): nothing is dropped, and nothing is used either.
     cache.dropUnlessFor(null);
+    expect(cache.get("Buy milk", M, "u1")).toBe("Errands");
+    expect(cache.get("Buy milk", M, null)).toBeNull();
+    cache.dropUnlessFor("u2");
     expect(device.data[AI_LABELS_NAME]).toBeUndefined();
     device.data[AI_LABELS_NAME] = "{";
     cache.dropUnlessFor("u1");
@@ -105,12 +109,12 @@ describe("the label cache", () => {
     expect(() => cache.clear()).not.toThrow();
   });
 
-  it("is cleared with the key: Forget key removes it, and its name is one of the AI storage names", () => {
+  it("is cleared with the key: Forget key removes it (it is not an AI setting, so another tab's labels don't reload them)", () => {
     const session = memory();
     const device = memory();
     const ai = createAiStore({ session, device, now: () => new Date() });
     createLabelCache(device).putAll([["Buy milk", "Errands"]], M, null);
-    expect(AI_STORAGE_KEYS).toContain(AI_LABELS_NAME);
+    expect(AI_STORAGE_KEYS).not.toContain(AI_LABELS_NAME);
     ai.forgetKey();
     expect(device.data[AI_LABELS_NAME]).toBeUndefined();
   });
@@ -143,6 +147,17 @@ describe("sortWithAi", () => {
     expect(asked[1].user).toContain('["Errands","Stuff"]');
     expect(cache.get("item 0", M, "u1")).toBe("Stuff");
     expect(cache.get(`item ${texts.length - 1}`, M, "u1")).toBe("Stuff");
+  });
+
+  it("counts only the items that got a label, and keeps the spelling of a name already chosen", async () => {
+    const cache = createLabelCache(memory());
+    const ask = async (): Promise<AiResult> => ({ ok: true, value: { categories: ["errands"], labels: [{ i: 0, c: 0 }] } });
+    const progress: number[] = [];
+    const r = await sortWithAi({ ask, cache, uid: null, model: M, texts: ["Buy milk", "Mystery"], known: ["Errands"], onProgress: (n) => progress.push(n) });
+    expect(r).toEqual({ ok: true, sorted: 1 });
+    expect(progress).toEqual([2]);
+    expect(cache.get("Buy milk", M, null)).toBe("Errands");
+    expect(cache.get("Mystery", M, null)).toBeNull();
   });
 
   it("stops at the first failure with its message, keeping the batches already done", async () => {

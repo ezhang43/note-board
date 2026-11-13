@@ -6,7 +6,7 @@ import { categoryOf } from '../model/categorize';
 import { ai, useAiSettings } from '../store/ai';
 import { aiLabels } from '../store/aiLabels';
 import { appStore } from '../store/appStore';
-import { collab } from '../sync/collabSession';
+import { collab, useSharing } from '../sync/collabSession';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
 import { useMedia } from './usePhone';
@@ -83,6 +83,7 @@ function Overlay() {
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
   // Sort with AI: the labels saved on this device are used only while this person has a key saved.
   useAiSettings();
+  useSharing(); // signing in or out redraws, so uid below is current
   const uid = collab.me()?.uid ?? null;
   const hasKey = ai.hasKey(uid);
   const model = ai.getModel();

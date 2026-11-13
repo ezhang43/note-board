@@ -26,8 +26,9 @@ export const AI_MAX_TOKENS = 4000;
 /** Where this device keeps the labels (localStorage). */
 export const AI_LABELS_NAME = 'note-board:ai-categories';
 
-/** One way to tidy an item's text, used both when sending and when looking a label up. */
-export const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/g, ' ').trim();
+/** One way to tidy an item's text, used both when sending and when looking a label up: spaces joined, cut to AI_ITEM_MAX letters (what is sent). */
+export const normalizeText = (text: string) =>
+  Array.from(text.normalize('NFC').replace(/\s+/g, ' ').trim()).slice(0, AI_ITEM_MAX).join('').trim();
 
 /**
  * The texts one press sends: tidied, each once, skipping empty ones and ones already labeled, cut to
@@ -42,7 +43,7 @@ export function toSend(texts: string[], labeled: (text: string) => boolean): { t
     seen.add(n);
     out.push(n);
   }
-  return { texts: out.slice(0, AI_MAX_PER_PRESS).map((t) => Array.from(t).slice(0, AI_ITEM_MAX).join('')), total: out.length };
+  return { texts: out.slice(0, AI_MAX_PER_PRESS), total: out.length };
 }
 
 export const LABELS_SCHEMA: AiSchema = {

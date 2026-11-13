@@ -1,6 +1,7 @@
-import { INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, burstSize, cellArea, cellCentre, coreAt, discRadius, fitLabel, LABEL_RADIUS, particleSeed, pillarLevel, project, tailPoints, warpPhase, wedgeSpan } from '../model/vizGeometry';
+import { BEAM_ALPHA, INNER, OUTER, PARTICLE_DELAY, STRIKE, TILT, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { loopMs, playhead, type Wedge } from '../model/visualizer';
-import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } from '../model/vizBurst';
+import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
+import { CARD_LIFE_MS, cardBox, cardRoom, cardSlotsFor, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
 // look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
@@ -8,8 +9,9 @@ import { CARD_LIFE_MS, cardBox, cardsAt, dashCount, dashFor, shouldShowCard } fr
 // Per-frame work stays in this file; only the feed re-renders, once per landing.
 // Each item is light warping into the middle: a thin beam shoots in from beyond the top of the canvas onto
 // its cell (a white dot and a small ring show where it lands and the cell lights), then a burst of small
-// glowing particles fans out from the cell along curved paths up into the core, which flares, and a thin
-// pillar of light through the core swells with it (the timing is warpPhase in model/vizGeometry). The
+// glowing particles rises from the cell in a tall arc and streams along its wedge, curving in on the disc's tilt, then up
+// into the core, which flares, and a thin pillar of light through the core swells with it (the timing is warpPhase in
+// model/vizGeometry). The
 // still parts of the picture (the floor, the track rings, the hub) are drawn once into one cached layer;
 // the glows and shafts are cached sprites stamped or stretched with additive blending: no gradient is
 // built and no shadowBlur is used per frame, and nothing here moves or measures the page (no layout, no
@@ -33,8 +35,8 @@ const CARD_PAD = 11;
 /** The small uppercase monospace of the labels (a system font: nothing to download). */
 const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
-/** Room for a board name is rounded down to this many pixels when its cut is remembered. */
-const LABEL_STEP = 4;
+/** The room a name's dot takes at its left, in pixels. */
+const DOT_W = 12;
 
 /** Colors, read from the `--viz-*` variables (hex only, so a see-through version can be made from them). */
 export interface Palette {
@@ -218,22 +220,21 @@ export function startDisc(o: DiscOptions): () => void {
   let w = 0;
   let h = 0;
   let dpr = 1;
-  let labelW = 58; // the widest name round the rim, in pixels: the disc is sized so it fits beside the dashed ring
   const labelFont = () => `500 ${w > 800 ? 11 : 10}px ${MONO}`;
-  // Each board's name as cut to fit, by the room it had (in LABEL_STEP pixel steps), so measureText runs when a room is first seen, not every frame. Emptied on resize.
-  const labels = wedges.map(() => new Map<number, string>());
+  // Each board's name (cut only if it is wider than the stage) and how wide its box is with the dot, measured once per size.
+  let nameTexts: string[] = [];
+  let nameWidths: number[] = [];
+  // Where the disc sits and how big it is: as big as the stage's width allows with the names fitting round it. Worked out per size.
+  let fit = { rx: 40, cx: 0, cy: 0 };
   const hubTexts: (string | undefined)[] = wedges.map(() => undefined);
-  // The cards' lines as cut to fit (and their width), by item, measured when first shown. Emptied on resize.
-  const cardText = new Map<number, { title: string; sub: string; width: number }>();
+  // The cards' lines as cut to fit (and their width), by item and place, measured when first shown. Emptied on resize.
+  const cardText = new Map<string, { title: string; sub: string; width: number }>();
   // The still parts of the picture, drawn once per size (a canvas of the same size, stamped each frame).
   const base = document.createElement('canvas');
 
   /** Where the disc and the core sit on the canvas, and how big the disc is. Sits low; when the stage is tall there is room to lift it so the core and the beams get their space above. */
   const layout = () => {
-    const rx = discRadius(w, h, labelW);
-    const spare = Math.max(0, (h - (rx * 1.4 + 60)) / 2);
-    const cx = w / 2;
-    const cy = h - rx * TILT * LABEL_RADIUS - 34 - spare;
+    const { rx, cx, cy } = fit;
     return { rx, cx, cy, core: coreAt(cx, cy, rx) };
   };
 
@@ -306,17 +307,17 @@ export function startDisc(o: DiscOptions): () => void {
     h = canvas.clientHeight;
     canvas.width = Math.max(1, Math.round(w * dpr));
     canvas.height = Math.max(1, Math.round(h * dpr));
-    labels.forEach((m) => m.clear());
     hubTexts.fill(undefined);
     cardText.clear();
-    if (wedges.length > 0 && wedges.length <= MAX_LABELLED) {
-      ctx.font = labelFont();
-      labelW = Math.max(...wedges.map((wedge) => ctx.measureText(fitLabel(wedge.name.toUpperCase(), Infinity, (t) => ctx.measureText(t).width)).width));
-    }
+    ctx.font = labelFont();
+    nameTexts = wedges.length > MAX_LABELLED ? [] : wedges.map((wedge) => fitLabel(wedge.name.toUpperCase(), Math.max(20, w - 2 * NAME_MARGIN - DOT_W), (t) => ctx.measureText(t).width));
+    nameWidths = nameTexts.map((text) => ctx.measureText(text).width + DOT_W);
+    fit = fitDisc(w, h, nameWidths);
     paintBase();
-    // The names as they read at the narrowest spot (beside the disc), for the browser tests to check.
-    const side = Math.min(labelW, w * 0.2);
-    canvas.dataset.rimLabels = wedges.length > MAX_LABELLED ? '' : wedges.map((wedge) => fitLabel(wedge.name.toUpperCase(), side, (t) => ctx.measureText(t).width)).join('|');
+    // The names as they read (cut only if wider than the stage), for the browser tests to check.
+    canvas.dataset.rimLabels = nameTexts.join('|');
+    // The disc's middle and half width, and the stage's size, in pixels (for the browser tests to check how much of the stage the disc fills).
+    canvas.dataset.disc = [fit.cx, fit.cy, fit.rx, w, h].map(Math.round).join(',');
   };
   size();
   const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
@@ -328,8 +329,7 @@ export function startDisc(o: DiscOptions): () => void {
   let landed = 0;
   let latest = -1; // the wedge of the item that landed last, named in the hub
   // The items that got a card (when they landed, on the animation clock), oldest first, and when the last was shown.
-  let cardArrivals: { index: number; at: number; slot: 0 | 1 }[] = [];
-  let cardCount = 0; // how many cards this trip, so they take the two places by turns
+  let cardArrivals: { index: number; at: number; slot: CardSlot }[] = [];
   let lastCard = -Infinity;
   let raf = 0;
 
@@ -408,31 +408,25 @@ export function startDisc(o: DiscOptions): () => void {
       });
     });
 
-    // Names around the rim, small uppercase monospace, evenly spaced; the name of the latest landing sits in the hub.
+    // Names round the disc, outside its dashed ring (above and below it where there is no room beside it), small uppercase monospace; the name of the latest landing sits in the hub.
     ctx.font = labelFont();
     ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
     if (count > 0 && count <= MAX_LABELLED) {
-      wedges.forEach((wedge, wi) => {
+      const phis = wedges.map((_, wi) => {
         const span = wedgeSpan(wi, count);
-        const mid = (span.a0 + span.a1) / 2;
-        const p = project(mid, LABEL_RADIUS, spin, cx, cy, rx);
-        const side = Math.cos(mid + spin);
-        ctx.textAlign = side > 0.25 ? 'left' : side < -0.25 ? 'right' : 'center';
-        const front = (Math.sin(mid + spin) + 1) / 2;
-        const room = side > 0.25 ? w - p.x - 14 : side < -0.25 ? p.x - 14 : Math.min(150, (rx * Math.PI * 2 * 0.9) / count);
-        const step = Math.max(0, Math.floor(room / LABEL_STEP));
-        let text = labels[wi].get(step);
-        if (text === undefined) {
-          text = fitLabel(wedge.name.toUpperCase(), step * LABEL_STEP, (t) => ctx.measureText(t).width);
-          labels[wi].set(step, text);
-        }
-        const dx = side > 0.25 ? 8 : side < -0.25 ? -8 : 0;
-        ctx.fillStyle = rgba(palette.label, 0.55 + 0.45 * front);
-        ctx.fillText(text, p.x + dx, p.y);
+        return (span.a0 + span.a1) / 2 + spin;
+      });
+      placeNames(nameWidths, phis, { w, h, cx, cy, rx }).forEach((box, wi) => {
+        if (box.fade <= 0.02) return;
+        const front = (Math.sin(phis[wi]) + 1) / 2;
+        const alpha = (0.55 + 0.45 * front) * box.fade;
+        ctx.fillStyle = rgba(palette.label, alpha);
+        ctx.fillText(nameTexts[wi], box.x + DOT_W, box.y + NAME_H / 2);
         // A small dot in the wedge's own color keeps what each name stands for.
-        ctx.fillStyle = rgba(hueOf(wi), 0.7 + 0.3 * front);
+        ctx.fillStyle = rgba(hueOf(wi), (0.7 + 0.3 * front) * box.fade);
         ctx.beginPath();
-        ctx.arc(p.x + (side > 0.25 ? 2 : side < -0.25 ? -2 : -ctx.measureText(text).width / 2 - 6), p.y, 1.8, 0, Math.PI * 2);
+        ctx.arc(box.x + 3, box.y + NAME_H / 2, 1.8, 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -451,6 +445,7 @@ export function startDisc(o: DiscOptions): () => void {
     // The pillar of light through the core down to the hub, and the core's bloom: always there, swelling with the flare.
     const pulse = still ? 1 : 1 + 0.05 * Math.sin(now / 600) + 0.25 * flare;
     const lv = pillarLevel(flare);
+    const beam = beamWidths(rx); // how wide a beam is drawn: wider on a bigger stage, never thinner than a few pixels
     const unit = Math.max(0.6, Math.min(1.2, rx / 260)); // the beams, flash and pillar follow the size of the stage, so on a phone a landing does not flood its neighbors
     ctx.globalCompositeOperation = 'lighter';
     for (const [color, wide, a, swell] of [
@@ -500,8 +495,8 @@ export function startDisc(o: DiscOptions): () => void {
           const from = beamStart(to, cx);
           const head = beamPoint(from, to, ph.beam);
           const a = ph.beamAlpha;
-          drawShaft(shaft(palette.core, 'beam'), from, head, 7 * unit, 0.5 * a); // the faint halo
-          drawShaft(shaft(palette.spark, 'beam'), from, head, 1.8 * unit, 0.85 * a); // a thin bright line
+          drawShaft(shaft(palette.core, 'beam'), from, head, beam.glow, BEAM_ALPHA.glow * a); // the wide pink glow
+          drawShaft(shaft(palette.spark, 'beam'), from, head, beam.core, BEAM_ALPHA.core * a); // the thin bright core
           stamp(ctx, palette.core, head.x, head.y, 12 * unit, 0.7 * a);
           stamp(ctx, palette.spark, head.x, head.y, 4.5 * unit, a); // the bright dot where it lands
           if (ph.beam < 1) {
@@ -539,14 +534,18 @@ export function startDisc(o: DiscOptions): () => void {
           stamp(ctx, palette.spark, to.x, to.y, 16 * unit, 0.8 * ph.column.alpha);
         }
         if (ph.comet !== null) {
-          // The fountain: shooting stars fanned out along curved paths from the cell into the core, each rising to its own height. Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). Some are tinted green, the rest white and lavender.
+          // The fountain: shooting stars that stream from the cell along its wedge, curving in on the disc's tilt, then lift into the core (the flow paths are `flowTail`).
+          const sp = wedgeSpan(s.wedge, count);
+          const half = (sp.a1 - sp.a0) / 2;
+          const view = { spin, cx, cy, rx };
+          // Each has a white-hot head in a soft halo and a long tapering tail along its recent path (longer the faster it goes). Some are tinted green, the rest white and lavender.
           for (let k = 0; k < bursts; k++) {
             const seed = particleSeed(f.index, k);
             const q = Math.min(1, (ph.comet - seed.delay) / (1 - PARTICLE_DELAY));
             if (q <= 0) continue;
             const alpha = Math.min(1, (1 - q) / 0.12);
             if (alpha <= 0) continue;
-            const pts = tailPoints(to, core, seed.spread, q, crowded ? 2 : 3, seed.lift);
+            const pts = flowTail(c, half, seed.spread, q, crowded ? 4 : 7, seed.lift, view);
             const head = pts[pts.length - 1];
             const tint = k % 4 === 0 ? palette.lead : k % 2 ? palette.pink : palette.spark;
             const lead = (k === 0 ? 1.2 : 1) * Math.max(0.4, Math.min(1.2, rx / 260)); // follows the size of the stage more closely than `unit`, so on a phone the fountain stays a few crisp streaks
@@ -565,19 +564,21 @@ export function startDisc(o: DiscOptions): () => void {
     if (!still) {
       const titlePx = rx > 200 ? 12 : rx > 150 ? 11 : 10; // the card follows the size of the stage, so on a phone it stays small beside the disc
       const subPx = titlePx - 2;
+      const places = cardSlotsFor(core, rx, w, CARD_H); // after a resize a live card may be in a place that no longer fits: it is skipped
       for (const card of cardsAt(cardArrivals, now)) {
         const lines = o.cards[card.index];
-        if (!lines) continue;
-        let text = cardText.get(card.index);
+        if (!lines || !places.includes(card.slot)) continue;
+        const textKey = `${card.index}:${card.slot}`;
+        let text = cardText.get(textKey);
         if (!text) {
-          const room = Math.min(240, w - 16) - CARD_PAD * 2;
+          const room = cardRoom(card.slot, core, rx, w, CARD_H) - CARD_PAD * 2; // the place's own room, so the text is cut to fit it
           ctx.font = `600 ${titlePx}px ${SANS}`;
           const title = fitLabel(lines[0], room, (t) => ctx.measureText(t).width);
           const titleW = ctx.measureText(title).width;
           ctx.font = `400 ${subPx}px ${SANS}`;
           const sub = fitLabel(lines[1], room, (t) => ctx.measureText(t).width);
           text = { title, sub, width: Math.ceil(Math.max(titleW, ctx.measureText(sub).width)) + CARD_PAD * 2 };
-          cardText.set(card.index, text);
+          cardText.set(textKey, text);
         }
         const box = cardBox(card.slot, core, rx, w, text.width, CARD_H, card.rise);
         ctx.globalAlpha = card.alpha;
@@ -614,7 +615,6 @@ export function startDisc(o: DiscOptions): () => void {
       flashAt.forEach((row) => row.fill(-Infinity));
       latest = -1;
       cardArrivals = [];
-      cardCount = 0;
       lastCard = -Infinity;
       o.onLanded(0);
     }
@@ -624,9 +624,11 @@ export function startDisc(o: DiscOptions): () => void {
       latest = s.wedge;
       landedCount[s.wedge][s.cell]++;
       flashAt[s.wedge][s.cell] = now;
-      if (!still && shouldShowCard(lastCard, now)) {
+      if (!still && shouldShowCard(lastCard, now, n)) {
         lastCard = now;
-        cardArrivals.push({ index: k, at: now, slot: (cardCount++ % 2) as 0 | 1 });
+        const { rx, core } = layout();
+        const places = cardSlotsFor(core, rx, w, CARD_H);
+        if (places.length) cardArrivals.push({ index: k, at: now, slot: pickSlot(cardArrivals, places, now) });
       }
     }
     while (cardArrivals.length && now - cardArrivals[0].at >= CARD_LIFE_MS) cardArrivals.shift();

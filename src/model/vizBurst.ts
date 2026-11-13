@@ -1,4 +1,5 @@
-import { INNER, OUTER, TRACKS, type Area } from './vizGeometry';
+import { CORE_LIFT, INNER, OUTER, TRACKS, type Area } from './vizGeometry';
+import { keepOut } from './vizNames';
 
 // The Visualizer's lit cells and the small cards by the core (owner request, 2026-11-13, "viz-burst", to match
 // a second reference clip). Pure maths, no drawing, nothing random: the same item always shows in the same place.
@@ -50,19 +51,46 @@ export function dashFor(area: Area, k: number, seed: number): Area {
 }
 
 // ---- The floating cards ----
+// Up to four at once (owner request, 2026-11-13, "make the name cards show for more items"), each in its own place
+// round the core: upper right, lower left, upper left, lower right. A place is a fixed box inside the ring the rim
+// names stay outside of, so a card can never cover another card, the core or a name. A new card takes the place of
+// the oldest.
 
 /** How long a card is on screen, how long it takes to fade in, and to fade out at the end. */
-export const CARD_LIFE_MS = 2600;
+export const CARD_LIFE_MS = 2000;
 export const CARD_FADE_IN = 250;
-const CARD_FADE_OUT = 600;
-/** How quickly the oldest of three cards fades away when the third arrives. */
-const CARD_BUMP_MS = 200;
-/** A card is shown for an arrival only this long after the last one shown, so a wave of arrivals does not make the cards flicker. */
-export const CARD_GAP_MS = 700;
-export const MAX_CARDS = 2;
+const CARD_FADE_OUT = 500;
+/** How quickly an old card fades away when a new one takes its place; the new one fades in after that. */
+export const CARD_BUMP_MS = 150;
+/** In a long list a card is shown for an arrival only this long after the last one shown, so a wave does not make the cards flicker. */
+export const CARD_GAP_MS = 300;
+export const MAX_CARDS = 4;
+/** A list this long or shorter gives every item a card, however close together they land. */
+export const SMALL_LIST = 8;
 
-/** Whether the arrival at `at` ms gets a card, when the last card was shown for an arrival at `lastShown`. */
-export const shouldShowCard = (lastShown: number, at: number): boolean => at - lastShown >= CARD_GAP_MS;
+/** Which place by the core: 0 upper right, 1 lower left, 2 upper left, 3 lower right. */
+export type CardSlot = 0 | 1 | 2 | 3;
+
+/** Whether the arrival at `at` ms gets a card, when the last card was shown for an arrival at `lastShown`, in a list of `listLength` items. */
+export const shouldShowCard = (lastShown: number, at: number, listLength = Infinity): boolean => listLength <= SMALL_LIST || at - lastShown >= CARD_GAP_MS;
+
+/**
+ * The place for a card arriving `now`: the first of `slots` that no card still on screen holds, else the place of
+ * the card that has been there longest. `live` is every card shown so far (those past their life don't count).
+ */
+export function pickSlot(live: { slot: CardSlot; at: number }[], slots: CardSlot[], now: number): CardSlot {
+  let best = slots[0];
+  let bestAt = Infinity;
+  for (const s of slots) {
+    const latest = live.reduce((m, l) => (l.slot === s && now - l.at < CARD_LIFE_MS ? Math.max(m, l.at) : m), -Infinity);
+    if (latest === -Infinity) return s;
+    if (latest < bestAt) {
+      bestAt = latest;
+      best = s;
+    }
+  }
+  return best;
+}
 
 export interface CardState {
   index: number;
@@ -70,41 +98,80 @@ export interface CardState {
   alpha: number;
   /** How far through its life it is (0 to 1): the card drifts up as this grows. */
   rise: number;
-  /** Which of the two places by the core it takes. */
-  slot: 0 | 1;
+  /** Which place by the core it takes. */
+  slot: CardSlot;
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 /**
- * The cards to draw `now`, oldest first, for `arrivals` (those that got a card, oldest first, each with the ms
- * it landed and, if given, which of the two places it takes). A card fades in, holds, and fades out over CARD_LIFE_MS. At most MAX_CARDS show: when a third
- * arrives the oldest fades away in CARD_BUMP_MS.
+ * The cards to draw `now`, oldest first, for `arrivals` (those that got a card, oldest first, each with the ms it
+ * landed and the place it was given). A card fades in, holds, and fades out over CARD_LIFE_MS. When a later card
+ * takes its place the old one fades away in CARD_BUMP_MS and the new one fades in after that, so two cards never
+ * show in one place.
  */
-export function cardsAt(arrivals: { index: number; at: number; slot?: 0 | 1 }[], now: number): CardState[] {
+export function cardsAt(arrivals: { index: number; at: number; slot: CardSlot }[], now: number): CardState[] {
   const out: CardState[] = [];
   arrivals.forEach((a, j) => {
     const age = now - a.at;
     if (age < 0 || age >= CARD_LIFE_MS) return;
-    let alpha = clamp01(age / CARD_FADE_IN) * clamp01((CARD_LIFE_MS - age) / CARD_FADE_OUT);
-    const later = arrivals.slice(j + 1).filter((b) => b.at <= now);
-    if (later.length >= MAX_CARDS) alpha *= 1 - clamp01((now - later[MAX_CARDS - 1].at) / CARD_BUMP_MS);
+    const holds = (b: { at: number; slot: CardSlot }) => b.slot === a.slot;
+    const heldBefore = arrivals.slice(0, j).some((b) => holds(b) && a.at - b.at < CARD_LIFE_MS);
+    let alpha = clamp01((age - (heldBefore ? CARD_BUMP_MS : 0)) / CARD_FADE_IN) * clamp01((CARD_LIFE_MS - age) / CARD_FADE_OUT);
+    const next = arrivals.slice(j + 1).find((b) => holds(b) && b.at <= now);
+    if (next) alpha *= 1 - clamp01((now - next.at) / CARD_BUMP_MS);
     if (alpha <= 0 && age > 0) return;
-    out.push({ index: a.index, alpha, rise: age / CARD_LIFE_MS, slot: a.slot ?? ((a.index % 2) as 0 | 1) });
+    out.push({ index: a.index, alpha, rise: age / CARD_LIFE_MS, slot: a.slot });
   });
   return out;
 }
 
-/** How far a card drifts up over its life, in pixels. */
-const CARD_DRIFT = 18;
+/** How far a card drifts up over its life, in pixels: less on a small stage, where the places are close to the ring. */
+export const cardDrift = (rx: number): number => Math.min(18, 0.1 * rx);
+
+const onRight = (slot: CardSlot) => slot === 0 || slot === 3;
+const isUpper = (slot: CardSlot) => slot === 0 || slot === 2;
+const cardGap = (rx: number) => rx * 0.08;
+/** Where a card's top starts, before it drifts: the upper row ends just above the core, the lower row starts just below it. */
+const rowTop = (slot: CardSlot, core: { x: number; y: number }, rx: number, h: number) => (isUpper(slot) ? core.y - rx * 0.1 - 8 - h : core.y + rx * 0.12);
 
 /**
- * Where a card `w` by `h` pixels goes, by the core: slot 0 above and to the right of it, slot 1 below and to the
- * left, drifted up by `rise`, and held wholly inside a canvas `canvasW` wide (8px in from each side).
+ * How wide a card in `slot` can be: it stays wholly inside the ring the rim names stay outside of (so it can never
+ * touch one), on the canvas (8px in from each side), and no wider than 240. 0 when it does not fit at all.
  */
-export function cardBox(slot: 0 | 1, core: { x: number; y: number }, rx: number, canvasW: number, w: number, h: number, rise: number): { x: number; y: number; w: number; h: number } {
-  const width = Math.min(w, canvasW - 16);
-  const x = slot === 0 ? core.x + rx * 0.08 : core.x - rx * 0.08 - width;
-  const y = slot === 0 ? core.y - rx * 0.25 - h / 2 : core.y + rx * 0.12;
-  return { x: Math.max(8, Math.min(canvasW - 8 - width, x)), y: Math.max(0, y - rise * CARD_DRIFT), w: width, h };
+export function cardRoom(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, h: number): number {
+  const { a, b } = keepOut(rx);
+  const cy = core.y + CORE_LIFT * rx; // the middle of the disc, which is the middle of that ring
+  const top = rowTop(slot, core, rx, h) - cardDrift(rx);
+  const far = Math.max(Math.abs(top - cy), Math.abs(top + cardDrift(rx) + h - cy));
+  if (far >= b) return 0;
+  const gap = cardGap(rx);
+  const reach = a * Math.sqrt(1 - (far / b) ** 2) - gap; // from the core's side of the card to the ring, at the farthest row
+  const canvas = onRight(slot) ? canvasW - 8 - (core.x + gap) : core.x - gap - 8;
+  return Math.max(0, Math.min(240, reach, canvas));
+}
+
+/** A card narrower than this is not worth showing in a place. */
+const MIN_ROOM = 80;
+
+/**
+ * The places that have room for a card: all four on a stage wide enough, else at most two, the lower pair first
+ * (on a phone the upper row does not fit inside the ring). None on a stage too small for any: then no card is shown.
+ */
+export function cardSlotsFor(core: { x: number; y: number }, rx: number, canvasW: number, h: number): CardSlot[] {
+  const fits = (s: CardSlot) => cardRoom(s, core, rx, canvasW, h) >= MIN_ROOM;
+  const all: CardSlot[] = [0, 1, 2, 3];
+  if (all.every(fits)) return all;
+  const some = ([1, 3, 0, 2] as CardSlot[]).filter(fits).slice(0, 2);
+  return some;
+}
+
+/**
+ * Where a card `w` by `h` pixels goes in `slot`: beside the core on the slot's side, cut to the room it has, drifted
+ * up by `rise`.
+ */
+export function cardBox(slot: CardSlot, core: { x: number; y: number }, rx: number, canvasW: number, w: number, h: number, rise: number): { x: number; y: number; w: number; h: number } {
+  const width = Math.min(w, cardRoom(slot, core, rx, canvasW, h));
+  const gap = cardGap(rx);
+  return { x: onRight(slot) ? core.x + gap : core.x - gap - width, y: Math.max(0, rowTop(slot, core, rx, h) - rise * cardDrift(rx)), w: width, h };
 }

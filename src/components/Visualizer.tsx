@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MONTHS, dayKey } from '../model/calendar';
 import { VIZ_DEFAULT_RANGE, VIZ_GROUPS, VIZ_RANGES, cardLines, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizGroupBy, type VizRange } from '../model/visualizer';
+import { makeAiCategorizer, toSend } from '../model/aiCategories';
+import { categoryOf } from '../model/categorize';
+import { ai, useAiSettings } from '../store/ai';
+import { aiLabels } from '../store/aiLabels';
 import { appStore } from '../store/appStore';
+import { collab } from '../sync/collabSession';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
 import { useMedia } from './usePhone';
 import { closeVisualizer, openVisualizer, readGroupBy, saveGroupBy, useVisualizerOpen } from './visualizerState';
 import { readPalette, startDisc } from './visualizerDraw';
+import { VizAiSort } from './VizAiSort';
 
 /**
  * The Visualizer (owner request 2026-11-12): a full-screen, always dark view that loops over what Clean up
@@ -75,7 +81,18 @@ function Overlay() {
   const kept = useRef<DoneItem[] | undefined>(undefined);
   const items = useMemo(() => (kept.current = keepIfSame(kept.current, loopOrder(inRange(all, range, today)))), [all, range, today]);
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
-  const disc = useMemo(() => discOf(items, group), [items, group]);
+  // Sort with AI: the labels saved on this device are used only while this person has a key saved.
+  useAiSettings();
+  const uid = collab.me()?.uid ?? null;
+  const hasKey = ai.hasKey(uid);
+  const model = ai.getModel();
+  const [labelsRev, setLabelsRev] = useState(0);
+  // Labels someone else saved (before a sign-out or a change of person) are of no use here: drop them.
+  useEffect(() => aiLabels.dropUnlessFor(uid), [uid]);
+  const lookup = useMemo(() => (hasKey ? aiLabels.reader(model, uid) : null), [hasKey, model, uid, labelsRev]); // labelsRev: read again once a press ends
+  const categorize = useMemo(() => (lookup ? makeAiCategorizer(items.map((i) => i.text), lookup) : categoryOf), [items, lookup]);
+  const disc = useMemo(() => discOf(items, group, categorize), [items, group, categorize]);
+  const pending = useMemo(() => (lookup ? toSend(items.map((i) => i.text), (t) => lookup(t) !== null) : null), [items, lookup]);
   // The two lines of the small card for each item as it lands (plain text, drawn on the canvas).
   const cards = useMemo(() => items.map((item, i) => cardLines(item, disc.wedges[disc.slots[i]?.wedge]?.name, group)), [items, disc, group]);
   const days = useMemo(() => perDay(items, range, today), [items, range, today]);
@@ -142,6 +159,16 @@ function Overlay() {
               ))}
             </div>
           </div>
+          {pending && group === 'category' && (
+            <VizAiSort
+              uid={uid}
+              model={model}
+              texts={pending.texts}
+              total={pending.total}
+              known={disc.wedges.filter((w) => w.key.startsWith('ai:')).map((w) => w.name)}
+              onSorted={() => setLabelsRev((n) => n + 1)}
+            />
+          )}
           <dl className="viz-counts">
             {(
               [

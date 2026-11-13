@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { VIZ_GROUP_KEY, parseGroupBy, type VizGroupBy } from '../model/visualizer';
+import { VIZ_CALM_KEY, VIZ_GROUP_KEY, parseCalm, parseGroupBy, type VizGroupBy } from '../model/visualizer';
 
 // Whether the Visualizer is open (owner request 2026-11-12). It is view state only: never saved, never
 // undone, and kept out of the board store so opening it can't touch the saved boards (SPEC "Visualizer").
@@ -33,6 +33,23 @@ export function readGroupBy(): VizGroupBy {
 export function saveGroupBy(by: VizGroupBy) {
   try {
     localStorage.setItem(VIZ_GROUP_KEY, by);
+  } catch {
+    // not kept: it is only a convenience
+  }
+}
+
+/** The Calm button's choice saved on this device. Unreadable or blocked storage means off. */
+export function readCalm(): boolean {
+  try {
+    return parseCalm(localStorage.getItem(VIZ_CALM_KEY));
+  } catch {
+    return false;
+  }
+}
+
+export function saveCalm(on: boolean) {
+  try {
+    localStorage.setItem(VIZ_CALM_KEY, on ? '1' : '0');
   } catch {
     // not kept: it is only a convenience
   }

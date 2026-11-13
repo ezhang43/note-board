@@ -9,8 +9,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { collab, useSharing } from '../sync/collabSession';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
-import { useMedia } from './usePhone';
-import { closeVisualizer, openVisualizer, readGroupBy, saveGroupBy, useVisualizerOpen } from './visualizerState';
+import { closeVisualizer, openVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy, useVisualizerOpen } from './visualizerState';
 import { readPalette, startDisc } from './visualizerDraw';
 import { VizAiSort } from './VizAiSort';
 
@@ -70,7 +69,8 @@ function Overlay() {
     return () => window.removeEventListener('keydown', close, true);
   }, []);
 
-  const reduced = useMedia('(prefers-reduced-motion: reduce)');
+  // Always full motion, whatever the system says (owner, 2026-11-13); only the Calm button turns the quiet drawing on.
+  const [calm, setCalm] = useState(readCalm);
   const [range, setRange] = useState<VizRange>(VIZ_DEFAULT_RANGE);
   const [group, setGroup] = useState<VizGroupBy>(readGroupBy);
   // The real boards, even while Version history is showing an old one: this is a read, never a write.
@@ -116,14 +116,14 @@ function Overlay() {
       wedges: disc.wedges,
       slots: disc.slots,
       palette: readPalette(el),
-      still: reduced,
+      still: calm,
       cards,
       onLanded: (landed) => {
         if (!landed) loop++;
         setAt({ landed, loop });
       },
     });
-  }, [disc, cards, reduced]);
+  }, [disc, cards, calm]);
 
   // `at` is from the loop before when the range has just changed (the effect below resets it a moment later), so it can be past the end.
   const landed = Math.min(at.landed, items.length);
@@ -162,6 +162,19 @@ function Overlay() {
                   {g.label}
                 </button>
               ))}
+            </div>
+            <div className="viz-range" role="group" aria-label="Motion">
+              <button
+                type="button"
+                aria-pressed={calm}
+                title="Calm: no beams, sparks or cards"
+                onClick={() => {
+                  setCalm(!calm);
+                  saveCalm(!calm);
+                }}
+              >
+                Calm
+              </button>
             </div>
           </div>
           {pending && group === 'category' && (

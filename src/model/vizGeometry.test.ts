@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEAM_RISE, BEAM_ALPHA, beamWidths, BURST_BUDGET, COMET_START, LIFT_MAX, LIFT_MIN, RIPPLES, burstSize,CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, flowAt, flowTail, particleSeed, pillarLevel, project, STRIKE, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
+import { BEAM_RISE, BEAM_ALPHA, beamWidths, BURST_BUDGET, COMET_START, LIFT_MAX, LIFT_MIN, RIPPLES, burstSize,CORE_LIFT, INNER, MAX_LABEL_CHARS, OUTER, PARTICLES, PARTICLE_DELAY, TILT, beamPoint, beamStart, cellArea, cellCentre, coreAt, fitLabel, flowAt, flowTail, particleSeed, pillarLevel, project, STRIKE, TRIP_MS, DROP_MS, FLARE_MAX, pulseAt, PULSE_PEAK, PULSE_RISE_MS, PULSE_FALL_MS, tailSpan, warpPhase, wedgeSpan } from './vizGeometry';
 
 // The disc's shape (Visualizer, owner request 2026-11-12): wedges around, cells in rings inside each wedge.
 
@@ -292,9 +292,9 @@ describe('how high the sparks arc', () => {
   const cells = Array.from({ length: 9 }, (_, w) => ({ cell: cellCentre(w, 9, 2, 6), half: Math.PI / 9 }));
   const average = (lift: number) => cells.reduce((s, c) => s + bulge(c.cell, c.half, lift), 0) / cells.length;
 
-  it('bends 0.07 to 0.14 of the disc width off the straight line, from the lowest lift to the highest', () => {
-    expect(average(LIFT_MIN)).toBeGreaterThan(0.07);
-    expect(average(LIFT_MAX)).toBeLessThan(0.14);
+  it('bends 0.10 to 0.21 of the disc width off the straight line, from the lowest lift to the highest', () => {
+    expect(average(LIFT_MIN)).toBeGreaterThan(0.1);
+    expect(average(LIFT_MAX)).toBeLessThan(0.21);
     expect(average(LIFT_MAX)).toBeGreaterThan(average(LIFT_MIN));
   });
 
@@ -351,40 +351,43 @@ describe('flowTail', () => {
   });
 });
 
+/** The trip's progress `ms` milliseconds into it. */
+const at = (ms: number) => ms / TRIP_MS;
+
 describe('warpPhase', () => {
   it('drops the beam first: it starts at the top and reaches the cell at STRIKE', () => {
     expect(warpPhase(0).beam).toBe(0);
     expect(warpPhase(STRIKE / 2).beam).toBeGreaterThan(0);
     expect(warpPhase(STRIKE / 2).beam).toBeLessThan(1);
     expect(warpPhase(STRIKE).beam).toBe(1);
-    expect(warpPhase(0.1).beamAlpha).toBe(1);
-    expect(warpPhase(STRIKE + 0.2).beamAlpha).toBe(0); // gone soon after it lands
+    expect(warpPhase(at(300)).beamAlpha).toBe(1);
+    expect(warpPhase(STRIKE + at(500)).beamAlpha).toBe(0); // gone soon after it lands
   });
 
   it('lets the beam and its ring linger on the cell a moment, then sends the particles along the whole arc and fades them into the core', () => {
     expect(COMET_START).toBeGreaterThan(STRIKE);
-    expect(warpPhase(COMET_START - 0.01).comet).toBeNull();
-    expect(warpPhase(STRIKE + 0.01).beamAlpha).toBeGreaterThan(0.5); // still there after landing
+    expect(warpPhase(COMET_START - at(10)).comet).toBeNull();
+    expect(warpPhase(STRIKE + at(20)).beamAlpha).toBeGreaterThan(0.5); // still there after landing
     expect(warpPhase(COMET_START).comet).toBe(0);
     expect(warpPhase((COMET_START + 1) / 2).comet).toBeCloseTo(0.5);
-    expect(warpPhase(0.999).comet).toBeGreaterThan(0.99);
+    expect(warpPhase(0.9999).comet).toBeGreaterThan(0.99);
   });
 
   it('flares the core as the comet arrives, not before', () => {
     expect(warpPhase(0).flare).toBe(0);
-    expect(warpPhase(0.5).flare).toBe(0);
-    expect(warpPhase(0.95).flare).toBeGreaterThan(0.9);
-    expect(warpPhase(0.999).flare).toBeLessThan(warpPhase(0.95).flare);
+    expect(warpPhase(at(1000)).flare).toBe(0);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
+    expect(warpPhase(0.999).flare).toBeLessThan(warpPhase(0.9).flare);
   });
 
   it('peaks late, when the particles are nearly in the core, not before they get there', () => {
-    expect(warpPhase(0.95).flare).toBeGreaterThan(warpPhase(0.9).flare);
-    expect(warpPhase(0.95).flare).toBeGreaterThan(warpPhase(0.75).flare);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(warpPhase(0.8).flare);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(warpPhase(0.6).flare);
   });
 
   it('has finished flaring by the time the trip ends, so the core does not pop back', () => {
     expect(warpPhase(1).flare).toBeCloseTo(0, 9);
-    expect(warpPhase(0.95).flare).toBeGreaterThan(0.9);
+    expect(warpPhase(0.9).flare).toBeGreaterThan(0.9);
   });
 
   it('keeps its numbers inside 0 to 1 whatever progress it is given', () => {
@@ -433,13 +436,28 @@ describe('beamStart and beamPoint', () => {
   });
 });
 
+describe('slower beams and sparks (owner, 2026-11-13)', () => {
+  it('drops the beam over 700ms (twice the first 350ms), and the sparks fly for 1820ms (twice 910ms), the strike and what follows shifting later together', () => {
+    expect(DROP_MS).toBe(700);
+    expect(STRIKE * TRIP_MS).toBeCloseTo(700);
+    expect((1 - COMET_START) * TRIP_MS).toBeCloseTo(1820);
+  });
+
+  it('keeps the core flare to half of what it was, however many sparks arrive together', () => {
+    expect(warpPhase(0.9).flare).toBeLessThanOrEqual(1);
+    expect(FLARE_MAX).toBe(0.5);
+    expect(FLARE_MAX * Math.tanh(50)).toBeLessThanOrEqual(0.5);
+    expect(FLARE_MAX * Math.tanh(1)).toBeLessThan(0.5);
+  });
+});
+
 describe('warpPhase impact flash', () => {
   it('flashes as the beam lands, brightest at the strike, and is spent soon after', () => {
-    expect(warpPhase(STRIKE - 0.01).flash).toBe(0);
+    expect(warpPhase(STRIKE - at(10)).flash).toBe(0);
     expect(warpPhase(STRIKE).flash).toBe(1);
-    expect(warpPhase(STRIKE + 0.03).flash).toBeGreaterThan(0);
-    expect(warpPhase(STRIKE + 0.03).flash).toBeLessThan(1);
-    expect(warpPhase(STRIKE + 0.3).flash).toBe(0);
+    expect(warpPhase(STRIKE + at(40)).flash).toBeGreaterThan(0);
+    expect(warpPhase(STRIKE + at(40)).flash).toBeLessThan(1);
+    expect(warpPhase(STRIKE + at(500)).flash).toBe(0);
   });
 });
 
@@ -478,8 +496,8 @@ describe('fountain', () => {
       expect(burstSize(o)).toBeGreaterThanOrEqual(4);
       expect(burstSize(o)).toBeLessThanOrEqual(PARTICLES);
     }
-    expect(burstSize(8)).toBeLessThan(burstSize(2));
-    expect(burstSize(8) * 8).toBeLessThanOrEqual(BURST_BUDGET + 8); // all that can be in the air at once stay near the budget
+    expect(burstSize(16)).toBeLessThan(burstSize(2));
+    expect(burstSize(16) * 16).toBeLessThanOrEqual(BURST_BUDGET + 16); // all that can be in the air at once stay near the budget
   });
 
   it('arcs each spark up to its own height, within limits, the same every time', () => {
@@ -498,29 +516,29 @@ describe('fountain', () => {
 
 describe('ripples and column', () => {
   it('rings three ripples out from the landing, one after another, each opening and fading', () => {
-    const none = warpPhase(STRIKE - 0.01).ripples;
+    const none = warpPhase(STRIKE - at(10)).ripples;
     expect(none).toHaveLength(RIPPLES);
     expect(none.every((r) => r.alpha === 0)).toBe(true);
-    const early = warpPhase(STRIKE + 0.02).ripples;
+    const early = warpPhase(STRIKE + at(30)).ripples;
     expect(early[0].alpha).toBeGreaterThan(0);
     expect(early[RIPPLES - 1].alpha).toBe(0); // the last has not started
-    const later = warpPhase(STRIKE + 0.2).ripples;
+    const later = warpPhase(STRIKE + at(300)).ripples;
     expect(later.filter((r) => r.alpha > 0).length).toBe(RIPPLES);
     expect(later[0].open).toBeGreaterThan(later[RIPPLES - 1].open); // the first has opened further
-    expect(warpPhase(0.95).ripples.every((r) => r.alpha === 0)).toBe(true);
+    expect(warpPhase(0.99).ripples.every((r) => r.alpha === 0)).toBe(true);
   });
 
   it('raises a bright column from the landing for a moment, then lets it go', () => {
-    expect(warpPhase(STRIKE - 0.01).column).toEqual({ height: 0, alpha: 0 });
+    expect(warpPhase(STRIKE - at(10)).column).toEqual({ height: 0, alpha: 0 });
     expect(warpPhase(STRIKE).column.alpha).toBeGreaterThan(0);
-    const peak = warpPhase(STRIKE + 0.06).column;
+    const peak = warpPhase(STRIKE + at(80)).column;
     expect(peak.alpha).toBeGreaterThan(0.8);
-    expect(peak.height).toBeGreaterThan(warpPhase(STRIKE + 0.01).column.height);
-    expect(warpPhase(STRIKE + 0.4).column.alpha).toBe(0);
+    expect(peak.height).toBeGreaterThan(warpPhase(STRIKE + at(15)).column.height);
+    expect(warpPhase(STRIKE + at(600)).column.alpha).toBe(0);
   });
 
   it('keeps ripples and column inside 0 to 1', () => {
-    for (const p of [-1, 0, STRIKE, STRIKE + 0.1, 0.6, 1, 5]) {
+    for (const p of [-1, 0, STRIKE, STRIKE + at(150), 0.6, 1, 5]) {
       const w = warpPhase(p);
       for (const v of [w.column.height, w.column.alpha, ...w.ripples.flatMap((r) => [r.open, r.alpha])]) {
         expect(v).toBeGreaterThanOrEqual(0);
@@ -537,11 +555,11 @@ describe('beamWidths', () => {
   const HALF = 0.38;
   const old = (rx: number) => ({ glow: 7 * Math.max(0.6, Math.min(1.2, rx / 260)), core: 1.8 * Math.max(0.6, Math.min(1.2, rx / 260)) });
 
-  it('makes the pink glow about 0.0055 of the disc width across at half brightness on a big stage', () => {
+  it('makes the pink glow about 0.008 of the disc width across at half brightness on a big stage', () => {
     for (const rx of [330, 400, 469, 600]) {
       const share = (beamWidths(rx).glow * HALF) / (2 * rx);
-      expect(share).toBeGreaterThan(0.0045);
-      expect(share).toBeLessThan(0.0065);
+      expect(share).toBeGreaterThan(0.0068);
+      expect(share).toBeLessThan(0.0095);
     }
   });
 
@@ -563,5 +581,31 @@ describe('beamWidths', () => {
   it('draws the glow bright enough to read as pink, not faint', () => {
     expect(BEAM_ALPHA.glow).toBeGreaterThanOrEqual(0.7);
     expect(BEAM_ALPHA.core).toBeGreaterThanOrEqual(0.85);
+  });
+});
+
+describe('arcs stay on the canvas', () => {
+  it('never rise above the top edge, even on a short stage where the arc would', () => {
+    const short = { spin: 0, cx: 200, cy: 110, rx: 180 };
+    for (const lift of [LIFT_MIN, LIFT_MAX]) {
+      for (let i = 0; i <= 50; i++) expect(flowAt(cellCentre(0, 3, 2, 6), 0.5, 0, i / 50, lift, short).y).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('core pulse on each landing (owner, 2026-11-13)', () => {
+  it('is nothing before the beam lands, rises over about 0.15s, eases back over about 0.4s, and is spent after', () => {
+    expect(pulseAt(-10)).toBe(0);
+    expect(pulseAt(0)).toBe(0);
+    expect(pulseAt(PULSE_RISE_MS)).toBeCloseTo(PULSE_PEAK, 6);
+    expect(pulseAt(PULSE_RISE_MS / 2)).toBeGreaterThan(0);
+    expect(pulseAt(PULSE_RISE_MS / 2)).toBeLessThan(PULSE_PEAK);
+    expect(pulseAt(PULSE_RISE_MS + PULSE_FALL_MS / 2)).toBeLessThan(PULSE_PEAK);
+    expect(pulseAt(PULSE_RISE_MS + PULSE_FALL_MS)).toBe(0);
+    expect(pulseAt(5000)).toBe(0);
+  });
+  it('never passes its peak, and the shared cap keeps even sixteen together under FLARE_MAX', () => {
+    for (let t = 0; t < 700; t += 10) expect(pulseAt(t)).toBeLessThanOrEqual(PULSE_PEAK + 1e-9);
+    expect(FLARE_MAX * Math.tanh(16 * PULSE_PEAK + 16)).toBeLessThanOrEqual(FLARE_MAX);
   });
 });

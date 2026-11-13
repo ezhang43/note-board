@@ -89,13 +89,13 @@ test('counts every board: done today, this week and in the range; the switch ope
   await expect(dialog(page).getByRole('img', { name: /6 items cleaned up: Errands & shopping 3, Home & chores 1, Other 2\./ })).toBeVisible();
 });
 
-test('the feed fills as the loop runs, oldest item first, and names its list and board', async ({ page }) => {
+test('the feed fills as the loop runs, oldest item at the bottom, and names its list and board', async ({ page }) => {
   await seed(page);
   await openVisualizer(page);
   const rows = dialog(page).locator('.viz-feed li');
   await expect(rows.first()).toBeVisible({ timeout: 10000 });
-  await expect(rows.first().locator('.viz-feed-text')).toHaveText('laundry'); // 10 days ago: the oldest in 30 days
-  await expect(rows.first().locator('.viz-feed-where')).toHaveText('Home & chores · Chores · Home'); // category, list, board
+  await expect(rows.last().locator('.viz-feed-text')).toHaveText('laundry'); // 10 days ago: the oldest in 30 days (a wave of two lands together, so it is the bottom row)
+  await expect(rows.last().locator('.viz-feed-where')).toHaveText('Home & chores · Chores · Home'); // category, list, board
   // Later ones push in above it.
   await expect.poll(async () => rows.count(), { timeout: 8000 }).toBeGreaterThan(1);
 });
@@ -129,7 +129,7 @@ test('wedges are categories by default; By board switches to boards, and the cho
   await expect(groupButton(page, 'By board')).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog(page).getByRole('img', { name: /5 items cleaned up: Home 4, Garage 1/ })).toBeVisible();
   // The feed rows go back to list and board.
-  await expect(dialog(page).locator('.viz-feed li').first().locator('.viz-feed-where')).toHaveText('Chores · Home', { timeout: 10000 });
+  await expect(dialog(page).locator('.viz-feed li').last().locator('.viz-feed-where')).toHaveText('Chores · Home', { timeout: 10000 });
   // The range is unchanged by it.
   await expect(rangeButton(page, '30 days')).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => localStorage.getItem('note-board:viz-group'))).toBe('board');
@@ -193,13 +193,39 @@ const topRows = (page: Page, away: boolean) =>
       return false;
     }, away);
 
-test('under reduced motion there is no beam and no trail, only the cell lighting up and a faint still pillar', async ({ page }) => {
+const calm = (page: Page) => dialog(page).getByRole('button', { name: 'Calm', exact: true });
+
+test('with the system set to reduce motion the Visualizer still plays the full animation (owner, 2026-11-13)', async ({ page }) => {
   await seed(page);
   await openVisualizer(page);
+  await expect(calm(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => topRows(page, true), { timeout: 6000, intervals: [30] }).toBe(true); // the beam comes in from above
+});
+
+test('Calm stops the beams and sparks (cells just light, a faint still pillar) and is remembered after a reload', async ({ page }) => {
+  await seed(page);
+  await openVisualizer(page);
+  await calm(page).click();
+  await expect(calm(page)).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-calm'))).toBe('1');
   await expect(dialog(page).locator('.viz-feed li').first()).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(300);
   expect(await topRows(page, true)).toBe(false);
-  expect(await topRows(page, false)).toBe(true); // the pillar is there from the top of the canvas
+  expect(await topRows(page, false)).toBe(true);
+  await page.reload();
+  await fontsLoaded(page);
+  await openVisualizer(page);
+  await expect(calm(page)).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(1500);
+  expect(await topRows(page, true)).toBe(false);
+  await calm(page).click();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-calm'))).toBe('0');
+});
+
+test('an unreadable saved Calm value means off', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('note-board:viz-calm', 'banana'));
+  await openVisualizer(page);
+  await expect(calm(page)).toHaveAttribute('aria-pressed', 'false');
 });
 
 test.describe('with motion on', () => {
@@ -268,6 +294,42 @@ test.describe('on a phone', () => {
     expect(close.height).toBeGreaterThanOrEqual(44);
     await dialog(page).getByRole('button', { name: 'Close' }).tap();
     await expect(dialog(page)).toHaveCount(0);
+  });
+
+  test('the ring takes about 70% of the screen, the switches are one or two slim rows of 44px buttons above it, and the × stays in reach', async ({ page }) => {
+    await seed(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Visualizer', exact: true }).tap();
+    await expect(dialog(page)).toBeVisible();
+    const ring = (await dialog(page).locator('.viz-stage').boundingBox())!;
+    expect(ring.height).toBeGreaterThanOrEqual(780 * 0.6);
+    const controls = (await dialog(page).locator('.viz-controls').boundingBox())!;
+    expect(controls.y + controls.height).toBeLessThanOrEqual(ring.y + 1); // above the ring
+    expect(controls.height).toBeLessThanOrEqual(44 * 2 + 40); // two rows at most
+    for (const name of ['7 days', 'By category', 'Calm']) expect((await dialog(page).getByRole('button', { name, exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const counts = await dialog(page).locator('.viz-count').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(counts).size).toBe(1); // the three counts share one row
+    await dialog(page).evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await expect(dialog(page).getByRole('button', { name: 'Close' })).toBeInViewport();
+  });
+
+  test('with Reduce Motion on, the phone still plays full motion, and has a 44px Calm button that fits', async ({ page }) => {
+    await seed(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Visualizer', exact: true }).tap();
+    await expect(dialog(page)).toBeVisible();
+    expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+    await expect.poll(() => topRows(page, true), { timeout: 6000, intervals: [30] }).toBe(true);
+    const b = (await calm(page).boundingBox())!;
+    expect(b.width).toBeGreaterThanOrEqual(44);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+    expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: '/tmp/claude-0/-home-user-note-board/e8bfa421-c4d5-5e65-a6ea-bf1ac9b1cf8c/scratchpad/viz-sparks/calm-phone.png' });
+    await calm(page).tap();
+    await expect(calm(page)).toHaveAttribute('aria-pressed', 'true');
+    await page.waitForTimeout(1200);
+    expect(await topRows(page, true)).toBe(false);
   });
 });
 

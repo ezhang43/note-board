@@ -6,7 +6,7 @@ import { OUTER, TILT } from './vizGeometry';
 // below the disc's shoulders instead, where the stage is empty.
 
 /** The height of a name's line, the room outside the stage edge, and the gap between the dashed ring and a name (pixels). */
-export const NAME_H = 14;
+export const NAME_H = 18; // 14 at first; names are 1.3x bigger (owner request 2026-11-13, "make the category names outside bigger too")
 export const NAME_MARGIN = 8;
 export const NAME_GAP = 8;
 /** The dashed ring just outside the rim, as a share of the disc's half width (the disc draws it; names stay outside it). */

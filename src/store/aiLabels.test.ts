@@ -133,7 +133,7 @@ describe("sortWithAi", () => {
     const ask = vi.fn(async (a: AskArgs) => (asked.push(a), reply(a)));
     const progress: number[] = [];
     const texts = Array.from({ length: AI_BATCH * 2 + 3 }, (_, i) => `item ${i}`);
-    const r = await sortWithAi({ ask, cache, uid: "u1", model: M, texts, known: ["Errands"], onProgress: (n) => progress.push(n) });
+    const r = await sortWithAi({ ask, cache, uid: "u1", model: M, entries: texts.map((text) => ({ text })), known: ["Errands"], onProgress: (n) => progress.push(n) });
     expect(r).toEqual({ ok: true, sorted: texts.length });
     expect(asked.map((a) => JSON.parse(a.user.slice(a.user.lastIndexOf("["))).length)).toEqual([AI_BATCH, AI_BATCH, 3]);
     expect(progress).toEqual([AI_BATCH, AI_BATCH * 2, texts.length]);
@@ -153,11 +153,26 @@ describe("sortWithAi", () => {
     const cache = createLabelCache(memory());
     const ask = async (): Promise<AiResult> => ({ ok: true, value: { categories: ["errands"], labels: [{ i: 0, c: 0 }] } });
     const progress: number[] = [];
-    const r = await sortWithAi({ ask, cache, uid: null, model: M, texts: ["Buy milk", "Mystery"], known: ["Errands"], onProgress: (n) => progress.push(n) });
+    const r = await sortWithAi({ ask, cache, uid: null, model: M, entries: ["Buy milk", "Mystery"].map((text) => ({ text })), known: ["Errands"], onProgress: (n) => progress.push(n) });
     expect(r).toEqual({ ok: true, sorted: 1 });
     expect(progress).toEqual([2]);
     expect(cache.get("Buy milk", M, null)).toBe("Errands");
     expect(cache.get("Mystery", M, null)).toBeNull();
+  });
+
+  it("saves a sub-item's label under its text and its parent, so the same text under another parent has none", async () => {
+    const device = memory();
+    const cache = createLabelCache(device);
+    const asked: AskArgs[] = [];
+    const r = await sortWithAi({ ask: async (a) => (asked.push(a), reply(a, "Gaming")), cache, uid: null, model: M, entries: [{ text: "Beat the boss", parent: "Elden Ring" }], known: [], onProgress: () => {} });
+    expect(r).toEqual({ ok: true, sorted: 1 });
+    expect(asked[0].user).toContain('[{"item":"Beat the boss","under":"Elden Ring"}]');
+    expect(cache.get("Beat the boss", M, null, "Elden Ring")).toBe("Gaming");
+    expect(cache.reader(M, null)("Beat the boss", "Elden Ring")).toBe("Gaming");
+    expect(cache.get("Beat the boss", M, null, "Hollow Knight")).toBeNull();
+    expect(cache.get("Beat the boss", M, null)).toBeNull();
+    // Only hashes are kept: neither text is in what the device stores.
+    expect(device.data[AI_LABELS_NAME]).not.toMatch(/Elden|boss/);
   });
 
   it("stops at the first failure with its message, keeping the batches already done", async () => {
@@ -166,7 +181,7 @@ describe("sortWithAi", () => {
     const ask = async (a: AskArgs): Promise<AiResult> =>
       ++n === 2 ? { ok: false, kind: "rate-limit", message: "Too many" } : reply(a);
     const texts = Array.from({ length: AI_BATCH * 3 }, (_, i) => `item ${i}`);
-    const r = await sortWithAi({ ask, cache, uid: null, model: M, texts, known: [], onProgress: () => {} });
+    const r = await sortWithAi({ ask, cache, uid: null, model: M, entries: texts.map((text) => ({ text })), known: [], onProgress: () => {} });
     expect(r).toEqual({ ok: false, kind: "rate-limit", message: "Too many" });
     expect(n).toBe(2);
     expect(cache.get("item 0", M, null)).toBe("Stuff");
@@ -181,14 +196,14 @@ describe("sortWithAi", () => {
       expect(a.signal?.aborted).toBe(true);
       return reply(a);
     };
-    const r = await sortWithAi({ ask, cache, uid: null, model: M, texts: ["a"], known: [], onProgress: () => {}, signal: stop.signal });
+    const r = await sortWithAi({ ask, cache, uid: null, model: M, entries: ["a"].map((text) => ({ text })), known: [], onProgress: () => {}, signal: stop.signal });
     expect(r).toEqual(CANCELLED);
     expect(cache.get("a", M, null)).toBeNull();
   });
 
   it("an answer that comes after the key or model changed is not saved", async () => {
     const cache = createLabelCache(memory());
-    const r = await sortWithAi({ ask: async (a) => reply(a), cache, uid: null, model: M, texts: ["a"], known: [], onProgress: () => {}, stillValid: () => false });
+    const r = await sortWithAi({ ask: async (a) => reply(a), cache, uid: null, model: M, entries: ["a"].map((text) => ({ text })), known: [], onProgress: () => {}, stillValid: () => false });
     expect(r).toEqual(CANCELLED);
     expect(cache.get("a", M, null)).toBeNull();
   });
@@ -203,7 +218,7 @@ describe("sortWithAi", () => {
             resolve((a.signal?.reason as { name?: string })?.name === "TimeoutError" ? { ok: false, kind: "timeout", message: "slow" } : CANCELLED),
           ),
         );
-      const done = sortWithAi({ ask, cache, uid: null, model: M, texts: ["a"], known: [], onProgress: () => {}, timeoutMs: 1000 });
+      const done = sortWithAi({ ask, cache, uid: null, model: M, entries: ["a"].map((text) => ({ text })), known: [], onProgress: () => {}, timeoutMs: 1000 });
       await vi.advanceTimersByTimeAsync(1001);
       expect(await done).toEqual({ ok: false, kind: "timeout", message: "slow" });
     } finally {

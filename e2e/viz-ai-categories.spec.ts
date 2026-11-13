@@ -51,7 +51,8 @@ async function anthropic(page: Page, status = 200) {
     bodies.push(body);
     if (status !== 200) return r.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } }) });
     const user: string = JSON.parse(body).messages[0].content;
-    const texts = JSON.parse(user.slice(user.lastIndexOf('['))) as string[];
+    // A sub-item comes as {"item","under"}; the stand-in labels it by its own text.
+    const texts = (JSON.parse(user.slice(user.lastIndexOf('['))) as (string | { item: string })[]).map((t) => (typeof t === 'string' ? t : t.item));
     const categories = ['Food', 'Housework'];
     const labels = texts.flatMap((t, i) => (AI[t] ? [{ i, c: categories.indexOf(AI[t]) }] : []));
     const reply = { type: 'message', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ categories, labels }) }] };
@@ -158,7 +159,7 @@ test('Sort automatically is on by default and sorts as soon as the Visualizer op
   // The hint says it is automatic; "sand the door" got no label, so it is still waiting for a press, and is not asked about again in this open.
   await expect(
     dialog(page).getByText(
-      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
+      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key (a sub-item with the text of the item it is under): no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
     ),
   ).toBeVisible();
   await page.waitForTimeout(500);
@@ -275,4 +276,37 @@ test('Cancel stops a sort that is still running', async ({ page }) => {
   await expect(dialog(page).getByText('Stopped.')).toBeVisible();
   await expect(sortButton(page)).toBeEnabled();
   answer();
+});
+
+test('a sub-item goes with the text of the item it is under; a parent like Today or one that names a topic is not sent', async ({ page }) => {
+  // Three more finished entries on Home, each a ticked parent with one ticked sub-item.
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const entries = data.boards.home.cards.home_done.groups[0].entries;
+    const sub = (id: string, parent: string, child: string) => ({
+      item: { id, text: parent, done: true, note: 'secret note', children: [{ id: `${id}c`, text: child, done: true, children: [], note: 'secret note' }] },
+      fromCardId: 'home_l',
+      fromTitle: 'Groceries',
+      fromParentId: null,
+    });
+    entries.push(sub('p1', 'Elden Ring', 'Beat the boss'), sub('p2', 'Today', 'water plants'), sub('p3', 'Clean the garage', 'find the box'));
+    localStorage.setItem('note-board:v1', JSON.stringify(data));
+  });
+  await page.reload();
+  await fontsLoaded(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await sortButton(page).click();
+  await expect(dialog(page).getByText(/^Sorted /)).toBeVisible();
+  expect(bodies).toHaveLength(1);
+  const sent = bodies[0];
+  // The sub-item goes with its parent's text, as context.
+  expect(sent).toContain('{\\"item\\":\\"Beat the boss\\",\\"under\\":\\"Elden Ring\\"}');
+  // Under a time word it goes by its own words alone; under a parent that names a topic it is not sent at all.
+  expect(sent).toContain('\\"water plants\\"');
+  expect(sent).not.toContain('Today');
+  expect(sent).not.toContain('find the box');
+  expect(sent).not.toContain('Clean the garage');
+  for (const never of ['Home', 'Garage', 'Groceries', 'home_', 'secret note', 'SECRET']) expect(sent).not.toContain(never);
 });

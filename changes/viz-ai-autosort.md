@@ -4,3 +4,4 @@
 - A new **Sort automatically** box next to the button turns this off. It is on by default and remembered on this device. With it off, nothing is sent until you press the button, as before.
 - It sorts at most once each time you open the Visualizer for each range, so a failure is shown and not retried by itself. The button stays for the rest past 200 and for another try.
 - The hint, AI settings and the Privacy policy now say that the Visualizer can send item texts by itself.
+- **Sub-items are sorted with their parent in mind.** A finished sub-item now goes to Claude with the text of the item it sits under (for example "Beat the boss" under "Elden Ring"), so the sub-items of one topic land in one category. A parent like "Today" is skipped, and items that are only a time word are never sent. The hint, AI settings and the Privacy policy say so.

@@ -88,9 +88,6 @@ export const categoryOf = (item: { text: string; context?: string[] }, listTitle
   return own !== OTHER_CATEGORY ? own : byWords(listTitle);
 };
 
-/** `inner` (Sort with AI) with a descriptive parent's built-in category in front: it wins over the sub-item's AI label. Items with no such parent go to `inner` unchanged. */
-export const parentFirst = (inner: Categorizer): Categorizer => (item, listTitle) => parentCategory(item) ?? inner(item, listTitle);
-
 /** Where a category sits in CATEGORIES (an id nobody knows is Other, the last). */
 export function categoryIndex(id: CategoryId): number {
   const i = CATEGORIES.findIndex((c) => c.id === id);

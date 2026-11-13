@@ -556,6 +556,7 @@ test('the Privacy policy says what an AI button sends, to whom, and with whose k
   await section.locator('summary').click();
   await expect(section).toContainText('used only when you press an AI button or Test key, or when the Visualizer sorts your finished items by itself');
   await expect(section).toContainText('An AI button sends the text of finished checklist items from your own boards (never from boards someone else shared with you) straight from your browser to Anthropic, with your own key');
+  await expect(section).toContainText('For a finished sub-item it also sends the text of the item it sits under, as context, even if that item is not ticked.');
   await expect(section).toContainText('never passes through BusyAnts');
   await expect(section).not.toContainText('not sent anywhere else yet');
   await expect(section.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://www.anthropic.com/legal/privacy');

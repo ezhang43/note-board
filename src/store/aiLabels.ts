@@ -5,6 +5,7 @@ import {
   AI_MAX_CATEGORIES,
   AI_MAX_TOKENS,
   LABELS_SCHEMA,
+  type AiEntry,
   buildPrompt,
   cleanLabel,
   labelKey,
@@ -14,7 +15,7 @@ import type { AskArgs } from "./ai";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave, kept in this browser's localStorage
 // only. Never board data: not in a saved board, Version history, an export or the sync. Saved under a hash
-// of the item text and the model, with whose they are (a different person signed in sees none of them).
+// of the item text (and, for a sub-item, its parent's text) and the model, with whose they are (a different person signed in sees none of them).
 // Forget key removes them (src/store/ai.ts), and the Visualizer only uses them while a key is saved.
 
 /** At most this many labels are kept; the oldest go first. */
@@ -34,14 +35,14 @@ export function createLabelCache(device: Place) {
     }
   };
   const store = {
-    /** The label saved for `text` with `model`, cleaned again (it may have been changed on this device), or null. */
-    get(text: string, model: string, owner: string | null): string | null {
-      return cleanLabel(load(owner)[labelKey(text, model)]);
+    /** The label saved for `text` (under `parent`, for a sub-item) with `model`, cleaned again (it may have been changed on this device), or null. */
+    get(text: string, model: string, owner: string | null, parent?: string): string | null {
+      return cleanLabel(load(owner)[labelKey(text, model, parent)]);
     },
     /** Like `get`, for many texts: reads the saved labels once. */
-    reader(model: string, owner: string | null): (text: string) => string | null {
+    reader(model: string, owner: string | null): (text: string, parent?: string) => string | null {
       const entries = load(owner);
-      return (text) => cleanLabel(entries[labelKey(text, model)]);
+      return (text, parent) => cleanLabel(entries[labelKey(text, model, parent)]);
     },
     /** Removes labels saved by anyone but `owner` (after a sign-out or a change of person), or damaged ones. */
     dropUnlessFor(owner: string | null) {
@@ -56,11 +57,11 @@ export function createLabelCache(device: Place) {
       }
       if (!mine) store.clear();
     },
-    /** Saves labels for texts; anyone else's labels are replaced. False when storage said no. */
-    putAll(pairs: [string, string][], model: string, owner: string | null): boolean {
+    /** Saves labels for texts (each with its parent, for a sub-item); anyone else's labels are replaced. False when storage said no. */
+    putAll(pairs: [text: string, label: string, parent?: string][], model: string, owner: string | null): boolean {
       const entries = { ...load(owner) };
-      for (const [text, label] of pairs) {
-        const k = labelKey(text, model);
+      for (const [text, label, parent] of pairs) {
+        const k = labelKey(text, model, parent);
         delete entries[k]; // written again, so it counts as new
         entries[k] = label;
       }
@@ -109,7 +110,7 @@ export const aiLabels = createLabelCache(
 const BATCH_TIMEOUT_MS = 90_000;
 
 /**
- * Sends `texts` (already picked by toSend) to Claude in batches of AI_BATCH, one counted use each, and saves
+ * Sends `entries` (already picked by toSend) to Claude in batches of AI_BATCH, one counted use each, and saves
  * each batch's labels as it comes back. Stops at the first failure with its message (batches already done
  * stay saved). `known` is the category names already on the disc, so new items reuse them. An answer that
  * comes back after Cancel, or after `stillValid` says the key or model changed, is not saved.
@@ -119,7 +120,7 @@ export async function sortWithAi({
   cache,
   uid,
   model,
-  texts,
+  entries,
   known,
   onProgress,
   signal,
@@ -130,7 +131,7 @@ export async function sortWithAi({
   cache: LabelCache;
   uid: string | null;
   model: string;
-  texts: string[];
+  entries: AiEntry[];
   known: string[];
   onProgress: (sorted: number) => void;
   signal?: AbortSignal;
@@ -140,9 +141,9 @@ export async function sortWithAi({
   const names = [...known].slice(0, AI_MAX_CATEGORIES);
   let sorted = 0;
   let asked = 0;
-  for (let at = 0; at < texts.length; at += AI_BATCH) {
+  for (let at = 0; at < entries.length; at += AI_BATCH) {
     if (signal?.aborted) return stoppedBy(signal);
-    const batch = texts.slice(at, at + AI_BATCH);
+    const batch = entries.slice(at, at + AI_BATCH);
     // simple: forwards Cancel by hand with a timer for the time-out; AbortSignal.any / .timeout need iOS Safari 17.4+ / 16. Upgrade when older iPhones no longer matter.
     const own = new AbortController();
     const cancel = () => own.abort(signal?.reason);
@@ -158,13 +159,13 @@ export async function sortWithAi({
     if (signal?.aborted || !stillValid()) return CANCELLED;
     if (!r.ok) return r;
     const labels = readLabels(r.value, batch.length);
-    const pairs: [string, string][] = [];
+    const pairs: [text: string, label: string, parent?: string][] = [];
     labels.forEach((l, i) => {
       if (!l) return;
       // A name already chosen keeps its first spelling, so "errands" joins the "Errands" wedge.
       const same = names.find((n) => n.toLowerCase() === l.toLowerCase());
       if (!same && names.length < AI_MAX_CATEGORIES) names.push(l);
-      pairs.push([batch[i], same ?? l]);
+      pairs.push([batch[i].text, same ?? l, batch[i].parent]);
     });
     cache.putAll(pairs, model, uid);
     sorted += pairs.length;

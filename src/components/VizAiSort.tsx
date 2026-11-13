@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { AI_MAX_PER_PRESS, autoSortDue } from '../model/aiCategories';
+import { AI_MAX_PER_PRESS, autoSortDue, type AiEntry } from '../model/aiCategories';
 import { ai, askClaude } from '../store/ai';
 import { aiLabels, sortWithAi } from '../store/aiLabels';
 import { readAutoSort, saveAutoSort } from './visualizerState';
@@ -18,12 +18,14 @@ type Status =
   | { kind: 'error'; message: string };
 
 const NOT_SENT = 'no board names, lists or notes, and nothing from boards shared with you.';
+// A sub-item goes with the text of the item it sat under, as context (owner request 2026-11-13); that item may not be ticked itself.
+const WITH_PARENT = ' (a sub-item with the text of the item it is under)';
 const items = (n: number) => `${n} finished ${n === 1 ? 'item' : 'items'}`;
 
 export function VizAiSort({
   uid,
   model,
-  texts,
+  entries,
   total,
   loading,
   known,
@@ -36,7 +38,7 @@ export function VizAiSort({
   uid: string | null;
   model: string;
   /** What one press sends (see toSend). */
-  texts: string[];
+  entries: AiEntry[];
   /** How many still need a label, before the per-press cut. */
   total: number;
   /** The shares are not known yet, so no board counts as own and nothing can be sent. */
@@ -79,17 +81,17 @@ export function VizAiSort({
     // Stopped as soon as the key or the model changes (forgotten here or in another tab, signed out, another model).
     const stillValid = () => ai.getKey(uid) === key && ai.getModel() === model;
     const off = ai.subscribe(() => !stillValid() && run.abort());
-    setStatus({ kind: 'running', sorted: 0, of: texts.length });
+    setStatus({ kind: 'running', sorted: 0, of: entries.length });
     const r = await sortWithAi({
       ask: askClaude,
       cache: aiLabels,
       uid,
       model,
-      texts,
+      entries,
       known,
       signal: run.signal,
       stillValid,
-      onProgress: (sorted) => setStatus({ kind: 'running', sorted, of: texts.length }),
+      onProgress: (sorted) => setStatus({ kind: 'running', sorted, of: entries.length }),
     });
     off();
     if (runningKey.current === runKey) runningKey.current = null;
@@ -114,11 +116,11 @@ export function VizAiSort({
     : !total
       ? 'Nothing left to sort from your own boards. The labels stay on this device.'
       : !auto
-        ? `Sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: ${NOT_SENT}${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`
+        ? `Sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`
         : !tried.current.has(runKey)
-          ? `Sorts automatically when opened: sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: ${NOT_SENT}${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press Sort with AI for the rest.` : ''}`
+          ? `Sorts automatically when opened: sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press Sort with AI for the rest.` : ''}`
           : // Already run in this range and open: it will not send again by itself until the next open, so say what a press does.
-            `Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: ${NOT_SENT} Press Sort with AI to send ${items(texts.length)} still waiting${total > texts.length ? ` (the first ${AI_MAX_PER_PRESS} of ${total})` : ''}.`;
+            `Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT} Press Sort with AI to send ${items(entries.length)} still waiting${total > entries.length ? ` (the first ${AI_MAX_PER_PRESS} of ${total})` : ''}.`;
 
   return (
     <div className="viz-ai">

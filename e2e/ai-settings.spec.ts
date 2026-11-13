@@ -55,6 +55,8 @@ test.describe("on a wide desktop", () => {
     expect(text).toContain(
       "the text of finished checklist items from your own boards, never from boards shared with you",
     );
+    // A sub-item goes with the text of the item it is under, as context (job viz-ai-autosort).
+    expect(text).toContain("(with a sub-item, also the text of the item it is under)");
     await expect(
       dialog(page).getByRole("button", { name: "Test key" }),
     ).toBeDisabled();

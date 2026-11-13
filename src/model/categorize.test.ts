@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, isTimeWord, parentCategory, parentFirst, categoryIndex, type CategoryId } from './categorize';
+import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, isTimeWord, parentCategory, categoryIndex, type CategoryId } from './categorize';
 
 // The Visualizer's categories (owner request, 2026-11-12): built-in word rules behind one function,
 // categoryOf(item, listTitle), so a later AI categorizer can stand in for it.
@@ -178,11 +178,3 @@ describe('isTimeWord', () => {
   });
 });
 
-describe("parentFirst", () => {
-  const ai = () => ({ name: "Gaming" });
-  it("a descriptive parent beats the AI label; otherwise the AI label stands", () => {
-    expect(parentFirst(ai)({ text: "Buy milk", context: ["Clean the garage"] }, "")).toBe("home");
-    expect(parentFirst(ai)({ text: "Buy milk", context: ["Today"] }, "")).toEqual({ name: "Gaming" });
-    expect(parentFirst(ai)({ text: "Buy milk" }, "")).toEqual({ name: "Gaming" });
-  });
-});

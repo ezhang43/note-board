@@ -300,6 +300,19 @@ test('rim names: on a desktop window every name shows in full, none empty or jus
   for (const l of labels) expect(l).not.toMatch(/^…?$/);
 });
 
+const discBox = async (page: Page) => (await dialog(page).locator('canvas').getAttribute('data-disc'))!.split(',').map(Number);
+
+test('the disc is big: it fills most of the stage width and stays whole on the stage', async ({ page }) => {
+  await seedCategories(page);
+  await openVisualizer(page);
+  const [cx, cy, rx, w, h] = await discBox(page);
+  expect(rx * 2).toBeGreaterThan(w * 0.8);
+  expect(cx - rx).toBeGreaterThanOrEqual(0);
+  expect(cx + rx).toBeLessThanOrEqual(w);
+  expect(cy).toBeGreaterThan(h / 2); // sits low, the names below it
+  expect(cy + rx * 0.62).toBeLessThanOrEqual(h);
+});
+
 test.describe('rim names on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 780 } });
 
@@ -317,5 +330,14 @@ test.describe('rim names on a phone', () => {
     expect(labels.some((l) => l.startsWith('ERRANDS'))).toBe(true);
     expect(labels.some((l) => l.startsWith('LEARNING'))).toBe(true);
     expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  });
+
+  test('the disc is much bigger than before on a phone (it was under half the width), as big as the names allow', async ({ page }) => {
+    await seedCategories(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Visualizer', exact: true }).tap();
+    await expect(dialog(page)).toBeVisible();
+    const [, , rx, w] = await discBox(page);
+    expect(rx * 2).toBeGreaterThan(w * 0.55);
   });
 });

@@ -1,5 +1,5 @@
 import { BEAM_ALPHA, BEAM_EXTRA, INNER, OUTER, PARTICLE_DELAY, FLARE_MAX, STRIKE, pulseAt, TILT, TRIP_MS, DROP_MS, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
-import { loopMs, playhead, type Wedge } from '../model/visualizer';
+import { playhead, type Wedge } from '../model/visualizer';
 import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
 import { CARD_LIFE_MS, cardBox, cardLayout, cardRoom, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
 
@@ -198,8 +198,8 @@ export interface DiscOptions {
   still: boolean;
   /** The two lines of the small card shown for each item of the loop (its text, then "category · board"), in loop order. Plain text. */
   cards: [string, string][];
-  /** How many items have landed so far in this trip round the loop (0 when it starts again). Called when that changes. */
-  onLanded(landed: number): void;
+  /** How many items have landed so far in this round of the list, and which round it is (0 for the first). Called when that changes. */
+  onLanded(landed: number, round: number): void;
 }
 
 /** Starts the loop on the canvas. Returns the function that stops it. */
@@ -211,12 +211,10 @@ export function startDisc(o: DiscOptions): () => void {
   const flight = still ? 1 : FLIGHT_MS;
   const strike = still ? 1 : FLIGHT_MS * STRIKE; // when the beam reaches its cell: it lands and lights up
   const hueOf = (wi: number) => palette.hues[wedges[wi].hue % palette.hues.length];
-  const total = loopMs(n, flight);
-  // The most fountains in the air together over this loop sets how many sparks each has; the same for the whole loop, so none pops in or out. A narrow stage (a phone) gets a few fewer.
-  let overlap = 1;
-  if (!still) for (let at = 0; at < total; at += 50) overlap = Math.max(overlap, playhead(at, n, flight, strike).flying.length);
+  // The most fountains in the air together (once the stream is going) sets how many sparks each has; the same for the whole run, so none pops in or out. A narrow stage (a phone) gets a few fewer.
+  const overlap = still || !n ? 1 : Math.max(1, playhead(flight * 3, n, flight, strike).flying.length);
   const sparks = burstSize(overlap);
-  const crowded = overlap > 4; // fixed for the whole loop too, so a fountain never changes look in flight
+  const crowded = overlap > 4; // fixed for the whole run too, so a fountain never changes look in flight
   let bursts = sparks;
   let landedCount = wedges.map((w) => w.cells.map(() => 0));
   const flashAt = wedges.map((w) => w.cells.map(() => -Infinity));
@@ -629,34 +627,30 @@ export function startDisc(o: DiscOptions): () => void {
     last = now;
     t += dt;
     if (!still) spin += dt * SPIN_PER_MS;
-    if (n && t >= total) {
-      // Back to the start: the cells go dark again and the oldest item is next.
-      t -= total;
-      landed = 0;
-      landedCount = wedges.map((x) => x.cells.map(() => 0));
-      flashAt.forEach((row) => row.fill(-Infinity));
-      latest = -1;
-      cardArrivals = [];
-      lastCard = -Infinity;
-      o.onLanded(0);
-    }
-    const ph = playhead(t, n, flight, strike);
+    // Calm: everything is simply lit, once, and nothing moves. Otherwise a stream with no end: launches go round the list again and again.
+    const ph = still ? { landed: n, flying: [] } : playhead(t, n, flight, strike);
     for (let k = landed; k < ph.landed; k++) {
-      const s = slots[k];
+      if (k > 0 && k % n === 0) {
+        // The list ran out and starts again: the cells go dark and the oldest item is next (the beams already in the air carry on).
+        landedCount = wedges.map((x) => x.cells.map(() => 0));
+        flashAt.forEach((row) => row.fill(-Infinity));
+        latest = -1;
+      }
+      const s = slots[k % n];
       latest = s.wedge;
       landedCount[s.wedge][s.cell]++;
       flashAt[s.wedge][s.cell] = now;
-      if (!still && shouldShowCard(lastCard, now, n)) {
+      if (!still && shouldShowCard(lastCard, now)) {
         lastCard = now;
         const { rx, core } = layout();
         const places = cardLayout(core, rx, w, CARD_H).slots;
-        if (places.length) cardArrivals.push({ index: k, at: now, slot: pickSlot(cardArrivals, places, now) });
+        if (places.length) cardArrivals.push({ index: k % n, at: now, slot: pickSlot(cardArrivals, places, now) });
       }
     }
     while (cardArrivals.length && now - cardArrivals[0].at >= CARD_LIFE_MS) cardArrivals.shift();
     if (ph.landed !== landed) {
       landed = ph.landed;
-      o.onLanded(landed);
+      o.onLanded(landed ? ((landed - 1) % n) + 1 : 0, landed ? Math.floor((landed - 1) / n) : 0);
     }
     draw(now, ph.flying);
     raf = requestAnimationFrame(frame);

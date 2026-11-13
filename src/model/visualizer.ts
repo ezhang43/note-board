@@ -242,20 +242,55 @@ export const LOOP_REST_MS = 2500;
 /** Time between one item and the next: about a second each, quicker when there are many so a loop lasts about 45 seconds. */
 export const gapMs = (n: number): number => Math.min(MAX_GAP_MS, Math.max(MIN_GAP_MS, LOOP_TARGET_MS / Math.max(1, n)));
 
+/** Items land in waves (owner request 2026-11-13, "many arrivals overlap"): up to this many together, a moment apart. */
+export const WAVE_MAX = 8;
+/** The gap between the items of one wave (never more than the loop's own gap). */
+export const WAVE_GAP_MS = 120;
+/** The most beams and fountains drawn at once, so a very busy loop stays inside the frame (the oldest are cut short). */
+export const MAX_FLYING = 8;
+
+/** How many items land together: one at a time for a handful, up to WAVE_MAX for a long list (about a sixth of the items). */
+export const waveSize = (n: number): number => Math.min(WAVE_MAX, Math.max(1, Math.round(n / 6)));
+
+/** When item `i` of `n` starts its trip, in ms from the start of the loop: a wave starts each `waveSize * gapMs`, its items WAVE_GAP_MS apart. */
+export function startOf(i: number, n: number): number {
+  const wave = waveSize(n);
+  const gap = gapMs(n);
+  return Math.floor(i / wave) * wave * gap + (i % wave) * Math.min(WAVE_GAP_MS, gap);
+}
+
 /** How long one trip around the loop takes, rest included (flight is how long a spark takes to land). */
-export const loopMs = (n: number, flight: number): number => (n ? (n - 1) * gapMs(n) + flight + LOOP_REST_MS : 0);
+export const loopMs = (n: number, flight: number): number => (n ? startOf(n - 1, n) + flight + LOOP_REST_MS : 0);
+
+/** How many of the `n` items have a start time (plus `offset`) at or before `t` ms; `startOf` only grows with `i`, so this halves the range each step. */
+function startedBy(t: number, n: number, offset: number): number {
+  let lo = 0;
+  let hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (startOf(mid, n) + offset <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
 
 /**
  * Where the loop is `t` ms after it started: how many items have landed, which are still animating (with
- * how far along, 0 to 1), and whether `t` has gone past the end (the caller starts again at `t - loop`).
- * An item has "landed" `strike` ms into its `flight` ms trip (by default at the end of it): that is when
- * its cell lights and its row joins the feed, while its comet may still be on the way to the core.
+ * how far along, 0 to 1; at most MAX_FLYING, the newest), and whether `t` has gone past the end (the caller
+ * starts again at `t - loop`). An item has "landed" `strike` ms into its `flight` ms trip (by default at the
+ * end of it): that is when its cell lights and its row joins the feed, while its fountain may still be on the
+ * way to the core. Every item still lands when the loop is busy; only the drawing of the oldest is cut short.
  */
 export function playhead(t: number, n: number, flight: number, strike: number = flight): { landed: number; flying: { index: number; progress: number }[]; wrapped: boolean } {
-  const gap = gapMs(n);
-  const landed = t < strike ? 0 : Math.min(n, Math.floor((t - strike) / gap) + 1);
-  const done = t < flight ? 0 : Math.min(n, Math.floor((t - flight) / gap) + 1); // whose whole trip is over
+  const landed = startedBy(t, n, strike);
+  const done = startedBy(t, n, flight); // whose whole trip is over
+  const started = startedBy(t, n, 0);
   const flying: { index: number; progress: number }[] = [];
-  for (let i = done; i < n && t - i * gap >= 0; i++) flying.push({ index: i, progress: (t - i * gap) / flight });
+  for (let i = Math.max(done, started - MAX_FLYING); i < started; i++) flying.push({ index: i, progress: (t - startOf(i, n)) / flight });
   return { landed, flying, wrapped: t >= loopMs(n, flight) };
+}
+
+/** The two lines on the small card that floats by the core for an item that just landed: its text, then "category · board" (or "list · board" By board). Plain text only. */
+export function cardLines(item: DoneItem, wedgeName: string | undefined, by: VizGroupBy): [string, string] {
+  return [item.text.trim() || 'Untitled item', [by === 'category' ? wedgeName : item.list, item.boardName].filter(Boolean).join(' · ')];
 }

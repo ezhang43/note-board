@@ -22,11 +22,16 @@ export function dayLabel(day: string): string {
 
 const isRecord = (c: Card): c is CompletedCard => c.kind === 'completed';
 
+/** Days as one list: whatever falls on the same day together, in the order given, newest day first. */
+function byDay<T>(days: [string, T[]][]): [string, T[]][] {
+  const out = new Map<string, T[]>();
+  for (const [date, rows] of days) out.set(date, [...(out.get(date) ?? []), ...rows]);
+  return [...out].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
+}
+
 /** The days of several records as one list: entries of the same day together, newest day first. */
 function mergeDays(records: CompletedCard[]): CompletedGroup[] {
-  const days = new Map<string, CompletedEntry[]>();
-  for (const g of records.flatMap((r) => r.groups)) days.set(g.date, [...(days.get(g.date) ?? []), ...g.entries]);
-  return [...days].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)).map(([date, entries]) => ({ date, entries }));
+  return byDay(records.flatMap((r) => r.groups.map((g): [string, CompletedEntry[]] => [g.date, g.entries]))).map(([date, entries]) => ({ date, entries }));
 }
 
 const viewOf = new WeakMap<Board, CompletedCard | null>();
@@ -42,6 +47,25 @@ export function completedCardOf(board: Board): CompletedCard | null {
   const view = all.length > 1 ? { ...all[0], groups: mergeDays(all) } : (all[0] ?? null);
   viewOf.set(board, view);
   return view;
+}
+
+/** One row of the Completed panel: an entry, the record it is in, and whether that is the Main checklist's. */
+export interface CompletedRow {
+  entry: CompletedEntry;
+  cardId: string;
+  checklist: boolean;
+}
+
+/**
+ * The Completed panel's days (owner, 2026-11-13): the open board's record with the Main checklist's mixed in,
+ * under the same dates, newest first; in a day the board's own items come first. Nothing is saved this way:
+ * each record stays on its own board.
+ */
+export function mergeCompleted(own: CompletedCard | null, checklist: CompletedCard | null): { date: string; rows: CompletedRow[] }[] {
+  const tagged = ([[own, false], [checklist, true]] as const).flatMap(([card, isList]) =>
+    (card?.groups ?? []).map((g): [string, CompletedRow[]] => [g.date, g.entries.map((entry) => ({ entry, cardId: card!.id, checklist: isList }))]),
+  );
+  return byDay(tagged).map(([date, rows]) => ({ date, rows }));
 }
 
 /** `place`, or a loose spot when it names a column that is gone (the card is never left in no place). */

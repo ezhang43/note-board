@@ -3,7 +3,7 @@ import * as B from './board';
 import { createCard, createColumn } from './cards';
 import { editItems } from './checklist';
 import { copyBlocks } from './clipboard';
-import { cleanUp, completedCardOf, dayKey, dayLabel, deleteTicked, hasTickedItems, tickedCount, restoreEntry } from './completed';
+import { cleanUp, completedCardOf, dayKey, dayLabel, deleteTicked, hasTickedItems, mergeCompleted, tickedCount, restoreEntry } from './completed';
 import { parseBoard, serializeBoard } from './persist';
 import type { Board, CompletedCard, TodoCard, TodoItem } from './types';
 
@@ -235,5 +235,46 @@ describe('Delete completed items: every ticked item (job 200)', () => {
   it('returns the same board when nothing is ticked', () => {
     const b = B.addCard(B.createBoard(), list('x', 'Open', [it_('p', false, [it_('q')])]), here);
     expect(deleteTicked(b, makeId)).toBe(b);
+  });
+});
+
+describe('the Completed panel with the Main checklist mixed in (owner, 2026-11-13)', () => {
+  const entry = (id: string) => ({ item: it_(id, true), fromCardId: 'x', fromTitle: 'List', fromParentId: null });
+  const record = (id: string, groups: [string, string[]][]): CompletedCard => ({
+    id,
+    kind: 'completed',
+    color: 'stone',
+    collapsed: false,
+    x: 0,
+    y: 0,
+    w: null,
+    h: null,
+    groups: groups.map(([date, ids]) => ({ date, entries: ids.map(entry) })),
+  });
+  const shown = (days: ReturnType<typeof mergeCompleted>) =>
+    days.map((d) => `${d.date}: ${d.rows.map((r) => (r.checklist ? `c:${r.entry.item.id}` : r.entry.item.id)).join(', ')}`);
+
+  it('shows the board’s days and the checklist’s under the same dates, newest first, the board’s items first in a day', () => {
+    const own = record('k1', [
+      ['2026-11-12', ['b2']],
+      ['2026-11-10', ['b1']],
+    ]);
+    const list = record('k9', [
+      ['2026-11-13', ['c3']],
+      ['2026-11-12', ['c2']],
+      ['2026-11-01', ['c1']],
+    ]);
+    expect(shown(mergeCompleted(own, list))).toEqual(['2026-11-13: c:c3', '2026-11-12: b2, c:c2', '2026-11-10: b1', '2026-11-01: c:c1']);
+    // Each row knows the record it is in, so an untick goes back to the right board.
+    const rows = mergeCompleted(own, list).flatMap((d) => d.rows);
+    expect(rows.filter((r) => r.checklist).map((r) => r.cardId)).toEqual(['k9', 'k9', 'k9']);
+    expect(rows.filter((r) => !r.checklist).map((r) => r.cardId)).toEqual(['k1', 'k1']);
+  });
+
+  it('with only one of the two records, shows that one as it is', () => {
+    const own = record('k1', [['2026-11-12', ['b1', 'b2']]]);
+    expect(shown(mergeCompleted(own, null))).toEqual(['2026-11-12: b1, b2']);
+    expect(shown(mergeCompleted(null, own))).toEqual(['2026-11-12: c:b1, c:b2']);
+    expect(mergeCompleted(null, null)).toEqual([]);
   });
 });

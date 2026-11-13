@@ -23,7 +23,7 @@ import { Tour } from './components/Tour';
 import { Toolbar } from './components/Toolbar';
 import { ZoomControl } from './components/ZoomControl';
 import { usePhone } from './components/usePhone';
-import { appStore, BoardScope, useAppState, useViewOnly } from './store/appStore';
+import { appStore, useAppState, useViewOnly } from './store/appStore';
 import { ChecklistPanel } from './components/ChecklistPanel';
 import { ViewOnlyNote } from './components/ViewOnly';
 import { PomodoroPanel } from './components/PomodoroPanel';
@@ -88,7 +88,6 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   // The Checklist panel on the left (owner request, 2026-11-12), open beside any panel on the right. With one
   // open there it gives way first, keeping 300px of board between the two while the window allows.
   const checklistOpen = useAppState((s) => s.ui.checklistOpen);
-  const completedBoard = useAppState((s) => s.ui.completedBoard);
   // A phone shows one panel at a time: a panel opened on the right closes the checklist.
   useEffect(() => {
     if (phone && checklistOpen && historyOpen) appStore.openChecklist();
@@ -122,11 +121,8 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         </SidePanel>
       )}
       {sidePanel === 'completed' && (
-        // Opened from the Checklist panel, it shows that checklist's record (completedBoard).
-        <SidePanel title={completedBoard ? 'Completed: Checklist' : 'Completed'} onClose={closeCompleted}>
-          <BoardScope value={completedBoard}>
-            <CompletedPanel />
-          </BoardScope>
+        <SidePanel title="Completed" onClose={closeCompleted}>
+          <CompletedPanel />
         </SidePanel>
       )}
       {sidePanel === 'journal' && (

@@ -1,9 +1,9 @@
-import type { CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import { ITEM_INDENT } from '../model/checklist';
-import { completedCardOf, dayLabel } from '../model/completed';
+import { completedCardOf, dayLabel, mergeCompleted, type CompletedRow as CompletedRowData } from '../model/completed';
 import { styleCss } from '../model/textStyle';
-import type { CompletedEntry, TodoItem } from '../model/types';
-import { appStore, useAppState, useBoardStore, useViewOnly } from '../store/appStore';
+import type { TodoItem } from '../model/types';
+import { appStore, useAppState } from '../store/appStore';
 import { FindMarks } from './FindMarks';
 import { CompletedIcon } from './icons';
 
@@ -39,19 +39,37 @@ export function CompletedButton({ onOpen }: { onOpen?: () => void }) {
   );
 }
 
-/** The Completed panel: items moved here by Clean up, grouped by day, newest first. Unticking one sends it back. */
+/**
+ * The Completed panel: items moved here by Clean up, grouped by day, newest first. Unticking one sends it back.
+ * The Main checklist's cleaned-up items are mixed in under the same days, marked "Checklist" (owner, 2026-11-13);
+ * each stays in its own board's record.
+ */
 export function CompletedPanel() {
-  const card = useAppState((s) => completedCardOf(s.board));
+  const own = useAppState((s) => completedCardOf(s.board));
+  const list = useAppState((s) => {
+    const id = appStore.completedChecklist();
+    const board = id ? s.boards.others[id] : undefined;
+    return board ? completedCardOf(board) : null;
+  });
+  const days = useMemo(() => mergeCompleted(own, list), [own, list]);
+  const ref = useRef<HTMLDivElement>(null);
+  // Nothing goes back on a read-only board (job 161) or while an old version is shown.
+  const readOnly = useAppState(() => appStore.completedReadOnly());
+  const untick = (row: CompletedRowData) => {
+    // The ticked row goes away: the keyboard stays in the panel, so Ctrl+Z there takes the untick back.
+    ref.current?.focus({ preventScroll: true });
+    appStore.untickCompleted(row.entry.item.id, row.checklist);
+  };
   return (
-    <div className="completed-panel">
-      {!card?.groups.length ? (
+    <div className="completed-panel" ref={ref} tabIndex={-1}>
+      {!days.length ? (
         <p className="completed-empty">Ticked items stay in their list. Press <b>Clean up</b> (in a list or the toolbar) to move them here, grouped by day.</p>
       ) : (
-        card.groups.map((g) => (
+        days.map((g) => (
           <section key={g.date} className="completed-day" aria-label={dayLabel(g.date)}>
             <h3 className="completed-date">{dayLabel(g.date)}</h3>
-            {g.entries.map((e) => (
-              <CompletedRow key={e.item.id} entry={e} cardId={card.id} />
+            {g.rows.map((r) => (
+              <CompletedRow key={`${r.checklist ? 'c' : 'b'}:${r.entry.item.id}`} row={r} readOnly={readOnly} onUntick={untick} />
             ))}
           </section>
         ))
@@ -60,43 +78,52 @@ export function CompletedPanel() {
   );
 }
 
-/** One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. */
-function CompletedRow({ entry, cardId }: { entry: CompletedEntry; cardId: string }) {
-  const readOnly = useViewOnly(); // nothing goes back on a read-only board (job 161)
-  const store = useBoardStore(); // the Checklist panel's record goes back to its own board
+/**
+ * One cleaned-up item: untick it to send it back to its list. Its sub-items are shown as they were. The Main
+ * checklist's rows are not Find matches here (Find on All boards finds them on that board).
+ */
+function CompletedRow({ row, readOnly, onUntick }: { row: CompletedRowData; readOnly: boolean; onUntick: (r: CompletedRowData) => void }) {
+  const { entry, cardId, checklist } = row;
+  const find = checklist ? null : cardId;
   return (
     <div className="completed-entry" data-entry-id={entry.item.id}>
       <div className="completed-row">
         <label className="tick">
           <input
             type="checkbox"
-            aria-label={`Send "${entry.item.text}" back to ${entry.fromTitle || 'its list'}`}
+            aria-label={`Send "${entry.item.text}" back to ${checklist ? 'Checklist' : entry.fromTitle || 'its list'}`}
             title="Untick to send it back to its list"
             checked
             disabled={readOnly}
-            onChange={() => store.restoreCompleted(entry.item.id)}
+            onChange={() => onUntick(row)}
           />
         </label>
-        <span className="completed-text" data-find={`done:${cardId}:${entry.item.id}`} style={styleCss(entry.item.style) as CSSProperties}>
-          <FindMarks find={`done:${cardId}:${entry.item.id}`} text={entry.item.text} />
-        </span>
-        <span className="completed-from">{entry.fromTitle || 'List'}</span>
+        <CompletedText item={entry.item} find={find} />
+        <span className="completed-from">{checklist ? 'Checklist' : entry.fromTitle || 'List'}</span>
       </div>
-      <CompletedChildren items={entry.item.children} depth={1} cardId={cardId} />
+      <CompletedChildren items={entry.item.children} depth={1} find={find} />
     </div>
   );
 }
 
-function CompletedChildren({ items, depth, cardId }: { items: TodoItem[]; depth: number; cardId: string }) {
+/** An item's text, as a Find match when `find` names the record it is in. */
+function CompletedText({ item, find }: { item: TodoItem; find: string | null }) {
+  const key = find && `done:${find}:${item.id}`;
+  return (
+    <span className="completed-text" data-find={key || undefined} style={styleCss(item.style) as CSSProperties}>
+      {key ? <FindMarks find={key} text={item.text} /> : item.text}
+    </span>
+  );
+}
+
+function CompletedChildren({ items, depth, find }: { items: TodoItem[]; depth: number; find: string | null }) {
   return items.map((it) => (
     <div key={it.id}>
       <div className={`completed-row sub${it.done ? ' done' : ''}`} style={{ paddingLeft: depth * ITEM_INDENT }}>
         <input type="checkbox" aria-label={it.text.trim() ? `Done: ${it.text.trim()}` : 'Done'} checked={it.done} disabled />
-        <span className="completed-text" data-find={`done:${cardId}:${it.id}`} style={styleCss(it.style) as CSSProperties}>
-          <FindMarks find={`done:${cardId}:${it.id}`} text={it.text} />
-        </span>
+        <CompletedText item={it} find={find} />
       </div>
-      <CompletedChildren items={it.children} depth={depth + 1} cardId={cardId} />
+      <CompletedChildren items={it.children} depth={depth + 1} find={find} />
     </div>
   ));
 }

@@ -57,16 +57,18 @@ export function useShortcuts() {
       // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
       const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && e.target.closest('.weight-new') !== null;
       if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new, .jn-rename')) return;
-      // In the Checklist panel on the left, its time picker, items selected there, or the Completed panel showing its
-      // record, they step the checklist's own history (owner request, 2026-11-12), leaving the open board as it is.
+      // In the Completed panel they step back through the panel's own unticks, each on the board it changed (owner,
+      // 2026-11-13: it mixes in the Main checklist's items), and with none left do nothing, never the open board's.
+      if (inPanel && panel === 'completed' && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoCompleted);
+      if (inPanel && panel === 'completed' && mod && key === 'y') return run(e, appStore.redoCompleted);
+      // In the Checklist panel on the left, its time picker or items selected there, they step the checklist's own history (owner request, 2026-11-12), leaving the open board as it is.
       const sel = appStore.getState().ui.itemSel;
       // Not while typing elsewhere or on the board: there the keys are that box's or the board's.
       const elsewhere = e.target instanceof Element && !e.target.closest('.checklist-panel') && (isTextField(e.target) || e.target.closest('[data-testid="canvas"]') !== null);
       const selInChecklist = !!sel && storeOfCard(sel.cardId) !== appStore && !inAnyPanelBut(e, '.checklist-panel') && !elsewhere;
       const inChecklist = (e.target instanceof Element && e.target.closest('.checklist-panel, [data-checklist-scope]') !== null) || selInChecklist;
-      const checklistsRecord = inPanel && panel === 'completed' && appStore.getState().ui.completedBoard !== null;
-      if ((inChecklist || checklistsRecord) && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoChecklist);
-      if ((inChecklist || checklistsRecord) && mod && key === 'y') return run(e, appStore.redoChecklist);
+      if (inChecklist && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoChecklist);
+      if (inChecklist && mod && key === 'y') return run(e, appStore.redoChecklist);
       const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
       if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
       if (inJournal && mod && key === 'y') return run(e, redo);

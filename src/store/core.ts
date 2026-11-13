@@ -112,6 +112,11 @@ export interface StoreContext {
   /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. `typing`: the item the cursor is in on the open board (see stepOpen; read from the page when left out, unused for other boards). */
   undoOn(id: string, which: 'undo' | 'redo', typing?: TypingAt): void;
   /**
+   * Board `id`'s undo history (open or not), or undefined when it has none. A new object after every change that can
+   * be undone, every undo and redo, and when the board comes from elsewhere; the same while the app only tidies blocks.
+   */
+  historyOf(id: string): History | undefined;
+  /**
    * A delete: `run` makes it, as one change on board `board` (the open one by default). When it changed
    * something, `text` is said aloud and shown with Undo. Returns whether it did.
    */
@@ -144,6 +149,7 @@ const BOARD_SWITCH_UI: Partial<Ui> = {
   focusBlock: null,
   colourMenuOpen: false,
   preview: null,
+  completedSteps: null,
 };
 
 /** The boards as one object, in a fixed order (so saving the same boards gives the same text). */
@@ -689,6 +695,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceWorkspace,
     commitTo,
     undoOn,
+    historyOf: (id) => (id === state.boards.open ? history : histories.get(id)),
     deleting,
     viewOnly: locked,
     scoped,

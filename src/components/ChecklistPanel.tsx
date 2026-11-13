@@ -7,7 +7,7 @@ import { checklistCardOf } from '../model/mainChecklist';
 import type { ItemDrag } from '../store/store';
 import { appStore, BoardScope, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
-import { ClipboardCheckIcon, CloseIcon, CompletedIcon } from './icons';
+import { ClipboardCheckIcon, CloseIcon } from './icons';
 import { escapeIsForChecklist } from './textField';
 import { TodoBody } from './TodoList';
 import { usePhone } from './usePhone';
@@ -36,7 +36,6 @@ export function ChecklistPanel() {
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, []);
-  const completedOpen = useAppState((s) => s.ui.sidePanel === 'completed' && !!id && s.ui.completedBoard === id);
   const phone = usePhone();
   const { done, total } = card ? doneCount(card.items) : { done: 0, total: 0 };
   return (
@@ -60,17 +59,6 @@ export function ChecklistPanel() {
             Clean up
           </button>
         )}
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Completed"
-          title="Items cleaned up from this checklist"
-          aria-pressed={completedOpen}
-          disabled={!id}
-          onClick={() => appStore.openChecklistCompleted(phone)}
-        >
-          <CompletedIcon />
-        </button>
         <button type="button" className="icon-button" aria-label="Close checklist" title="Close (Esc)" onClick={close}>
           <CloseIcon />
         </button>

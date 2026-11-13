@@ -88,7 +88,7 @@ function Overlay() {
   const hasKey = ai.hasKey(uid);
   const model = ai.getModel();
   const [labelsRev, setLabelsRev] = useState(0);
-  // The ranges Sort automatically has already run in this open: kept here, not in VizAiSort, so By board and back is not a second run.
+  // What Sort with AI has already run in this open (for each person, model and range): kept here, not in VizAiSort, so By board and back is not a second run.
   const autoTried = useRef(new Set<string>());
   // Labels someone else saved (before a sign-out or a change of person) are of no use here: drop them.
   useEffect(() => aiLabels.dropUnlessFor(uid), [uid]);
@@ -182,8 +182,10 @@ function Overlay() {
               texts={pending.texts}
               total={pending.total}
               loading={!sharesKnown}
+              hasKey={hasKey}
+              byCategory={group === 'category'}
               range={range}
-              tried={autoTried.current}
+              tried={autoTried}
               known={disc.wedges.filter((w) => w.key.startsWith('ai:')).map((w) => w.name)}
               onSorted={() => setLabelsRev((n) => n + 1)}
             />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { AI_MAX_PER_PRESS, autoSortDue } from '../model/aiCategories';
 import { ai, askClaude } from '../store/ai';
 import { aiLabels, sortWithAi } from '../store/aiLabels';
@@ -17,6 +17,7 @@ type Status =
   | { kind: 'stopped' }
   | { kind: 'error'; message: string };
 
+const NOT_SENT = 'no board names, lists or notes, and nothing from boards shared with you.';
 const items = (n: number) => `${n} finished ${n === 1 ? 'item' : 'items'}`;
 
 export function VizAiSort({
@@ -26,6 +27,8 @@ export function VizAiSort({
   total,
   loading,
   known,
+  hasKey,
+  byCategory,
   range,
   tried,
   onSorted,
@@ -40,22 +43,38 @@ export function VizAiSort({
   loading: boolean;
   /** The AI category names already on the disc. */
   known: string[];
-  /** The range showing: Sort automatically runs once per open for each. */
+  /** This person's key is saved, and By category shows (the Visualizer only shows this then; Sort automatically checks again). */
+  hasKey: boolean;
+  byCategory: boolean;
+  /** The range showing: Sort automatically runs once per open for each (and for each person and model). */
   range: string;
-  /** The ranges Sort automatically has already run in this open (the Visualizer keeps it, so it outlives By board and back). */
-  tried: Set<string>;
+  /** What has already run in this open, pressed or automatic (the Visualizer keeps it, so it outlives By board and back). */
+  tried: MutableRefObject<Set<string>>;
   /** After a press ends (done, stopped or failed): the disc picks up the labels saved. */
   onSorted: () => void;
 }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [auto, setAuto] = useState(readAutoSort);
   const stop = useRef<AbortController | null>(null);
-  // Closing the Visualizer stops a sort still running.
-  useEffect(() => () => stop.current?.abort(), []);
+  // What a run is counted under in `tried`: the person, the model and the range.
+  const runKey = `${uid ?? ''}\u0000${model}\u0000${range}`;
+  const runningKey = useRef<string | null>(null);
+  // Closing the Visualizer (or switching to By board) stops a sort still running. A run cut short that way does
+  // not count as run, so coming back to By category in the same open sorts again (a failure or a Cancel still counts).
+  useEffect(
+    () => () => {
+      if (runningKey.current) tried.current.delete(runningKey.current);
+      stop.current?.abort();
+    },
+    [tried],
+  );
 
   const start = async () => {
     const run = new AbortController();
     stop.current = run;
+    // A press counts too, so ticking Sort automatically afterwards does not send the same range again.
+    tried.current.add(runKey);
+    runningKey.current = runKey;
     const key = ai.getKey(uid);
     // Stopped as soon as the key or the model changes (forgotten here or in another tab, signed out, another model).
     const stillValid = () => ai.getKey(uid) === key && ai.getModel() === model;
@@ -73,6 +92,7 @@ export function VizAiSort({
       onProgress: (sorted) => setStatus({ kind: 'running', sorted, of: texts.length }),
     });
     off();
+    if (runningKey.current === runKey) runningKey.current = null;
     if (stop.current !== run) return;
     stop.current = null;
     setStatus(r.ok ? { kind: 'done', sorted: r.sorted } : r.kind === 'cancelled' ? { kind: 'stopped' } : { kind: 'error', message: r.message });
@@ -80,23 +100,25 @@ export function VizAiSort({
   };
 
   const running = status.kind === 'running';
-  // Sort automatically: the same start as a press. Started on the next tick, and the range marked tried only then,
-  // so React's development double run (mount, unmount, mount) neither stops it nor skips it.
+  // Sort automatically: the same start as a press. Started on the next tick (start marks it tried), so React's
+  // development double run (mount, unmount, mount) neither stops it nor skips it.
   useEffect(() => {
-    // byCategory: this only shows By category (the Visualizer decides).
-    if (!autoSortDue({ auto, hasKey: ai.hasKey(uid), byCategory: true, loading, running, total, range, tried })) return;
-    const t = setTimeout(() => {
-      tried.add(range);
-      void start();
-    });
+    if (!autoSortDue({ auto, hasKey, byCategory, loading, running, total, range: runKey, tried: tried.current })) return;
+    const t = setTimeout(() => void start());
     return () => clearTimeout(t);
-  });
+    // start is left out on purpose: it is a new function each render; these are what decide a run.
+  }, [auto, hasKey, byCategory, loading, running, total, runKey, tried]);
 
   const hint = loading
     ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
     : !total
       ? 'Nothing left to sort from your own boards. The labels stay on this device.'
-      : `${auto ? 'Sorts automatically when opened: sends' : 'Sends'} the text of ${items(texts.length)} from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
+      : !auto
+        ? `Sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: ${NOT_SENT}${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`
+        : !tried.current.has(runKey)
+          ? `Sorts automatically when opened: sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: ${NOT_SENT}${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press Sort with AI for the rest.` : ''}`
+          : // Already run in this range and open: it will not send again by itself until the next open, so say what a press does.
+            `Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: ${NOT_SENT} Press Sort with AI to send ${items(texts.length)} still waiting${total > texts.length ? ` (the first ${AI_MAX_PER_PRESS} of ${total})` : ''}.`;
 
   return (
     <div className="viz-ai">

@@ -22,15 +22,15 @@ function completedBoard(id: string, name: string, texts: string[]) {
 }
 
 /** A demo person whose boards on this device start as `boards` (set before the app first loads). */
-async function person(browser: Browser, name: string, boards: Record<string, unknown>, path = '/') {
+async function person(browser: Browser, name: string, boards: Record<string, unknown>, path = '/', auto = false) {
   const context = await browser.newContext();
   const uid = `demo-${name.toLowerCase()}`;
   await context.addInitScript(
-    ([k, v]) => {
+    ([k, v, a]) => {
       if (!localStorage.getItem(k)) localStorage.setItem(k, v);
-      localStorage.setItem('note-board:viz-ai-auto', '0'); // this test presses Sort with AI itself (Sort automatically goes through the same toSend)
+      localStorage.setItem('note-board:viz-ai-auto', a); // Sort automatically, on or off for this run
     },
-    [`${uid}:note-board:v1`, JSON.stringify({ version: 6, home: 'home', boards })] as const,
+    [`${uid}:note-board:v1`, JSON.stringify({ version: 6, home: 'home', boards }), auto ? '1' : '0'] as const,
   );
   const page = await context.newPage();
   const url = new URL(path, 'http://x');
@@ -42,7 +42,9 @@ async function person(browser: Browser, name: string, boards: Record<string, unk
 
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Visualizer' });
 
-test('Sort with AI never sends an item from a board shared with you, and that item keeps its built-in category', async ({ browser }) => {
+// Once pressed, and once with Sort automatically (job viz-ai-autosort), which sends without a press.
+for (const auto of [false, true])
+test(`${auto ? 'Sort automatically' : 'Sort with AI'} never sends an item from a board shared with you, and that item keeps its built-in category`, async ({ browser }) => {
   const t = tag();
   const alice = await person(browser, `Alice${t}`, { home: completedBoard('home', 'Home', []), [`trip${t}`]: completedBoard(`trip${t}`, 'Trip', [SHARED_TEXT]) });
   await alice.getByRole('button', { name: 'Boards', exact: true }).click();
@@ -53,7 +55,7 @@ test('Sort with AI never sends an item from a board shared with you, and that it
   await expect(share.getByLabel('Share link')).toHaveValue(/\?join=/);
   const link = (await share.getByLabel('Share link').inputValue()).replace(/^https?:\/\/[^/]+/, '');
 
-  const bob = await person(browser, `Bob${t}`, { home: completedBoard('home', 'Home', [OWN_TEXT]) }, link);
+  const bob = await person(browser, `Bob${t}`, { home: completedBoard('home', 'Home', [OWN_TEXT]) }, link, auto);
   await expect(bob.getByLabel('Board name')).toHaveValue('Trip');
 
   const bodies: string[] = [];
@@ -83,11 +85,12 @@ test('Sort with AI never sends an item from a board shared with you, and that it
   const canvas = dialog(bob).locator('canvas.viz-canvas');
   // Both items are on the disc; only Bob's own one would be sent, and the hint says so.
   await expect(canvas).toHaveAttribute('aria-label', /^2 items cleaned up/);
-  await expect(dialog(bob).getByText('Sends the text of 1 finished item from your own boards to Anthropic', { exact: false })).toBeVisible();
-  await expect(dialog(bob).getByText(/shared with you/)).toBeVisible();
-
-  await expect(canvas).toHaveAttribute('aria-label', '2 items cleaned up: Errands & shopping 1, Other 1.');
-  await dialog(bob).getByRole('button', { name: 'Sort with AI' }).click();
+  if (!auto) {
+    await expect(dialog(bob).getByText('Sends the text of 1 finished item from your own boards to Anthropic', { exact: false })).toBeVisible();
+    await expect(dialog(bob).getByText(/shared with you/)).toBeVisible();
+    await expect(canvas).toHaveAttribute('aria-label', '2 items cleaned up: Errands & shopping 1, Other 1.');
+    await dialog(bob).getByRole('button', { name: 'Sort with AI' }).click();
+  }
   // Bob's own item is in Camping; the shared one keeps its built-in category (Other), despite the saved label.
   await expect(canvas).toHaveAttribute('aria-label', '2 items cleaned up: Camping 1, Other 1.');
   expect(bodies).toHaveLength(1);

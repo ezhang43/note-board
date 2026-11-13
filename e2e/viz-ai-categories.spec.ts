@@ -155,8 +155,12 @@ test('Sort automatically is on by default and sorts as soon as the Visualizer op
   expect(bodies).toHaveLength(1);
   for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(bodies[0]).toContain(text);
   for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'secret note', 'SECRET']) expect(bodies[0]).not.toContain(never);
-  // The hint says it is automatic; "sand the door" got no label, so it is still waiting, and is not asked about again in this open.
-  await expect(dialog(page).getByText(/Sorts automatically when opened: sends the text of 1 finished item from your own boards to Anthropic with your key: no board names, lists or notes/)).toBeVisible();
+  // The hint says it is automatic; "sand the door" got no label, so it is still waiting for a press, and is not asked about again in this open.
+  await expect(
+    dialog(page).getByText(
+      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
+    ),
+  ).toBeVisible();
   await page.waitForTimeout(500);
   expect(bodies).toHaveLength(1);
 });
@@ -220,6 +224,39 @@ test('after a failure Sort automatically does not try again by itself in the sam
   // Another range is its own run.
   await dialog(page).getByRole('button', { name: '7 days' }).click();
   await expect.poll(() => bodies.length).toBe(2);
+});
+
+test('a press counts as the run for that range: ticking Sort automatically afterwards sends nothing more', async ({ page }) => {
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).check();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+});
+
+test('an automatic sort cut short by switching to By board runs again on coming back to By category', async ({ page }) => {
+  await autoDefault(page);
+  let answer: () => void = () => {};
+  const held = new Promise<void>((r) => (answer = r));
+  let asked = 0;
+  await page.route('https://api.anthropic.com/**', async (r: Route) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
+    asked++;
+    await held;
+    return r.fulfill({ status: 500, headers: cors, body: '{}' }).catch(() => {});
+  });
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
+  await dialog(page).getByRole('button', { name: 'By board' }).click();
+  await dialog(page).getByRole('button', { name: 'By category' }).click();
+  await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
+  await expect.poll(() => asked).toBe(2);
+  answer();
 });
 
 test('Cancel stops a sort that is still running', async ({ page }) => {

@@ -71,6 +71,12 @@ describe('doneItems: an entry with completed sub-items', () => {
     const got = run({ id: 'p', text: 'Clean the garage', done: true, children: [{ ...item('a'), children: [item('a1')] }] });
     expect(got.map((i) => [i.text, i.context])).toEqual([['a', ['Clean the garage']], ['a1', ['a', 'Clean the garage']], ['solo', []]]);
   });
+  it('an item that is just a time word ("Today", "daily") is never an item, but its completed sub-items are; "Daily stretch" still is', () => {
+    expect(run({ id: 'p', text: 'Today', done: true, children: [item('a'), { ...item('t'), text: 'Now', children: [item('a1')] }] }).map((i) => i.text)).toEqual(['a', 'a1', 'solo']);
+    expect(run({ id: 'p', text: 'Daily!', done: true, children: [] }).map((i) => i.text)).toEqual(['solo']);
+    expect(run({ id: 'p', text: 'Daily stretch', done: true, children: [] }).map((i) => i.text)).toEqual(['Daily stretch', 'solo']);
+    expect(run({ id: 'p', text: 'Buy milk', done: true, children: [{ ...item('t'), text: 'Soon' }] }).map((i) => i.text)).toEqual(['Buy milk', 'solo']);
+  });
   it('stays one item when no sub-item is done', () => {
     const got = run({ id: 'p', text: 'p', done: true, children: [{ ...item('a'), done: false }] });
     expect(got.map((i) => i.text)).toEqual(['p', 'solo']);
@@ -130,7 +136,7 @@ describe('ranges', () => {
     { day: '2026-10-14', lists: [['A', ['edge30']]] }, // 29 days before 2026-11-12
     { day: '2026-11-06', lists: [['A', ['edge7']]] }, // 6 days before
     { day: '2026-11-05', lists: [['A', ['just out']]] },
-    { day: '2026-11-12', lists: [['A', ['today']]] },
+    { day: '2026-11-12', lists: [['A', ['item-now']]] },
     { day: '2026-11-13', lists: [['A', ['clock ahead']]] },
   ]);
   const all = doneItems(ws({ home }));
@@ -143,8 +149,8 @@ describe('ranges', () => {
   });
 
   it('filters by the Completed day group, ends today, and All keeps everything', () => {
-    expect(inRange(all, '7', today).map((i) => i.text).sort()).toEqual(['edge7', 'today']);
-    expect(inRange(all, '30', today).map((i) => i.text).sort()).toEqual(['edge30', 'edge7', 'just out', 'today']);
+    expect(inRange(all, '7', today).map((i) => i.text).sort()).toEqual(['edge7', 'item-now']);
+    expect(inRange(all, '30', today).map((i) => i.text).sort()).toEqual(['edge30', 'edge7', 'item-now', 'just out']);
     expect(inRange(all, 'all', today)).toHaveLength(6);
   });
 

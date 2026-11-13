@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, parentCategory, parentFirst, categoryIndex, type CategoryId } from './categorize';
+import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, isTimeWord, parentCategory, parentFirst, categoryIndex, type CategoryId } from './categorize';
 
 // The Visualizer's categories (owner request, 2026-11-12): built-in word rules behind one function,
 // categoryOf(item, listTitle), so a later AI categorizer can stand in for it.
@@ -155,6 +155,20 @@ describe('categoryOf: a sub-item and its parents', () => {
     expect(parentCategory({ context: ['Today', 'Clean the garage'] })).toBe('home');
     expect(parentCategory({ context: ['Today'] })).toBeNull();
     expect(parentCategory({})).toBeNull();
+  });
+});
+
+describe('isTimeWord', () => {
+  it('is true for a whole text that is just a time word or phrase, ignoring case, spaces and trailing punctuation or emoji', () => {
+    for (const t of ['today', 'Today', ' TODAY ', 'Today:', 'now!', 'Right now', 'tonight 🌙', 'Daily.', 'tomorrow', 'this morning', 'Morning', 'This   week', 'weekly', 'this weekend', 'later', 'soon', 'ASAP', 'todo', 'To do', 'to-do', 'Monday', 'sunday', 'next week', 'this afternoon', 'evening', 'this evening', 'weekend', 'afternoon'])
+      expect(isTimeWord(t), t).toBe(true);
+  });
+  it('is false when there are more words or other words', () => {
+    for (const t of ["Today's groceries", 'Daily stretch', 'Call Sam today', 'Monday meeting', '', '   ', 'Gaming', 'next month'])
+      expect(isTimeWord(t), t).toBe(false);
+  });
+  it('such a parent gives no category', () => {
+    expect(parentCategory({ context: ['Weekend', 'Now'] })).toBeNull();
   });
 });
 

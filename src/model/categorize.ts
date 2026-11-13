@@ -54,9 +54,21 @@ function byWords(text: string): CategoryId {
  */
 export type Categorizer = (item: { text: string; /** The words of the items a sub-item sits under, nearest first. */ context?: string[]; /** The board it is on, where known (the Visualizer's items). */ boardId?: string }, listTitle: string) => CategoryId | { name: string };
 
+/** Time words and phrases (owner 2026-11-13): an item that is only one of these is never a Visualizer item, and as a parent it gives its sub-items no category. */
+const TIME_WORDS = new Set([
+  'today', 'tonight', 'now', 'right now', 'daily', 'tomorrow', 'this morning', 'morning', 'this afternoon', 'afternoon', 'this evening', 'evening',
+  'this week', 'weekly', 'this weekend', 'weekend', 'later', 'soon', 'asap', 'todo', 'to do', 'to-do', 'next week',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+]);
+
+/** True when the whole text (case, extra spaces and trailing punctuation or emoji ignored) is just a time word or phrase. "Daily stretch" is not. */
+export const isTimeWord = (text: string): boolean =>
+  TIME_WORDS.has(text.toLowerCase().replace(/[\s\p{P}\p{S}\p{Extended_Pictographic}‍️]+$/u, '').replace(/^\s+/, '').replace(/\s+/g, ' '));
+
 /** The category a sub-item takes from the items it sits under: the nearest one (`context` is nearest first) whose words give a real category, else null. A parent like "Today" or "Now" gives none. */
 export const parentCategory = (item: { context?: string[] }): CategoryId | null => {
   for (const text of item.context ?? []) {
+    if (isTimeWord(text)) continue;
     const c = byWords(text);
     if (c !== OTHER_CATEGORY) return c;
   }

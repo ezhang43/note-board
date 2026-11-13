@@ -1,7 +1,7 @@
 import { BEAM_ALPHA, BEAM_EXTRA, INNER, OUTER, PARTICLE_DELAY, FLARE_MAX, STRIKE, pulseAt, TILT, TRIP_MS, DROP_MS, TRACKS, beamPoint, beamStart, beamWidths, burstSize, cellArea, cellCentre, coreAt, fitLabel, flowTail, particleSeed, pillarLevel, project, warpPhase, wedgeSpan } from '../model/vizGeometry';
 import { playhead, type Wedge } from '../model/visualizer';
 import { NAME_H, NAME_MARGIN, fitDisc, placeNames } from '../model/vizNames';
-import { CARD_LIFE_MS, cardBox, cardLayout, cardRoom, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
+import { CARD_LIFE_MS, cardBox, CARD_LOOK, cardLayout, cardRoom, cardsAt, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from '../model/vizBurst';
 
 // Draws the Visualizer's ring on one canvas (owner request 2026-11-12; reshaped the same day to match the
 // look and motion of a video the owner sent). Nothing here touches React state or the board: it is handed
@@ -573,7 +573,7 @@ export function startDisc(o: DiscOptions): () => void {
     // The small cards by the core, for the items that just landed (none for reduced motion).
     if (!still) {
       const titlePx = rx > 200 ? 12 : rx > 150 ? 11 : 10; // the card follows the size of the stage, so on a phone it stays small beside the disc
-      const { scale: cs, slots: places } = cardLayout(core, rx, w, CARD_H); // bigger when the stage has room (up to 1.4x), back toward the first size when it has not; after a resize a live card may be in a place that no longer fits: it is skipped
+      const { scale: cs, slots: places } = cardLayout(core, rx, w, CARD_H); // bigger when the stage has room (up to 1.15x), back toward the first size when it has not; after a resize a live card may be in a place that no longer fits: it is skipped
       const tPx = titlePx * cs;
       const subPx = (titlePx - 2) * cs;
       const pad = CARD_PAD * cs;
@@ -586,7 +586,7 @@ export function startDisc(o: DiscOptions): () => void {
         let text = cardText.get(textKey);
         if (!text) {
           const room = cardRoom(card.slot, core, rx, w, cardH, maxW) - pad * 2; // the place's own room, so the text is cut to fit it
-          ctx.font = `600 ${tPx}px ${SANS}`;
+          ctx.font = `${CARD_LOOK.titleWeight} ${tPx}px ${SANS}`;
           const title = fitLabel(lines[0], room, (t) => ctx.measureText(t).width);
           const titleW = ctx.measureText(title).width;
           ctx.font = `400 ${subPx}px ${SANS}`;
@@ -597,13 +597,13 @@ export function startDisc(o: DiscOptions): () => void {
         const box = cardBox(card.slot, core, rx, w, text.width, cardH, card.rise, maxW);
         ctx.globalAlpha = card.alpha;
         // A soft green glow round the card (owner, 2026-11-13, "glow brighter"): the cached glow sprite stamped along the card, behind it, so it fades with the card and costs no shadowBlur.
-        const gr = box.h * 1.1;
+        const gr = box.h * CARD_LOOK.glowReach;
         const gy = box.y + box.h / 2;
-        const gAlpha = 0.45 * card.alpha;
+        const gAlpha = CARD_LOOK.glowAlpha * card.alpha;
         for (const gx of [box.x + box.h * 0.4, box.x + box.w / 2, box.x + box.w - box.h * 0.4]) stamp(ctx, palette.lead, gx, gy, gr, gAlpha);
         ctx.globalAlpha = card.alpha;
-        ctx.fillStyle = 'rgba(10, 6, 28, 0.92)';
-        ctx.strokeStyle = rgba(palette.lead, 1);
+        ctx.fillStyle = `rgba(10, 6, 28, ${CARD_LOOK.fillAlpha})`;
+        ctx.strokeStyle = rgba(palette.lead, CARD_LOOK.borderAlpha);
         ctx.lineWidth = 1.25;
         ctx.beginPath();
         ctx.roundRect(box.x, box.y, box.w, box.h, 9 * cs);
@@ -612,7 +612,7 @@ export function startDisc(o: DiscOptions): () => void {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = palette.spark;
-        ctx.font = `600 ${tPx}px ${SANS}`;
+        ctx.font = `${CARD_LOOK.titleWeight} ${tPx}px ${SANS}`;
         ctx.fillText(text.title, box.x + pad, box.y + 15 * cs);
         ctx.fillStyle = rgba(palette.label, 1);
         ctx.font = `400 ${subPx}px ${SANS}`;

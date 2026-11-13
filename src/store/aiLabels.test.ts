@@ -3,7 +3,8 @@ import { CANCELLED, type AiResult } from "../model/ai";
 import { AI_BATCH, AI_LABELS_NAME, LABELS_SCHEMA, labelKey, toSend } from "../model/aiCategories";
 import { AI_STORAGE_KEYS, createAiStore } from "./ai";
 import type { AskArgs } from "./ai";
-import { LABELS_MAX, SAVE_FAILED, createLabelCache, sortWithAi } from "./aiLabels";
+import { BOARD_KEY } from "../model/persist";
+import { BOARDS_ROOM, LABELS_MAX, NO_ROOM, SAVE_FAILED, createLabelCache, sortWithAi } from "./aiLabels";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave are kept on this device only, keyed by a
 // hash of the item text and the model, so the same items are not asked about again.
@@ -29,7 +30,7 @@ describe("the label cache", () => {
   it("gives back a label for the same text and model, and nothing for another model", () => {
     const device = memory();
     const cache = createLabelCache(device);
-    expect(cache.putAll([["Buy milk", "Errands"]], M, "u1")).toBe(true);
+    expect(cache.putAll([["Buy milk", "Errands"]], M, "u1")).toBe("saved");
     expect(cache.get("Buy milk", M, "u1")).toBe("Errands");
     expect(cache.get("  Buy  milk ", M, "u1")).toBe("Errands");
     expect(cache.get("Buy milk", "claude-opus-5-5", "u1")).toBeNull();
@@ -104,7 +105,7 @@ describe("the label cache", () => {
 
   it("never crashes on blocked storage", () => {
     const cache = createLabelCache(blocked());
-    expect(cache.putAll([["a", "b"]], M, null)).toBe(false);
+    expect(cache.putAll([["a", "b"]], M, null)).toBe("cant-save");
     expect(cache.get("a", M, null)).toBeNull();
     expect(() => cache.clear()).not.toThrow();
   });
@@ -157,10 +158,10 @@ describe("whether Sort automatically may send (job viz-ai-autosort, owner 2026-1
       },
     };
     const cache = createLabelCache(device);
-    expect(cache.putAll([["a", "A"]], M, "u1")).toBe(false);
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe("cant-save");
     expect(cache.room(1, "u1")).toBe("cant-save");
     full = false;
-    expect(cache.putAll([["a", "A"]], M, "u1")).toBe(true);
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe("saved");
     expect(cache.room(1, "u1")).toBe("ok");
     // Clearing the labels (a change of person) frees their room too.
     full = true;
@@ -168,6 +169,51 @@ describe("whether Sort automatically may send (job viz-ai-autosort, owner 2026-1
     full = false;
     cache.clear();
     expect(cache.room(1, "u1")).toBe("ok");
+  });
+
+  it("a clear that storage refused does not free the room", () => {
+    const m = memory();
+    const device = { ...m, setItem: (k: string, v: string) => { if (k === AI_LABELS_NAME) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); }, removeItem: () => { throw new Error("blocked"); } };
+    const cache = createLabelCache(device);
+    cache.putAll([["a", "A"]], M, "u1");
+    cache.clear();
+    expect(cache.room(1, "u1")).toBe("cant-save");
+  });
+
+  it("never uses the room the boards need: it keeps BOARDS_ROOM free, or twice the boards' saved size if that is more", () => {
+    // Storage that holds `cap` letters in all, as a browser's does.
+    const limited = (cap: number) => {
+      const m = memory();
+      const used = () => Object.values(m.data).reduce((n, v) => n + v.length, 0);
+      return { ...m, setItem: (k: string, v: string) => { if (used() - (m.data[k]?.length ?? 0) + v.length > cap) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); } };
+    };
+    const small = limited(10_000 + BOARDS_ROOM + 500);
+    small.data[BOARD_KEY] = "b".repeat(10_000);
+    // Ten labels would fit, but would leave less than BOARDS_ROOM free.
+    expect(createLabelCache(small).room(10, "u1")).toBe("cant-save");
+    expect(createLabelCache(small).room(1, "u1")).toBe("ok");
+    // Big boards: twice their size is kept, which is more than BOARDS_ROOM.
+    const big = limited(600_000 + BOARDS_ROOM + 100_000);
+    big.data[BOARD_KEY] = "b".repeat(600_000);
+    expect(createLabelCache(big).room(1, "u1")).toBe("cant-save");
+    // A press does not write them either, and says so; the boards are as they were.
+    const cache = createLabelCache(big);
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe("no-room");
+    expect(big.data[AI_LABELS_NAME]).toBeUndefined();
+    expect(big.data[BOARD_KEY]).toHaveLength(600_000);
+    expect(Object.keys(big.data)).toEqual([BOARD_KEY]);
+  });
+
+  it("a press that would leave the boards too little room stops with a plain message, sending no more", async () => {
+    const m = memory();
+    const device = { ...m, setItem: (k: string, v: string) => { if (v.length >= BOARDS_ROOM) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); } };
+    let n = 0;
+    const many = Array.from({ length: AI_BATCH * 3 }, (_, i) => ({ text: `item ${i}` }));
+    const ask = async (a: AskArgs): Promise<AiResult> => (n++, { ok: true, value: { categories: ["Stuff"], labels: texts(a).map((_, i) => ({ i, c: 0 })) } });
+    const r = await sortWithAi({ ask, cache: createLabelCache(device), uid: null, model: M, entries: many, known: [], onProgress: () => {} });
+    expect(r).toEqual({ ok: false, kind: "labels-not-saved", message: NO_ROOM });
+    expect(NO_ROOM).toBe("Not saved: the sorted labels would use the space this device keeps for your boards. Free some space, then try again.");
+    expect(n).toBe(1);
   });
 
   it("not when saving would push out labels kept already (LABELS_MAX)", () => {
@@ -312,11 +358,13 @@ describe("sortWithAi", () => {
   });
 
   it("stops after the first batch it cannot save, with a plain message, so no more are sent and billed", async () => {
-    const device = { ...memory(), setItem: () => { throw new DOMException("full", "QuotaExceededError"); } };
+    // The room test passes, but the labels themselves are refused.
+    const m = memory();
+    const device = { ...m, setItem: (k: string, v: string) => { if (k === AI_LABELS_NAME) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); } };
     let n = 0;
     const many = Array.from({ length: AI_BATCH * 3 }, (_, i) => ({ text: `item ${i}` }));
     const r = await sortWithAi({ ask: async (a) => (n++, reply(a)), cache: createLabelCache(device), uid: null, model: M, entries: many, known: [], onProgress: () => {} });
-    expect(r).toEqual({ ok: false, kind: "storage", message: SAVE_FAILED });
+    expect(r).toEqual({ ok: false, kind: "labels-not-saved", message: SAVE_FAILED });
     expect(SAVE_FAILED).toBe("Can't save sorted labels on this device.");
     expect(n).toBe(1);
   });

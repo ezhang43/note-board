@@ -112,8 +112,21 @@ export function toSend(items: AiItem[], labeled: (entry: AiEntry) => boolean, is
  * button stays for a second try and for the rest past AI_MAX_PER_PRESS. (The caller also checks the labels can
  * be kept: LabelCache.room.)
  */
-export function autoSortDue(s: { auto: boolean; loading: boolean; running: boolean; total: number; run: string; tried: ReadonlySet<string> }): boolean {
-  return s.auto && !s.loading && !s.running && s.total > 0 && !s.tried.has(s.run);
+export function autoSortDue(s: {
+  auto: boolean;
+  loading: boolean;
+  running: boolean;
+  total: number;
+  run: string;
+  tried: ReadonlySet<string>;
+  /** Already paused for this run (the hint says why): not checked again while that shows. */
+  paused: boolean;
+  /** Whether the labels it brings back can be kept (aiLabels.room); asked last, since it is a test write. */
+  room: () => 'ok' | 'full' | 'cant-save';
+}): 'no' | 'send' | 'full' | 'cant-save' {
+  if (!s.auto || s.loading || s.running || s.total <= 0 || s.tried.has(s.run) || s.paused) return 'no';
+  const room = s.room();
+  return room === 'ok' ? 'send' : room;
 }
 
 export const LABELS_SCHEMA: AiSchema = {

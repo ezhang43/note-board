@@ -304,13 +304,32 @@ test('where the labels cannot be saved, Sort automatically sends nothing and say
   await page.waitForTimeout(500);
   expect(bodies).toEqual([]);
   await sortButton(page).click();
-  await expect(dialog(page).getByRole('alert')).toHaveText("Can't save sorted labels on this device.");
+  // Too full to keep the labels and still leave the boards their room: nothing written, and it says so.
+  await expect(dialog(page).getByRole('alert')).toHaveText('Not saved: the sorted labels would use the space this device keeps for your boards. Free some space, then try again.');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:ai-categories'))).toBeNull();
   expect(bodies).toHaveLength(1);
   // Room again: a press saves, and the paused line goes.
   await page.evaluate(() => ((window as unknown as { full: boolean }).full = false));
   await sortButton(page).click();
   await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
   await expect(paused).toHaveCount(0);
+});
+
+test('when AI uses cannot be counted, the counter says so and Sort automatically is not shown as paused for the labels', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await page.evaluate(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (k === 'note-board:ai-uses') throw new DOMException('full', 'QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText("won't let Note Board count AI uses");
+  await expect(dialog(page).getByText(/Sort automatically is paused/)).toHaveCount(0);
+  expect(bodies).toEqual([]);
 });
 
 test('with the labels kept on this device full, Sort automatically pauses instead of pushing older ones out', async ({ page }) => {

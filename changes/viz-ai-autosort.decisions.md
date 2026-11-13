@@ -16,3 +16,24 @@
 - 2026-11-13 (owner answer, job "viz-ai-autosort"). A parent whose text is empty once tidied is skipped like a time word, so the next one up is sent. A sub-item already labeled under such a parent with a named one above it is asked about once more, with that parent.
 - 2026-11-13 (owner answer, job "viz-ai-autosort"). A saved value that is neither a label nor "no label" (changed on this device) counts as not asked, so it is asked again, as before "no label" was saved.
 - 2026-11-13 (owner answer, job "viz-ai-autosort"). `docs/play-store/data-safety.md` now says the text is sent when an AI button is pressed or when the Visualizer sorts by itself, with a sub-item's parent text. The recommended Play Console ticks stay the same; the owner re-checks the Play Console form against it.
+
+## The boards keep their room in storage (2026-11-13, coordinator re-review of PR #300)
+
+The sorted labels and the saved boards share the space the browser gives the app, so filling it with labels could
+make a board save fail. Decision: no sort, pressed or automatic, writes labels unless at least 1,000,000 letters
+stay free, or twice what the boards take now if that is more (`BOARDS_ROOM`), checked by writing and removing a
+test of that size. 1,000,000 is about a fifth of a usual 5 MB allowance and far more than a typical board save;
+twice the boards' size covers a board save rewriting the whole save and growing. A press that would use that room
+writes nothing and says so in plain words; an automatic run pauses, as it already did when it could not save.
+
+## Only an unsaved label pauses Sort automatically (2026-11-13, coordinator re-review of PR #300)
+
+Labels that cannot be saved come back as their own kind of failure (`labels-not-saved`), so the AI-use counter's
+storage failure, which has its own message, no longer shows as "Can't save sorted labels on this device" and no
+longer pauses Sort automatically.
+
+## Whether an automatic run may send is decided in one place (2026-11-13, coordinator re-review of PR #300)
+
+`autoSortDue` now takes the label store's answer (`room`) and whether this run is already paused, and answers
+"no", "send", "full" or "cant-save". The Visualizer row only shows what it says, so the rule is in the pure model
+layer where unit tests reach it (CLAUDE.md: no rules logic in components).

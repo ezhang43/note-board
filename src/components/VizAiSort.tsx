@@ -62,6 +62,9 @@ export function VizAiSort({
   const [paused, setPaused] = useState<{ run: string; why: keyof typeof PAUSED } | null>(null);
   // The sort running, and whether Sort automatically started it (then unticking the box stops it, as Cancel does).
   const stop = useRef<{ run: AbortController; auto: boolean } | null>(null);
+  // What a press sends now: Sort automatically starts on a later tick, so it reads this rather than an older list.
+  const now = useRef(entries);
+  now.current = entries;
   // What a run is counted under in `tried`: the person, the model and the range.
   const runKey = `${uid ?? ''}\u0000${model}\u0000${range}`;
   // Closing the Visualizer (or switching to By board) stops a sort still running. It still counts as run (marked
@@ -69,6 +72,7 @@ export function VizAiSort({
   useEffect(() => () => stop.current?.run.abort(), []);
 
   const start = async (byItself: boolean) => {
+    const entries = now.current;
     const run = new AbortController();
     stop.current = { run, auto: byItself };
     // A press counts too, so ticking Sort automatically afterwards does not send the same range again.
@@ -92,8 +96,9 @@ export function VizAiSort({
     off();
     if (stop.current?.run !== run) return;
     stop.current = null;
-    // A save that failed pauses Sort automatically; one that worked (a press, after room was made) ends the pause.
-    setPaused((p) => (!r.ok && r.kind === 'storage' ? { run: runKey, why: 'cant-save' } : r.ok ? null : p));
+    // Labels that could not be saved pause Sort automatically; a sort that saved them (a press, after room was
+    // made) ends the pause. Any other failure (the AI-use counter's own, say) shows its message and changes neither.
+    setPaused((p) => (!r.ok && r.kind === 'labels-not-saved' ? { run: runKey, why: 'cant-save' } : r.ok ? null : p));
     setStatus(r.ok ? { kind: 'done', sorted: r.sorted } : r.kind === 'cancelled' ? { kind: 'stopped' } : { kind: 'error', message: r.message });
     onSorted();
   };
@@ -105,16 +110,16 @@ export function VizAiSort({
   // once while this row shows, not again on every change to the items.
   const pausedHere = paused?.run === runKey;
   useEffect(() => {
-    if (pausedHere || !autoSortDue({ auto, loading, running, total, run: runKey, tried: tried.current })) return;
     const t = setTimeout(() => {
-      const room = aiLabels.room(entries.length, uid);
-      if (room !== 'ok') return setPaused({ run: runKey, why: room });
+      const due = autoSortDue({ auto, loading, running, total, run: runKey, tried: tried.current, paused: pausedHere, room: () => aiLabels.room(now.current.length, uid) });
+      if (due === 'no') return;
+      if (due !== 'send') return setPaused({ run: runKey, why: due });
       setPaused(null);
       void start(true);
     });
     return () => clearTimeout(t);
-    // start and entries are left out on purpose: new each render; these are what decide a run.
-  }, [auto, loading, running, total, runKey, tried, pausedHere]);
+    // start is left out on purpose (new each render) and reads the current entries itself; these decide a run.
+  }, [auto, loading, running, total, runKey, tried, pausedHere, uid]);
 
   // Said only when a sub-item is among what goes, so the hint stays exact.
   const withParent = entries.some((e) => e.parent !== undefined) ? WITH_PARENT : '';

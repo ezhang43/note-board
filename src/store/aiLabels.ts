@@ -11,6 +11,7 @@ import {
   labelKey,
   readLabels,
 } from "../model/aiCategories";
+import { BOARD_KEY } from "../model/persist";
 import type { AskArgs } from "./ai";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave, kept in this browser's localStorage
@@ -28,7 +29,18 @@ export const LABELS_MAX = 2000;
 /** What a sort says when a batch's labels could not be saved; it stops there, so no more are sent and billed. */
 export const SAVE_FAILED = "Can't save sorted labels on this device.";
 
-/** Where `room` writes a test the size of the labels to come, and removes it at once. */
+/** What a sort says when saving a batch's labels would leave the boards too little room (see BOARDS_ROOM); it stops there. */
+export const NO_ROOM = "Not saved: the sorted labels would use the space this device keeps for your boards. Free some space, then try again.";
+
+/**
+ * Letters of storage always left free for the boards, which share this device's storage with the labels: this
+ * many, or twice what the boards take now if that is more (job viz-ai-autosort, coordinator 2026-11-13). Twice,
+ * because a board save writes the whole save again and the boards can grow; 1,000,000 is about a fifth of what a
+ * browser gives a site, and far more than a typical board save.
+ */
+export const BOARDS_ROOM = 1_000_000;
+
+/** Where a test write (the labels to come plus the boards' room) goes; removed at once. */
 const PROBE_NAME = `${AI_LABELS_NAME}:room`;
 /** Letters one saved label takes, at most: its key and the JSON around it (about 16), and the name (24 letters, up to 96 storage characters for emoji and escaped quotes). */
 // simple: a fixed worst case rather than the real size, which is only known once Claude answers. If a save still
@@ -41,6 +53,28 @@ type Saved = { v: 1; owner: string; entries: Record<string, string> };
 export function createLabelCache(device: Place) {
   /** A save failed in this page (storage full or blocked): Sort automatically waits until one works again (a press) or the labels are cleared. */
   let failed = false;
+  /**
+   * Whether `letters` more can be written and still leave the boards their room: a test write that size, removed
+   * at once (storage does not say how much is free).
+   */
+  // simple: each check writes and removes a few MB (once per open and once per saved batch); fine at the sizes
+  // kept here. Upgrade if it shows up as slow on phones.
+  const fits = (letters: number): boolean => {
+    if (!device) return false;
+    try {
+      const boards = device.getItem(BOARD_KEY)?.length ?? 0;
+      device.setItem(PROBE_NAME, "x".repeat(Math.max(0, letters) + Math.max(BOARDS_ROOM, 2 * boards)));
+      return true;
+    } catch {
+      return false;
+    } finally {
+      try {
+        device.removeItem(PROBE_NAME);
+      } catch {
+        // Blocked: nothing was written (or, if storage was blocked between the two calls, the test stays, unread).
+      }
+    }
+  };
   const load = (owner: string | null): Record<string, string> => {
     try {
       const s = JSON.parse(device?.getItem(AI_LABELS_NAME) ?? "null") as Partial<Saved> | null;
@@ -75,26 +109,15 @@ export function createLabelCache(device: Place) {
     asked: (model: string, owner: string | null) => store.view(model, owner).asked,
     /**
      * Whether Sort automatically may send `count` more items for `owner` (job viz-ai-autosort, owner 2026-11-13):
-     * "cant-save" when their labels could not be saved (no storage, blocked, or too full for a test write their
-     * size, or a save already failed in this page), so the same items would be sent and billed again on every
+     * "cant-save" when their labels could not be saved (no storage, blocked, too full to keep them and still leave
+     * the boards their room (BOARDS_ROOM), or a save already failed in this page), so the same items would be sent and billed again on every
      * open; "full" when saving them would push out labels kept already (LABELS_MAX), which would then be sent
      * again. A press does not ask.
      */
     room(count: number, owner: string | null): "ok" | "full" | "cant-save" {
       if (failed || !device) return "cant-save";
       if (Object.keys(load(owner)).length + count > LABELS_MAX) return "full";
-      try {
-        device.setItem(PROBE_NAME, "x".repeat(count * LETTERS_PER_LABEL));
-        return "ok";
-      } catch {
-        return "cant-save";
-      } finally {
-        try {
-          device.removeItem(PROBE_NAME);
-        } catch {
-          // Blocked: nothing was written (or, if storage was blocked between the two calls, the test stays, unread).
-        }
-      }
+      return fits(count * LETTERS_PER_LABEL) ? "ok" : "cant-save";
     },
     /** Removes labels saved by anyone but `owner` (after a sign-out or a change of person), or damaged ones. */
     dropUnlessFor(owner: string | null) {
@@ -109,8 +132,11 @@ export function createLabelCache(device: Place) {
       }
       if (!mine) store.clear();
     },
-    /** Saves labels for texts (each with its parent, for a sub-item); anyone else's labels are replaced. False when storage said no. */
-    putAll(pairs: [text: string, label: string, parent?: string][], model: string, owner: string | null): boolean {
+    /**
+     * Saves labels for texts (each with its parent, for a sub-item); anyone else's labels are replaced. "no-room"
+     * (nothing written) when they would leave the boards less than their room; "cant-save" when storage said no.
+     */
+    putAll(pairs: [text: string, label: string, parent?: string][], model: string, owner: string | null): "saved" | "no-room" | "cant-save" {
       const entries = { ...load(owner) };
       for (const [text, label, parent] of pairs) {
         const k = labelKey(text, model, parent);
@@ -119,14 +145,19 @@ export function createLabelCache(device: Place) {
       }
       const keys = Object.keys(entries);
       for (const k of keys.slice(0, Math.max(0, keys.length - LABELS_MAX))) delete entries[k];
+      const json = JSON.stringify({ v: 1, owner: owner ?? "", entries } satisfies Saved);
       try {
         if (!device) throw new Error("no storage");
-        device.setItem(AI_LABELS_NAME, JSON.stringify({ v: 1, owner: owner ?? "", entries } satisfies Saved));
+        if (!fits(json.length - (device.getItem(AI_LABELS_NAME)?.length ?? 0))) {
+          failed = true;
+          return "no-room";
+        }
+        device.setItem(AI_LABELS_NAME, json);
         failed = false;
-        return true;
+        return "saved";
       } catch {
         failed = true;
-        return false;
+        return "cant-save";
       }
     },
     size: () => {
@@ -138,9 +169,9 @@ export function createLabelCache(device: Place) {
       }
     },
     clear() {
-      failed = false; // their room is free again
       try {
         device?.removeItem(AI_LABELS_NAME);
+        failed = false; // their room is free again (only once they are really gone)
       } catch {
         // Blocked storage: nothing kept.
       }
@@ -222,8 +253,10 @@ export async function sortWithAi({
       if (!same && names.length < AI_MAX_CATEGORIES) names.push(l);
       pairs.push([batch[i].text, same ?? l, batch[i].parent]);
     });
-    // Not saved (storage full or blocked): stop, so the rest are not sent and billed for labels that would be lost.
-    if (!cache.putAll(pairs, model, uid)) return fail("storage", SAVE_FAILED);
+    // Not saved (storage full or blocked, or it would use the boards' room): stop, so the rest are not sent and
+    // billed for labels that would be lost.
+    const saved = cache.putAll(pairs, model, uid);
+    if (saved !== "saved") return fail("labels-not-saved", saved === "no-room" ? NO_ROOM : SAVE_FAILED);
     sorted += pairs.filter((p) => p[1] !== NO_LABEL).length;
     asked += batch.length;
     onProgress(asked);

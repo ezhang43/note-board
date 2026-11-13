@@ -9,3 +9,5 @@
 - **Never paid for twice.** If this device can't save the sorted labels (storage blocked or full), Sort automatically sends nothing and says "Can't save sorted labels on this device, so Sort automatically is paused." Pressing Sort with AI still works, and any sort stops at the first batch it can't save. Once 2,000 labels are kept, Sort automatically pauses instead of dropping older ones (which would then be sent again).
 - Switching to By board while a sort runs, and back, no longer sends that batch again. Unticking Sort automatically stops a sort it started, like Cancel.
 - The Play Store data-safety notes now say the Visualizer can send item texts by itself, with a sub-item's parent text.
+- Sort with AI now leaves room for your boards: the labels and the boards share the space this browser gives the app, so a sort never writes labels that would eat into it. If they would, nothing is written and it says "Not saved: the sorted labels would use the space this device keeps for your boards."
+- Only a label that could not be saved pauses Sort automatically. Another kind of problem (the monthly AI-use count failing to save, say) shows its own message, as before.

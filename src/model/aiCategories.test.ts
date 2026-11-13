@@ -247,32 +247,43 @@ describe('the disc with AI labels', () => {
 });
 
 describe('autoSortDue (Sort automatically, owner request 2026-11-13)', () => {
-  const base = { auto: true, loading: false, running: false, total: 3, run: '30', tried: new Set<string>() };
+  const base = { auto: true, loading: false, running: false, total: 3, run: '30', tried: new Set<string>(), paused: false, room: () => 'ok' as const };
 
   it('runs on its own with the box on and items with no label yet', () => {
-    expect(autoSortDue(base)).toBe(true);
+    expect(autoSortDue(base)).toBe('send');
   });
 
   it('does not run with the box off, or with nothing left to sort', () => {
-    expect(autoSortDue({ ...base, auto: false })).toBe(false);
-    expect(autoSortDue({ ...base, total: 0 })).toBe(false);
+    expect(autoSortDue({ ...base, auto: false })).toBe('no');
+    expect(autoSortDue({ ...base, total: 0 })).toBe('no');
   });
 
   it('waits while the shares load or while a sort is running', () => {
-    expect(autoSortDue({ ...base, loading: true })).toBe(false);
-    expect(autoSortDue({ ...base, running: true })).toBe(false);
+    expect(autoSortDue({ ...base, loading: true })).toBe('no');
+    expect(autoSortDue({ ...base, running: true })).toBe('no');
   });
 
   it('runs at most once per open per range, so a failure is never retried by itself', () => {
     const tried = new Set<string>();
     const at = (run: string) => ({ ...base, run, tried });
-    expect(autoSortDue(at('30'))).toBe(true);
+    expect(autoSortDue(at('30'))).toBe('send');
     tried.add('30'); // the run starts (and then fails, or is stopped)
-    expect(autoSortDue(at('30'))).toBe(false); // the error shows; no second request
-    expect(autoSortDue({ ...at('30'), total: 120 })).toBe(false); // more waiting after a run: the button is for those
-    expect(autoSortDue(at('7'))).toBe(true); // another range is its own run
+    expect(autoSortDue(at('30'))).toBe('no'); // the error shows; no second request
+    expect(autoSortDue({ ...at('30'), total: 120 })).toBe('no'); // more waiting after a run: the button is for those
+    expect(autoSortDue(at('7'))).toBe('send'); // another range is its own run
     tried.add('7');
-    expect(autoSortDue(at('7'))).toBe(false);
-    expect(autoSortDue({ ...at('30'), tried: new Set() })).toBe(true); // the next open starts afresh
+    expect(autoSortDue(at('7'))).toBe('no');
+    expect(autoSortDue({ ...at('30'), tried: new Set() })).toBe('send'); // the next open starts afresh
+  });
+
+  it('sends only when the labels can be kept (job viz-ai-autosort): otherwise says why it pauses, once per range', () => {
+    expect(autoSortDue({ ...base, room: () => 'full' })).toBe('full');
+    expect(autoSortDue({ ...base, room: () => 'cant-save' })).toBe('cant-save');
+    // Already paused for this range: not checked again (each check is a test write).
+    let checked = 0;
+    const room = () => (checked++, 'ok' as const);
+    expect(autoSortDue({ ...base, paused: true, room })).toBe('no');
+    expect(autoSortDue({ ...base, auto: false, room })).toBe('no');
+    expect(checked).toBe(0);
   });
 });

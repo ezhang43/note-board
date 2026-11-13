@@ -4,7 +4,8 @@ import { ai, askClaude } from '../store/ai';
 import { aiLabels, sortWithAi } from '../store/aiLabels';
 
 // "Sort with AI" in the Visualizer (owner request, 2026-11-13): shown only while a key is saved (the
-// Visualizer decides). Nothing is sent until the button is pressed. The hint says exactly what goes.
+// Visualizer decides). Nothing is sent until the button is pressed. The hint says exactly what goes: only items
+// from the person's own boards, never from a board shared with them (owner, 2026-11-13; see toSend).
 
 type Status =
   | { kind: 'idle' }
@@ -20,6 +21,7 @@ export function VizAiSort({
   model,
   texts,
   total,
+  loading,
   known,
   onSorted,
 }: {
@@ -29,6 +31,8 @@ export function VizAiSort({
   texts: string[];
   /** How many still need a label, before the per-press cut. */
   total: number;
+  /** The shares are not known yet, so no board counts as own and nothing can be sent. */
+  loading: boolean;
   /** The AI category names already on the disc. */
   known: string[];
   /** After a press ends (done, stopped or failed): the disc picks up the labels saved. */
@@ -66,9 +70,11 @@ export function VizAiSort({
   };
 
   const running = status.kind === 'running';
-  const hint = !total
-    ? 'Every item here is sorted. The labels stay on this device.'
-    : `Sends the text of ${items(texts.length)} to Anthropic with your key: no board names, lists or notes.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
+  const hint = loading
+    ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
+    : !total
+      ? 'Every item from your own boards is sorted. The labels stay on this device.'
+      : `Sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
 
   return (
     <div className="viz-ai">
@@ -78,7 +84,7 @@ export function VizAiSort({
             Cancel
           </button>
         ) : (
-          <button type="button" className="viz-ai-button" disabled={!total} onClick={start}>
+          <button type="button" className="viz-ai-button" disabled={!total || loading} onClick={start}>
             Sort with AI
           </button>
         )}

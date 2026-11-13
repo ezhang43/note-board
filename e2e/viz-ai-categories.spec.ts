@@ -94,7 +94,7 @@ test('sorting sends only the item texts, changes the categories, and a reload re
   const bodies = await anthropic(page);
   await saveKey(page);
   await openVisualizer(page);
-  await expect(dialog(page).getByText(/Sends the text of 4 finished items to Anthropic/)).toBeVisible();
+  await expect(dialog(page).getByText(/Sends the text of 4 finished items from your own boards to Anthropic/)).toBeVisible();
   expect(bodies).toEqual([]);
 
   await sortButton(page).click();
@@ -106,7 +106,7 @@ test('sorting sends only the item texts, changes the categories, and a reload re
   for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'home_0', 'b2_', 'secret note']) expect(sent).not.toContain(never);
   expect(sent).not.toContain('SECRET');
   // The one item with no label is the only one left to send.
-  await expect(dialog(page).getByText(/Sends the text of 1 finished item to Anthropic/)).toBeVisible();
+  await expect(dialog(page).getByText(/Sends the text of 1 finished item from your own boards to Anthropic/)).toBeVisible();
 
   await page.reload();
   await fontsLoaded(page);

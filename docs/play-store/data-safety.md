@@ -1,6 +1,6 @@
 # Play Console: Data safety form (draft answers)
 
-Worked out from the code and `SPEC.md` on 2026-10-16. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
+Worked out from the code and `SPEC.md` on 2026-10-16; the AI part (Anthropic) updated on 2026-11-13. Paste or tick these in Play Console under App content > Data safety. Anything marked **OWNER CHECK** is a judgment call that Google's own definitions leave open, so please read it before you submit. This is not legal advice. The answers must match the privacy policy (https://ezhang43.github.io/note-board/privacy/); if what the app stores changes, update both.
 
 Files checked:
 - `src/sync/firebase.ts` (Google sign-in with Firebase Authentication) and `src/sync/database.ts` (Cloud Firestore, offline cache; `sendFeedback`: Send feedback saves the note with the person's email and account number, job #69)
@@ -12,6 +12,7 @@ Files checked:
 - `package.json` and a search of `src/` and `index.html` (no advertising, crash-reporting or tracking library; since 2026-10-19 the published pages load GoatCounter, a cookie-free page-visit counter, see Analytics below)
 - `privacy/index.html` (what the policy promises)
 - `mcp/` (the Claude connector; see below, it is not part of the app)
+- `src/store/ai.ts`, `src/model/aiCategories.ts`, `src/components/VizAiSort.tsx` (the AI buttons: what is sent to Anthropic with the person's own key, see "Sharing with third parties")
 
 ## Summary answers
 
@@ -20,12 +21,12 @@ Files checked:
 | Does your app collect or share any of the required user data types? | Yes |
 | Is all of the user data collected by your app encrypted in transit? | Yes (everything goes over HTTPS: Firebase, Google sign-in, the website) |
 | Do you provide a way for users to request that their data is deleted? | Yes. Say so once job #63 is live: the in-app Delete account button and the website "Delete your account" page. Until then the policy says "email ezhang43@gmail.com, deleted within 30 days". |
-| Data shared with third parties? | No (see "Sharing" below). OWNER CHECK. |
+| Data shared with third parties? | Only if the person uses an AI button: the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. BusyAnts itself shares nothing (see "Sharing with third parties" below for how to answer). OWNER CHECK. |
 | Independent security review / "Committed to Play Families policy" | Leave "No" / not applicable. The app is not designed for children (privacy policy: not meant for children under 13). |
 
 ## Data types collected
 
-For each type: Collected = yes. Shared = no. Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no advertising, personalization or fraud prevention; the page-visit counter is covered under Analytics below).
+For each type: Collected = yes. Shared = no (but see "Sharing with third parties" for the text sent to Anthropic when the person presses an AI button). Processed ephemerally = no. Required (not optional), because sign-in is needed to use the online app. Purposes: App functionality and Account management (nothing else: no advertising, personalization or fraud prevention; the page-visit counter is covered under Analytics below).
 
 | Play category | Data type | Collected? | Why / where it comes from | Purposes |
 | --- | --- | --- | --- | --- |
@@ -42,10 +43,15 @@ OWNER CHECK: servers like Firebase and GitHub Pages receive an IP address whenev
 
 ## Sharing with third parties
 
-Recommended answer: **No data is shared.** Reasoning, using Google's definitions:
+What happens, as built: BusyAnts itself shares nothing. The one thing that leaves for a third party is this: the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. The person types in their own key in AI settings and presses the button themselves; the hint next to it says what goes. No board names, list names, notes or ids are sent, and nothing reaches BusyAnts's servers.
+
+Recommended answer: **No data is shared by BusyAnts.** OWNER CHECK: Google's form counts data as "shared" when it goes to a third party, but not when the user starts the transfer themselves in the app with a clear prompt, and the data here goes from the person's own browser to Anthropic under their own Anthropic account. That reads as "not shared". If you want to be cautious, answer "Yes" for "Other user-generated content", shared, optional, purpose App functionality, and say in the note that it is sent only when the person presses an AI button with their own key. Keep the same answer as the privacy policy.
+
+Reasoning for the rest, using Google's definitions:
 - Google Firebase (Authentication and Cloud Firestore) stores the data on BusyAnts's behalf. Google says that transferring data to a "service provider" that processes it on the developer's behalf is not "sharing". Firebase is that kind of processor, so it is declared as collected but not shared.
 - GitHub Pages only serves the site's files.
 - Google Fonts and Google Calendar are Google services used directly by the person's device.
+- Anthropic (the AI buttons): the text of finished checklist items from the person's own boards (never from boards shared with them) is sent to Anthropic only when they press an AI button, using their own Anthropic key, straight from their browser, and never through BusyAnts. It is a transfer the person starts, from their browser, with their own key (see above).
 - Sharing a board with another person is an action the user takes themselves, and Google says transfers the user starts in the app (with a clear prompt) are not "sharing" either. The panel shows the people who have it.
 
 OWNER CHECK: if you read it more strictly, you could answer "Yes" for Name and Photos (shown to people the user shares a board with). The recommended answer stays "No" because it is user-initiated and in-app. Pick the one you are comfortable with, and keep it the same as the privacy policy.

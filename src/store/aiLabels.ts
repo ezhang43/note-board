@@ -58,7 +58,9 @@ export function createLabelCache(device: Place) {
    * at once (storage does not say how much is free).
    */
   // simple: each check writes and removes a few MB (once per open and once per saved batch); fine at the sizes
-  // kept here. Upgrade if it shows up as slow on phones.
+  // kept here. Upgrade if it shows up as slow on phones. The test is ASCII, so where a browser measures its quota
+  // in bytes (not UTF-16 code units) the real reserve for boards full of emoji is up to half BOARDS_ROOM; still a
+  // wide margin. Upgrade to a non-Latin-1 test character if that margin ever matters.
   const fits = (letters: number): boolean => {
     if (!device) return false;
     try {

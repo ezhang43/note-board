@@ -5,6 +5,7 @@ import { makeAiCategorizer, ownBoards, toSend } from '../model/aiCategories';
 import { categoryOf } from '../model/categorize';
 import { ai, useAiSettings } from '../store/ai';
 import { aiLabels } from '../store/aiLabels';
+import { fetchCalendarDone } from '../store/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { collab, useSharing } from '../sync/collabSession';
 import { CloseIcon, VisualizerIcon } from './icons';
@@ -76,15 +77,34 @@ function Overlay() {
   // The real boards, even while Version history is showing an old one: this is a read, never a write.
   const ws = useSyncExternalStore(appStore.subscribe, appStore.workspace);
   const today = dayKey(new Date());
-  const all = useMemo(() => doneItems(ws), [ws]);
+  useSharing(); // signing in or out redraws, so uid is current for the calendar fetch below
+  const uid = collab.me()?.uid ?? null;
+  // Past and deleted calendar events (owner, 2026-11-13): fetched off the animation path, one fetch per open
+  // and range, using only access already kept on this device (never a Google window). They are not board data.
+  // Tagged with the person it was fetched for, so one person's events never show next to another's across a sign-in change.
+  const [cal, setCal] = useState<{ uid: string | null; events: DoneItem[]; note: 'none' | 'no-access' | 'error' }>({ uid, events: [], note: 'none' });
+  useEffect(() => {
+    const ac = new AbortController();
+    let live = true;
+    fetchCalendarDone(uid, range, today, ac.signal)
+      .then((r) => live && setCal({ uid, events: r.status === 'ok' ? r.items : [], note: r.status === 'no-access' ? 'no-access' : r.status === 'error' ? 'error' : 'none' }))
+      .catch(() => live && setCal({ uid, events: [], note: 'error' }));
+    return () => {
+      live = false;
+      ac.abort();
+    };
+  }, [uid, range, today]);
+  // Ignore events still in state from a previous person (the fetch for the new one has not landed yet).
+  const calEvents = cal.uid === uid ? cal.events : [];
+  const calNote = cal.uid === uid ? cal.note : 'none';
+  const board = useMemo(() => doneItems(ws), [ws]);
+  const all = useMemo(() => (calEvents.length ? [...board, ...calEvents] : board), [board, calEvents]);
   // The same list again when a board change elsewhere (a synced edit) left the finished items as they were, so the loop does not start over.
   const kept = useRef<DoneItem[] | undefined>(undefined);
   const items = useMemo(() => (kept.current = keepIfSame(kept.current, loopOrder(inRange(all, range, today)))), [all, range, today]);
   const numbers = useMemo(() => counts(all, items, today), [all, items, today]);
   // Sort with AI: the labels saved on this device are used only while this person has a key saved.
   useAiSettings();
-  useSharing(); // signing in or out redraws, so uid below is current
-  const uid = collab.me()?.uid ?? null;
   const hasKey = ai.hasKey(uid);
   const model = ai.getModel();
   const [labelsRev, setLabelsRev] = useState(0);
@@ -177,6 +197,9 @@ function Overlay() {
               </button>
             </div>
           </div>
+          {calNote !== 'none' && (
+            <p className="viz-cal-note">{calNote === 'no-access' ? 'Open Calendar once to include your events.' : "Couldn't load your calendar events."}</p>
+          )}
           {pending && group === 'category' && (
             <VizAiSort
               uid={uid}
@@ -228,7 +251,17 @@ function Overlay() {
                 const index = landed - 1 - i;
                 return (
                   <li key={`${at.loop}-${index}`}>
-                    <span className="viz-feed-text">{item.text || 'Untitled item'}</span>
+                    <span className="viz-feed-text">
+                      {item.event && (
+                        <svg className="viz-feed-mark" viewBox="0 0 16 16" width="12" height="12" role="img" aria-label="Calendar event">
+                          <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                          <line x1="1.5" y1="5.5" x2="14.5" y2="5.5" stroke="currentColor" strokeWidth="1.3" />
+                          <line x1="4.5" y1="1" x2="4.5" y2="3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                          <line x1="11.5" y1="1" x2="11.5" y2="3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                        </svg>
+                      )}
+                      {item.text || 'Untitled item'}
+                    </span>
                     <span className="viz-feed-where">
                       {[group === 'category' ? disc.wedges[disc.slots[index]?.wedge]?.name : undefined, item.list, item.boardName].filter(Boolean).join(' · ')}
                     </span>

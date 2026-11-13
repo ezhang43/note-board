@@ -33,6 +33,8 @@ export interface DoneItem {
   order: number;
   /** For a completed sub-item: the words of the items it sat under, nearest first (they help to categorize it). Empty for an entry's own item. */
   context?: string[];
+  /** A Google Calendar event that has passed or was deleted (not board data; never saved or sent to AI). See vizCalendar. */
+  event?: true;
 }
 
 /** A real day key: four-digit year, as `addDays` writes it back (so 2026-13-45, 0001-01-01 and "soon" are not). */
@@ -196,7 +198,8 @@ const BOARD_HUES = 8;
 
 /**
  * The disc for `items` (given in loop order). By board: one wedge per board in menu order, the busiest
- * boards only past MAX_WEDGES (the rest share one "Other boards" wedge, last). By category: one wedge per
+ * boards only past MAX_WEDGES (the rest share one "Other boards" wedge; calendar events are their own
+ * "Calendar" wedge after it, counted in MAX_WEDGES). By category: one wedge per
  * category that has items, in the categories' own order (Other last), each in its own fixed color. In a
  * wedge, one cell per list title (the busiest first, so the same title on two boards is one cell); past
  * MAX_CELLS the rest share "Other lists". `slots[i]` says which wedge and cell `items[i]` lands in.
@@ -227,16 +230,22 @@ interface Group {
 }
 
 function boardGroups(items: DoneItem[]): Group[] {
+  // Calendar events (owner, 2026-11-13) are always their own "Calendar" wedge, last, never folded into Other boards.
+  const events = items.filter((i) => i.event);
   const boards = new Map<string, { name: string; rank: number; items: DoneItem[] }>();
   for (const i of items) {
+    if (i.event) continue;
     const b = boards.get(i.boardId) ?? { name: i.boardName, rank: i.boardRank, items: [] };
     b.items.push(i);
     boards.set(i.boardId, b);
   }
   const all = [...boards].map(([key, b]) => ({ key, ...b }));
-  const kept = all.length > MAX_WEDGES ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, MAX_WEDGES - 1) : all;
+  // Leave room for the Calendar wedge (if any events) so the disc never goes past MAX_WEDGES.
+  const room = MAX_WEDGES - (events.length ? 1 : 0);
+  const kept = all.length > room ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, room - 1) : all;
   const groups: (Group & { rank: number })[] = kept.sort((a, b) => a.rank - b.rank);
   if (kept.length < all.length) groups.push({ key: '', name: OTHER_BOARDS, rank: Infinity, items: all.filter((b) => !kept.includes(b)).flatMap((b) => b.items) });
+  if (events.length) groups.push({ key: events[0].boardId, name: events[0].boardName, rank: Infinity, items: events });
   return groups;
 }
 

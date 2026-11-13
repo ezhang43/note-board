@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { canChangeSeries, dayKey, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
+import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
+import type { DoneItem, VizRange } from '../model/visualizer';
 import { announce } from './announce';
 import { deviceStorage } from './env';
 import { createWidthStore } from './panelWidths';
@@ -30,6 +32,8 @@ export interface CalendarSource {
   forget(): void;
   /** Gets ready before the panel opens, so the click can ask for access with no wait. */
   prepare?(): void;
+  /** The token already kept on this device (over a minute left), or null — never opening Google's window (the Visualizer, owner 2026-11-13). */
+  keptToken?(): Promise<string | null>;
 }
 
 /** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
@@ -395,6 +399,7 @@ function defaultSource(): CalendarSource | null {
       token: () => (ready ? ready.token() : google().then((g) => g.token())),
       forget: () => ready?.forget(),
       prepare: () => void google().then((g) => g.prepare()),
+      keptToken: () => (ready ? Promise.resolve(ready.keptToken()) : google().then((g) => g.keptToken())),
     };
   }
   const demo = demoUser();
@@ -416,7 +421,69 @@ function defaultSource(): CalendarSource | null {
       return demo.uid;
     },
     forget: () => dropAccess(device),
+    keptToken: async () => readAccess(device, demo.uid)?.token ?? null,
   };
+}
+
+/** What the Visualizer gets when it asks for past and deleted calendar events (owner, 2026-11-13). */
+export type VizCalendar =
+  | { status: 'signed-out' } // no calendar here, or nobody signed in: show nothing about the calendar
+  | { status: 'no-access' } // signed in, but no fresh access kept on this device: "Open Calendar once"
+  | { status: 'ok'; items: DoneItem[] }
+  | { status: 'error' }; // the fetch failed: the Visualizer shows a quiet line and no events
+
+// One fetch per open and range, paged. The window never exceeds the chart's two years, so one page of 2500
+// almost always covers it; a few pages are read at most, then it stops.
+// simple: at most 5 pages (12,500 events). Events come oldest-first (orderBy=startTime), so a busier two years would
+// miss the NEWEST events (the recent days that matter most); raise the cap if a calendar that full ever shows up.
+const VIZ_MAX_PAGES = 5;
+
+/**
+ * Past and deleted events on the person's primary calendar within `range`, using only access already kept on
+ * this device (never opening Google's window). Off the animation path: the Visualizer calls this in an effect,
+ * not while drawing. `uid` null means nobody is signed in, so there is no calendar at all.
+ */
+export async function fetchCalendarDone(
+  uid: string | null,
+  range: VizRange,
+  today: DayKey,
+  signal?: AbortSignal,
+  fetchFn: typeof fetch = (url, init) => fetch(url, init),
+  src: CalendarSource | null = source,
+): Promise<VizCalendar> {
+  if (!src || uid === null) return { status: 'signed-out' };
+  const token = src.keptToken ? await src.keptToken() : null;
+  if (!token) return { status: 'no-access' };
+  const { timeMin, timeMax } = vizWindow(range, today);
+  // Built as a string (not new URL): the dev server's base is a relative path, which new URL() would reject.
+  const endpoint = `${src.base}/calendars/primary/events`;
+  const raw: unknown[] = [];
+  let pageToken: string | undefined;
+  try {
+    for (let page = 0; page < VIZ_MAX_PAGES; page++) {
+      const q = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: 'true', // each past instance of a repeating event, once
+        showDeleted: 'true', // include deleted (cancelled) events
+        eventTypes: 'default', // not working-location / out-of-office / focus-time / birthday
+        orderBy: 'startTime',
+        maxResults: '2500',
+      });
+      if (pageToken) q.set('pageToken', pageToken);
+      const res = await fetchFn(`${endpoint}?${q}`, { headers: { Authorization: `Bearer ${token}` }, signal });
+      if (res.status === 401) return { status: 'no-access' }; // access ran out: ask to open Calendar again
+      if (!res.ok) return { status: 'error' };
+      const data = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
+      if (Array.isArray(data.items)) raw.push(...data.items);
+      pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : undefined;
+      if (!pageToken) break;
+    }
+  } catch (e) {
+    if (signal?.aborted) throw e; // a cancelled fetch is not a failure to show
+    return { status: 'error' };
+  }
+  return { status: 'ok', items: calendarDoneItems(raw, range, today) };
 }
 
 const source = defaultSource();

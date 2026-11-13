@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
-import { calendarApi, createCalendar, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi } from './calendar';
+import { calendarApi, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: not in Ctrl+Z, synced with boards or kept in versions
@@ -1009,5 +1009,113 @@ describe('the panel width kept on this device', () => {
     expect(c.get().widths.week).toBe(420);
     c.setWidth('week', 480);
     expect(c.get().widths.week).toBe(480);
+  });
+});
+
+// Past and deleted events for the Visualizer (owner, 2026-11-13): fetchCalendarDone uses only access
+// already kept on this device (keptToken), never opening Google's window (so a source whose token()
+// throws must still work), pages through the results, and turns 401 into "open Calendar once" and any
+// other failure into a quiet error. uid null means nobody is signed in: nothing about the calendar.
+describe('fetchCalendarDone (Visualizer: past and deleted events)', () => {
+  const RANGE = '7';
+  const TODAY = '2026-11-13';
+  const res = (body: unknown, status = 200): Response => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as unknown as Response;
+
+  /** A source that gives a kept token but whose token() throws, so a fetch that opened Google's window would fail the test. */
+  const source = (over: Partial<CalendarSource> = {}): CalendarSource => ({
+    base: 'https://cal.test/v3',
+    token: () => Promise.reject(new Error('token() must never be called from the Visualizer')),
+    forget: () => {},
+    keptToken: async () => 'kept-token',
+    ...over,
+  });
+
+  it('nobody signed in (uid null): signed-out, and no fetch', async () => {
+    const fetchFn = vi.fn();
+    const r = await fetchCalendarDone(null, RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r).toEqual({ status: 'signed-out' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('no source at all (running locally with no calendar): signed-out', async () => {
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, (() => {}) as unknown as typeof fetch, null);
+    expect(r).toEqual({ status: 'signed-out' });
+  });
+
+  it('no fresh access kept: no-access, and never opens Google’s window', async () => {
+    const fetchFn = vi.fn();
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source({ keptToken: async () => null }));
+    expect(r).toEqual({ status: 'no-access' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('sends the right query (kept token, showDeleted, eventTypes=default, singleEvents) and never calls token()', async () => {
+    let seen: URL | undefined;
+    let auth: string | undefined;
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      seen = new URL(url);
+      auth = (init?.headers as Record<string, string>)?.Authorization;
+      return res({ items: [] });
+    });
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r.status).toBe('ok');
+    expect(auth).toBe('Bearer kept-token');
+    expect(seen!.pathname).toBe('/v3/calendars/primary/events');
+    const q = seen!.searchParams;
+    expect(q.get('singleEvents')).toBe('true');
+    expect(q.get('showDeleted')).toBe('true');
+    expect(q.get('eventTypes')).toBe('default');
+    expect(q.get('orderBy')).toBe('startTime');
+    expect(q.get('timeMin')).toBeTruthy();
+    expect(q.get('timeMax')).toBeTruthy();
+  });
+
+  it('pages through nextPageToken and stops when there is no more', async () => {
+    const pages = [
+      { items: [{ id: 'a' }], nextPageToken: 'p2' },
+      { items: [{ id: 'b' }], nextPageToken: 'p3' },
+      { items: [{ id: 'c' }] },
+    ];
+    const tokens: (string | null)[] = [];
+    let i = 0;
+    const fetchFn = vi.fn(async (url: string) => {
+      tokens.push(new URL(url).searchParams.get('pageToken'));
+      return res(pages[i++]);
+    });
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r.status).toBe('ok');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    expect(tokens).toEqual([null, 'p2', 'p3']);
+  });
+
+  it('stops at the page cap even if Google keeps offering more', async () => {
+    const fetchFn = vi.fn(async () => res({ items: [], nextPageToken: 'always' }));
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r.status).toBe('ok');
+    expect(fetchFn).toHaveBeenCalledTimes(5);
+  });
+
+  it('401 (access ran out) gives no-access', async () => {
+    const fetchFn = vi.fn(async () => res({}, 401));
+    const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r).toEqual({ status: 'no-access' });
+  });
+
+  it('any other failure (a 500, or fetch throwing) gives a quiet error', async () => {
+    const r500 = await fetchCalendarDone('u1', RANGE, TODAY, undefined, (async () => res({}, 500)) as unknown as typeof fetch, source());
+    expect(r500).toEqual({ status: 'error' });
+    const rThrow = await fetchCalendarDone('u1', RANGE, TODAY, undefined, (async () => {
+      throw new Error('network down');
+    }) as unknown as typeof fetch, source());
+    expect(rThrow).toEqual({ status: 'error' });
+  });
+
+  it('an aborted fetch rethrows (the Visualizer dropped this result), not a shown error', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const fetchFn = async () => {
+      throw new DOMException('aborted', 'AbortError');
+    };
+    await expect(fetchCalendarDone('u1', RANGE, TODAY, ac.signal, fetchFn as unknown as typeof fetch, source())).rejects.toThrow();
   });
 });

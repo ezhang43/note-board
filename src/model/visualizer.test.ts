@@ -336,6 +336,18 @@ describe('discOf', () => {
     expect(wide.wedges[0].cells[MAX_CELLS - 1]).toEqual({ list: OTHER_LISTS, count: 6 });
   });
 
+  it('keeps the Calendar wedge inside the wedge limit when there are many boards', () => {
+    const calEvent: DoneItem = { id: 'calendar:e1', text: 'Standup', boardId: 'calendar', boardName: 'Calendar', list: '', date: '2026-11-10', boardRank: Number.MAX_SAFE_INTEGER, order: 0, event: true };
+    for (const n of [MAX_WEDGES, MAX_WEDGES + 4]) {
+      const boards: Record<string, Board> = {};
+      for (let i = 0; i < n; i++) boards[`b${String(i).padStart(2, '0')}`] = cleaned(`Board ${i}`, [{ day: '2026-11-10', lists: [['L', Array.from({ length: i + 1 }, (_, k) => `b${i}i${k}`)]] }]);
+      const { wedges } = discOf(loopOrder([...doneItems(ws(boards)), calEvent]), 'board');
+      expect(wedges.length).toBeLessThanOrEqual(MAX_WEDGES);
+      expect(wedges[wedges.length - 1].name).toBe('Calendar'); // events are always the last wedge
+      expect(wedges.filter((w) => w.name === OTHER_BOARDS)).toHaveLength(1); // the overflow boards still fold into one wedge
+    }
+  });
+
   it('describes it in words for a screen reader', () => {
     expect(summaryOf(discOf(items, 'board').wedges, items.length)).toBe('5 items cleaned up: Home 4, Garage 1.');
     expect(summaryOf([], 0)).toBe('Nothing cleaned up in this range.');

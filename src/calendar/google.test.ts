@@ -123,6 +123,35 @@ describe('calendar access on the published site', () => {
     });
   });
 
+  describe('keptToken for the Visualizer (never opens Google’s window)', () => {
+    it('gives the access kept for this person, and leaves it stored', async () => {
+      keep('u1');
+      const google = await load();
+      auth.listener!({ uid: 'u1' });
+      expect(google.keptToken()).toBe('kept');
+      expect(data.has(ACCESS_KEY)).toBe(true);
+    });
+
+    it('gives null, without asking Google, when there is none fresh (someone else’s or nearly expired)', async () => {
+      for (const set of [() => keep('u2'), () => keep('u1', 'kept', 30_000)]) {
+        vi.resetModules();
+        data.clear();
+        set();
+        const google = await load();
+        expect(google.keptToken()).toBe(null);
+      }
+    });
+
+    it('gives null when nobody is signed in, and does NOT drop the stored access (guards the destructive readAccess)', async () => {
+      keep('u1');
+      const google = await load();
+      auth.currentUser = null;
+      expect(google.keptToken()).toBe(null);
+      // The guard must return before readAccess(device, null), which would drop the device copy.
+      expect(data.has(ACCESS_KEY)).toBe(true);
+    });
+  });
+
   it('forget (Google refused the access) drops it', async () => {
     keep('u1');
     const google = await load();

@@ -7,6 +7,7 @@ import {
   AI_MAX_CATEGORIES,
   AI_MAX_PER_PRESS,
   LABELS_SCHEMA,
+  aiEntry,
   autoSortDue,
   buildPrompt,
   cleanLabel,
@@ -285,5 +286,29 @@ describe('autoSortDue (Sort automatically, owner request 2026-11-13)', () => {
     expect(autoSortDue({ ...base, paused: true, room })).toBe('no');
     expect(autoSortDue({ ...base, auto: false, room })).toBe('no');
     expect(checked).toBe(0);
+  });
+});
+
+describe('calendar events are never sent to Anthropic nor given an AI label (owner, 2026-11-13)', () => {
+  // A calendar event counts in the Visualizer but its title is Google's, not board data: aiEntry returns null
+  // for it, so toSend skips it, the "N finished items" hint does not count it, and the disc never applies a
+  // saved label to it even when its text matches a labeled board item.
+  const event = (text: string, boardId = 'calendar') => ({ text, boardId, event: true as const });
+
+  it('aiEntry gives null for an event, so it is never asked about', () => {
+    expect(aiEntry({ text: 'Kayaking lesson', event: true })).toBeNull();
+  });
+
+  it('toSend leaves events out of both the texts sent and the count', () => {
+    const items = [...on(['Buy milk']), event('Kayaking lesson'), event('Pottery workshop')];
+    expect(toSend(items, () => false, allOwn)).toEqual({ entries: [{ text: 'Buy milk' }], total: 1 });
+  });
+
+  it('the disc gives an event its built-in category, never a saved AI label, even when its text matches a labeled board item', () => {
+    const labels: Record<string, string> = { 'Pottery workshop': 'Crafts' };
+    const items = [...on(['Pottery workshop']), event('Pottery workshop')];
+    const cat = makeAiCategorizer(items, (t) => labels[t] ?? null, allOwn);
+    expect(cat(items[0], 'List')).toEqual({ name: 'Crafts' }); // the board item takes the label
+    expect(cat(items[1], 'List')).toBe(categoryOf({ text: 'Pottery workshop' }, 'List')); // the event does not
   });
 });

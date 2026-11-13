@@ -129,6 +129,18 @@ export function token(): Promise<string> {
   return pending;
 }
 
+/**
+ * The token kept in memory or on this device, if it still has over a minute left, and null otherwise —
+ * never opening Google's window. The Visualizer uses this to read past events only when access is already
+ * there and fresh (owner, 2026-11-13: no Google pop-up, ever, from the Visualizer).
+ */
+export function keptToken(): string | null {
+  const user = getAuth().currentUser?.uid ?? null;
+  if (!user) return null;
+  if (!cached || cached.user !== user || cached.expiresAt <= Date.now() + 60_000) cached = readAccess(device, user);
+  return cached?.token ?? null;
+}
+
 export function forget() {
   cached = null;
   dropAccess(device);

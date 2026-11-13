@@ -3967,6 +3967,11 @@ a.cal-open { align-self: flex-start; }
 .viz-feed-text { font-size: 15px; color: var(--viz-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viz-feed-where { font-size: 12px; color: var(--viz-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viz-feed li:first-child .viz-feed-text { color: var(--viz-honey); }
+/* The small calendar mark before an event's title in the feed (owner, 2026-11-13). */
+.viz-feed-mark { flex: none; margin-right: 6px; vertical-align: -1px; color: var(--viz-faint); }
+.viz-feed li:first-child .viz-feed-mark { color: var(--viz-honey); }
+/* The quiet line under the controls: no kept access, or a failed fetch (never when signed out). */
+.viz-cal-note { margin: 0 0 4px; font-size: 12px; color: var(--viz-faint); }
 .viz-close {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 10px);

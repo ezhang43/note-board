@@ -255,14 +255,14 @@ export function summaryOf(wedges: Wedge[], total: number): string {
 // always be flowing in"): items launch one after another at an even beat, round and round the list, so there is
 // never a moment with nothing in the air. No loop length, no wave, no rest at the end.
 
-/** How many trips are in the air together once the stream is going (below MAX_FLYING, so none is cut short). */
-export const STREAM_FLYING = 10;
+/** How many trips are in the air together once the stream is going (owner 2026-11-13, "slower... but with more things coming in"; below MAX_FLYING, so none is cut short). */
+export const STREAM_FLYING = 20;
 /** Launches are never further apart than this, however long a trip is. */
 export const MAX_LAUNCH_GAP_MS = 1000;
 /** The most beams and fountains drawn at once, so a very busy stream stays inside the frame (the oldest are cut short). */
-export const MAX_FLYING = 16;
+export const MAX_FLYING = 24;
 
-/** Time between one launch and the next: a trip shared out over STREAM_FLYING launches (about 266ms for a 2.66s trip), at most a second. */
+/** Time between one launch and the next: a trip shared out over STREAM_FLYING launches (about 200ms for a 4s trip), at most a second. */
 export const launchGapMs = (flight: number): number => Math.min(MAX_LAUNCH_GAP_MS, flight / STREAM_FLYING);
 
 /** When launch number `k` (0, 1, 2, ... counted round and round the list, so item `k % n`) starts, in ms from the start. */

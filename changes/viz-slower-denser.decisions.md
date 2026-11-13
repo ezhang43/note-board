@@ -1,0 +1,3 @@
+- 2026-11-13 (call, owner) Visualizer trips are 1.5x slower: about 4.0s in all (beam drop 1.05s, spark flight 2.73s, same ratio). The ripples and column keep their lengths. Why: owner said "can make it slower and more continuous, but with more things coming in".
+- 2026-11-13 (call, owner) About 20 trips in the air (STREAM_FLYING 20), so the beat is trip/20, about 0.2s. MAX_FLYING goes from 16 to 24 for headroom, and the spark budget from 100 to 200 so each fountain keeps its ten sparks. The 0.3s card gap, the core pulse cap, the look and Calm are unchanged.
+- 2026-11-13 (call, recommended) Frame cost is up: about twice as many sparks drawn at once (up to about 200). Not measured on a real phone; if it stutters there, lower STREAM_FLYING first.

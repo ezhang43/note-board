@@ -437,10 +437,10 @@ describe('beamStart and beamPoint', () => {
 });
 
 describe('slower beams and sparks (owner, 2026-11-13)', () => {
-  it('drops the beam over 700ms (twice the first 350ms), and the sparks fly for 1820ms (twice 910ms), the strike and what follows shifting later together', () => {
-    expect(DROP_MS).toBe(700);
-    expect(STRIKE * TRIP_MS).toBeCloseTo(700);
-    expect((1 - COMET_START) * TRIP_MS).toBeCloseTo(1820);
+  it('drops the beam over 1050ms (three times the first 350ms) and the sparks fly for 2730ms (three times 910ms), the whole trip about 4.0s (owner 2026-11-13, "can make it slower": 1.5x slower than 700 and 1820), the strike and what follows shifting later together', () => {
+    expect(DROP_MS).toBe(1050);
+    expect(STRIKE * TRIP_MS).toBeCloseTo(1050);
+    expect((1 - COMET_START) * TRIP_MS).toBeCloseTo(2730);
   });
 
   it('keeps the core flare to half of what it was, however many sparks arrive together', () => {
@@ -496,8 +496,9 @@ describe('fountain', () => {
       expect(burstSize(o)).toBeGreaterThanOrEqual(4);
       expect(burstSize(o)).toBeLessThanOrEqual(PARTICLES);
     }
-    expect(burstSize(16)).toBeLessThan(burstSize(2));
-    expect(burstSize(16) * 16).toBeLessThanOrEqual(BURST_BUDGET + 16); // all that can be in the air at once stay near the budget
+    expect(burstSize(24)).toBeLessThan(burstSize(2));
+    expect(burstSize(20)).toBe(PARTICLES); // 20 in the air: each fountain as dense as with 10 before
+    expect(burstSize(24) * 24).toBeLessThanOrEqual(BURST_BUDGET + 24); // all that can be in the air at once stay near the budget
   });
 
   it('arcs each spark up to its own height, within limits, the same every time', () => {

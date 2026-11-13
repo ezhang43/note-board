@@ -405,14 +405,17 @@ describe('the group-by switch', () => {
 });
 
 describe('pace: a steady stream, never a pause (owner request 2026-11-13, "things should always be flowing in")', () => {
-  const FLIGHT = 2660; // the real trip
-  const STRIKE_MS = 700; // the beam lands this far in
+  const FLIGHT = 3990; // the real trip
+  const STRIKE_MS = 1050; // the beam lands this far in
 
-  it('launches an item at least every second, and several trips overlap', () => {
+  it('launches an item at least every second, about every 0.2s, and about 20 trips overlap', () => {
+    expect(launchGapMs(FLIGHT)).toBeGreaterThan(190);
+    expect(launchGapMs(FLIGHT)).toBeLessThan(210);
+    expect(MAX_FLYING).toBeGreaterThanOrEqual(24);
     expect(launchGapMs(FLIGHT)).toBeLessThanOrEqual(1000);
     expect(launchGapMs(FLIGHT)).toBeGreaterThan(0);
-    expect(FLIGHT / launchGapMs(FLIGHT)).toBeGreaterThanOrEqual(4); // several in flight
-    expect(FLIGHT / launchGapMs(FLIGHT)).toBeLessThanOrEqual(MAX_FLYING);
+    expect(FLIGHT / launchGapMs(FLIGHT)).toBeGreaterThanOrEqual(19); // about 20 in flight
+    expect(Math.ceil(FLIGHT / launchGapMs(FLIGHT))).toBeLessThan(MAX_FLYING);
     expect(startOf(0, FLIGHT)).toBe(0);
     expect(startOf(3, FLIGHT) - startOf(2, FLIGHT)).toBe(launchGapMs(FLIGHT));
   });
@@ -420,6 +423,7 @@ describe('pace: a steady stream, never a pause (owner request 2026-11-13, "thing
   for (const n of [1, 5, 36, 200]) {
     it(`with ${n} item${n === 1 ? '' : 's'}: never a gap over 1s between launches, never none in flight, never over MAX_FLYING`, () => {
       let landedMost = 0;
+      let steady = 0;
       for (let t = 0; t <= 120_000; t += 20) {
         const p = playhead(t, n, FLIGHT, STRIKE_MS);
         expect(p.flying.length).toBeGreaterThan(0); // also during warm-up: the first beam leaves at 0
@@ -428,9 +432,12 @@ describe('pace: a steady stream, never a pause (owner request 2026-11-13, "thing
         // the newest launch is never older than a second
         expect(Math.min(...p.flying.map((f) => f.progress)) * FLIGHT).toBeLessThanOrEqual(1000);
         landedMost = p.landed;
+        if (t > FLIGHT) steady = Math.max(steady, p.flying.length);
+        if (t > FLIGHT) expect(p.flying.length).toBeGreaterThanOrEqual(19); // and about 20 once going
       }
       for (let k = 1; k < 400; k++) expect(startOf(k, FLIGHT) - startOf(k - 1, FLIGHT)).toBeLessThanOrEqual(1000);
       expect(landedMost).toBeGreaterThan(n); // it went round the list at least once
+      expect(steady).toBeLessThanOrEqual(MAX_FLYING);
     });
   }
 
@@ -452,7 +459,7 @@ describe('pace: a steady stream, never a pause (owner request 2026-11-13, "thing
   });
 
   it('keeps the newest trips when more than MAX_FLYING have started, and does nothing with no items', () => {
-    const p = playhead(30_000, 100, 20_000, 0); // a very long trip: 20 launches in the air: far more than MAX_FLYING in the air
+    const p = playhead(60_000, 100, 40_000, 0); // a very long trip: 40 launches in the air, far more than MAX_FLYING
     expect(p.flying.length).toBe(MAX_FLYING);
     expect(playhead(5000, 0, FLIGHT, STRIKE_MS)).toEqual({ landed: 0, flying: [] });
   });

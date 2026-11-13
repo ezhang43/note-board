@@ -41,16 +41,16 @@ export const isDay = (s: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(s) && ad
 export const UNTITLED_BOARD = 'Untitled board';
 export const UNTITLED_LIST = 'List';
 
+/** Every completed sub-item under `item`, nested ones too (top to bottom), with the words of what they sit under, nearest first. */
+function doneUnder(item: TodoItem, above: string[]): { item: TodoItem; context: string[] }[] {
+  const context = [item.text.trim(), ...above].filter(Boolean);
+  return item.children.flatMap((c) => [...(c.done && c.text.trim() ? [{ item: c, context }] : []), ...doneUnder(c, context)]);
+}
+
 /**
  * Every cleaned-up item on every board in `ws`: the open one, the others, the Journal and Habits boards
  * the menu leaves out, and shared boards. Boards come in the Boards menu order, then any the menu skips.
  */
-/** Every completed sub-item under `item`, nested ones too (top to bottom), with the words of what they sit under, nearest first. */
-function doneUnder(item: TodoItem, above: string[]): { item: TodoItem; context: string[] }[] {
-  const context = [item.text.trim(), ...above].filter(Boolean);
-  return item.children.flatMap((c) => [...(c.done ? [{ item: c, context }] : []), ...doneUnder(c, context)]);
-}
-
 export function doneItems(ws: Workspace): DoneItem[] {
   const ids = boardTree(ws).map((r) => r.id);
   const out: DoneItem[] = [];
@@ -126,10 +126,12 @@ export function perDay(items: DoneItem[], range: VizRange, today: string): DayCo
   return days;
 }
 
+const sameWords = (a: string[] = [], b: string[] = []) => a.length === b.length && a.every((w, k) => w === b[k]);
+
 /** `next` when it differs from `prev`, else `prev` itself, so a redraw from an unrelated board change keeps the same list and the loop does not start over. */
 export function keepIfSame(prev: DoneItem[] | undefined, next: DoneItem[]): DoneItem[] {
   if (!prev || prev.length !== next.length) return next;
-  const same = prev.every((p, i) => p.id === next[i].id && p.text === next[i].text && p.list === next[i].list && p.boardName === next[i].boardName && p.date === next[i].date && (p.context ?? []).join('\n') === (next[i].context ?? []).join('\n'));
+  const same = prev.every((p, i) => p.id === next[i].id && p.text === next[i].text && p.list === next[i].list && p.boardName === next[i].boardName && p.date === next[i].date && sameWords(p.context, next[i].context));
   return same ? prev : next;
 }
 

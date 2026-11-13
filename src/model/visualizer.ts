@@ -198,7 +198,8 @@ const BOARD_HUES = 8;
 
 /**
  * The disc for `items` (given in loop order). By board: one wedge per board in menu order, the busiest
- * boards only past MAX_WEDGES (the rest share one "Other boards" wedge, last). By category: one wedge per
+ * boards only past MAX_WEDGES (the rest share one "Other boards" wedge; calendar events are their own
+ * "Calendar" wedge after it, counted in MAX_WEDGES). By category: one wedge per
  * category that has items, in the categories' own order (Other last), each in its own fixed color. In a
  * wedge, one cell per list title (the busiest first, so the same title on two boards is one cell); past
  * MAX_CELLS the rest share "Other lists". `slots[i]` says which wedge and cell `items[i]` lands in.

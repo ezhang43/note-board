@@ -58,6 +58,8 @@ export function dashFor(area: Area, k: number, seed: number): Area {
 
 /** How long a card is on screen, how long it takes to fade in, and to fade out at the end. */
 export const CARD_LIFE_MS = 2000;
+/** Ease-out: starts quickly and settles gently, so a card eases in instead of popping. */
+const easeOut = (x: number) => 1 - (1 - x) ** 2;
 export const CARD_FADE_IN = 250;
 const CARD_FADE_OUT = 500;
 /** How quickly an old card fades away when a new one takes its place; the new one fades in after that. */
@@ -117,7 +119,7 @@ export function cardsAt(arrivals: { index: number; at: number; slot: CardSlot }[
     if (age < 0 || age >= CARD_LIFE_MS) return;
     const holds = (b: { at: number; slot: CardSlot }) => b.slot === a.slot;
     const heldBefore = arrivals.slice(0, j).some((b) => holds(b) && a.at - b.at < CARD_LIFE_MS);
-    let alpha = clamp01((age - (heldBefore ? CARD_BUMP_MS : 0)) / CARD_FADE_IN) * clamp01((CARD_LIFE_MS - age) / CARD_FADE_OUT);
+    let alpha = easeOut(clamp01((age - (heldBefore ? CARD_BUMP_MS : 0)) / CARD_FADE_IN)) * clamp01((CARD_LIFE_MS - age) / CARD_FADE_OUT);
     const next = arrivals.slice(j + 1).find((b) => holds(b) && b.at <= now);
     if (next) alpha *= 1 - clamp01((now - next.at) / CARD_BUMP_MS);
     if (alpha <= 0 && age > 0) return;
@@ -177,7 +179,10 @@ export function cardBox(slot: CardSlot, core: { x: number; y: number }, rx: numb
 }
 
 /** The cards are drawn up to this much bigger than at first (owner request 2026-11-13, "make the name cards bigger"). */
-export const CARD_SCALE_MAX = 1.4;
+export const CARD_SCALE_MAX = 1.15;
+
+/** How strong the name card looks (owner, 2026-11-13: "a bit too intense and bold"): its glow, fill, border and title weight. */
+export const CARD_LOOK = { glowAlpha: 0.22, glowReach: 0.55, fillAlpha: 0.64, borderAlpha: 0.7, titleWeight: 500 };
 
 /**
  * How big the cards are on this stage and where they stand: the biggest size, from 1 up to CARD_SCALE_MAX, at which

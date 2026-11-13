@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_BUMP_MS, CARD_FADE_IN, CARD_GAP_MS, CARD_LIFE_MS, DASH_MAX_FILL, MAX_CARDS, SMALL_LIST, CARD_SCALE_MAX, cardBox, cardDrift, cardLayout, cardRoom, cardSlotsFor, cardsAt, dashCapacity, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from './vizBurst';
+import { CARD_BUMP_MS, CARD_FADE_IN, CARD_GAP_MS, CARD_LIFE_MS, DASH_MAX_FILL, MAX_CARDS, SMALL_LIST, CARD_SCALE_MAX, CARD_LOOK, cardBox, cardDrift, cardLayout, cardRoom, cardSlotsFor, cardsAt, dashCapacity, dashCount, dashFor, pickSlot, shouldShowCard, type CardSlot } from './vizBurst';
 import { CORE_LIFT, INNER, OUTER, TRACKS, cellArea, coreAt } from './vizGeometry';
 import { keepOut } from './vizNames';
 
@@ -99,6 +99,15 @@ describe('when an arrival gets a card', () => {
 });
 
 describe('cardsAt', () => {
+  it('is softer (owner, 2026-11-13): 1.15x, a half-strength glow, lighter fill and border, medium weight, an ease-out fade-in', () => {
+    expect(CARD_SCALE_MAX).toBe(1.15);
+    expect(CARD_LOOK).toEqual({ glowAlpha: 0.22, glowReach: 0.55, fillAlpha: 0.64, borderAlpha: 0.7, titleWeight: 500 });
+    expect(CARD_FADE_IN).toBeGreaterThanOrEqual(200);
+    expect(CARD_FADE_IN).toBeLessThanOrEqual(250);
+    const arrivals = [{ index: 0, at: 1000, slot: 0 as CardSlot }];
+    const half = cardsAt(arrivals, 1000 + CARD_FADE_IN / 2)[0].alpha;
+    expect(half).toBeCloseTo(0.75, 2); // ease-out: past the straight-line 0.5 at the middle
+  });
   it('fades a card in, holds it, and fades it out by the end of its life', () => {
     const arrivals = [{ index: 0, at: 1000, slot: 0 as CardSlot }];
     expect(cardsAt(arrivals, 999)).toEqual([]);
@@ -284,7 +293,7 @@ describe('bigger cards (owner, 2026-11-13)', () => {
     const first = cardSlotsFor(core, st.rx, st.w, CARD_H);
     const { scale, slots } = cardLayout(core, st.rx, st.w, CARD_H);
 
-    it(`${st.label}: at most 1.4x, at least the first size, and never fewer places than at the first size`, () => {
+    it(`${st.label}: at most 1.15x, at least the first size, and never fewer places than at the first size`, () => {
       expect(scale).toBeGreaterThanOrEqual(1);
       expect(scale).toBeLessThanOrEqual(CARD_SCALE_MAX + 1e-9);
       expect(slots.length).toBeGreaterThanOrEqual(first.length);
@@ -305,7 +314,7 @@ describe('bigger cards (owner, 2026-11-13)', () => {
     });
   }
 
-  it('a big desktop window gets the full 1.4x', () => {
+  it('a big desktop window gets the full 1.15x', () => {
     const st = STAGES.find((s) => s.w > 900)!;
     expect(cardLayout(coreFor(st.w, st.rx), st.rx, st.w, CARD_H).scale).toBeCloseTo(CARD_SCALE_MAX, 1);
   });

@@ -175,7 +175,7 @@ const BOARD_HUES = 8;
  * category that has items, in the categories' own order (Other last), each in its own fixed color. In a
  * wedge, one cell per list title (the busiest first, so the same title on two boards is one cell); past
  * MAX_CELLS the rest share "Other lists". `slots[i]` says which wedge and cell `items[i]` lands in.
- * `categorize` is asked once per item (see categorize.ts); an id it makes up is Other.
+ * `categorize` is asked once per item (see categorize.ts); an id it makes up is Other, a name it gives is a wedge of its own.
  */
 export function discOf(items: DoneItem[], by: VizGroupBy = VIZ_DEFAULT_GROUP, categorize: Categorizer = categoryOf): { wedges: Wedge[]; slots: { wedge: number; cell: number }[] } {
   const groups = by === 'category' ? categoryGroups(items, categorize) : boardGroups(items);
@@ -215,13 +215,28 @@ function boardGroups(items: DoneItem[]): Group[] {
   return groups;
 }
 
+/**
+ * Built-in categories in their own order, each in its own fixed color. When the categorizer also names
+ * categories of its own (Sort with AI), those come first, busiest first, and every wedge but Other takes the
+ * next of the eight colors in turn (fixed colors would clash with the named ones); Other stays last and neutral.
+ */
 function categoryGroups(items: DoneItem[], categorize: Categorizer): Group[] {
   const by = new Map<number, DoneItem[]>();
+  const named = new Map<string, DoneItem[]>();
   for (const i of items) {
-    const c = categoryIndex(categorize(i, i.list));
-    (by.get(c) ?? by.set(c, []).get(c)!).push(i);
+    const c = categorize(i, i.list);
+    if (typeof c === 'object') (named.get(c.name) ?? named.set(c.name, []).get(c.name)!).push(i);
+    else {
+      const at = categoryIndex(c);
+      (by.get(at) ?? by.set(at, []).get(at)!).push(i);
+    }
   }
-  return [...by].sort((a, b) => a[0] - b[0]).map(([c, list]) => ({ key: CATEGORIES[c].id, name: CATEGORIES[c].name, items: list, hue: c }));
+  const builtIn = [...by].sort((a, b) => a[0] - b[0]).map(([c, list]): Group => ({ key: CATEGORIES[c].id, name: CATEGORIES[c].name, items: list, hue: c }));
+  if (!named.size) return builtIn;
+  const own = [...named].sort((a, b) => b[1].length - a[1].length).map(([name, list]): Group => ({ key: `ai:${name}`, name, items: list }));
+  const other = CATEGORIES.length - 1;
+  // simple: eight colors take turns, so with 8 AI wedges a leftover built-in wedge repeats a color (its name still tells it apart). Upgrade with more hues if that shows up often.
+  return [...own, ...builtIn].map((g, k) => ({ ...g, hue: g.hue === other ? other : k % BOARD_HUES }));
 }
 
 /** A summary in words for a screen reader (the disc is a picture): "12 items: Home 8, Garage 4". */

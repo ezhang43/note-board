@@ -33,6 +33,8 @@ export interface DoneItem {
   order: number;
   /** For a completed sub-item: the words of the items it sat under, nearest first (they help to categorize it). Empty for an entry's own item. */
   context?: string[];
+  /** A Google Calendar event that has passed or was deleted (not board data; never saved or sent to AI). See vizCalendar. */
+  event?: true;
 }
 
 /** A real day key: four-digit year, as `addDays` writes it back (so 2026-13-45, 0001-01-01 and "soon" are not). */
@@ -227,8 +229,11 @@ interface Group {
 }
 
 function boardGroups(items: DoneItem[]): Group[] {
+  // Calendar events (owner, 2026-11-13) are always their own "Calendar" wedge, last, never folded into Other boards.
+  const events = items.filter((i) => i.event);
   const boards = new Map<string, { name: string; rank: number; items: DoneItem[] }>();
   for (const i of items) {
+    if (i.event) continue;
     const b = boards.get(i.boardId) ?? { name: i.boardName, rank: i.boardRank, items: [] };
     b.items.push(i);
     boards.set(i.boardId, b);
@@ -237,6 +242,7 @@ function boardGroups(items: DoneItem[]): Group[] {
   const kept = all.length > MAX_WEDGES ? [...all].sort((a, b) => b.items.length - a.items.length || a.rank - b.rank).slice(0, MAX_WEDGES - 1) : all;
   const groups: (Group & { rank: number })[] = kept.sort((a, b) => a.rank - b.rank);
   if (kept.length < all.length) groups.push({ key: '', name: OTHER_BOARDS, rank: Infinity, items: all.filter((b) => !kept.includes(b)).flatMap((b) => b.items) });
+  if (events.length) groups.push({ key: events[0].boardId, name: events[0].boardName, rank: Infinity, items: events });
   return groups;
 }
 

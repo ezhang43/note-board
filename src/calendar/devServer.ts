@@ -8,8 +8,11 @@ import { dayKey as dateKey } from '../model/calendar';
 // Each demo person gets their own calendar, made on first use and kept in memory until the dev
 // server stops: "Dentist" today 10:00–11:00 (simple), "Team stand-up" every day 09:00–09:15
 // (repeating), "Lunch with Sam" tomorrow 12:30–13:30 (with a guest), "Holiday" all day in 3 days,
-// "Book club" in 2 days 18:00–19:00 (someone else's, the person invited).
-// Only what the panel uses: list (timeMin / timeMax), get, add, change and delete on calendars/primary,
+// "Book club" in 2 days 18:00–19:00 (someone else's, the person invited), plus two past events for the
+// Visualizer (owner, 2026-11-13): "Kayaking lesson" 3 days ago (passed) and "Pottery workshop" 2 days ago,
+// deleted after it started (status cancelled, with an `updated` deletion time after its start).
+// Each change sets `updated` (Google's last-modification time); showDeleted also returns cancelled events.
+// Only what the panel uses: list (timeMin / timeMax, showDeleted), get, add, change and delete on calendars/primary,
 // for one event of a series or the whole series (its id), with guests and sendUpdates (job #85).
 // Moving a series' time gives its events new ids, as Google can (job #88), made from that time, so
 // moving it back gives the old ids back. Like Google, a deleted event is kept as cancelled and can be
@@ -89,6 +92,9 @@ function seed(): Event[] {
       ],
     },
     { ...mine, id: 'holiday', summary: 'Holiday', start: date(3), end: date(4) },
+    // Past events for the Visualizer (owner, 2026-11-13): one that passed, one deleted after it started.
+    { ...mine, id: 'kayaking', summary: 'Kayaking lesson', start: at(-3, 14, 0), end: at(-3, 15, 0) },
+    { ...mine, id: 'pottery', summary: 'Pottery workshop', start: at(-2, 10, 0), end: at(-2, 11, 0), status: 'cancelled', updated: at(-2, 12, 0).dateTime },
     {
       id: 'bookclub',
       summary: 'Book club',
@@ -142,13 +148,20 @@ export function devCalendarPlugin(): Plugin {
         const found = events.findIndex((e) => e.id === id);
         // Deleted (cancelled), or one event of a deleted series.
         const gone = (e: Event) => e.status === 'cancelled' || events.some((s) => s.id === e.recurringEventId && s.status === 'cancelled');
+        // Google's "Last modification time" (used by the Visualizer as a deleted event's deletion time).
+        const stamp = () => new Date().toISOString();
         const sendUpdates = url.searchParams.get('sendUpdates');
         if (sendUpdates !== null && !['all', 'externalOnly', 'none'].includes(sendUpdates)) return send(400, { error: { code: 400, message: 'Invalid sendUpdates' } });
         try {
           if (req.method === 'GET' && !id) {
             const min = Date.parse(url.searchParams.get('timeMin') ?? '');
             const max = Date.parse(url.searchParams.get('timeMax') ?? '');
-            const items = events.filter((e) => !e.recurrence && !gone(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
+            // showDeleted (the Visualizer): also return events that are themselves cancelled, but never an
+            // instance hidden only because its series was deleted (Google returns those as cancelled too,
+            // but the dev server keeps it simple: a deleted series just hides its instances).
+            const withDeleted = url.searchParams.get('showDeleted') === 'true';
+            const shown = (e: Event) => (withDeleted ? e.status === 'cancelled' || !gone(e) : !gone(e));
+            const items = events.filter((e) => !e.recurrence && shown(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
             return send(200, { kind: 'calendar#events', items });
           }
           if (req.method === 'POST' && !id) {
@@ -163,6 +176,7 @@ export function devCalendarPlugin(): Plugin {
               end: body.end ?? {},
               ...(body.attendees !== undefined && { attendees: body.attendees }),
               id: `ev${next++}`,
+              updated: stamp(),
             };
             events.push(event);
             return send(200, event);
@@ -172,7 +186,7 @@ export function devCalendarPlugin(): Plugin {
           if (gone(events[found])) {
             // Only restoring a deleted event (not one of a deleted series) is allowed.
             if (req.method !== 'PATCH' || body.status !== 'confirmed' || events[found].status !== 'cancelled') return send(410, { error: { code: 410, message: 'Resource has been deleted' } });
-            events[found] = { ...events[found], status: 'confirmed' };
+            events[found] = { ...events[found], status: 'confirmed', updated: stamp() };
             return send(200, events[found]);
           }
           if (req.method === 'GET') return send(200, events[found]);
@@ -189,7 +203,7 @@ export function devCalendarPlugin(): Plugin {
             const newTime = ms(start) !== ms(events[found].start);
             const clock = (w: When) => new Date(ms(w)).toTimeString().slice(0, 5);
             if (!firstTime.has(`${who}/${id}`)) firstTime.set(`${who}/${id}`, clock(events[found].start));
-            events[found] = { ...events[found], ...fields, start, end };
+            events[found] = { ...events[found], ...fields, start, end, updated: stamp() };
             if (events[found].recurringEventId) changedAlone.add(`${who}/${id}`);
             // The whole series: its events not changed on their own follow, each on its own day.
             if (events[found].recurrence) {
@@ -198,7 +212,7 @@ export function devCalendarPlugin(): Plugin {
                 const alone = changedAlone.has(`${who}/${e.id}`);
                 if (!alone) {
                   const to = shift(e.originalStartTime as When, start, end);
-                  events[i] = { ...e, ...fields, ...to, ...(newTime && { originalStartTime: to.start }) };
+                  events[i] = { ...e, ...fields, ...to, updated: stamp(), ...(newTime && { originalStartTime: to.start }) };
                 }
                 // Like Google, an event's id comes from its series' time: a new time gives every event a new id (job #88).
                 if (newTime) {
@@ -215,8 +229,8 @@ export function devCalendarPlugin(): Plugin {
             return send(200, events[found]);
           }
           if (req.method === 'DELETE') {
-            // Kept as cancelled; a whole series hides its events with it.
-            events[found] = { ...events[found], status: 'cancelled' };
+            // Kept as cancelled; a whole series hides its events with it. `updated` is the deletion time.
+            events[found] = { ...events[found], status: 'cancelled', updated: stamp() };
             return send(204);
           }
           send(405, { error: { code: 405 } });

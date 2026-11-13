@@ -59,6 +59,8 @@ export interface AiItem {
   text: string;
   boardId: string;
   context?: string[];
+  /** A calendar event: never sent to Anthropic nor given an AI label (owner, 2026-11-13). */
+  event?: boolean;
 }
 
 /** What Sort with AI asks about, and saves a label under: an item's tidied text and, for a sub-item, its parent's tidied text. */
@@ -75,7 +77,9 @@ export interface AiEntry {
  *   parent is vague, so the sub-item is sorted by its own words), and Claude decides whether that parent names a topic.
  * Null when the item is not asked about.
  */
-export function aiEntry(item: { text: string; context?: string[] }): AiEntry | null {
+export function aiEntry(item: { text: string; context?: string[]; event?: boolean }): AiEntry | null {
+  // A calendar event is never asked about: its title is never sent to Anthropic (owner, 2026-11-13).
+  if (item.event) return null;
   const text = normalizeText(item.text);
   if (!text || isTimeWord(text) || parentCategory(item) !== null) return null;
   // An item above with no words left once tidied is skipped too, like a time word.
@@ -233,7 +237,7 @@ const builtIn = new Map(CATEGORIES.map((c) => [c.name.toLowerCase(), c.id] as co
  */
 export function makeAiCategorizer(items: AiItem[], lookup: (text: string, parent?: string) => string | null, isOwn: (boardId: string) => boolean): Categorizer {
   // An item with no board given (none on the disc) is not known to be own, so it gets no label.
-  const labelOf = (item: { text: string; context?: string[]; boardId?: string }) => {
+  const labelOf = (item: { text: string; context?: string[]; boardId?: string; event?: boolean }) => {
     if (item.boardId === undefined || !isOwn(item.boardId)) return null;
     const e = aiEntry(item);
     return e && lookup(e.text, e.parent);

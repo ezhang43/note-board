@@ -144,7 +144,7 @@ const isDay = (s: unknown): s is DayKey => typeof s === 'string' && /^\d{4}-\d{2
 const isTime = (s: unknown): s is string => typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
 /** A Google `start` / `end`: a day for all-day events, else a local 'YYYY-MM-DDTHH:MM'. */
-function readWhen(w: unknown): { allDay: boolean; at: string } | null {
+export function readWhen(w: unknown): { allDay: boolean; at: string } | null {
   if (typeof w !== 'object' || w === null) return null;
   const { date, dateTime } = w as { date?: unknown; dateTime?: unknown };
   if (isDay(date)) return { allDay: true, at: date };

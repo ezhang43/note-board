@@ -135,8 +135,8 @@ test('the strip on its right edge resizes it, gives way to a panel on the right,
   await expect.poll(async () => (await box(panel(page))).width).toBe(420);
 });
 
-test('ticking and Clean up work as on a card; its Completed button shows only what was cleaned up from it', async ({ page }) => {
-  // A list on the board with a cleaned-up item of its own.
+/** A list on the board with "board item" cleaned up, and the Checklist panel with "milk" cleaned up from bread, milk, eggs. */
+async function cleanedUpBoth(page: Page) {
   await clickEmpty(page);
   await add(page, 'Checklist');
   await page.keyboard.press('Tab');
@@ -151,19 +151,40 @@ test('ticking and Clean up work as on a card; its Completed button shows only wh
   await expect(panel(page).getByLabel('1 of 3 done')).toBeVisible();
   await panel(page).getByRole('button', { name: 'Clean up' }).click();
   expect(await texts(panel(page))).toEqual(['bread', 'eggs']);
-  await panel(page).getByRole('button', { name: 'Completed', exact: true }).click();
-  const done = page.getByRole('complementary', { name: 'Completed: Checklist' });
-  await expect(done).toContainText('milk');
-  await expect(done).not.toContainText('board item');
-  await expect(panel(page)).toBeVisible();
-  // Unticking there sends it back to the end of the panel's list, as on a card.
-  await done.getByRole('checkbox', { name: /Send "milk" back/ }).click();
-  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
-  // The board's own Completed shows the board's.
+}
+const completed = (page: Page) => page.getByRole('complementary', { name: 'Completed', exact: true });
+
+test('ticking and Clean up work as on a card; the board’s Completed panel shows them with the board’s own, marked “Checklist”', async ({ page }) => {
+  await cleanedUpBoth(page);
+  // The panel has no Completed button of its own any more (owner, 2026-11-13).
+  await expect(panel(page).getByRole('button', { name: 'Completed', exact: true })).toHaveCount(0);
   await toggleCompleted(page);
-  const boardDone = page.getByRole('complementary', { name: 'Completed', exact: true });
-  await expect(boardDone).toContainText('board item');
-  await expect(boardDone).not.toContainText('milk');
+  const done = completed(page);
+  await expect(done).toContainText('board item');
+  await expect(done).toContainText('milk');
+  await expect(panel(page)).toBeVisible();
+  // One date group holds both, and the checklist's item says where it came from.
+  await expect(done.locator('.completed-day')).toHaveCount(1);
+  await expect(done.locator('.completed-entry', { hasText: 'milk' }).locator('.completed-from')).toHaveText('Checklist');
+  // Unticking there sends it back to the end of the panel's list, as on a card; the board's stays.
+  await done.getByRole('checkbox', { name: 'Send "milk" back to Checklist' }).click();
+  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
+  await expect(done).not.toContainText('milk');
+  await expect(done).toContainText('board item');
+  // Ctrl+Z straight after, still in the Completed panel, takes it back out of the checklist; Ctrl+Y sends it back again.
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs']);
+  await expect(done).toContainText('milk');
+  await expect(done).toContainText('board item');
+  await expect(boardCards(page).first()).not.toContainText('board item');
+  await page.keyboard.press('Control+y');
+  await expect.poll(() => texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
+  // A second Ctrl+Z there, after a board item's untick, takes back the board's untick first.
+  await done.getByRole('checkbox', { name: /Send "board item" back/ }).click();
+  await expect.poll(() => texts(boardCards(page).first())).toContain('board item');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => texts(boardCards(page).first())).not.toContain('board item');
+  expect(await texts(panel(page))).toEqual(['bread', 'eggs', 'milk']);
 });
 
 test('undo in the panel steps its own list only; undo on the board leaves the panel as it is', async ({ page }) => {
@@ -236,15 +257,15 @@ test('an item dragged from a list on the board and let go over the panel stays i
   expect(await texts(panel(page))).toEqual(['panel item']);
 });
 
-test('“Completed: Checklist” closes with one press of its ×, and with one Escape', async ({ page }) => {
+test('Completed, open beside the Checklist panel, closes with one press of its ×, and with one Escape', async ({ page }) => {
   await openWith(page, ['a']);
-  const done = page.getByRole('complementary', { name: /^Completed/ });
-  await panel(page).getByRole('button', { name: 'Completed', exact: true }).click();
-  await expect(done).toHaveAccessibleName('Completed: Checklist');
+  const done = completed(page);
+  await toggleCompleted(page);
+  await expect(done).toBeVisible();
   await done.getByRole('button', { name: /Close/ }).click();
   await expect(done).toHaveCount(0);
   await expect(panel(page)).toBeVisible();
-  await panel(page).getByRole('button', { name: 'Completed', exact: true }).click();
+  await toggleCompleted(page);
   await done.getByRole('heading').first().click();
   await page.keyboard.press('Escape');
   await expect(done).toHaveCount(0);
@@ -430,5 +451,25 @@ test.describe('on a phone', () => {
     await page.keyboard.type('milk');
     expect(await texts(panel(page))).toEqual(['milk']);
     await expect(items(panel(page))).toBeFocused();
+  });
+
+  test('the Completed tile shows the checklist’s cleaned-up items with the board’s, and unticking one sends it back', async ({ page }) => {
+    await moreButton(page).tap();
+    await tile(page, 'Checklist').tap();
+    await items(panel(page)).tap();
+    await page.keyboard.type('stamps');
+    await panel(page).getByRole('checkbox', { name: 'Done: stamps' }).check();
+    await panel(page).getByRole('button', { name: 'Clean up' }).tap();
+    await panel(page).getByRole('button', { name: 'Close checklist' }).tap(); // it covers the bottom bar
+    await moreButton(page).tap();
+    await tile(page, 'Completed').tap();
+    const done = completed(page);
+    await expect(done.locator('.completed-entry', { hasText: 'stamps' }).locator('.completed-from')).toHaveText('Checklist');
+    await done.getByRole('checkbox', { name: 'Send "stamps" back to Checklist' }).tap();
+    await expect(done).not.toContainText('stamps');
+    await done.getByRole('button', { name: /Close/ }).tap();
+    await moreButton(page).tap();
+    await tile(page, 'Checklist').tap();
+    await expect.poll(() => texts(panel(page))).toContain('stamps');
   });
 });

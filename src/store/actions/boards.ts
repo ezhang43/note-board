@@ -355,7 +355,7 @@ export function boardActions(ctx: StoreContext) {
     openChecklist(phone = false): 'loading' | null {
       const { ui } = ctx.state;
       if (ui.checklistOpen) {
-        ctx.updateUi({ checklistOpen: false, ...(ui.completedBoard ? { completedBoard: null, sidePanel: ui.sidePanel === 'completed' ? null : ui.sidePanel } : {}) });
+        ctx.updateUi({ checklistOpen: false });
         return null;
       }
       if (!ui.sharesKnown) return 'loading';
@@ -367,7 +367,7 @@ export function boardActions(ctx: StoreContext) {
       ctx.updateUi({
         checklistOpen: true,
         itemSel: null,
-        ...(phone ? { sidePanel: null, historyOpen: false, completedBoard: null } : last && { focusItem: last.id, focusOffset: last.text.length }),
+        ...(phone ? { sidePanel: null, historyOpen: false, completedSteps: null } : last && { focusItem: last.id, focusOffset: last.text.length }),
       });
       return null;
     },
@@ -396,16 +396,14 @@ export function boardActions(ctx: StoreContext) {
       return { board: id, card: card.id, item: item.id };
     },
     /**
-     * The Checklist panel's Completed button: the Completed panel on the right, showing what Clean up moved off the
-     * main checklist (its own board's record, not the open board's). Pressed again, it closes. On a phone, where one
-     * panel shows at a time, the Checklist panel makes way.
+     * The Main checklist board whose cleaned-up items the Completed panel shows with the open board's (owner,
+     * 2026-11-13), or null: when there is none, while it is the open board (shown once, as the board's own), and
+     * while it isn't yet known which boards are shared (a share's "Main checklist" could be taken for it).
      */
-    openChecklistCompleted(phone = false) {
-      const { ui } = ctx.state;
+    completedChecklist(): string | null {
+      if (!ctx.state.ui.sharesKnown) return null;
       const id = checklistId();
-      if (!id) return;
-      if (ui.sidePanel === 'completed' && ui.completedBoard === id) return ctx.updateUi({ sidePanel: null, completedBoard: null });
-      ctx.updateUi({ sidePanel: 'completed', completedBoard: id, historyOpen: false, preview: null, ...(phone ? { checklistOpen: false } : {}) });
+      return id && id !== ctx.state.boards.open ? id : null;
     },
     /** Ctrl+Z / Ctrl+Y in the Checklist panel: on the Main checklist board's own history, whichever board is open. */
     undoChecklist() {

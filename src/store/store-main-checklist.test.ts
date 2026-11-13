@@ -189,36 +189,12 @@ describe('Checklist panel', () => {
     expect(checklistIds(s)).toHaveLength(1);
   });
 
-  it('its Completed button shows the checklist’s record in the Completed panel; the board’s own Completed shows the board’s again', () => {
+  it('the Completed panel’s × (and Escape) closes it in one press', () => {
     const s = setup();
     s.openChecklist();
-    const { id } = panel(s);
-    s.openChecklistCompleted();
-    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: id, checklistOpen: true });
-    // The board's Completed (⋯ More) switches it to the board's record rather than closing it.
-    s.toggleSidePanel('completed');
-    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: null });
-    s.openChecklistCompleted();
-    s.openChecklistCompleted(); // a second press closes it
-    expect(s.getState().ui.sidePanel).toBeNull();
-    // Any other panel on the right shows the board's record next time.
-    s.openChecklistCompleted();
-    s.toggleSidePanel('journal');
-    expect(s.getState().ui.completedBoard).toBeNull();
-    // On a phone it takes the screen, one panel at a time.
-    s.openChecklistCompleted(true);
-    expect(s.getState().ui).toMatchObject({ sidePanel: 'completed', completedBoard: id, checklistOpen: false });
-  });
-
-  it('the Completed panel’s × (and Escape) closes it in one press, whichever record it shows', () => {
-    const s = setup();
-    s.openChecklist();
-    s.openChecklistCompleted();
-    s.closeCompleted();
-    expect(s.getState().ui).toMatchObject({ sidePanel: null, completedBoard: null, checklistOpen: true });
     s.toggleSidePanel('completed');
     s.closeCompleted();
-    expect(s.getState().ui.sidePanel).toBeNull();
+    expect(s.getState().ui).toMatchObject({ sidePanel: null, checklistOpen: true });
   });
 
   it('a board someone named "Main checklist" without a list gets one clear of what is on it', () => {
@@ -296,6 +272,130 @@ function fakeRemote() {
   };
   return { remote, writes, send: (doc: RemoteDoc | null) => listener?.(doc) };
 }
+
+/**
+ * A board list with "board done" cleaned up, and the Main checklist with "list done" cleaned up and "keep" left
+ * in it (the owner, 2026-11-13: the checklist's cleaned-up items show in every board's Completed panel).
+ */
+function mixed() {
+  const s = setup();
+  s.addCard('todo');
+  const boardList = s.getState().ui.selection[0];
+  const boardItem = (s.getState().board.cards[boardList] as TodoCard).items[0].id;
+  s.setItemText(boardList, boardItem, 'board done');
+  s.toggleItem(boardList, boardItem);
+  s.cleanUp();
+  s.openChecklist();
+  const { id, p, list } = panel(s);
+  const first = list().items[0].id;
+  p.setItemText(list().id, first, 'list done');
+  p.itemEnter(list().id, first);
+  p.setItemText(list().id, s.getState().ui.focusItem!, 'keep');
+  p.toggleItem(list().id, first);
+  p.cleanUpList(list().id);
+  s.toggleSidePanel('completed');
+  const texts = () => list().items.map((i) => i.text);
+  const boardTexts = () => (s.getState().board.cards[boardList] as TodoCard).items.map((i) => i.text);
+  return { s, id, p, list, texts, boardTexts, boardItem, listItem: first };
+}
+
+describe('the Completed panel with the Main checklist’s items mixed in (owner, 2026-11-13)', () => {
+  it('mixes in the Main checklist’s record: not while it is the open board, not before shares are known, not when there is none', () => {
+    const none = setup();
+    expect(none.completedChecklist()).toBeNull();
+    const { s, id } = mixed();
+    expect(s.completedChecklist()).toBe(id);
+    s.setShares([], false);
+    expect(s.completedChecklist()).toBeNull(); // it could still turn out to be a share's board
+    s.setShares([], true);
+    const home = s.getState().boards.open;
+    s.openBoard(id);
+    expect(s.completedChecklist()).toBeNull(); // shown once, as the board's own
+    s.openBoard(home);
+    expect(s.completedChecklist()).toBe(id);
+  });
+
+  it('unticking a checklist item sends it back to the checklist, one undo step there; the open board is untouched', () => {
+    const { s, id, texts, listItem } = mixed();
+    const open = s.getState().board;
+    s.untickCompleted(listItem, true);
+    expect(texts()).toEqual(['keep', 'list done']);
+    expect(completedCardOf(s.workspace().boards[id])!.groups).toEqual([]);
+    expect(s.getState().board).toBe(open);
+    // Ctrl+Z in the Completed panel undoes it on the checklist, Ctrl+Y redoes it.
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep']);
+    expect(s.getState().board).toBe(open);
+    s.redoCompleted();
+    expect(texts()).toEqual(['keep', 'list done']);
+    expect(s.getState().board).toBe(open);
+  });
+
+  it('Ctrl+Z there steps back through the panel’s own unticks, newest first, then acts on the open board as before', () => {
+    const { s, texts, boardTexts, listItem, boardItem } = mixed();
+    s.untickCompleted(listItem, true);
+    s.untickCompleted(boardItem, false);
+    expect(boardTexts()).toEqual(['', 'board done']);
+    s.undoCompleted(); // the last untick was on the board
+    expect(boardTexts()).toEqual(['']);
+    expect(texts()).toEqual(['keep', 'list done']);
+    s.undoCompleted(); // then the checklist's
+    expect(texts()).toEqual(['keep']);
+    // No more unticks to take back: the next goes to the open board (its Clean up), never further back on the checklist.
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep']);
+    expect(boardTexts()).toEqual(['board done']);
+    // Redo walks forward the same way.
+    s.redoCompleted(); // the board's Clean up again (as Ctrl+Y on the board)
+    s.redoCompleted();
+    expect(texts()).toEqual(['keep', 'list done']);
+  });
+
+  it('once the checklist has changed since the untick, Ctrl+Z there leaves it alone and acts on the open board', () => {
+    const { s, p, list, texts, boardTexts, listItem } = mixed();
+    s.untickCompleted(listItem, true);
+    p.setItemText(list().id, list().items[0].id, 'keep it'); // typed in the Checklist panel afterwards
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep it', 'list done']);
+    expect(boardTexts()).toEqual(['board done']); // the open board's Clean up undone, as Ctrl+Z there did before
+  });
+
+  it('reopening the panel starts afresh: Ctrl+Z there is the open board’s', () => {
+    const { s, texts, listItem } = mixed();
+    s.untickCompleted(listItem, true);
+    s.closeCompleted();
+    s.toggleSidePanel('completed');
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep', 'list done']);
+  });
+
+  it('nothing goes back while the open board is read-only or an old version is shown', () => {
+    const { s, id, texts, listItem } = mixed();
+    const open = s.getState().boards.open;
+    const share = { id: 'sh', root: open, boards: [open], owner: false, ownerUid: 'x', people: [], links: { view: null, comment: null, edit: null }, role: 'view' };
+    s.setShares([share] as never, true);
+    s.untickCompleted(listItem, true);
+    expect(texts()).toEqual(['keep']);
+    s.setShares([], true);
+    s.previewVersion({ id: 'v', at: 0 } as never, s.getState().board);
+    s.untickCompleted(listItem, true);
+    expect(texts()).toEqual(['keep']);
+    s.endPreview();
+    s.untickCompleted(listItem, true);
+    expect(texts()).toEqual(['keep', 'list done']);
+    expect(completedCardOf(s.workspace().boards[id])!.groups).toEqual([]);
+  });
+
+  it('while the Main checklist is the open board, its items untick as the board’s own', () => {
+    const { s, id, texts, listItem } = mixed();
+    s.openBoard(id);
+    s.toggleSidePanel('completed');
+    s.untickCompleted(listItem, false);
+    expect(texts()).toEqual(['keep', 'list done']);
+    s.undoCompleted();
+    expect(texts()).toEqual(['keep']);
+  });
+});
 
 describe('Checklist panel and sync (PR 274 check)', () => {
   const online = (name: string) => {

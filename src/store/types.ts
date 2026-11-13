@@ -195,8 +195,13 @@ export interface Ui {
    * alongside any right-hand one.
    */
   checklistOpen: boolean;
-  /** The board whose Completed record the Completed panel shows: null for the open board (the Checklist panel's Completed button sets it). */
-  completedBoard: string | null;
+  /**
+   * The unticks made in the Completed panel since it opened (owner, 2026-11-13: it mixes in the Main checklist's
+   * items), so Ctrl+Z / Ctrl+Y there step the board each one changed: `undo` and `redo` hold board ids, newest
+   * last; `checklist` is the Main checklist board as the panel last left it (the panel never steps it once it has
+   * changed since). Null while the panel is shut.
+   */
+  completedSteps: { undo: string[]; redo: string[]; checklist: Board | null } | null;
   /** The board the Journal panel writes into (set when it opens). */
   journalBoard: string | null;
   /** The shared boards this person has (owner request: editing together); empty where nothing is shared. */
@@ -279,7 +284,7 @@ export const emptyUi: Ui = {
   find: null,
   sidePanel: null,
   checklistOpen: false,
-  completedBoard: null,
+  completedSteps: null,
   journalBoard: null,
   shares: [],
   sharesKnown: true,

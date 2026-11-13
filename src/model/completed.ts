@@ -44,6 +44,27 @@ export function completedCardOf(board: Board): CompletedCard | null {
   return view;
 }
 
+/** One row of the Completed panel: an entry, the record it is in, and whether that is the Main checklist's. */
+export interface CompletedRow {
+  entry: CompletedEntry;
+  cardId: string;
+  checklist: boolean;
+}
+
+/**
+ * The Completed panel's days (owner, 2026-11-13): the open board's record with the Main checklist's mixed in,
+ * under the same dates, newest first; in a day the board's own items come first. Nothing is saved this way:
+ * each record stays on its own board.
+ */
+export function mergeCompleted(own: CompletedCard | null, checklist: CompletedCard | null): { date: string; rows: CompletedRow[] }[] {
+  const days = new Map<string, CompletedRow[]>();
+  for (const [card, isList] of [[own, false], [checklist, true]] as const) {
+    if (!card) continue;
+    for (const g of card.groups) days.set(g.date, [...(days.get(g.date) ?? []), ...g.entries.map((entry) => ({ entry, cardId: card.id, checklist: isList }))]);
+  }
+  return [...days].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)).map(([date, rows]) => ({ date, rows }));
+}
+
 /** `place`, or a loose spot when it names a column that is gone (the card is never left in no place). */
 const placeOrLoose = (board: Board, place: Placement): Placement => (place.type === 'column' && !board.columns[place.columnId] ? { type: 'loose', x: 0, y: 0 } : place);
 

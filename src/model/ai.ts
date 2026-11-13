@@ -27,6 +27,7 @@ export type AiFailureKind =
   | "no-key"
   | "cap"
   | "storage"
+  | "labels-not-saved"
   | "invalid-key"
   | "browser-blocked"
   | "limit"

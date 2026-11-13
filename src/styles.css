@@ -3929,7 +3929,10 @@ a.cal-open { align-self: flex-start; }
 .viz-range button:active, .viz-close:active { transform: scale(0.97); }
 /* Sort with AI (shown only while a key is saved): one button, a status, and the line saying what is sent. */
 .viz-ai { display: flex; flex-direction: column; gap: 6px; margin-top: -12px; }
-.viz-ai-row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.viz-ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 32px; }
+/* "Sort automatically" (job viz-ai-autosort): a native checkbox beside the button, like "Remember on this device" in AI settings. */
+.viz-ai-auto { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--viz-soft); cursor: default; }
+.viz-ai-auto input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--viz-honey); }
 .viz-ai-button {
   height: 32px;
   padding: 0 14px;
@@ -4007,6 +4010,8 @@ a.cal-open { align-self: flex-start; }
   .viz-count-number { font-size: 28px; }
   .viz-ai { margin-top: 0; }
   .viz-ai-button { height: 44px; padding: 0 16px; }
+  .viz-ai-auto { min-height: 44px; }
+  .viz-ai-auto input { width: 20px; height: 20px; }
   .viz-feed-wrap { flex: none; overflow: visible; }
   .viz-close { position: fixed; right: 8px; } /* stays in reach while the numbers are scrolled to */
 }

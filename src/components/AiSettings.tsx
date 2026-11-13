@@ -115,10 +115,12 @@ function Dialog() {
           </button>
         </header>
         <p className="shortcuts-hint">
-          Your key is used only when you press Test key or an AI button. An AI
-          button sends the text of finished checklist items from your own
-          boards, never from boards shared with you, straight from this browser
-          to Anthropic, with your key; it never goes through BusyAnts.
+          Your key is used only when you press Test key or an AI button, or
+          when the Visualizer sorts by itself (Sort automatically, on until you
+          untick it). Sorting sends the text of finished checklist items from
+          your own boards, never from boards shared with you (with a sub-item,
+          also the text of the item it is under), straight from this browser to
+          Anthropic, with your key; it never goes through BusyAnts.
         </p>
 
         <div className="ai-warning" role="note">

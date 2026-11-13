@@ -522,3 +522,12 @@ describe("the Calm button", () => {
     for (const v of [null, "0", "", "banana", "true"]) expect(parseCalm(v)).toBe(false);
   });
 });
+
+describe("the Sort automatically box", () => {
+  it("is saved as note-board:viz-ai-auto, off only for 0; anything unreadable means on", async () => {
+    const { VIZ_AI_AUTO_KEY, parseAutoSort } = await import("./visualizer");
+    expect(VIZ_AI_AUTO_KEY).toBe("note-board:viz-ai-auto");
+    expect(parseAutoSort("0")).toBe(false);
+    for (const v of [null, "1", "", "banana", "false"]) expect(parseAutoSort(v)).toBe(true);
+  });
+});

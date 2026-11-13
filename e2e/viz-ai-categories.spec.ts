@@ -35,6 +35,8 @@ async function seed(page: Page) {
       boards[id] = { name, snap: true, cards: { [`${id}_done`]: { id: `${id}_done`, kind: 'completed', color: 'stone', x: 0, y: 0, groups: [{ date, entries }] } }, columns: {}, order: [`${id}_done`] };
     }
     localStorage.setItem('note-board:v1', JSON.stringify({ version: 6, home: 'home', boards }));
+    // The press tests start with Sort automatically off; the auto tests below turn it back on.
+    localStorage.setItem('note-board:viz-ai-auto', '0');
   }, SEED);
   await page.reload();
   await fontsLoaded(page);
@@ -49,7 +51,8 @@ async function anthropic(page: Page, status = 200) {
     bodies.push(body);
     if (status !== 200) return r.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } }) });
     const user: string = JSON.parse(body).messages[0].content;
-    const texts = JSON.parse(user.slice(user.lastIndexOf('['))) as string[];
+    // A sub-item comes as {"item","under"}; the stand-in labels it by its own text.
+    const texts = (JSON.parse(user.slice(user.lastIndexOf('['))) as (string | { item: string })[]).map((t) => (typeof t === 'string' ? t : t.item));
     const categories = ['Food', 'Housework'];
     const labels = texts.flatMap((t, i) => (AI[t] ? [{ i, c: categories.indexOf(AI[t]) }] : []));
     const reply = { type: 'message', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ categories, labels }) }] };
@@ -105,8 +108,9 @@ test('sorting sends only the item texts, changes the categories, and a reload re
   for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(sent).toContain(text);
   for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'home_0', 'b2_', 'secret note']) expect(sent).not.toContain(never);
   expect(sent).not.toContain('SECRET');
-  // The one item with no label is the only one left to send.
-  await expect(dialog(page).getByText(/Sends the text of 1 finished item from your own boards to Anthropic/)).toBeVisible();
+  // The one item Claude gave no label is remembered as asked, so it is not sent (and billed) again.
+  await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
+  await expect(sortButton(page)).toBeDisabled();
 
   await page.reload();
   await fontsLoaded(page);
@@ -138,6 +142,215 @@ test('an error from Anthropic is shown in plain words, and the categories stay a
   await expect(sortButton(page)).toBeEnabled();
 });
 
+// Sort automatically (owner request 2026-11-13, job "viz-ai-autosort"): on by default, remembered on this device.
+const autoBox = (page: Page) => dialog(page).getByRole('checkbox', { name: 'Sort automatically' });
+const autoDefault = (page: Page) => page.evaluate(() => localStorage.removeItem('note-board:viz-ai-auto'));
+
+test('Sort automatically is on by default and sorts as soon as the Visualizer opens, sending only the item texts', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  expect(bodies).toEqual([]);
+  await openVisualizer(page);
+  await expect(autoBox(page)).toBeChecked();
+  await expect(canvas(page)).toHaveAttribute('aria-label', '4 items cleaned up: Food 2, Housework 1, Other 1.');
+  expect(bodies).toHaveLength(1);
+  for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(bodies[0]).toContain(text);
+  for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'secret note', 'SECRET']) expect(bodies[0]).not.toContain(never);
+  // "sand the door" got no label: that is remembered too, so nothing is left to send, now or on the next open.
+  await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', '4 items cleaned up: Food 2, Housework 1, Other 1.');
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+});
+
+test('with Sort automatically off, opening sends nothing, as before', async ({ page }) => {
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(autoBox(page)).not.toBeChecked();
+  await expect(dialog(page).getByText(/^Sends the text of 4 finished items from your own boards/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
+});
+
+test('the Sort automatically choice is remembered on this device', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).uncheck();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-ai-auto'))).toBe('0');
+
+  await page.reload();
+  await fontsLoaded(page);
+  await openVisualizer(page);
+  await expect(autoBox(page)).not.toBeChecked();
+  // With the box off nothing goes by itself (and "sand the door" was already asked about, so nothing is waiting).
+  await expect(dialog(page).getByText(/^Nothing left to sort/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).check();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-ai-auto'))).toBe('1');
+});
+
+test('with no key saved, Sort automatically sends nothing and is not shown', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
+  await expect(autoBox(page)).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+});
+
+test('after a failure Sort automatically does not try again by itself in the same range', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page, 429);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText('too many requests');
+  expect(bodies).toHaveLength(1);
+  // Switching to By board and back is the same range in the same open: no second request.
+  await dialog(page).getByRole('button', { name: 'By board' }).click();
+  await dialog(page).getByRole('button', { name: 'By category' }).click();
+  await expect(sortButton(page)).toBeEnabled();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  // Another range is its own run.
+  await dialog(page).getByRole('button', { name: '7 days' }).click();
+  await expect.poll(() => bodies.length).toBe(2);
+});
+
+test('a press counts as the run for that range: ticking Sort automatically afterwards sends nothing more', async ({ page }) => {
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).check();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+});
+
+/** Holds every Anthropic request until `answer()`; `asked()` is how many came. */
+async function heldAnthropic(page: Page) {
+  let answer: () => void = () => {};
+  const held = new Promise<void>((r) => (answer = r));
+  let asked = 0;
+  await page.route('https://api.anthropic.com/**', async (r: Route) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
+    asked++;
+    await held;
+    return r.fulfill({ status: 500, headers: cors, body: '{}' }).catch(() => {});
+  });
+  return { answer: () => answer(), asked: () => asked };
+}
+
+test('an automatic sort cut short by switching to By board counts as run: coming back to By category sends nothing more', async ({ page }) => {
+  await autoDefault(page);
+  const held = await heldAnthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
+  await dialog(page).getByRole('button', { name: 'By board' }).click();
+  await dialog(page).getByRole('button', { name: 'By category' }).click();
+  // Not a second run: the button is there for another try.
+  await expect(sortButton(page)).toBeEnabled();
+  await page.waitForTimeout(500);
+  expect(held.asked()).toBe(1);
+  held.answer();
+});
+
+test('unticking Sort automatically stops an automatic sort still running, as Cancel does', async ({ page }) => {
+  await autoDefault(page);
+  const held = await heldAnthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText('Sorting… 0 of 4')).toBeVisible();
+  await autoBox(page).uncheck();
+  await expect(dialog(page).getByText('Stopped.')).toBeVisible();
+  await expect(sortButton(page)).toBeEnabled();
+  held.answer();
+  await page.waitForTimeout(300);
+  expect(held.asked()).toBe(1);
+});
+
+test('where the labels cannot be saved, Sort automatically sends nothing and says so; a press still works', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  // This browser's storage is full for the labels (the boards still save).
+  await page.evaluate(() => {
+    const w = window as unknown as { full: boolean };
+    w.full = true;
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (w.full && k.startsWith('note-board:ai-categories')) throw new DOMException('full', 'QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  const paused = dialog(page).getByText("Can't save sorted labels on this device, so Sort automatically is paused.", { exact: false });
+  await openVisualizer(page);
+  await expect(paused).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await sortButton(page).click();
+  // Too full to keep the labels and still leave the boards their room: nothing written, and it says so.
+  await expect(dialog(page).getByRole('alert')).toHaveText('Not saved: the sorted labels would use the space this device keeps for your boards. Free some space, then try again.');
+  expect(await page.evaluate(() => localStorage.getItem('note-board:ai-categories'))).toBeNull();
+  expect(bodies).toHaveLength(1);
+  // Room again: a press saves, and the paused line goes.
+  await page.evaluate(() => ((window as unknown as { full: boolean }).full = false));
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  await expect(paused).toHaveCount(0);
+});
+
+test('when AI uses cannot be counted, the counter says so and Sort automatically is not shown as paused for the labels', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await page.evaluate(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (k === 'note-board:ai-uses') throw new DOMException('full', 'QuotaExceededError');
+      return set.call(this, k, v);
+    };
+  });
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText("won't let Note Board count AI uses");
+  await expect(dialog(page).getByText(/Sort automatically is paused/)).toHaveCount(0);
+  expect(bodies).toEqual([]);
+});
+
+test('with the labels kept on this device full, Sort automatically pauses instead of pushing older ones out', async ({ page }) => {
+  await autoDefault(page);
+  // 2,000 labels kept already (the most), for nobody signed in.
+  await page.evaluate(() => {
+    const entries: Record<string, string> = {};
+    for (let i = 0; i < 2000; i++) entries[`hx${i}`] = 'Stuff';
+    localStorage.setItem('note-board:ai-categories', JSON.stringify({ v: 1, owner: '', entries }));
+  });
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText(/^Sort automatically is paused: this device keeps at most 2,000 sorted labels\./)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await sortButton(page).click();
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
+});
+
 test('Cancel stops a sort that is still running', async ({ page }) => {
   let answer: () => void = () => {};
   const held = new Promise<void>((r) => (answer = r));
@@ -154,4 +367,39 @@ test('Cancel stops a sort that is still running', async ({ page }) => {
   await expect(dialog(page).getByText('Stopped.')).toBeVisible();
   await expect(sortButton(page)).toBeEnabled();
   answer();
+});
+
+test('a sub-item goes with the text of the item it is under; a parent like Today or one that names a topic is not sent', async ({ page }) => {
+  // Three more finished entries on Home, each a ticked parent with one ticked sub-item.
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('note-board:v1')!);
+    const entries = data.boards.home.cards.home_done.groups[0].entries;
+    const sub = (id: string, parent: string, child: string) => ({
+      item: { id, text: parent, done: true, note: 'secret note', children: [{ id: `${id}c`, text: child, done: true, children: [], note: 'secret note' }] },
+      fromCardId: 'home_l',
+      fromTitle: 'Groceries',
+      fromParentId: null,
+    });
+    entries.push(sub('p1', 'Elden Ring', 'Beat the boss'), sub('p2', 'Today', 'water plants'), sub('p3', 'Clean the garage', 'find the box'));
+    localStorage.setItem('note-board:v1', JSON.stringify(data));
+  });
+  await page.reload();
+  await fontsLoaded(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  // The hint says a sub-item goes with its parent's text only when one is waiting to be sent.
+  await expect(dialog(page).getByText(/^Sends the text of 6 finished items from your own boards to Anthropic with your key \(a sub-item with the text of the item it is under\): no board names/)).toBeVisible();
+  await sortButton(page).click();
+  await expect(dialog(page).getByText(/^Sorted /)).toBeVisible();
+  expect(bodies).toHaveLength(1);
+  const sent = bodies[0];
+  // The sub-item goes with its parent's text, as context.
+  expect(sent).toContain('{\\"item\\":\\"Beat the boss\\",\\"under\\":\\"Elden Ring\\"}');
+  // Under a time word it goes by its own words alone; under a parent that names a topic it is not sent at all.
+  expect(sent).toContain('\\"water plants\\"');
+  expect(sent).not.toContain('Today');
+  expect(sent).not.toContain('find the box');
+  expect(sent).not.toContain('Clean the garage');
+  for (const never of ['Home', 'Garage', 'Groceries', 'home_', 'secret note', 'SECRET']) expect(sent).not.toContain(never);
 });

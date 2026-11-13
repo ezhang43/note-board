@@ -48,13 +48,15 @@ test.describe("on a wide desktop", () => {
       "separate workspace with a low spend limit and a key that expires",
     );
     expect(text).toContain(
-      "your key is used only when you press test key or an ai button",
+      "your key is used only when you press test key or an ai button, or when the visualizer sorts by itself (sort automatically, on until you untick it)",
     );
     expect(text).toContain("straight from this browser to anthropic");
     // Owner, 2026-11-13: only items from your own boards, never from boards shared with you.
     expect(text).toContain(
       "the text of finished checklist items from your own boards, never from boards shared with you",
     );
+    // A sub-item goes with the text of the item it is under, as context (job viz-ai-autosort).
+    expect(text).toContain("(with a sub-item, also the text of the item it is under)");
     await expect(
       dialog(page).getByRole("button", { name: "Test key" }),
     ).toBeDisabled();

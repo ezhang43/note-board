@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { MONTHS, dayKey } from '../model/calendar';
 import { VIZ_DEFAULT_RANGE, VIZ_GROUPS, VIZ_RANGES, cardLines, chartPath, counts, discOf, doneItems, inRange, keepIfSame, loopOrder, perDay, summaryOf, type DoneItem, type VizGroupBy, type VizRange } from '../model/visualizer';
 import { makeAiCategorizer, ownBoards, toSend } from '../model/aiCategories';
-import { categoryOf } from '../model/categorize';
+import { categoryOf, parentFirst } from '../model/categorize';
 import { ai, useAiSettings } from '../store/ai';
 import { aiLabels } from '../store/aiLabels';
 import { appStore, useAppState } from '../store/appStore';
@@ -97,7 +97,7 @@ function Overlay() {
   const shares = useAppState((s) => s.ui.shares);
   const sharesKnown = useAppState((s) => s.ui.sharesKnown);
   const isOwn = useMemo(() => ownBoards(shares, sharesKnown), [shares, sharesKnown]);
-  const categorize = useMemo(() => (lookup ? makeAiCategorizer(items, lookup, isOwn) : categoryOf), [items, lookup, isOwn]);
+  const categorize = useMemo(() => (lookup ? parentFirst(makeAiCategorizer(items, lookup, isOwn)) : categoryOf), [items, lookup, isOwn]);
   const disc = useMemo(() => discOf(items, group, categorize), [items, group, categorize]);
   const pending = useMemo(() => (lookup ? toSend(items, (t) => lookup(t) !== null, isOwn) : null), [items, lookup, isOwn]);
   // The two lines of the small card for each item as it lands (plain text, drawn on the canvas).

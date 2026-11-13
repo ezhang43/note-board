@@ -1,6 +1,7 @@
 import { addDays, weekStart } from './calendar';
-import { CATEGORIES, categoryIndex, categoryOf, type Categorizer } from './categorize';
+import { CATEGORIES, categoryIndex, categoryOf, isTimeWord, type Categorizer } from './categorize';
 import { completedCardOf } from './completed';
+import type { TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
 
 // The Visualizer (owner request, 2026-11-12): a looping, animated, read-only view of the items Clean up
@@ -16,7 +17,7 @@ export const VIZ_RANGES: { id: VizRange; label: string }[] = [
 ];
 export const VIZ_DEFAULT_RANGE: VizRange = '30';
 
-/** One cleaned-up item (an entry of a Completed panel; whatever was nested under it travels with it and isn't counted). */
+/** One cleaned-up item: an entry of a Completed panel, or, when the entry has completed sub-items (nested ones too), each of those instead (the parent is not an item then). */
 export interface DoneItem {
   id: string;
   text: string;
@@ -30,6 +31,8 @@ export interface DoneItem {
   boardRank: number;
   /** Its place in its board's panel, newest day first: breaks ties inside a board. */
   order: number;
+  /** For a completed sub-item: the words of the items it sat under, nearest first (they help to categorize it). Empty for an entry's own item. */
+  context?: string[];
 }
 
 /** A real day key: four-digit year, as `addDays` writes it back (so 2026-13-45, 0001-01-01 and "soon" are not). */
@@ -37,6 +40,12 @@ export const isDay = (s: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(s) && ad
 
 export const UNTITLED_BOARD = 'Untitled board';
 export const UNTITLED_LIST = 'List';
+
+/** Every completed sub-item under `item`, nested ones too (top to bottom), with the words of what they sit under, nearest first. */
+function doneUnder(item: TodoItem, above: string[]): { item: TodoItem; context: string[] }[] {
+  const context = [item.text.trim(), ...above].filter(Boolean);
+  return item.children.flatMap((c) => [...(c.done && c.text.trim() && !isTimeWord(c.text) ? [{ item: c, context }] : []), ...doneUnder(c, context)]);
+}
 
 /**
  * Every cleaned-up item on every board in `ws`: the open one, the others, the Journal and Habits boards
@@ -52,7 +61,11 @@ export function doneItems(ws: Workspace): DoneItem[] {
       // A day that is not a real date (a shared board or an imported backup can hold anything) is left out.
       if (!isDay(g.date)) continue;
       for (const e of g.entries) {
-        out.push({ id: `${boardId}:${e.item.id}`, text: e.item.text.trim(), boardId, boardName: board.name.trim() || UNTITLED_BOARD, list: e.fromTitle.trim() || UNTITLED_LIST, date: g.date, boardRank, order: order++ });
+        const subs = doneUnder(e.item, []);
+        // An item that is only a time word ("Today", "daily") is never an item itself; its completed sub-items still are.
+        for (const { item, context } of subs.length ? subs : isTimeWord(e.item.text) ? [] : [{ item: e.item, context: [] }]) {
+          out.push({ id: `${boardId}:${item.id}`, text: item.text.trim(), boardId, boardName: board.name.trim() || UNTITLED_BOARD, list: e.fromTitle.trim() || UNTITLED_LIST, date: g.date, boardRank, order: order++, context });
+        }
       }
     }
   });
@@ -114,10 +127,12 @@ export function perDay(items: DoneItem[], range: VizRange, today: string): DayCo
   return days;
 }
 
+const sameWords = (a: string[] = [], b: string[] = []) => a.length === b.length && a.every((w, k) => w === b[k]);
+
 /** `next` when it differs from `prev`, else `prev` itself, so a redraw from an unrelated board change keeps the same list and the loop does not start over. */
 export function keepIfSame(prev: DoneItem[] | undefined, next: DoneItem[]): DoneItem[] {
   if (!prev || prev.length !== next.length) return next;
-  const same = prev.every((p, i) => p.id === next[i].id && p.text === next[i].text && p.list === next[i].list && p.boardName === next[i].boardName && p.date === next[i].date);
+  const same = prev.every((p, i) => p.id === next[i].id && p.text === next[i].text && p.list === next[i].list && p.boardName === next[i].boardName && p.date === next[i].date && sameWords(p.context, next[i].context));
   return same ? prev : next;
 }
 

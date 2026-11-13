@@ -11,7 +11,7 @@ const rangeButton = (page: Page, name: string) => dialog(page).getByRole('button
 const count = (page: Page, label: string) => dialog(page).locator('.viz-count').filter({ hasText: label }).locator('.viz-count-number');
 
 /** [board, list, text, days ago]: three boards' worth of cleaned-up items, one older than 30 days and one older than 7. */
-const SEED: [string, string, string, number][] = [
+const SEED: [string, string, string, number, string[]?][] = [
   ['home', 'Groceries', 'milk', 0],
   ['home', 'Groceries', 'bread', 0],
   ['home', 'Groceries', 'eggs', 1],
@@ -21,7 +21,7 @@ const SEED: [string, string, string, number][] = [
 ];
 
 /** Saves two boards (Home and Garage) with the items above already cleaned up, then reloads. Returns how many of them fall in this calendar week. */
-async function seed(page: Page, rows: [string, string, string, number][] = SEED) {
+async function seed(page: Page, rows: [string, string, string, number, string[]?][] = SEED) {
   const inWeek = await page.evaluate((seed) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     const key = (ago: number) => {
@@ -32,10 +32,10 @@ async function seed(page: Page, rows: [string, string, string, number][] = SEED)
     const boards: Record<string, unknown> = {};
     for (const [id, name] of [['home', 'Home'], ['b2', 'Garage']]) {
       const groups: Record<string, { date: string; entries: unknown[] }> = {};
-      seed.filter((s) => s[0] === id).forEach(([, list, text, ago], i) => {
+      seed.filter((s) => s[0] === id).forEach(([, list, text, ago, subs], i) => {
         const date = key(ago);
         groups[date] ??= { date, entries: [] };
-        groups[date].entries.push({ item: { id: `${id}_${i}`, text, done: true, children: [] }, fromCardId: `${id}_l`, fromTitle: list, fromParentId: null });
+        groups[date].entries.push({ item: { id: `${id}_${i}`, text, done: true, children: (subs ?? []).map((t, k) => ({ id: `${id}_${i}_${k}`, text: t, done: true, children: [] })) }, fromCardId: `${id}_l`, fromTitle: list, fromParentId: null });
       });
       const sorted = Object.values(groups).sort((a, b) => (a.date < b.date ? 1 : -1));
       boards[id] = { name, snap: true, cards: { [`${id}_done`]: { id: `${id}_done`, kind: 'completed', color: 'stone', x: 0, y: 0, groups: sorted } }, columns: {}, order: [`${id}_done`] };
@@ -118,6 +118,19 @@ test('switching to a shorter range part-way round the loop does not break it (no
 });
 
 const groupButton = (page: Page, name: string) => dialog(page).getByRole('group', { name: 'Group by' }).getByRole('button', { name, exact: true });
+
+test('an item with completed sub-items counts as its sub-items: the parent is not in the feed or the numbers', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await seed(page, [['home', 'Tasks', 'Today', 0, ['call Sam', 'pay rent', 'boxes']], ['home', 'Tasks', 'solo', 0]]);
+  await openVisualizer(page);
+  await expect(count(page, 'Done today')).toHaveText('4'); // three sub-items and the plain item, not the parent
+  const rows = dialog(page).locator('.viz-feed li');
+  await expect.poll(async () => rows.count(), { timeout: 8000 }).toBe(4);
+  await expect(dialog(page).locator('.viz-feed-text', { hasText: /^Today$/ })).toHaveCount(0);
+  await expect(dialog(page).locator('.viz-feed-where', { hasText: 'Calls & messages' })).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
 
 test('wedges are categories by default; By board switches to boards, and the choice is remembered on this device', async ({ page }) => {
   await seed(page);

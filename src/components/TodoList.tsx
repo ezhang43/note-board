@@ -1,7 +1,7 @@
 import { BoardReadOnly, boxProps } from './textBox';
 import { styleCss } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
-import { memo, use, useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, use, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canFold, canMoveItem, doneCount, hasFoldable, isFolded, ITEM_INDENT } from '../model/checklist';
 import type { TodoCard, TodoItem } from '../model/types';
 import { storeOfCard, useAppState } from '../store/appStore';
@@ -107,6 +107,15 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     const m = s.ui.find?.current;
     return !!m && m.showInstead === item.id && m.key.startsWith(`item:${cardId}:`); // in this list, not one with the same ids
   });
+  // Set only when the person ticks this item themselves (its box, or Ctrl+Enter): the tick animation (CSS) plays for it and
+  // for no other row, and never for undo, redo, sync, Clean up or a parent ticked by its children. Display only.
+  const [popped, setPopped] = useState(false);
+  useEffect(() => {
+    if (!popped) return;
+    const t = setTimeout(() => setPopped(false), 260);
+    return () => clearTimeout(t);
+  }, [popped]);
+  const tickPop = popped && item.done;
   const dimmed = useAppState((s) => !!s.ui.itemDrag && s.ui.itemDrag.cardId === cardId && s.ui.itemDrag.allIds.includes(item.id));
   // Lifted by press-and-hold (phone): the rows slide aside by this many px (0: back in place).
   const lifting = useAppState((s) => !!s.ui.itemDrag?.lift);
@@ -141,6 +150,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       // Ctrl+Enter (⌘+Enter): tick or untick, like the Done box (owner request, 2026-10-15).
       e.preventDefault();
       const el = e.currentTarget;
+      setPopped(!item.done);
       storeOfCard(cardId).tickFromKeyboard(cardId, item.id, el.selectionStart);
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -178,6 +188,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   const classes = [
     'todo-item',
     item.done && 'done',
+    tickPop && 'tick-pop',
     picked && 'picked',
     words !== null && 'words',
     mark && `mark-${mark}`,
@@ -213,7 +224,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
         </button>
       )}
       <label className="tick" {...tickBoxPress}>
-        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => storeOfCard(cardId).toggleItem(cardId, item.id)} onClick={tickBoxClick} />
+        <input type="checkbox" aria-label={item.text.trim() ? `Done: ${item.text.trim()}` : 'Done'} checked={item.done} disabled={readOnly} onChange={() => {
+          setPopped(!item.done);
+          storeOfCard(cardId).toggleItem(cardId, item.id);
+        }} onClick={tickBoxClick} />
       </label>
       <GrowTextarea
         ref={ref}

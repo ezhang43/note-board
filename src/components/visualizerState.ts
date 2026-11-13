@@ -47,8 +47,13 @@ export function readCalm(): boolean {
   }
 }
 
-/** Sort with AI's "Sort automatically" box saved on this device. Unreadable or blocked storage means on. */
+// A choice this visit could not save (storage blocked or full): it holds until the page is reloaded, so an untick
+// (which stops sending without a press) is not undone by an older saved value or the default.
+let unsaved: boolean | null = null;
+
+/** Sort with AI's "Sort automatically" box saved on this device. Unreadable or blocked storage means on, unless it was unticked in this visit. */
 export function readAutoSort(): boolean {
+  if (unsaved !== null) return unsaved;
   try {
     return parseAutoSort(localStorage.getItem(VIZ_AI_AUTO_KEY));
   } catch {
@@ -59,8 +64,9 @@ export function readAutoSort(): boolean {
 export function saveAutoSort(on: boolean) {
   try {
     localStorage.setItem(VIZ_AI_AUTO_KEY, on ? '1' : '0');
+    unsaved = null;
   } catch {
-    // not kept: it is only a convenience
+    unsaved = on;
   }
 }
 

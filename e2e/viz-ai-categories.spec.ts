@@ -159,7 +159,7 @@ test('Sort automatically is on by default and sorts as soon as the Visualizer op
   // The hint says it is automatic; "sand the door" got no label, so it is still waiting for a press, and is not asked about again in this open.
   await expect(
     dialog(page).getByText(
-      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key (a sub-item with the text of the item it is under): no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
+      'Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you. Press Sort with AI to send 1 finished item still waiting.',
     ),
   ).toBeVisible();
   await page.waitForTimeout(500);
@@ -297,6 +297,8 @@ test('a sub-item goes with the text of the item it is under; a parent like Today
   const bodies = await anthropic(page);
   await saveKey(page);
   await openVisualizer(page);
+  // The hint says a sub-item goes with its parent's text only when one is waiting to be sent.
+  await expect(dialog(page).getByText(/^Sends the text of 6 finished items from your own boards to Anthropic with your key \(a sub-item with the text of the item it is under\): no board names/)).toBeVisible();
   await sortButton(page).click();
   await expect(dialog(page).getByText(/^Sorted /)).toBeVisible();
   expect(bodies).toHaveLength(1);

@@ -18,7 +18,7 @@ type Status =
   | { kind: 'error'; message: string };
 
 const NOT_SENT = 'no board names, lists or notes, and nothing from boards shared with you.';
-// A sub-item goes with the text of the item it sat under, as context (owner request 2026-11-13); that item may not be ticked itself.
+// A sub-item goes with the text of the item it sat under, as context (coordinator request 2026-11-13); that item may not be ticked itself.
 const WITH_PARENT = ' (a sub-item with the text of the item it is under)';
 const items = (n: number) => `${n} finished ${n === 1 ? 'item' : 'items'}`;
 
@@ -111,16 +111,18 @@ export function VizAiSort({
     // start is left out on purpose: it is a new function each render; these are what decide a run.
   }, [auto, hasKey, byCategory, loading, running, total, runKey, tried]);
 
+  // Said only when a sub-item is among what goes, so the hint stays exact.
+  const withParent = entries.some((e) => e.parent !== undefined) ? WITH_PARENT : '';
   const hint = loading
     ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
     : !total
       ? 'Nothing left to sort from your own boards. The labels stay on this device.'
       : !auto
-        ? `Sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`
+        ? `Sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${withParent}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`
         : !tried.current.has(runKey)
-          ? `Sorts automatically when opened: sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press Sort with AI for the rest.` : ''}`
+          ? `Sorts automatically when opened: sends the text of ${items(entries.length)} from your own boards to Anthropic with your key${withParent}: ${NOT_SENT}${total > entries.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press Sort with AI for the rest.` : ''}`
           : // Already run in this range and open: it will not send again by itself until the next open, so say what a press does.
-            `Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key${WITH_PARENT}: ${NOT_SENT} Press Sort with AI to send ${items(entries.length)} still waiting${total > entries.length ? ` (the first ${AI_MAX_PER_PRESS} of ${total})` : ''}.`;
+            `Sorts automatically when opened: sends the text of finished items from your own boards to Anthropic with your key${withParent}: ${NOT_SENT} Press Sort with AI to send ${items(entries.length)} still waiting${total > entries.length ? ` (the first ${AI_MAX_PER_PRESS} of ${total})` : ''}.`;
 
   return (
     <div className="viz-ai">

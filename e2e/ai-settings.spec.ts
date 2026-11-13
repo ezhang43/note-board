@@ -48,7 +48,7 @@ test.describe("on a wide desktop", () => {
       "separate workspace with a low spend limit and a key that expires",
     );
     expect(text).toContain(
-      "your key is used only when you press test key or an ai button",
+      "your key is used only when you press test key or an ai button, or when the visualizer sorts by itself (sort automatically, on until you untick it)",
     );
     expect(text).toContain("straight from this browser to anthropic");
     // Owner, 2026-11-13: only items from your own boards, never from boards shared with you.

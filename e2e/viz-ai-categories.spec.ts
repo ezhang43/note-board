@@ -35,6 +35,8 @@ async function seed(page: Page) {
       boards[id] = { name, snap: true, cards: { [`${id}_done`]: { id: `${id}_done`, kind: 'completed', color: 'stone', x: 0, y: 0, groups: [{ date, entries }] } }, columns: {}, order: [`${id}_done`] };
     }
     localStorage.setItem('note-board:v1', JSON.stringify({ version: 6, home: 'home', boards }));
+    // The press tests start with Sort automatically off; the auto tests below turn it back on.
+    localStorage.setItem('note-board:viz-ai-auto', '0');
   }, SEED);
   await page.reload();
   await fontsLoaded(page);
@@ -136,6 +138,88 @@ test('an error from Anthropic is shown in plain words, and the categories stay a
   await expect(dialog(page).getByRole('alert')).toContainText('too many requests');
   await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
   await expect(sortButton(page)).toBeEnabled();
+});
+
+// Sort automatically (owner request 2026-11-13, job "viz-ai-autosort"): on by default, remembered on this device.
+const autoBox = (page: Page) => dialog(page).getByRole('checkbox', { name: 'Sort automatically' });
+const autoDefault = (page: Page) => page.evaluate(() => localStorage.removeItem('note-board:viz-ai-auto'));
+
+test('Sort automatically is on by default and sorts as soon as the Visualizer opens, sending only the item texts', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  expect(bodies).toEqual([]);
+  await openVisualizer(page);
+  await expect(autoBox(page)).toBeChecked();
+  await expect(canvas(page)).toHaveAttribute('aria-label', '4 items cleaned up: Food 2, Housework 1, Other 1.');
+  expect(bodies).toHaveLength(1);
+  for (const text of ['milk', 'bread', 'laundry', 'sand the door']) expect(bodies[0]).toContain(text);
+  for (const never of ['Home', 'Garage', 'Groceries', 'Chores', 'Tools', 'secret note', 'SECRET']) expect(bodies[0]).not.toContain(never);
+  // The hint says it is automatic; "sand the door" got no label, so it is still waiting, and is not asked about again in this open.
+  await expect(dialog(page).getByText(/Sorts automatically when opened: sends the text of 1 finished item from your own boards to Anthropic with your key: no board names, lists or notes/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+});
+
+test('with Sort automatically off, opening sends nothing, as before', async ({ page }) => {
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(autoBox(page)).not.toBeChecked();
+  await expect(dialog(page).getByText(/^Sends the text of 4 finished items from your own boards/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
+});
+
+test('the Sort automatically choice is remembered on this device', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Food 2/);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).uncheck();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-ai-auto'))).toBe('0');
+
+  await page.reload();
+  await fontsLoaded(page);
+  await openVisualizer(page);
+  await expect(autoBox(page)).not.toBeChecked();
+  // "sand the door" still has no label, but with the box off nothing goes until Sort with AI is pressed.
+  await expect(dialog(page).getByText(/^Sends the text of 1 finished item/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  await autoBox(page).check();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:viz-ai-auto'))).toBe('1');
+});
+
+test('with no key saved, Sort automatically sends nothing and is not shown', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page);
+  await openVisualizer(page);
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
+  await expect(autoBox(page)).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(bodies).toEqual([]);
+});
+
+test('after a failure Sort automatically does not try again by itself in the same range', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page, 429);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText('too many requests');
+  expect(bodies).toHaveLength(1);
+  // Switching to By board and back is the same range in the same open: no second request.
+  await dialog(page).getByRole('button', { name: 'By board' }).click();
+  await dialog(page).getByRole('button', { name: 'By category' }).click();
+  await expect(sortButton(page)).toBeEnabled();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  // Another range is its own run.
+  await dialog(page).getByRole('button', { name: '7 days' }).click();
+  await expect.poll(() => bodies.length).toBe(2);
 });
 
 test('Cancel stops a sort that is still running', async ({ page }) => {

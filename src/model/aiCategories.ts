@@ -76,6 +76,26 @@ export function toSend(items: AiItem[], labeled: (text: string) => boolean, isOw
   return { texts: out.slice(0, AI_MAX_PER_PRESS), total: out.length };
 }
 
+/**
+ * Whether Sort with AI runs by itself now (owner request 2026-11-13, job "viz-ai-autosort"): only with this
+ * person's key saved, By category showing, the "Sort automatically" box on, the shares known, no sort running
+ * and items left with no label (`total`, from toSend). At most once per open per range (`tried`, the ranges
+ * already run in this open, kept by the caller), so a failure or a Cancel is never retried by itself; the
+ * button stays for a second try and for the rest past AI_MAX_PER_PRESS.
+ */
+export function autoSortDue(s: {
+  auto: boolean;
+  hasKey: boolean;
+  byCategory: boolean;
+  loading: boolean;
+  running: boolean;
+  total: number;
+  range: string;
+  tried: ReadonlySet<string>;
+}): boolean {
+  return s.auto && s.hasKey && s.byCategory && !s.loading && !s.running && s.total > 0 && !s.tried.has(s.range);
+}
+
 export const LABELS_SCHEMA: AiSchema = {
   type: 'object',
   properties: {

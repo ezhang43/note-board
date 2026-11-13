@@ -28,6 +28,7 @@ async function person(browser: Browser, name: string, boards: Record<string, unk
   await context.addInitScript(
     ([k, v]) => {
       if (!localStorage.getItem(k)) localStorage.setItem(k, v);
+      localStorage.setItem('note-board:viz-ai-auto', '0'); // this test presses Sort with AI itself (Sort automatically goes through the same toSend)
     },
     [`${uid}:note-board:v1`, JSON.stringify({ version: 6, home: 'home', boards })] as const,
   );

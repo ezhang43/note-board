@@ -168,6 +168,11 @@ export const VIZ_CALM_KEY = 'note-board:viz-calm';
 /** Calm as saved on this device: on only for "1"; anything else, or nothing, is off. */
 export const parseCalm = (saved: string | null): boolean => saved === '1';
 
+/** Where this device remembers Sort with AI's "Sort automatically" box (owner request 2026-11-13, job "viz-ai-autosort"). */
+export const VIZ_AI_AUTO_KEY = 'note-board:viz-ai-auto';
+/** The box as saved on this device: off only for "0"; anything else, or nothing, is on (the default). */
+export const parseAutoSort = (saved: string | null): boolean => saved !== '0';
+
 /** The switch as saved on this device, or By category. */
 export const parseGroupBy = (saved: string | null): VizGroupBy => (saved === 'board' ? 'board' : VIZ_DEFAULT_GROUP);
 

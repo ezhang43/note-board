@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { AI_MAX_PER_PRESS } from '../model/aiCategories';
+import { AI_MAX_PER_PRESS, autoSortDue } from '../model/aiCategories';
 import { ai, askClaude } from '../store/ai';
 import { aiLabels, sortWithAi } from '../store/aiLabels';
+import { readAutoSort, saveAutoSort } from './visualizerState';
 
-// "Sort with AI" in the Visualizer (owner request, 2026-11-13): shown only while a key is saved (the
-// Visualizer decides). Nothing is sent until the button is pressed. The hint says exactly what goes: only items
-// from the person's own boards, never from a board shared with them (owner, 2026-11-13; see toSend).
+// "Sort with AI" in the Visualizer (owner request, 2026-11-13): shown only while a key is saved and By category
+// shows (the Visualizer decides). With "Sort automatically" on (the default, job "viz-ai-autosort") it runs by
+// itself once per open per range (autoSortDue), exactly as a press would; with it off nothing is sent until the
+// button is pressed. The hint says exactly what goes: only items from the person's own boards, never from a
+// board shared with them (owner, 2026-11-13; see toSend).
 
 type Status =
   | { kind: 'idle' }
@@ -23,6 +26,8 @@ export function VizAiSort({
   total,
   loading,
   known,
+  range,
+  tried,
   onSorted,
 }: {
   uid: string | null;
@@ -35,10 +40,15 @@ export function VizAiSort({
   loading: boolean;
   /** The AI category names already on the disc. */
   known: string[];
+  /** The range showing: Sort automatically runs once per open for each. */
+  range: string;
+  /** The ranges Sort automatically has already run in this open (the Visualizer keeps it, so it outlives By board and back). */
+  tried: Set<string>;
   /** After a press ends (done, stopped or failed): the disc picks up the labels saved. */
   onSorted: () => void;
 }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [auto, setAuto] = useState(readAutoSort);
   const stop = useRef<AbortController | null>(null);
   // Closing the Visualizer stops a sort still running.
   useEffect(() => () => stop.current?.abort(), []);
@@ -70,11 +80,23 @@ export function VizAiSort({
   };
 
   const running = status.kind === 'running';
+  // Sort automatically: the same start as a press. Started on the next tick, and the range marked tried only then,
+  // so React's development double run (mount, unmount, mount) neither stops it nor skips it.
+  useEffect(() => {
+    // byCategory: this only shows By category (the Visualizer decides).
+    if (!autoSortDue({ auto, hasKey: ai.hasKey(uid), byCategory: true, loading, running, total, range, tried })) return;
+    const t = setTimeout(() => {
+      tried.add(range);
+      void start();
+    });
+    return () => clearTimeout(t);
+  });
+
   const hint = loading
     ? 'Waiting for your shared boards to load, so that only items from your own boards are sent.'
     : !total
       ? 'Nothing left to sort from your own boards. The labels stay on this device.'
-      : `Sends the text of ${items(texts.length)} from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
+      : `${auto ? 'Sorts automatically when opened: sends' : 'Sends'} the text of ${items(texts.length)} from your own boards to Anthropic with your key: no board names, lists or notes, and nothing from boards shared with you.${total > texts.length ? ` The first ${AI_MAX_PER_PRESS} of ${total} now; press again for the rest.` : ''}`;
 
   return (
     <div className="viz-ai">
@@ -88,6 +110,17 @@ export function VizAiSort({
             Sort with AI
           </button>
         )}
+        <label className="viz-ai-auto">
+          <input
+            type="checkbox"
+            checked={auto}
+            onChange={(e) => {
+              setAuto(e.target.checked);
+              saveAutoSort(e.target.checked);
+            }}
+          />
+          <span>Sort automatically</span>
+        </label>
         <p className="viz-ai-status" role="status">
           {status.kind === 'running' ? `Sorting… ${status.sorted} of ${status.of}` : status.kind === 'done' ? `Sorted ${items(status.sorted)}.` : status.kind === 'stopped' ? 'Stopped.' : ''}
         </p>

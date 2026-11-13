@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { VIZ_CALM_KEY, VIZ_GROUP_KEY, parseCalm, parseGroupBy, type VizGroupBy } from '../model/visualizer';
+import { VIZ_AI_AUTO_KEY, VIZ_CALM_KEY, VIZ_GROUP_KEY, parseAutoSort, parseCalm, parseGroupBy, type VizGroupBy } from '../model/visualizer';
 
 // Whether the Visualizer is open (owner request 2026-11-12). It is view state only: never saved, never
 // undone, and kept out of the board store so opening it can't touch the saved boards (SPEC "Visualizer").
@@ -44,6 +44,23 @@ export function readCalm(): boolean {
     return parseCalm(localStorage.getItem(VIZ_CALM_KEY));
   } catch {
     return false;
+  }
+}
+
+/** Sort with AI's "Sort automatically" box saved on this device. Unreadable or blocked storage means on. */
+export function readAutoSort(): boolean {
+  try {
+    return parseAutoSort(localStorage.getItem(VIZ_AI_AUTO_KEY));
+  } catch {
+    return parseAutoSort(null);
+  }
+}
+
+export function saveAutoSort(on: boolean) {
+  try {
+    localStorage.setItem(VIZ_AI_AUTO_KEY, on ? '1' : '0');
+  } catch {
+    // not kept: it is only a convenience
   }
 }
 

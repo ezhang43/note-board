@@ -7,6 +7,7 @@ import {
   AI_MAX_CATEGORIES,
   AI_MAX_PER_PRESS,
   LABELS_SCHEMA,
+  autoSortDue,
   buildPrompt,
   cleanLabel,
   labelKey,
@@ -169,5 +170,38 @@ describe('the disc with AI labels', () => {
     // Only own items count towards the busiest labels.
     const shared = makeAiCategorizer([item('Fix the bike', 'trip')], lookup, isOwn);
     expect(shared(item('Fix the bike'), 'List')).toBe(categoryOf(item('Fix the bike'), 'List'));
+  });
+});
+
+describe('autoSortDue (Sort automatically, owner request 2026-11-13)', () => {
+  const base = { auto: true, hasKey: true, byCategory: true, loading: false, running: false, total: 3, range: '30', tried: new Set<string>() };
+
+  it('runs on its own with a key saved, By category, the box on and items with no label yet', () => {
+    expect(autoSortDue(base)).toBe(true);
+  });
+
+  it('does not run without a key, By board, with the box off, or with nothing left to sort', () => {
+    expect(autoSortDue({ ...base, hasKey: false })).toBe(false);
+    expect(autoSortDue({ ...base, byCategory: false })).toBe(false);
+    expect(autoSortDue({ ...base, auto: false })).toBe(false);
+    expect(autoSortDue({ ...base, total: 0 })).toBe(false);
+  });
+
+  it('waits while the shares load or while a sort is running', () => {
+    expect(autoSortDue({ ...base, loading: true })).toBe(false);
+    expect(autoSortDue({ ...base, running: true })).toBe(false);
+  });
+
+  it('runs at most once per open per range, so a failure is never retried by itself', () => {
+    const tried = new Set<string>();
+    const at = (range: string) => ({ ...base, range, tried });
+    expect(autoSortDue(at('30'))).toBe(true);
+    tried.add('30'); // the run starts (and then fails, or is stopped)
+    expect(autoSortDue(at('30'))).toBe(false); // the error shows; no second request
+    expect(autoSortDue({ ...at('30'), total: 120 })).toBe(false); // more waiting after a run: the button is for those
+    expect(autoSortDue(at('7'))).toBe(true); // another range is its own run
+    tried.add('7');
+    expect(autoSortDue(at('7'))).toBe(false);
+    expect(autoSortDue({ ...at('30'), tried: new Set() })).toBe(true); // the next open starts afresh
   });
 });

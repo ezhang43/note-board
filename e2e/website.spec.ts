@@ -554,7 +554,7 @@ test('the Privacy policy says what an AI button sends, to whom, and with whose k
   await expect(privacy).toContainText('Effective from November 13, 2026');
   const section = privacy.locator('details:has(h2:text("An AI key you enter"))');
   await section.locator('summary').click();
-  await expect(section).toContainText('used only when you press an AI button or Test key');
+  await expect(section).toContainText('used only when you press an AI button or Test key, or when the Visualizer sorts your finished items by itself');
   await expect(section).toContainText('An AI button sends the text of finished checklist items from your own boards (never from boards someone else shared with you) straight from your browser to Anthropic, with your own key');
   await expect(section).toContainText('never passes through BusyAnts');
   await expect(section).not.toContainText('not sent anywhere else yet');

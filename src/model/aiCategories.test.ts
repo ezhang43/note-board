@@ -159,7 +159,7 @@ describe('sub-items: the parent goes along as context (owner request 2026-11-13)
   });
 
   it('cuts a very long parent text before sending it', () => {
-    const [e] = toSend([sub('a', ['p'.repeat(AI_ITEM_MAX + 50)])], () => false, allOwn).entries;
+    const [e] = toSend([sub('apple', ['p'.repeat(AI_ITEM_MAX + 50)])], () => false, allOwn).entries;
     expect(e.parent).toHaveLength(AI_ITEM_MAX);
   });
 
@@ -174,6 +174,12 @@ describe('sub-items: the parent goes along as context (owner request 2026-11-13)
     expect(toSend(on(['Today', 'Now!', 'Daily']), () => false, allOwn)).toEqual({ entries: [], total: 0 });
     expect(toSend([sub('Beat the boss', ['Today'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss' }]);
     expect(toSend([sub('Beat the boss', ['Tonight', 'Elden Ring'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss', parent: 'Elden Ring' }]);
+  });
+
+  it('never sends an item with no meaning on its own (owner 2026-11-14), and such a parent is vague', () => {
+    expect(toSend(on(['meow', 'nowww', 'test', 'x', '!!!']), () => false, allOwn)).toEqual({ entries: [], total: 0 });
+    expect(toSend([sub('Beat the boss', ['meow', 'Elden Ring'])], () => false, allOwn).entries).toEqual([{ text: 'Beat the boss', parent: 'Elden Ring' }]);
+    expect(toSend(on(['gym']), () => false, allOwn).entries).toEqual([{ text: 'gym' }]);
   });
 
   it('skips a parent whose tidied text is empty, as it skips a time word: the next one up counts', () => {
@@ -220,9 +226,9 @@ describe('the disc with AI labels', () => {
   });
 
   it('a label that is a built-in category name joins that category', () => {
-    const cat = makeAiCategorizer(on(['a', 'b']), (t) => (t === 'a' ? 'work' : 'Other'), allOwn);
-    expect(cat(item('a'), '')).toBe('work');
-    expect(cat(item('b'), '')).toBe('other');
+    const cat = makeAiCategorizer(on(['alpha', 'beta']), (t) => (t === 'alpha' ? 'work' : 'Other'), allOwn);
+    expect(cat(item('alpha'), '')).toBe('work');
+    expect(cat(item('beta'), '')).toBe('other');
   });
 
   it('keeps only the busiest labels up to the cap; the rest use the built-in rules', () => {

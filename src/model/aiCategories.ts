@@ -14,7 +14,7 @@
 // - Labels are never board data: src/store/aiLabels.ts keeps them on this device only.
 
 import type { AiSchema } from './ai';
-import { CATEGORIES, categoryOf, isTimeWord, parentCategory, type Categorizer, type CategoryId } from './categorize';
+import { CATEGORIES, categoryOf, isEmptyWord, parentCategory, type Categorizer, type CategoryId } from './categorize';
 
 /** At most this many AI categories on the disc, so the names round the rim still fit. */
 export const AI_MAX_CATEGORIES = 8;
@@ -71,9 +71,9 @@ export interface AiEntry {
 
 /**
  * The one rule for what Sort with AI asks about (owner 2026-11-13), used for sending, for saving and for drawing:
- * - an item whose whole text is only a time word ("Today", "Now") is never asked about;
+ * - an item whose whole text is with no meaning on its own ("Today", "Meow") is never asked about;
  * - a sub-item whose parent already gives a built-in category is not either: the parent decides, as without AI;
- * - otherwise a sub-item goes with its nearest parent that is not a time word or empty once tidied (a time-word
+ * - otherwise a sub-item goes with its nearest parent that is not an empty word or empty once tidied (a time-word
  *   parent is vague, so the sub-item is sorted by its own words), and Claude decides whether that parent names a topic.
  * Null when the item is not asked about.
  */
@@ -81,9 +81,9 @@ export function aiEntry(item: { text: string; context?: string[]; event?: boolea
   // A calendar event is never asked about: its title is never sent to Anthropic (owner, 2026-11-13).
   if (item.event) return null;
   const text = normalizeText(item.text);
-  if (!text || isTimeWord(text) || parentCategory(item) !== null) return null;
-  // An item above with no words left once tidied is skipped too, like a time word.
-  const parent = item.context?.map(normalizeText).find((t) => t && !isTimeWord(t));
+  if (!text || isEmptyWord(text) || parentCategory(item) !== null) return null;
+  // An item above with no words left once tidied is skipped too, like an empty word.
+  const parent = item.context?.map(normalizeText).find((t) => t && !isEmptyWord(t));
   return parent ? { text, parent } : { text };
 }
 

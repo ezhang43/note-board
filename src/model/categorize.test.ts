@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, isTimeWord, parentCategory, categoryIndex, type CategoryId } from './categorize';
+import { CATEGORIES, OTHER_CATEGORY, categoryName, categoryOf, isEmptyWord, parentCategory, categoryIndex, type CategoryId } from './categorize';
 
 // The Visualizer's categories (owner request, 2026-11-12): built-in word rules behind one function,
 // categoryOf(item, listTitle), so a later AI categorizer can stand in for it.
@@ -158,19 +158,34 @@ describe('categoryOf: a sub-item and its parents', () => {
   });
 });
 
-describe('isTimeWord', () => {
+describe('isEmptyWord: an item with no meaning on its own (owner 2026-11-14)', () => {
+  it('is true for filler words, stretched letters and short forms', () => {
+    for (const t of ['meow', 'Meow!', 'nowww', 'NOWWWW', 'todayyy', 'meowww', 'sooon', 'noww', 'yess', 'rn', 'tn', 'tdy', 'tmr', 'tmrw', '2day', '2nite', '2morrow', 'tonite', 'to-day', 'right nowww', 'test', 'Testing', 'asdf', 'qwerty', 'sdf', 'aaa', 'aa', 'XXX', 'lol', 'idk', 'hmm', 'hmmmm', 'ok', 'okay', 'oookay', 'yes', 'no', 'misc', 'stuff', 'thing', 'things', 'task', 'tasks', 'item', 'items', 'list', 'untitled', 'new item', 'New Task', 'done', 'blah', 'placeholder'])
+      expect(isEmptyWord(t), t).toBe(true);
+  });
+  it('is true for text with no letters at all, and a single letter', () => {
+    for (const t of ['1', '42', '!!!', '???', '…', '✅', '- - -', '1.', 'x', 'a', 'Z.'])
+      expect(isEmptyWord(t), t).toBe(true);
+  });
+  it('is false for real but short tasks and for longer phrases', () => {
+    for (const t of ['gym', 'eat', 'run', 'mop', 'tax', 'vet', 'nap', 'cook', 'tests due', 'Test the smoke alarm', 'Buy things', 'new bike', 'list groceries', 'Done with taxes', 'Tess', '3 pm', '401k', 'ok boomer', '猫'])
+      expect(isEmptyWord(t), t).toBe(false);
+  });
+});
+
+describe('isEmptyWord: time words', () => {
   it('is true for a whole text that is just a time word or phrase, ignoring case, spaces and trailing punctuation or emoji', () => {
     for (const t of ['today', 'Today', ' TODAY ', 'Today:', 'now!', 'Right now', 'tonight 🌙', 'Daily.', 'tomorrow', 'this morning', 'Morning', 'This   week', 'weekly', 'this weekend', 'later', 'soon', 'ASAP', 'todo', 'To do', 'to-do', 'Monday', 'sunday', 'next week', 'this afternoon', 'evening', 'this evening', 'weekend', 'afternoon'])
-      expect(isTimeWord(t), t).toBe(true);
+      expect(isEmptyWord(t), t).toBe(true);
   });
   it('is false when there are more words or other words', () => {
-    for (const t of ["Today's groceries", 'Daily stretch', 'Call Sam today', 'Monday meeting', '', '   ', 'Gaming', 'next month'])
-      expect(isTimeWord(t), t).toBe(false);
+    for (const t of ["Today's groceries", 'Daily stretch', 'Call Sam today', 'Monday meeting', 'Gaming', 'next month'])
+      expect(isEmptyWord(t), t).toBe(false);
   });
   it('a very long text is answered at once (no slow pattern matching)', () => {
     const start = performance.now();
-    expect(isTimeWord(' '.repeat(50000) + 'x')).toBe(false);
-    expect(isTimeWord('!'.repeat(50000) + 'x')).toBe(false);
+    expect(isEmptyWord(' '.repeat(50000) + 'x')).toBe(false);
+    expect(isEmptyWord('!'.repeat(50000) + 'x')).toBe(false);
     expect(performance.now() - start).toBeLessThan(100);
   });
   it('such a parent gives no category', () => {

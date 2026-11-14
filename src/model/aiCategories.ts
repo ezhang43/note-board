@@ -14,7 +14,7 @@
 // - Labels are never board data: src/store/aiLabels.ts keeps them on this device only.
 
 import type { AiSchema } from './ai';
-import { CATEGORIES, categoryOf, isTimeWord, parentCategory, type Categorizer, type CategoryId } from './categorize';
+import { CATEGORIES, categoryOf, isEmptyWord, parentCategory, type Categorizer, type CategoryId } from './categorize';
 
 /** At most this many AI categories on the disc, so the names round the rim still fit. */
 export const AI_MAX_CATEGORIES = 8;
@@ -81,9 +81,9 @@ export function aiEntry(item: { text: string; context?: string[]; event?: boolea
   // A calendar event is never asked about: its title is never sent to Anthropic (owner, 2026-11-13).
   if (item.event) return null;
   const text = normalizeText(item.text);
-  if (!text || isTimeWord(text) || parentCategory(item) !== null) return null;
+  if (!text || isEmptyWord(text) || parentCategory(item) !== null) return null;
   // An item above with no words left once tidied is skipped too, like a time word.
-  const parent = item.context?.map(normalizeText).find((t) => t && !isTimeWord(t));
+  const parent = item.context?.map(normalizeText).find((t) => t && !isEmptyWord(t));
   return parent ? { text, parent } : { text };
 }
 

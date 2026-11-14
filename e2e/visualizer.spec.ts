@@ -132,6 +132,16 @@ test('an item with completed sub-items counts as its sub-items: the parent is no
   expect(errors).toEqual([]);
 });
 
+test('items with no meaning on their own (meow, nowww) are not counted, a short real task (gym) is', async ({ page }) => {
+  await seed(page, [['home', 'Tasks', 'meow', 0], ['home', 'Tasks', 'nowww', 0], ['home', 'Tasks', 'gym', 0]]);
+  await openVisualizer(page);
+  await expect(count(page, 'Done today')).toHaveText('1');
+  const rows = dialog(page).locator('.viz-feed li');
+  await expect.poll(async () => rows.count(), { timeout: 8000 }).toBe(1);
+  await expect(dialog(page).locator('.viz-feed-text', { hasText: /^gym$/ })).toHaveCount(1);
+  await expect(dialog(page).locator('.viz-feed-text', { hasText: /meow|nowww/ })).toHaveCount(0);
+});
+
 test('wedges are categories by default; By board switches to boards, and the choice is remembered on this device', async ({ page }) => {
   await seed(page);
   await openVisualizer(page);

@@ -1,5 +1,5 @@
 import { addDays, weekStart } from './calendar';
-import { CATEGORIES, categoryIndex, categoryOf, isTimeWord, type Categorizer } from './categorize';
+import { CATEGORIES, categoryIndex, categoryOf, isEmptyWord, type Categorizer } from './categorize';
 import { completedCardOf } from './completed';
 import type { TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
@@ -46,7 +46,7 @@ export const UNTITLED_LIST = 'List';
 /** Every completed sub-item under `item`, nested ones too (top to bottom), with the words of what they sit under, nearest first. */
 function doneUnder(item: TodoItem, above: string[]): { item: TodoItem; context: string[] }[] {
   const context = [item.text.trim(), ...above].filter(Boolean);
-  return item.children.flatMap((c) => [...(c.done && c.text.trim() && !isTimeWord(c.text) ? [{ item: c, context }] : []), ...doneUnder(c, context)]);
+  return item.children.flatMap((c) => [...(c.done && c.text.trim() && !isEmptyWord(c.text) ? [{ item: c, context }] : []), ...doneUnder(c, context)]);
 }
 
 /**
@@ -65,7 +65,7 @@ export function doneItems(ws: Workspace): DoneItem[] {
       for (const e of g.entries) {
         const subs = doneUnder(e.item, []);
         // An item that is only a time word ("Today", "daily") is never an item itself; its completed sub-items still are.
-        for (const { item, context } of subs.length ? subs : isTimeWord(e.item.text) ? [] : [{ item: e.item, context: [] }]) {
+        for (const { item, context } of subs.length ? subs : isEmptyWord(e.item.text) ? [] : [{ item: e.item, context: [] }]) {
           out.push({ id: `${boardId}:${item.id}`, text: item.text.trim(), boardId, boardName: board.name.trim() || UNTITLED_BOARD, list: e.fromTitle.trim() || UNTITLED_LIST, date: g.date, boardRank, order: order++, context });
         }
       }

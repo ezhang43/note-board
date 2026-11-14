@@ -62,28 +62,38 @@ describe('doneItems: an entry with completed sub-items', () => {
     return doneItems(ws({ b }));
   };
   it('is replaced by its sub-items, nested ones too: the parent itself is not an item', () => {
-    const got = run({ id: 'p', text: 'Today', done: true, children: [{ ...item('a'), children: [item('a1')] }, item('b')] });
-    expect(got.map((i) => i.text)).toEqual(['a', 'a1', 'b', 'solo']);
+    const got = run({ id: 'p-1', text: 'Today', done: true, children: [{ ...item('a-1'), children: [item('a1')] }, item('b-1')] });
+    expect(got.map((i) => i.text)).toEqual(['a-1', 'a1', 'b-1', 'solo']);
     expect(got.map((i) => i.list)).toEqual(['Tasks', 'Tasks', 'Tasks', 'Tasks']); // the cell is still the entry's list title
     expect(new Set(got.map((i) => i.id)).size).toBe(4);
   });
   it('gives each sub-item its parents\' words as context, nearest first', () => {
-    const got = run({ id: 'p', text: 'Clean the garage', done: true, children: [{ ...item('a'), children: [item('a1')] }] });
-    expect(got.map((i) => [i.text, i.context])).toEqual([['a', ['Clean the garage']], ['a1', ['a', 'Clean the garage']], ['solo', []]]);
+    const got = run({ id: 'p-1', text: 'Clean the garage', done: true, children: [{ ...item('a-1'), children: [item('a1')] }] });
+    expect(got.map((i) => [i.text, i.context])).toEqual([['a-1', ['Clean the garage']], ['a1', ['a-1', 'Clean the garage']], ['solo', []]]);
   });
   it('an item that is just a time word ("Today", "daily") is never an item, but its completed sub-items are; "Daily stretch" still is', () => {
-    expect(run({ id: 'p', text: 'Today', done: true, children: [item('a'), { ...item('t'), text: 'Now', children: [item('a1')] }] }).map((i) => i.text)).toEqual(['a', 'a1', 'solo']);
-    expect(run({ id: 'p', text: 'Daily!', done: true, children: [] }).map((i) => i.text)).toEqual(['solo']);
-    expect(run({ id: 'p', text: 'Daily stretch', done: true, children: [] }).map((i) => i.text)).toEqual(['Daily stretch', 'solo']);
-    expect(run({ id: 'p', text: 'Buy milk', done: true, children: [{ ...item('t'), text: 'Soon' }] }).map((i) => i.text)).toEqual(['Buy milk', 'solo']);
+    expect(run({ id: 'p-1', text: 'Today', done: true, children: [item('a-1'), { ...item('t-1'), text: 'Now', children: [item('a1')] }] }).map((i) => i.text)).toEqual(['a-1', 'a1', 'solo']);
+    expect(run({ id: 'p-1', text: 'Daily!', done: true, children: [] }).map((i) => i.text)).toEqual(['solo']);
+    expect(run({ id: 'p-1', text: 'Daily stretch', done: true, children: [] }).map((i) => i.text)).toEqual(['Daily stretch', 'solo']);
+    expect(run({ id: 'p-1', text: 'Buy milk', done: true, children: [{ ...item('t-1'), text: 'Soon' }] }).map((i) => i.text)).toEqual(['Buy milk', 'solo']);
+  });
+  it('every ticked descendant counts, middle levels too (owner 2026-11-14)', () => {
+    const got = run({ id: 'p-1', text: 'Clean the garage', done: true, children: [{ ...item('mid'), children: [{ ...item('low'), children: [item('lowest')] }] }] });
+    expect(got.map((i) => i.text)).toEqual(['mid', 'low', 'lowest', 'solo']);
+  });
+  it('an item with no meaning on its own (meow, nowww, test, x, 123) is never an item; a real short task is', () => {
+    for (const t of ['meow', 'nowww', 'Test', 'x', '123', '✅'])
+      expect(run({ id: 'p-1', text: t, done: true, children: [] }).map((i) => i.text), t).toEqual(['solo']);
+    expect(run({ id: 'p-1', text: 'gym', done: true, children: [] }).map((i) => i.text)).toEqual(['gym', 'solo']);
+    expect(run({ id: 'p-1', text: 'meow', done: true, children: [item('aa-1')] }).map((i) => i.text)).toEqual(['aa-1', 'solo']);
   });
   it('stays one item when no sub-item is done', () => {
-    const got = run({ id: 'p', text: 'p', done: true, children: [{ ...item('a'), done: false }] });
-    expect(got.map((i) => i.text)).toEqual(['p', 'solo']);
+    const got = run({ id: 'p-1', text: 'p-1', done: true, children: [{ ...item('a-1'), done: false }] });
+    expect(got.map((i) => i.text)).toEqual(['p-1', 'solo']);
   });
   it('keepIfSame sees a change in sub-items', () => {
-    const a = run({ id: 'p', text: 'p', done: true, children: [item('x')] });
-    const b = run({ id: 'p', text: 'p', done: true, children: [item('y')] });
+    const a = run({ id: 'p-1', text: 'p-1', done: true, children: [item('x-1')] });
+    const b = run({ id: 'p-1', text: 'p-1', done: true, children: [item('y-1')] });
     expect(keepIfSame(a, b)).toBe(b);
   });
 });
@@ -101,9 +111,9 @@ describe('doneItems', () => {
   });
 
   it('counts hidden boards (Journal, Habits) and boards with no name or no list title', () => {
-    const home = cleaned('Home', [{ day: '2026-11-10', lists: [['', ['a']]] }]);
-    const journal = cleaned('Journal', [{ day: '2026-11-10', lists: [['Notes', ['b']]] }]);
-    const unnamed = cleaned('', [{ day: '2026-11-10', lists: [['Misc', ['c']]] }]);
+    const home = cleaned('Home', [{ day: '2026-11-10', lists: [['', ['a-1']]] }]);
+    const journal = cleaned('Journal', [{ day: '2026-11-10', lists: [['Notes', ['b-1']]] }]);
+    const unnamed = cleaned('', [{ day: '2026-11-10', lists: [['Misc', ['c-1']]] }]);
     const got = doneItems(ws({ home, journal, unnamed }));
     expect(got.map((i) => [i.boardName, i.list])).toEqual([
       ['Home', 'List'],
@@ -114,8 +124,8 @@ describe('doneItems', () => {
 
   it('counts the completed sub-items of a ticked item (not the parent), and a board with nothing cleaned up not at all', () => {
     let b: Board = { ...B.createBoard(), name: 'Home' };
-    const parent: TodoItem = { ...item('p'), children: [item('c1'), item('c2')] };
-    b = B.addCard(b, { ...list('l', 'Chores', []), items: [parent] }, { type: 'loose', x: 0, y: 0 });
+    const parent: TodoItem = { ...item('p-1'), children: [item('c1'), item('c2')] };
+    b = B.addCard(b, { ...list('l-1', 'Chores', []), items: [parent] }, { type: 'loose', x: 0, y: 0 });
     b = cleanUp(b, '2026-11-10', { type: 'loose', x: 0, y: 0 }, makeId).board;
     expect(doneItems(ws({ home: b, other: B.createBoard() })).map((i) => i.text)).toEqual(['c1', 'c2']);
   });
@@ -155,7 +165,7 @@ describe('ranges', () => {
   });
 
   it('crosses a month and a year end by calendar days', () => {
-    const b = cleaned('Home', [{ day: '2025-12-31', lists: [['A', ['x']]] }]);
+    const b = cleaned('Home', [{ day: '2025-12-31', lists: [['A', ['x-1']]] }]);
     expect(inRange(doneItems(ws({ b })), '7', '2026-01-02')).toHaveLength(1);
     expect(inRange(doneItems(ws({ b })), '7', '2026-01-06')).toHaveLength(1);
     expect(inRange(doneItems(ws({ b })), '7', '2026-01-07')).toHaveLength(0);
@@ -166,7 +176,7 @@ describe('ranges', () => {
     const week = cleaned('Home', [
       { day: '2026-11-08', lists: [['A', ['sun']]] },
       { day: '2026-11-09', lists: [['A', ['mon']]] },
-      { day: '2026-11-12', lists: [['A', ['a', 'b']]] },
+      { day: '2026-11-12', lists: [['A', ['a-1', 'b-1']]] },
     ]);
     const items = doneItems(ws({ week }));
     expect(counts(items, inRange(items, '30', today), today)).toEqual({ today: 2, week: 3, inRange: 4 });
@@ -187,7 +197,7 @@ describe('loopOrder', () => {
   });
 
   it('does not change the list it is given', () => {
-    const home = cleaned('Home', [{ day: '2026-11-11', lists: [['A', ['x']]] }, { day: '2026-11-10', lists: [['A', ['y']]] }]);
+    const home = cleaned('Home', [{ day: '2026-11-11', lists: [['A', ['x-1']]] }, { day: '2026-11-10', lists: [['A', ['y-1']]] }]);
     const items = doneItems(ws({ home }));
     const copy = [...items];
     loopOrder(items);
@@ -196,7 +206,7 @@ describe('loopOrder', () => {
 });
 
 describe('keepIfSame', () => {
-  const home = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a', 'b']]] }]);
+  const home = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a-1', 'b-1']]] }]);
   const items = doneItems(ws({ home }));
 
   it('hands back the earlier list when the new one holds the same items, so the loop does not restart for nothing', () => {
@@ -206,7 +216,7 @@ describe('keepIfSame', () => {
   });
 
   it('hands back the new list when anything differs (text, list, board, day or count)', () => {
-    const edited = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a', 'c']]] }]);
+    const edited = cleaned('Home', [{ day: '2026-11-10', lists: [['A', ['a-1', 'c-1']]] }]);
     const next = doneItems(ws({ home: edited }));
     expect(keepIfSame(items, next)).toBe(next);
     expect(keepIfSame(items, items.slice(1))).not.toBe(items);
@@ -217,8 +227,8 @@ describe('keepIfSame', () => {
 describe('perDay', () => {
   const today = '2026-11-12';
   const home = cleaned('Home', [
-    { day: '2026-11-10', lists: [['A', ['a', 'b']]] },
-    { day: '2026-11-12', lists: [['A', ['c']]] },
+    { day: '2026-11-10', lists: [['A', ['a-1', 'b-1']]] },
+    { day: '2026-11-12', lists: [['A', ['c-1']]] },
   ]);
   const items = doneItems(ws({ home }));
 
@@ -241,20 +251,20 @@ describe('perDay', () => {
 
   it('does not blow up on bad dates from a shared board or an imported backup: they are left out, and 0001 and 9999 stay small', () => {
     const bad = cleaned('Bad', [
-      { day: 'soon', lists: [['A', ['a']]] },
-      { day: '2026-13-45', lists: [['A', ['b']]] },
-      { day: '', lists: [['A', ['c']]] },
-      { day: '2026-2-3', lists: [['A', ['d']]] },
-      { day: '0001-01-01', lists: [['A', ['e']]] },
-      { day: '9999-12-31', lists: [['A', ['f']]] },
-      { day: '2026-11-12', lists: [['A', ['g']]] },
+      { day: 'soon', lists: [['A', ['a-1']]] },
+      { day: '2026-13-45', lists: [['A', ['b-1']]] },
+      { day: '', lists: [['A', ['c-1']]] },
+      { day: '2026-2-3', lists: [['A', ['d-1']]] },
+      { day: '0001-01-01', lists: [['A', ['e-1']]] },
+      { day: '9999-12-31', lists: [['A', ['f-1']]] },
+      { day: '2026-11-12', lists: [['A', ['g-1']]] },
     ]);
     const got = doneItems(ws({ bad }));
-    expect(got.map((i) => i.text)).toEqual(expect.arrayContaining(['f', 'g']));
-    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['a']));
-    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['b']));
-    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['c']));
-    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['d']));
+    expect(got.map((i) => i.text)).toEqual(expect.arrayContaining(['f-1', 'g-1']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['a-1']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['b-1']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['c-1']));
+    expect(got.map((i) => i.text)).not.toEqual(expect.arrayContaining(['d-1']));
     const all = perDay(got, 'all', today);
     expect(all.length).toBeLessThanOrEqual(MAX_CHART_DAYS);
     expect(all[all.length - 1].date).toBe(today);
@@ -266,9 +276,9 @@ describe('perDay', () => {
 
   it('stays small whatever the dates: at most the last two years, ending today, even for a date in 1970 or 2099', () => {
     const odd = cleaned('Odd', [
-      { day: '1970-01-01', lists: [['A', ['x']]] },
-      { day: '2099-01-01', lists: [['A', ['y']]] },
-      { day: '2026-11-12', lists: [['A', ['z']]] },
+      { day: '1970-01-01', lists: [['A', ['x-1']]] },
+      { day: '2099-01-01', lists: [['A', ['y-1']]] },
+      { day: '2026-11-12', lists: [['A', ['z-1']]] },
     ]);
     const all = perDay(doneItems(ws({ odd })), 'all', today);
     expect(all).toHaveLength(MAX_CHART_DAYS);
@@ -287,10 +297,10 @@ describe('perDay', () => {
 
 describe('discOf', () => {
   const home = cleaned('Home', [
-    { day: '2026-11-10', lists: [['Groceries', ['a', 'b']], ['Chores', ['c']]] },
-    { day: '2026-11-11', lists: [['Groceries', ['d']]] },
+    { day: '2026-11-10', lists: [['Groceries', ['a-1', 'b-1']], ['Chores', ['c-1']]] },
+    { day: '2026-11-11', lists: [['Groceries', ['d-1']]] },
   ]);
-  const garage = cleaned('Garage', [{ day: '2026-11-10', lists: [['Tools', ['e']]] }]);
+  const garage = cleaned('Garage', [{ day: '2026-11-10', lists: [['Tools', ['e-1']]] }]);
   const items = loopOrder(doneItems(ws({ home, garage })));
 
   it('makes a wedge per board and a cell per list, the busiest list first', () => {
@@ -351,16 +361,16 @@ describe('discOf', () => {
   it('describes it in words for a screen reader', () => {
     expect(summaryOf(discOf(items, 'board').wedges, items.length)).toBe('5 items cleaned up: Home 4, Garage 1.');
     expect(summaryOf([], 0)).toBe('Nothing cleaned up in this range.');
-    expect(summaryOf([{ key: 'h', name: 'Home', count: 1, cells: [], hue: 0 }], 1)).toBe('1 item cleaned up: Home 1.');
+    expect(summaryOf([{ key: 'h-1', name: 'Home', count: 1, cells: [], hue: 0 }], 1)).toBe('1 item cleaned up: Home 1.');
   });
 });
 
 describe('discOf by category', () => {
   const home = cleaned('Home', [
-    { day: '2026-11-10', lists: [['Groceries', ['a', 'b']], ['Chores', ['c']]] },
-    { day: '2026-11-11', lists: [['Groceries', ['d']]] },
+    { day: '2026-11-10', lists: [['Groceries', ['a-1', 'b-1']], ['Chores', ['c-1']]] },
+    { day: '2026-11-11', lists: [['Groceries', ['d-1']]] },
   ]);
-  const garage = cleaned('Garage', [{ day: '2026-11-10', lists: [['Tools', ['e']], ['Groceries', ['f']]] }]);
+  const garage = cleaned('Garage', [{ day: '2026-11-10', lists: [['Tools', ['e-1']], ['Groceries', ['f-1']]] }]);
   const items = loopOrder(doneItems(ws({ home, garage })));
 
   it('groups by category when not told otherwise, like the switch does', () => {
@@ -386,14 +396,14 @@ describe('discOf by category', () => {
   it('says for every item, in loop order, which wedge and cell it lands in', () => {
     const { wedges, slots } = discOf(items, 'category');
     items.forEach((it, i) => {
-      expect(wedges[slots[i].wedge].name).toBe({ a: 'Errands & shopping', b: 'Errands & shopping', c: 'Home & chores', d: 'Errands & shopping', e: 'Other', f: 'Errands & shopping' }[it.text]);
+      expect(wedges[slots[i].wedge].name).toBe({ 'a-1': 'Errands & shopping', 'b-1': 'Errands & shopping', 'c-1': 'Home & chores', 'd-1': 'Errands & shopping', 'e-1': 'Other', 'f-1': 'Errands & shopping' }[it.text]);
       expect(wedges[slots[i].wedge].cells[slots[i].cell].list).toBe(it.list);
     });
   });
 
   it('gives a category the same color whichever others have items, and Other the neutral ninth hue', () => {
     expect(discOf(items, 'category').wedges.map((w) => w.hue)).toEqual([0, 3, 8]);
-    const onlyHome = items.filter((i) => i.text === 'c');
+    const onlyHome = items.filter((i) => i.text === 'c-1');
     expect(discOf(onlyHome, 'category').wedges.map((w) => w.hue)).toEqual([3]);
   });
 
@@ -404,15 +414,15 @@ describe('discOf by category', () => {
       'category',
       (item, title) => {
         asked.push(`${item.text}|${title}`);
-        return item.text === 'a' ? 'work' : 'made-up';
+        return item.text === 'a-1' ? 'work' : 'made-up';
       },
     );
-    expect(asked.sort()).toEqual(['a|Groceries', 'b|Groceries', 'c|Chores', 'd|Groceries', 'e|Tools', 'f|Groceries']);
+    expect(asked.sort()).toEqual(['a-1|Groceries', 'b-1|Groceries', 'c-1|Chores', 'd-1|Groceries', 'e-1|Tools', 'f-1|Groceries']);
     expect(wedges.map((w) => [w.name, w.count])).toEqual([['Work', 1], ['Other', 5]]);
   });
 
   it('makes a wedge per named label (Sort with AI), busiest first, then the built-in categories, Other last and neutral', () => {
-    const named: Record<string, string> = { a: 'Snacks', b: 'Snacks', c: 'Tidying' };
+    const named: Record<string, string> = { 'a-1': 'Snacks', 'b-1': 'Snacks', 'c-1': 'Tidying' };
     const { wedges } = discOf(items, 'category', (item, title) => (named[item.text] ? { name: named[item.text] } : categoryOf(item, title)));
     expect(wedges.map((w) => [w.key, w.name, w.count, w.hue])).toEqual([
       ['ai:Snacks', 'Snacks', 2, 0],
@@ -468,7 +478,7 @@ describe('pace: a steady stream, never a pause (owner request 2026-11-13, "thing
   });
 
   for (const n of [1, 5, 36, 200]) {
-    it(`with ${n} item${n === 1 ? '' : 's'}: never a gap over 1s between launches, never none in flight, never over MAX_FLYING`, () => {
+    it(`with ${n} item${n === 1 ? '' : 's-1'}: never a gap over 1s between launches, never none in flight, never over MAX_FLYING`, () => {
       let landedMost = 0;
       let steady = 0;
       for (let t = 0; t <= 120_000; t += 20) {
@@ -513,7 +523,7 @@ describe('pace: a steady stream, never a pause (owner request 2026-11-13, "thing
 });
 
 describe('cardLines', () => {
-  const it1 = { id: 'a', text: 'Buy milk', boardId: 'b', boardName: 'Home', list: 'Groceries', date: '2026-11-01', boardRank: 0, order: 0 };
+  const it1 = { id: 'a-1', text: 'Buy milk', boardId: 'b-1', boardName: 'Home', list: 'Groceries', date: '2026-11-01', boardRank: 0, order: 0 };
 
   it('reads the item, then "category · board" (or "list · board" By board)', () => {
     expect(cardLines(it1, 'Errands & shopping', 'category')).toEqual(['Buy milk', 'Errands & shopping · Home']);

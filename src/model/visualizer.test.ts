@@ -87,6 +87,9 @@ describe('doneItems: an entry with completed sub-items', () => {
     expect(run({ id: 'p-1', text: 'gym', done: true, children: [] }).map((i) => i.text)).toEqual(['gym', 'solo']);
     expect(run({ id: 'p-1', text: 'meow', done: true, children: [item('aa-1')] }).map((i) => i.text)).toEqual(['aa-1', 'solo']);
   });
+  it('a parent whose ticked sub-items are all empty words still counts as itself (nothing is lost)', () => {
+    expect(run({ id: 'p', text: 'Groceries', done: true, children: [item('1'), item('ok')] }).map((i) => i.text)).toEqual(['Groceries', 'solo']);
+  });
   it('stays one item when no sub-item is done', () => {
     const got = run({ id: 'p-1', text: 'p-1', done: true, children: [{ ...item('a-1'), done: false }] });
     expect(got.map((i) => i.text)).toEqual(['p-1', 'solo']);

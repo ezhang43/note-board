@@ -80,7 +80,8 @@ export const isEmptyWord = (text: string): boolean => {
   if (text.length > 40) return false; // no phrase on the list is longer; also keeps the patterns below from backtracking on a very long run of spaces or marks
   if (!/\p{L}/u.test(text)) return true;
   const t = text.toLowerCase().replace(/[\s\p{P}\p{S}\p{Extended_Pictographic}‍️]+$/u, '').replace(/^\s+/, '').replace(/\s+/g, ' ');
-  if (/^[a-z]$/.test(t) || /^([a-z])\1+$/.test(t)) return true;
+  if (/^([a-z])\1*$/.test(t) && !/[+#]/.test(text)) return true; // not "C++", "A+", "C#"
+  // simple: a real word that shrinks to a listed word (a doubled last letter) is skipped too; prune EMPTY_WORDS if one turns up.
   // Stretched letters: three or more in a row shrink to two or one ("sooon", "nowww"); two at the very end shrink to one ("yess").
   return [t, t.replace(/(.)\1{2,}/gu, '$1$1'), t.replace(/(.)\1{2,}/gu, '$1'), t.replace(/(\p{L})\1+$/u, '$1')].some((v) => EMPTY_WORDS.has(v));
 };

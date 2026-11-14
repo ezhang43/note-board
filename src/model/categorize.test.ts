@@ -168,7 +168,7 @@ describe('isEmptyWord: an item with no meaning on its own (owner 2026-11-14)', (
       expect(isEmptyWord(t), t).toBe(true);
   });
   it('is false for real but short tasks and for longer phrases', () => {
-    for (const t of ['gym', 'eat', 'run', 'mop', 'tax', 'vet', 'nap', 'cook', 'tests due', 'Test the smoke alarm', 'Buy things', 'new bike', 'list groceries', 'Done with taxes', 'Tess', '3 pm', '401k', 'ok boomer', '猫'])
+    for (const t of ['gym', 'eat', 'run', 'mop', 'tax', 'vet', 'nap', 'cook', 'tests due', 'Test the smoke alarm', 'Buy things', 'new bike', 'list groceries', 'Done with taxes', 'Tess', '3 pm', '401k', 'ok boomer', '猫', 'C++', 'A+', 'C#'])
       expect(isEmptyWord(t), t).toBe(false);
   });
 });

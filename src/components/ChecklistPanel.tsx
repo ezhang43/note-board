@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type CSSProperties } from 'react';
 import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 import { GrowTextarea } from './GrowTextarea';
 import { BoardReadOnly } from './textBox';
@@ -8,7 +8,7 @@ import type { ItemDrag } from '../store/store';
 import { appStore, BoardScope, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
 import { ClipboardCheckIcon, CloseIcon } from './icons';
-import { escapeIsForChecklist } from './textField';
+import { escapeIsForChecklist, isTextField } from './textField';
 import { TodoBody } from './TodoList';
 import { usePhone } from './usePhone';
 
@@ -37,10 +37,28 @@ export function ChecklistPanel() {
     return () => window.removeEventListener('keydown', key, true);
   }, []);
   const phone = usePhone();
+  // The item box the keyboard was in. When a step (Ctrl+Z on a new item) takes it off the page, focus goes to the panel itself,
+  // not to the page, so the next Ctrl+Z is still the checklist's and never the board's (as in the Journal panel).
+  const root = useRef<HTMLElement>(null);
+  const typing = useRef<Element | null>(null);
+  useLayoutEffect(() => {
+    const was = typing.current;
+    if (was && !was.isConnected) {
+      typing.current = null;
+      if (document.activeElement === document.body || !document.activeElement) root.current?.focus({ preventScroll: true });
+    }
+  });
   const { done, total } = card ? doneCount(card.items) : { done: 0, total: 0 };
   return (
     // tabIndex -1: a click on its heading or blank space keeps the keyboard in the panel, so keys meant for it never reach the board.
-    <aside className="checklist-panel" aria-label="Checklist" tabIndex={-1}>
+    <aside
+      ref={root}
+      className="checklist-panel"
+      aria-label="Checklist"
+      tabIndex={-1}
+      onFocusCapture={(e) => (typing.current = isTextField(e.target) ? e.target : null)}
+      onBlurCapture={(e) => e.target.isConnected && (typing.current = null)}
+    >
       <header className="history-head">
         <h2>Checklist</h2>
         {total > 0 && (

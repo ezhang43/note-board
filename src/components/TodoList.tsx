@@ -133,6 +133,10 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
   useEffect(() => {
     const el = ref.current;
     if (!wantsFocus || !el) return;
+    // The Main checklist board and the Checklist panel can both show this list: only the copy the person is typing in takes the cursor.
+    const typing = document.activeElement;
+    const twin = document.querySelectorAll(`[data-item-id="${CSS.escape(item.id)}"]`).length > 1;
+    if (twin && typing instanceof HTMLElement && typing.closest('[data-item-id] :is(input, textarea)') && !!typing.closest('.checklist-panel') !== !!el.closest('.checklist-panel')) return;
     el.focus({ preventScroll: true });
     const [from, to] = Array.isArray(focusOffset) ? focusOffset : [focusOffset ?? el.value.length, focusOffset ?? el.value.length];
     el.setSelectionRange(from, to);

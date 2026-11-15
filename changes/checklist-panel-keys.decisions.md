@@ -1,0 +1,1 @@
+- 2026-11-15 Review finding 13 (toolbar Undo and the Undo message lose the cursor restore while typing in the Checklist panel) did not reproduce: the cursor stays in the panel. Left as it is, no change to the undo code.

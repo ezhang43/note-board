@@ -329,6 +329,86 @@ describe("sortWithAi", () => {
     expect(cache.asked(M, null)("Mystery")).toBe(false);
   });
 
+  // A reply that would fail the same way again (job ai-sort-failing-batch, owner 2026-11-15): Claude declined, ran out
+  // of room, or answered in the wrong shape. Its batch is remembered as asked (no label), so the next sort, by itself
+  // or by a press, sends the items behind it instead of sending and billing the same 50 again on every open.
+  const failure = (kind: string) => ({ ok: false, kind, message: `failed: ${kind}` }) as AiResult;
+  for (const kind of ["refusal", "too-long", "bad-reply"]) {
+    it(`a batch that failed with ${kind} is remembered as asked, with no label, and the items behind it go next`, async () => {
+      const cache = createLabelCache(memory());
+      const items = Array.from({ length: AI_BATCH + 7 }, (_, i) => ({ text: `item ${i}`, boardId: "b" }));
+      const first = toSend(items, () => false, () => true).entries;
+      let n = 0;
+      const r = await sortWithAi({ ask: async () => (n++, failure(kind)), cache, uid: "u1", model: M, entries: first, known: [], onProgress: () => {} });
+      // The message still shows, and the sort stops there: one request, one counted use.
+      expect(r).toEqual(failure(kind));
+      expect(n).toBe(1);
+      const asked = cache.asked(M, "u1");
+      expect(asked("item 0")).toBe(true);
+      expect(asked(`item ${AI_BATCH - 1}`)).toBe(true);
+      expect(asked(`item ${AI_BATCH}`)).toBe(false);
+      // No name is read back: the items keep their built-in category.
+      expect(cache.get("item 0", M, "u1")).toBeNull();
+      // The next sort sends the 7 behind them, not the same 50.
+      const next = toSend(items, (e) => asked(e.text, e.parent), () => true);
+      expect(next.total).toBe(7);
+      expect(next.entries[0].text).toBe(`item ${AI_BATCH}`);
+      // Another model asks again.
+      expect(cache.asked("claude-opus-5-5", "u1")("item 0")).toBe(false);
+    });
+  }
+
+  it("a sub-item in a batch that failed that way is remembered under its parent", async () => {
+    const cache = createLabelCache(memory());
+    await sortWithAi({ ask: async () => failure("refusal"), cache, uid: null, model: M, entries: [{ text: "Beat the boss", parent: "Elden Ring" }], known: [], onProgress: () => {} });
+    expect(cache.asked(M, null)("Beat the boss", "Elden Ring")).toBe(true);
+    expect(cache.asked(M, null)("Beat the boss")).toBe(false);
+  });
+
+  // Everything else may work next time (network, limits, the key, Anthropic busy) or never reached Claude: not remembered.
+  const notRemembered = ["no-key", "cap", "storage", "labels-not-saved", "invalid-key", "browser-blocked", "limit", "rate-limit", "permission", "workspace", "update", "model", "too-big", "busy", "network", "timeout", "cancelled", "other"];
+  for (const kind of notRemembered) {
+    it(`a batch that failed with ${kind} is not remembered`, async () => {
+      const device = memory();
+      const cache = createLabelCache(device);
+      const r = await sortWithAi({ ask: async () => failure(kind), cache, uid: null, model: M, entries: [{ text: "Mystery" }], known: [], onProgress: () => {} });
+      expect(r).toEqual(failure(kind));
+      expect(cache.asked(M, null)("Mystery")).toBe(false);
+      expect(device.data[AI_LABELS_NAME]).toBeUndefined();
+    });
+  }
+
+  it("a refusal that comes back after Cancel, or after the key or model changed, is not remembered", async () => {
+    const cache = createLabelCache(memory());
+    const stop = new AbortController();
+    const r = await sortWithAi({ ask: async () => (stop.abort(), failure("refusal")), cache, uid: null, model: M, entries: [{ text: "Mystery" }], known: [], onProgress: () => {}, signal: stop.signal });
+    expect(r).toBe(CANCELLED);
+    const r2 = await sortWithAi({ ask: async () => failure("refusal"), cache, uid: null, model: M, entries: [{ text: "Mystery" }], known: [], onProgress: () => {}, stillValid: () => false });
+    expect(r2).toBe(CANCELLED);
+    expect(cache.asked(M, null)("Mystery")).toBe(false);
+  });
+
+  it("when a failed batch cannot be remembered, it says the labels can't be saved, so Sort automatically pauses", async () => {
+    const m = memory();
+    const device = { ...m, setItem: (k: string, v: string) => { if (k === AI_LABELS_NAME) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); } };
+    const r = await sortWithAi({ ask: async () => failure("refusal"), cache: createLabelCache(device), uid: null, model: M, entries: [{ text: "Mystery" }], known: [], onProgress: () => {} });
+    expect(r).toEqual({ ok: false, kind: "labels-not-saved", message: SAVE_FAILED });
+  });
+
+  it("a later batch that fails that way keeps the batches already done and remembers only its own items", async () => {
+    const cache = createLabelCache(memory());
+    let n = 0;
+    const ask = async (a: AskArgs): Promise<AiResult> => (++n === 2 ? failure("too-long") : reply(a));
+    const texts = Array.from({ length: AI_BATCH * 3 }, (_, i) => `item ${i}`);
+    const r = await sortWithAi({ ask, cache, uid: null, model: M, entries: texts.map((text) => ({ text })), known: [], onProgress: () => {} });
+    expect(r).toEqual(failure("too-long"));
+    expect(n).toBe(2);
+    expect(cache.get("item 0", M, null)).toBe("Stuff");
+    expect(cache.asked(M, null)(`item ${AI_BATCH}`)).toBe(true);
+    expect(cache.get(`item ${AI_BATCH}`, M, null)).toBeNull();
+    expect(cache.asked(M, null)(`item ${AI_BATCH * 2}`)).toBe(false);
+  });
+
   it("saves a sub-item's label under its text and its parent, so the same text under another parent has none", async () => {
     const device = memory();
     const cache = createLabelCache(device);

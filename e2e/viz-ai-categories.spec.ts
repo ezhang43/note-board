@@ -229,6 +229,47 @@ test('after a failure Sort automatically does not try again by itself in the sam
   await expect.poll(() => bodies.length).toBe(2);
 });
 
+// Job ai-sort-failing-batch (owner 2026-11-15): a reply that would fail the same way again is not sent and billed again on every open.
+test('when Claude declines a batch, its items are remembered as asked, so the next open does not send them again', async ({ page }) => {
+  await autoDefault(page);
+  const bodies: string[] = [];
+  await page.route('https://api.anthropic.com/**', (r: Route) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
+    bodies.push(r.request().postData() ?? '');
+    const reply = { type: 'message', stop_reason: 'refusal', content: [] };
+    return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(reply) });
+  });
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText('Claude declined');
+  expect(bodies).toHaveLength(1);
+  // The items keep their built-in categories, and nothing is left waiting.
+  await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
+  await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await openVisualizer(page);
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+  await page.reload();
+  await fontsLoaded(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByText(/^Nothing left to sort/)).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bodies).toHaveLength(1);
+});
+
+test('a failure that may pass next time (too many requests) is not remembered: the next open tries again', async ({ page }) => {
+  await autoDefault(page);
+  const bodies = await anthropic(page, 429);
+  await saveKey(page);
+  await openVisualizer(page);
+  await expect(dialog(page).getByRole('alert')).toContainText('too many requests');
+  expect(bodies).toHaveLength(1);
+  await page.keyboard.press('Escape');
+  await openVisualizer(page);
+  await expect.poll(() => bodies.length).toBe(2);
+});
+
 test('a press counts as the run for that range: ticking Sort automatically afterwards sends nothing more', async ({ page }) => {
   const bodies = await anthropic(page);
   await saveKey(page);

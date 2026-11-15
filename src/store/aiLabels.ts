@@ -1,4 +1,4 @@
-import { fail, stoppedBy, CANCELLED, type AiFailure, type AiResult } from "../model/ai";
+import { fail, stoppedBy, CANCELLED, type AiFailure, type AiFailureKind, type AiResult } from "../model/ai";
 import {
   AI_BATCH,
   AI_LABELS_NAME,
@@ -194,13 +194,19 @@ export const aiLabels = createLabelCache(
   })(),
 );
 
+/**
+ * Failures that come only from a reply Anthropic gave (a 200, see readReply): Claude declined, ran out of room, or
+ * answered in the wrong shape. Sent again, the same batch would most likely fail the same way.
+ */
+const SAME_AGAIN: ReadonlySet<AiFailureKind> = new Set(["refusal", "too-long", "bad-reply"]);
+
 /** How long one request may take before it stops with the time-out message. */
 const BATCH_TIMEOUT_MS = 90_000;
 
 /**
  * Sends `entries` (already picked by toSend) to Claude in batches of AI_BATCH, one counted use each, and saves
  * each batch's labels as it comes back. Stops at the first failure with its message (batches already done
- * stay saved). `known` is the category names already on the disc, so new items reuse them. An answer that
+ * stay saved; a batch that failed in a way that would repeat, SAME_AGAIN, is saved as asked). `known` is the category names already on the disc, so new items reuse them. An answer that
  * comes back after Cancel, or after `stillValid` says the key or model changed, is not saved.
  */
 export async function sortWithAi({
@@ -245,7 +251,14 @@ export async function sortWithAi({
       signal?.removeEventListener("abort", cancel);
     }
     if (signal?.aborted || !stillValid()) return CANCELLED;
-    if (!r.ok) return r;
+    if (!r.ok) {
+      // A reply that would fail the same way again (job ai-sort-failing-batch, owner 2026-11-15): its items are
+      // remembered as asked, with no label, so the next sort sends the ones behind them instead of billing these
+      // again on every open. Anything else (network, limits, the key, busy) may pass next time: nothing is saved.
+      if (!SAME_AGAIN.has(r.kind)) return r;
+      const saved = cache.putAll(batch.map((e) => [e.text, NO_LABEL, e.parent]), model, uid);
+      return saved === "saved" ? r : fail("labels-not-saved", saved === "no-room" ? NO_ROOM : SAVE_FAILED);
+    }
     const labels = readLabels(r.value, batch.length);
     const pairs: [text: string, label: string, parent?: string][] = [];
     labels.forEach((l, i) => {

@@ -47,6 +47,17 @@ permission rules, project allow rules), not every field. Their fingerprints stil
 Changelog skim, 2026-11-15 (2.1.320 to 2.1.325): nothing needs a change here. Scheduled tasks and `/loop`
 now ask before running a skill that declares `allowed-tools` or hooks; none of ours do. Other entries
 cover sandbox and permission-check fixes, plugins and worktree safety, which touch no file we keep.
+Also in 2.1.323: `/security-review` now asks before it runs (outside auto and bypass modes), and the sandbox
+makes `git worktree add|move|remove` read-only. We use neither: `finish-step` runs `code-review` and
+`security-review` as skills in a session the owner can answer, and workers get their worktree from the crew
+coordinator.
+
+Headings seen on 2026-11-15 that this file's lists do not name, read and judged to need no change (feature
+docs, not advice): memory (AGENTS.md sections, startup warning for files over 200 lines, 4 MiB skip, `CLAUDE_CODE_NEW_INIT`);
+skills (`skillOverrides`, `/run-skill-generator`, skills synced from claude.ai, `skillListingBudgetFraction`);
+sub-agents (output scanning, API errors, extended thinking and effort); permissions (PowerShell rules, a comment
+on a permission prompt); costs ("Understanding changes in Claude Code behavior"); common-workflows ("Work in
+notes and non-code folders"). One item is a question: Q13.
 
 ---
 
@@ -360,3 +371,10 @@ exploration to a subagent.
 - **Q12. Add an `ask` rule for `git push *`?** Page 1 shows it as an example. Recommend: no. The guard
   hook already refuses pushes to `build/v1` and `main` for everyone but the coordinator, and workers
   must push their own branches without being asked. Excluded: it changes how pushing works.
+- **Q13. Should the `bash` guard also cover the PowerShell tool?** The hooks reference (matcher
+  `Bash|PowerShell`, and "wherever the PowerShell tool is enabled, Claude treats PowerShell as the primary
+  shell" on Windows) means that on the owner's Windows computer, commands may run through PowerShell, which
+  our `matcher: "Bash"` hook never sees, so the `pkill`, force-push and push-to-`main`/`build/v1` guard
+  would not run there. Recommend: yes, change the matcher to `Bash|PowerShell` (the guard reads
+  `tool_input.command` either way), and check once on Windows that a refused push is refused. Not applied:
+  it changes how pushing is protected (`.claude/settings.json` hook and rule 9).

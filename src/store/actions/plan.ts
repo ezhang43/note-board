@@ -26,6 +26,10 @@ export function planActions(ctx: StoreContext) {
     setBrainDumpText(text: string) {
       ctx.updateUi({ brainDumpText: text });
     },
+    /** Empties the box and closes the dialog, in one change: on sign-out or when another person signs in (code review, 2026-11-15). */
+    forgetBrainDump() {
+      ctx.updateUi({ brainDumpOpen: false, brainDumpText: '' });
+    },
     /**
      * Adds a card for each draft to the open board, packed near the view and selected, as one undo step (the
      * same lanes as Import file). Returns how many were added: none on a board that may only be viewed.

@@ -4,7 +4,7 @@ import { OPEN_BOARD_KEY, parseWorkspace, readWorkspace, serializeWorkspace } fro
 import { ACCESS_KEY } from '../model/calendar';
 import { JOURNAL_KNOWN_KEY } from '../model/journal';
 import { AI_KEY_NAMES } from '../model/aiKey';
-import { AI_LABELS_NAME } from '../model/aiLabelsName';
+import { AI_LABELS_NAME, aiLabelsOwner } from '../model/aiLabelsName';
 import { baseKey, commentsSeenKey, ownBoardsKey, sharesKey } from './sharing';
 import type { Store } from './store';
 import { dataKey, LIST_KEY } from './versions';
@@ -185,15 +185,18 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
  * mode, text size, the tour, the focus timer, the calendar's width). The Google Calendar access kept
  * on the device (job 107) goes too: it isn't a setting (one per device, so a demo person's has no prefix);
  * so do the person's own AI key and whose it is (job 12b, also unprefixed; the AI model, limit and count are settings and stay),
- * and the Sort with AI labels (code review 2026-11-15, unprefixed too; by then they are this person's, since the
- * sign-in watcher drops anyone else's).
+ * and the Sort with AI labels when they are this person's or damaged (code review 2026-11-15, unprefixed too;
+ * `labels`: their saved text; another person's stay, as on a browser two demo people share).
  * `prefix`: a demo person's keys start with it.
  */
-export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = ''): string[] {
+export function accountKeys(keys: string[], uid: string, shareIds: string[], kept: string | null, prefix = '', labels: string | null = null): string[] {
   const keptIds = listedShares(kept);
   const exact = new Set([BOARD_KEY, OPEN_BOARD_KEY, VIEW_KEY, LIST_KEY, parkedKey(uid), parkedBasesKey(uid), heldKey(uid), JOURNAL_KNOWN_KEY, sharesKey(uid), ownBoardsKey(uid), commentsSeenKey(uid), ...[...shareIds, ...keptIds].map(baseKey)]);
+  const labelsOwner = aiLabelsOwner(labels);
+  const ownLabels = labels !== null && (labelsOwner === uid || labelsOwner === null);
   return keys.filter((key) => {
-    if (key === ACCESS_KEY || key === AI_LABELS_NAME || AI_KEY_NAMES.includes(key)) return true;
+    if (key === ACCESS_KEY || AI_KEY_NAMES.includes(key)) return true;
+    if (key === AI_LABELS_NAME) return ownLabels;
     if (!key.startsWith(prefix)) return false;
     const k = key.slice(prefix.length);
     return exact.has(k) || k.startsWith(dataKey('')) || k.startsWith(UNREADABLE_KEY);

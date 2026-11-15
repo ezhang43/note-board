@@ -253,13 +253,19 @@ describe('accountKeys', () => {
     expect(accountKeys(ai, 'demo-alice', [], null, 'demo-alice:').sort()).toEqual(['note-board:ai-key', 'note-board:ai-key-user']);
   });
 
-  it('the Sort with AI labels go too (code review, 2026-11-15): only their own entry, for a demo person as well', () => {
+  it('the Sort with AI labels go too when they are this person’s (code review, 2026-11-15): only their own entry, for a demo person as well', () => {
     const ai = ['note-board:ai-categories', 'note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses'];
-    const got = accountKeys([...keys, ...ai], 'me', [], null);
+    const labels = (owner: string) => JSON.stringify({ v: 1, owner, entries: { abc: 'Errands' } });
+    const got = accountKeys([...keys, ...ai], 'me', [], null, '', labels('me'));
     expect(got).toContain('note-board:ai-categories');
     for (const k of ['note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses', 'note-board:theme', 'unrelated']) expect(got).not.toContain(k);
-    // Kept once for the browser (unprefixed), like the AI key: it goes for a demo person too, and none of another demo person's keys.
-    expect(accountKeys([...ai, 'demo-bob:note-board:v1'], 'demo-alice', [], null, 'demo-alice:')).toEqual(['note-board:ai-categories']);
+    // Kept once for the browser (unprefixed): it goes for a demo person whose labels they are, and none of another demo person's keys.
+    expect(accountKeys([...ai, 'demo-bob:note-board:v1'], 'demo-alice', [], null, 'demo-alice:', labels('demo-alice'))).toEqual(['note-board:ai-categories']);
+    // Another person's labels stay (two demo people share one browser; on the site the sign-in watcher has already dropped them).
+    expect(accountKeys(ai, 'demo-alice', [], null, 'demo-alice:', labels('demo-bob'))).toEqual([]);
+    expect(accountKeys(ai, 'me', [], null)).toEqual([]);
+    // Damaged ones are of no use to anyone: they go.
+    expect(accountKeys(ai, 'me', [], null, '', '{')).toEqual(['note-board:ai-categories']);
   });
 
   it('copies kept of an unreadable save go too (job #160)', () => {

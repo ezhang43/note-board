@@ -24,14 +24,9 @@ const m = vi.hoisted(() => ({
   accountRemote: vi.fn(),
   remover: null as (() => Promise<void>) | null,
   /** The Brain dump's text (view state, not saved) and whether its dialog is open. */
-  appStore: { brainDump: { text: '', open: false } } as {
-    brainDump: { text: string; open: boolean };
-    closeBrainDump?: () => void;
-    setBrainDumpText?: (text: string) => void;
-  },
+  appStore: { brainDump: { text: '', open: false } } as { brainDump: { text: string; open: boolean }; forgetBrainDump?: () => void },
 }));
-m.appStore.closeBrainDump = () => void (m.appStore.brainDump.open = false);
-m.appStore.setBrainDumpText = (text: string) => void (m.appStore.brainDump.text = text);
+m.appStore.forgetBrainDump = () => void (m.appStore.brainDump = { text: '', open: false });
 
 vi.mock('./firebase', () => ({
   watchUser: (fn: typeof m.onUser) => {

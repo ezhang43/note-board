@@ -171,6 +171,24 @@ describe("whether Sort automatically may send (job viz-ai-autosort, owner 2026-1
     expect(cache.room(1, "u1")).toBe("ok");
   });
 
+  it("a failed save belongs to the person it happened to: the next person signed in on this page may sort (code review, 2026-11-15)", () => {
+    // The sign-in watcher removes the labels without telling this cache, so nothing else resets it.
+    let full = true;
+    const m = memory();
+    const device = {
+      ...m,
+      setItem: (k: string, v: string) => {
+        if (k === AI_LABELS_NAME && full) throw new DOMException("full", "QuotaExceededError");
+        m.setItem(k, v);
+      },
+    };
+    const cache = createLabelCache(device);
+    expect(cache.putAll([["a", "A"]], M, "u1")).toBe("cant-save");
+    full = false;
+    expect(cache.room(1, "u1")).toBe("cant-save");
+    expect(cache.room(1, "u2")).toBe("ok");
+  });
+
   it("a clear that storage refused does not free the room", () => {
     const m = memory();
     const device = { ...m, setItem: (k: string, v: string) => { if (k === AI_LABELS_NAME) throw new DOMException("full", "QuotaExceededError"); m.setItem(k, v); }, removeItem: () => { throw new Error("blocked"); } };

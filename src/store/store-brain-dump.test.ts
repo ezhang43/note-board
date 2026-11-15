@@ -140,6 +140,17 @@ describe('Brain dump: the dialog', () => {
     expect(store().getState().ui.brainDumpText).toBe('');
   });
 
+  it('forgetting it (a sign-out or another person) empties the box and closes the dialog, in one change that is not an undo step (code review, 2026-11-15)', () => {
+    const s = store();
+    s.openBrainDump();
+    s.setBrainDumpText('call the bank');
+    let changes = 0;
+    s.subscribe(() => changes++);
+    s.forgetBrainDump();
+    expect(s.getState().ui).toMatchObject({ brainDumpOpen: false, brainDumpText: '', canUndo: false });
+    expect(changes).toBe(1);
+  });
+
   it('keeps what was typed when the cards could not be added', () => {
     const s = store();
     const open = s.getState().boards.open;

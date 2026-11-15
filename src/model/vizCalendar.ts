@@ -90,6 +90,8 @@ function parse(raw: unknown, range: VizRange, today: string, now: number): Parse
     // It was deleted mid-run, so it lands on the day it started (a multi-day one may never have fully ended).
     day = dayOf(start);
   } else {
+    // Only a confirmed event counts (SPEC): a tentative one is left out. A missing status is Google's default, confirmed.
+    if (e.status !== undefined && e.status !== 'confirmed') return null;
     // Passed: a confirmed event counts once it has ended, and lands on its end day.
     if (!end || whenMs(end) > now) return null;
     day = endDay(end);

@@ -321,7 +321,12 @@ export function startDisc(o: DiscOptions): () => void {
     canvas.dataset.disc = [fit.cx, fit.cy, fit.rx, w, h].map(Math.round).join(',');
   };
   size();
-  const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size);
+  // Calm draws one picture and stops asking for frames (see `frame`); a new size is the one thing that needs it drawn again.
+  const resized = () => {
+    size();
+    if (still && !raf) raf = requestAnimationFrame(frame);
+  };
+  const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resized);
   watch?.observe(canvas);
 
   let t = 0;
@@ -380,7 +385,7 @@ export function startDisc(o: DiscOptions): () => void {
     wedges.forEach((wedge, wi) => {
       wedge.cells.forEach((_, ci) => {
         const done = landedCount[wi][ci];
-        const flash = Math.max(0, 1 - (now - flashAt[wi][ci]) / FLASH_MS);
+        const flash = still ? 0 : Math.max(0, 1 - (now - flashAt[wi][ci]) / FLASH_MS); // Calm: no fading flash, so the one picture drawn is the final one
         if (!done) return;
         const a = cellArea(wi, count, ci, wedge.cells.length);
         const front = (Math.sin((a.a0 + a.a1) / 2 + spin) + 1) / 2; // 1 at the front of the ring, 0 at the back
@@ -653,7 +658,8 @@ export function startDisc(o: DiscOptions): () => void {
       o.onLanded(landed ? ((landed - 1) % n) + 1 : 0, landed ? Math.floor((landed - 1) / n) : 0);
     }
     draw(now, ph.flying);
-    raf = requestAnimationFrame(frame);
+    // Calm: everything is lit and nothing moves, so the picture is drawn once and the loop ends (a resize starts it for one more frame).
+    raf = still ? 0 : requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
 

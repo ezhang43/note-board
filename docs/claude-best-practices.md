@@ -48,16 +48,16 @@ Changelog skim, 2026-11-15 (2.1.320 to 2.1.325): nothing needs a change here. Sc
 now ask before running a skill that declares `allowed-tools` or hooks; none of ours do. Other entries
 cover sandbox and permission-check fixes, plugins and worktree safety, which touch no file we keep.
 Also in 2.1.323: `/security-review` now asks before it runs (outside auto and bypass modes), and the sandbox
-makes `git worktree add|move|remove` read-only. We use neither: `finish-step` runs `code-review` and
-`security-review` as skills in a session the owner can answer, and workers get their worktree from the crew
-coordinator.
+makes `git worktree add|move|remove` read-only (workers get their worktree from the crew coordinator, so
+that part does not touch us). The `/security-review` prompt may stop a background worker at `finish-step`
+step 4, where nobody can answer: Q14.
 
 Headings seen on 2026-11-15 that this file's lists do not name, read and judged to need no change (feature
 docs, not advice): memory (AGENTS.md sections, startup warning for files over 200 lines, 4 MiB skip, `CLAUDE_CODE_NEW_INIT`);
 skills (`skillOverrides`, `/run-skill-generator`, skills synced from claude.ai, `skillListingBudgetFraction`);
 sub-agents (output scanning, API errors, extended thinking and effort); permissions (PowerShell rules, a comment
 on a permission prompt); costs ("Understanding changes in Claude Code behavior"); common-workflows ("Work in
-notes and non-code folders"). One item is a question: Q13.
+notes and non-code folders"). Two items are questions: Q13 and Q14.
 
 ---
 
@@ -378,3 +378,8 @@ exploration to a subagent.
   would not run there. Recommend: yes, change the matcher to `Bash|PowerShell` (the guard reads
   `tool_input.command` either way), and check once on Windows that a refused push is refused. Not applied:
   it changes how pushing is protected (`.claude/settings.json` hook and rule 9).
+- **Q14. Will `/security-review` stall crew workers?** Since 2.1.323 Claude Code asks before it runs
+  `/security-review` (outside auto and bypass modes). `finish-step` step 4 runs it for risky changes, and a
+  background worker has nobody to answer. Not yet seen to happen. Recommend: do nothing now; if a worker
+  ever reports it blocked, add `Skill(security-review)` to `permissions.allow` then. Excluded from
+  automatic changes: it is a permissions change.

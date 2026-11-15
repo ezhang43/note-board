@@ -3,7 +3,7 @@
 Owner request, 2026-10-29: follow Anthropic's Claude Code best-practices pages, and when a page
 changes, apply the change that day.
 
-- **Last checked: 2026-11-08** (every URL below was fetched that day, with Claude Code 2.1.319 installed).
+- **Last checked: 2026-11-15** (every URL below was fetched that day, with Claude Code 2.1.325 installed).
 - Paraphrased, not quoted. Section names are the page's own headings, so the daily check can find them.
 - Anthropic's older engineering post, `https://www.anthropic.com/engineering/claude-code-best-practices`
   ("Claude Code: Best practices for agentic coding"), now answers with a permanent redirect (HTTP 308) to
@@ -29,20 +29,24 @@ changes, apply the change that day.
 
 | # | Page | URL | Fingerprint |
 | - | - | - | - |
-| 1 | Best practices for Claude Code | https://code.claude.com/docs/en/best-practices.md | fe692b7566e6 |
-| 2 | How Claude remembers your project (CLAUDE.md, rules, memory) | https://code.claude.com/docs/en/memory.md | 275fe39e8501 |
-| 3 | Extend Claude with skills | https://code.claude.com/docs/en/skills.md | 977bb9f8d6a0 |
-| 4 | Create custom subagents | https://code.claude.com/docs/en/sub-agents.md | db8a532d4c04 |
-| 5 | Automate actions with hooks (guide) | https://code.claude.com/docs/en/hooks-guide.md | 662e38ddd6af |
-| 6 | Hooks reference | https://code.claude.com/docs/en/hooks.md | 302eb7b42195 |
-| 7 | Settings files and precedence | https://code.claude.com/docs/en/settings.md | 448f49ae3a98 |
-| 8 | Configure permissions | https://code.claude.com/docs/en/permissions.md | 70a451a0e032 |
-| 9 | Manage costs effectively | https://code.claude.com/docs/en/costs.md | e07ef16eda37 |
-| 10 | Common workflows | https://code.claude.com/docs/en/common-workflows.md | fcd7053b20f2 |
+| 1 | Best practices for Claude Code | https://code.claude.com/docs/en/best-practices.md | ee235042febd |
+| 2 | How Claude remembers your project (CLAUDE.md, rules, memory) | https://code.claude.com/docs/en/memory.md | 524cff77043d |
+| 3 | Extend Claude with skills | https://code.claude.com/docs/en/skills.md | 654fd3e23932 |
+| 4 | Create custom subagents | https://code.claude.com/docs/en/sub-agents.md | 00bda45456b2 |
+| 5 | Automate actions with hooks (guide) | https://code.claude.com/docs/en/hooks-guide.md | 635c222faf54 |
+| 6 | Hooks reference | https://code.claude.com/docs/en/hooks.md | cf74269ef6d1 |
+| 7 | Settings files and precedence | https://code.claude.com/docs/en/settings.md | bc72fdd5dc45 |
+| 8 | Configure permissions | https://code.claude.com/docs/en/permissions.md | 3f504ff0e98e |
+| 9 | Manage costs effectively | https://code.claude.com/docs/en/costs.md | 859c2c4bd046 |
+| 10 | Common workflows | https://code.claude.com/docs/en/common-workflows.md | 16a0b3b401c3 |
 
 Index of all pages (to spot new ones): https://code.claude.com/docs/llms.txt. Pages 6 and 8 are large
 reference pages; this first pass read their headings and the sections that give advice (hook security,
 permission rules, project allow rules), not every field. Their fingerprints still catch any change.
+
+Changelog skim, 2026-11-15 (2.1.320 to 2.1.325): nothing needs a change here. Scheduled tasks and `/loop`
+now ask before running a skill that declares `allowed-tools` or hooks; none of ours do. Other entries
+cover sandbox and permission-check fixes, plugins and worktree safety, which touch no file we keep.
 
 ---
 
@@ -73,7 +77,7 @@ Related resources.
   `SPEC.md`, then build from it in a fresh session.
 - Keep CLAUDE.md short (the memory page says under 200 lines): exact commands to check work and run one
   test file, misleading places in the code, decisions not in the repo, anything corrected twice. Check
-  loading with `/context`. `/init` drafts one; `/doctor` suggests cuts; `/doctor prompt-audit` flags stale
+  loading with `/context all`. `/init` drafts one; `/doctor` suggests cuts; `/doctor prompt-audit` flags stale
   or contradicting instructions. Personal notes go in `CLAUDE.local.md`, which is gitignored. Adding
   IMPORTANT does not fix an ignored line.
 - Rules that only matter in one area go in `.claude/rules/` with a `paths:` filter.
@@ -84,7 +88,7 @@ Related resources.
   along in context); code-intelligence plugins help typed languages.
 - Give Claude a pass/fail check (tests, build, linter, screenshot) and ask for evidence (command and
   output), not "all tests pass". Strength ladder: the prompt, `/goal`, a `Stop` hook (exit code 2 sends
-  Claude back to work; capped at eight blocked stops in a row), or a fresh-context reviewer
+  Claude back to work; capped at eight blocked stops in a row; `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises it), or a fresh-context reviewer
   (`/code-review`, or a subagent told to review against the spec and skip style). `/verify` runs the real
   app.
 - Hooks (shell, HTTP, MCP tool, prompt or agent): only `command`/`http` are deterministic; add
@@ -343,7 +347,7 @@ exploration to a subagent.
   (rule 9 says merging is blocked until it passes, so this may already be on). The coordinator pushes
   `build/v1` and `main` directly by design, so the rule must allow it. Needs a change outside the code.
 - **Q9. Run `/doctor prompt-audit` once** in a local interactive session and look at what it proposes
-  for `CLAUDE.md`, the skills and the agent. It needs Claude Code 2.1.283 or later (2.1.312 is
+  for `CLAUDE.md`, the skills and the agent. It needs Claude Code 2.1.283 or later (2.1.325 is
   installed here) and an interactive session, which a background worker does not have. Recommend: yes,
   once, by the coordinator after this lands.
 - **Q10. Shorten the vendored `emil-design-eng` skill (674 lines; the page says keep skills under 500)?**

@@ -42,7 +42,7 @@ async function seed(page: Page) {
   await fontsLoaded(page);
 }
 
-/** Answers Anthropic with labels from AI (or with `status` and an error), and keeps every request body. */
+/** Answers Anthropic with labels from AI (or with `status` and an error; or, with `stop` and status 200, an answer with nothing in it, such as `refusal`), and keeps every request body. */
 async function anthropic(page: Page, status = 200, stop = 'end_turn') {
   const bodies: string[] = [];
   await page.route('https://api.anthropic.com/**', (r: Route) => {

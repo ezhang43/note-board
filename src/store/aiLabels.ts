@@ -195,7 +195,7 @@ export const aiLabels = createLabelCache(
 );
 
 /**
- * What a sort says when Claude answered a batch but gave no labels (declined, ran out of room, or the wrong shape;
+ * What a sort says when Claude answered a batch but gave no labels (declined, too long, or the wrong shape;
  * `answered` in model/ai.ts). Sent again, that batch would most likely fail the same way, so its items are saved as
  * asked with no label and keep their built-in categories: "Try again" would not fit, since they are not sent again.
  */
@@ -203,7 +203,7 @@ export const notSorted = (kind: AnsweredFailureKind, n: number) => {
   const what = `${n} finished ${n === 1 ? "item" : "items"}`;
   const keep = n === 1 ? "it keeps its built-in category" : "they keep their built-in categories";
   if (kind === "refusal") return `Claude declined to sort ${what}, so ${keep}.`;
-  return `Claude's answer for ${what} ${kind === "too-long" ? "ran out of room" : "didn't come back in the expected shape"}, so ${keep}.`;
+  return `Claude's answer for ${what} ${kind === "too-long" ? "was too long" :"didn't come back in the expected shape"}, so ${keep}.`;
 };
 
 /** How long one request may take before it stops with the time-out message. */

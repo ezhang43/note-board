@@ -333,6 +333,11 @@ describe("sortWithAi", () => {
   // of room, or answered in the wrong shape. Its batch is remembered as asked (no label), so the next sort, by itself
   // or by a press, sends the items behind it instead of sending and billing the same 50 again on every open.
   const failure = (kind: string) => ({ ok: false, kind, message: `failed: ${kind}` }) as AiResult;
+  const said: Record<string, string> = {
+    refusal: "Claude declined to sort 50 finished items, so they keep their built-in categories.",
+    "too-long": "Claude's answer for 50 finished items was too long, so they keep their built-in categories.",
+    "bad-reply": "Claude's answer for 50 finished items didn't come back in the expected shape, so they keep their built-in categories.",
+  };
   for (const kind of ["refusal", "too-long", "bad-reply"]) {
     it(`a batch that failed with ${kind} is remembered as asked, with no label, and the items behind it go next`, async () => {
       const cache = createLabelCache(memory());
@@ -340,9 +345,10 @@ describe("sortWithAi", () => {
       const first = toSend(items, () => false, () => true).entries;
       let n = 0;
       const r = await sortWithAi({ ask: async () => (n++, failure(kind)), cache, uid: "u1", model: M, entries: first, known: [], onProgress: () => {} });
-      // The message still shows, and the sort stops there: one request, one counted use.
-      // It says so in place of "Try again", since these items are not sent again: the next sort moves on.
-      expect(r).toEqual({ ok: false, kind, message: notSorted(kind as "refusal", AI_BATCH) });
+      // The sort stops there (one request, one counted use) and says so in place of "Try again", since these
+      // items are not sent again: the next sort moves on.
+      expect(AI_BATCH).toBe(50);
+      expect(r).toEqual({ ok: false, kind, message: said[kind] });
       expect(n).toBe(1);
       const asked = cache.asked(M, "u1");
       expect(asked("item 0")).toBe(true);
@@ -361,7 +367,7 @@ describe("sortWithAi", () => {
 
   it("says in plain words that those items keep their built-in categories", () => {
     expect(notSorted("refusal", 50)).toBe("Claude declined to sort 50 finished items, so they keep their built-in categories.");
-    expect(notSorted("too-long", 1)).toBe("Claude's answer for 1 finished item ran out of room, so it keeps its built-in category.");
+    expect(notSorted("too-long", 1)).toBe("Claude's answer for 1 finished item was too long, so it keeps its built-in category.");
     expect(notSorted("bad-reply", 3)).toBe("Claude's answer for 3 finished items didn't come back in the expected shape, so they keep their built-in categories.");
   });
 

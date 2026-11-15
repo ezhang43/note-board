@@ -434,9 +434,12 @@ export type VizCalendar =
 
 // One fetch per open and range, paged. The window never exceeds the chart's two years, so one page of 2500
 // almost always covers it; a few pages are read at most, then it stops.
-// simple: at most 5 pages (12,500 events). Events come oldest-first (orderBy=startTime), so a busier two years would
-// miss the NEWEST events (the recent days that matter most); raise the cap if a calendar that full ever shows up.
+// Google lists oldest-first only (orderBy=startTime; there is no descending order), so a calendar too full for the
+// cap would lose its NEWEST events, the recent days that matter most (owner, 2026-11-15: keep the newest). Then the
+// window is read again in pieces, newest piece first, until the pages run out; a piece the pages cannot finish is
+// left out whole, so what is kept is an unbroken run up to today and what goes is the oldest.
 const VIZ_MAX_PAGES = 5;
+const VIZ_PIECE_DAYS = 30;
 
 /**
  * Past and deleted events on the person's primary calendar within `range`, using only access already kept on
@@ -457,13 +460,15 @@ export async function fetchCalendarDone(
   const { timeMin, timeMax } = vizWindow(range, today);
   // Built as a string (not new URL): the dev server's base is a relative path, which new URL() would reject.
   const endpoint = `${src.base}/calendars/primary/events`;
-  const raw: unknown[] = [];
-  let pageToken: string | undefined;
-  try {
-    for (let page = 0; page < VIZ_MAX_PAGES; page++) {
+
+  /** Reads [min, max) page by page, at most `budget` pages. `done` is false when Google still had more. */
+  const read = async (min: string, max: string, budget: number): Promise<{ items: unknown[]; pages: number; done: boolean } | 'no-access' | 'error'> => {
+    const items: unknown[] = [];
+    let pageToken: string | undefined;
+    for (let pages = 1; pages <= budget; pages++) {
       const q = new URLSearchParams({
-        timeMin,
-        timeMax,
+        timeMin: min,
+        timeMax: max,
         singleEvents: 'true', // each past instance of a repeating event, once
         showDeleted: 'true', // include deleted (cancelled) events
         eventTypes: 'default', // not working-location / out-of-office / focus-time / birthday
@@ -472,12 +477,39 @@ export async function fetchCalendarDone(
       });
       if (pageToken) q.set('pageToken', pageToken);
       const res = await fetchFn(`${endpoint}?${q}`, { headers: { Authorization: `Bearer ${token}` }, signal });
-      if (res.status === 401) return { status: 'no-access' }; // access ran out: ask to open Calendar again
-      if (!res.ok) return { status: 'error' };
+      if (res.status === 401) return 'no-access'; // access ran out: ask to open Calendar again
+      if (!res.ok) return 'error';
       const data = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
-      if (Array.isArray(data.items)) raw.push(...data.items);
+      if (Array.isArray(data.items)) items.push(...data.items);
       pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : undefined;
-      if (!pageToken) break;
+      if (!pageToken) return { items, pages, done: true };
+    }
+    return { items, pages: budget, done: false };
+  };
+
+  let raw: unknown[];
+  try {
+    const whole = await read(timeMin, timeMax, VIZ_MAX_PAGES);
+    if (typeof whole === 'string') return { status: whole };
+    raw = whole.items;
+    if (!whole.done) {
+      // Too full for the cap: read it again newest piece first, so the oldest are what is left out. A piece's first page
+      // is free (a quiet month must not use up the budget; there are at most about 25 pieces in two years); the rest share VIZ_MAX_PAGES.
+      raw = [];
+      let left = VIZ_MAX_PAGES;
+      const oldest = Date.parse(timeMin);
+      for (let to = Date.parse(timeMax); to > oldest; ) {
+        const from = Math.max(oldest, to - VIZ_PIECE_DAYS * 86400000);
+        const piece = await read(new Date(from).toISOString(), new Date(to).toISOString(), left + 1);
+        if (typeof piece === 'string') return { status: piece };
+        // A piece the pages cannot finish is left out whole, so nothing newer than what is kept is missing.
+        // simple: unless nothing newer was found; then its first pages (its OLDEST days) are kept. Upgrade if 30 days can ever hold 12,500 events.
+        if (!piece.done && raw.length) break;
+        raw.push(...piece.items);
+        left -= piece.pages - 1;
+        to = from;
+        if (!piece.done) break;
+      }
     }
   } catch (e) {
     if (signal?.aborted) throw e; // a cancelled fetch is not a failure to show

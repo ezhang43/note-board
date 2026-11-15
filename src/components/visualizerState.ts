@@ -14,12 +14,26 @@ const set = (to: boolean) => {
 
 export const openVisualizer = () => set(true);
 export const closeVisualizer = () => set(false);
+export const visualizerIsOpen = () => open;
+
+let closing: ReturnType<typeof setTimeout> | undefined;
+/**
+ * The effect of the Visualizer component, which is there as long as the board is. When the board goes away (a sign-out),
+ * the Visualizer closes, so signing in again in the same tab does not reopen it. React's development check (unmount, then
+ * mount again at once) cancels the close.
+ */
+export function closeWhenGone(): () => void {
+  clearTimeout(closing);
+  return () => {
+    closing = setTimeout(closeVisualizer, 0);
+  };
+}
 
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => void listeners.delete(l);
 };
-export const useVisualizerOpen = () => useSyncExternalStore(subscribe, () => open);
+export const useVisualizerOpen = () => useSyncExternalStore(subscribe, visualizerIsOpen);
 
 /** The By category / By board choice saved on this device. Storage can be missing or blocked (a private window, cleared site data): then it is By category and nothing is kept. */
 export function readGroupBy(): VizGroupBy {

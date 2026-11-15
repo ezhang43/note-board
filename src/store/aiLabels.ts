@@ -1,4 +1,4 @@
-import { fail, stoppedBy, CANCELLED, type AiFailure, type AiResult } from "../model/ai";
+import { fail, stoppedBy, CANCELLED, answered, type AiFailure, type AiResult, type AnsweredFailureKind } from "../model/ai";
 import {
   AI_BATCH,
   AI_LABELS_NAME,
@@ -194,14 +194,26 @@ export const aiLabels = createLabelCache(
   })(),
 );
 
+/**
+ * What a sort says when Claude answered a batch but gave no labels (declined, too long, or the wrong shape;
+ * `answered` in model/ai.ts). Sent again, that batch would most likely fail the same way, so its items are saved as
+ * asked with no label and keep their built-in categories: "Try again" would not fit, since they are not sent again.
+ */
+export const notSorted = (kind: AnsweredFailureKind, n: number) => {
+  const what = `${n} finished ${n === 1 ? "item" : "items"}`;
+  const keep = n === 1 ? "it keeps its built-in category" : "they keep their built-in categories";
+  if (kind === "refusal") return `Claude declined to sort ${what}, so ${keep}.`;
+  return `Claude's answer for ${what} ${kind === "too-long" ? "was too long" :"didn't come back in the expected shape"}, so ${keep}.`;
+};
+
 /** How long one request may take before it stops with the time-out message. */
 const BATCH_TIMEOUT_MS = 90_000;
 
 /**
  * Sends `entries` (already picked by toSend) to Claude in batches of AI_BATCH, one counted use each, and saves
  * each batch's labels as it comes back. Stops at the first failure with its message (batches already done
- * stay saved). `known` is the category names already on the disc, so new items reuse them. An answer that
- * comes back after Cancel, or after `stillValid` says the key or model changed, is not saved.
+ * stay saved, and a batch Claude answered with no labels is saved as asked, see notSorted). `known` is the
+ * category names already on the disc, so new items reuse them. An answer that comes back after Cancel, or after `stillValid` says the key or model changed, is not saved.
  */
 export async function sortWithAi({
   ask,
@@ -245,8 +257,12 @@ export async function sortWithAi({
       signal?.removeEventListener("abort", cancel);
     }
     if (signal?.aborted || !stillValid()) return CANCELLED;
-    if (!r.ok) return r;
-    const labels = readLabels(r.value, batch.length);
+    // A batch Claude answered with no labels (job ai-sort-failing-batch, owner 2026-11-15) would fail the same way
+    // again: its items are saved as asked, with no label, so the next sort sends the ones behind them instead of
+    // billing these again on every open. Any other failure (network, limits, the key, busy) may pass next time:
+    // nothing is saved.
+    if (!r.ok && !answered(r)) return r;
+    const labels = r.ok ? readLabels(r.value, batch.length) : batch.map(() => null);
     const pairs: [text: string, label: string, parent?: string][] = [];
     labels.forEach((l, i) => {
       if (!l) return void pairs.push([batch[i].text, NO_LABEL, batch[i].parent]);
@@ -259,6 +275,7 @@ export async function sortWithAi({
     // billed for labels that would be lost.
     const saved = cache.putAll(pairs, model, uid);
     if (saved !== "saved") return fail("labels-not-saved", saved === "no-room" ? NO_ROOM : SAVE_FAILED);
+    if (!r.ok) return fail(r.kind, notSorted(r.kind, batch.length));
     sorted += pairs.filter((p) => p[1] !== NO_LABEL).length;
     asked += batch.length;
     onProgress(asked);

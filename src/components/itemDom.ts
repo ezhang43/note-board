@@ -139,6 +139,7 @@ function itemHintAt(clientX: number, clientY: number, d: ItemDrag, at: DragPlace
   const slid = d.slide && rowWithoutSlide(clientX, clientY, at.zoom);
   if (slid) return hintOnRow(slid.row, slid.rect, clientX, clientY, d, at);
   for (const el of document.elementsFromPoint(clientX, clientY)) {
+    if (at.panel && !el.closest('.checklist-panel')) break; // blank panel space: look no further, the board under the panel is no drop
     if (el.closest('.item-arrows')) continue; // the Move up / Move down pill floats over the row above: look through it
     const row = el.closest<HTMLElement>('[data-item-id]');
     if (row && !d.slide) return hintOnRow(row, row.getBoundingClientRect(), clientX, clientY, d, at);

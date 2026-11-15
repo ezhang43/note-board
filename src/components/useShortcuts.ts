@@ -82,6 +82,9 @@ export function useShortcuts() {
       if (mod && key === '0') return run(e, appStore.resetZoom);
       // Keys pressed in a side panel never act on the board behind it (the Journal and Habits panels have their own
       // history above; undo, redo and zoom, handled above, work from every panel).
+      // Not while a dialog covers the board (Brain dump, AI settings, Sign out?, Send feedback): the items selected in the panel
+      // behind it are out of reach, so Tab, Delete and Ctrl+X on a dialog button leave them alone (undo and redo, above, still work).
+      if (inChecklist && panelCovers()) return;
       if (inChecklist) return checklistKeys(e, key, mod);
       if (inAnyPanel) return;
       // Nothing below acts on the board while a panel covers it (Send feedback, Delete account),

@@ -199,7 +199,7 @@ export function createAiStore({
     },
     /** For the page's storage event (another tab changed the key or a setting): tells the screen, and stops a Test key whose key or model went. */
     reload: changed,
-    /** Removes the key from this browser (both places), and the Sort with AI labels with it. (Signing out and deleting an account clear the key's names directly, job 12b; the labels are then unused, see aiLabels.ts.) */
+    /** Removes the key from this browser (both places), and the Sort with AI labels with it. (Signing out, a change of person and deleting an account clear the key's names and the labels directly: job 12b, code review 2026-11-15.) */
     forgetKey() {
       wipeKey();
       remove(device, AI_LABELS_NAME);

@@ -182,6 +182,27 @@ test('deleting also removes the Journal general notes this device remembers (202
   expect(alice.errors).toEqual([]);
 });
 
+test('deleting also removes the Sort with AI labels kept on this device, and nothing of another person (code review, 2026-11-15)', async ({ browser }) => {
+  const alice = await person(browser, `Alice${tag()}`);
+  const uid = `demo-${alice.who.toLowerCase()}`;
+  const LABELS = 'note-board:ai-categories';
+  await alice.evaluate(
+    ([k, owner]) => {
+      localStorage.setItem(k, JSON.stringify({ v: 1, owner, entries: { abc: 'Errands' } }));
+      localStorage.setItem('demo-somebody-else:note-board:v1', 'theirs');
+    },
+    [LABELS, uid],
+  );
+
+  await openPanel(alice);
+  await panel(alice).getByLabel('Type DELETE to confirm').fill('DELETE');
+  await panel(alice).getByRole('button', { name: 'Delete my account' }).click();
+  await expect(alice.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 8000 });
+  expect(await alice.evaluate((k) => localStorage.getItem(k), LABELS)).toBeNull();
+  expect(await alice.evaluate(() => localStorage.getItem('demo-somebody-else:note-board:v1'))).toBe('theirs');
+  expect(alice.errors).toEqual([]);
+});
+
 // The person's own Anthropic key (wow plan, job 12b): kept in this browser only, never sent with
 // their boards, and gone with their account. The device's AI model choice stays (a setting).
 const AI_KEY = 'sk-ant-api03-SECRET-abcd1234';

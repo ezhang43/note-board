@@ -17,7 +17,8 @@ import type { AskArgs } from "./ai";
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave, kept in this browser's localStorage
 // only. Never board data: not in a saved board, Version history, an export or the sync. Saved under a hash
 // of the item text (and, for a sub-item, its parent's text) and the model, with whose they are (a different person signed in sees none of them).
-// Forget key removes them (src/store/ai.ts), and the Visualizer only uses them while a key is saved.
+// Forget key removes them (src/store/ai.ts), as do sign-out, another person signing in (src/model/aiLabelsName.ts, from the
+// sign-in watcher) and Delete account (accountKeys); the Visualizer only uses them while a key is saved.
 
 /** Saved for an item Claude was asked about and gave no label: never read as a name (cleanLabel gives null), but
  * the item counts as asked, so Sort automatically does not send and bill the same text again (coordinator, 2026-11-13). */

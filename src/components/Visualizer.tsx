@@ -10,7 +10,7 @@ import { appStore, useAppState } from '../store/appStore';
 import { collab, useSharing } from '../sync/collabSession';
 import { CloseIcon, VisualizerIcon } from './icons';
 import { useCoverBoard } from './textField';
-import { closeVisualizer, openVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy, useVisualizerOpen } from './visualizerState';
+import { closeVisualizer, closeWhenGone, openVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy, useVisualizerOpen } from './visualizerState';
 import { readPalette, startDisc } from './visualizerDraw';
 import { VizAiSort } from './VizAiSort';
 
@@ -40,6 +40,7 @@ export function VisualizerButton({ onOpen }: { onOpen?: () => void }) {
 }
 
 export function Visualizer() {
+  useEffect(closeWhenGone, []);
   return useVisualizerOpen() ? <Overlay /> : null;
 }
 

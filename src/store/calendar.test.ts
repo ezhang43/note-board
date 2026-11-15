@@ -1092,7 +1092,52 @@ describe('fetchCalendarDone (Visualizer: past and deleted events)', () => {
     const fetchFn = vi.fn(async () => res({ items: [], nextPageToken: 'always' }));
     const r = await fetchCalendarDone('u1', RANGE, TODAY, undefined, fetchFn as unknown as typeof fetch, source());
     expect(r.status).toBe('ok');
-    expect(fetchFn).toHaveBeenCalledTimes(5);
+    expect(fetchFn).toHaveBeenCalledTimes(11); // 5 on the whole window, then 6 (a piece's first page is free) reading it newest piece first
+  });
+
+  it('when the page cap is hit, the oldest events are the ones dropped, never the newest', async () => {
+    // A calendar too full for 5 pages: Google (orderBy=startTime) gives each window oldest-first, so reading the
+    // whole window would cut off the newest days. The pretend calendar has an event every 3 days (40 of them, ending
+    // 2026-11-12) and a page holds only 3, so the whole window needs 14 pages and a 30-day piece needs 4.
+    const dayMs = 86400000;
+    const all = Array.from({ length: 40 }, (_, i) => ({ id: `e${i}`, at: Date.parse('2026-11-12T10:00:00Z') - (39 - i) * 3 * dayMs }));
+    const fetchFn = vi.fn(async (url: string) => {
+      const q = new URL(url).searchParams;
+      const min = Date.parse(q.get('timeMin')!);
+      const max = Date.parse(q.get('timeMax')!);
+      const within = all.filter((e) => e.at >= min && e.at < max);
+      const from = Number(q.get('pageToken') ?? 0);
+      const page = within.slice(from, from + 3);
+      const next = from + 3 < within.length ? String(from + 3) : undefined;
+      return res({ items: page.map((e) => ({ id: e.id, summary: e.id, organizer: { self: true }, start: { dateTime: new Date(e.at).toISOString() }, end: { dateTime: new Date(e.at + 3600000).toISOString() } })), nextPageToken: next });
+    });
+    const r = await fetchCalendarDone('u1', 'all', '2026-11-13', undefined, fetchFn as unknown as typeof fetch, source());
+    expect(r.status).toBe('ok');
+    const ids = r.status === 'ok' ? r.items.map((i) => i.text) : [];
+    expect(ids).toContain('e39'); // the newest is kept
+    expect(ids).not.toContain('e0'); // the oldest is what went
+    // what is kept is one unbroken run up to the newest (no hole in the middle)
+    const nums = ids.map((t) => Number(t.slice(1))).sort((a, b) => a - b);
+    expect(nums[nums.length - 1]).toBe(39);
+    expect(nums.every((n, i) => i === 0 || n === nums[i - 1] + 1)).toBe(true);
+  });
+
+  it('empty recent pieces do not use up the page budget: the newest events that exist are still kept', async () => {
+    // 30 events two days apart that all ended about 100 days ago; the three newest 30-day pieces are empty.
+    const dayMs = 86400000;
+    const all = Array.from({ length: 30 }, (_, i) => ({ id: `e${i}`, at: Date.parse('2026-11-13T10:00:00Z') - 100 * dayMs - (29 - i) * 2 * dayMs }));
+    const fetchFn = vi.fn(async (url: string) => {
+      const q = new URL(url).searchParams;
+      const min = Date.parse(q.get('timeMin')!);
+      const max = Date.parse(q.get('timeMax')!);
+      const within = all.filter((e) => e.at >= min && e.at < max);
+      const from = Number(q.get('pageToken') ?? 0);
+      const next = from + 3 < within.length ? String(from + 3) : undefined;
+      return res({ items: within.slice(from, from + 3).map((e) => ({ id: e.id, summary: e.id, organizer: { self: true }, start: { dateTime: new Date(e.at).toISOString() }, end: { dateTime: new Date(e.at + 3600000).toISOString() } })), nextPageToken: next });
+    });
+    const r = await fetchCalendarDone('u1', 'all', '2026-11-13', undefined, fetchFn as unknown as typeof fetch, source());
+    const ids = r.status === 'ok' ? r.items.map((i) => i.text) : [];
+    expect(ids).toContain('e29'); // the newest event there is
   });
 
   it('401 (access ran out) gives no-access', async () => {

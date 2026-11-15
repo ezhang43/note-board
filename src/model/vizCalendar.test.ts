@@ -36,6 +36,13 @@ describe('calendarDoneItems — which events count', () => {
     expect(out[0].id).toContain('a');
   });
 
+  it('only a confirmed event counts as passed: a tentative one is left out, a missing status still counts', () => {
+    const base = { ...mine, summary: 'Maybe lunch', start: timed(ago(-1), 10, 0), end: timed(ago(-1), 11, 0) };
+    expect(only({ ...base, id: 't', status: 'tentative' })).toHaveLength(0);
+    expect(only({ ...base, id: 'c', status: 'confirmed' })).toHaveLength(1);
+    expect(only({ ...base, id: 'n' })).toHaveLength(1);
+  });
+
   it('an all-day event lands on its last day (Google’s end is the day after)', () => {
     const out = only({ ...mine, id: 'b', summary: 'Holiday', start: allDay(ago(-2)), end: allDay(ago(-1)) });
     expect(out).toHaveLength(1);

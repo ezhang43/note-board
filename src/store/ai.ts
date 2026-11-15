@@ -6,6 +6,7 @@ import {
   ANTHROPIC_VERSION,
   CANCELLED,
   NETWORK_FAILURE,
+  answered,
   buildRequest,
   errorFor,
   fail,
@@ -381,12 +382,7 @@ export function createAiStore({
       // A sign-out clears storage without telling this store, so look again now.
       if (changedUnder()) return CANCELLED;
       // These come only after Anthropic answered (200), so the key was accepted.
-      return r.ok ||
-        r.kind === "refusal" ||
-        r.kind === "too-long" ||
-        r.kind === "bad-reply"
-        ? { ok: true }
-        : r;
+      return r.ok || answered(r) ? { ok: true } : r;
     },
   };
   return store;

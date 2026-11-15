@@ -43,13 +43,15 @@ async function seed(page: Page) {
 }
 
 /** Answers Anthropic with labels from AI (or with `status` and an error), and keeps every request body. */
-async function anthropic(page: Page, status = 200) {
+async function anthropic(page: Page, status = 200, stop = 'end_turn') {
   const bodies: string[] = [];
   await page.route('https://api.anthropic.com/**', (r: Route) => {
     if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
     const body = r.request().postData() ?? '';
     bodies.push(body);
     if (status !== 200) return r.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } }) });
+    // Claude answered but gave nothing to use (declined, say).
+    if (stop !== 'end_turn') return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ type: 'message', stop_reason: stop, content: [] }) });
     const user: string = JSON.parse(body).messages[0].content;
     // A sub-item comes as {"item","under"}; the stand-in labels it by its own text.
     const texts = (JSON.parse(user.slice(user.lastIndexOf('['))) as (string | { item: string })[]).map((t) => (typeof t === 'string' ? t : t.item));
@@ -232,22 +234,18 @@ test('after a failure Sort automatically does not try again by itself in the sam
 // Job ai-sort-failing-batch (owner 2026-11-15): a reply that would fail the same way again is not sent and billed again on every open.
 test('when Claude declines a batch, its items are remembered as asked, so the next open does not send them again', async ({ page }) => {
   await autoDefault(page);
-  const bodies: string[] = [];
-  await page.route('https://api.anthropic.com/**', (r: Route) => {
-    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
-    bodies.push(r.request().postData() ?? '');
-    const reply = { type: 'message', stop_reason: 'refusal', content: [] };
-    return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(reply) });
-  });
+  const bodies = await anthropic(page, 200, 'refusal');
   await saveKey(page);
   await openVisualizer(page);
-  await expect(dialog(page).getByRole('alert')).toContainText('Claude declined');
+  await expect(dialog(page).getByRole('alert')).toHaveText('Claude declined to sort 4 finished items, so they keep their built-in categories.');
   expect(bodies).toHaveLength(1);
   // The items keep their built-in categories, and nothing is left waiting.
   await expect(canvas(page)).toHaveAttribute('aria-label', /Errands & shopping 2/);
   await expect(dialog(page).getByText('Nothing left to sort from your own boards. The labels stay on this device.')).toBeVisible();
   await page.keyboard.press('Escape');
   await openVisualizer(page);
+  // Nothing waiting (so Sort automatically has nothing to send), however long it is given.
+  await expect(dialog(page).getByText(/^Nothing left to sort/)).toBeVisible();
   await page.waitForTimeout(500);
   expect(bodies).toHaveLength(1);
   await page.reload();

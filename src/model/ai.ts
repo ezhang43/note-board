@@ -141,6 +141,14 @@ export function validate(s: AiSchema, v: unknown): Checked {
 
 const BAD_REPLY = "Claude's answer didn't come back in the expected shape. Try again.";
 
+/**
+ * The failures readReply gives for a reply Anthropic did send (a 200): Claude declined, ran out of room, or answered
+ * in the wrong shape. Test key counts them as "the key works"; Sort with AI as "the same text would fail again".
+ */
+export type AnsweredFailureKind = "refusal" | "too-long" | "bad-reply";
+export const ANSWERED_FAILURES: ReadonlySet<AiFailureKind> = new Set<AnsweredFailureKind>(["refusal", "too-long", "bad-reply"]);
+export const answered = (r: AiFailure): r is AiFailure & { kind: AnsweredFailureKind } => ANSWERED_FAILURES.has(r.kind);
+
 /** Reads a successful (200) Messages API reply: the stop reason first, then the JSON in its text part. */
 export function readReply(reply: unknown, schema: AiSchema): AiResult {
   if (typeof reply !== "object" || reply === null) return fail("bad-reply", BAD_REPLY);

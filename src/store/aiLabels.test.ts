@@ -4,7 +4,7 @@ import { AI_BATCH, AI_LABELS_NAME, LABELS_SCHEMA, labelKey, toSend } from "../mo
 import { AI_STORAGE_KEYS, createAiStore } from "./ai";
 import type { AskArgs } from "./ai";
 import { BOARD_KEY } from "../model/persist";
-import { BOARDS_ROOM, LABELS_MAX, NO_ROOM, SAVE_FAILED, createLabelCache, sortWithAi } from "./aiLabels";
+import { BOARDS_ROOM, LABELS_MAX, NO_ROOM, SAVE_FAILED, createLabelCache, notSorted, sortWithAi } from "./aiLabels";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave are kept on this device only, keyed by a
 // hash of the item text and the model, so the same items are not asked about again.
@@ -341,7 +341,8 @@ describe("sortWithAi", () => {
       let n = 0;
       const r = await sortWithAi({ ask: async () => (n++, failure(kind)), cache, uid: "u1", model: M, entries: first, known: [], onProgress: () => {} });
       // The message still shows, and the sort stops there: one request, one counted use.
-      expect(r).toEqual(failure(kind));
+      // It says so in place of "Try again", since these items are not sent again: the next sort moves on.
+      expect(r).toEqual({ ok: false, kind, message: notSorted(kind as "refusal", AI_BATCH) });
       expect(n).toBe(1);
       const asked = cache.asked(M, "u1");
       expect(asked("item 0")).toBe(true);
@@ -357,6 +358,12 @@ describe("sortWithAi", () => {
       expect(cache.asked("claude-opus-5-5", "u1")("item 0")).toBe(false);
     });
   }
+
+  it("says in plain words that those items keep their built-in categories", () => {
+    expect(notSorted("refusal", 50)).toBe("Claude declined to sort 50 finished items, so they keep their built-in categories.");
+    expect(notSorted("too-long", 1)).toBe("Claude's answer for 1 finished item ran out of room, so it keeps its built-in category.");
+    expect(notSorted("bad-reply", 3)).toBe("Claude's answer for 3 finished items didn't come back in the expected shape, so they keep their built-in categories.");
+  });
 
   it("a sub-item in a batch that failed that way is remembered under its parent", async () => {
     const cache = createLabelCache(memory());
@@ -401,7 +408,7 @@ describe("sortWithAi", () => {
     const ask = async (a: AskArgs): Promise<AiResult> => (++n === 2 ? failure("too-long") : reply(a));
     const texts = Array.from({ length: AI_BATCH * 3 }, (_, i) => `item ${i}`);
     const r = await sortWithAi({ ask, cache, uid: null, model: M, entries: texts.map((text) => ({ text })), known: [], onProgress: () => {} });
-    expect(r).toEqual(failure("too-long"));
+    expect(r).toEqual({ ok: false, kind: "too-long", message: notSorted("too-long", AI_BATCH) });
     expect(n).toBe(2);
     expect(cache.get("item 0", M, null)).toBe("Stuff");
     expect(cache.asked(M, null)(`item ${AI_BATCH}`)).toBe(true);

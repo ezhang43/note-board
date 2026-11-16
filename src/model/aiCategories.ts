@@ -28,8 +28,8 @@ export const AI_MAX_PER_PRESS = 200;
 export const AI_ITEM_MAX = 200;
 /** Answer size per request. Thinking shares it, so it has room to spare: the answer itself is a few hundred. */
 export const AI_MAX_TOKENS = 4000;
-/** Where this device keeps the labels (localStorage). */
-export const AI_LABELS_NAME = 'note-board:ai-categories';
+/** Where this device keeps the labels (localStorage); defined in aiLabelsName.ts, which the sign-in watcher loads. */
+export { AI_LABELS_NAME } from './aiLabelsName';
 
 /** One way to tidy an item's text, used both when sending and when looking a label up: spaces joined, cut to AI_ITEM_MAX letters (what is sent). */
 export const normalizeText = (text: string) =>

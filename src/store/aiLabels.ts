@@ -11,13 +11,15 @@ import {
   labelKey,
   readLabels,
 } from "../model/aiCategories";
+import { readAiLabels } from "../model/aiLabelsName";
 import { BOARD_KEY } from "../model/persist";
 import type { AskArgs } from "./ai";
 
 // "Sort with AI" (owner request, 2026-11-13): the labels Claude gave, kept in this browser's localStorage
 // only. Never board data: not in a saved board, Version history, an export or the sync. Saved under a hash
 // of the item text (and, for a sub-item, its parent's text) and the model, with whose they are (a different person signed in sees none of them).
-// Forget key removes them (src/store/ai.ts), and the Visualizer only uses them while a key is saved.
+// Forget key removes them (src/store/ai.ts), as do sign-out, another person signing in (src/model/aiLabelsName.ts, from the
+// sign-in watcher) and Delete account (accountKeys); the Visualizer only uses them while a key is saved.
 
 /** Saved for an item Claude was asked about and gave no label: never read as a name (cleanLabel gives null), but
  * the item counts as asked, so Sort automatically does not send and bill the same text again (coordinator, 2026-11-13). */
@@ -44,15 +46,21 @@ export const BOARDS_ROOM = 1_000_000;
 const PROBE_NAME = `${AI_LABELS_NAME}:room`;
 /** Letters one saved label takes, at most: its key and the JSON around it (about 16), and the name (24 letters, up to 96 storage characters for emoji and escaped quotes). */
 // simple: a fixed worst case rather than the real size, which is only known once Claude answers. If a save still
-// fails, the sort stops at that batch and Sort automatically waits until a save works (`failed`).
+// fails, the sort stops at that batch and Sort automatically waits until a save works for that person (`failedFor`).
 const LETTERS_PER_LABEL = 112;
 
 type Place = Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
 type Saved = { v: 1; owner: string; entries: Record<string, string> };
+/** Stands for "no save has failed" in `failedFor`. */
+const NONE = Symbol("none");
 
 export function createLabelCache(device: Place) {
-  /** A save failed in this page (storage full or blocked): Sort automatically waits until one works again (a press) or the labels are cleared. */
-  let failed = false;
+  /**
+   * Whose save failed in this page (storage full or blocked): Sort automatically waits, for that person, until one
+   * works again (a press) or the labels are cleared. Kept per person, as the sign-in watcher removes the labels
+   * without telling this cache (code review, 2026-11-15).
+   */
+  let failedFor: string | typeof NONE = NONE;
   /**
    * Whether `letters` more can be written and still leave the boards their room: a test write that size, removed
    * at once (storage does not say how much is free).
@@ -77,14 +85,16 @@ export function createLabelCache(device: Place) {
       }
     }
   };
-  const load = (owner: string | null): Record<string, string> => {
+  const raw = () => {
     try {
-      const s = JSON.parse(device?.getItem(AI_LABELS_NAME) ?? "null") as Partial<Saved> | null;
-      if (s?.v !== 1 || s.owner !== (owner ?? "") || typeof s.entries !== "object" || !s.entries || Array.isArray(s.entries)) return {};
-      return s.entries;
+      return device?.getItem(AI_LABELS_NAME) ?? null;
     } catch {
-      return {};
+      return null;
     }
+  };
+  const load = (owner: string | null): Record<string, string> => {
+    const s = readAiLabels(raw());
+    return s && s.owner === (owner ?? "") ? s.entries : {};
   };
   const store = {
     /** The label saved for `text` (under `parent`, for a sub-item) with `model`, cleaned again (it may have been changed on this device), or null. */
@@ -117,7 +127,7 @@ export function createLabelCache(device: Place) {
      * again. A press does not ask.
      */
     room(count: number, owner: string | null): "ok" | "full" | "cant-save" {
-      if (failed || !device) return "cant-save";
+      if (failedFor === (owner ?? "") || !device) return "cant-save";
       if (Object.keys(load(owner)).length + count > LABELS_MAX) return "full";
       return fits(count * LETTERS_PER_LABEL) ? "ok" : "cant-save";
     },
@@ -125,14 +135,9 @@ export function createLabelCache(device: Place) {
     dropUnlessFor(owner: string | null) {
       // Nobody signed in (or sign-in still loading): keep them; reader() gives nothing to the wrong person anyway.
       if (!owner) return;
-      let mine = false;
-      try {
-        const s = JSON.parse(device?.getItem(AI_LABELS_NAME) ?? "null") as Partial<Saved> | null;
-        mine = !s || (s.v === 1 && s.owner === (owner ?? ""));
-      } catch {
-        // Damaged: of no use to anyone.
-      }
-      if (!mine) store.clear();
+      // Damaged ones are of no use to anyone.
+      const saved = raw();
+      if (saved !== null && readAiLabels(saved)?.owner !== owner) store.clear();
     },
     /**
      * Saves labels for texts (each with its parent, for a sub-item); anyone else's labels are replaced. "no-room"
@@ -151,14 +156,14 @@ export function createLabelCache(device: Place) {
       try {
         if (!device) throw new Error("no storage");
         if (!fits(json.length - (device.getItem(AI_LABELS_NAME)?.length ?? 0))) {
-          failed = true;
+          failedFor = owner ?? "";
           return "no-room";
         }
         device.setItem(AI_LABELS_NAME, json);
-        failed = false;
+        failedFor = NONE;
         return "saved";
       } catch {
-        failed = true;
+        failedFor = owner ?? "";
         return "cant-save";
       }
     },
@@ -173,7 +178,7 @@ export function createLabelCache(device: Place) {
     clear() {
       try {
         device?.removeItem(AI_LABELS_NAME);
-        failed = false; // their room is free again (only once they are really gone)
+        failedFor = NONE; // their room is free again (only once they are really gone)
       } catch {
         // Blocked storage: nothing kept.
       }

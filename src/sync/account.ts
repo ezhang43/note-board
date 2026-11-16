@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { parseWorkspace } from '../model/workspace';
 import { AI_KEY_NAMES } from '../model/aiKey';
+import { AI_LABELS_NAME } from '../model/aiLabelsName';
 import { accountKeys } from '../store/account';
 import { sharesKey } from '../store/sharing';
 import type { Store } from '../store/store';
@@ -65,7 +66,7 @@ export function finishDeletion(store: Store, storage: Storage, uid: string, shar
   }
   try {
     const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i) ?? '');
-    for (const key of accountKeys(keys, uid, shareIds, storage.getItem(prefix + sharesKey(uid)), prefix)) storage.removeItem(key);
+    for (const key of accountKeys(keys, uid, shareIds, storage.getItem(prefix + sharesKey(uid)), prefix, storage.getItem(AI_LABELS_NAME))) storage.removeItem(key);
     sessionStorage.setItem(DELETED_KEY, '1');
   } catch {
     // Storage blocked: there is nothing kept on the device to clear.

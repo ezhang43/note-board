@@ -338,3 +338,60 @@ describe('the AI key kept in this browser (wow plan, job 12b)', () => {
     expect(fire(null)).toEqual([null]);
   });
 });
+
+describe('the Sort with AI labels kept on this device (code review, 2026-11-15)', () => {
+  // The sign-in watcher drops them on sign-out and when another person signs in, the same as the AI
+  // key above; the same person signed in after a reload keeps them. Only the labels' own entry goes.
+  const LABELS = 'note-board:ai-categories';
+  const data = new Map<string, string>();
+  const tab = new Map<string, string>();
+  const fake = (m: Map<string, string>) => ({ getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
+  const saved = (owner: string) => JSON.stringify({ v: 1, owner, entries: { abc: 'Errands' } });
+  const others = ['note-board:ai-model', 'note-board:ai-cap', 'note-board:ai-uses', 'note-board:v1', 'demo-u1:note-board:ai-categories'];
+  beforeEach(() => {
+    data.clear();
+    tab.clear();
+    vi.stubGlobal('localStorage', fake(data));
+    vi.stubGlobal('sessionStorage', fake(tab));
+    data.set(LABELS, saved('u1'));
+    for (const k of others) data.set(k, 'x');
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const fire = (u: { uid: string } | null) => {
+    const seen: unknown[] = [];
+    watchUser((x) => void seen.push(x));
+    (vi.mocked(auth.onAuthStateChanged).mock.calls.at(-1)![1] as (u: unknown) => void)(u);
+    return seen;
+  };
+
+  it('are kept when the same person is still signed in after a reload', () => {
+    fire({ uid: 'u1' });
+    expect(data.get(LABELS)).toBe(saved('u1'));
+  });
+
+  it('are dropped on sign-out, and nothing else goes', () => {
+    expect(fire(null)).toEqual([null]);
+    expect(data.has(LABELS)).toBe(false);
+    for (const k of others) expect(data.get(k)).toBe('x');
+  });
+
+  it('are dropped when another person signs in, and nothing else goes', () => {
+    fire({ uid: 'u2' });
+    expect(data.has(LABELS)).toBe(false);
+    for (const k of others) expect(data.get(k)).toBe('x');
+  });
+
+  it('damaged labels are dropped when someone signs in', () => {
+    data.set(LABELS, '{');
+    fire({ uid: 'u1' });
+    expect(data.has(LABELS)).toBe(false);
+  });
+
+  it('blocked storage never stops the sign-in watcher', () => {
+    const blocked = { getItem: () => { throw new Error('blocked'); }, setItem() {}, removeItem: () => { throw new Error('blocked'); } };
+    vi.stubGlobal('localStorage', blocked);
+    vi.stubGlobal('sessionStorage', blocked);
+    expect(fire({ uid: 'u2' })).toEqual([{ uid: 'u2' }]);
+    expect(fire(null)).toEqual([null]);
+  });
+});

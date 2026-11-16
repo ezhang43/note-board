@@ -23,7 +23,10 @@ const m = vi.hoisted(() => ({
   deleteAccountData: vi.fn(async () => ({ shareIds: [] as string[] })),
   accountRemote: vi.fn(),
   remover: null as (() => Promise<void>) | null,
+  /** The Brain dump's text (view state, not saved) and whether its dialog is open. */
+  appStore: { brainDump: { text: '', open: false } } as { brainDump: { text: string; open: boolean }; forgetBrainDump?: () => void },
 }));
+m.appStore.forgetBrainDump = () => void (m.appStore.brainDump = { text: '', open: false });
 
 vi.mock('./firebase', () => ({
   watchUser: (fn: typeof m.onUser) => {
@@ -34,7 +37,7 @@ vi.mock('./firebase', () => ({
   signInWithGoogle: vi.fn(async () => {}),
   signOutUser: vi.fn(),
 }));
-vi.mock('../store/appStore', () => ({ appStore: {} }));
+vi.mock('../store/appStore', () => ({ appStore: m.appStore }));
 vi.mock('../store/sharing', () => ({
   boardsInKeptShares: () => [],
   ownBoardsGuard: () => ({ remote: {}, isShared: () => false, known: vi.fn() }),
@@ -151,6 +154,19 @@ describe('the database code loads only after sign-in (job 169)', () => {
     expect(session.getStatus()).toBe('error');
     expect(m.startSharing).not.toHaveBeenCalled();
   });
+});
+
+describe('the Brain dump’s text belongs to the person who typed it (code review, 2026-11-15)', () => {
+  for (const signsOut of [true, false]) {
+    it(`is emptied and its dialog closed ${signsOut ? 'on sign-out' : 'when another person signs in'}`, async () => {
+      await openPage();
+      m.onUser!({ uid: 'ann' });
+      await arrive();
+      m.appStore.brainDump = { text: 'call the bank\nbuy milk', open: true };
+      m.onUser!(signsOut ? null : { uid: 'bob' });
+      expect(m.appStore.brainDump).toEqual({ text: '', open: false });
+    });
+  }
 });
 
 /** The save-state reporters handed to the most recent shared-board and own-board syncs. */

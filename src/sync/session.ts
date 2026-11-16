@@ -84,6 +84,8 @@ watchUser((user) => {
   stopAll();
   collab.set(null, null);
   feedback.reset();
+  // The Brain dump's text is this person's (code review, 2026-11-15): never shown to whoever is next.
+  appStore.forgetBrainDump();
   if (!user) {
     if (!deleting) update('signed-out');
     return;

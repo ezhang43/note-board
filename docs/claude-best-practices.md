@@ -376,10 +376,13 @@ exploration to a subagent.
   shell" on Windows) means that on the owner's Windows computer, commands may run through PowerShell, which
   our `matcher: "Bash"` hook never sees, so the `pkill`, force-push and push-to-`main`/`build/v1` guard
   would not run there. Recommend: yes, change the matcher to `Bash|PowerShell` (the guard reads
-  `tool_input.command` either way), and check once on Windows that a refused push is refused. Not applied:
-  it changes how pushing is protected (`.claude/settings.json` hook and rule 9).
+  `tool_input.command` either way), and check once on Windows that a refused push is refused. **Owner
+  answer 2026-11-16: watch both. Applied:** the matcher is `Bash|PowerShell` and `scripts/claude-hooks.mjs`
+  guards both tools' commands (test in `scripts/claude-hooks.test.ts`). Still to do: the owner checks once
+  on Windows.
 - **Q14. Will `/security-review` stall crew workers?** Since 2.1.323 Claude Code asks before it runs
   `/security-review` (outside auto and bypass modes). `finish-step` step 4 runs it for risky changes, and a
   background worker has nobody to answer. Not yet seen to happen. Recommend: do nothing now; if a worker
   ever reports it blocked, add `Skill(security-review)` to `permissions.allow` then. Excluded from
-  automatic changes: it is a permissions change.
+  automatic changes: it is a permissions change. **Owner answer 2026-11-16: wait and see.** Nothing
+  changed; revisit only if a worker is seen stuck on it.

@@ -152,6 +152,14 @@ describe('bash guard hook', () => {
     }
   });
 
+  it('guards PowerShell commands the same way (Windows)', () => {
+    const ps = (command: string) => ({ tool_name: 'PowerShell', tool_input: { command } });
+    expect(bashGuardHook(ps('git push origin build/v1'), worker).code).toBe(2);
+    expect(bashGuardHook(ps('git push --force origin main'), coordinator).code).toBe(2);
+    expect(bashGuardHook(ps('cd C:\\x; git.exe push origin HEAD:build/v1'), worker).code).toBe(2);
+    expect(bashGuardHook(ps('git push -u origin my-job'), worker)).toEqual({ code: 0, message: '' });
+  });
+
   it('ignores other tools and calls with no command', () => {
     expect(bashGuardHook({ tool_name: 'Edit', tool_input: { file_path: 'pkill' } }, worker)).toEqual({ code: 0, message: '' });
     expect(bashGuardHook({ tool_name: 'Bash', tool_input: {} }, worker)).toEqual({ code: 0, message: '' });

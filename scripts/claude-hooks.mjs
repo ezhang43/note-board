@@ -101,7 +101,7 @@ const LIVE_BRANCHES = ['main', 'build/v1'];
  * @param {Record<string, string | undefined>} env
  */
 export function bashGuardHook(input, env) {
-  const command = input.tool_name === 'Bash' ? input.tool_input?.command : undefined;
+  const command = ['Bash', 'PowerShell'].includes(input.tool_name ?? '') ? input.tool_input?.command : undefined;
   if (typeof command !== 'string') return { code: 0, message: '' };
   const refuse = (/** @type {string} */ why) => ({ code: 2, message: `Blocked: ${why}` });
   for (const segment of command.split(/[;&|\n]/)) {

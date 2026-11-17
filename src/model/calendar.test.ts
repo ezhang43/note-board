@@ -304,13 +304,13 @@ describe('a day in the month grid (job #47)', () => {
 });
 
 describe('editing an event', () => {
-  it('a new event is an hour from 9:00 on the chosen day', () => {
-    expect(newDraft('2026-10-07')).toEqual({ title: '', allDay: false, startDate: '2026-10-07', startTime: '09:00', endDate: '2026-10-07', endTime: '10:00', guests: [] });
+  it('a new event is an hour from 12:00 PM (noon) on the chosen day', () => {
+    expect(newDraft('2026-10-07')).toEqual({ title: '', allDay: false, startDate: '2026-10-07', startTime: '12:00', endDate: '2026-10-07', endTime: '13:00', guests: [] });
   });
 
   it('fills the form from an event (an all-day event’s last day is shown, not the day after)', () => {
     expect(draftFor(timed())).toEqual({ title: 'Dentist', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] });
-    expect(draftFor(timed({ allDay: true, start: '2026-10-08', end: '2026-10-10' }))).toMatchObject({ allDay: true, startDate: '2026-10-08', endDate: '2026-10-09' });
+    expect(draftFor(timed({ allDay: true, start: '2026-10-08', end: '2026-10-10' }))).toMatchObject({ allDay: true, startDate: '2026-10-08', startTime: '12:00', endDate: '2026-10-09', endTime: '13:00' });
   });
 
   it('an untitled event opens with an empty title, so "(No title)" is never sent as its name (2026-10-17)', () => {

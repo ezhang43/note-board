@@ -1,0 +1,2 @@
+- 2026-11-17 Calendar default time (owner request: "could you set the default time to be 12pm?"): a new event's quick-add starts at 12:00 PM and ends at 1:00 PM, one hour.
+- 2026-11-17 Calendar default time (coordinator call): an all-day event's hidden times, used if All day is unticked, are now 12:00 and 13:00 too, so unticking it gives the same noon hour as a new event. The dev server's sample events are unchanged.

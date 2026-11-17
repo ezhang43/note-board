@@ -138,7 +138,7 @@ test('a timed event can be made all-day, and back', async ({ page }) => {
   await edit(page, today.getByRole('button', { name: 'All day Dentist' }));
   await form(page).getByLabel('All day').uncheck();
   await form(page).getByRole('button', { name: 'Save' }).click();
-  await expect(today.getByRole('button', { name: '9 – 10am Dentist' })).toBeVisible();
+  await expect(today.getByRole('button', { name: '12 – 1pm Dentist' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -1031,7 +1031,7 @@ test('Month: a click on the day that is already picked opens the new-event form 
   await cell(other).locator('.cal-date').click();
   await expect(cell(other)).toHaveAttribute('aria-selected', 'true');
   await expect(form(page)).toHaveCount(0);
-  // Clicking it again, on the empty part of its cell, opens the form: 9:00 for an hour on that day.
+  // Clicking it again, on the empty part of its cell, opens the form: 12:00 PM for an hour on that day.
   const box = (await cell(other).boundingBox())!;
   await cell(other).click({ position: { x: box.width - 4, y: box.height - 4 } });
   await expect(form(page)).toBeVisible();
@@ -1039,8 +1039,8 @@ test('Month: a click on the day that is already picked opens the new-event form 
   await expect(panel(page).getByRole('grid')).toBeVisible();
   await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(other));
-  await expect(form(page).getByLabel('Start time')).toHaveValue('9:00 AM');
-  await expect(form(page).getByLabel('End time')).toHaveValue('10:00 AM');
+  await expect(form(page).getByLabel('Start time')).toHaveValue('12:00 PM');
+  await expect(form(page).getByLabel('End time')).toHaveValue('1:00 PM');
   // Escape closes it and the keyboard goes back to the cell's date button (the cell itself can't take focus).
   await page.keyboard.press('Escape');
   await expect(form(page)).toHaveCount(0);
@@ -1514,10 +1514,10 @@ test('+ opens a quick-add beside the panel, with the Week list still in view', a
   // The list is not replaced: the day's events and the panel's own buttons are still there.
   await expect(dentist).toBeVisible();
   await expect(panel(page).getByRole('button', { name: 'Today' })).toBeVisible();
-  // Quick: title, date, 9:00 - 10:00, All day, Save and More options; nothing else yet.
+  // Quick: title, date, 12:00 PM - 1:00 PM, All day, Save and More options; nothing else yet.
   await expect(form(page).getByLabel('Start date')).toHaveValue(key(today));
-  await expect(form(page).getByLabel('Start time')).toHaveValue('9:00 AM');
-  await expect(form(page).getByLabel('End time')).toHaveValue('10:00 AM');
+  await expect(form(page).getByLabel('Start time')).toHaveValue('12:00 PM');
+  await expect(form(page).getByLabel('End time')).toHaveValue('1:00 PM');
   await expect(form(page).getByLabel('All day')).not.toBeChecked();
   await expect(form(page).getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(form(page).getByRole('button', { name: 'More options' })).toBeVisible();
@@ -1536,7 +1536,7 @@ test('quick-add: a title and Enter saves it, the list shows it and the overlay i
   await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(form(page)).toHaveCount(0);
-  await expect(day(page, today).getByRole('button', { name: '9 – 10am Swim' })).toBeVisible();
+  await expect(day(page, today).getByRole('button', { name: '12 – 1pm Swim' })).toBeVisible();
   expect(sent).toHaveLength(1);
   // All day, without times, from the quick-add too.
   await plus(page, today).click();
@@ -1602,14 +1602,14 @@ test('time picker: pick a start from the list and the end follows; the end list 
   await plus(page, new Date()).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   const end = form(page).getByRole('combobox', { name: 'End time' });
-  await expect(start).toHaveValue('9:00 AM');
+  await expect(start).toHaveValue('12:00 PM');
   await expect(start).toHaveAttribute('aria-expanded', 'false');
   await start.click();
   await expect(start).toHaveAttribute('aria-expanded', 'true');
   await expect(timeList(page, 'Start time')).toBeVisible();
   // The list opens with the current time in view and marked.
-  await expect(timeOption(page, '9:00 AM')).toHaveAttribute('aria-selected', 'true');
-  await expect(timeOption(page, '9:00 AM')).toBeInViewport();
+  await expect(timeOption(page, '12:00 PM')).toHaveAttribute('aria-selected', 'true');
+  await expect(timeOption(page, '12:00 PM')).toBeInViewport();
   await timeOption(page, '2:00 PM').click();
   await expect(timeList(page, 'Start time')).toHaveCount(0);
   await expect(start).toHaveValue('2:00 PM');
@@ -1690,15 +1690,15 @@ test('time picker: ↑ ↓ and Enter pick from the list; Escape closes only the 
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   await start.focus();
   await expect(start).toHaveAttribute('aria-expanded', 'true');
-  await expect(start).toHaveAttribute('aria-activedescendant', (await timeOption(page, '9:00 AM').getAttribute('id')) ?? 'missing');
+  await expect(start).toHaveAttribute('aria-activedescendant', (await timeOption(page, '12:00 PM').getAttribute('id')) ?? 'missing');
   await start.press('ArrowDown');
   await start.press('ArrowDown');
-  await expect(timeOption(page, '9:30 AM')).toHaveAttribute('aria-selected', 'true');
+  await expect(timeOption(page, '12:30 PM')).toHaveAttribute('aria-selected', 'true');
   await start.press('ArrowUp');
   await start.press('Enter');
-  await expect(start).toHaveValue('9:15 AM');
+  await expect(start).toHaveValue('12:15 PM');
   await expect(start).toHaveAttribute('aria-expanded', 'false');
-  await expect(form(page).getByRole('combobox', { name: 'End time' })).toHaveValue('10:15 AM');
+  await expect(form(page).getByRole('combobox', { name: 'End time' })).toHaveValue('1:15 PM');
   await expect(form(page)).toBeVisible();
   // Escape closes the list and keeps the value; the next Escape closes the form.
   await start.press('ArrowDown');
@@ -1706,7 +1706,7 @@ test('time picker: ↑ ↓ and Enter pick from the list; Escape closes only the 
   await expect(timeList(page, 'Start time')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(timeList(page, 'Start time')).toHaveCount(0);
-  await expect(start).toHaveValue('9:15 AM');
+  await expect(start).toHaveValue('12:15 PM');
   await expect(form(page)).toBeVisible();
   await expect(panel(page)).toBeVisible();
   await page.keyboard.press('Escape');
@@ -1741,14 +1741,14 @@ test('More options opens the full form in the same overlay, keeping what was typ
   const today = new Date();
   await plus(page, today).click();
   await page.keyboard.type('Planning');
-  await setTime(form(page).getByLabel('End time'), '11:30');
+  await setTime(form(page).getByLabel('End time'), '14:30');
   const before = (await form(page).boundingBox())!;
   await form(page).getByRole('button', { name: 'More options' }).click();
   await expect(form(page).getByLabel('Guest email')).toBeVisible();
   await expect(form(page).getByLabel('End date')).toHaveValue(key(today));
   await expect(form(page).getByRole('button', { name: 'More options' })).toHaveCount(0);
   await expect(form(page).getByLabel('Title')).toHaveValue('Planning');
-  await expect(form(page).getByLabel('End time')).toHaveValue('11:30 AM');
+  await expect(form(page).getByLabel('End time')).toHaveValue('2:30 PM');
   await expect(form(page).getByLabel('Title')).toBeFocused();
   // Same overlay: still just left of the panel, and the list is still there.
   const [after, side] = await Promise.all([form(page).boundingBox(), panel(page).boundingBox()]);
@@ -1761,7 +1761,7 @@ test('More options opens the full form in the same overlay, keeping what was typ
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, EMAILS).getByRole('button', { name: /Don.t send/ }).click();
   await expect(form(page)).toHaveCount(0);
-  await expect(day(page, today).getByRole('button', { name: '9 – 11:30am Planning' })).toBeVisible();
+  await expect(day(page, today).getByRole('button', { name: '12 – 2:30pm Planning' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

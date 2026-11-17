@@ -2373,6 +2373,40 @@ test.describe('calendar keys', () => {
     expect(errors).toEqual([]);
   });
 
+  test('right after the panel opens from its button, → and N work without clicking into it', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const first = await range(page).textContent();
+    await page.keyboard.press('ArrowRight');
+    await expect(range(page)).not.toHaveText(first!);
+    await page.keyboard.press('n');
+    await expect(form(page)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('typing in a board note after deleting an event: Ctrl+Z undoes the typing first, not the delete', async ({ page }) => {
+    const errors = await openAs(page);
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+    await button(page).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await answered(page);
+    const body = cards(page).first().locator('[contenteditable], textarea').first();
+    await body.click();
+    await page.keyboard.type('hello');
+    await page.keyboard.press('Escape');
+    await page.locator('.canvas').click({ position: { x: 700, y: 500 } });
+    await page.keyboard.press('Control+z');
+    await expect(cards(page).first()).not.toContainText('hello');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('none of the keys fire while typing in the event form', async ({ page }) => {
     const errors = await openAs(page);
     await button(page).click();

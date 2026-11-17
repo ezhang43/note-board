@@ -65,6 +65,8 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
         if (!open) void calendar.open();
         appStore.toggleSidePanel('calendar');
         onOpen?.();
+        // The keyboard goes into the panel it opened, so its keys (N, T, the arrows) work straight away.
+        if (!open) requestAnimationFrame(() => document.querySelector<HTMLElement>('.side-panel')?.focus({ preventScroll: true }));
       }}
     >
       <CalendarDaysIcon />

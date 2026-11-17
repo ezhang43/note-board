@@ -1267,6 +1267,8 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   display: flex;
   align-items: center;
   gap: 4px;
+  /* As wide as its words (else, centred from the middle, a phone gives it only half the screen and cuts them short). */
+  width: max-content;
   max-width: calc(100vw - 32px);
   padding: 4px 4px 4px 16px;
   background: var(--ink);

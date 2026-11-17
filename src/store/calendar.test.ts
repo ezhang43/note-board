@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
 import { tick } from './undoClock';
-import { calendarApi, canRetry, CalendarApiError, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
+import { calendarApi, canRetry, CalendarApiError, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: not synced with boards or kept in versions; undone by the Undo
@@ -27,7 +27,7 @@ const mail = (notify?: boolean) => (notify === undefined ? '' : notify ? ' (emai
 
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null; down: boolean; status: number | null } = {
+  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null; down: boolean; status: number | null; reason?: string } = {
     calls,
     fail: false,
     down: false,
@@ -82,10 +82,10 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
       return there;
     },
   };
-  /** `down`: no network (fetch throws, as offline); `status`: Google answers with that HTTP status. */
+  /** `down`: no network (fetch throws, as offline); `status`: Google answers with that HTTP status (and `reason`). */
   function gone() {
     if (api.down) throw new TypeError('Failed to fetch');
-    if (api.status) throw new CalendarApiError(api.status);
+    if (api.status) throw new CalendarApiError(api.status, api.reason);
   }
   return api;
 }
@@ -706,7 +706,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.settled();
     api.fail = true;
     await cal.undo();
-    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+    expect(cal.get().done).toMatchObject({ text: UNDO_REFUSED, undo: null, retry: null });
   });
 
   it('no message when the change was refused before it was sent, no Undo when Google refused it; a new change replaces the message; dismiss clears it', async () => {
@@ -1248,6 +1248,33 @@ describe('talking to the Calendar API', () => {
     expect(canRetry(new Error(SERIES_FAILED))).toBe(false);
   });
 
+  // Owner decision 2026-11-17: Google sends some rate limits as a 403 with a reason in its JSON body (error.errors[].reason,
+  // "rateLimitExceeded" or "userRateLimitExceeded", the Calendar API's error guide); those are kept to retry, like a 429.
+  it('a 403 that is a rate limit is kept to retry; any other 403 is not, also when its body isn’t JSON', async () => {
+    const answer = (status: number, body: string) => {
+      const fn = vi.fn(async () => new Response(body, { status })) as unknown as typeof fetch;
+      return calendarApi(source(), fn).restore('a').catch((e: unknown) => e);
+    };
+    const google = (reason: unknown) => JSON.stringify({ error: { errors: [{ domain: 'usageLimits', reason, message: 'x' }], code: 403, message: 'x' } });
+    for (const reason of ['rateLimitExceeded', 'userRateLimitExceeded']) {
+      const err = await answer(403, google(reason));
+      expect(err).toBeInstanceOf(CalendarApiError);
+      expect(err).toMatchObject({ status: 403, reason, message: 'Calendar API: 403' });
+      expect(canRetry(err)).toBe(true);
+    }
+    for (const reason of ['forbiddenForNonOrganizer', 'quotaExceeded', 'forbidden']) expect(canRetry(await answer(403, google(reason)))).toBe(false);
+    // No reason to read: a page that isn't JSON, no errors list, a reason that isn't text, or an empty body.
+    for (const body of ['<html>Forbidden</html>', '{"error":{"code":403}}', google(42), '', 'null', '{"error":{"errors":[null]}}']) {
+      const err = await answer(403, body);
+      expect(err).toBeInstanceOf(CalendarApiError);
+      expect(err).toMatchObject({ status: 403, reason: undefined });
+      expect(canRetry(err)).toBe(false);
+    }
+    // A rate-limit reason on a 400 or 404 is not believed: only a 403 (or 429) is a rate limit.
+    expect(canRetry(await answer(404, google('rateLimitExceeded')))).toBe(false);
+    expect(canRetry(await answer(429, google('rateLimitExceeded')))).toBe(true);
+  });
+
   it('lists the primary calendar’s events between two days, repeating ones as single events', async () => {
     const f = fakeFetch(200, {
       items: [
@@ -1644,14 +1671,14 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
     await cal.settled();
     api.fail = true;
     await cal.undoLast();
-    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+    expect(cal.get().done).toMatchObject({ text: UNDO_REFUSED, undo: null, retry: null });
     expect(cal.marks().redo).toBe(0);
     api.fail = false;
     await cal.undoLast(); // the step before is still there
     expect(api.calls.at(-2)).toBe('restore a');
     api.fail = true;
     await cal.redo();
-    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    expect(cal.get().done).toMatchObject({ text: REDO_REFUSED, undo: null, retry: null });
     expect(cal.marks().redo).toBe(0);
     api.fail = false;
     const from = api.calls.length;
@@ -1717,7 +1744,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
     await cal.undoLast();
     api.failId = 'su';
     await cal.redo();
-    expect(cal.get().done).toMatchObject({ text: SERIES_FAILED, undo: null });
+    expect(cal.get().done).toMatchObject({ text: SERIES_REDO_PART, undo: null, retry: null });
     expect(api.calls.at(-1)).toMatch(/^list /); // fetched again, whatever day the week starts on
   });
 
@@ -1768,7 +1795,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
     google.answer();
     api.fail = true;
     await undoing;
-    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+    expect(cal.get().done).toMatchObject({ text: UNDO_REFUSED, undo: null, retry: null });
   });
 
   it('an “All events” save is numbered when it starts, so a board change made while Google answers counts as newer', async () => {
@@ -1836,7 +1863,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       const mark = cal.marks().undo;
       api.down = true;
       await cal.undoLast();
-      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null, retry: expect.any(Function) });
       expect(cal.marks()).toEqual({ undo: mark, redo: 0 });
       api.down = false;
       const from = api.calls.length;
@@ -1854,7 +1881,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       const mark = cal.marks().redo;
       api.down = true;
       await cal.redo();
-      expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+      expect(cal.get().done).toMatchObject({ text: REDO_FAILED, undo: null, retry: expect.any(Function) });
       expect(cal.marks()).toEqual({ undo: 0, redo: mark });
       api.down = false;
       const from = api.calls.length;
@@ -1877,7 +1904,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       await new Promise((r) => setTimeout(r, 0));
       google.refuse();
       await undoing;
-      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null, retry: expect.any(Function) });
       expect(cal.marks().undo).toBeGreaterThan(0);
     });
 
@@ -1888,12 +1915,90 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       await cal.settled();
       api.status = status;
       await cal.undoLast();
-      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.get().done).toMatchObject({ text: UNDO_REFUSED, undo: null, retry: null });
       expect(cal.marks().redo).toBe(0);
       api.status = null;
       const from = api.calls.length;
       await cal.undoLast();
       expect(sent(api, from)).toEqual(['restore a']);
+    });
+
+    // Owner decisions 2026-11-17: Google's rate limits sent as a 403 are kept like a 429; a kept step's message has
+    // Try again (the same undo or redo again, as pressing the key again would); a dropped one says it can't be undone.
+    it.each(['rateLimitExceeded', 'userRateLimitExceeded'])('a 403 “%s” (Google’s rate limit) keeps the step, with Try again', async (reason) => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      const mark = cal.marks().undo;
+      api.status = 403;
+      api.reason = reason;
+      await cal.undoLast();
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null, retry: expect.any(Function) });
+      expect(cal.marks()).toEqual({ undo: mark, redo: 0 });
+      api.status = null;
+      api.reason = undefined;
+      const from = api.calls.length;
+      await cal.get().done!.retry!();
+      expect(sent(api, from)).toEqual(['restore a']);
+      expect(cal.marks().undo).toBe(0);
+      expect(cal.marks().redo).toBeGreaterThan(0);
+    });
+
+    it('any other 403 drops the step, says it can’t be undone, and has no Try again', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      api.status = 403;
+      api.reason = 'forbiddenForNonOrganizer';
+      await cal.undoLast();
+      expect(cal.get().done).toMatchObject({ text: UNDO_REFUSED, undo: null, retry: null });
+      expect(UNDO_REFUSED).not.toMatch(/try again/i);
+      expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
+    });
+
+    it('Try again on a kept Ctrl+Y makes the change again; while still offline it is kept again, with Try again', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      await cal.undoLast();
+      api.down = true;
+      await cal.redo();
+      const first = cal.get().done!;
+      expect(first).toMatchObject({ text: REDO_FAILED, retry: expect.any(Function) });
+      await first.retry!();
+      expect(cal.get().done).toMatchObject({ text: REDO_FAILED, retry: expect.any(Function) });
+      expect(cal.get().done!.n).toBeGreaterThan(first.n);
+      api.down = false;
+      const from = api.calls.length;
+      await cal.get().done!.retry!();
+      expect(sent(api, from)).toEqual(['remove a (no emails)']);
+      expect(cal.marks().redo).toBe(0);
+      expect(cal.marks().undo).toBeGreaterThan(0);
+    });
+
+    it('a dropped Ctrl+Y says it can’t be redone, with no Try again', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      await cal.undoLast();
+      api.status = 400;
+      await cal.redo();
+      expect(cal.get().done).toMatchObject({ text: REDO_REFUSED, undo: null, retry: null });
+      expect(REDO_REFUSED).not.toMatch(/try again/i);
+    });
+
+    it('Try again after the step has gone (the panel opened again) sends nothing', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      api.down = true;
+      await cal.undoLast();
+      const retry = cal.get().done!.retry!;
+      api.down = false;
+      await cal.open();
+      const from = api.calls.length;
+      await retry();
+      expect(sent(api, from)).toEqual([]);
     });
 
     it('a 404 on Ctrl+Y drops that step too', async () => {
@@ -1980,7 +2085,7 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
         return real(id, body, notify);
       };
       await cal.redo();
-      expect(cal.get().done).toMatchObject({ text: SERIES_FAILED, undo: null });
+      expect(cal.get().done).toMatchObject({ text: SERIES_REDO_PART, undo: null, retry: null });
       expect(cal.marks().redo).toBe(0);
     });
 

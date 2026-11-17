@@ -1542,6 +1542,28 @@ test.describe('on a phone-sized screen', () => {
     await card(page).getByRole('button', { name: 'Edit event' }).tap();
     await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
   });
+
+  // Owner decision 2026-11-17: an Undo that didn't get through offers Try again, tapped like any button; its words fit.
+  test('an Undo that doesn’t get through says so in full, and Try again (a tap) brings the event back once online', async ({ page }) => {
+    await openAs(page);
+    await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+    await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
+    await day(page, nowDate()).getByRole('button', { name: /Dentist/ }).tap();
+    await card(page).getByRole('button', { name: 'Delete event' }).tap();
+    const toast = page.locator('.undo-toast');
+    await expect(toast).toHaveText(/Event deleted/);
+    await answered(page);
+    await page.route('**/__calendar/**', (route) => (route.request().method() === 'PATCH' ? route.abort('internetdisconnected') : route.continue()));
+    await toast.getByRole('button', { name: 'Undo' }).tap();
+    const again = toast.getByRole('button', { name: 'Try again' });
+    await expect(again).toBeVisible();
+    // Not cut short with "…" on a phone.
+    expect(await toast.locator('span').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await answered(page);
+    await page.unroute('**/__calendar/**');
+    await again.tap();
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  });
 });
 
 // The add / change form is an overlay like the event card, not a screen that replaces the list
@@ -2323,12 +2345,68 @@ test.describe('calendar keys', () => {
     await page.route('**/__calendar/**', (route) => (route.request().method() === 'PATCH' ? route.abort('internetdisconnected') : route.continue()));
     await today.getByRole('heading').first().click();
     await page.keyboard.press('Control+z');
-    await expect(toast(page)).toHaveText('The undo didn’t reach Google Calendar. Try again later.');
+    await expect(toast(page)).toHaveText('Undo didn’t reach Google Calendar.Try again');
     await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
     await answered(page);
     await page.unroute('**/__calendar/**');
     await page.keyboard.press('Control+z');
     await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  });
+
+  // Owner decision 2026-11-17: a kept step's message has Try again, which tries the same undo again (mouse, touch, keyboard).
+  test('Try again on a Ctrl+Z that didn’t get through tries it again: still offline it says so again, back online the event comes back', async ({ page }) => {
+    await openAs(page);
+    await button(page).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await answered(page);
+    const sent = changesSent(page);
+    let tries = 0;
+    await page.route('**/__calendar/**', (route) => (route.request().method() === 'PATCH' ? (tries++, route.abort('internetdisconnected')) : route.continue()));
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('Control+z');
+    const again = toast(page).getByRole('button', { name: 'Try again' });
+    await expect(again).toBeVisible();
+    await expect(toast(page)).toHaveText('Undo didn’t reach Google Calendar.Try again');
+    await expect.poll(() => tries).toBe(1);
+    await again.click();
+    await expect.poll(() => tries).toBe(2);
+    await expect(again).toBeVisible();
+    await answered(page);
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await page.unroute('**/__calendar/**');
+    // The keyboard: Tab-free, focus the button and press Enter, as a keyboard user would after tabbing to it.
+    await again.focus();
+    await page.keyboard.press('Enter');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+    await expect(toast(page)).toHaveCount(0);
+  });
+
+  test('a Ctrl+Z Google says can’t be done says so, with no Try again, and the step is gone', async ({ page }) => {
+    await openAs(page);
+    await button(page).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await answered(page);
+    await page.route('**/__calendar/**', (route) =>
+      route.request().method() === 'PATCH' ? route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"errors":[{"reason":"forbidden"}],"code":403}}' }) : route.continue(),
+    );
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('Control+z');
+    await expect(toast(page)).toHaveText('This change can’t be undone: Google refused it.');
+    await expect(toast(page).getByRole('button')).toHaveCount(0);
+    await answered(page);
+    await page.unroute('**/__calendar/**');
+    const sent = changesSent(page);
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(300);
+    expect(sent).toEqual([]);
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
   });
 
   test('goes back several steps; a newer board change is undone first, and with the panel closed Ctrl+Z is the board’s alone', async ({ page }) => {

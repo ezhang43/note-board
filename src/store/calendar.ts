@@ -24,14 +24,24 @@ export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
 export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
-export const UNDO_FAILED = 'The undo didn’t reach Google Calendar. Try again later.';
+/** A Ctrl+Z or Ctrl+Y that didn't get through: its step is kept, and the message has Try again (owner decision 2026-11-17). */
+export const UNDO_FAILED = 'Undo didn’t reach Google Calendar.';
+export const REDO_FAILED = 'Redo didn’t reach Google Calendar.';
+/** One Google said can't be done: its step is dropped, so the message offers nothing (owner decision 2026-11-17). */
+export const UNDO_REFUSED = 'This change can’t be undone: Google refused it.';
+export const REDO_REFUSED = 'This change can’t be redone: Google refused it.';
+/** A series Ctrl+Y that only half reached Google: dropped, as Google is left mixed. */
+export const SERIES_REDO_PART = 'Only this event was redone, not the rest of the series.';
 export const UNDO_PART = 'Only the series was put back: this event’s own change didn’t reach Google Calendar.';
 /** Ctrl+Z and Ctrl+Y keep this many event changes (owner request 2026-11-17). */
 export const UNDO_LIMIT = 50;
 
-/** Google answered a call with this HTTP status (not 2xx); the message names it, as before. */
+/**
+ * Google answered a call with this HTTP status (not 2xx); the message names it, as before. `reason` is the first
+ * reason in Google's JSON answer (`error.errors[].reason`, such as "rateLimitExceeded"), if it gave one.
+ */
 export class CalendarApiError extends Error {
-  constructor(readonly status: number) {
+  constructor(readonly status: number, readonly reason?: string) {
     super(`Calendar API: ${status}`);
   }
 }
@@ -45,7 +55,19 @@ export class CalendarApiError extends Error {
 export function canRetry(err: unknown): boolean {
   if (err instanceof Error && (err.message === UNDO_PART || err.message === SERIES_FAILED)) return false;
   if (!(err instanceof CalendarApiError)) return true;
+  // Google sends some rate limits as a 403 with one of these reasons, to be handled like a 429 (the Calendar API's
+  // error guide; owner decision 2026-11-17). Its other 403s ("forbiddenForNonOrganizer", "quotaExceeded"...) are refusals.
+  if (err.status === 403 && (err.reason === 'rateLimitExceeded' || err.reason === 'userRateLimitExceeded')) return true;
   return err.status < 400 || err.status >= 500 || [401, 408, 429].includes(err.status);
+}
+
+/** The first reason in Google's error answer (`{ error: { errors: [{ reason }] } }`); none for anything else, such as a page that isn't JSON. */
+async function errorReason(res: Response): Promise<string | undefined> {
+  const body: unknown = await res.json().catch(() => null);
+  const errors = (body as { error?: { errors?: unknown } } | null)?.error?.errors;
+  if (!Array.isArray(errors)) return undefined;
+  const reason = errors.map((e) => (e as { reason?: unknown } | null)?.reason).find((r) => typeof r === 'string');
+  return reason as string | undefined;
 }
 
 /** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
@@ -104,8 +126,9 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
     if (res.status === 401) source.forget();
     return res;
   }
-  const ok = (res: Response) => {
-    if (!res.ok) throw new CalendarApiError(res.status);
+  // The body of a refusal is read only to find Google's reason (a rate limit sent as a 403); it is never shown.
+  const ok = async (res: Response) => {
+    if (!res.ok) throw new CalendarApiError(res.status, await errorReason(res));
   };
   const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
   const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
@@ -115,18 +138,18 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       // simple: one page of up to 250 events, plenty for a month; more would need nextPageToken.
       const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
       const res = await call(`${events}?${q}`);
-      ok(res);
+      await ok(res);
       const body = (await res.json()) as { items?: unknown };
       return Array.isArray(body.items) ? body.items.map(parseEvent).filter((e): e is CalEvent => e !== null) : [];
     },
     async get(id) {
       const res = await call(one(id));
-      ok(res);
+      await ok(res);
       return parseEvent(await res.json());
     },
     async create(body, notify) {
       const res = await call(`${events}${updates(notify)}`, { method: 'POST', body: JSON.stringify(body) });
-      ok(res);
+      await ok(res);
       // Google has made it: an answer that can't be read only means no Undo, never a failed add (a retry would make two).
       const id = await res.json().then((b: { id?: unknown } | null) => b?.id, () => null);
       return typeof id === 'string' && id ? id : null;
@@ -136,17 +159,17 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       // timed event made all-day (or back) would have both a date and a time, which Google refuses.
       const clear = { date: null, dateTime: null, timeZone: null };
       const patch = body.start && body.end ? { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } } : body;
-      ok(await call(one(id, notify), { method: 'PATCH', body: JSON.stringify(patch) }));
+      await ok(await call(one(id, notify), { method: 'PATCH', body: JSON.stringify(patch) }));
     },
     async remove(id, notify) {
       const res = await call(one(id, notify), { method: 'DELETE' });
       // Already deleted (in Google Calendar, say): that's what was wanted.
       if (res.status === 404 || res.status === 410) return false;
-      ok(res);
+      await ok(res);
       return true;
     },
     async restore(id) {
-      ok(await call(one(id, false), { method: 'PATCH', body: JSON.stringify({ status: 'confirmed' }) }));
+      await ok(await call(one(id, false), { method: 'PATCH', body: JSON.stringify({ status: 'confirmed' }) }));
     },
   };
 }
@@ -166,9 +189,10 @@ export interface CalendarState {
   /**
    * The soft message after a change (owner request, 2026-10-29, job 217): "Event added", "Event
    * saved" or "Event deleted", with what its Undo does (null: no Undo, as after a failed undo).
+   * `retry`: a Ctrl+Z or Ctrl+Y that didn't get through, kept, tried again by its Try again (owner decision 2026-11-17).
    * `n` tells one message from the next.
    */
-  done: { text: string; undo: (() => Promise<unknown>) | null; n: number } | null;
+  done: { text: string; undo: (() => Promise<unknown>) | null; retry: (() => Promise<unknown>) | null; n: number } | null;
   /**
    * Events with a change on its way to Google (owner request, 2026-11-17: shown at once, Google told
    * in the background): changed, deleted or dragged again only once Google has answered. A new event
@@ -243,8 +267,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   const seriesBusy = (series: string) => [...sendingSeries.values()].includes(series);
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** Shows (and says aloud) the message after a change, with its Undo when it has a step to undo. */
-  const tell = (text: string, step: Entry | null) => {
-    set({ done: { text, undo: step && (() => undoEntry(step)), n: ++said } });
+  const tell = (text: string, step: Entry | null, retry: (() => Promise<unknown>) | null = null) => {
+    set({ done: { text, undo: step && (() => undoEntry(step)), retry, n: ++said } });
     announce(text);
   };
 
@@ -334,7 +358,9 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       } catch (err) {
         const part = err instanceof Error && err.message === UNDO_PART;
         // Unless a newer change has its own message by now; a half-done undo is said anyway, as Google is left mixed.
-        if (state.done === null || part) tell(part ? UNDO_PART : UNDO_FAILED, null);
+        // A kept step (the same canRetry as inTurn's) gets Try again: the same undo again, as Ctrl+Z again would.
+        const kept = canRetry(err);
+        if (state.done === null || part) tell(part ? UNDO_PART : kept ? UNDO_FAILED : UNDO_REFUSED, null, kept ? () => undoEntry(e) : null);
         if (part) await load();
         throw err;
       }
@@ -352,7 +378,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         await step.redo();
       } catch (err) {
         const part = err instanceof Error && err.message === SERIES_FAILED;
-        if (state.done === null || part) tell(part ? SERIES_FAILED : SAVE_FAILED, null);
+        const kept = canRetry(err);
+        if (state.done === null || part) tell(part ? SERIES_REDO_PART : kept ? REDO_FAILED : REDO_REFUSED, null, kept ? () => redoEntry(e) : null);
         if (part) await load();
         throw err;
       }

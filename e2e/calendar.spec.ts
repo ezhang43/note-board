@@ -568,6 +568,22 @@ test('the shortcuts list says Delete removes a one-off event at once and answers
   await expect(list).not.toContainText('press again to confirm');
 });
 
+test('the shortcuts list has the calendar’s keys (owner request 2026-11-17)', async ({ page }) => {
+  await page.goto('/');
+  await fontsLoaded(page);
+  await page.keyboard.press('?');
+  const list = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  for (const text of [
+    'Undo / redo this session’s event changes, while the panel is open (the newer of those and the board’s changes goes first)',
+    'New event on the day looked at, 12 to 1pm',
+    'Go to today',
+    'The week or month before / after',
+    'Edit the event whose card is open',
+    'Copy the event whose card is open, at the same time (without its guests)',
+  ])
+    await expect(list).toContainText(text);
+});
+
 // Pressing Delete again answers the question (owner request, 2026-10-21, job #132); a one-off goes at once (job #209).
 test('only a fresh Delete or Backspace deletes; a held key never deletes the board note behind; a second press answers a series with All events, never the guest-email question', async ({ page }) => {
   const errors = await openAs(page);
@@ -2341,6 +2357,11 @@ test.describe('calendar keys', () => {
     await expect(range(page)).toHaveText(first!);
     await expect(form(page)).toHaveCount(1);
     // Ctrl+Z in the title undoes the typing, not an event change.
+    const sent = changesSent(page);
+    await page.keyboard.press('Control+z');
+    await expect(form(page).getByLabel('Title')).not.toHaveValue('ntex');
+    await expect(form(page)).toHaveCount(1);
+    expect(sent).toEqual([]);
     expect(errors).toEqual([]);
   });
 

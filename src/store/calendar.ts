@@ -189,6 +189,9 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   let standIns = 0;
   const patch = (change: Patch) => set({ events: state.events && change(state.events) });
   const busy = (id: string) => state.sending.includes(id);
+  // A whole series waits while one of its events still has a change on its way (its rollback could bring that one back).
+  const sendingSeries = new Map<string, string>();
+  const seriesBusy = (series: string) => [...sendingSeries.values()].includes(series);
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** Shows (and says aloud) the message after a change. */
   const tell = (text: string, undo: (() => Promise<unknown>) | null) => {
@@ -211,25 +214,30 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
    * already made to Google. If Google says yes, the usual message with its Undo shows (only now, so
    * an Undo never runs on a stand-in id); if it refuses (offline or an error), `back` puts back only
    * this event, unless the panel was opened afresh since, and the message says it didn't reach Google.
-   * simple: a fetch started before Google answered and ending after may show the event as it was until the next fetch.
+   * A yes that comes while a fetch is running (read before Google had the change), or after the panel
+   * was opened afresh, fetches the calendar again, so the list shows what Google now has; after a
+   * fresh open there is no Undo, as someone else may be signed in by then.
    */
-  function instant(id: string, change: Patch, back: Patch, answer: Promise<Taken>) {
+  function instant(id: string, series: string | null, change: Patch, back: Patch, answer: Promise<Taken>) {
     const at = session;
     shownEarly.set(id, change);
+    if (series) sendingSeries.set(id, series);
     // The last change's message goes: its Undo must not race this change.
     set({ sending: [...state.sending, id], done: null });
     patch(change);
     const sent = () => {
       shownEarly.delete(id);
       flights.delete(id);
+      sendingSeries.delete(id);
       set({ sending: state.sending.filter((s) => s !== id) });
     };
     const flight = answer.then(
       async (taken) => {
         sent();
-        if (at === session) patch(taken.after);
-        tell(taken.text, taken.undo);
-        if (taken.reload && at === session) await load();
+        const same = at === session;
+        if (same) patch(taken.after);
+        tell(taken.text, same ? taken.undo : null);
+        if (taken.reload || state.loading || !same) await load();
       },
       () => {
         sent();
@@ -313,7 +321,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       if (!draft.guests.every(isEmail)) return BAD_EMAIL;
       // The whole series keeps its days: only offered while the event is still on its own day.
       const all = choice.all === true;
-      if (all && !canChangeSeries(event, draft)) return SAVE_FAILED;
+      if (all && (!canChangeSeries(event, draft) || (event?.series && seriesBusy(event.series)))) return SAVE_FAILED;
       // Guests are sent only when the person changed them here (from what this event had).
       let attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
@@ -333,7 +341,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
               reload: !id || attendees !== null,
             }),
           );
-          instant(standIn, (l) => (l.some((e) => e.id === standIn) ? l : [...l, shown]), (l) => l.filter((e) => e.id !== standIn), answer);
+          instant(standIn, null, (l) => (l.some((e) => e.id === standIn) ? l : [...l, shown]), (l) => l.filter((e) => e.id !== standIn), answer);
           return null;
         }
         const shown = savedEvent(event, sent, event.id);
@@ -347,7 +355,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           }),
         );
         // Only this event goes back, and only while it is still shown as changed.
-        instant(event.id, (l) => l.map((e) => (e.id === event.id ? shown : e)), (l) => l.map((e) => (e === shown ? event : e)), answer);
+        instant(event.id, event.series, (l) => l.map((e) => (e.id === event.id ? shown : e)), (l) => l.map((e) => (e === shown ? event : e)), answer);
         return null;
       }
       // "All events in the series" waits for Google (the form shows its answer), as before.
@@ -407,7 +415,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     async move(id: string, from: DayKey, to: DayKey, choice: Choice = {}): Promise<void> {
       const event = editable(id);
       const draft = event && dragDraft(event, from, to);
-      if (!api || !event || !draft || busy(id)) return;
+      // A drag never shows the form's notes (an end not after the start): it just does nothing.
+      if (!api || !event || !draft || busy(id) || !draftBody(draft, timeZone())) return;
       // Shown on the new day at once (a change shown before Google answers); resolves once Google has.
       const note = await this.save(event, draft, { notify: choice.notify });
       if (note) tell(note, null);
@@ -418,6 +427,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       const event = editable(id);
       if (!api || !event || busy(id)) return SAVE_FAILED;
       const series = choice.all === true ? event.series : null;
+      if (series !== null && seriesBusy(series)) return SAVE_FAILED;
       const notify = emailGuests(event, null) ? choice.notify === true : undefined;
       if (series === null) {
         // Off the list at once; Google is asked in this same tick. Refused: it comes back (it shows by its day and time).
@@ -432,7 +442,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
             reload: !deleted,
           }),
         );
-        instant(id, gone, (l) => (l.some((e) => e.id === id) ? l : [...l, event]), answer);
+        instant(id, event.series, gone, (l) => (l.some((e) => e.id === id) ? l : [...l, event]), answer);
         return null;
       }
       // All of a series waits for Google (the card shows its answer), as before.

@@ -1095,20 +1095,77 @@ describe('changes show at once while Google is told in the background (owner req
     expect(ids(cal)).toEqual(['b', 'new1']);
   });
 
-  it('opening the panel again drops changes still on their way from what is shown (someone else may be signed in)', async () => {
-    const api = fakeApi([ev('a')]);
+  it('opening the panel again drops changes still on their way from what is shown (someone else may be signed in); a yes then fetches the calendar again, with no Undo', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
     const cal = createCalendar(api, today);
     await cal.open();
     const adding = hold(api, 'create');
     const deleting = hold(api, 'remove');
     await cal.save(null, swim);
     await cal.remove('a');
+    await cal.remove('b');
     await cal.open();
-    expect(ids(cal)).toEqual(['a']);
+    expect(ids(cal)).toEqual(['a', 'b']);
     adding.answer();
+    await vi.waitFor(() => expect(cal.get().done).toMatchObject({ text: 'Event added', undo: null }));
+    deleting.answer();
+    await vi.waitFor(() => expect(cal.get().done).toMatchObject({ text: 'Event deleted', undo: null }));
+    // The calendar as Google now has it: 'a' is gone.
+    await vi.waitFor(() => expect(ids(cal)).toEqual(['b']));
+    expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
     deleting.refuse();
     await cal.settled();
-    expect(ids(cal)).toEqual(['a']);
+    expect(ids(cal)).toEqual(['b']);
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+  });
+
+  it('a change Google says yes to while a fetch is running still shows once that fetch (read before the change) lands', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const deleting = hold(api, 'remove');
+    await cal.remove('a');
+    // A fetch that reads the calendar now, before Google has the delete, and answers late.
+    const real = api.list.bind(api);
+    let land = () => {};
+    api.list = (from, to) => {
+      const read = real(from, to);
+      api.list = real;
+      return new Promise((ok) => (land = () => ok(read)));
+    };
+    const fetching = cal.step(0);
+    deleting.answer();
+    await vi.waitFor(() => expect(cal.get().done?.text).toBe('Event deleted'));
+    land();
+    await fetching;
+    await cal.settled();
+    expect(ids(cal)).toEqual(['b']);
+  });
+
+  it('a drag that gives no times Google’s form allows (start equal to end) does nothing and says nothing', async () => {
+    const api = fakeApi([ev('a', { start: '2026-10-06T10:00', end: '2026-10-06T10:00' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.move('a', '2026-10-06', '2026-10-08');
+    expect(cal.get().done).toBeNull();
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+  });
+
+  it('“All events in the series” waits while one event of that series still has a change on its way', async () => {
+    const api = fakeApi([ev('su_1', { series: 'su' }), ev('su_2', { series: 'su', start: '2026-10-07T09:00', end: '2026-10-07T10:00' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const deleting = hold(api, 'remove');
+    await cal.remove('su_1', { all: false });
+    expect(await cal.remove('su_2', { all: true })).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'su_2'), { ...draftOf('su_2'), title: 'Sync' }, { all: true })).toBe(SAVE_FAILED);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    deleting.answer();
+    await cal.settled();
+    const all = cal.remove('su_2', { all: true });
+    await vi.waitFor(() => expect(deleting.waiting).toBe(1));
+    deleting.answer();
+    expect(await all).toBeNull();
   });
 
   it('changing guests, or one event of a series, fetches the calendar again once Google says yes', async () => {

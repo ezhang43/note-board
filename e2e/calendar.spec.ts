@@ -673,6 +673,8 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     google.answer();
     await expect(toast(page)).toHaveText(/Event added\s*Undo/);
     await expect(swim).toBeVisible();
+    // The card was for the stand-in: it closes once Google gives the event its own id.
+    await expect(card(page)).toHaveCount(0);
     await page.unroute('**/__calendar/**');
     await swim.click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
@@ -690,7 +692,16 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     await form(page).getByLabel('Title').fill('Dentist check-up');
     await form(page).getByRole('button', { name: 'Save' }).click();
     await expect(form(page)).toHaveCount(0);
-    await expect(today.getByRole('button', { name: '10 – 11am Dentist check-up' })).toBeVisible();
+    const changed = today.getByRole('button', { name: '10 – 11am Dentist check-up' });
+    await expect(changed).toBeVisible();
+    // It can't be dragged while its change is on its way: no copy follows the pointer.
+    const a = (await changed.boundingBox())!;
+    const b = (await day(page, daysFromToday(1)).boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+    await expect(page.locator('.cal-ghost')).toHaveCount(0);
+    await page.mouse.up();
     google.refuse();
     await expect(toast(page)).toHaveText(FAILED);
     await expect(toast(page).getByRole('button')).toHaveCount(0);

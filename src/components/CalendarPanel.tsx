@@ -105,6 +105,8 @@ export function CalendarPanel() {
   // Dragging an event onto another day (owner request, 2026-11-11): saved like an edit's Save, asking about the guests first.
   const [moving, setMoving] = useState<{ event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement } | null>(null);
   const drag: OnDrag = (down, event) => {
+    // Not while its last change is still on its way to Google (a press still opens its card).
+    if (s.sending.includes(event.id)) return;
     const opener = down.currentTarget;
     beginEventDrag(down, (from, to) => {
       const draft = dragDraft(event, from, to);

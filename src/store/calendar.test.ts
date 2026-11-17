@@ -91,11 +91,11 @@ describe('the calendar panel', () => {
     expect(createCalendar(fakeApi(), today).available).toBe(true);
   });
 
-  it('opening it shows the events of today and the next six days (not the past days of this week)', async () => {
+  it('opening it shows the events of this week, Sunday to Saturday (Tuesday 6 Oct: 4 to 10 Oct)', async () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
     await cal.open();
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
     expect(cal.get()).toMatchObject({ view: 'week', day: '2026-10-06', note: null, loading: false });
     expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
   });
@@ -110,10 +110,10 @@ describe('the calendar panel', () => {
     await cal.step(-1);
     expect(cal.get().day).toBe('2026-09-13');
     await cal.goToday();
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'list 2026-10-13 2026-10-20', 'list 2026-09-28 2026-11-02', 'list 2026-08-31 2026-10-05', 'list 2026-09-28 2026-11-02']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11', 'list 2026-10-11 2026-10-18', 'list 2026-09-27 2026-11-01', 'list 2026-08-30 2026-10-04', 'list 2026-09-27 2026-11-01']);
   });
 
-  it('in the week view back goes to the seven days before, and Today comes back to today', async () => {
+  it('in the week view back goes to the week before, and Today comes back to this week', async () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
     await cal.open();
@@ -121,7 +121,7 @@ describe('the calendar panel', () => {
     expect(cal.get().day).toBe('2026-09-29');
     await cal.goToday();
     expect(cal.get().day).toBe('2026-10-06');
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'list 2026-09-29 2026-10-06', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11', 'list 2026-09-27 2026-10-04', 'list 2026-10-04 2026-10-11']);
   });
 
   it('picking a day in the month only selects it (no new fetch while it is in the month shown)', async () => {
@@ -146,7 +146,7 @@ describe('the calendar panel', () => {
     await cal.setView('month');
     await cal.step(1);
     expect(cal.get().day).toBe('2027-01-20');
-    expect(api.calls[api.calls.length - 1]).toBe('list 2026-12-28 2027-02-01');
+    expect(api.calls[api.calls.length - 1]).toBe('list 2026-12-27 2027-02-07');
   });
 
   it('records today’s behavior: a month step from the 31st clamps to a shorter month and stays there', async () => {
@@ -166,7 +166,7 @@ describe('the calendar panel', () => {
     await cal.setView('month');
     await cal.pickDay('2026-09-28');
     expect(cal.get().day).toBe('2026-09-28');
-    expect(api.calls[2]).toBe('list 2026-08-31 2026-10-05');
+    expect(api.calls[2]).toBe('list 2026-08-30 2026-10-04');
   });
 
   it('when Google can’t be reached it shows one plain note, and Try again tries again', async () => {
@@ -253,7 +253,7 @@ describe('changing events', () => {
     await cal.open();
     expect(await cal.save(at(cal, 'r'), draft)).toBe(SAVE_FAILED);
     expect(await cal.remove('r')).toBe(SAVE_FAILED);
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
   });
 
   it('refuses an end before the start, without asking Google', async () => {
@@ -316,7 +316,7 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBeNull();
     await cal.settled();
-    expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Stand-up', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Stand-up', 'list 2026-10-04 2026-10-11']);
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:30:00' });
     expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
   });
@@ -360,7 +360,7 @@ describe('repeating events and guests (job #85)', () => {
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync', startTime: '10:30', endTime: '10:45' }, { all: true })).toBeNull();
     await cal.settled();
-    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-04 2026-10-11']);
     // Its own time stays; the series gets the new one.
     expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
     expect(api.bodies[1].start).toMatchObject({ dateTime: '2026-09-01T10:30:00' });
@@ -387,7 +387,7 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const draft = { ...change, startTime: '10:00', endTime: '10:15', title: 'Daily sync' };
     expect(await cal.save(moved, draft, { all: true })).toBe(SERIES_FAILED);
-    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-04 2026-10-11']);
     expect(cal.get().events?.[0].title).toBe('Daily sync');
     // The form still holds the event as it opened, so the series still gets the new title.
     api.failId = null;
@@ -412,7 +412,7 @@ describe('repeating events and guests (job #85)', () => {
     expect(await cal.save(at(cal, 'su_1016'), { ...change, startDate: '2026-10-17', endDate: '2026-10-17' }, { all: true })).toBe(SAVE_FAILED);
     expect(await cal.save(at(cal, 'a'), draftOf('a'), { all: true })).toBe(SAVE_FAILED);
     expect(await cal.save(at(cal, 'su_1016'), { ...change, allDay: true }, { all: true })).toBe(SAVE_FAILED);
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
   });
 
   it('“All events” of a series kept in another time zone is left to Google Calendar', async () => {
@@ -555,7 +555,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.settled();
     expect(done(cal)).toBe('Event added');
     await cal.undo();
-    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-04 2026-10-11']);
     expect(done(cal)).toBeNull();
   });
 
@@ -612,7 +612,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     expect(done(cal)).toBe('Event saved');
     const before = api.bodies.length;
     await cal.undo();
-    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-04 2026-10-11']);
     expect(api.bodies[before]).toEqual({ summary: 'Stand-up', start: { dateTime: '2026-09-01T09:00:00', timeZone: zone }, end: { dateTime: '2026-09-01T09:15:00', timeZone: zone } });
     expect(api.bodies[before + 1]).toEqual({ summary: 'Stand-up' });
   });
@@ -627,7 +627,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.settled();
     expect(done(cal)).toBe('Event deleted');
     await cal.undo();
-    expect(api.calls.slice(-2)).toEqual(['restore a', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-2)).toEqual(['restore a', 'list 2026-10-04 2026-10-11']);
     await cal.remove('su_1016', { all: false });
     await cal.settled();
     await cal.undo();
@@ -650,7 +650,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     // The series goes back (its events get their old ids back), then the event's own change fails.
     api.failId = 'su_1016';
     await cal.undo();
-    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-3)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'list 2026-10-04 2026-10-11']);
     expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016']);
     expect(cal.get().done).toMatchObject({ text: UNDO_PART, undo: null });
   });
@@ -684,7 +684,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.settled();
     expect(cal.get().done).toMatchObject({ text: 'Event deleted', undo: null });
     // The panel was out of date, so it is fetched again: Google may still have it under a new id (404).
-    expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
+    expect(api.calls.at(-1)).toBe('list 2026-10-04 2026-10-11');
     expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
   });
 
@@ -809,7 +809,7 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
     await cal.move('a', '2026-10-06', '2026-10-06');
     await cal.move('r', '2026-10-06', '2026-10-07');
     await cal.move('nope', '2026-10-06', '2026-10-07');
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
     expect(done(cal)).toBeNull();
   });
 
@@ -832,7 +832,7 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.move('s~1', '2026-10-06', '2026-10-08');
-    expect(api.calls.slice(1)).toEqual(['update s~1 Stand-up', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(1)).toEqual(['update s~1 Stand-up', 'list 2026-10-04 2026-10-11']);
   });
 
   it('shows it on the new day at once, while Google is still answering', async () => {
@@ -955,7 +955,7 @@ describe('changes show at once while Google is told in the background (owner req
     expect(cal.get().sending).toEqual([]);
     expect(cal.get().done).toMatchObject({ text: 'Event added' });
     // Nothing is fetched again: the list already shows what Google now has.
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'create Swim']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11', 'create Swim']);
   });
 
   it('a change shows at once and “Event saved” comes when Google answers, with no fetch after', async () => {
@@ -969,7 +969,7 @@ describe('changes show at once while Google is told in the background (owner req
     google.answer();
     await cal.settled();
     expect(cal.get().done).toMatchObject({ text: 'Event saved' });
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'update a Dentist']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11', 'update a Dentist']);
   });
 
   it('a delete takes the event off at once; “Event deleted” comes when Google answers', async () => {
@@ -1019,7 +1019,7 @@ describe('changes show at once while Google is told in the background (owner req
     expect(await cal.save(at(cal, 'a'), { ...draftOf('a'), guests: ['not an email'] })).toBe(BAD_EMAIL);
     expect(ids(cal)).toEqual(['a']);
     expect(cal.get().events?.[0].title).toBe('a');
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
   });
 
   it('Undo is offered only once Google has answered, so it never runs on the stand-in id', async () => {
@@ -1029,11 +1029,11 @@ describe('changes show at once while Google is told in the background (owner req
     const google = hold(api, 'create');
     await cal.save(null, swim);
     await cal.undo();
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
     google.answer();
     await cal.settled();
     await cal.undo();
-    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-04 2026-10-11']);
   });
 
   it('a new change takes away the last change’s message, so its Undo can’t race the new change', async () => {
@@ -1065,7 +1065,7 @@ describe('changes show at once while Google is told in the background (owner req
     expect(await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'C' })).toBe(SAVE_FAILED);
     await cal.move('a', '2026-10-06', '2026-10-08');
     expect(adding.waiting + saving.waiting).toBe(2);
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
     adding.answer();
     saving.answer();
     await cal.settled();
@@ -1113,7 +1113,7 @@ describe('changes show at once while Google is told in the background (owner req
     await vi.waitFor(() => expect(cal.get().done).toMatchObject({ text: 'Event deleted', undo: null }));
     // The calendar as Google now has it: 'a' is gone.
     await vi.waitFor(() => expect(ids(cal)).toEqual(['b']));
-    expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
+    expect(api.calls.at(-1)).toBe('list 2026-10-04 2026-10-11');
     deleting.refuse();
     await cal.settled();
     expect(ids(cal)).toEqual(['b']);
@@ -1149,7 +1149,7 @@ describe('changes show at once while Google is told in the background (owner req
     await cal.open();
     await cal.move('a', '2026-10-06', '2026-10-08');
     expect(cal.get().done).toBeNull();
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
   });
 
   it('“All events in the series” waits while one event of that series still has a change on its way', async () => {
@@ -1160,7 +1160,7 @@ describe('changes show at once while Google is told in the background (owner req
     await cal.remove('su_1', { all: false });
     expect(await cal.remove('su_2', { all: true })).toBe(SAVE_FAILED);
     expect(await cal.save(at(cal, 'su_2'), { ...draftOf('su_2'), title: 'Sync' }, { all: true })).toBe(SAVE_FAILED);
-    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
     deleting.answer();
     await cal.settled();
     const all = cal.remove('su_2', { all: true });
@@ -1175,10 +1175,10 @@ describe('changes show at once while Google is told in the background (owner req
     await cal.open();
     await cal.save(at(cal, 'a'), { ...draftOf('a'), guests: ['sam@example.com'] }, { notify: false });
     await cal.settled();
-    expect(api.calls.slice(-2)).toEqual(['update a a (no emails)', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-2)).toEqual(['update a a (no emails)', 'list 2026-10-04 2026-10-11']);
     await cal.save(at(cal, 'su_1'), { ...draftOf('su_1'), title: 'Stand-up' }, { all: false });
     await cal.settled();
-    expect(api.calls.slice(-2)).toEqual(['update su_1 Stand-up', 'list 2026-10-06 2026-10-13']);
+    expect(api.calls.slice(-2)).toEqual(['update su_1 Stand-up', 'list 2026-10-04 2026-10-11']);
   });
 
   it('“All events in the series” still waits for Google: nothing is shown or answered until it has', async () => {

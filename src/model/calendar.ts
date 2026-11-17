@@ -1,6 +1,7 @@
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD' keys
-// in the person's own time zone, times 'HH:MM' on the 24-hour clock (shown as 10am, 10:30am). The week view is seven days from the day
-// it starts on (today when it opens); the month grid's weeks start on Monday.
+// in the person's own time zone, times 'HH:MM' on the 24-hour clock (shown as 10am, 10:30am). The calendar's weeks run Sunday to Saturday (owner
+// request, 2026-11-17): the week view shows the week of the picked day, the month grid starts each row on Sunday.
+// Habits, the Journal and the other week features stay Monday first (`weekStart`).
 // Calendar events aren't board data: they are never undone, synced with boards or kept in versions.
 
 export type DayKey = string;
@@ -95,25 +96,29 @@ export function addMonths(key: DayKey, n: number): DayKey {
   return fromDate(first);
 }
 
+/** The Monday on or before `key`: Habits, the Journal, the Completed panel, the visualizer and the week review use it. */
 export const weekStart = (key: DayKey) => addDays(key, -((toDate(key).getUTCDay() + 6) % 7));
 
-/** Seven days from `key`: the week view (today and the next six when it opens), or a row of the month grid. */
+/** The Sunday on or before `key`: the calendar's week starts here. */
+export const sundayStart = (key: DayKey) => addDays(key, -toDate(key).getUTCDay());
+
+/** Seven days from `key`: the week view (from the week's Sunday), or a row of a month grid. */
 export function weekDays(key: DayKey): DayKey[] {
   return Array.from({ length: 7 }, (_, i) => addDays(key, i));
 }
 
-/** Whole weeks (Monday to Sunday) covering every day of the month `key` is in. */
-export function monthGrid(key: DayKey): DayKey[][] {
+/** Whole weeks covering every day of the month `key` is in: Sunday to Saturday, or Monday to Sunday with `'mon'` (Habits). */
+export function monthGrid(key: DayKey, firstDay: 'sun' | 'mon' = 'sun'): DayKey[][] {
   const first = `${key.slice(0, 7)}-01`;
   const next = addMonths(first, 1);
   const weeks: DayKey[][] = [];
-  for (let monday = weekStart(first); monday < next; monday = addDays(monday, 7)) weeks.push(weekDays(monday));
+  for (let from = (firstDay === 'sun' ? sundayStart : weekStart)(first); from < next; from = addDays(from, 7)) weeks.push(weekDays(from));
   return weeks;
 }
 
 /** The days shown, `to` not included. */
 export function viewRange(view: CalView, key: DayKey): { from: DayKey; to: DayKey } {
-  if (view === 'week') return { from: key, to: addDays(key, 7) };
+  if (view === 'week') return { from: sundayStart(key), to: addDays(sundayStart(key), 7) };
   const grid = monthGrid(key);
   return { from: grid[0][0], to: addDays(grid[grid.length - 1][6], 1) };
 }
@@ -128,16 +133,16 @@ export function dayLabel(key: DayKey): string {
   return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/** "Thu 15 – Wed 21 Oct 2026", "Wed 30 Sep – Tue 6 Oct 2026", "October 2026" */
+/** "18–24 Oct 2026", "27 Sep – 3 Oct 2026", "27 Dec 2026 – 2 Jan 2027", "October 2026" */
 export function rangeLabel(view: CalView, key: DayKey): string {
   const a = toDate(key);
   if (view === 'month') return `${MONTH_NAMES[a.getUTCMonth()]} ${a.getUTCFullYear()}`;
-  const last = addDays(key, 6);
-  const b = toDate(last);
-  const end = `${dayLabel(last)} ${b.getUTCFullYear()}`;
-  if (a.getUTCFullYear() !== b.getUTCFullYear()) return `${dayLabel(key)} ${a.getUTCFullYear()} – ${end}`;
-  if (a.getUTCMonth() !== b.getUTCMonth()) return `${dayLabel(key)} – ${end}`;
-  return `${DAYS[a.getUTCDay()]} ${a.getUTCDate()} – ${end}`;
+  const from = toDate(sundayStart(key));
+  const to = toDate(addDays(sundayStart(key), 6));
+  const part = (d: Date, year = false) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${year ? ` ${d.getUTCFullYear()}` : ''}`;
+  if (from.getUTCFullYear() !== to.getUTCFullYear()) return `${part(from, true)} – ${part(to, true)}`;
+  if (from.getUTCMonth() !== to.getUTCMonth()) return `${part(from)} – ${part(to, true)}`;
+  return `${from.getUTCDate()}–${part(to, true)}`;
 }
 
 const isDay = (s: unknown): s is DayKey => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && fromDate(toDate(s)) === s;

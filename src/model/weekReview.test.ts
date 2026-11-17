@@ -10,7 +10,7 @@ import type { Board, NoteCard, TodoCard, TodoItem } from './types';
 import { weekReview } from './weekReview';
 import type { Workspace } from './workspace';
 
-// The weekly review's data (job 7, no screen yet). Weeks run Monday to Sunday, as in the calendar.
+// The weekly review's data (job 7, no screen yet). Weeks run Monday to Sunday.
 // Run in Sydney's time zone, which changes its clocks on Sunday 4 Oct 2026, so the week of 28 Sep
 // has that change inside it.
 

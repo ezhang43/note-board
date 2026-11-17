@@ -255,8 +255,8 @@ export function hiddenJournal(ws: Workspace, shared: string[]): string | null {
   return opened ? null : id;
 }
 
-// Entries grouped Year > Month > Week (owner request, 2026-10-19). Weeks run Monday to Sunday, as in
-// the calendar. A week that spans two months is split: each month lists its own days.
+// Entries grouped Year > Month > Week (owner request, 2026-10-19). Weeks run Monday to Sunday (the Calendar panel
+// uses Sunday to Saturday). A week that spans two months is split: each month lists its own days.
 
 /** The day a date line names, as 'YYYY-MM-DD' (a day out of range rolls over, as the calendar's days do), or null. */
 export function journalDayKey(date: string): DayKey | null {

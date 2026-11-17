@@ -13,15 +13,28 @@ const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const label = (d: Date) => `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+/**
+ * The browser's clock is pinned to a Sunday (the calendar's weeks run Sunday to Saturday), so the days
+ * these tests use, a few days from today, are always in the week shown, whatever day the tests run.
+ */
+const PINNED = new Date(2026, 10, 15, 12, 0);
+const nowDate = () => new Date(PINNED);
 /** A day `n` days from today. */
 function daysFromToday(n: number) {
-  const d = new Date();
+  const d = nowDate();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+/** The page's clock, and the day the demo calendar lays its events out around, are the pinned day. */
+async function pinToday(page: Page) {
+  await page.clock.setFixedTime(PINNED);
+  await page.setExtraHTTPHeaders({ 'x-demo-today': key(PINNED) });
 }
 
 async function openAs(page: Page, name = `Cal${tag()}`, path = '/') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  await pinToday(page);
   await page.goto(`${path}?demo-user=${name}`);
   await fontsLoaded(page);
   return errors;
@@ -59,7 +72,7 @@ test('opens beside the board with this week’s events; someone else’s event i
   await button(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(button(page)).toHaveAttribute('aria-pressed', 'true');
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
   await expect(today.getByRole('button', { name: /9 – 9:15am Team stand-up/ })).toBeVisible();
 
@@ -90,7 +103,7 @@ test('add an event on a day; it is still there after a reload', async ({ page })
   const name = `Cal${tag()}`;
   await openAs(page, name);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await day(page, today).getByRole('button', { name: `Add event on ${label(today)}` }).click();
   await expect(form(page).getByLabel('Title')).toBeFocused();
   await page.keyboard.type('Swim');
@@ -108,7 +121,7 @@ test('add an event on a day; it is still there after a reload', async ({ page })
 test('an end before the start is refused with a plain note', async ({ page }) => {
   await openAs(page);
   await button(page).click();
-  await edit(page, day(page, new Date()).getByRole('button', { name: /Dentist/ }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: /Dentist/ }));
   await setTime(form(page).getByLabel('End time'), '09:00');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await expect(form(page).getByText('The end must be after the start.')).toBeVisible();
@@ -117,7 +130,7 @@ test('an end before the start is refused with a plain note', async ({ page }) =>
 test('rename a simple event and move it to another day', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   const other = daysFromToday(2);
   await edit(page, day(page, today).getByRole('button', { name: '10 – 11am Dentist' }));
   await form(page).getByLabel('Title').fill('Dentist check-up');
@@ -133,7 +146,7 @@ test('rename a simple event and move it to another day', async ({ page }) => {
 test('a timed event can be made all-day, and back', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   await edit(page, today.getByRole('button', { name: '10 – 11am Dentist' }));
   await form(page).getByLabel('All day').check();
   await form(page).getByRole('button', { name: 'Save' }).click();
@@ -150,7 +163,7 @@ test('the form’s Delete deletes a one-off event at once, with no question; Ctr
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   await edit(page, today.getByRole('button', { name: /Dentist/ }));
   await form(page).getByRole('button', { name: 'Delete' }).click();
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
@@ -202,7 +215,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   const standUp = (n: number) => day(page, daysFromToday(n)).getByRole('button', { name: /Team stand-up/ });
 
   // Only this event: today's is renamed, tomorrow's isn't. No guests, so no question about emails.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Planning');
   await form(page).getByRole('button', { name: 'Save' }).click();
   const which = asked(page, WHICH);
@@ -210,7 +223,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await which.getByRole('button', { name: 'Only this event' }).click();
   await expect(form(page)).toHaveCount(0);
   await expect(asked(page, EMAILS)).toHaveCount(0);
-  await expect(day(page, new Date()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
   await expect(standUp(1)).toHaveAccessibleName('9 – 9:15am Team stand-up');
 
   // All events: tomorrow's is moved to 09:30, and every other one follows, except today's (changed on its own).
@@ -221,7 +234,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
   for (const n of [1, 2, 6]) await expect(standUp(n)).toHaveAccessibleName('9:30 – 9:45am Team stand-up');
-  await expect(day(page, new Date()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '9 – 9:15am Planning' })).toBeVisible();
   await panel(page).getByRole('button', { name: 'Next week' }).click();
   await expect(standUp(7)).toHaveAccessibleName('9:30 – 9:45am Team stand-up');
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
@@ -265,7 +278,7 @@ test('a repeating event: “Only this event” changes just that one, “All eve
   await asked(page, 'Delete “Team stand-up”?').getByRole('button', { name: 'All events in the series' }).click();
   // Like Google, the whole series includes the ones changed on their own.
   await expect(panel(page).getByRole('button', { name: /Team stand-up|Planning/ })).toHaveCount(0);
-  await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -273,14 +286,14 @@ test('“All events” after one event was moved on its own changes only what wa
   const errors = await openAs(page);
   await button(page).click();
   // Today's stand-up moves to 10:00 on its own.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await setTime(form(page).getByLabel('Start time'), '10:00');
   await setTime(form(page).getByLabel('End time'), '10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
-  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Team stand-up' })).toBeVisible();
   // Then only its title changes, for all events: the others keep 09:00.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Daily sync');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
@@ -288,20 +301,20 @@ test('“All events” after one event was moved on its own changes only what wa
   await expect(day(page, daysFromToday(1)).getByRole('button', { name: '9 – 9:15am Daily sync' })).toBeVisible();
   await expect(day(page, daysFromToday(2)).getByRole('button', { name: '9 – 9:15am Daily sync' })).toBeVisible();
   // Finding 2: the edited event itself shows the new title too, at its own time.
-  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test('“All events” with a new time, from an event moved on its own, reaches both though the series’ new time gives its events new ids (job #88)', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await edit(page, day(page, new Date()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '9 – 9:15am Team stand-up' }));
   await setTime(form(page).getByLabel('Start time'), '10:00');
   await setTime(form(page).getByLabel('End time'), '10:15');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
   // Now a new title and a new time for all events: the series moves to 10:30, this one keeps 10:00.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Team stand-up' }));
   await form(page).getByLabel('Title').fill('Daily sync');
   await setTime(form(page).getByLabel('Start time'), '10:30');
   await setTime(form(page).getByLabel('End time'), '10:45');
@@ -309,7 +322,7 @@ test('“All events” with a new time, from an event moved on its own, reaches 
   await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
   await expect(form(page)).toHaveCount(0);
   await expect(day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45am Daily sync' })).toBeVisible();
-  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Daily sync' })).toBeVisible();
   // Tomorrow's followed the series, so it isn't one changed on its own: renaming all from it changes only the series.
   const sent = changesSent(page);
   await edit(page, day(page, daysFromToday(1)).getByRole('button', { name: '10:30 – 10:45am Daily sync' }));
@@ -320,11 +333,11 @@ test('“All events” with a new time, from an event moved on its own, reaches 
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatch(/\/events\/standup(\?|$)/);
   // It can still be changed with its new id.
-  await edit(page, day(page, new Date()).getByRole('button', { name: '10 – 10:15am Daily sync' }));
+  await edit(page, day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Daily sync' }));
   await form(page).getByLabel('Title').fill('Sync');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await asked(page, WHICH).getByRole('button', { name: 'Only this event' }).click();
-  await expect(day(page, new Date()).getByRole('button', { name: '10 – 10:15am Sync' })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: '10 – 10:15am Sync' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -332,7 +345,7 @@ test('guests can be added and removed; “Send update emails to guests?” is as
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
 
   // No guests: saved straight away, nothing about emails sent to Google.
   await edit(page, today.getByRole('button', { name: /Dentist/ }));
@@ -407,7 +420,7 @@ test('an event opens a small card beside it: title, when, guests; ×, Escape and
   await expect(card(page).getByText(`${label(daysFromToday(1))} · 12:30 – 1:30pm`)).toBeVisible();
   await expect(card(page).getByRole('listitem')).toHaveText(['sam@example.com']);
   // The list stays in view behind it, and the card sits to the left of the event.
-  await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   await expect(form(page)).toHaveCount(0);
   // Just left of the panel, clear of its resize strip, its top level with the event.
   const cardBox = (await card(page).boundingBox())!;
@@ -434,7 +447,7 @@ test('an event opens a small card beside it: title, when, guests; ×, Escape and
 
   // The pencil opens the change form; an event without guests shows none.
   await button(page).click();
-  await day(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' }).click();
+  await day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' }).click();
   await expect(card(page).getByRole('listitem')).toHaveCount(0);
   await card(page).getByRole('button', { name: 'Edit event' }).click();
   await expect(card(page)).toHaveCount(0);
@@ -446,7 +459,7 @@ test('the card’s trash deletes a one-off event at once; with guests it asks on
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   await today.getByRole('button', { name: /Dentist/ }).click();
   await card(page).getByRole('button', { name: 'Delete event' }).click();
   await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
@@ -494,7 +507,7 @@ test('a held Enter on a repeating event’s trash or the form’s Delete never d
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const standUp = day(page, new Date()).getByRole('button', { name: /Team stand-up/ });
+  const standUp = day(page, nowDate()).getByRole('button', { name: /Team stand-up/ });
   const which = asked(page, 'Delete “Team stand-up”?');
   // The card's trash, held: the first press asks, the auto-repeats land on the question, not on a delete button.
   await standUp.click();
@@ -529,7 +542,7 @@ test('Delete or Backspace with the card open deletes a one-off event at once, ne
   await page.keyboard.press('Escape');
   await expect(page.locator('.card.selected')).toHaveCount(1);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   const dentist = today.getByRole('button', { name: /Dentist/ });
 
   await dentist.click();
@@ -592,7 +605,7 @@ test('only a fresh Delete or Backspace deletes; a held key never deletes the boa
   await page.keyboard.press('Escape');
   await expect(page.locator('.card.selected')).toHaveCount(1);
   await button(page).click();
-  const today = day(page, new Date());
+  const today = day(page, nowDate());
   const dentist = today.getByRole('button', { name: /Dentist/ });
 
   // An auto-repeated key (held down from before) never deletes it.
@@ -674,9 +687,9 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     const errors = await openAs(page);
     await button(page).click();
     const google = await holdChanges(page, 'POST');
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     const posted = page.waitForRequest((r) => r.method() === 'POST');
-    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await today.getByRole('button', { name: `Add event on ${label(nowDate())}` }).click();
     await page.keyboard.type('Swim');
     await setTime(form(page).getByLabel('Start time'), '07:00');
     await form(page).getByRole('button', { name: 'Save' }).click();
@@ -707,7 +720,7 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     const errors = await openAs(page);
     await button(page).click();
     const google = await holdChanges(page, 'PATCH');
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await edit(page, today.getByRole('button', { name: '10 – 11am Dentist' }));
     await form(page).getByLabel('Title').fill('Dentist check-up');
     await form(page).getByRole('button', { name: 'Save' }).click();
@@ -734,8 +747,8 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     const errors = await openAs(page);
     await button(page).click();
     const google = await holdChanges(page, 'POST');
-    const today = day(page, new Date());
-    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: `Add event on ${label(nowDate())}` }).click();
     await page.keyboard.type('Swim');
     await page.keyboard.press('Enter');
     await expect(form(page)).toHaveCount(0);
@@ -750,7 +763,7 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     const errors = await openAs(page);
     await button(page).click();
     const google = await holdChanges(page, 'DELETE');
-    const dentist = day(page, new Date()).getByRole('button', { name: /Dentist/ });
+    const dentist = day(page, nowDate()).getByRole('button', { name: /Dentist/ });
     await dentist.click();
     const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
     await page.keyboard.press('Delete');
@@ -801,7 +814,7 @@ test('with no room beside a wide panel the card sits inside the panel, fully see
   await button(page).click();
   await dragTo(page, 300);
   await expect.poll(async () => (await panel(page).boundingBox())!.x).toBe(300);
-  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await day(page, nowDate()).getByRole('button', { name: /Dentist/ }).click();
   await expect(card(page)).toBeInViewport({ ratio: 1 });
   const box = (await card(page).boundingBox())!;
   // 8px from the window's right edge, so nothing of it is under the strip (296–304).
@@ -813,7 +826,7 @@ test('with no room beside a wide panel the card sits inside the panel, fully see
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 610, height: 800 });
   await expect.poll(async () => (await panel(page).boundingBox())!.x).toBe(300);
-  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await day(page, nowDate()).getByRole('button', { name: /Dentist/ }).click();
   await expect(card(page)).toBeInViewport({ ratio: 1 });
   expect((await card(page).boundingBox())!.x).toBeGreaterThanOrEqual(308);
   expect(errors).toEqual([]);
@@ -823,7 +836,7 @@ test('the card moves with the panel’s edge when the panel or the window is res
   const errors = await openAs(page);
   await page.setViewportSize({ width: 1280, height: 420 });
   await button(page).click();
-  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
+  await day(page, nowDate()).getByRole('button', { name: /Dentist/ }).click();
   await expect(card(page)).toBeVisible();
   // It keeps the height it opened at, also when the list has scrolled since.
   const top = (await card(page).boundingBox())!.y;
@@ -849,7 +862,7 @@ test('the card moves with the panel’s edge when the panel or the window is res
 test('a guest still typed in when Save is clicked is added, or stops the save if it isn’t an email address', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await day(page, today).getByRole('button', { name: `Add event on ${label(today)}` }).click();
   await page.keyboard.type('Coffee');
   // Guests are in the full form, behind "More options".
@@ -888,26 +901,35 @@ test('week and month views, back and forward, and Today', async ({ page }) => {
   await button(page).click();
   await expect(panel(page).getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const heading = panel(page).locator('.cal-range');
-  // The week starts today (no past days of this week) and runs seven days.
+  // The week runs Sunday to Saturday (owner request 2026-11-17); the clock is pinned to Sunday 15 Nov 2026.
   const days = panel(page).locator('.cal-day');
   await expect(days).toHaveCount(7);
-  await expect(days.first()).toHaveAttribute('aria-label', label(new Date()));
-  await expect(days.last()).toHaveAttribute('aria-label', label(daysFromToday(6)));
-  const dayAndDate = (d: Date) => label(d).split(' ').slice(0, 2).join(' '); // "Thu 15"
-  await expect(heading).toHaveText(new RegExp(`^${dayAndDate(new Date())}\\b.* – ${dayAndDate(daysFromToday(6))}\\b`));
-  const thisWeek = await heading.textContent();
+  await expect(days.first()).toHaveAttribute('aria-label', 'Sun 15 Nov');
+  await expect(days.last()).toHaveAttribute('aria-label', 'Sat 21 Nov');
+  await expect(heading).toHaveText('15–21 Nov 2026');
   await panel(page).getByRole('button', { name: 'Next week' }).click();
-  await expect(heading).not.toHaveText(thisWeek!);
-  await expect(days.first()).toHaveAttribute('aria-label', label(daysFromToday(7)));
+  await expect(heading).toHaveText('22–28 Nov 2026');
+  await expect(days.first()).toHaveAttribute('aria-label', 'Sun 22 Nov');
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
-  await expect(heading).toHaveText(thisWeek!);
+  await expect(heading).toHaveText('15–21 Nov 2026');
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
-  await expect(days.first()).toHaveAttribute('aria-label', label(daysFromToday(-7)));
-  await expect(days.last()).toHaveAttribute('aria-label', label(daysFromToday(-1)));
+  await expect(heading).toHaveText('8–14 Nov 2026');
+  await expect(days.first()).toHaveAttribute('aria-label', 'Sun 8 Nov');
+  await expect(days.last()).toHaveAttribute('aria-label', 'Sat 14 Nov');
+  await panel(page).getByRole('button', { name: 'Previous week' }).click();
+  await expect(heading).toHaveText('1–7 Nov 2026');
+  await panel(page).getByRole('button', { name: 'Previous week' }).click();
+  await expect(heading).toHaveText('25–31 Oct 2026');
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
 
+  // Month: the header starts on Sunday, and 1 Nov 2026 (a Sunday) is the first cell.
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
-  const now = new Date();
+  await expect(panel(page).getByRole('columnheader')).toHaveText(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  await expect(panel(page).getByRole('gridcell').first()).toHaveAccessibleName(/^Sun 1 Nov/);
+  await expect(panel(page).getByRole('gridcell').last()).toHaveAccessibleName(/^Sat 5 Dec/);
+  await panel(page).getByRole('button', { name: 'Week', exact: true }).click();
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const now = nowDate();
   const monthName = now.toLocaleString('en-GB', { month: 'long' });
   await expect(heading).toHaveText(`${monthName} ${now.getFullYear()}`);
   // The month is a grid of days; today's day is picked and its events are listed under it.
@@ -926,7 +948,7 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
   const grid = panel(page).getByRole('grid');
   const cell = (d: Date) => grid.getByRole('gridcell', { name: new RegExp(`^${label(d)}`) });
-  const now = new Date();
+  const now = nowDate();
   // Today: Team stand-up (09:00, repeating) and Dentist (10:00), in time order, by name.
   const todayCell = cell(now);
   await expect(todayCell.locator('.cal-chip')).toHaveText([/Team stand-up/, /Dentist/]);
@@ -976,7 +998,7 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
 test('the month grid cuts a long name at two lines with …; the full name is in the hover text and the day’s list', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const now = new Date();
+  const now = nowDate();
   const long = 'Quarterly planning review with the whole design and engineering team';
   await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
   await page.keyboard.type(long);
@@ -1003,7 +1025,7 @@ test('the month grid cuts a long name at two lines with …; the full name is in
 test('Month: a long name continues after the time, wraps under it in two lines at most, and no word is split', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const now = new Date();
+  const now = nowDate();
   const long = 'Product Marketing Manager, Business Accounts Interview with Airwallex';
   await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
   await page.keyboard.type(long);
@@ -1044,7 +1066,7 @@ test('Month: a click on the day that is already picked opens the new-event form 
   const errors = await openAs(page);
   await button(page).click();
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
-  const now = new Date();
+  const now = nowDate();
   const other = now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1);
   const cell = (d: Date) => panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(d)}`) });
   // A day that isn't picked yet is only picked.
@@ -1080,7 +1102,7 @@ test('Month: a click on the day that is already picked opens the new-event form 
 test('clicking an event whose card is already open opens its edit form; a read-only one stays open', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const now = new Date();
+  const now = nowDate();
   // Week view.
   const dentist = day(page, now).getByRole('button', { name: /Dentist/ });
   await dentist.click();
@@ -1149,7 +1171,7 @@ test('the side panel opens 420px wide for Week and 720px for Month, and other pa
   // The zoom control and its buttons move aside to stay clear of the panel.
   await expect.poll(() => cornerRight(page)).toBe(744);
   // Cells are about 100px, so timed events show their start time.
-  const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(new Date())}`) });
+  const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(nowDate())}`) });
   await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
   await viewButton(page, 'Week').click();
   await expect.poll(() => width(page)).toBe(420);
@@ -1248,9 +1270,9 @@ test('a bad remembered width falls back to the defaults', async ({ page }) => {
 test('in the Week view an event’s name wraps onto a second line instead of being cut', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const now = new Date();
+  const now = nowDate();
   await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
-  await page.keyboard.type('Quarterly planning review with the whole design and engineering teams');
+  await page.keyboard.type('Quarterly planning review with the whole design team');
   await form(page).getByRole('button', { name: 'Save' }).click();
   await answered(page);
   const title = day(page, now).locator('.cal-title', { hasText: 'Quarterly planning' });
@@ -1270,7 +1292,7 @@ test('in the Week view an event’s name wraps onto a second line instead of bei
 
 /** Week view (owner request 2026-10-24, job 210): the date on the left, its events in a column to its right. */
 async function expectDateThenEvents(page: Page) {
-  const section = day(page, new Date());
+  const section = day(page, nowDate());
   const date = section.getByRole('heading').first();
   const events = section.locator('.cal-event');
   expect(await events.count()).toBeGreaterThanOrEqual(2); // Dentist and the stand-up
@@ -1298,7 +1320,7 @@ async function expectDateThenEvents(page: Page) {
 test('in the Week view each day is a date on the left with its events in a column to its right', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await expect(day(page, new Date()).locator('.cal-event')).toHaveCount(2);
+  await expect(day(page, nowDate()).locator('.cal-event')).toHaveCount(2);
   await expectDateThenEvents(page);
   expect(errors).toEqual([]);
 });
@@ -1320,7 +1342,7 @@ test('when Google Calendar can’t be reached, one plain note shows and nothing 
   await expect(panel(page).getByRole('button', { name: 'Connect Google Calendar' })).toHaveCount(0);
   await page.unroute('**/__calendar/**');
   await panel(page).getByRole('button', { name: 'Try again' }).click();
-  await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -1333,6 +1355,7 @@ for (const [kind, note] of [
   test(`without calendar access (${kind}) it says why, and Connect Google Calendar asks again`, async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
+    await pinToday(page);
     await page.goto(`/?demo-user=Cal${tag()}&demo-calendar=${kind}`);
     await fontsLoaded(page);
     await button(page).click();
@@ -1341,7 +1364,7 @@ for (const [kind, note] of [
     const connect = panel(page).getByRole('button', { name: 'Connect Google Calendar' });
     await expect(connect).toHaveClass(/cal-connect/);
     await connect.click();
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     await expect(connect).toHaveCount(0);
     expect(errors).toEqual([]);
   });
@@ -1358,7 +1381,7 @@ test.describe('calendar access kept on this device for the hour', () => {
   async function connect(page: Page, name: string) {
     const errors = await openAs(page, name);
     await button(page).click();
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     expect(JSON.parse((await kept(page)) ?? 'null')).toMatchObject({ user: `demo-${name.toLowerCase()}` });
     return errors;
   }
@@ -1366,17 +1389,18 @@ test.describe('calendar access kept on this device for the hour', () => {
   test('a reload within the hour shows the events without asking again', async ({ page }) => {
     const name = `Cal${tag()}`;
     const errors = await connect(page, name);
+    await pinToday(page);
     await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
     await fontsLoaded(page);
     await button(page).click();
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
     // In a tab that already connected, ?demo-calendar=blocked has no effect: not later either,
     // when the kept access is gone and the demo asks again.
     await page.evaluate((k) => localStorage.removeItem(k), ACCESS_KEY);
     await panel(page).getByRole('button', { name: 'Next week' }).click();
     await panel(page).getByRole('button', { name: 'Previous week' }).click();
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     await expect(panel(page).getByText(blockedNote)).toHaveCount(0);
     expect(errors).toEqual([]);
   });
@@ -1387,10 +1411,11 @@ test.describe('calendar access kept on this device for the hour', () => {
     const errors = await connect(page, name);
     const again = async (other: Page) => {
       other.on('pageerror', (e) => errors.push(e.message));
+      await pinToday(other);
       await other.goto(`/?demo-user=${name}&demo-calendar=blocked`);
       await fontsLoaded(other);
       await button(other).click();
-      await expect(day(other, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+      await expect(day(other, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
       await expect(panel(other).getByText(blockedNote)).toHaveCount(0);
     };
     // Another tab in the same browser.
@@ -1415,6 +1440,7 @@ test.describe('calendar access kept on this device for the hour', () => {
 
   test('another person in the same tab doesn’t get it: they are asked, and the kept access is dropped', async ({ page }) => {
     await connect(page, `Cal${tag()}`);
+    await pinToday(page);
     await page.goto(`/?demo-user=Other${tag()}&demo-calendar=blocked`);
     await fontsLoaded(page);
     await button(page).click();
@@ -1429,6 +1455,7 @@ test.describe('calendar access kept on this device for the hour', () => {
       const a = JSON.parse(localStorage.getItem(k)!);
       localStorage.setItem(k, JSON.stringify({ ...a, expiresAt: Date.now() + 30_000 }));
     }, ACCESS_KEY);
+    await pinToday(page);
     await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
     await fontsLoaded(page);
     await button(page).click();
@@ -1439,12 +1466,13 @@ test.describe('calendar access kept on this device for the hour', () => {
     const name = `Cal${tag()}`;
     const errors = await openAs(page, name);
     await page.evaluate((k) => localStorage.setItem(k, '{not json'), ACCESS_KEY);
+    await pinToday(page);
     await page.goto(`/?demo-user=${name}&demo-calendar=blocked`);
     await fontsLoaded(page);
     await button(page).click();
     await expect(panel(page).getByText(blockedNote)).toBeVisible();
     await panel(page).getByRole('button', { name: 'Connect Google Calendar' }).click();
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -1466,7 +1494,7 @@ test.describe('on a wide phone-layout screen (month cells 70px or wider)', () =>
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
     await panel(page).getByRole('button', { name: 'Month', exact: true }).tap();
-    const now = new Date();
+    const now = nowDate();
     const todayCell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
     await expect(todayCell.locator('.cal-chip')).toHaveText(['9amTeam stand-up', '10amDentist']);
     await expect(todayCell.locator('.cal-chip-time').first()).toBeVisible();
@@ -1490,14 +1518,14 @@ test.describe('on a phone-sized screen', () => {
     await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
     await expect(panel(page)).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'More' })).toHaveCount(0);
-    await expect(day(page, new Date()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   });
 
   test('the week list is a date column with the events to its right', async ({ page }) => {
     await openAs(page);
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
-    await expect(day(page, new Date()).locator('.cal-event')).toHaveCount(2);
+    await expect(day(page, nowDate()).locator('.cal-event')).toHaveCount(2);
     await expectDateThenEvents(page);
   });
 
@@ -1505,7 +1533,7 @@ test.describe('on a phone-sized screen', () => {
     await openAs(page);
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
-    await day(page, new Date()).getByRole('button', { name: /Dentist/ }).tap();
+    await day(page, nowDate()).getByRole('button', { name: /Dentist/ }).tap();
     await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
     const box = (await card(page).boundingBox())!;
     expect(box.x).toBe(0);
@@ -1524,7 +1552,7 @@ const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqu
 test('+ opens a quick-add beside the panel, with the Week list still in view', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   const dentist = day(page, today).getByRole('button', { name: '10 – 11am Dentist' });
   await plus(page, today).click();
   await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
@@ -1552,7 +1580,7 @@ test('quick-add: a title and Enter saves it, the list shows it and the overlay i
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await plus(page, today).click();
   await page.keyboard.type('Swim');
   await expect(day(page, today).getByRole('button', { name: /Dentist/ })).toBeVisible();
@@ -1574,7 +1602,7 @@ test('quick-add: a title and Enter saves it, the list shows it and the overlay i
 test('quick-add: changing the start moves the end, a new end sets a new length', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   const start = form(page).getByLabel('Start time');
   const end = form(page).getByLabel('End time');
   await setTime(start, '10:00');
@@ -1594,7 +1622,7 @@ test('quick-add: changing the start moves the end, a new end sets a new length',
 test('full form: the end follows the start for a new event and for a changed one, and the end date follows the start date', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await plus(page, today).click();
   await form(page).getByRole('button', { name: 'More options' }).click();
   await setTime(form(page).getByLabel('Start time'), '10:00');
@@ -1621,7 +1649,7 @@ const timeOption = (page: Page, text: string) => page.getByRole('option', { name
 test('time picker: pick a start from the list and the end follows; the end list says how long each is', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   const end = form(page).getByRole('combobox', { name: 'End time' });
   await expect(start).toHaveValue('12:00 PM');
@@ -1651,7 +1679,7 @@ test('time picker: pick a start from the list and the end follows; the end list 
 test('time picker: a typed time is taken on Enter or when the box is left; one that cannot be read goes back', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   const end = form(page).getByRole('combobox', { name: 'End time' });
   await start.fill('4:10pm');
@@ -1678,7 +1706,7 @@ test('time picker: a typed time is taken on Enter or when the box is left; one t
 test('time picker: a time off the 15-minute list is kept when Enter is pressed in the box without choosing', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await plus(page, today).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   await start.fill('4:10pm');
@@ -1696,7 +1724,7 @@ test('time picker: a time off the 15-minute list is kept when Enter is pressed i
 test('time picker: clicking the box selects the time, so typing replaces it', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   await start.click();
   await page.keyboard.type('11:30am');
@@ -1708,7 +1736,7 @@ test('time picker: clicking the box selects the time, so typing replaces it', as
 test('time picker: ↑ ↓ and Enter pick from the list; Escape closes only the list', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   await start.focus();
   await expect(start).toHaveAttribute('aria-expanded', 'true');
@@ -1740,7 +1768,7 @@ test('time picker: ↑ ↓ and Enter pick from the list; Escape closes only the 
 test('time picker: a click outside closes the list; the full form has the same boxes, and a later end day lists the whole day', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  await plus(page, new Date()).click();
+  await plus(page, nowDate()).click();
   await form(page).getByRole('button', { name: 'More options' }).click();
   const start = form(page).getByRole('combobox', { name: 'Start time' });
   await start.click();
@@ -1760,7 +1788,7 @@ test('time picker: a click outside closes the list; the full form has the same b
 test('More options opens the full form in the same overlay, keeping what was typed', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   await plus(page, today).click();
   await page.keyboard.type('Planning');
   await setTime(form(page).getByLabel('End time'), '14:30');
@@ -1790,7 +1818,7 @@ test('More options opens the full form in the same overlay, keeping what was typ
 test('the pencil opens the full form in the overlay, level with the event, the list still in view', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   const dentist = day(page, today).getByRole('button', { name: '10 – 11am Dentist' });
   await dentist.click();
   await card(page).getByRole('button', { name: 'Edit event' }).click();
@@ -1815,7 +1843,7 @@ test('Escape, the × and a click outside close the overlay without saving', asyn
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
-  const today = new Date();
+  const today = nowDate();
   const plusToday = plus(page, today);
   await plusToday.click();
   await page.keyboard.type('Never saved');
@@ -1846,7 +1874,7 @@ test.describe('the overlay on a phone', () => {
     await openAs(page);
     await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
     await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
-    const today = new Date();
+    const today = nowDate();
     await plus(page, today).tap();
     await expect(form(page).getByRole('heading', { name: 'New event' })).toBeVisible();
     const sheet = async () => (await form(page).boundingBox())!;
@@ -1891,8 +1919,8 @@ test.describe('the Undo message after a change (job 217)', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const today = day(page, new Date());
-    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: `Add event on ${label(nowDate())}` }).click();
     await page.keyboard.type('Swim');
     await setTime(form(page).getByLabel('Start time'), '07:00');
     await form(page).getByRole('button', { name: 'Save' }).click();
@@ -1930,7 +1958,7 @@ test.describe('the Undo message after a change (job 217)', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await today.getByRole('button', { name: /Dentist/ }).click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
     await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
@@ -1954,7 +1982,7 @@ test.describe('the Undo message after a change (job 217)', () => {
     await page.route('**/__calendar/**', (route) =>
       route.request().method() === 'DELETE' ? (deletes++, route.fulfill({ status: 410, contentType: 'application/json', body: '{"error":{"code":410}}' })) : route.fallback(),
     );
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await today.getByRole('button', { name: /Dentist/ }).click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
     await expect(toast(page)).toHaveText('Event deleted');
@@ -2006,7 +2034,7 @@ test.describe('the Undo message after a change (job 217)', () => {
     await page.clock.install();
     const errors = await openAs(page);
     await button(page).click();
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await today.getByRole('button', { name: /Dentist/ }).click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
     await expect(toast(page)).toHaveText(/Event deleted/);
@@ -2055,7 +2083,7 @@ test.describe('dragging an event onto another day', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const from = day(page, new Date());
+    const from = day(page, nowDate());
     const to = day(page, daysFromToday(2));
     const dentist = from.getByRole('button', { name: '10 – 11am Dentist' });
     await drag(page, dentist, to, true);
@@ -2101,7 +2129,7 @@ test.describe('dragging an event onto another day', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const from = day(page, new Date());
+    const from = day(page, nowDate());
     await drag(page, from.getByRole('button', { name: /Dentist/ }), day(page, daysFromToday(2)), true);
     await expect(page.locator('.cal-ghost')).toHaveCount(1);
     await page.keyboard.press('Escape');
@@ -2121,7 +2149,7 @@ test.describe('dragging an event onto another day', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const from = day(page, new Date());
+    const from = day(page, nowDate());
     const dentist = from.getByRole('button', { name: '10 – 11am Dentist' });
     await drag(page, dentist, from.getByRole('button', { name: /Team stand-up/ }));
     await expect(card(page)).toHaveCount(0);
@@ -2204,7 +2232,7 @@ test.describe('dragging an event onto another day', () => {
     await page.route('**/__calendar/**', (route) =>
       route.request().method() === 'PATCH' ? route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }) : route.continue(),
     );
-    const from = day(page, new Date());
+    const from = day(page, nowDate());
     await drag(page, from.getByRole('button', { name: /Dentist/ }), day(page, daysFromToday(2)));
     await expect(toast(page)).toHaveText('That change didn’t reach Google Calendar. Try again later.');
     await expect(toast(page).getByRole('button')).toHaveCount(0);
@@ -2218,19 +2246,19 @@ test.describe('dragging an event onto another day', () => {
     await button(page).click();
     await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
     const other = await neighbour(page);
-    const dentist = cell(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' });
+    const dentist = cell(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' });
     await drag(page, dentist, cell(page, other), true);
     await expect(cell(page, other)).toHaveAttribute('data-drop', '');
     await page.mouse.up();
     await expect(cell(page, other).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
-    await expect(cell(page, new Date()).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await expect(cell(page, nowDate()).getByRole('button', { name: /Dentist/ })).toHaveCount(0);
     await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
     await expect(card(page)).toHaveCount(0);
     await expect(page.getByRole('form')).toHaveCount(0);
     await expect(cell(page, other)).toHaveAttribute('aria-selected', 'false');
     expect(sent).toHaveLength(1);
     await toast(page).getByRole('button', { name: 'Undo' }).click();
-    await expect(cell(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(cell(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -2239,7 +2267,7 @@ test.describe('dragging an event onto another day', () => {
     const sent = changesSent(page);
     await button(page).click();
     await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
-    const now = cell(page, new Date());
+    const now = cell(page, nowDate());
     const dentist = now.getByRole('button', { name: '10 – 11am Dentist' });
     await drag(page, dentist, now.getByRole('button').first());
     await expect(card(page)).toHaveCount(0);

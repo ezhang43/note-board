@@ -43,12 +43,13 @@ import {
   timeLabel,
   viewRange,
   weekDays,
+  sundayStart,
   withGuest,
   type CalEvent,
 } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD'
-// keys in the person's own time zone; weeks start on Monday.
+// keys in the person's own time zone; the calendar's weeks run Sunday to Saturday.
 
 const timed = (over: Partial<CalEvent> = {}): CalEvent => ({
   id: 'e1',
@@ -83,24 +84,45 @@ describe('day maths', () => {
     expect(addMonths('2026-01-15', -1)).toBe('2025-12-15');
   });
 
-  it('the week view is seven days from the day it starts on (today when it opens), not Monday to Sunday', () => {
+  it('weekDays is seven days from the day given', () => {
     expect(weekDays('2026-10-15')).toEqual(['2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21']);
-    expect(weekDays('2026-10-11')[0]).toBe('2026-10-11');
     expect(weekDays('2026-12-29')[6]).toBe('2027-01-04');
   });
 
-  it('a month grid is whole weeks covering every day of the month', () => {
+  it('the calendar week starts on the Sunday on or before the day', () => {
+    expect(sundayStart('2026-10-18')).toBe('2026-10-18'); // a Sunday
+    expect(sundayStart('2026-10-19')).toBe('2026-10-18'); // Monday
+    expect(sundayStart('2026-10-24')).toBe('2026-10-18'); // Saturday
+    expect(sundayStart('2027-01-01')).toBe('2026-12-27'); // over New Year
+  });
+
+  it('a month grid is whole Sunday-to-Saturday weeks covering every day of the month', () => {
     const grid = monthGrid('2026-10-20');
+    expect(grid[0][0]).toBe('2026-09-27');
+    expect(grid[grid.length - 1][6]).toBe('2026-10-31');
+    expect(grid.every((w) => w.length === 7 && new Date(`${w[0]}T12:00:00Z`).getUTCDay() === 0)).toBe(true);
+    expect(grid.length).toBe(5);
+    expect(monthGrid('2027-02-10').length).toBe(5); // Feb 2027 starts on a Monday and ends on a Sunday
+  });
+
+  it('a month that starts on a Sunday has no days of the month before', () => {
+    const grid = monthGrid('2026-11-10'); // 1 Nov 2026 is a Sunday
+    expect(grid[0][0]).toBe('2026-11-01');
+    expect(grid[grid.length - 1][6]).toBe('2026-12-05');
+    expect(monthGrid('2026-03-10')[0][0]).toBe('2026-03-01');
+  });
+
+  it('a month grid can still start on Monday (Habits)', () => {
+    const grid = monthGrid('2026-10-20', 'mon');
     expect(grid[0][0]).toBe('2026-09-28');
     expect(grid[grid.length - 1][6]).toBe('2026-11-01');
-    expect(grid.every((w) => w.length === 7)).toBe(true);
-    expect(grid.length).toBe(5);
-    expect(monthGrid('2027-02-10').length).toBe(4); // Feb 2027 starts on a Monday and has 28 days
   });
 
   it('the range to fetch is the days shown, the end day not included', () => {
-    expect(viewRange('week', '2026-10-15')).toEqual({ from: '2026-10-15', to: '2026-10-22' });
-    expect(viewRange('month', '2026-10-06')).toEqual({ from: '2026-09-28', to: '2026-11-02' });
+    expect(viewRange('week', '2026-10-21')).toEqual({ from: '2026-10-18', to: '2026-10-25' });
+    expect(viewRange('week', '2026-10-18')).toEqual({ from: '2026-10-18', to: '2026-10-25' });
+    expect(viewRange('week', '2026-10-17')).toEqual({ from: '2026-10-11', to: '2026-10-18' });
+    expect(viewRange('month', '2026-10-06')).toEqual({ from: '2026-09-27', to: '2026-11-01' });
   });
 
   it('back and forward move a week or a month', () => {
@@ -111,26 +133,28 @@ describe('day maths', () => {
 
   it('labels days and ranges', () => {
     expect(dayLabel('2026-10-06')).toBe('Tue 6 Oct');
-    expect(rangeLabel('week', '2026-10-15')).toBe('Thu 15 – Wed 21 Oct 2026');
-    expect(rangeLabel('week', '2026-09-30')).toBe('Wed 30 Sep – Tue 6 Oct 2026');
-    expect(rangeLabel('week', '2026-12-30')).toBe('Wed 30 Dec 2026 – Tue 5 Jan 2027');
+    expect(rangeLabel('week', '2026-10-21')).toBe('18–24 Oct 2026');
+    expect(rangeLabel('week', '2026-10-18')).toBe('18–24 Oct 2026');
+    expect(rangeLabel('week', '2026-10-24')).toBe('18–24 Oct 2026');
+    expect(rangeLabel('week', '2026-09-30')).toBe('27 Sep – 3 Oct 2026');
+    expect(rangeLabel('week', '2026-12-30')).toBe('27 Dec 2026 – 2 Jan 2027');
     expect(rangeLabel('month', '2026-10-06')).toBe('October 2026');
   });
 });
 
 describe('month grids at New Year and in a leap February (job #156)', () => {
-  it('a month grid over New Year runs from the Monday before to the Sunday after', () => {
+  it('a month grid over New Year runs from the Sunday before to the Saturday after', () => {
     const grid = monthGrid('2027-01-15');
-    expect(grid[0][0]).toBe('2026-12-28');
-    expect(grid[grid.length - 1][6]).toBe('2027-01-31');
-    expect(grid.length).toBe(5);
-    expect(viewRange('month', '2027-01-15')).toEqual({ from: '2026-12-28', to: '2027-02-01' });
+    expect(grid[0][0]).toBe('2026-12-27');
+    expect(grid[grid.length - 1][6]).toBe('2027-02-06');
+    expect(grid.length).toBe(6);
+    expect(viewRange('month', '2027-01-15')).toEqual({ from: '2026-12-27', to: '2027-02-07' });
   });
 
   it('February in a leap year has its 29th', () => {
     const grid = monthGrid('2028-02-10');
-    expect(grid[0][0]).toBe('2028-01-31');
-    expect(grid[grid.length - 1][6]).toBe('2028-03-05');
+    expect(grid[0][0]).toBe('2028-01-30');
+    expect(grid[grid.length - 1][6]).toBe('2028-03-04');
     expect(grid.length).toBe(5);
     expect(grid.flat()).toContain('2028-02-29');
   });

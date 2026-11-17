@@ -17,6 +17,7 @@ import {
   moveDraftStartTime,
   newDraft,
   rangeLabel,
+  sundayStart,
   startTimeOptions,
   timeLabel,
   weekDays,
@@ -72,7 +73,7 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
   );
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** What the side panel shows for Google Calendar. */
 export function CalendarPanel() {
@@ -168,7 +169,7 @@ export function CalendarPanel() {
 
       {s.events !== null &&
         (s.view === 'week' ? (
-          weekDays(s.day).map((d) => dayList(d, true))
+          weekDays(sundayStart(s.day)).map((d) => dayList(d, true))
         ) : (
           <>
             <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onDrag={drag} onAdd={add} />

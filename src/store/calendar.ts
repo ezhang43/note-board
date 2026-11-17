@@ -126,9 +126,10 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
     if (res.status === 401) source.forget();
     return res;
   }
-  // The body of a refusal is read only to find Google's reason (a rate limit sent as a 403); it is never shown.
+  // Only a 403's body is read, to find Google's reason (a rate limit sent as a 403); it is never shown.
+  // simple: a 403 whose answer stalls holds the undo queue until the browser gives up on it; add a timeout if that is ever seen.
   const ok = async (res: Response) => {
-    if (!res.ok) throw new CalendarApiError(res.status, await errorReason(res));
+    if (!res.ok) throw new CalendarApiError(res.status, res.status === 403 ? await errorReason(res) : undefined);
   };
   const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
   const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
@@ -269,7 +270,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   /** Shows (and says aloud) the message after a change, with its Undo when it has a step to undo. */
   const tell = (text: string, step: Entry | null, retry: (() => Promise<unknown>) | null = null) => {
     set({ done: { text, undo: step && (() => undoEntry(step)), retry, n: ++said } });
-    announce(text);
+    // The button is on the message, away from the keyboard: say that it is there.
+    announce(retry ? `${text} Try again is on the message.` : text);
   };
 
   // Ctrl+Z and Ctrl+Y (owner request 2026-11-17): the steps of this session's changes, newest last, and one queue
@@ -687,6 +689,10 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     /** The message's Undo: the change is undone at Google, then the calendar is shown again (the same step as Ctrl+Z). */
     async undo() {
       await state.done?.undo?.();
+    },
+    /** The message's Try again: the undo or redo that didn't get through, tried again (owner decision 2026-11-17). */
+    async retry() {
+      await state.done?.retry?.();
     },
     /** Ctrl+Z with the panel open: undoes the newest event change of this session, once Google has it. */
     undoLast(): Promise<void> {

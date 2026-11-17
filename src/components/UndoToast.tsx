@@ -38,7 +38,7 @@ export function UndoToast() {
         }}
       />
     );
-  const run = done && (done.undo ?? done.retry);
+  const run = done && (done.undo ? calendar.undo : done.retry ? calendar.retry : null);
   return (
     done && (
       <Pill

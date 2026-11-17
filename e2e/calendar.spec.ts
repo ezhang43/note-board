@@ -2385,10 +2385,16 @@ test.describe('calendar keys', () => {
     await expect(toast(page)).toHaveCount(0);
   });
 
-  test('a Ctrl+Z Google says can’t be done says so, with no Try again, and the step is gone', async ({ page }) => {
+  test('a Ctrl+Z Google says can’t be done says so, with no Try again, and the step is gone: Ctrl+Z then undoes the change before', async ({ page }) => {
     await openAs(page);
     await button(page).click();
     const today = day(page, nowDate());
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('n');
+    await form(page).getByLabel('Title').fill('Lunch');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(today.getByRole('button', { name: /Lunch/ })).toBeVisible();
+    await answered(page);
     await today.getByRole('button', { name: /Dentist/ }).click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
     await expect(toast(page)).toHaveText(/Event deleted/);
@@ -2402,11 +2408,30 @@ test.describe('calendar keys', () => {
     await expect(toast(page).getByRole('button')).toHaveCount(0);
     await answered(page);
     await page.unroute('**/__calendar/**');
-    const sent = changesSent(page);
+    // The delete's step is gone, so the next Ctrl+Z undoes the add before it.
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(300);
-    expect(sent).toEqual([]);
+    await expect(today.getByRole('button', { name: /Lunch/ })).toHaveCount(0);
     await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  });
+
+  test('Try again under a pointer that stays still is not taken away after 6 seconds', async ({ page }) => {
+    await page.clock.install();
+    await openAs(page);
+    await button(page).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await answered(page);
+    await page.route('**/__calendar/**', (route) => (route.request().method() === 'PATCH' ? route.abort('internetdisconnected') : route.continue()));
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('Control+z');
+    const again = toast(page).getByRole('button', { name: 'Try again' });
+    await again.click();
+    await expect(again).toBeVisible();
+    await answered(page);
+    await page.clock.runFor(7000);
+    await expect(again).toBeVisible();
   });
 
   test('goes back several steps; a newer board change is undone first, and with the panel closed Ctrl+Z is the board’s alone', async ({ page }) => {

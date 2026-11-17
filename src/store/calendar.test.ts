@@ -1275,6 +1275,13 @@ describe('talking to the Calendar API', () => {
     expect(canRetry(await answer(429, google('rateLimitExceeded')))).toBe(true);
   });
 
+  it('only a 403’s answer is read: a 5xx whose answer never ends fails at once, kept to retry', async () => {
+    const stalled = vi.fn(async () => new Response(new ReadableStream({ start() {} }), { status: 503 })) as unknown as typeof fetch;
+    const err = await calendarApi(source(), stalled).restore('a').catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 503, reason: undefined });
+    expect(canRetry(err)).toBe(true);
+  });
+
   it('lists the primary calendar’s events between two days, repeating ones as single events', async () => {
     const f = fakeFetch(200, {
       items: [
@@ -1985,6 +1992,20 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       await cal.redo();
       expect(cal.get().done).toMatchObject({ text: REDO_REFUSED, undo: null, retry: null });
       expect(REDO_REFUSED).not.toMatch(/try again/i);
+    });
+
+    it('the store’s retry() is the message’s Try again', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      api.down = true;
+      await cal.undoLast();
+      api.down = false;
+      const from = api.calls.length;
+      await cal.retry();
+      expect(sent(api, from)).toEqual(['restore a']);
+      await cal.retry(); // the message has gone: nothing more
+      expect(sent(api, from)).toEqual(['restore a']);
     });
 
     it('Try again after the step has gone (the panel opened again) sends nothing', async () => {

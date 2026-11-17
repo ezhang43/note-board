@@ -92,7 +92,7 @@ export function loopOrder(items: DoneItem[]): DoneItem[] {
 
 export interface VizCounts {
   today: number;
-  /** This calendar week, Monday to today (as the Calendar and Habits count a week). */
+  /** This calendar week, Monday to today (as Habits counts a week; the Calendar panel's weeks start on Sunday). */
   week: number;
   inRange: number;
 }

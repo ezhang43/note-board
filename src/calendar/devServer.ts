@@ -63,16 +63,22 @@ function shift(first: When, start: When, end: When): { start: When; end: When } 
 const badGuests = (a: unknown) =>
   a !== undefined && (!Array.isArray(a) || a.some((g) => typeof g?.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.email)));
 
-function seed(): Event[] {
+/** The day the demo events are laid out around: today, or the day a test asks for with an `x-demo-today` header ('YYYY-MM-DD'). */
+function seedDay(header: string | string[] | undefined): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof header === 'string' ? header : '');
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : new Date();
+}
+
+function seed(base: Date): Event[] {
   const at = (days: number, h: number, m: number) => {
-    const d = new Date();
+    const d = new Date(base);
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + days);
     d.setHours(h, m);
     return { dateTime: d.toISOString() };
   };
   const date = (days: number) => {
-    const d = new Date();
+    const d = new Date(base);
     d.setDate(d.getDate() + days);
     return { date: dateKey(d) };
   };
@@ -140,7 +146,7 @@ export function devCalendarPlugin(): Plugin {
         };
         const who = /^Bearer (demo-.{1,60})$/u.exec(req.headers.authorization ?? '')?.[1];
         if (!who) return send(401, { error: { code: 401, message: 'Invalid Credentials' } });
-        if (!calendars.has(who)) calendars.set(who, seed());
+        if (!calendars.has(who)) calendars.set(who, seed(seedDay(req.headers['x-demo-today'])));
         const events = calendars.get(who)!;
         const url = new URL(req.url ?? '', 'http://dev');
         if (!url.pathname.startsWith(PATH)) return send(404, { error: { code: 404 } });

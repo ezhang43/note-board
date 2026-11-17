@@ -2312,6 +2312,25 @@ test.describe('calendar keys', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a Ctrl+Z that doesn’t get through (offline) says so and keeps the step: Ctrl+Z again brings the event back', async ({ page }) => {
+    await openAs(page);
+    await button(page).click();
+    const today = day(page, nowDate());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await answered(page);
+    await page.route('**/__calendar/**', (route) => (route.request().method() === 'PATCH' ? route.abort('internetdisconnected') : route.continue()));
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('Control+z');
+    await expect(toast(page)).toHaveText('The undo didn’t reach Google Calendar. Try again later.');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await answered(page);
+    await page.unroute('**/__calendar/**');
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  });
+
   test('goes back several steps; a newer board change is undone first, and with the panel closed Ctrl+Z is the board’s alone', async ({ page }) => {
     const errors = await openAs(page);
     await button(page).click();

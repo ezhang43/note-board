@@ -29,6 +29,25 @@ export const UNDO_PART = 'Only the series was put back: this event’s own chang
 /** Ctrl+Z and Ctrl+Y keep this many event changes (owner request 2026-11-17). */
 export const UNDO_LIMIT = 50;
 
+/** Google answered a call with this HTTP status (not 2xx); the message names it, as before. */
+export class CalendarApiError extends Error {
+  constructor(readonly status: number) {
+    super(`Calendar API: ${status}`);
+  }
+}
+
+/**
+ * Whether a Ctrl+Z or Ctrl+Y that failed is kept to try again (owner decision 2026-11-17, "Keep step, retry"): yes when
+ * it didn't get through (fetch threw, offline, a timeout, no access, a 5xx, or a 401 / 408 / 429, which a new token or a
+ * wait can fix); no when Google says it can't be done (any other 4xx, such as 400, 403, 404 or 410), or when a series was
+ * only half put back (UNDO_PART, SERIES_FAILED), as Google is left mixed.
+ */
+export function canRetry(err: unknown): boolean {
+  if (err instanceof Error && (err.message === UNDO_PART || err.message === SERIES_FAILED)) return false;
+  if (!(err instanceof CalendarApiError)) return true;
+  return err.status < 400 || err.status >= 500 || [401, 408, 429].includes(err.status);
+}
+
 /** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
 export interface CalendarSource {
   base: string;
@@ -86,7 +105,7 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
     return res;
   }
   const ok = (res: Response) => {
-    if (!res.ok) throw new Error(`Calendar API: ${res.status}`);
+    if (!res.ok) throw new CalendarApiError(res.status);
   };
   const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
   const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
@@ -175,9 +194,12 @@ interface Step {
 /**
  * A step on the undo or redo list, numbered on the counter shared with the board (undoClock.ts). `step` is
  * undefined until Google has answered the change (`ready`), and null when there turned out to be nothing to undo.
+ * `flying`: its undo or redo is on its way; it stays in its place on the list until Google has answered, so one that
+ * didn't get through is still there to try again (owner decision 2026-11-17).
  */
 interface Entry {
   at: number;
+  flying?: boolean;
   step: Step | null | undefined;
   ready: Promise<void>;
   settle(step: Step | null): void;
@@ -231,17 +253,25 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   let undos: Entry[] = [];
   let redos: Entry[] = [];
   let queue: Promise<void> = Promise.resolve();
+  // A press that didn't get through stops the presses queued behind it, so an older step never reaches Google first.
+  let halts = 0;
   const onto = (list: Entry[], e: Entry) => [...list, e].slice(-UNDO_LIMIT);
+  /** The newest step that isn't on its way already: the next one Ctrl+Z (or Ctrl+Y) steps. */
+  const newest = (list: Entry[]) => {
+    for (let i = list.length - 1; i >= 0; i--) if (!list[i].flying) return list[i];
+    return undefined;
+  };
+  const drop = (e: Entry) => {
+    undos = undos.filter((x) => x !== e);
+    redos = redos.filter((x) => x !== e);
+  };
   /** A new step, waiting for its change; nothing to undo (null) takes it off the lists. */
   function entry(at = tick()): Entry {
     const e = { at, step: undefined } as Entry;
     e.ready = new Promise<void>((done) => {
       e.settle = (step) => {
         e.step = step;
-        if (!step) {
-          undos = undos.filter((x) => x !== e);
-          redos = redos.filter((x) => x !== e);
-        }
+        if (!step) drop(e);
         done();
       };
     });
@@ -256,25 +286,36 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   }
   /**
    * Runs one undo or redo of `from`'s step after the ones already on their way, unless the panel was opened afresh
-   * meanwhile; `to` (on the other list) gets the step once it has reached Google, or is dropped if it didn't.
+   * meanwhile; `to` (on the other list) gets the step once it has reached Google, or is dropped if it didn't. `from`
+   * leaves its list once Google has it, or has said it can't be done; one that didn't get through stays in its place,
+   * with its number, to try again, and the presses queued behind it send nothing (owner decision 2026-11-17).
    */
   function inTurn(from: Entry, to: Entry, run: (step: Step) => Promise<void>): Promise<void> {
     const at = session;
+    const halted = halts;
+    from.flying = true;
     // Its message goes (its Undo must not run the same step), as when a new change is made.
     set({ done: null });
     const job = queue.then(async () => {
       await from.ready;
-      if (!from.step || at !== session) return to.settle(null);
+      if (!from.step || at !== session || halted !== halts) {
+        from.flying = false;
+        return to.settle(null);
+      }
       const step = from.step;
       const key = `step ${to.at}`;
       if (step.series) sendingSeries.set(key, step.series);
       set({ sending: [...state.sending, ...step.ids] });
       try {
         await run(step);
+        drop(from);
         to.settle(step);
-      } catch {
+      } catch (err) {
+        if (canRetry(err)) halts++;
+        else drop(from);
         to.settle(null);
       } finally {
+        from.flying = false;
         sendingSeries.delete(key);
         set({ sending: state.sending.filter((s) => !step.ids.includes(s)) });
       }
@@ -284,8 +325,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   }
   /** Undoes this step at Google (Ctrl+Z, or the message's Undo); Ctrl+Y can then redo it. */
   function undoEntry(e: Entry): Promise<void> {
-    if (!undos.includes(e)) return Promise.resolve();
-    undos = undos.filter((x) => x !== e);
+    if (!undos.includes(e) || e.flying) return Promise.resolve();
     const back = entry();
     redos = onto(redos, back);
     return inTurn(e, back, async (step) => {
@@ -304,7 +344,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   }
   /** Makes an undone step again at Google (Ctrl+Y); Ctrl+Z can then undo it again. */
   function redoEntry(e: Entry): Promise<void> {
-    redos = redos.filter((x) => x !== e);
+    if (!redos.includes(e) || e.flying) return Promise.resolve();
     const again = entry();
     undos = onto(undos, again);
     return inTurn(e, again, async (step) => {
@@ -365,7 +405,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         if (same) patch(taken.after);
         step.settle(same ? taken.step : null);
         // Unless Ctrl+Z already took it back while Google answered: its undo has its own message.
-        if (!step.step || undos.includes(step)) tell(taken.text, step.step ? step : null);
+        if (!step.step || (undos.includes(step) && !step.flying)) tell(taken.text, step.step ? step : null);
         if (taken.reload || state.loading || !same) await load();
       },
       () => {
@@ -623,16 +663,16 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     },
     /** Ctrl+Z with the panel open: undoes the newest event change of this session, once Google has it. */
     undoLast(): Promise<void> {
-      const e = undos.at(-1);
+      const e = newest(undos);
       return e ? undoEntry(e) : Promise.resolve();
     },
     /** Ctrl+Y (or Ctrl+Shift+Z): makes the last undone event change again. */
     redo(): Promise<void> {
-      const e = redos.at(-1);
+      const e = newest(redos);
       return e ? redoEntry(e) : Promise.resolve();
     },
     /** The newest undo and redo steps on the counter shared with the board (0: none), so the newer one is stepped. */
-    marks: (): CalendarMarks => ({ undo: undos.at(-1)?.at ?? 0, redo: redos.at(-1)?.at ?? 0 }),
+    marks: (): CalendarMarks => ({ undo: newest(undos)?.at ?? 0, redo: newest(redos)?.at ?? 0 }),
     dismissDone() {
       set({ done: null });
     },

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
 import { tick } from './undoClock';
-import { calendarApi, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
+import { calendarApi, canRetry, CalendarApiError, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: not synced with boards or kept in versions; undone by the Undo
@@ -27,40 +27,44 @@ const mail = (notify?: boolean) => (notify === undefined ? '' : notify ? ' (emai
 
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null } = {
+  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null; down: boolean; status: number | null } = {
     calls,
     fail: false,
+    down: false,
+    status: null,
     noAccess: null,
     series: {},
     failId: null,
     async list(from, to) {
       calls.push(`list ${from} ${to}`);
       if (api.noAccess) throw new NoAccess(api.noAccess);
-      if (api.fail) throw new Error('403');
+      if (api.fail) throw new CalendarApiError(403);
       return events;
     },
     bodies: [] as Partial<EventBody>[],
     async get(id) {
       calls.push(`get ${id}`);
-      if (api.fail) throw new Error('403');
+      if (api.fail) throw new CalendarApiError(403);
       // A series' own record: its first event was on 1 Sep, kept in this device's time zone.
       return ev(id, { start: '2026-09-01T09:00', end: '2026-09-01T09:15', editable: false, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...api.series });
     },
     async create(body: EventBody, notify?: boolean) {
       calls.push(`create ${body.summary}${mail(notify)}`);
       api.bodies.push(body);
-      if (api.fail) throw new Error('403');
+      if (api.fail) throw new CalendarApiError(403);
       return 'new1';
     },
     async restore(id) {
       calls.push(`restore ${id}`);
-      if (api.fail) throw new Error('403');
+      gone();
+      if (api.fail) throw new CalendarApiError(403);
     },
     async update(id, body, notify) {
       calls.push(`update ${id} ${body.summary}${mail(notify)}`);
       api.bodies.push(body);
-      if (api.fail || id === api.failId) throw new Error('403');
-      if (!events.some((e) => e.id === id || e.series === id)) throw new Error('404');
+      gone();
+      if (api.fail || id === api.failId) throw new CalendarApiError(403);
+      if (!events.some((e) => e.id === id || e.series === id)) throw new CalendarApiError(404);
       // Like Google, an event of a series has an id made from its series' time, so changing the
       // series' time gives its events new ids, and putting the time back gives the old ids back.
       if (body.start) {
@@ -71,12 +75,18 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
     },
     async remove(id, notify) {
       calls.push(`remove ${id}${mail(notify)}`);
-      if (api.fail) throw new Error('403');
+      gone();
+      if (api.fail) throw new CalendarApiError(403);
       const there = events.some((e) => e.id === id || e.series === id);
       events = events.filter((e) => e.id !== id);
       return there;
     },
   };
+  /** `down`: no network (fetch throws, as offline); `status`: Google answers with that HTTP status. */
+  function gone() {
+    if (api.down) throw new TypeError('Failed to fetch');
+    if (api.status) throw new CalendarApiError(api.status);
+  }
   return api;
 }
 
@@ -870,7 +880,7 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
     const slow = api.update;
     api.update = async (...args) => {
       await new Promise<void>((r) => (release[args[0]] = r));
-      if (args[0] === 'a') throw new Error('403');
+      if (args[0] === 'a') throw new CalendarApiError(403);
       return slow(...args);
     };
     const first = cal.move('a', '2026-10-06', '2026-10-09');
@@ -920,7 +930,7 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
  * Holds one kind of call to Google until the test answers it (or refuses it, as when offline), to see
  * what the panel shows while Google is still answering. Calls are answered in the order they were made.
  */
-function hold(api: ReturnType<typeof fakeApi>, kind: 'create' | 'update' | 'remove') {
+function hold(api: ReturnType<typeof fakeApi>, kind: 'create' | 'update' | 'remove' | 'restore') {
   const real = api[kind] as (...args: unknown[]) => Promise<unknown>;
   const waiting: { ok: () => void; no: () => void }[] = [];
   (api as unknown as Record<string, unknown>)[kind] = (...args: unknown[]) =>
@@ -1219,6 +1229,24 @@ describe('talking to the Calendar API', () => {
     return { fn: fn as unknown as typeof fetch, calls };
   }
   const source = () => ({ base: 'https://api.test/calendar/v3', token: vi.fn(async () => 'tok'), forget: vi.fn() });
+
+  it('tells a change Google says can’t be done (4xx) from one that didn’t get through (offline, 5xx), for Ctrl+Z to retry', async () => {
+    const refusal = (status: number) => calendarApi(source(), fakeFetch(status, {}).fn).restore('a').catch((e: unknown) => e);
+    for (const status of [400, 403, 404, 410]) {
+      const err = await refusal(status);
+      expect(err).toBeInstanceOf(CalendarApiError);
+      expect((err as CalendarApiError).status).toBe(status);
+      expect(canRetry(err)).toBe(false);
+    }
+    for (const status of [401, 408, 429, 500, 503]) expect(canRetry(await refusal(status))).toBe(true);
+    const offline = (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    expect(canRetry(await calendarApi(source(), offline).restore('a').catch((e: unknown) => e))).toBe(true);
+    // A half-done series is never retried: Google is left mixed.
+    expect(canRetry(new Error(UNDO_PART))).toBe(false);
+    expect(canRetry(new Error(SERIES_FAILED))).toBe(false);
+  });
 
   it('lists the primary calendar’s events between two days, repeating ones as single events', async () => {
     const f = fakeFetch(200, {
@@ -1795,5 +1823,176 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
     await cal.settled();
     await cal.undoLast();
     expect(cal.marks().redo).toBeGreaterThan(made);
+  });
+
+  // Owner decision 2026-11-17 ("Keep step, retry"): an undo or redo that fails for want of the network (offline, a
+  // timeout, a 5xx) stays where it was, so pressing Ctrl+Z (or Ctrl+Y) again tries it again; only a change Google says
+  // is impossible (a 4xx such as 400, 403, 404, 410) drops the step, and a half-done series keeps its own handling.
+  describe('a Ctrl+Z or Ctrl+Y that doesn’t reach Google for want of the network is kept to try again', () => {
+    it('Ctrl+Z on a delete offline says so and keeps the step; pressing it again brings the event back', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      const mark = cal.marks().undo;
+      api.down = true;
+      await cal.undoLast();
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.marks()).toEqual({ undo: mark, redo: 0 });
+      api.down = false;
+      const from = api.calls.length;
+      await cal.undoLast();
+      expect(sent(api, from)).toEqual(['restore a']);
+      expect(cal.marks().undo).toBe(0);
+      expect(cal.marks().redo).toBeGreaterThan(0);
+    });
+
+    it('Ctrl+Y offline says so and keeps the step; pressing it again deletes the event again', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      await cal.undoLast();
+      const mark = cal.marks().redo;
+      api.down = true;
+      await cal.redo();
+      expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+      expect(cal.marks()).toEqual({ undo: 0, redo: mark });
+      api.down = false;
+      const from = api.calls.length;
+      await cal.redo();
+      expect(sent(api, from)).toEqual(['remove a (no emails)']);
+      expect(cal.marks().redo).toBe(0);
+      expect(cal.marks().undo).toBeGreaterThan(0);
+    });
+
+    it('a 5xx from Google, or a call held and then cut off, also keeps the step', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      api.status = 503;
+      await cal.undoLast();
+      expect(cal.marks().undo).toBeGreaterThan(0);
+      api.status = null;
+      const google = hold(api, 'restore');
+      const undoing = cal.undoLast();
+      await new Promise((r) => setTimeout(r, 0));
+      google.refuse();
+      await undoing;
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.marks().undo).toBeGreaterThan(0);
+    });
+
+    it.each([400, 403, 404, 410])('a %i (Google says it can’t be done) drops the step: Ctrl+Z goes to the one before', async (status) => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.remove('b');
+      await cal.settled();
+      api.status = status;
+      await cal.undoLast();
+      expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+      expect(cal.marks().redo).toBe(0);
+      api.status = null;
+      const from = api.calls.length;
+      await cal.undoLast();
+      expect(sent(api, from)).toEqual(['restore a']);
+    });
+
+    it('a 404 on Ctrl+Y drops that step too', async () => {
+      const { api, cal } = await opened();
+      await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'Dentist' });
+      await cal.settled();
+      await cal.undoLast();
+      api.status = 404;
+      await cal.redo();
+      expect(cal.marks().redo).toBe(0);
+    });
+
+    it('the other steps keep their order and numbers: after a failed Ctrl+Z, presses undo newest first as before', async () => {
+      const { api, cal } = await opened([ev('a'), ev('b'), ev('c')]);
+      await cal.remove('a');
+      await cal.remove('b');
+      await cal.remove('c');
+      await cal.settled();
+      const mark = cal.marks().undo;
+      api.down = true;
+      await cal.undoLast();
+      expect(cal.marks().undo).toBe(mark);
+      api.down = false;
+      const from = api.calls.length;
+      await cal.undoLast();
+      await cal.undoLast();
+      await cal.undoLast();
+      expect(sent(api, from)).toEqual(['restore c', 'restore b', 'restore a']);
+    });
+
+    it('quick presses behind a failed one send nothing (so an older step never reaches Google first), and all stay', async () => {
+      const { api, cal } = await opened([ev('a'), ev('b'), ev('c')]);
+      await cal.remove('a');
+      await cal.remove('b');
+      await cal.remove('c');
+      await cal.settled();
+      api.down = true;
+      let from = api.calls.length;
+      await Promise.all([cal.undoLast(), cal.undoLast(), cal.undoLast()]);
+      expect(sent(api, from)).toEqual(['restore c']);
+      api.down = false;
+      from = api.calls.length;
+      await Promise.all([cal.undoLast(), cal.undoLast(), cal.undoLast()]);
+      expect(sent(api, from)).toEqual(['restore c', 'restore b', 'restore a']);
+    });
+
+    it('a redo cut off after a new change has cleared the redo list does not come back', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      await cal.undoLast();
+      const google = hold(api, 'remove');
+      const redoing = cal.redo();
+      await new Promise((r) => setTimeout(r, 0));
+      await cal.save(at(cal, 'b'), { ...draftOf('b'), title: 'Dentist' });
+      google.refuse();
+      await redoing;
+      await cal.settled();
+      expect(cal.marks().redo).toBe(0);
+    });
+
+    it('an undo cut off after the panel was opened again leaves nothing to undo', async () => {
+      const { api, cal } = await opened();
+      await cal.remove('a');
+      await cal.settled();
+      const google = hold(api, 'restore');
+      const undoing = cal.undoLast();
+      await new Promise((r) => setTimeout(r, 0));
+      await cal.open();
+      google.refuse();
+      await undoing;
+      expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
+    });
+
+    it('a series Ctrl+Y that only half reaches Google offline is still dropped (Google is left mixed), as before', async () => {
+      const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+      const { api, cal } = await opened([moved]);
+      api.series = { title: 'Stand-up' };
+      await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+      await cal.undoLast();
+      const real = api.update;
+      api.update = async (id, body, notify) => {
+        if (id === 'su') throw new TypeError('Failed to fetch');
+        return real(id, body, notify);
+      };
+      await cal.redo();
+      expect(cal.get().done).toMatchObject({ text: SERIES_FAILED, undo: null });
+      expect(cal.marks().redo).toBe(0);
+    });
+
+    it('a series Ctrl+Z that only half reaches Google is still dropped, as before', async () => {
+      const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+      const { api, cal } = await opened([moved]);
+      api.series = { title: 'Stand-up' };
+      await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+      api.failId = 'su_1016';
+      await cal.undoLast();
+      expect(cal.get().done).toMatchObject({ text: UNDO_PART, undo: null });
+      expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
+    });
   });
 });

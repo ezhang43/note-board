@@ -2289,7 +2289,7 @@ test.describe('calendar keys', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await today.getByRole('button', { name: /Dentist/ }).click();
     await card(page).getByRole('button', { name: 'Delete event' }).click();
     await expect(toast(page)).toHaveText(/Event deleted/);
@@ -2315,7 +2315,7 @@ test.describe('calendar keys', () => {
   test('goes back several steps; a newer board change is undone first, and with the panel closed Ctrl+Z is the board’s alone', async ({ page }) => {
     const errors = await openAs(page);
     await button(page).click();
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await edit(page, today.getByRole('button', { name: /Dentist/ }));
     await form(page).getByLabel('Title').fill('Dentist visit');
     await form(page).getByRole('button', { name: 'Save' }).click();
@@ -2347,7 +2347,7 @@ test.describe('calendar keys', () => {
     await page.keyboard.press('Control+z');
     await expect(cards(page)).toHaveCount(0);
     await button(page).click();
-    await expect(day(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -2369,7 +2369,7 @@ test.describe('calendar keys', () => {
     await expect(form(page)).toBeVisible();
     await expect(form(page).getByLabel('Start time')).toHaveValue('12:00 PM');
     await expect(form(page).getByLabel('End time')).toHaveValue('1:00 PM');
-    await expect(form(page).getByLabel('Start date')).toHaveValue(key(new Date()));
+    await expect(form(page).getByLabel('Start date')).toHaveValue(key(nowDate()));
     expect(errors).toEqual([]);
   });
 
@@ -2377,7 +2377,7 @@ test.describe('calendar keys', () => {
     const errors = await openAs(page);
     await button(page).click();
     const first = await range(page).textContent();
-    await day(page, new Date()).getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await day(page, nowDate()).getByRole('button', { name: `Add event on ${label(nowDate())}` }).click();
     await page.keyboard.type('ntex');
     await page.keyboard.press('ArrowLeft');
     await page.keyboard.press('ArrowRight');
@@ -2397,7 +2397,7 @@ test.describe('calendar keys', () => {
     const errors = await openAs(page);
     await button(page).click();
     const first = await range(page).textContent();
-    await day(page, new Date()).getByRole('button', { name: /Team stand-up/ }).click();
+    await day(page, nowDate()).getByRole('button', { name: /Team stand-up/ }).click();
     await page.keyboard.press('Delete');
     const question = card(page).getByRole('alertdialog');
     await expect(question).toBeVisible();
@@ -2412,7 +2412,7 @@ test.describe('calendar keys', () => {
     const errors = await openAs(page);
     const sent = changesSent(page);
     await button(page).click();
-    const today = day(page, new Date());
+    const today = day(page, nowDate());
     await today.getByRole('button', { name: /Dentist/ }).click();
     await expect(card(page)).toBeVisible();
     await page.keyboard.press('e');

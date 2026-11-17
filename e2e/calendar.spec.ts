@@ -39,7 +39,10 @@ async function setTime(box: Locator, hhmm: string) {
   await box.press('Enter');
 }
 /** Clicks an event, then the card's pencil: the change form, as a click alone opened before job #108. */
+/** No change is still on its way to Google (an event is busy until Google answers, and can't be changed meanwhile). */
+const answered = (page: Page) => expect(panel(page).locator('[aria-busy="true"]')).toHaveCount(0);
 async function edit(page: Page, event: Locator) {
+  await answered(page);
   await event.click();
   await card(page).getByRole('button', { name: 'Edit event' }).click();
 }
@@ -665,6 +668,7 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     await expect(form(page)).toHaveCount(0);
     const swim = today.getByRole('button', { name: '7 – 8am Swim' });
     await expect(swim).toBeVisible();
+    await expect(swim).toHaveAttribute('aria-busy', 'true');
     await expect(toast(page)).toHaveCount(0);
     // Not changed or deleted again until Google has answered.
     await swim.click();
@@ -1232,6 +1236,7 @@ test('in the Week view an event’s name wraps onto a second line instead of bei
   await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
   await page.keyboard.type('Quarterly planning review with the whole design and engineering teams');
   await form(page).getByRole('button', { name: 'Save' }).click();
+  await answered(page);
   const title = day(page, now).locator('.cal-title', { hasText: 'Quarterly planning' });
   const box = await title.evaluate((el) => ({ height: el.clientHeight, full: el.scrollHeight }));
   expect(box.height).toBeGreaterThan(24); // two lines
@@ -1240,6 +1245,7 @@ test('in the Week view an event’s name wraps onto a second line instead of bei
   await edit(page, day(page, now).getByRole('button', { name: /Quarterly planning/ }));
   await form(page).getByLabel('Title').fill('word '.repeat(60));
   await form(page).getByRole('button', { name: 'Save' }).click();
+  await answered(page);
   const long = await day(page, now).locator('.cal-title', { hasText: 'word word' }).evaluate((el) => ({ height: el.clientHeight, full: el.scrollHeight }));
   expect(long.height).toBeLessThan(44);
   expect(long.full).toBeGreaterThan(long.height);

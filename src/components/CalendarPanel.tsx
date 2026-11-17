@@ -209,6 +209,8 @@ function DayEvents({
 }) {
   const label = dayLabel(day);
   const list = eventsOnDay(events, day);
+  // An event whose change is still on its way to Google is marked busy (owner request 2026-11-17).
+  const { sending } = useCalendar();
   const section = useRef<HTMLElement>(null);
   // Picking a day in the Month grid shows its list (under the grid, maybe below the visible part of the panel).
   useEffect(() => {
@@ -232,6 +234,7 @@ function DayEvents({
           type="button"
           className={`cal-event${e.editable ? '' : ' read-only'}`}
           data-event={e.id}
+          aria-busy={sending.includes(e.id) || undefined}
           aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
           onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
@@ -266,6 +269,7 @@ function MonthGrid({
   onAdd: (day: DayKey, opener: HTMLElement) => void;
 }) {
   const month = day.slice(0, 7);
+  const { sending } = useCalendar();
   const [narrow, setNarrow] = useState(true);
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
   // Measured before the first paint, so a wide grid doesn't first show two lines.
@@ -314,6 +318,7 @@ function MonthGrid({
                       type="button"
                       className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
                       data-event={e.id}
+                      aria-busy={sending.includes(e.id) || undefined}
                       aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
                       title={`${time && `${time} `}${e.title}`}
                       onClick={(ev) => {

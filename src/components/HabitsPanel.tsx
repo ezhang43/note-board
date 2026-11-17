@@ -365,7 +365,7 @@ export function HabitsPanel() {
                         {w}
                       </span>
                     ))}
-                    {monthGrid(shown)
+                    {monthGrid(shown, 'mon')
                       .flat()
                       .map((d) =>
                         d.slice(0, 7) === shown.slice(0, 7)

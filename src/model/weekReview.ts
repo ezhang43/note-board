@@ -6,7 +6,7 @@ import type { Board, TodoItem } from './types';
 import { boardTree, type Workspace } from './workspace';
 
 // The weekly review's data (plan job 7; no screen yet). Pure: it reads the boards and the calendar's
-// events it is given and changes nothing. Weeks run Monday to Sunday, as in the calendar.
+// events it is given and changes nothing. Weeks run Monday to Sunday (the Calendar panel's run Sunday to Saturday).
 
 /** An item ticked this week, and where it is. */
 export interface DoneItem {

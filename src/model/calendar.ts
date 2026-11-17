@@ -251,16 +251,16 @@ export function timeLabel(e: CalEvent): string {
   return `${from.slice(-2) === to.slice(-2) ? from.slice(0, -2) : from} – ${to}`;
 }
 
-/** A new event: an hour from 9:00 on the chosen day. */
+/** A new event: an hour from 12:00 (noon) on the chosen day. */
 export function newDraft(key: DayKey): Draft {
-  return { title: '', allDay: false, startDate: key, startTime: '09:00', endDate: key, endTime: '10:00', guests: [] };
+  return { title: '', allDay: false, startDate: key, startTime: '12:00', endDate: key, endTime: '13:00', guests: [] };
 }
 
 export function draftFor(e: CalEvent): Draft {
   const guests = others(e);
   // The "(No title)" shown for an untitled event is the form's placeholder, never sent as its name.
   const title = e.title === UNTITLED ? '' : e.title;
-  if (e.allDay) return { title, allDay: true, startDate: e.start, startTime: '09:00', endDate: addDays(e.end, -1), endTime: '10:00', guests };
+  if (e.allDay) return { title, allDay: true, startDate: e.start, startTime: '12:00', endDate: addDays(e.end, -1), endTime: '13:00', guests };
   return { title, allDay: false, startDate: e.start.slice(0, 10), startTime: e.start.slice(11), endDate: e.end.slice(0, 10), endTime: e.end.slice(11), guests };
 }
 

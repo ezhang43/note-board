@@ -460,6 +460,27 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
   return { summary, start: { dateTime: start, timeZone }, end: { dateTime: end, timeZone } };
 }
 
+/**
+ * The event as the panel shows it while a change (`body`) is still on its way to Google (owner
+ * request, 2026-11-17): `e` is the event as it was (null for a new one, then shown under `id`).
+ */
+export function savedEvent(e: CalEvent | null, body: EventBody, id: string): CalEvent {
+  const when = (w: EventBody['start']) => ('date' in w ? w.date : w.dateTime.slice(0, 16));
+  return {
+    id,
+    title: body.summary.trim() ? body.summary : UNTITLED,
+    allDay: 'date' in body.start,
+    start: when(body.start),
+    end: when(body.end),
+    editable: true,
+    link: e?.link ?? CALENDAR_HOME,
+    series: e?.series ?? null,
+    guests: body.attendees ?? e?.guests ?? [],
+    timeZone: 'timeZone' in body.start ? body.start.timeZone : null,
+    moved: e?.moved ?? false,
+  };
+}
+
 // The calendar access (Google's token, about an hour) is kept on this device, in localStorage, so a
 // reload, a new tab or reopening the browser within the hour doesn't ask Google again (owner choice
 // "Remember for the hour", 2026-10-19, job 107). The storage is passed as a getter, since even

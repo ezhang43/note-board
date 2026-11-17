@@ -631,59 +631,137 @@ test('only a fresh Delete or Backspace deletes; a held key never deletes the boa
   expect(errors).toEqual([]);
 });
 
-test('while a delete is on its way the card stays open, so a refusal is shown; changing the week by keyboard closes it', async ({ page }) => {
-  const errors = await openAs(page);
-  await button(page).click();
-  let answer: () => void = () => {};
+/**
+ * Holds the calendar's changes of one kind (POST, PATCH or DELETE) until the test lets them through,
+ * or refuses them as Google would (403), to see what the panel shows while Google is still answering.
+ */
+async function holdChanges(page: Page, method: string) {
+  const waiting: { go: () => void; no: () => void }[] = [];
   await page.route('**/__calendar/**', (route) =>
-    route.request().method() === 'DELETE'
-      ? new Promise<void>((done) => (answer = done)).then(() => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }))
+    route.request().method() === method
+      ? new Promise<void>((done) => waiting.push({ go: () => done(void route.continue()), no: () => done(void route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' })) }))
       : route.continue(),
   );
-  const dentist = day(page, new Date()).getByRole('button', { name: /Dentist/ });
-  await dentist.click();
-  const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
-  await page.keyboard.press('Delete');
-  await deleting;
-  // A click outside and Escape wait for Google's answer.
-  await page.locator('.canvas').click({ position: { x: 200, y: 300 } });
-  await page.keyboard.press('Escape');
-  await expect(card(page)).toBeVisible();
-  answer();
-  await expect(card(page).getByText('That change didn’t reach Google Calendar. Try again later.')).toBeVisible();
-  await expect(dentist).toBeVisible();
-  await page.unroute('**/__calendar/**');
+  return {
+    answer: () => waiting.shift()!.go(),
+    refuse: () => waiting.shift()!.no(),
+  };
+}
+const FAILED = 'That change didn’t reach Google Calendar. Try again later.';
+const toast = (page: Page) => page.locator('.undo-toast');
 
-  // Next week by keyboard: the event's card goes with the list it belonged to.
-  await page.keyboard.press('Escape');
-  await dentist.click();
-  await panel(page).getByRole('button', { name: 'Next week' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(card(page)).toHaveCount(0);
-  await expect(panel(page)).toBeVisible();
-  expect(errors).toEqual([]);
-});
+test.describe('a change shows at once while Google is told (owner request 2026-11-17)', () => {
+  test('adding: the form closes and the event shows before Google answers; “Event added · Undo” comes with the answer, then it can be deleted', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const google = await holdChanges(page, 'POST');
+    const today = day(page, new Date());
+    const posted = page.waitForRequest((r) => r.method() === 'POST');
+    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await page.keyboard.type('Swim');
+    await setTime(form(page).getByLabel('Start time'), '07:00');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await posted;
+    await expect(form(page)).toHaveCount(0);
+    const swim = today.getByRole('button', { name: '7 – 8am Swim' });
+    await expect(swim).toBeVisible();
+    await expect(toast(page)).toHaveCount(0);
+    // Not changed or deleted again until Google has answered.
+    await swim.click();
+    await expect(card(page).getByRole('button', { name: 'Delete event' })).toBeDisabled();
+    await expect(card(page).getByRole('button', { name: 'Edit event' })).toBeDisabled();
+    google.answer();
+    await expect(toast(page)).toHaveText(/Event added\s*Undo/);
+    await expect(swim).toBeVisible();
+    await page.unroute('**/__calendar/**');
+    await swim.click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted\s*Undo/);
+    await expect(today.getByRole('button', { name: /Swim/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 
-test('while a delete is on its way, clicking another event waits, so Google’s refusal still shows in the card', async ({ page }) => {
-  const errors = await openAs(page);
-  await button(page).click();
-  let answer: () => void = () => {};
-  await page.route('**/__calendar/**', (route) =>
-    route.request().method() === 'DELETE'
-      ? new Promise<void>((done) => (answer = done)).then(() => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403}}' }))
-      : route.continue(),
-  );
-  await day(page, new Date()).getByRole('button', { name: /Dentist/ }).click();
-  const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
-  await page.keyboard.press('Delete');
-  await deleting;
-  await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();
-  await panel(page).getByRole('button', { name: 'Next week' }).click();
-  await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
-  answer();
-  await expect(card(page).getByText('That change didn’t reach Google Calendar. Try again later.')).toBeVisible();
-  await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
-  expect(errors).toEqual([]);
+  test('saving: the new name shows at once; if Google refuses, the old one comes back and the message says so, with no Undo', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const google = await holdChanges(page, 'PATCH');
+    const today = day(page, new Date());
+    await edit(page, today.getByRole('button', { name: '10 – 11am Dentist' }));
+    await form(page).getByLabel('Title').fill('Dentist check-up');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(form(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist check-up' })).toBeVisible();
+    google.refuse();
+    await expect(toast(page)).toHaveText(FAILED);
+    await expect(toast(page).getByRole('button')).toHaveCount(0);
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await expect(today.getByRole('button', { name: /check-up/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('adding: if Google refuses, the new event goes off the screen and the message says so', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const google = await holdChanges(page, 'POST');
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await page.keyboard.type('Swim');
+    await page.keyboard.press('Enter');
+    await expect(form(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: /Swim/ })).toBeVisible();
+    google.refuse();
+    await expect(toast(page)).toHaveText(FAILED);
+    await expect(today.getByRole('button', { name: /Swim/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('deleting a one-off event: the card closes and it goes at once; if Google refuses, it comes back and the message says so; changing the week by keyboard closes a card', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const google = await holdChanges(page, 'DELETE');
+    const dentist = day(page, new Date()).getByRole('button', { name: /Dentist/ });
+    await dentist.click();
+    const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
+    await page.keyboard.press('Delete');
+    await deleting;
+    await expect(card(page)).toHaveCount(0);
+    await expect(dentist).toHaveCount(0);
+    google.refuse();
+    await expect(toast(page)).toHaveText(FAILED);
+    await expect(toast(page).getByRole('button')).toHaveCount(0);
+    await expect(dentist).toBeVisible();
+    await page.unroute('**/__calendar/**');
+
+    // Next week by keyboard: the event's card goes with the list it belonged to.
+    await dentist.click();
+    await panel(page).getByRole('button', { name: 'Next week' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(card(page)).toHaveCount(0);
+    await expect(panel(page)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('deleting all of a series still waits: the card stays, clicks elsewhere in the panel wait, and Google’s refusal shows in it', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const google = await holdChanges(page, 'DELETE');
+    const standUp = day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ });
+    await standUp.click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    const deleting = page.waitForRequest((r) => r.method() === 'DELETE');
+    await card(page).getByRole('button', { name: 'All events in the series' }).click();
+    await deleting;
+    await day(page, daysFromToday(1)).getByRole('button', { name: /Lunch with Sam/ }).click();
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    await page.keyboard.press('Escape');
+    await expect(card(page).getByRole('heading', { name: 'Team stand-up' })).toBeVisible();
+    await expect(standUp).toBeVisible();
+    google.refuse();
+    await expect(card(page).getByText(FAILED)).toBeVisible();
+    await expect(card(page).getByRole('heading', { name: 'Team stand-up' })).toBeVisible();
+    await expect(standUp).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
 
 test('with no room beside a wide panel the card sits inside the panel, fully seen and clear of its resize strip', async ({ page }) => {

@@ -227,12 +227,14 @@ describe('the calendar panel', () => {
 describe('changing events', () => {
   const draft = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00', guests: [] as string[] };
 
-  it('adds an event, then shows the calendar again', async () => {
+  it('adds an event and shows it, by the id Google gave it, without fetching the calendar again', async () => {
     const api = fakeApi();
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(null, draft)).toBeNull();
-    expect(api.calls.slice(1)).toEqual(['create Swim', 'list 2026-10-06 2026-10-13']);
+    await cal.settled();
+    expect(api.calls.slice(1)).toEqual(['create Swim']);
+    expect(cal.get().events).toMatchObject([{ id: 'a' }, { id: 'new1', title: 'Swim', start: '2026-10-07T07:00' }]);
   });
 
   it('renames or moves a simple event', async () => {
@@ -240,6 +242,7 @@ describe('changing events', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(at(cal, 'a'), { ...draft, title: 'Dentist (moved)' })).toBeNull();
+    await cal.settled();
     expect(api.calls).toContain('update a Dentist (moved)');
   });
 
@@ -265,6 +268,7 @@ describe('changing events', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.remove('a')).toBeNull();
+    await cal.settled();
     expect(cal.get().events?.map((e) => e.id)).toEqual(['b']);
   });
 
@@ -273,9 +277,17 @@ describe('changing events', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     api.fail = true;
-    expect(await cal.save(null, draft)).toBe(SAVE_FAILED);
-    expect(await cal.remove('a')).toBe(SAVE_FAILED);
-    expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
+    await cal.save(null, draft);
+    await cal.settled();
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    await cal.remove('a');
+    await cal.settled();
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    await cal.save(at(cal, 'a'), { ...draft, title: 'Dentist' });
+    await cal.settled();
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    expect(cal.get().events).toMatchObject([{ id: 'a', title: 'a' }]);
+    expect(cal.get().events).toHaveLength(1);
   });
 });
 
@@ -291,6 +303,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(at(cal, 'su_1016'), change, { all: false })).toBeNull();
+    await cal.settled();
     expect(api.calls[1]).toBe('update su_1016 Stand-up');
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-10-16T09:30:00' });
   });
@@ -301,6 +314,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(at(cal, 'su_1016'), change, { all: true })).toBeNull();
+    await cal.settled();
     expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su Stand-up', 'list 2026-10-06 2026-10-13']);
     expect(api.bodies[0].start).toMatchObject({ dateTime: '2026-09-01T09:30:00' });
     expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
@@ -315,6 +329,7 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
+    await cal.settled();
     expect(api.calls[3]).toBe('update su Daily sync');
     expect(api.bodies[1].start).toMatchObject({ dateTime: '2026-09-01T09:00:00' });
     expect(api.bodies[1].end).toMatchObject({ dateTime: '2026-09-01T09:15:00' });
@@ -329,6 +344,7 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync' }, { all: true })).toBeNull();
+    await cal.settled();
     // The event first: the series' change can give it a new id (job #88).
     expect(api.calls.slice(1, 4)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
     expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
@@ -342,6 +358,7 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const was = { ...change, startTime: '10:00', endTime: '10:15' };
     expect(await cal.save(at(cal, 'su_1016'), { ...was, title: 'Daily sync', startTime: '10:30', endTime: '10:45' }, { all: true })).toBeNull();
+    await cal.settled();
     expect(api.calls.slice(1)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync', 'list 2026-10-06 2026-10-13']);
     // Its own time stays; the series gets the new one.
     expect(api.bodies[0]).toEqual({ summary: 'Daily sync' });
@@ -374,6 +391,7 @@ describe('repeating events and guests (job #85)', () => {
     // The form still holds the event as it opened, so the series still gets the new title.
     api.failId = null;
     expect(await cal.save(moved, draft, { all: true })).toBeNull();
+    await cal.settled();
     expect(api.calls.slice(5, 8)).toEqual(['get su', 'update su_1016 Daily sync', 'update su Daily sync']);
   });
 
@@ -422,9 +440,11 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(at(cal, 'su_1016'), { ...change, guests: ['sam@example.com'] }, { all: true, notify: false });
+    await cal.settled();
     expect(api.bodies[0].attendees).toBeUndefined();
     // The series' new time gave the event a new id.
     expect(await cal.save(cal.get().events![0], { ...change, guests: ['sam@example.com', 'pat@example.com'] }, { all: true, notify: false })).toBeNull();
+    await cal.settled();
     expect(api.bodies[1].attendees).toEqual([me, seriesSam, { email: 'pat@example.com' }]);
     expect(api.bodies).toHaveLength(2);
   });
@@ -435,8 +455,10 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.remove('su_1016', { all: false })).toBeNull();
+    await cal.settled();
     expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1017', 'a']);
     expect(await cal.remove('su_1017', { all: true })).toBeNull();
+    await cal.settled();
     expect(api.calls.slice(1)).toEqual(['remove su_1016', 'remove su']);
     expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
   });
@@ -447,9 +469,13 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07', guests: ['sam@example.com'] };
     await cal.save(at(cal, 'lunch'), d, { notify: true });
+    await cal.settled();
     await cal.save(at(cal, 'lunch'), d, { notify: false });
+    await cal.settled();
     await cal.save(at(cal, 'lunch'), d); // not asked: never emails
+    await cal.settled();
     await cal.remove('lunch', { notify: true });
+    await cal.settled();
     expect(api.calls.filter((c) => !c.startsWith('list'))).toEqual(['update lunch Lunch (emails sent)', 'update lunch Lunch (no emails)', 'update lunch Lunch (no emails)', 'remove lunch (emails sent)']);
   });
 
@@ -458,8 +484,10 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(at(cal, 'a'), draftOf('a'), { notify: true });
+    await cal.settled();
     await cal.remove('a', { notify: true });
-    expect(api.calls.slice(1)).toEqual(['update a a', 'list 2026-10-06 2026-10-13', 'remove a']);
+    await cal.settled();
+    expect(api.calls.slice(1)).toEqual(['update a a', 'remove a']);
   });
 
   it('adds and removes guests; the list is sent only when it changed', async () => {
@@ -468,10 +496,13 @@ describe('repeating events and guests (job #85)', () => {
     await cal.open();
     const d = { ...change, title: 'Lunch', startDate: '2026-10-07', endDate: '2026-10-07' };
     await cal.save(at(cal, 'lunch'), { ...d, guests: ['sam@example.com'] }, { notify: false });
+    await cal.settled();
     expect(api.bodies[0].attendees).toBeUndefined();
     await cal.save(at(cal, 'lunch'), { ...d, guests: ['sam@example.com', 'pat@example.com'] }, { notify: false });
+    await cal.settled();
     expect(api.bodies[1].attendees).toEqual([me, sam, { email: 'pat@example.com' }]);
     await cal.save(at(cal, 'lunch'), { ...d, guests: [] }, { notify: true });
+    await cal.settled();
     expect(api.bodies[2].attendees).toEqual([me]);
     expect(api.calls).toContain('update lunch Lunch (emails sent)');
   });
@@ -489,6 +520,7 @@ describe('repeating events and guests (job #85)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(null, { ...change, guests: ['pat@example.com'] }, { notify: true });
+    await cal.settled();
     expect(api.calls[1]).toBe('create Stand-up (emails sent)');
     expect(api.bodies[0].attendees).toEqual([{ email: 'pat@example.com' }]);
   });
@@ -519,6 +551,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.open();
     expect(done(cal)).toBeNull();
     expect(await cal.save(null, { ...swim, guests: ['pat@example.com'] }, { notify: true })).toBeNull();
+    await cal.settled();
     expect(done(cal)).toBe('Event added');
     await cal.undo();
     expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-06 2026-10-13']);
@@ -532,6 +565,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.open();
     const d = { ...swim, title: 'Brunch', startTime: '11:00', endTime: '12:00', guests: [] };
     expect(await cal.save(at(cal, 'lunch'), d, { notify: true })).toBeNull();
+    await cal.settled();
     expect(done(cal)).toBe('Event saved');
     await cal.undo();
     expect(api.calls.at(-2)).toBe('update lunch Lunch (no emails)');
@@ -548,6 +582,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'B' });
+    await cal.settled();
     await cal.undo();
     expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
   });
@@ -557,6 +592,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(at(cal, 'h'), { ...draftOf('h'), allDay: true, startDate: '2026-10-11', endDate: '2026-10-11' });
+    await cal.settled();
     await cal.undo();
     expect(api.bodies.at(-1)).toEqual({ summary: 'h', start: { date: '2026-10-09' }, end: { date: '2026-10-10' } });
   });
@@ -570,6 +606,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     // A new time too: the series' change gives the edited event a new id, and putting it back gives the old one back.
     const d = { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' };
     expect(await cal.save(at(cal, 'su_1016'), d, { all: true })).toBeNull();
+    await cal.settled();
     expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016~']);
     expect(done(cal)).toBe('Event saved');
     const before = api.bodies.length;
@@ -586,13 +623,16 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.remove('a')).toBeNull();
+    await cal.settled();
     expect(done(cal)).toBe('Event deleted');
     await cal.undo();
     expect(api.calls.slice(-2)).toEqual(['restore a', 'list 2026-10-06 2026-10-13']);
     await cal.remove('su_1016', { all: false });
+    await cal.settled();
     await cal.undo();
     expect(api.calls.slice(-2)[0]).toBe('restore su_1016');
     await cal.remove('su_1017', { all: true });
+    await cal.settled();
     await cal.undo();
     expect(api.calls.slice(-2)[0]).toBe('restore su');
   });
@@ -605,6 +645,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.open();
     const d = { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' };
     await cal.save(at(cal, 'su_1016'), d, { all: true });
+    await cal.settled();
     // The series goes back (its events get their old ids back), then the event's own change fails.
     api.failId = 'su_1016';
     await cal.undo();
@@ -620,12 +661,14 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+    await cal.settled();
     let fail!: () => void;
     api.update = async (id) => {
       if (id === 'su_1016') await new Promise((_, no) => (fail = () => no(new Error('offline'))));
     };
     const undoing = cal.undo();
     await cal.remove('b');
+    await cal.settled();
     fail();
     await undoing;
     expect(cal.get().done?.text).toBe(UNDO_PART);
@@ -637,6 +680,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     await cal.open();
     api.remove = async () => false;
     expect(await cal.remove('a')).toBeNull();
+    await cal.settled();
     expect(cal.get().done).toMatchObject({ text: 'Event deleted', undo: null });
     // The panel was out of date, so it is fetched again: Google may still have it under a new id (404).
     expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
@@ -648,24 +692,29 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.remove('a');
+    await cal.settled();
     api.fail = true;
     await cal.undo();
     expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
   });
 
-  it('no message when the change itself failed or was refused; a new change replaces the message; dismiss clears it', async () => {
+  it('no message when the change was refused before it was sent, no Undo when Google refused it; a new change replaces the message; dismiss clears it', async () => {
     const api = fakeApi([ev('a'), ev('b')]);
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(null, { ...swim, endTime: '06:00' })).toBe(BAD_TIMES);
     expect(done(cal)).toBeNull();
     api.fail = true;
-    expect(await cal.remove('a')).toBe(SAVE_FAILED);
-    expect(done(cal)).toBeNull();
+    expect(await cal.remove('a')).toBeNull();
+    await cal.settled();
+    expect(done(cal)).toBe(SAVE_FAILED);
+    expect(cal.get().done?.undo).toBeNull();
     api.fail = false;
     await cal.save(at(cal, 'a'), draftOf('a'));
+    await cal.settled();
     const first = cal.get().done!;
     await cal.remove('b');
+    await cal.settled();
     expect(done(cal)).toBe('Event deleted');
     expect(cal.get().done!.n).not.toBe(first.n);
     cal.dismissDone();
@@ -681,6 +730,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(await cal.save(at(cal, 'z'), { ...draftOf('z'), startTime: '09:00', endTime: '09:30' })).toBeNull();
+    await cal.settled();
     expect(cal.get().done).toMatchObject({ text: 'Event saved', undo: null });
   });
 
@@ -689,10 +739,12 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.remove('a');
+    await cal.settled();
     let fail!: () => void;
     api.restore = () => new Promise((_, no) => (fail = () => no(new Error('offline'))));
     const undoing = cal.undo();
     await cal.remove('b');
+    await cal.settled();
     fail();
     await undoing;
     expect(cal.get().done?.text).toBe('Event deleted');
@@ -704,6 +756,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.remove('a');
+    await cal.settled();
     await cal.open();
     expect(cal.get().done).toBeNull();
   });
@@ -714,6 +767,7 @@ describe('Undo after adding, saving or deleting an event (job 217)', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.save(null, swim);
+    await cal.settled();
     expect(cal.get().done).toMatchObject({ text: 'Event added', undo: null });
   });
 });
@@ -733,7 +787,8 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
     const cal = createCalendar(api, today);
     await cal.open();
     await cal.move('a', '2026-10-06', '2026-10-09');
-    expect(api.calls.slice(1)).toEqual(['update a a', 'list 2026-10-06 2026-10-13']);
+    // Shown on its new day already: the calendar isn't fetched again.
+    expect(api.calls.slice(1)).toEqual(['update a a']);
     expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-09T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-09T11:00:00', timeZone: zone } });
     expect(done(cal)?.text).toBe('Event saved');
   });
@@ -857,6 +912,242 @@ describe('dragging an event onto another day (owner request 2026-11-11)', () => 
     expect(api.calls.at(-2)).toBe('update lunch lunch (no emails)');
     expect(api.bodies.at(-1)).toEqual({ summary: 'lunch', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
     expect(done(cal)).toBeNull();
+  });
+});
+
+/**
+ * Holds one kind of call to Google until the test answers it (or refuses it, as when offline), to see
+ * what the panel shows while Google is still answering. Calls are answered in the order they were made.
+ */
+function hold(api: ReturnType<typeof fakeApi>, kind: 'create' | 'update' | 'remove') {
+  const real = api[kind] as (...args: unknown[]) => Promise<unknown>;
+  const waiting: { ok: () => void; no: () => void }[] = [];
+  (api as unknown as Record<string, unknown>)[kind] = (...args: unknown[]) =>
+    new Promise((ok, no) => waiting.push({ ok: () => ok(real(...args)), no: () => no(new Error('offline')) }));
+  return {
+    answer: () => waiting.shift()!.ok(),
+    refuse: () => waiting.shift()!.no(),
+    get waiting() {
+      return waiting.length;
+    },
+  };
+}
+
+describe('changes show at once while Google is told in the background (owner request 2026-11-17)', () => {
+  const swim = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00', guests: [] as string[] };
+  const ids = (cal: ReturnType<typeof createCalendar>) => cal.get().events?.map((e) => e.id);
+
+  it('a new event shows at once with a stand-in id, then gets Google’s id and “Event added” when Google answers', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const google = hold(api, 'create');
+    expect(await cal.save(null, swim)).toBeNull();
+    const shown = cal.get().events!.find((e) => e.title === 'Swim')!;
+    expect(shown).toMatchObject({ start: '2026-10-07T07:00', end: '2026-10-07T08:00', editable: true });
+    expect(shown.id).not.toBe('new1');
+    expect(cal.get().sending).toEqual([shown.id]);
+    expect(cal.get().done).toBeNull();
+    google.answer();
+    await cal.settled();
+    expect(ids(cal)).toEqual(['a', 'new1']);
+    expect(cal.get().sending).toEqual([]);
+    expect(cal.get().done).toMatchObject({ text: 'Event added' });
+    // Nothing is fetched again: the list already shows what Google now has.
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'create Swim']);
+  });
+
+  it('a change shows at once and “Event saved” comes when Google answers, with no fetch after', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const google = hold(api, 'update');
+    expect(await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'Dentist', startTime: '12:00', endTime: '13:00' })).toBeNull();
+    expect(cal.get().events).toMatchObject([{ id: 'a', title: 'Dentist', start: '2026-10-06T12:00', end: '2026-10-06T13:00' }]);
+    expect(cal.get().done).toBeNull();
+    google.answer();
+    await cal.settled();
+    expect(cal.get().done).toMatchObject({ text: 'Event saved' });
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13', 'update a Dentist']);
+  });
+
+  it('a delete takes the event off at once; “Event deleted” comes when Google answers', async () => {
+    const api = fakeApi([ev('a'), ev('b')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const google = hold(api, 'remove');
+    expect(await cal.remove('a')).toBeNull();
+    expect(ids(cal)).toEqual(['b']);
+    expect(cal.get().done).toBeNull();
+    google.answer();
+    await cal.settled();
+    expect(ids(cal)).toEqual(['b']);
+    expect(cal.get().done).toMatchObject({ text: 'Event deleted' });
+    expect(cal.get().done?.undo).not.toBeNull();
+  });
+
+  it('when Google refuses, only that event goes back, and the message says so with no Undo', async () => {
+    const api = fakeApi([ev('a'), ev('b', { start: '2026-10-06T12:00', end: '2026-10-06T13:00' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const adding = hold(api, 'create');
+    const saving = hold(api, 'update');
+    const deleting = hold(api, 'remove');
+    await cal.save(null, swim);
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'Renamed' });
+    await cal.remove('b');
+    const swimId = cal.get().events!.find((e) => e.title === 'Swim')!.id;
+    expect(ids(cal)).toEqual(['a', swimId]);
+    saving.refuse();
+    await vi.waitFor(() => expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null }));
+    expect(cal.get().events).toMatchObject([{ id: 'a', title: 'a' }, { id: swimId, title: 'Swim' }]);
+    adding.refuse();
+    await vi.waitFor(() => expect(ids(cal)).toEqual(['a']));
+    deleting.refuse();
+    await cal.settled();
+    expect(ids(cal)).toEqual(['a', 'b']);
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    expect(cal.get().sending).toEqual([]);
+  });
+
+  it('a note that needs no answer from Google still comes back at once, and nothing is shown or sent', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    expect(await cal.save(null, { ...swim, endTime: '06:00' })).toBe(BAD_TIMES);
+    expect(await cal.save(at(cal, 'a'), { ...draftOf('a'), guests: ['not an email'] })).toBe(BAD_EMAIL);
+    expect(ids(cal)).toEqual(['a']);
+    expect(cal.get().events?.[0].title).toBe('a');
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+  });
+
+  it('Undo is offered only once Google has answered, so it never runs on the stand-in id', async () => {
+    const api = fakeApi([]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const google = hold(api, 'create');
+    await cal.save(null, swim);
+    await cal.undo();
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    google.answer();
+    await cal.settled();
+    await cal.undo();
+    expect(api.calls.slice(-2)).toEqual(['remove new1 (no emails)', 'list 2026-10-06 2026-10-13']);
+  });
+
+  it('a new change takes away the last change’s message, so its Undo can’t race the new change', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'B' });
+    await cal.settled();
+    expect(cal.get().done?.text).toBe('Event saved');
+    const google = hold(api, 'update');
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'C' });
+    expect(cal.get().done).toBeNull();
+    google.answer();
+    await cal.settled();
+  });
+
+  it('an event with a change on its way can’t be changed, deleted or moved again until Google answers', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const adding = hold(api, 'create');
+    const saving = hold(api, 'update');
+    await cal.save(null, swim);
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'B' });
+    const stand = cal.get().events!.find((e) => e.title === 'Swim')!;
+    expect(await cal.remove(stand.id)).toBe(SAVE_FAILED);
+    expect(await cal.save(stand, { ...swim, title: 'Swim more' })).toBe(SAVE_FAILED);
+    expect(await cal.remove('a')).toBe(SAVE_FAILED);
+    expect(await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'C' })).toBe(SAVE_FAILED);
+    await cal.move('a', '2026-10-06', '2026-10-08');
+    expect(adding.waiting + saving.waiting).toBe(2);
+    expect(api.calls).toEqual(['list 2026-10-06 2026-10-13']);
+    adding.answer();
+    saving.answer();
+    await cal.settled();
+    // Once answered, the new event is changed by Google’s id.
+    expect(await cal.remove('new1')).toBeNull();
+    await cal.settled();
+    expect(api.calls).toContain('remove new1');
+  });
+
+  it('a list fetched while a change is on its way (another week and back, or an Undo’s fetch) still shows the change', async () => {
+    const list = [ev('a'), ev('b')];
+    const api = fakeApi(list);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const deleting = hold(api, 'remove');
+    const adding = hold(api, 'create');
+    await cal.remove('a');
+    await cal.save(null, swim);
+    await cal.step(1);
+    await cal.step(-1);
+    expect(cal.get().events?.map((e) => e.title)).toEqual(['b', 'Swim']);
+    // Google already lists the new event by the time it answers: it is shown once, by Google's id.
+    list.push(ev('new1', { title: 'Swim', start: '2026-10-07T07:00', end: '2026-10-07T08:00' }));
+    await cal.goToday();
+    adding.answer();
+    deleting.answer();
+    await cal.settled();
+    expect(ids(cal)).toEqual(['b', 'new1']);
+  });
+
+  it('opening the panel again drops changes still on their way from what is shown (someone else may be signed in)', async () => {
+    const api = fakeApi([ev('a')]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const adding = hold(api, 'create');
+    const deleting = hold(api, 'remove');
+    await cal.save(null, swim);
+    await cal.remove('a');
+    await cal.open();
+    expect(ids(cal)).toEqual(['a']);
+    adding.answer();
+    deleting.refuse();
+    await cal.settled();
+    expect(ids(cal)).toEqual(['a']);
+  });
+
+  it('changing guests, or one event of a series, fetches the calendar again once Google says yes', async () => {
+    const api = fakeApi([ev('a'), ev('su_1', { series: 'su' })]);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), guests: ['sam@example.com'] }, { notify: false });
+    await cal.settled();
+    expect(api.calls.slice(-2)).toEqual(['update a a (no emails)', 'list 2026-10-06 2026-10-13']);
+    await cal.save(at(cal, 'su_1'), { ...draftOf('su_1'), title: 'Stand-up' }, { all: false });
+    await cal.settled();
+    expect(api.calls.slice(-2)).toEqual(['update su_1 Stand-up', 'list 2026-10-06 2026-10-13']);
+  });
+
+  it('“All events in the series” still waits for Google: nothing is shown or answered until it has', async () => {
+    const standUp = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T09:00', end: '2026-10-16T09:15' });
+    const api = fakeApi([standUp]);
+    api.series = { title: 'Stand-up' };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    const saving = hold(api, 'update');
+    let answered = false;
+    const save = cal
+      .save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '09:00', endTime: '09:15' }, { all: true })
+      .then((n) => ((answered = true), n));
+    await vi.waitFor(() => expect(saving.waiting).toBe(1));
+    expect(answered).toBe(false);
+    expect(cal.get().events?.[0].title).toBe('Stand-up');
+    saving.answer();
+    expect(await save).toBeNull();
+    const deleting = hold(api, 'remove');
+    let gone = false;
+    const remove = cal.remove(cal.get().events![0].id, { all: true }).then((n) => ((gone = true), n));
+    await vi.waitFor(() => expect(deleting.waiting).toBe(1));
+    expect(gone).toBe(false);
+    expect(cal.get().events).toHaveLength(1);
+    deleting.refuse();
+    expect(await remove).toBe(SAVE_FAILED);
+    expect(cal.get().events).toHaveLength(1);
   });
 });
 

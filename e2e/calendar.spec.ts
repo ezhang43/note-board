@@ -146,7 +146,7 @@ test('a timed event can be made all-day, and back', async ({ page }) => {
 });
 
 // A one-off event is deleted at once, with no question (owner request, 2026-10-24, job #209).
-test('the form’s Delete deletes a one-off event at once, with no question; Ctrl+Z doesn’t bring it back', async ({ page }) => {
+test('the form’s Delete deletes a one-off event at once, with no question; Ctrl+Z brings it back', async ({ page }) => {
   const errors = await openAs(page);
   const sent = changesSent(page);
   await button(page).click();
@@ -159,11 +159,11 @@ test('the form’s Delete deletes a one-off event at once, with no question; Ctr
   await expect(panel(page)).toBeVisible();
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatch(/^DELETE /);
-  // Calendar events aren't board data: undo doesn't touch them.
+  // With the panel open, Ctrl+Z undoes the newest event change (owner request 2026-11-17), even from the board.
   await page.locator('.canvas').click({ position: { x: 300, y: 300 } });
   await page.keyboard.press('Control+z');
-  await expect(today.getByRole('button', { name: /Team stand-up/ })).toBeVisible();
-  await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+  await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+  expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
   expect(errors).toEqual([]);
 });
 
@@ -2231,6 +2231,144 @@ test.describe('dragging an event onto another day', () => {
     await dentist.click();
     await expect(card(page).getByRole('heading', { name: 'Dentist' })).toBeVisible();
     expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});
+
+// Keys for events (owner request 2026-11-17, job calendar-hotkeys). No test here checks the order of the weekday columns.
+test.describe('calendar keys', () => {
+  const toast = (page: Page) => page.locator('.undo-toast');
+  const range = (page: Page) => panel(page).locator('.cal-range');
+
+  test('Ctrl+Z after the message has gone brings a deleted event back; Ctrl+Y and Ctrl+Shift+Z delete it again', async ({ page }) => {
+    await page.clock.install();
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(toast(page)).toHaveText(/Event deleted/);
+    await page.clock.runFor(6500);
+    await expect(toast(page)).toHaveCount(0);
+    await today.getByRole('heading').first().click();
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(sent.at(-1)).toMatch(/^PATCH .*sendUpdates=none/);
+    await answered(page);
+    await page.keyboard.press('Control+y');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    expect(sent.at(-1)).toMatch(/^DELETE .*sendUpdates=none/);
+    await answered(page);
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toBeVisible();
+    await answered(page);
+    await page.keyboard.press('Control+Shift+z');
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('goes back several steps; a newer board change is undone first, and with the panel closed Ctrl+Z is the board’s alone', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await edit(page, today.getByRole('button', { name: /Dentist/ }));
+    await form(page).getByLabel('Title').fill('Dentist visit');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist visit' })).toBeVisible();
+    await answered(page);
+    await today.getByRole('button', { name: /Dentist visit/ }).click();
+    await card(page).getByRole('button', { name: 'Delete event' }).click();
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await answered(page);
+    // A board change after them is newer: Ctrl+Z takes it back first.
+    await add(page, 'Note');
+    await page.keyboard.press('Escape');
+    await expect(cards(page)).toHaveCount(1);
+    await page.locator('.canvas').click({ position: { x: 700, y: 500 } });
+    await page.keyboard.press('Control+z');
+    await expect(cards(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: /Dentist/ })).toHaveCount(0);
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist visit' })).toBeVisible();
+    await answered(page);
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await answered(page);
+    // Panel closed: Ctrl+Y and Ctrl+Z are the board's (the note comes back and goes), the event stays as it is.
+    await button(page).click();
+    await expect(panel(page)).toHaveCount(0);
+    await page.keyboard.press('Control+y');
+    await expect(cards(page)).toHaveCount(1);
+    await page.keyboard.press('Control+z');
+    await expect(cards(page)).toHaveCount(0);
+    await button(page).click();
+    await expect(day(page, new Date()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('N opens a new event on the day looked at, 12 to 1pm; T goes to today; ← and → change the week', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const first = await range(page).textContent();
+    await panel(page).getByRole('button', { name: 'Today' }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(range(page)).not.toHaveText(first!);
+    const next = await range(page).textContent();
+    await page.keyboard.press('ArrowRight');
+    await expect(range(page)).not.toHaveText(next!);
+    await page.keyboard.press('ArrowLeft');
+    await expect(range(page)).toHaveText(next!);
+    await page.keyboard.press('t');
+    await expect(range(page)).toHaveText(first!);
+    await page.keyboard.press('n');
+    await expect(form(page)).toBeVisible();
+    await expect(form(page).getByLabel('Start time')).toHaveValue('12:00 PM');
+    await expect(form(page).getByLabel('End time')).toHaveValue('1:00 PM');
+    await expect(form(page).getByLabel('Start date')).toHaveValue(key(new Date()));
+    expect(errors).toEqual([]);
+  });
+
+  test('none of the keys fire while typing in the event form', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const first = await range(page).textContent();
+    await day(page, new Date()).getByRole('button', { name: `Add event on ${label(new Date())}` }).click();
+    await page.keyboard.type('ntex');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    await expect(form(page).getByLabel('Title')).toHaveValue('ntex');
+    await expect(range(page)).toHaveText(first!);
+    await expect(form(page)).toHaveCount(1);
+    // Ctrl+Z in the title undoes the typing, not an event change.
+    expect(errors).toEqual([]);
+  });
+
+  test('E and Enter edit the event whose card is open; Ctrl+D copies it at the same time', async ({ page }) => {
+    const errors = await openAs(page);
+    const sent = changesSent(page);
+    await button(page).click();
+    const today = day(page, new Date());
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await expect(card(page)).toBeVisible();
+    await page.keyboard.press('e');
+    await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+    await form(page).getByRole('button', { name: 'Cancel' }).click();
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await card(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(form(page).getByLabel('Title')).toHaveValue('Dentist');
+    await form(page).getByRole('button', { name: 'Cancel' }).click();
+    await today.getByRole('button', { name: /Dentist/ }).click();
+    await page.keyboard.press('Control+d');
+    await expect(card(page)).toHaveCount(0);
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toHaveCount(2);
+    await expect(toast(page)).toHaveText(/Event added/);
+    expect(sent.at(-1)).toMatch(/^POST /);
+    await answered(page);
+    // And Ctrl+Z takes the copy away.
+    await page.keyboard.press('Control+z');
+    await expect(today.getByRole('button', { name: '10 – 11am Dentist' })).toHaveCount(1);
     expect(errors).toEqual([]);
   });
 });

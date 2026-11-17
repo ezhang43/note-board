@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
+import { tick } from './undoClock';
 import { calendarApi, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
-// Calendar events aren't board data: not in Ctrl+Z, synced with boards or kept in versions
-// (only the Undo message after a change, job 217).
+// Calendar events aren't board data: not synced with boards or kept in versions; undone by the Undo
+// message after a change (job 217) or Ctrl+Z with the panel open (owner request 2026-11-17).
 
 const ev = (id: string, over: Partial<CalEvent> = {}): CalEvent => ({
   id,
@@ -263,7 +264,7 @@ describe('changing events', () => {
     expect(api.calls.length).toBe(1);
   });
 
-  it('deletes an event (not in Ctrl+Z: it is Google’s, not the board’s)', async () => {
+  it('deletes an event', async () => {
     const api = fakeApi([ev('a'), ev('b')]);
     const cal = createCalendar(api, today);
     await cal.open();
@@ -1510,5 +1511,235 @@ describe('fetchCalendarDone (Visualizer: past and deleted events)', () => {
       throw new DOMException('aborted', 'AbortError');
     };
     await expect(fetchCalendarDone('u1', RANGE, TODAY, ac.signal, fetchFn as unknown as typeof fetch, source())).rejects.toThrow();
+  });
+});
+
+// Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17, job calendar-hotkeys): several steps back through this
+// session's event changes, kept in memory only, each one what the change's Undo message would do. Never emails guests.
+describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
+  const swim = { title: 'Swim', allDay: false, startDate: '2026-10-07', startTime: '07:00', endDate: '2026-10-07', endTime: '08:00', guests: [] as string[] };
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const sent = (api: ReturnType<typeof fakeApi>, from: number) => api.calls.slice(from).filter((c) => !c.startsWith('list'));
+
+  async function opened(events: CalEvent[] = [ev('a'), ev('b')]) {
+    const api = fakeApi(events);
+    const cal = createCalendar(api, today);
+    await cal.open();
+    return { api, cal };
+  }
+
+  it('an add: Ctrl+Z deletes it, Ctrl+Y brings the same event back (no new event), neither emailing guests', async () => {
+    const { api, cal } = await opened([]);
+    await cal.save(null, { ...swim, guests: ['pat@example.com'] }, { notify: true });
+    await cal.settled();
+    const from = api.calls.length;
+    await cal.undoLast();
+    await cal.redo();
+    expect(sent(api, from)).toEqual(['remove new1 (no emails)', 'restore new1']);
+  });
+
+  it('an edit: Ctrl+Z puts the old title and time back, Ctrl+Y sends the change again without emails', async () => {
+    const { api, cal } = await opened();
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'Dentist', startTime: '12:00', endTime: '13:00' });
+    await cal.settled();
+    const from = api.calls.length;
+    await cal.undoLast();
+    expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
+    await cal.redo();
+    expect(sent(api, from)).toEqual(['update a a (no emails)', 'update a Dentist (no emails)']);
+    expect(api.bodies.at(-1)).toEqual({ summary: 'Dentist', start: { dateTime: '2026-10-06T12:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T13:00:00', timeZone: zone } });
+  });
+
+  it('a delete: Ctrl+Z restores it, Ctrl+Y deletes it again', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.settled();
+    const from = api.calls.length;
+    await cal.undoLast();
+    await cal.redo();
+    expect(sent(api, from)).toEqual(['restore a', 'remove a (no emails)']);
+  });
+
+  it('a drag: Ctrl+Z puts it back on its old day', async () => {
+    const { api, cal } = await opened();
+    await cal.move('a', '2026-10-06', '2026-10-09');
+    await cal.undoLast();
+    expect(api.bodies.at(-1)).toEqual({ summary: 'a', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone }, end: { dateTime: '2026-10-06T11:00:00', timeZone: zone } });
+  });
+
+  it('goes back several steps, newest first, even pressed quickly, and works after the message has gone', async () => {
+    const { api, cal } = await opened();
+    await cal.save(null, swim);
+    await cal.save(at(cal, 'a'), { ...draftOf('a'), title: 'Dentist' });
+    await cal.remove('b');
+    await cal.settled();
+    cal.dismissDone();
+    const from = api.calls.length;
+    await Promise.all([cal.undoLast(), cal.undoLast(), cal.undoLast()]);
+    expect(sent(api, from)).toEqual(['restore b', 'update a a (no emails)', 'remove new1 (no emails)']);
+    expect(cal.marks().undo).toBe(0);
+    // And forward again, the last one undone redone last.
+    await Promise.all([cal.redo(), cal.redo(), cal.redo()]);
+    expect(sent(api, from).slice(3)).toEqual(['restore new1', 'update a Dentist (no emails)', 'remove b (no emails)']);
+  });
+
+  it('Ctrl+Z right after a change waits for Google’s answer, so it never sends a stand-in id', async () => {
+    const { api, cal } = await opened();
+    const google = hold(api, 'create');
+    await cal.save(null, swim);
+    const undoing = cal.undoLast();
+    google.answer();
+    await undoing;
+    expect(api.calls.filter((c) => c.startsWith('remove'))).toEqual(['remove new1 (no emails)']);
+  });
+
+  it('a change Google refused, or one with no Undo, is not a step: Ctrl+Z goes to the one before', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.settled();
+    api.fail = true;
+    await cal.remove('b');
+    await cal.settled();
+    api.fail = false;
+    api.create = async () => null; // Google gave no id: no Undo
+    await cal.save(null, swim);
+    await cal.settled();
+    const from = api.calls.length;
+    await cal.undoLast();
+    expect(sent(api, from)).toEqual(['restore a']);
+  });
+
+  it('a refused Ctrl+Z says so and drops that step; a refused Ctrl+Y says so and drops it too', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.remove('b');
+    await cal.settled();
+    api.fail = true;
+    await cal.undoLast();
+    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+    expect(cal.marks().redo).toBe(0);
+    api.fail = false;
+    await cal.undoLast(); // the step before is still there
+    expect(api.calls.at(-2)).toBe('restore a');
+    api.fail = true;
+    await cal.redo();
+    expect(cal.get().done).toMatchObject({ text: SAVE_FAILED, undo: null });
+    expect(cal.marks().redo).toBe(0);
+    api.fail = false;
+    const from = api.calls.length;
+    await cal.redo();
+    expect(sent(api, from)).toEqual([]);
+  });
+
+  it('a new change clears what Ctrl+Y could redo', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.settled();
+    await cal.undoLast();
+    expect(cal.marks().redo).toBeGreaterThan(0);
+    await cal.remove('b');
+    expect(cal.marks().redo).toBe(0);
+    await cal.settled();
+    const from = api.calls.length;
+    await cal.redo();
+    expect(sent(api, from)).toEqual([]);
+  });
+
+  it('the message’s Undo and Ctrl+Z take back the same step, once', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.remove('b');
+    await cal.settled();
+    await cal.undo(); // the message: “Event deleted · Undo” (b)
+    const from = api.calls.length;
+    await cal.undoLast(); // then a
+    await cal.undoLast(); // nothing left
+    expect(sent(api, from)).toEqual(['restore a']);
+    expect(api.calls.filter((c) => c === 'restore b')).toHaveLength(1);
+  });
+
+  it('Ctrl+Z takes the message away, so its Undo can’t run the same step again', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.settled();
+    expect(cal.get().done?.undo).not.toBeNull();
+    const undoing = cal.undoLast();
+    expect(cal.get().done).toBeNull();
+    await undoing;
+    await cal.undo();
+    expect(api.calls.filter((c) => c === 'restore a')).toHaveLength(1);
+  });
+
+  it('“All events in the series”: Ctrl+Z puts the series back first, Ctrl+Y sends this event’s own change first', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const { api, cal } = await opened([moved]);
+    api.series = { title: 'Stand-up' };
+    await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+    const from = api.calls.length;
+    await cal.undoLast();
+    await cal.redo();
+    expect(sent(api, from)).toEqual(['update su Stand-up (no emails)', 'update su_1016 Stand-up (no emails)', 'update su_1016 Daily sync (no emails)', 'update su Daily sync (no emails)']);
+  });
+
+  it('a series Ctrl+Y that only half reaches Google shows the calendar as Google has it and says so', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const { api, cal } = await opened([moved]);
+    api.series = { title: 'Stand-up' };
+    await cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+    await cal.undoLast();
+    api.failId = 'su';
+    await cal.redo();
+    expect(cal.get().done).toMatchObject({ text: SERIES_FAILED, undo: null });
+    expect(api.calls.at(-1)).toBe('list 2026-10-06 2026-10-13');
+  });
+
+  it('a deleted series: Ctrl+Z restores it, Ctrl+Y deletes it again', async () => {
+    const { api, cal } = await opened([ev('su_1016', { series: 'su' })]);
+    await cal.remove('su_1016', { all: true });
+    const from = api.calls.length;
+    await cal.undoLast();
+    await cal.redo();
+    expect(sent(api, from)).toEqual(['restore su', 'remove su (no emails)']);
+  });
+
+  it('keeps the last 50 steps', async () => {
+    const { api, cal } = await opened([ev('a')]);
+    for (let i = 0; i < 52; i++) {
+      await cal.save(at(cal, 'a'), { ...draftOf('a'), title: `t${i}` });
+      await cal.settled();
+    }
+    let undone = 0;
+    for (let i = 0; i < 55; i++) {
+      const before = api.calls.filter((c) => c.startsWith('update')).length;
+      await cal.undoLast();
+      if (api.calls.filter((c) => c.startsWith('update')).length > before) undone++;
+    }
+    expect(undone).toBe(50);
+  });
+
+  it('opening the panel again starts with nothing to undo or redo (someone else may be signed in)', async () => {
+    const { api, cal } = await opened();
+    await cal.remove('a');
+    await cal.remove('b');
+    await cal.settled();
+    await cal.undoLast();
+    await cal.open();
+    expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
+    const from = api.calls.length;
+    await cal.undoLast();
+    await cal.redo();
+    expect(sent(api, from)).toEqual([]);
+  });
+
+  it('each step, undo and redo takes a newer number on the counter shared with the board', async () => {
+    const { cal } = await opened();
+    expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
+    const before = tick();
+    await cal.remove('a');
+    const made = cal.marks().undo;
+    expect(made).toBeGreaterThan(before);
+    await cal.settled();
+    await cal.undoLast();
+    expect(cal.marks().redo).toBeGreaterThan(made);
   });
 });

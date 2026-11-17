@@ -6,10 +6,13 @@ import type { DoneItem, VizRange } from '../model/visualizer';
 import { announce } from './announce';
 import { deviceStorage } from './env';
 import { createWidthStore } from './panelWidths';
+import { tick, type CalendarMarks } from './undoClock';
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
-// events are Google's, not board data, so nothing here is in Ctrl+Z, synced with boards or kept in
-// Version history; a change's own Undo message (job 217) is the only undo. It talks to the Calendar API (v3) directly with fetch.
+// events are Google's, not board data, so nothing here is synced with boards or kept in Version history.
+// A change is undone by its own Undo message (job 217) or, while the panel is open, by Ctrl+Z, which goes
+// back several steps through this session's event changes, and Ctrl+Y forward again (owner request
+// 2026-11-17); that history is in memory only, apart from the board's. It talks to the Calendar API (v3) directly with fetch.
 
 export const NOT_CONNECTED = 'Google Calendar isn’t connected yet. Try again later.';
 /** Without access yet (`needsAccess`), the panel offers Connect Google Calendar instead of Try again. */
@@ -23,6 +26,8 @@ export const SERIES_FAILED = 'Only this event changed: the rest of the series di
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
 export const UNDO_FAILED = 'The undo didn’t reach Google Calendar. Try again later.';
 export const UNDO_PART = 'Only the series was put back: this event’s own change didn’t reach Google Calendar.';
+/** Ctrl+Z and Ctrl+Y keep this many event changes (owner request 2026-11-17). */
+export const UNDO_LIMIT = 50;
 
 /** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
 export interface CalendarSource {
@@ -155,10 +160,30 @@ export interface CalendarState {
 
 /** A change to the list of events shown. */
 type Patch = (events: CalEvent[]) => CalEvent[];
+/**
+ * One change that Ctrl+Z (or its Undo message) takes back and Ctrl+Y makes again at Google, never emailing guests.
+ * Both keep the event's id (a deleted event is restored, not made again), so the steps around it still fit.
+ */
+interface Step {
+  undo: () => Promise<unknown>;
+  redo: () => Promise<unknown>;
+  /** The events it changes: not changed again while it is on its way. */
+  ids: string[];
+}
+/**
+ * A step on the undo or redo list, numbered on the counter shared with the board (undoClock.ts). `step` is
+ * undefined until Google has answered the change (`ready`), and null when there turned out to be nothing to undo.
+ */
+interface Entry {
+  at: number;
+  step: Step | null | undefined;
+  ready: Promise<void>;
+  settle(step: Step | null): void;
+}
 /** What happens once Google has taken a change shown at once. */
 interface Taken {
   text: string;
-  undo: (() => Promise<unknown>) | null;
+  step: Step | null;
   /** Makes the list match what Google now has (a new event gets Google's id). */
   after: Patch;
   /** Fetch the calendar again: what Google made of it can't be known here (guests' answers, a series' event). */
@@ -193,11 +218,103 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   const sendingSeries = new Map<string, string>();
   const seriesBusy = (series: string) => [...sendingSeries.values()].includes(series);
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-  /** Shows (and says aloud) the message after a change. */
-  const tell = (text: string, undo: (() => Promise<unknown>) | null) => {
-    set({ done: { text, undo, n: ++said } });
+  /** Shows (and says aloud) the message after a change, with its Undo when it has a step to undo. */
+  const tell = (text: string, step: Entry | null) => {
+    set({ done: { text, undo: step && (() => undoEntry(step)), n: ++said } });
     announce(text);
   };
+
+  // Ctrl+Z and Ctrl+Y (owner request 2026-11-17): the steps of this session's changes, newest last, and one queue
+  // that sends each undo or redo to Google after the one before, so quick presses go in order.
+  let undos: Entry[] = [];
+  let redos: Entry[] = [];
+  let queue: Promise<void> = Promise.resolve();
+  const onto = (list: Entry[], e: Entry) => [...list, e].slice(-UNDO_LIMIT);
+  /** A new step, waiting for its change; nothing to undo (null) takes it off the lists. */
+  function entry(): Entry {
+    const e = { at: tick(), step: undefined } as Entry;
+    e.ready = new Promise<void>((done) => {
+      e.settle = (step) => {
+        e.step = step;
+        if (!step) {
+          undos = undos.filter((x) => x !== e);
+          redos = redos.filter((x) => x !== e);
+        }
+        done();
+      };
+    });
+    return e;
+  }
+  /** A new change: its step goes on the undo list, and what could be redone is gone. */
+  function remember(): Entry {
+    const e = entry();
+    undos = onto(undos, e);
+    redos = [];
+    return e;
+  }
+  /**
+   * Runs one undo or redo of `from`'s step after the ones already on their way, unless the panel was opened afresh
+   * meanwhile; `to` (on the other list) gets the step once it has reached Google, or is dropped if it didn't.
+   */
+  function inTurn(from: Entry, to: Entry, run: (step: Step) => Promise<void>): Promise<void> {
+    const at = session;
+    // Its message goes (its Undo must not run the same step), as when a new change is made.
+    set({ done: null });
+    const job = queue.then(async () => {
+      await from.ready;
+      if (!from.step || at !== session) return to.settle(null);
+      const step = from.step;
+      set({ sending: [...state.sending, ...step.ids] });
+      try {
+        await run(step);
+        to.settle(step);
+      } catch {
+        to.settle(null);
+      } finally {
+        set({ sending: state.sending.filter((s) => !step.ids.includes(s)) });
+      }
+    });
+    queue = job;
+    return job;
+  }
+  /** Undoes this step at Google (Ctrl+Z, or the message's Undo); Ctrl+Y can then redo it. */
+  function undoEntry(e: Entry): Promise<void> {
+    if (!undos.includes(e)) return Promise.resolve();
+    undos = undos.filter((x) => x !== e);
+    const back = entry();
+    redos = onto(redos, back);
+    return inTurn(e, back, async (step) => {
+      try {
+        await step.undo();
+      } catch (err) {
+        const part = err instanceof Error && err.message === UNDO_PART;
+        // Unless a newer change has its own message by now; a half-done undo is said anyway, as Google is left mixed.
+        if (state.done === null || part) tell(part ? UNDO_PART : UNDO_FAILED, null);
+        if (part) await load();
+        throw err;
+      }
+      announce('Undid the last change');
+      await load();
+    });
+  }
+  /** Makes an undone step again at Google (Ctrl+Y); Ctrl+Z can then undo it again. */
+  function redoEntry(e: Entry): Promise<void> {
+    redos = redos.filter((x) => x !== e);
+    const again = entry();
+    undos = onto(undos, again);
+    return inTurn(e, again, async (step) => {
+      try {
+        await step.redo();
+      } catch (err) {
+        const part = err instanceof Error && err.message === SERIES_FAILED;
+        if (state.done === null || part) tell(part ? SERIES_FAILED : SAVE_FAILED, null);
+        if (part) await load();
+        throw err;
+      }
+      announce('Redid the last change');
+      await load();
+    });
+  }
   /**
    * What puts an event back as it was (Undo after a save): its old title and time, and its old
    * guests (as Google gave them) when the change sent guests. Never emails them.
@@ -208,6 +325,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     // Old times Google allows but the form doesn't (an end not after its start): no Undo.
     return body && (() => api!.update(id, guests ? { ...body, attendees: was.guests } : body, false));
   };
+  /** A save's step: none when it can't be put back. */
+  const undoSave = (id: string, undo: (() => Promise<unknown>) | null, redo: () => Promise<unknown>): Step | null => (undo ? { undo, redo, ids: [id] } : null);
 
   /**
    * A change shown at once while Google is told (owner request, 2026-11-17). `answer` is the call
@@ -220,6 +339,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
    */
   function instant(id: string, series: string | null, change: Patch, back: Patch, answer: Promise<Taken>) {
     const at = session;
+    // Its Ctrl+Z step is on the list from now (it waits for Google's answer), so Ctrl+Z never skips it.
+    const step = remember();
     shownEarly.set(id, change);
     if (series) sendingSeries.set(id, series);
     // The last change's message goes: its Undo must not race this change.
@@ -236,11 +357,13 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         sent();
         const same = at === session;
         if (same) patch(taken.after);
-        tell(taken.text, same ? taken.undo : null);
+        step.settle(same ? taken.step : null);
+        tell(taken.text, step.step ? step : null);
         if (taken.reload || state.loading || !same) await load();
       },
       () => {
         sent();
+        step.settle(null);
         if (at === session) patch(back);
         tell(SAVE_FAILED, null);
       },
@@ -275,6 +398,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     open() {
       session++;
       shownEarly.clear();
+      undos = [];
+      redos = [];
       set({ day: today(), events: null, done: null });
       return load();
     },
@@ -335,7 +460,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           const answer = api.create(sent, notify).then(
             (id): Taken => ({
               text: 'Event added',
-              undo: id ? () => api.remove(id, false) : null,
+              // Redo brings the same event back, so a step made after it (an edit) still finds it.
+              step: id ? { undo: () => api.remove(id, false), redo: () => api.restore(id), ids: [id] } : null,
               // Already listed by Google's id (a fetch in between): shown once. No id: shown as Google has it.
               after: (l) => (id && !l.some((e) => e.id === id) ? l.map((e) => (e.id === standIn ? { ...e, id } : e)) : l.filter((e) => e.id !== standIn)),
               reload: !id || attendees !== null,
@@ -348,7 +474,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         const answer = api.update(event.id, sent, notify).then(
           (): Taken => ({
             text: 'Event saved',
-            undo: putBack(event.id, event, sent.attendees !== undefined),
+            step: undoSave(event.id, putBack(event.id, event, sent.attendees !== undefined), () => api.update(event.id, sent, false)),
             after: (l) => l,
             // Guests' answers, or an event of a series (its id may change), as Google has them.
             reload: sent.attendees !== undefined || event.series !== null,
@@ -381,19 +507,27 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       } catch {
         return SAVE_FAILED;
       }
-      let undo: (() => Promise<unknown>) | null;
+      let step: Step | null;
       try {
-        await api.update(seriesId, body, notify);
+        const seriesBody = body;
+        await api.update(seriesId, seriesBody, notify);
         // The series first, which also gives its events back their old ids, then the edited event's own change.
         const seriesBack = putBack(seriesId, series, attendees !== null);
         const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
-        undo =
+        step = undoSave(
+          event.id,
           seriesBack &&
-          (async () => {
-            await seriesBack();
-            // Half undone: the series is back but this event isn't, so the calendar is shown as Google has it.
-            if (ownBack) await api.update(event.id, ownBack, false).catch(() => Promise.reject(new Error(UNDO_PART)));
-          });
+            (async () => {
+              await seriesBack();
+              // Half undone: the series is back but this event isn't, so the calendar is shown as Google has it.
+              if (ownBack) await api.update(event.id, ownBack, false).catch(() => Promise.reject(new Error(UNDO_PART)));
+            }),
+          // Redone as it was saved: this event's own change first, then the series (half done: the calendar is shown as Google has it).
+          async () => {
+            if (own) await api.update(event.id, own, false);
+            await api.update(seriesId, seriesBody, false).catch((e) => Promise.reject(own ? new Error(SERIES_FAILED) : e));
+          },
+        );
       } catch {
         if (!own) return SAVE_FAILED;
         // Only this event changed: show the calendar as it now is, and say so.
@@ -401,7 +535,9 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return SERIES_FAILED;
       }
       await load();
-      tell('Event saved', undo);
+      const e = remember();
+      e.settle(step);
+      tell('Event saved', step ? e : null);
       return null;
     },
     /**
@@ -436,7 +572,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
           (deleted): Taken => ({
             text: 'Event deleted',
             // Already gone (someone deleted it on purpose): no Undo to bring it back.
-            undo: deleted ? () => api.restore(id) : null,
+            step: deleted ? { undo: () => api.restore(id), redo: () => api.remove(id, false), ids: [id] } : null,
             after: gone,
             // The panel was out of date: show the calendar as Google has it (a 404 may be an event with a new id).
             reload: !deleted,
@@ -453,27 +589,28 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return SAVE_FAILED;
       }
       set({ events: state.events?.filter((e) => e.id !== id && e.series !== series) ?? null });
-      tell('Event deleted', deleted ? () => api.restore(series) : null);
+      const step = remember();
+      step.settle(deleted ? { undo: () => api.restore(series), redo: () => api.remove(series, false), ids: [id] } : null);
+      tell('Event deleted', step.step ? step : null);
       if (!deleted) await load();
       return null;
     },
-    /** The message's Undo: the change is undone at Google, then the calendar is shown again. */
+    /** The message's Undo: the change is undone at Google, then the calendar is shown again (the same step as Ctrl+Z). */
     async undo() {
-      const undo = state.done?.undo;
-      if (!undo) return;
-      set({ done: null });
-      try {
-        await undo();
-      } catch (e) {
-        const part = e instanceof Error && e.message === UNDO_PART;
-        // Unless a newer change has its own message by now; a half-done undo is said anyway, as Google is left mixed.
-        if (state.done === null || part) tell(part ? UNDO_PART : UNDO_FAILED, null);
-        if (part) await load();
-        return;
-      }
-      announce('Undid the last change');
-      await load();
+      await state.done?.undo?.();
     },
+    /** Ctrl+Z with the panel open: undoes the newest event change of this session, once Google has it. */
+    undoLast(): Promise<void> {
+      const e = undos.at(-1);
+      return e ? undoEntry(e) : Promise.resolve();
+    },
+    /** Ctrl+Y (or Ctrl+Shift+Z): makes the last undone event change again. */
+    redo(): Promise<void> {
+      const e = redos.at(-1);
+      return e ? redoEntry(e) : Promise.resolve();
+    },
+    /** The newest undo and redo steps on the counter shared with the board (0: none), so the newer one is stepped. */
+    marks: (): CalendarMarks => ({ undo: undos.at(-1)?.at ?? 0, redo: redos.at(-1)?.at ?? 0 }),
     dismissDone() {
       set({ done: null });
     },

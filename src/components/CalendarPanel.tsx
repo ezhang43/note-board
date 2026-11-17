@@ -34,12 +34,14 @@ import { keyboardCover } from './ItemBar';
 import { usePhone } from './usePhone';
 import { TimePicker, closeTimeList } from './TimePicker';
 import { beginEventDrag } from './eventDrag';
+import { useCalendarKeys } from './calendarKeys';
 
 const START_TIMES = startTimeOptions();
 
 // Google Calendar side panel (owner request, 2026-10-06): the signed-in person's primary calendar,
 // a week or a month, beside the board. The person's own events can be added, moved, renamed and
-// deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data: not in Ctrl+Z or Version history (a change's Undo message, job 217, is their undo).
+// deleted, with their guests, one or all of a repeating series (job #85); the rest open in Google Calendar. Calendar events aren't board data:
+// not in Version history. A change's Undo message (job 217) or, with the panel open, Ctrl+Z (owner request 2026-11-17) undoes it.
 
 /**
  * Opens the panel: a round button by the zoom control (the toolbar is full at 1280px), a tile in ⋯
@@ -116,6 +118,11 @@ export function CalendarPanel() {
       else void calendar.move(event.id, from, to);
     });
   };
+  // N, T, ← and → (owner request 2026-11-17); N closes an open card, as a click on a + would.
+  useCalendarKeys(editing !== null || moving !== null, (opener) => {
+    setOpen(null);
+    add(s.day, opener);
+  });
   const dayList = (day: DayKey, columns = false) => (
     <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onDrag={drag} onAdd={(opener) => add(day, opener)} />
   );
@@ -435,6 +442,20 @@ function EventCard({ event, sending, opener, onClose, onEdit }: { event: CalEven
         if (!ask) remove();
         // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
         else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.toLowerCase() === 'e' || (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a'))))) {
+        // E, or Enter on the card itself (a button keeps its own Enter), edits it as the pencil does (owner request 2026-11-17).
+        if (!event.editable || busy || sending || ask || e.repeat) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onEdit();
+      } else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
+        // Ctrl+D: a copy at the same time, without its guests, so no one is invited unasked (owner request 2026-11-17).
+        // Never the board's duplicate or the browser's bookmark behind the card.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (!event.editable || busy || sending || ask || e.repeat) return;
+        void calendar.save(null, { ...draft, guests: [] });
+        close();
       }
     };
     window.addEventListener('keydown', key, true);

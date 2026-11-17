@@ -93,15 +93,20 @@ export function CalendarPanel() {
     setOpen(null);
     setEditing({ event, draft: draftFor(event), opener });
   };
-  // Clicking an event whose card is already open edits it (job #131); a read-only one has nothing to edit, so its card just stays.
+  // Clicking an event whose card is already open edits it (job #131); a read-only one has nothing to edit, so its card just stays,
+  // and so does one with a change still on its way to Google (owner request 2026-11-17).
   const pick = (event: CalEvent, opener: HTMLElement) => {
     if (open?.event.id !== event.id) setOpen({ event, opener });
-    else if (event.editable) edit(event, opener);
+    else if (event.editable && !s.sending.includes(event.id)) edit(event, opener);
   };
+  // The card shows the event as the list shows it now (a change that Google refused goes back in it too).
+  const openEvent = open && (s.events?.find((e) => e.id === open.event.id) ?? open.event);
   const add = (day: DayKey, opener: HTMLElement) => setEditing({ event: null, draft: newDraft(day), opener });
   // Dragging an event onto another day (owner request, 2026-11-11): saved like an edit's Save, asking about the guests first.
   const [moving, setMoving] = useState<{ event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement } | null>(null);
   const drag: OnDrag = (down, event) => {
+    // Not while its last change is still on its way to Google (a press still opens its card).
+    if (s.sending.includes(event.id)) return;
     const opener = down.currentTarget;
     beginEventDrag(down, (from, to) => {
       const draft = dragDraft(event, from, to);
@@ -163,13 +168,14 @@ export function CalendarPanel() {
             {dayList(s.day)}
           </>
         ))}
-      {open && (
+      {openEvent && open && (
         <EventCard
-          key={open.event.id}
-          event={open.event}
+          key={openEvent.id}
+          event={openEvent}
+          sending={s.sending.includes(openEvent.id)}
           opener={open.opener}
           onClose={() => setOpen(null)}
-          onEdit={() => edit(open.event, open.opener)}
+          onEdit={() => edit(openEvent, open.opener)}
         />
       )}
       {editing && <EventForm event={editing.event} start={editing.draft} opener={editing.opener} onClose={() => setEditing(null)} />}
@@ -203,6 +209,8 @@ function DayEvents({
 }) {
   const label = dayLabel(day);
   const list = eventsOnDay(events, day);
+  // An event whose change is still on its way to Google is marked busy (owner request 2026-11-17).
+  const { sending } = useCalendar();
   const section = useRef<HTMLElement>(null);
   // Picking a day in the Month grid shows its list (under the grid, maybe below the visible part of the panel).
   useEffect(() => {
@@ -226,6 +234,7 @@ function DayEvents({
           type="button"
           className={`cal-event${e.editable ? '' : ' read-only'}`}
           data-event={e.id}
+          aria-busy={sending.includes(e.id) || undefined}
           aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
           onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
@@ -260,6 +269,7 @@ function MonthGrid({
   onAdd: (day: DayKey, opener: HTMLElement) => void;
 }) {
   const month = day.slice(0, 7);
+  const { sending } = useCalendar();
   const [narrow, setNarrow] = useState(true);
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
   // Measured before the first paint, so a wide grid doesn't first show two lines.
@@ -308,6 +318,7 @@ function MonthGrid({
                       type="button"
                       className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
                       data-event={e.id}
+                      aria-busy={sending.includes(e.id) || undefined}
                       aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
                       title={`${time && `${time} `}${e.title}`}
                       onClick={(ev) => {
@@ -373,7 +384,7 @@ function useCardPlace(ref: RefObject<HTMLElement | null>, opener: HTMLElement, c
  * asking which, job #209), and so do Delete and Backspace; pressed again, they answer a series' question
  * with all of it. Others' events, and Google's special kinds, show without pencil and trash.
  */
-function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
+function EventCard({ event, sending, opener, onClose, onEdit }: { event: CalEvent; sending: boolean; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const draft = draftFor(event);
   // Gone (another event's card opened, or the panel closed) before Google answered: nothing to close or focus.
@@ -406,7 +417,7 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
   // Escape and Delete belong to the card while it is open, wherever the keyboard is (capture: before
   // the board's own shortcuts, so a block selected on the board is never deleted behind it; and
   // stopImmediatePropagation, so the side panel's own Escape never runs after it, whichever was added first).
-  // While a delete is on its way the card stays, so Google's answer (or refusal) can show in it.
+  // While a delete of all of a series is on its way the card stays, so Google's answer (or refusal) can show in it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
@@ -420,7 +431,7 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
         e.preventDefault();
         e.stopImmediatePropagation();
         // Only a fresh press: a held key's auto-repeat never deletes or answers.
-        if (!event.editable || busy || e.repeat) return;
+        if (!event.editable || busy || sending || e.repeat) return;
         if (!ask) remove();
         // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
         else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
@@ -430,7 +441,7 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
     return () => window.removeEventListener('keydown', key, true);
   });
   // A click or tap anywhere else closes it, except on the panel's resize strip, so the card can follow
-  // the edge, and on its own event's button, whose click edits it (job #131). While a change is on its way, clicks elsewhere in the panel (another event, another
+  // the edge, and on its own event's button, whose click edits it (job #131). While all of a series is being deleted, clicks elsewhere in the panel (another event, another
   // week, the panel's ×) wait too, so the card stays to show Google's answer.
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
@@ -457,10 +468,11 @@ function EventCard({ event, opener, onClose, onEdit }: { event: CalEvent; opener
       <div className="cal-card-tools">
         {event.editable && (
           <>
-            <button type="button" className="icon-button" aria-label="Edit event" title="Edit event" disabled={busy || ask !== null} onClick={onEdit}>
+            {/* Not while an earlier change to it is still on its way to Google (owner request 2026-11-17). */}
+            <button type="button" className="icon-button" aria-label="Edit event" title="Edit event" disabled={busy || sending || ask !== null} onClick={onEdit}>
               <PencilIcon />
             </button>
-            <button type="button" className="icon-button" aria-label="Delete event" title="Delete event" disabled={busy || ask !== null} onClick={remove}>
+            <button type="button" className="icon-button" aria-label="Delete event" title="Delete event" disabled={busy || sending || ask !== null} onClick={remove}>
               <TrashIcon />
             </button>
           </>
@@ -563,7 +575,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
 
   // Escape closes it (first the question, if one is open), wherever the keyboard is, even in the title
   // (capture and stopImmediatePropagation, as for the card: the board's shortcuts and the panel's own Escape never see it).
-  // While a change is on its way it stays, so Google's answer (or refusal) can show in it.
+  // While a change to all of a series is on its way it stays, so Google's answer (or refusal) can show in it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
@@ -579,7 +591,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
   });
   // A click or tap anywhere else closes it, as for the card, except on the panel's resize strip (so the
   // overlay can follow the edge). Nothing typed is asked about: it closes, as Google Calendar's does.
-  // While a change is on its way, clicks elsewhere in the panel wait too.
+  // While a change to all of a series is on its way, clicks elsewhere in the panel wait too.
   useEffect(() => {
     const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
     const down = (e: PointerEvent) => {

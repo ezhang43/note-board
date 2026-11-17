@@ -38,6 +38,7 @@ import {
   parseEvent,
   rangeLabel,
   safeLink,
+  savedEvent,
   seriesDraft,
   timeLabel,
   viewRange,
@@ -765,5 +766,33 @@ describe('time picker', () => {
     const list = endTimeOptions('14:00', false);
     expect(list).toHaveLength(96);
     expect(list[0]).toEqual({ value: '00:00', text: '12:00 AM' });
+  });
+});
+
+describe('a change shown before Google answers (owner request 2026-11-17)', () => {
+  const zone = 'Europe/London';
+  it('a changed event shows its new title, times and guests, keeping its id, link and series', () => {
+    const was = timed({ id: 'su_1', series: 'su', link: 'https://calendar.google.com/x', guests: [{ email: 'me@example.com', self: true }] });
+    const body = draftBody({ ...draftFor(was), title: 'Stand-up', startTime: '11:00', endTime: '11:30' }, zone)!;
+    expect(savedEvent(was, body, 'su_1')).toEqual({ ...was, title: 'Stand-up', start: '2026-10-06T11:00', end: '2026-10-06T11:30', timeZone: zone });
+    const sam = { email: 'sam@example.com' };
+    expect(savedEvent(was, { ...body, attendees: [sam] }, 'su_1').guests).toEqual([sam]);
+  });
+
+  it('a new event gets the id it is given, and an untitled or all-day one shows as Google would', () => {
+    const body = draftBody({ title: '  ', allDay: true, startDate: '2026-10-08', startTime: '09:00', endDate: '2026-10-09', endTime: '10:00', guests: [] }, zone)!;
+    expect(savedEvent(null, body, 'local-1')).toEqual({
+      id: 'local-1',
+      title: '(No title)',
+      allDay: true,
+      start: '2026-10-08',
+      end: '2026-10-10',
+      editable: true,
+      link: 'https://calendar.google.com/',
+      series: null,
+      guests: [],
+      timeZone: null,
+      moved: false,
+    });
   });
 });

@@ -1283,6 +1283,8 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .undo-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .app.phone .undo-toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .app.phone .undo-toast button { height: 44px; }
+/* On a phone the words wrap onto a second line rather than end in "…": the screen is too narrow for the longer messages (and fonts differ by phone). */
+.app.phone .undo-toast span { white-space: normal; }
 
 /* ---------- layout and resizing (step 3) ---------- */
 

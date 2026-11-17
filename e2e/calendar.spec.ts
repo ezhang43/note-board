@@ -1557,8 +1557,9 @@ test.describe('on a phone-sized screen', () => {
     await toast.getByRole('button', { name: 'Undo' }).tap();
     const again = toast.getByRole('button', { name: 'Try again' });
     await expect(again).toBeVisible();
-    // Not cut short with "…" on a phone.
-    expect(await toast.locator('span').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    // Not cut short with "…" on a phone, even in a wider font than this machine's (GitHub's runner has one).
+    await page.addStyleTag({ content: '.undo-toast { letter-spacing: 1px; }' });
+    expect(await toast.locator('span').evaluate((el) => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)).toBe(true);
     await answered(page);
     await page.unroute('**/__calendar/**');
     await again.tap();

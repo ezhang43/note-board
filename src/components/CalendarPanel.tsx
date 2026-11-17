@@ -119,9 +119,9 @@ export function CalendarPanel() {
     });
   };
   // N, T, ← and → (owner request 2026-11-17); N closes an open card, as a click on a + would.
-  useCalendarKeys(editing !== null || moving !== null, (opener) => {
+  useCalendarKeys(editing !== null || moving !== null, (day, opener) => {
     setOpen(null);
-    add(s.day, opener);
+    add(day, opener);
   });
   const dayList = (day: DayKey, columns = false) => (
     <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onDrag={drag} onAdd={(opener) => add(day, opener)} />
@@ -454,8 +454,11 @@ function EventCard({ event, sending, opener, onClose, onEdit }: { event: CalEven
         e.preventDefault();
         e.stopImmediatePropagation();
         if (!event.editable || busy || sending || ask || e.repeat) return;
-        void calendar.save(null, { ...draft, guests: [] });
+        void calendar.copy(event.id);
         close();
+      } else if ((busy || ask) && !e.ctrlKey && !e.metaKey && !e.altKey && ['n', 't', 'ArrowLeft', 'ArrowRight'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) {
+        // N, T, ← and → wait while its question is open or a series delete is on its way (they would close the card).
+        e.stopImmediatePropagation();
       }
     };
     window.addEventListener('keydown', key, true);

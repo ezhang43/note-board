@@ -169,6 +169,8 @@ interface Step {
   redo: () => Promise<unknown>;
   /** The events it changes: not changed again while it is on its way. */
   ids: string[];
+  /** A whole series it changes: no "All events" change to it meanwhile. */
+  series?: string;
 }
 /**
  * A step on the undo or redo list, numbered on the counter shared with the board (undoClock.ts). `step` is
@@ -231,8 +233,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
   let queue: Promise<void> = Promise.resolve();
   const onto = (list: Entry[], e: Entry) => [...list, e].slice(-UNDO_LIMIT);
   /** A new step, waiting for its change; nothing to undo (null) takes it off the lists. */
-  function entry(): Entry {
-    const e = { at: tick(), step: undefined } as Entry;
+  function entry(at = tick()): Entry {
+    const e = { at, step: undefined } as Entry;
     e.ready = new Promise<void>((done) => {
       e.settle = (step) => {
         e.step = step;
@@ -245,9 +247,9 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     });
     return e;
   }
-  /** A new change: its step goes on the undo list, and what could be redone is gone. */
-  function remember(): Entry {
-    const e = entry();
+  /** A new change (numbered `at`, when it started): its step goes on the undo list, and what could be redone is gone. */
+  function remember(at?: number): Entry {
+    const e = entry(at);
     undos = onto(undos, e);
     redos = [];
     return e;
@@ -264,6 +266,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       await from.ready;
       if (!from.step || at !== session) return to.settle(null);
       const step = from.step;
+      const key = `step ${to.at}`;
+      if (step.series) sendingSeries.set(key, step.series);
       set({ sending: [...state.sending, ...step.ids] });
       try {
         await run(step);
@@ -271,6 +275,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       } catch {
         to.settle(null);
       } finally {
+        sendingSeries.delete(key);
         set({ sending: state.sending.filter((s) => !step.ids.includes(s)) });
       }
     });
@@ -326,7 +331,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     return body && (() => api!.update(id, guests ? { ...body, attendees: was.guests } : body, false));
   };
   /** A save's step: none when it can't be put back. */
-  const undoSave = (id: string, undo: (() => Promise<unknown>) | null, redo: () => Promise<unknown>): Step | null => (undo ? { undo, redo, ids: [id] } : null);
+  const undoSave = (id: string, series: string | undefined, undo: (() => Promise<unknown>) | null, redo: () => Promise<unknown>): Step | null =>
+    undo ? { undo, redo, ids: [id], series } : null;
 
   /**
    * A change shown at once while Google is told (owner request, 2026-11-17). `answer` is the call
@@ -358,7 +364,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         const same = at === session;
         if (same) patch(taken.after);
         step.settle(same ? taken.step : null);
-        tell(taken.text, step.step ? step : null);
+        // Unless Ctrl+Z already took it back while Google answered: its undo has its own message.
+        if (!step.step || undos.includes(step)) tell(taken.text, step.step ? step : null);
         if (taken.reload || state.loading || !same) await load();
       },
       () => {
@@ -474,7 +481,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         const answer = api.update(event.id, sent, notify).then(
           (): Taken => ({
             text: 'Event saved',
-            step: undoSave(event.id, putBack(event.id, event, sent.attendees !== undefined), () => api.update(event.id, sent, false)),
+            step: undoSave(event.id, undefined, putBack(event.id, event, sent.attendees !== undefined), () => api.update(event.id, sent, false)),
             after: (l) => l,
             // Guests' answers, or an event of a series (its id may change), as Google has them.
             reload: sent.attendees !== undefined || event.series !== null,
@@ -485,6 +492,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return null;
       }
       // "All events in the series" waits for Google (the form shows its answer), as before.
+      // Numbered now, so a board change made while Google answers counts as newer.
+      const started = tick();
       const seriesId = event.series;
       let own: Partial<EventBody> | null;
       let series: CalEvent | null;
@@ -516,6 +525,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
         step = undoSave(
           event.id,
+          seriesId,
           seriesBack &&
             (async () => {
               await seriesBack();
@@ -535,7 +545,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return SERIES_FAILED;
       }
       await load();
-      const e = remember();
+      const e = remember(started);
       e.settle(step);
       tell('Event saved', step ? e : null);
       return null;
@@ -557,6 +567,17 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       const note = await this.save(event, draft, { notify: choice.notify });
       if (note) tell(note, null);
       else await flights.get(id);
+    },
+    /**
+     * Ctrl+D on an event's card (owner request 2026-11-17): a new event like it at the same time, without its
+     * guests, so no one is invited unasked; added as the form adds one ("Event added", undone like any add).
+     * A refusal says so in the message.
+     */
+    async copy(id: string): Promise<void> {
+      const event = editable(id);
+      if (!event || busy(id)) return;
+      const note = await this.save(null, { ...draftFor(event), guests: [] });
+      if (note) tell(note, null);
     },
     /** Deletes an event, or its whole series (after the panel asked); its Undo brings it back (job 217). */
     async remove(id: string, choice: Choice = {}): Promise<string | null> {
@@ -582,6 +603,7 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return null;
       }
       // All of a series waits for Google (the card shows its answer), as before.
+      const started = tick();
       let deleted: boolean;
       try {
         deleted = await api.remove(series, notify);
@@ -589,8 +611,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
         return SAVE_FAILED;
       }
       set({ events: state.events?.filter((e) => e.id !== id && e.series !== series) ?? null });
-      const step = remember();
-      step.settle(deleted ? { undo: () => api.restore(series), redo: () => api.remove(series, false), ids: [id] } : null);
+      const step = remember(started);
+      step.settle(deleted ? { undo: () => api.restore(series), redo: () => api.remove(series, false), ids: [id], series } : null);
       tell('Event deleted', step.step ? step : null);
       if (!deleted) await load();
       return null;

@@ -1731,6 +1731,60 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
     expect(sent(api, from)).toEqual([]);
   });
 
+  // From the high-level code review.
+  it('Ctrl+Z before Google has answered an add: no “Event added · Undo” after it, so a refused undo still says so', async () => {
+    const { api, cal } = await opened();
+    const google = hold(api, 'create');
+    await cal.save(null, swim);
+    const undoing = cal.undoLast();
+    google.answer();
+    api.fail = true;
+    await undoing;
+    expect(cal.get().done).toMatchObject({ text: UNDO_FAILED, undo: null });
+  });
+
+  it('an “All events” save is numbered when it starts, so a board change made while Google answers counts as newer', async () => {
+    const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
+    const { api, cal } = await opened([moved]);
+    api.series = { title: 'Stand-up' };
+    const google = hold(api, 'update');
+    const saving = cal.save(at(cal, 'su_1016'), { ...swim, title: 'Daily sync', startDate: '2026-10-16', endDate: '2026-10-16', startTime: '10:30', endTime: '10:45' }, { all: true });
+    await Promise.resolve();
+    const board = tick();
+    while (google.waiting) {
+      google.answer();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    await saving;
+    expect(cal.marks().undo).toBeLessThan(board);
+  });
+
+  it('while a series undo is on its way, an “All events” change to that series is refused', async () => {
+    const { api, cal } = await opened([ev('su_1016', { series: 'su' }), ev('su_1017', { series: 'su', start: '2026-10-07T10:00', end: '2026-10-07T11:00' })]);
+    await cal.remove('su_1016', { all: true });
+    await cal.undoLast();
+    const google = hold(api, 'remove');
+    const redoing = cal.redo();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await cal.remove('su_1017', { all: true })).toBe(SAVE_FAILED);
+    google.answer();
+    await redoing;
+  });
+
+  it('Ctrl+D’s copy: the event again at the same time, without its guests, and refused copies say so', async () => {
+    const { api, cal } = await opened([ev('a', { guests: [{ email: 'pat@example.com' }] })]);
+    await cal.copy('a');
+    await cal.settled();
+    expect(api.calls.filter((c) => c.startsWith('create'))).toHaveLength(1);
+    expect(api.bodies.at(-1)).toMatchObject({ summary: 'a', start: { dateTime: '2026-10-06T10:00:00', timeZone: zone } });
+    expect(api.bodies.at(-1)?.attendees ?? []).toEqual([]);
+    expect(cal.get().done?.text).toBe('Event added');
+    api.fail = true;
+    await cal.copy('a');
+    await cal.settled();
+    expect(cal.get().done?.text).toBe(SAVE_FAILED);
+  });
+
   it('each step, undo and redo takes a newer number on the counter shared with the board', async () => {
     const { cal } = await opened();
     expect(cal.marks()).toEqual({ undo: 0, redo: 0 });

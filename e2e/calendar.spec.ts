@@ -2365,6 +2365,21 @@ test.describe('calendar keys', () => {
     expect(errors).toEqual([]);
   });
 
+  test('N, T and the arrows wait while an event card’s question is open', async ({ page }) => {
+    const errors = await openAs(page);
+    await button(page).click();
+    const first = await range(page).textContent();
+    await day(page, new Date()).getByRole('button', { name: /Team stand-up/ }).click();
+    await page.keyboard.press('Delete');
+    const question = card(page).getByRole('alertdialog');
+    await expect(question).toBeVisible();
+    for (const k of ['n', 't', 'ArrowRight']) await page.keyboard.press(k);
+    await expect(question).toBeVisible();
+    await expect(form(page)).toHaveCount(0);
+    await expect(range(page)).toHaveText(first!);
+    expect(errors).toEqual([]);
+  });
+
   test('E and Enter edit the event whose card is open; Ctrl+D copies it at the same time', async ({ page }) => {
     const errors = await openAs(page);
     const sent = changesSent(page);

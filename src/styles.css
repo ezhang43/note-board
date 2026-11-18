@@ -1267,6 +1267,8 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   display: flex;
   align-items: center;
   gap: 4px;
+  /* As wide as its words (else, centred from the middle, a phone gives it only half the screen and cuts them short). */
+  width: max-content;
   max-width: calc(100vw - 32px);
   padding: 4px 4px 4px 16px;
   background: var(--ink);
@@ -1281,6 +1283,8 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .undo-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .app.phone .undo-toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .app.phone .undo-toast button { height: 44px; }
+/* On a phone the words wrap onto a second line rather than end in "…": the screen is too narrow for the longer messages (and fonts differ by phone). */
+.app.phone .undo-toast span { white-space: normal; }
 
 /* ---------- layout and resizing (step 3) ---------- */
 

@@ -13,6 +13,8 @@ import { itemOf, removeItemByKey } from './itemDom';
 import { focusedBox } from './textBox';
 import { cursorLost, forgetLostCursor, leaveField, watchLostCursor } from './lostCursor';
 import { isTextField, panelCovers } from './textField';
+import { calendar } from '../store/calendar';
+import { calendarFirst } from '../store/undoClock';
 
 /** Where keys never act on the board behind (C-M1): panels, popover menus and the Undo message. */
 const NOT_THE_BOARD = '.side-panel, .history-panel, .checklist-panel, .format-bar, .share-panel, .file-menu, .boards-menu, .toolbar-more, .colour-menu, .phone-sheet, .undo-toast';
@@ -72,6 +74,13 @@ export function useShortcuts() {
       const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
       if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
       if (inJournal && mod && key === 'y') return run(e, redo);
+      // With the Google Calendar panel open they also step this session's event changes, whichever of those and the
+      // board's is newer (owner request 2026-11-17). In the event form the browser undoes the typing; its buttons do nothing.
+      if (panel === 'calendar' && mod && (key === 'z' || key === 'y')) {
+        if (e.target instanceof Element && e.target.closest('.cal-form')) return isTextField(e.target) ? undefined : run(e, () => {});
+        const which = key === 'z' && !e.shiftKey ? 'undo' : 'redo';
+        if (calendarFirst(which, appStore.undoMarks(), calendar.marks())) return run(e, which === 'undo' ? calendar.undoLast : calendar.redo);
+      }
       if (mod && key === 'z' && !e.shiftKey) return run(e, appStore.undo);
       if (mod && key === 'y') return run(e, appStore.redo);
       if (mod && key === 'z' && e.shiftKey) return run(e, () => {}); // does nothing, on purpose

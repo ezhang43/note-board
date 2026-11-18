@@ -8,6 +8,7 @@ import { savedByNewer, viewOnly } from '../model/sharing';
 import { recordPushes, type Pushes } from '../model/placement';
 import { blockOf, createBoard, layoutSnapshot, type LayoutSnapshot } from '../model/board';
 import { caretAfterStep, cursorAfterStep, type TypingAt } from '../model/undoCursor';
+import { tick, type BoardMarks } from './undoClock';
 import { dropEmptyFolds } from '../model/checklist';
 import { FONT_KEY, startingFontSize } from '../model/font';
 import { THEME_KEY, startingTheme } from '../model/theme';
@@ -244,6 +245,23 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let history: History = emptyHistory;
   /** Undo history of each board that isn't open (undo belongs to each board). */
   const histories = new Map<string, History>();
+  // On the counter shared with the calendar's undo (undoClock.ts): when each undo step was made (or redone) and each redo
+  // step undone, keyed by its board, kept beside the history (never in the board, which is saved), and the last new change.
+  const madeAt = new WeakMap<Board, number>();
+  const undoneAt = new WeakMap<Board, number>();
+  let changedAt = 0;
+  /** recordChange, marking the step (a burst of typing joined to the last step marks it newer). */
+  function record(h: History, before: Board, merge: string | null): History {
+    const next = recordChange(h, before, merge, Date.now());
+    changedAt = tick();
+    madeAt.set(next.past[next.past.length - 1], changedAt);
+    return next;
+  }
+  /** Marks the step an undo or redo just moved. */
+  function marked(which: 'undo' | 'redo', h: History) {
+    if (which === 'undo') undoneAt.set(h.future[h.future.length - 1], tick());
+    else madeAt.set(h.past[h.past.length - 1], tick());
+  }
   let wsCache: { board: Board; boards: Boards; ws: Workspace } | null = null;
   function workspace(): Workspace {
     if (!wsCache || wsCache.board !== state.board || wsCache.boards !== state.boards) {
@@ -320,7 +338,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       return refuse({ ...opts.ui, ...ui });
     }
     if (board !== before) {
-      history = recordChange(history, before, opts.merge ?? null, Date.now());
+      history = record(history, before, opts.merge ?? null);
       edits++;
     }
     set({ ...state, board, ui: uiWith({ ...opts.ui, ...ui }) });
@@ -554,6 +572,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (state.ui.preview || locked()) return;
     const before = state.board;
     const step = (which === 'undo' ? undoStep : redoStep)(history, before);
+    if (step) marked(which, step.history);
     if (step && step.board !== before) edits++; // counted before it shows, for version history
     const to = step && step.board !== before && typing?.itemId ? cursorAfterStep(before, step.board, typing) : undefined;
     // No item of that list is drawn now (it was collapsed, or the card is gone): nothing stays selected, so Backspace on the page deletes nothing.
@@ -570,7 +589,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     const changed = fn(before);
     if (changed === before) return;
     const board = dropEmptyFolds(before, changed); // as in commit
-    histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, merge ?? null, Date.now()));
+    histories.set(id, record(histories.get(id) ?? emptyHistory, before, merge ?? null));
     edits++;
     set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });
   }
@@ -582,6 +601,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (!before || !h || state.ui.preview || locked(id)) return;
     const step = (which === 'undo' ? undoStep : redoStep)(h, before);
     if (!step) return;
+    marked(which, step.history);
     histories.set(id, step.history);
     if (step.board === before) return;
     edits++;
@@ -630,7 +650,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       return refuse({ ...opts.ui, ...ui });
     }
     if (board !== before) {
-      histories.set(id, recordChange(histories.get(id) ?? emptyHistory, before, opts.merge ?? null, Date.now()));
+      histories.set(id, record(histories.get(id) ?? emptyHistory, before, opts.merge ?? null));
       edits++;
     }
     const others = board === before ? state.boards.others : { ...state.boards.others, [id]: board };
@@ -753,6 +773,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     },
     undo: () => stepOpen('undo'),
     redo: () => stepOpen('redo'),
+    /** The open board's newest undo and redo steps and the last new change on any board, on the counter shared with the calendar (0: none). */
+    undoMarks: (): BoardMarks => ({
+      undo: (history.past.length && madeAt.get(history.past[history.past.length - 1])) || 0,
+      redo: (history.future.length && undoneAt.get(history.future[history.future.length - 1])) || 0,
+      changed: changedAt,
+    }),
     undoToast,
     /** Whether the open board is shared with this person to view or comment on only (job 161). */
     viewOnly: () => locked(),

@@ -11,7 +11,8 @@ const UNDO_TOAST_MS = 6000;
  * Ctrl+Z; the message goes when anything else changes (the store stops offering it), after 6 seconds,
  * or on Undo. It is said aloud by the page's live region (the store announces it).
  * The Google Calendar panel's "Event added / saved / deleted · Undo" (job 217) is the same message,
- * one at a time: whichever came last shows.
+ * one at a time: whichever came last shows. A Ctrl+Z or Ctrl+Y on an event that didn't get through says so with
+ * Try again instead, which tries that same undo or redo again (owner decision 2026-11-17).
  */
 export function UndoToast() {
   const toast = useAppState(() => appStore.undoToast());
@@ -37,18 +38,20 @@ export function UndoToast() {
         }}
       />
     );
+  const run = done && (done.undo ? calendar.undo : done.retry ? calendar.retry : null);
   return (
     done && (
       <Pill
         key={`cal${done.n}`}
         text={done.text}
+        label={done.undo ? 'Undo' : 'Try again'}
         onDismiss={calendar.dismissDone}
         onUndo={
-          done.undo &&
+          run &&
           ((kept) => {
             // The keyboard goes to the side panel (the calendar, where the change shows) as the button goes.
             if (kept) document.querySelector<HTMLElement>('.side-panel')?.focus({ preventScroll: true });
-            void calendar.undo();
+            void run();
           })
         }
       />
@@ -56,7 +59,7 @@ export function UndoToast() {
   );
 }
 
-function Pill({ text, onUndo, onDismiss }: { text: string; onUndo: ((kept: boolean) => void) | null; onDismiss: () => void }) {
+function Pill({ text, label = 'Undo', onUndo, onDismiss }: { text: string; label?: string; onUndo: ((kept: boolean) => void) | null; onDismiss: () => void }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const held = hovered || focused;
@@ -70,7 +73,7 @@ function Pill({ text, onUndo, onDismiss }: { text: string; onUndo: ((kept: boole
       <span>{text}</span>
       {onUndo && (
         <button type="button" onClick={(e) => onUndo(document.activeElement === e.currentTarget)} {...keepsBlockCursor}>
-          Undo
+          {label}
         </button>
       )}
     </div>

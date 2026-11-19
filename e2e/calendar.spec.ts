@@ -2810,3 +2810,14 @@ test('the ‹ and › buttons sit together, left of the range heading, in Week a
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
   await expect(heading).toHaveText('15–21 Nov 2026');
 });
+
+test('the panel keeps room for a scrollbar, so stepping through weeks does not shift it', async ({ page }) => {
+  await openAs(page);
+  await button(page).click();
+  // Overlay scrollbars (headless) can't show the shift, so check the style that prevents it.
+  await expect(panel(page)).toHaveCSS('scrollbar-gutter', 'stable');
+  const before = (await panel(page).locator('.cal-range').boundingBox())!;
+  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  const after = (await panel(page).locator('.cal-range').boundingBox())!;
+  expect(after.x).toBe(before.x);
+});

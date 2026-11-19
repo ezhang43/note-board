@@ -129,3 +129,41 @@ test('the Calendar (Week), the Journal and Habits all open the same width when n
   await open(page, habits);
   await expect.poll(() => width(page, habits)).toBe(420);
 });
+
+// Owner request 2026-11-19: the Journal's edge and the Checklist's edge are controlled separately. Dragging one
+// never changes the other panel's width on screen; the right panel stops where 300px of board would be left.
+test('the Journal strip and the Checklist strip each move only their own panel', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const journal = PANELS[3];
+  const checklist = page.getByRole('complementary', { name: 'Checklist', exact: true });
+  const checklistStrip = page.getByRole('separator', { name: 'Resize checklist' });
+  await dock(page).getByRole('button', { name: 'Checklist', exact: true }).click();
+  await open(page, journal);
+  await expect(checklistStrip).toBeVisible();
+  const stripX = async () => (await checklistStrip.boundingBox())!.x;
+  const before = await stripX();
+  // Pull the Journal's strip far to the left: the Checklist stays put, the Journal stops with 300px of board left.
+  await dragTo(page, journal, before - 500);
+  await expect.poll(() => width(page, journal)).toBe(1600 - 300 - (await checklist.boundingBox())!.width);
+  expect(await stripX()).toBe(before);
+  expect((await checklist.boundingBox())!.width).toBe(420);
+  // The Checklist's strip still moves (narrower), and the Journal does not change.
+  const journalWidth = await width(page, journal);
+  const h = (await checklistStrip.boundingBox())!;
+  await page.mouse.move(h.x + h.width / 2, h.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(350, h.y + 200, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => (await checklist.boundingBox())!.width).toBe(350);
+  expect(await width(page, journal)).toBe(journalWidth);
+  // The other way: the Checklist's strip is limited by the Journal's shown width and leaves the Journal alone.
+  await dragTo(page, journal, 1600 - 500);
+  await expect.poll(() => width(page, journal)).toBe(500);
+  const h2 = (await checklistStrip.boundingBox())!;
+  await page.mouse.move(h2.x + h2.width / 2, h2.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(1500, h2.y + 200, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => (await checklist.boundingBox())!.width).toBe(1600 - 300 - 500);
+  expect(await width(page, journal)).toBe(500);
+});

@@ -471,6 +471,50 @@ test('with the Main checklist board open, an old version of it leaves the panel 
   expect(await texts(panel(page))).toEqual(['zebra now']);
 });
 
+// Header (owner request, 2026-11-19): "Clean up" is as big as the title, and the done count sits level with it, whatever
+// the font's own proportions (the app's font is the first one; the others stand in for fonts with other metrics).
+for (const font of ["'IBM Plex Sans', sans-serif", 'Inter, sans-serif', "'DejaVu Sans', sans-serif", 'Carlito, sans-serif']) {
+  test(`in the panel header Clean up is as big as the title and the done count sits level with it (${font.split(',')[0]})`, async ({ page }) => {
+    await openWith(page, ['one', 'two']);
+    await panel(page).getByRole('checkbox').first().check();
+    await page.evaluate((f) => document.documentElement.style.setProperty('--font', f), font);
+    await fontsLoaded(page);
+    const head = panel(page).locator('.history-head');
+    await expect(head.locator('.checklist-count')).toHaveText('1/2');
+    await expect(head.getByRole('button', { name: 'Clean up' })).toBeVisible();
+    const r = await head.evaluate((h) => {
+      h.style.fontSize = '20px'; // an inherited size would follow this; Clean up's own 16px does not
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      // Baseline (found with a zero-size inline probe that sits on it) and the middle of the given glyphs above it,
+      // from the font: the way the list count on a card is checked (checklist-done-count.spec.ts).
+      const middle = (el: Element, glyphs: string) => {
+        const cs = getComputedStyle(el);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} 1000px ${cs.fontFamily}`;
+        const ascent = (ctx.measureText(glyphs).actualBoundingBoxAscent * parseFloat(cs.fontSize)) / 1000;
+        const probe = document.createElement('span');
+        probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+        el.appendChild(probe);
+        const baseline = probe.getBoundingClientRect().bottom;
+        probe.remove();
+        return baseline - ascent / 2;
+      };
+      const title = h.querySelector('h2')!;
+      return {
+        digits: middle(h.querySelector('.checklist-count')!, '0123456789') - middle(title, 'H'),
+        cleanUp: getComputedStyle(h.querySelector('.list-clean-up')!).fontSize,
+        cleanUpWeight: getComputedStyle(h.querySelector('.list-clean-up')!).fontWeight,
+        cleanUpColor: getComputedStyle(h.querySelector('.list-clean-up')!).color,
+        titleColor: getComputedStyle(h.querySelector('h2')!).color,
+        title: getComputedStyle(title).fontSize,
+      };
+    });
+    expect(r.cleanUp).toBe(r.title);
+    expect(r.cleanUpWeight).toBe('600');
+    expect(r.cleanUpColor).toBe(r.titleColor);
+    expect(Math.abs(r.digits), `the digits' middle is ${r.digits.toFixed(2)}px off the title's cap-height middle`).toBeLessThanOrEqual(0.75);
+  });
+}
+
 test.describe('on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 

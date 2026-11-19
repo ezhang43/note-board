@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import './appFonts';
 import { Canvas } from './components/Canvas';
 import { CommentThread } from './components/Comments';
@@ -33,7 +33,7 @@ import { JournalPanel } from './components/JournalPanel';
 import { HabitsPanel } from './components/HabitsPanel';
 import { CalendarPanel } from './components/CalendarPanel';
 import { PanelResizeHandle } from './components/PanelResizeHandle';
-import { PANEL_MIN } from './model/calendar';
+import { clampPanelWidth, PANEL_MIN } from './model/calendar';
 import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
 import { announce } from './store/announce';
@@ -96,6 +96,18 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
     .filter(Boolean)
     .join(' ');
   const room = resize ? `max(${PANEL_MIN}px, 100vw - ${PANEL_MIN}px - var(--side-width))` : `100vw - ${PANEL_MIN}px`;
+  // Each panel's strip moves only its own panel (owner request, 2026-11-19). The right panel's strip stops where
+  // 300px of board would be left beside the open Checklist; only a window too narrow for both lets the Checklist
+  // give way (the CSS above). `leftBeside` is the Checklist's width as shown, held back from the right panel.
+  const [win, setWin] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWin(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const rightShown = resize ? clampPanelWidth(resize.width, win) : 0;
+  const leftShown = Math.min(clampPanelWidth(others.checklist, win), Math.max(PANEL_MIN, win - PANEL_MIN - rightShown));
+  const leftBeside = checklistOpen && !phone ? Math.max(0, Math.min(leftShown, win - PANEL_MIN - rightShown)) : 0;
   const style = {
     ...(resize && { '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` }),
     ...(checklistOpen && !phone && { '--left-width': `clamp(${PANEL_MIN}px, ${others.checklist}px, ${room})` }),
@@ -133,7 +145,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
           <HabitsPanel />
         </SidePanel>
       )}
-      {resize && <PanelResizeHandle name={resize.name} width={resize.width} onSet={resize.set} onReset={resize.reset} />}
+      {resize && <PanelResizeHandle name={resize.name} width={resize.width} beside={leftBeside} onSet={resize.set} onReset={resize.reset} />}
       {checklistOpen && <ChecklistPanel />}
       {checklistOpen && !phone && (
         <PanelResizeHandle

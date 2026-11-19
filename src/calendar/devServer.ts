@@ -12,7 +12,7 @@ import { dayKey as dateKey } from '../model/calendar';
 // Visualizer (owner, 2026-11-13): "Kayaking lesson" 3 days ago (passed) and "Pottery workshop" 2 days ago,
 // deleted after it started (status cancelled, with an `updated` deletion time after its start).
 // Each change sets `updated` (Google's last-modification time); showDeleted also returns cancelled events.
-// Only what the panel uses: list (timeMin / timeMax, showDeleted), get, add, change and delete on calendars/primary,
+// Only what the panel uses: list (timeMin / timeMax, showDeleted, q for search), get, add, change and delete on calendars/primary,
 // for one event of a series or the whole series (its id), with guests and sendUpdates (job #85).
 // Moving a series' time gives its events new ids, as Google can (job #88), made from that time, so
 // moving it back gives the old ids back. Like Google, a deleted event is kept as cancelled and can be
@@ -167,7 +167,14 @@ export function devCalendarPlugin(): Plugin {
             // but the dev server keeps it simple: a deleted series just hides its instances).
             const withDeleted = url.searchParams.get('showDeleted') === 'true';
             const shown = (e: Event) => (withDeleted ? e.status === 'cancelled' || !gone(e) : !gone(e));
-            const items = events.filter((e) => !e.recurrence && shown(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
+            // q (search, owner request 2026-11-19): like Google, the text must be in the name, description, place or a guest's email or name.
+            const q = url.searchParams.get('q')?.toLowerCase();
+            const found = (e: Event) =>
+              !q ||
+              [e.summary, e.description, e.location, ...((e.attendees as { email?: string; displayName?: string }[] | undefined) ?? []).flatMap((a) => [a.email, a.displayName])].some(
+                (t) => typeof t === 'string' && t.toLowerCase().includes(q),
+              );
+            const items = events.filter((e) => !e.recurrence && shown(e) && found(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
             return send(200, { kind: 'calendar#events', items });
           }
           if (req.method === 'POST' && !id) {

@@ -3393,6 +3393,13 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal .tb-button { height: 32px; font-size: 13px; }
 .cal .tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 .cal-views { display: flex; gap: 4px; }
+.cal-tools { display: flex; align-items: center; gap: 4px; }
+/* The search box (owner request, 2026-11-19): no focus rectangle on the text field (rule 6); the box's edge shows it instead. */
+.cal-search { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; height: 36px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--surface); color: var(--ink-soft); }
+.cal-search:focus-within { border-color: var(--accent); }
+.cal-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
+.cal-search input::-webkit-search-cancel-button { display: none; }
+.cal-results { display: flex; flex-direction: column; gap: 8px; }
 .cal-range { flex: 1; margin: 0; text-align: left; font-size: 14px; font-weight: 600; }
 .cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .cal-note .history-note { margin: 4px; }

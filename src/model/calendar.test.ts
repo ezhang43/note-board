@@ -38,6 +38,8 @@ import {
   parseEvent,
   rangeLabel,
   safeLink,
+  searchDayLabel,
+  searchGroups,
   savedEvent,
   seriesDraft,
   timeLabel,
@@ -818,5 +820,47 @@ describe('a change shown before Google answers (owner request 2026-11-17)', () =
       timeZone: null,
       moved: false,
     });
+  });
+});
+
+describe('search results (owner request, 2026-11-19)', () => {
+  const at = (id: string, start: string, over: Partial<CalEvent> = {}) => timed({ id, title: id, start, end: start, ...over });
+  const today = '2026-10-10';
+
+  it('puts upcoming days first, soonest at the top, then past days, most recent first', () => {
+    const events = [
+      at('old', '2026-01-05T09:00'),
+      at('later', '2026-12-01T09:00'),
+      at('last-week', '2026-10-03T09:00'),
+      at('soon', '2026-10-12T09:00'),
+    ];
+    expect(searchGroups(events, today).map((g) => g.day)).toEqual(['2026-10-12', '2026-12-01', '2026-10-03', '2026-01-05']);
+  });
+
+  it('counts today as upcoming, even for an event that has already started', () => {
+    const groups = searchGroups([at('yesterday', '2026-10-09T09:00'), at('now', '2026-10-10T08:00')], today);
+    expect(groups.map((g) => g.day)).toEqual(['2026-10-10', '2026-10-09']);
+  });
+
+  it('groups a day’s events, all-day first, then by time, in every group', () => {
+    const events = [at('b', '2026-10-03T15:00'), at('a', '2026-10-03T08:00'), at('hol', '2026-10-03', { allDay: true, end: '2026-10-04' })];
+    const [group] = searchGroups(events, today);
+    expect(group.events.map((e) => e.id)).toEqual(['hol', 'a', 'b']);
+  });
+
+  it('groups a many-day event under the day it starts, and lists an event once', () => {
+    const trip = at('trip', '2026-10-20', { allDay: true, end: '2026-10-25' });
+    const groups = searchGroups([trip, trip], today);
+    expect(groups).toEqual([{ day: '2026-10-20', events: [trip] }]);
+  });
+
+  it('gives no groups for no events', () => {
+    expect(searchGroups([], today)).toEqual([]);
+  });
+
+  it('adds the year to a heading only when it is not this year', () => {
+    expect(searchDayLabel('2026-10-12', today)).toBe('Mon 12 Oct');
+    expect(searchDayLabel('2025-10-12', today)).toBe('Sun 12 Oct 2025');
+    expect(searchDayLabel('2027-01-04', today)).toBe('Mon 4 Jan 2027');
   });
 });

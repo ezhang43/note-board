@@ -17,6 +17,8 @@ import {
   moveDraftStartTime,
   newDraft,
   rangeLabel,
+  searchDayLabel,
+  searchGroups,
   sundayStart,
   startTimeOptions,
   timeLabel,
@@ -28,8 +30,8 @@ import {
 } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { cardPosition, whenLabel } from '../model/eventCard';
-import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type Choice } from '../store/calendar';
-import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, TrashIcon } from './icons';
+import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type CalendarState, type Choice } from '../store/calendar';
+import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from './icons';
 import { isTextField, panelCovers } from './textField';
 import { keyboardCover } from './ItemBar';
 import { usePhone } from './usePhone';
@@ -122,16 +124,42 @@ export function CalendarPanel() {
     });
   };
   // N, T, ← and → (owner request 2026-11-17); N closes an open card, as a click on a + would.
-  useCalendarKeys(editing !== null || moving !== null, (day, opener) => {
+  const showSearch = () => {
     setOpen(null);
-    add(day, opener);
+    calendar.openSearch();
+    // The keyboard goes into the box once it is drawn (a box already open is focused again).
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('.cal-search input')?.focus());
+  };
+  useCalendarKeys(
+    editing !== null || moving !== null,
+    (day, opener) => {
+      setOpen(null);
+      add(day, opener);
+    },
+    showSearch,
+  );
+  // A result clicked in the search: its day is shown, then its card opens on the event there (waits while that day's events load).
+  const [goTo, setGoTo] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (goTo === null || s.search || s.loading) return;
+    const event = s.events?.find((e) => e.id === goTo);
+    const opener = event && document.querySelector<HTMLElement>(`.side-panel [data-event="${CSS.escape(goTo)}"]`);
+    if (event && opener) setOpen({ event, opener });
+    setGoTo(null);
   });
+  const found = (event: CalEvent) => {
+    calendar.closeSearch();
+    setOpen(null);
+    setGoTo(event.id);
+    void calendar.pickDay(event.start.slice(0, 10));
+  };
   const dayList = (day: DayKey, columns = false) => (
     <DayEvents key={day} day={day} today={day === today} columns={columns} events={s.events ?? []} reveal={reveal} onPick={pick} onDrag={drag} onAdd={(opener) => add(day, opener)} />
   );
 
   return (
     <div className="cal">
+      {s.search && <SearchBox search={s.search} />}
       <div className="cal-bar">
         <div className="cal-views" role="group" aria-label="Show">
           <button type="button" className="tb-button" aria-pressed={s.view === 'week'} onClick={() => void calendar.setView('week')}>
@@ -141,9 +169,14 @@ export function CalendarPanel() {
             Month
           </button>
         </div>
-        <button type="button" className="tb-button" onClick={() => void calendar.goToday()}>
-          Today
-        </button>
+        <div className="cal-tools">
+          <button type="button" className="icon-button" aria-label="Search events" title="Search events" aria-pressed={s.search !== null} onClick={showSearch}>
+            <SearchIcon />
+          </button>
+          <button type="button" className="tb-button" onClick={() => void calendar.goToday()}>
+            Today
+          </button>
+        </div>
       </div>
       <div className="cal-bar">
         <span className="habit-steps">
@@ -159,19 +192,16 @@ export function CalendarPanel() {
         </h3>
       </div>
 
-      {s.note ? (
-        <div className="cal-note" role="status">
-          <p className="history-note">{s.note}</p>
-          {/* Straight from the click, so Google's window isn't blocked. */}
-          <button type="button" className={`tb-button${s.needsAccess ? ' cal-connect' : ''}`} onClick={() => void calendar.load()}>
-            {s.needsAccess ? 'Connect Google Calendar' : 'Try again'}
-          </button>
-        </div>
+      {s.search?.text.trim() ? (
+        <SearchResults search={s.search} today={today} onPick={found} />
+      ) : s.note ? (
+        <Note note={s.note} needsAccess={s.needsAccess} retry={() => void calendar.load()} />
       ) : (
         s.events === null && <p className="history-note">Loading…</p>
       )}
 
-      {s.events !== null &&
+      {!s.search?.text.trim() &&
+        s.events !== null &&
         (s.view === 'week' ? (
           weekDays(sundayStart(s.day)).map((d) => dayList(d, true))
         ) : (
@@ -192,6 +222,70 @@ export function CalendarPanel() {
       )}
       {editing && <EventForm event={editing.event} start={editing.draft} opener={editing.opener} onClose={() => setEditing(null)} />}
       {moving && <MoveAsk key={moving.event.id} {...moving} onClose={() => setMoving(null)} />}
+    </div>
+  );
+}
+
+/** Why Google couldn't be reached, and the button to try again (or to Connect); straight from the click, so Google's window isn't blocked. */
+function Note({ note, needsAccess, retry }: { note: string; needsAccess: boolean; retry: () => void }) {
+  return (
+    <div className="cal-note" role="status">
+      <p className="history-note">{note}</p>
+      <button type="button" className={`tb-button${needsAccess ? ' cal-connect' : ''}`} onClick={retry}>
+        {needsAccess ? 'Connect Google Calendar' : 'Try again'}
+      </button>
+    </div>
+  );
+}
+
+/** The search box at the top of the panel (owner request, 2026-11-19). Escape or × closes it, whichever of its parts has the keyboard. */
+function SearchBox({ search }: { search: NonNullable<CalendarState['search']> }) {
+  const close = () => {
+    calendar.closeSearch();
+    // The keyboard stays in the panel, so its keys still work.
+    document.querySelector<HTMLElement>('.cal-tools button')?.focus();
+  };
+  return (
+    <div
+      className="cal-search"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+      }}
+    >
+      <SearchIcon />
+      <input type="search" aria-label="Search events" placeholder="Search events" autoComplete="off" value={search.text} onChange={(e) => calendar.setSearchText(e.target.value)} />
+      <button type="button" className="icon-button" aria-label="Close search" title="Close search (Esc)" onClick={close}>
+        <CloseIcon />
+      </button>
+    </div>
+  );
+}
+
+/** What the search found for the text typed: dates with their events, upcoming first, then earlier days, most recent first. */
+function SearchResults({ search, today, onPick }: { search: NonNullable<CalendarState['search']>; today: DayKey; onPick: (e: CalEvent) => void }) {
+  if (search.note) return <Note note={search.note} needsAccess={search.needsAccess} retry={() => void calendar.searchNow()} />;
+  if (search.results === null) return <p className="history-note" role="status">Searching…</p>;
+  if (search.results.length === 0) return <p className="history-note" role="status">No events found</p>;
+  return (
+    <div className="cal-results">
+      {searchGroups(search.results, today).map(({ day, events }) => (
+        <section key={day} data-day={day} className={`cal-day${day === today ? ' today' : ''}`} aria-label={searchDayLabel(day, today)}>
+          <h3>
+            {searchDayLabel(day, today)}
+            {day === today && <span className="cal-today">· Today</span>}
+          </h3>
+          {events.map((e) => (
+            <button key={e.id} type="button" className={`cal-event${e.editable ? '' : ' read-only'}`} aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`} onClick={() => onPick(e)}>
+              <span className="cal-time">{timeLabel(e)}</span>
+              <span className="cal-title">{e.title}</span>
+              {!e.editable && <ExternalIcon />}
+            </button>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

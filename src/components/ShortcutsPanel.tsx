@@ -88,6 +88,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
       ['Ctrl+Z / Ctrl+Y', 'Undo / redo this session’s event changes, while the panel is open (the newer of those and the board’s changes goes first)'],
       ['N', 'New event on the day looked at, 12 to 1pm'],
       ['T', 'Go to today'],
+      ['/', 'Search the calendar (Ctrl+F is still the board’s Find)'],
       ['← / →', 'The week or month before / after'],
       ['E or Enter', 'Edit the event whose card is open'],
       ['Ctrl+D', 'Copy the event whose card is open, at the same time (without its guests)'],

@@ -232,6 +232,35 @@ export function eventsOnDay(events: CalEvent[], key: DayKey): CalEvent[] {
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
 }
 
+/** One day of search results: the events that start on it. */
+export interface SearchGroup {
+  day: DayKey;
+  events: CalEvent[];
+}
+
+/**
+ * Search results (owner request, 2026-11-19) grouped by the day each event starts: today and later first, soonest at the
+ * top, then earlier days, most recent first. Inside a day, all-day first, then by start time. An event Google sent twice is listed once.
+ */
+export function searchGroups(events: CalEvent[], today: DayKey): SearchGroup[] {
+  const byDay = new Map<DayKey, CalEvent[]>();
+  for (const e of new Map(events.map((e) => [e.id, e])).values()) {
+    const day = e.start.slice(0, 10);
+    byDay.set(day, [...(byDay.get(day) ?? []), e]);
+  }
+  const days = [...byDay.keys()].sort();
+  const order = [...days.filter((d) => d >= today), ...days.filter((d) => d < today).reverse()];
+  return order.map((day) => ({
+    day,
+    events: byDay.get(day)!.sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start)),
+  }));
+}
+
+/** A search heading: "Tue 6 Oct", with the year when it is not the year of `today` ("Sun 12 Oct 2025"). */
+export function searchDayLabel(key: DayKey, today: DayKey): string {
+  return key.slice(0, 4) === today.slice(0, 4) ? dayLabel(key) : `${dayLabel(key)} ${key.slice(0, 4)}`;
+}
+
 /** A day in the month grid shows up to `max` lines; when more events than that, the last line says "+n more". */
 export function cellLines(events: CalEvent[], max: number): { shown: CalEvent[]; more: number } {
   if (events.length <= max) return { shown: events, more: 0 };

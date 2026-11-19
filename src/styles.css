@@ -3103,6 +3103,15 @@ button.estimate-chip:active { transform: scale(0.97); }
 .app.phone .jt-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .app.phone .jt-size > button, .app.phone .jt-sizes button { min-width: 44px; height: 44px; }
 .app.phone .jt-sizes { width: 64px; max-height: 50vh; left: 48px; }
+/* The same size box in the small format bar (owner request 2026-11-19): flat, so it fits the bar's 28px row, on a phone too; its list stays as in the Journal. */
+.format-bar .jt-size { padding: 0; background: none; }
+.format-bar .jt-size > button { min-width: 0; }
+.app.phone .format-bar .jt-size > button { min-width: 0; height: 28px; }
+.app.phone .format-bar .jt-size > .jt-size-box { width: 44px; }
+.app.phone .format-bar .jt-sizes { left: 30px; }
+@media (hover: hover) {
+  .format-bar .jt-size > button[aria-disabled='true']:hover { background: transparent; }
+}
 .app.phone .jt-mini button, .app.phone .jt-fonts button, .app.phone .jt-hls button:not(.jt-dot) { min-height: 44px; }
 .app.phone .jt-dot { width: 36px; height: 36px; }
 

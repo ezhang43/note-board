@@ -57,16 +57,17 @@ test('⌘+Shift+. / ⌘+Shift+, make the box larger / smaller too, one step at a
   const l = await list(page, 'Groceries', ['milk']);
   const milk = l.getByLabel('Item text').first();
   const size = async () => parseFloat(await css(milk, 'font-size'));
-  const normal = await size();
+  expect(await size()).toBe(14);
+  // One step of the size box's list a press (owner request 2026-11-19): 14 → 16 → 18, then back.
   await page.keyboard.press('Meta+Shift+Period');
-  await expect.poll(size).toBeGreaterThan(normal);
-  const large = await size();
-  await page.keyboard.press('Meta+Shift+Period'); // already the largest: stays
+  await expect.poll(size).toBe(16);
+  await page.keyboard.press('Meta+Shift+Period');
+  await expect.poll(size).toBe(18);
   await page.keyboard.press('Meta+Shift+Comma');
-  await expect.poll(size).toBe(normal);
+  await expect.poll(size).toBe(16);
   await page.keyboard.press('Meta+Shift+Comma');
-  await expect.poll(size).toBeLessThan(normal);
-  expect(large).toBeGreaterThan(normal);
+  await page.keyboard.press('Meta+Shift+Comma');
+  await expect.poll(size).toBe(12);
 });
 
 test('highlighting text shows the bar; it formats the whole box, and the Font menu changes the typeface', async ({ page }) => {
@@ -77,7 +78,7 @@ test('highlighting text shows the bar; it formats the whole box, and the Font me
   await title.selectText();
   await expect(bar(page)).toBeVisible();
   const before = parseFloat(await css(title, 'font-size'));
-  await bar(page).getByRole('button', { name: 'Large' }).click();
+  await bar(page).getByRole('button', { name: 'Larger' }).click();
   await expect.poll(async () => parseFloat(await css(title, 'font-size'))).toBeGreaterThan(before);
   await expect(title).toBeFocused(); // the bar never takes the cursor away
   await bar(page).getByRole('button', { name: 'Font' }).click();

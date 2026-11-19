@@ -11,7 +11,8 @@ export type CardKind = 'note' | 'todo' | 'link';
  * upright, Plex Sans. Only what differs is saved.
  */
 export interface TextStyle {
-  size?: 'small' | 'large';
+  /** A size in px, 10 to 36 (the size box, owner request 2026-11-19); 'small' and 'large' are the words saved before it, still read and drawn as before. */
+  size?: 'small' | 'large' | number;
   bold?: true;
   italic?: true;
   font?: 'serif' | 'rounded' | 'hand' | 'mono';

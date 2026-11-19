@@ -558,7 +558,11 @@ export const sizeEm = (size: RunSize, type: BlockType): number => sizePx(size, t
 
 /** − and +: the next size in the list below or above, stopping at the ends. */
 export function stepSize(size: RunSize | undefined, dir: 1 | -1, type: BlockType = 'p'): number {
-  const px = Math.round(sizePx(size, type)); // from the number the box shows (Small shows 14)
+  return nextSize(Math.round(sizePx(size, type)), dir); // from the number the box shows (Small shows 14)
+}
+
+/** The size box's − and + from a size in px: the next size in the list below or above, stopping at the ends. Also used by the whole-box format bar. */
+export function nextSize(px: number, dir: 1 | -1): number {
   const next = dir > 0 ? SIZE_STEPS.find((s) => s > px) : [...SIZE_STEPS].reverse().find((s) => s < px);
   return next ?? (dir > 0 ? MAX_SIZE : MIN_SIZE);
 }

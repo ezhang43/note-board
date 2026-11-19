@@ -1,8 +1,9 @@
 import { flushSync } from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyEvent } from 'react';
-import { FONTS, styleOf, type Box, type TextFont, type TextSize } from '../model/textStyle';
+import { FONTS, sizesOf, styleOf, type Box, type TextFont } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
 import { appStore, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
+import { SizeBox } from './SizeBox';
 import { boxKey, focusedBox } from './textBox';
 import { isTextField, panelCovers } from './textField';
 
@@ -64,11 +65,6 @@ function refollow(t: Target): Target | null {
 
 const BAR_H = 36;
 const PAUSE = 250; // ms after the highlight settles
-const SIZES: { key: TextSize; label: string; px: number }[] = [
-  { key: 'small', label: 'Small', px: 11 },
-  { key: 'normal', label: 'Normal', px: 14 },
-  { key: 'large', label: 'Large', px: 18 },
-];
 
 export function FormatBar() {
   // Redraw on any board, view or selection change, so the bar follows its text box.
@@ -82,6 +78,7 @@ export function FormatBar() {
   const quiet = useRef({ timer: 0, down: false, waiting: false, sig: '', itemSig: '' });
   const viewOnly = useViewOnly();
   const [fontsOpen, setFontsOpen] = useState(false);
+  const [sizesOpen, setSizesOpen] = useState(false);
   const [hovering, setHovering] = useState(false);
   const fontButton = useRef<HTMLButtonElement>(null);
   const fontMenu = useRef<HTMLDivElement>(null);
@@ -217,6 +214,7 @@ export function FormatBar() {
   useEffect(() => {
     if (!visible) {
       setFontsOpen(false);
+      setSizesOpen(false);
       setHovering(false);
     }
   }, [visible]);
@@ -227,8 +225,9 @@ export function FormatBar() {
   }, [fontsOpen]);
 
   if (!visible) return null; // not yet (or no longer) due; nothing is formatted on a read-only board (job 161)
-  const now = styleOf(storeOfCard(boxCard(target.boxes[0])).getState().board, target.boxes[0]) ?? {};
-  const size: TextSize = now.size ?? 'normal';
+  const shownBoard = storeOfCard(boxCard(target.boxes[0])).getState().board;
+  const now = styleOf(shownBoard, target.boxes[0]) ?? {};
+  const px = sizesOf(shownBoard, target.boxes); // null when the boxes' sizes differ
   const font: TextFont = now.font ?? 'sans';
   // Above the text (below the toolbar); else below it if that fits on screen; the bar never covers the highlighted words.
   const above = target.top - BAR_H - 6;
@@ -237,6 +236,11 @@ export function FormatBar() {
   const top = up ? above : Math.max(72, Math.min(target.bottom + 6, window.innerHeight - BAR_H - 8));
   const style: CSSProperties = { left: Math.max(8, target.left), top };
   const apply = (ask: FormatAsk) => storeOfCard(boxCard(target.boxes[0])).formatBoxes(target.boxes, ask);
+  /** Shut the size list; from the keyboard, the keyboard goes back to the size number, as the Font menu's does to Font. */
+  const closeSizes = () => {
+    if (focusInBar()) document.querySelector<HTMLElement>('.format-bar .jt-size-box')?.focus();
+    setSizesOpen(false);
+  };
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();
   // Keyboard inside the bar: Escape goes back to the text (or closes the open Font menu), Tab goes round, arrows walk along.
@@ -248,6 +252,10 @@ export function FormatBar() {
       if (fontsOpen) {
         setFontsOpen(false);
         fontButton.current?.focus();
+        return;
+      }
+      if (sizesOpen) {
+        closeSizes();
         return;
       }
       const to = back.current;
@@ -268,7 +276,7 @@ export function FormatBar() {
       walk = buttons(fontMenu.current!);
       step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
     } else {
-      walk = walk.filter((b) => !fontMenu.current?.contains(b));
+      walk = walk.filter((b) => !fontMenu.current?.contains(b) && !b.closest('.jt-sizes')); // the bar, not its open lists
       step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     }
     if (!step) return;
@@ -294,22 +302,25 @@ export function FormatBar() {
         I
       </button>
       <span className="fb-divider" />
-      {SIZES.map((s) => (
-        <button
-          key={s.key}
-          type="button"
-          aria-label={s.label}
-          title={`${s.label} text (Ctrl+Shift+. / Ctrl+Shift+,)`}
-          aria-pressed={size === s.key}
-          style={{ fontSize: s.px }}
-          onClick={() => apply({ size: s.key })}
-        >
-          A
-        </button>
-      ))}
+      <SizeBox
+        px={px}
+        open={sizesOpen}
+        onToggle={() => {
+          setFontsOpen(false);
+          setSizesOpen((o) => !o);
+        }}
+        onStep={(dir) => apply({ sizeStep: dir })}
+        onPick={(n) => {
+          apply({ size: n });
+          closeSizes();
+        }}
+      />
       <span className="fb-divider" />
       <div className="fb-font">
-        <button ref={fontButton} type="button" aria-label="Font" title="Font" aria-haspopup="menu" aria-expanded={fontsOpen} style={{ fontFamily: fontVar(font) }} onClick={() => setFontsOpen((o) => !o)}>
+        <button ref={fontButton} type="button" aria-label="Font" title="Font" aria-haspopup="menu" aria-expanded={fontsOpen} style={{ fontFamily: fontVar(font) }} onClick={() => {
+            setSizesOpen(false);
+            setFontsOpen((o) => !o);
+          }}>
           {FONTS.find((f) => f.key === font)!.label} ▾
         </button>
         {fontsOpen && (

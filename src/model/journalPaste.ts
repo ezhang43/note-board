@@ -1,7 +1,7 @@
 import { newId, type MakeId } from './cards';
 import { MAX_DEPTH } from './checklist';
 import { isList, MAX_INDENT, parseRich, plainSize, sizePx, type Block, type Marks, type Rich, type Run } from './richText';
-import { parseStyle } from './textStyle';
+import { parseStyle, TEXT_PX } from './textStyle';
 import type { TextStyle, TodoItem } from './types';
 
 // Pasting between the Journal and checklists (owner request, 2026-11-01). A copy made in the app
@@ -11,9 +11,15 @@ import type { TextStyle, TodoItem } from './types';
 
 /** How many items a paste may bring (the clipboard is untrusted); sub-items go as deep as a checklist does. */
 const MAX_ITEMS = 5000;
-/** A checklist item's Small and Large, as Journal sizes in px: sizes the size box lists (Small one step under the 14px normal text). */
+/**
+ * The old words Small and Large (an item's, or the Journal's), as sizes in px the size box lists: Small one step
+ * under the 14px normal text. A number is the same px on both sides: an item's text and normal Journal text are 14px.
+ */
 const SMALL_PX = 12;
 const LARGE_PX = 20;
+/** Heading 1 as an item: the nearest size to the old Large it used to become (18.2px). */
+const H1_PX = 18;
+const wordPx = (size: 'small' | 'large') => (size === 'small' ? SMALL_PX : LARGE_PX);
 
 // ---- Journal lines <-> checklist items ----
 
@@ -27,14 +33,11 @@ function styleOf(blk: Block): TextStyle | undefined {
     const first = get(runs[0]);
     return first !== undefined && runs.every((r) => get(r) === first) ? first : undefined;
   };
-  const sizeKind = (r: Run) => {
-    const px = sizePx(r.size, blk.type); // the old Small (13.6px) is still Small
-    const plain = plainSize(blk.type);
-    return px < plain ? 'small' : px > plain ? 'large' : 'normal';
-  };
-  const kind = same(sizeKind);
-  // A heading is bold (Heading 1 also large) unless its words have a size of their own.
-  const size = kind && kind !== 'normal' ? kind : kind === 'normal' && blk.type === 'h1' ? 'large' : undefined;
+  // Each run's size in px as the size box shows it, 0 for the line's own size.
+  const runPx = (r: Run) => (r.size === undefined || r.size === plainSize(blk.type) ? 0 : typeof r.size === 'number' ? Math.round(sizePx(r.size, blk.type)) : wordPx(r.size));
+  const px = same(runPx);
+  // A heading is bold (Heading 1 also large) unless its words have a size of their own; 14 is an item's usual size.
+  const size = px === 0 ? (blk.type === 'h1' ? H1_PX : undefined) : px === TEXT_PX ? undefined : px;
   const style: TextStyle = {};
   if (size) style.size = size;
   if (blk.type === 'h1' || blk.type === 'h2' || same((r) => r.b)) style.bold = true;
@@ -75,7 +78,8 @@ export function itemsToRich(items: TodoItem[]): Rich {
       const marks: Marks = {};
       if (it.style?.bold) marks.b = true;
       if (it.style?.italic) marks.i = true;
-      if (it.style?.size) marks.size = it.style.size === 'small' ? SMALL_PX : LARGE_PX;
+      const size = it.style?.size;
+      if (size !== undefined) marks.size = typeof size === 'number' ? size : wordPx(size);
       if (it.style?.font) marks.font = it.style.font;
       const indent = Math.min(depth, MAX_INDENT);
       out.push({ type: 'bullet', ...(indent ? { indent } : {}), runs: it.text ? [{ text: it.text, ...marks }] : [] });

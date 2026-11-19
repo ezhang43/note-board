@@ -3,13 +3,14 @@ import { JOURNAL_KNOWN_KEY, JOURNAL_NOTES, NOTE_NAME_MAX, UNTITLED_NOTE, groupJo
 import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
-import { HIGHLIGHTS, journalRich, MAX_SIZE, MIN_SIZE, SIZE_STEPS, sizePx, type Look, type Toggle } from '../model/richText';
+import { HIGHLIGHTS, journalRich, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
 import { CaretIcon, PlusIcon, TrashIcon } from './icons';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { SidePanel } from './SidePanel';
+import { SizeBox } from './SizeBox';
 
 /** Which year, month and week groups are open: kept on this device only, never in the board's data (owner request, 2026-10-19). */
 const OPEN_KEY = 'note-board:journal-open';
@@ -490,28 +491,16 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div className="jt-row">
                 <span className="jt-label">Size</span>
-                {/* aria-disabled, not disabled, at 10 and 36: a press on a disabled button may not reach the toolbar's keep in every browser, and would take the cursor out of the note. */}
-                <div className="jt-size" role="group" aria-label="Text size">
-                  <button type="button" aria-label="Smaller" title="Smaller" aria-disabled={!mixedSize && px <= MIN_SIZE} onClick={() => (mixedSize || px > MIN_SIZE) && act((h) => h.stepSize(-1))}>
-                    −
-                  </button>
-                  <button type="button" className="jt-size-box" aria-label={mixedSize ? 'Size: mixed' : `Size ${px}`} title="Choose a size" aria-expanded={sizesOpen} onClick={() => setSizesOpen((o) => !o)}>
-                    {mixedSize ? '' : px}
-                  </button>
-                  <button type="button" aria-label="Larger" title="Larger" aria-disabled={!mixedSize && px >= MAX_SIZE} onClick={() => (mixedSize || px < MAX_SIZE) && act((h) => h.stepSize(1))}>
-                    +
-                  </button>
-                  {sizesOpen && (
-                    <div className="jt-sizes" role="group" aria-label="Sizes">
-                      {SIZE_STEPS.map((n) =>
-                        choice(String(n), !mixedSize && px === n, () => {
-                          act((h) => h.setSize(n));
-                          setSizesOpen(false);
-                        }),
-                      )}
-                    </div>
-                  )}
-                </div>
+                <SizeBox
+                  px={mixedSize ? null : px}
+                  open={sizesOpen}
+                  onToggle={() => setSizesOpen((o) => !o)}
+                  onStep={(dir) => act((h) => h.stepSize(dir))}
+                  onPick={(n) => {
+                    act((h) => h.setSize(n));
+                    setSizesOpen(false);
+                  }}
+                />
               </div>
               <div className="jt-row">
                 <span className="jt-label">Font</span>

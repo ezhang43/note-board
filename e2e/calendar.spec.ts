@@ -2593,3 +2593,33 @@ test.describe('calendar keys', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test('the ‹ and › buttons sit together, left of the range heading, in Week and Month', async ({ page }) => {
+  await openAs(page);
+  await button(page).click();
+  const heading = panel(page).locator('.cal-range');
+  for (const view of ['Week', 'Month']) {
+    await panel(page).getByRole('button', { name: view, exact: true }).click();
+    const unit = view.toLowerCase();
+    const prev = (await panel(page).getByRole('button', { name: `Previous ${unit}` }).boundingBox())!;
+    const next = (await panel(page).getByRole('button', { name: `Next ${unit}` }).boundingBox())!;
+    const range = (await heading.boundingBox())!;
+    // Next is directly right of Previous (touching, as the Habits panel's joined pair), same row.
+    expect(Math.abs(next.y - prev.y)).toBeLessThan(2);
+    expect(next.x - (prev.x + prev.width)).toBeLessThan(2);
+    expect(next.x).toBeGreaterThanOrEqual(prev.x + prev.width - 1);
+    // Both are left of the heading.
+    expect(range.x).toBeGreaterThanOrEqual(next.x + next.width);
+  }
+  // Tab order: Previous, then Next.
+  await panel(page).getByRole('button', { name: 'Previous month' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(panel(page).getByRole('button', { name: 'Next month' })).toBeFocused();
+  // Still steps.
+  await panel(page).getByRole('button', { name: 'Week', exact: true }).click();
+  await expect(heading).toHaveText('15–21 Nov 2026');
+  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  await expect(heading).toHaveText('22–28 Nov 2026');
+  await panel(page).getByRole('button', { name: 'Previous week' }).click();
+  await expect(heading).toHaveText('15–21 Nov 2026');
+});

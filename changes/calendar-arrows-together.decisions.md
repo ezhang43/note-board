@@ -1,0 +1,1 @@
+- 2026-11-19 (call, recommended) The Calendar panel's ‹ and › use the Habits panel's joined-pair look (same CSS classes, `habit-steps` and `habit-step`), placed left of the range heading, which is now left-aligned. Why: the owner asked for the two arrows together on the left; reusing the Habits pair keeps both panels matching and avoids a second copy of the style.

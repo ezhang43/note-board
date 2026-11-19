@@ -3390,8 +3390,7 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal .tb-button { height: 32px; font-size: 13px; }
 .cal .tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 .cal-views { display: flex; gap: 4px; }
-.cal-range { flex: 1; margin: 0; text-align: center; font-size: 14px; font-weight: 600; }
-.cal-step { font-size: 20px; line-height: 1; color: var(--ink); }
+.cal-range { flex: 1; margin: 0; text-align: left; font-size: 14px; font-weight: 600; }
 .cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .cal-note .history-note { margin: 4px; }
 .cal-day { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; border-top: 1px solid var(--line); }

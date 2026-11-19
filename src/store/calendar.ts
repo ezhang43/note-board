@@ -282,8 +282,41 @@ interface Taken {
 
 const WIDTH_KEY = 'note-board:calendar-width';
 
-export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null) {
+/** The most ranges kept to show at once (owner request, 2026-11-19): the ones looked at or fetched ahead most recently. */
+export const CACHE_LIMIT = 12;
+
+/** `ahead`: fetch the range before and after the one shown (the tests count calls, so most turn it off). */
+export function createCalendar(realApi: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null, ahead = true) {
   const widthStore = createWidthStore(WIDTH_KEY, PANEL_DEFAULT, storage);
+  // Weeks and months already fetched, in memory only, newest last (owner request, 2026-11-19): shown at once on stepping, then
+  // refreshed. Raw from Google, without the changes in `shownEarly`. `generation` counts the times it was cleared, so an answer
+  // that was asked for before a change or a fresh open is never kept.
+  const cache = new Map<string, CalEvent[]>();
+  const fetching = new Set<string>();
+  let generation = 0;
+  const forget = () => {
+    cache.clear();
+    fetching.clear();
+    generation++;
+  };
+  const keep = (key: string, events: CalEvent[]) => {
+    cache.delete(key);
+    cache.set(key, events);
+    for (const old of cache.keys()) if (cache.size > CACHE_LIMIT) cache.delete(old);
+  };
+  // simple: any change to Google (add, save, delete, undo, redo, restore) forgets every fetched range, before and after Google
+  // answers, instead of working out which ranges it touches; upgrade if stepping right after a change is ever too slow.
+  const changing = <T,>(call: Promise<T>): Promise<T> => {
+    forget();
+    return call.finally(forget);
+  };
+  const api: CalendarApi | null = realApi && {
+    ...realApi,
+    create: (...a) => changing(realApi.create(...a)),
+    update: (...a) => changing(realApi.update(...a)),
+    remove: (...a) => changing(realApi.remove(...a)),
+    restore: (...a) => changing(realApi.restore(...a)),
+  };
   let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null };
   let said = 0;
   const listeners = new Set<() => void>();
@@ -488,18 +521,64 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     flights.set(id, flight);
   }
 
+  const rangeKey = (view: CalView, day: DayKey) => `${view} ${viewRange(view, day).from}`;
+  const withEarly = (events: CalEvent[]) => [...shownEarly.values()].reduce((list, change) => change(list), events);
+  /** The key of the range whose events are on show, to tell a reload from a move to another range. */
+  let shownKey: string | null = null;
+
+  // Fetches the range before and the range after the one shown, quietly, unless already kept or on their way.
+  function fetchAhead(view: CalView, day: DayKey) {
+    for (const step of [-1, 1]) {
+      const near = moveView(view, day, step);
+      const key = rangeKey(view, near);
+      if (!api || !ahead || cache.has(key) || fetching.has(key)) continue;
+      const { from, to } = viewRange(view, near);
+      const at = generation;
+      fetching.add(key);
+      api.list(from, to).then(
+        (events) => void (at === generation && keep(key, events)),
+        () => {}, // quiet: stepping there asks again, and shows why if it fails
+      ).finally(() => fetching.delete(key));
+    }
+  }
+
   async function load() {
     if (!api) return;
     const n = ++asked;
-    const { from, to } = viewRange(state.view, state.day);
-    set({ loading: true, note: null, needsAccess: false });
+    const { view, day } = state;
+    const { from, to } = viewRange(view, day);
+    const key = rangeKey(view, day);
+    const early = cache.get(key);
+    const at = generation;
+    if (early) {
+      // Shown at once; the fresh list replaces it when it arrives. Looked at, so it is kept longest.
+      keep(key, early);
+      shownKey = key;
+      set({ events: withEarly(early), loading: false, note: null, needsAccess: false });
+    } else {
+      // Never another range's events under this heading (a reload of the same range keeps what is shown).
+      if (shownKey !== key) {
+        shownKey = null;
+        set({ events: null });
+      }
+      set({ loading: true, note: null, needsAccess: false });
+    }
     try {
       const events = await api.list(from, to);
-      if (n === asked) set({ events: [...shownEarly.values()].reduce((list, change) => change(list), events), loading: false });
+      if (at === generation) keep(key, events);
+      if (n === asked) {
+        shownKey = key;
+        set({ events: withEarly(events), loading: false });
+        fetchAhead(view, day);
+      }
     } catch (e) {
+      cache.delete(key);
       const needsAccess = e instanceof NoAccess;
       const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
-      if (n === asked) set({ events: null, loading: false, note, needsAccess });
+      if (n === asked) {
+        shownKey = null;
+        set({ events: null, loading: false, note, needsAccess });
+      }
     }
   }
 
@@ -536,6 +615,8 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     /** The panel opened: today's week or month, fetched afresh (whoever is signed in now). */
     open() {
       session++;
+      forget();
+      shownKey = null;
       shownEarly.clear();
       undos = [];
       redos = [];

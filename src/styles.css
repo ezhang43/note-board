@@ -1986,6 +1986,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
   z-index: var(--z-side-panel);
   width: var(--side-width);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 8px 10px 16px;
   background: var(--surface);
   border-left: 1px solid var(--line);

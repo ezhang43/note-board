@@ -44,7 +44,7 @@ const GROUPS: { title: string; keys: Row[] }[] = [
     title: 'Text',
     keys: [
       ['Ctrl+B / Ctrl+I', 'Bold / italic: the whole text box, selected items, or every box in selected cards'],
-      ['Ctrl+Shift+. / Ctrl+Shift+,', 'Larger / smaller (Small, Normal, Large), as in Google Docs'],
+      ['Ctrl+Shift+. / Ctrl+Shift+,', 'Larger / smaller, one size at a time (10 to 36), as in Google Docs'],
       ['Highlight some text', 'Shows the format bar: bold, italic, size and font'],
       ['Alt+F10', 'With text highlighted: move into the format bar (arrows or Tab to move around it, Enter to press, Escape to go back to the text)'],
     ],

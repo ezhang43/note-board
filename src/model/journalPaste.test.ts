@@ -47,24 +47,27 @@ describe('richToItems (a Journal selection pasted into a checklist)', () => {
     const out = richToItems(rich, makeId);
     expect(out[0].style).toEqual({ bold: true, italic: true, font: 'serif' });
     expect(out[1].style).toBeUndefined();
-    expect(out[2].style).toEqual({ size: 'small' });
-    expect(out[3].style).toEqual({ size: 'large' });
-    expect(out[4].style).toEqual({ size: 'small' });
+    // A size is the same number of px on the item (owner request 2026-11-19); the Journal's old Small is 12, as an item's Small pastes into the Journal.
+    expect(out[2].style).toEqual({ size: 12 });
+    expect(out[3].style).toEqual({ size: 24 });
+    expect(out[4].style).toEqual({ size: 12 });
     expect(out[5].style).toBeUndefined();
     expect(out.every((i) => i.done === false)).toBe(true);
   });
 
   it('compares with normal Journal text, 14 (2026-11-11): 16 is larger, a saved 14 is normal', () => {
     const out = richToItems([line('bullet', 'sixteen', 0, { size: 16 }), line('bullet', 'fourteen', 0, { size: 14 }), line('h2', 'head', 0, { size: 16 })], makeId);
-    expect(out[0].style).toEqual({ size: 'large' });
+    expect(out[0].style).toEqual({ size: 16 });
     expect(out[1].style).toBeUndefined();
     // 16 in a heading is the heading's own size.
     expect(out[2].style).toEqual({ bold: true });
   });
 
-  it('shows headings as bold items, Heading 1 also large', () => {
-    const out = richToItems([line('h1', 'Big'), line('h2', 'Mid')], makeId);
-    expect(out[0].style).toEqual({ bold: true, size: 'large' });
+  it('shows headings as bold items, Heading 1 also large (18, the nearest to the old Large)', () => {
+    const out = richToItems([line('h1', 'Big'), line('h2', 'Mid'), line('bullet', 'old large', 0, { size: 'large' }), line('h2', 'sized', 0, { size: 28 })], makeId);
+    expect(out[0].style).toEqual({ bold: true, size: 18 });
+    expect(out[2].style).toEqual({ size: 20 });
+    expect(out[3].style).toEqual({ bold: true, size: 28 });
     expect(out[1].style).toEqual({ bold: true });
   });
 
@@ -107,12 +110,14 @@ describe('itemsToRich (copied checklist items pasted into the Journal)', () => {
       item('s', [], { style: { size: 'small' } }),
       item('l', [], { style: { size: 'large' } }),
       item('done', [], { done: true }),
+      item('n', [], { style: { size: 28 } }),
     ]);
     expect(out[0].runs).toEqual([{ text: 'b', b: true, i: true, font: 'mono' }]);
     // Normal Journal text is 14 (2026-11-11), so a Small item comes in one step below it.
     expect(out[1].runs).toEqual([{ text: 's', size: 12 }]);
     expect(out[2].runs).toEqual([{ text: 'l', size: 20 }]);
     expect(out[3].runs).toEqual([{ text: 'done' }]);
+    expect(out[4].runs).toEqual([{ text: 'n', size: 28 }]); // a number is the same px in the Journal
   });
 
   it('keeps a blank item as an empty bullet', () => {

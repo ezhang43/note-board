@@ -1,22 +1,26 @@
 import { blockOf, updateCard } from './board';
 import { editItems, findItem, flatIds } from './checklist';
+import { MAX_SIZE, MIN_SIZE, nextSize } from './richText';
 import type { Board, TextStyle } from './types';
 
-// Formatting whole text boxes (owner request): size Small / Normal / Large, bold, italic and a
-// typeface. Always the whole box (a card title, a note's text, a checklist item, a column title),
-// never single words, so the text boxes stay plain text.
+// Formatting whole text boxes (owner request): a size in px (the Journal's size box, owner request
+// 2026-11-19; it replaced Small / Normal / Large), bold, italic and a typeface. Always the whole box
+// (a card title, a note's text, a checklist item, a column title), never single words, so the text
+// boxes stay plain text.
 
 /** One text box: a card's title or note text, a checklist item, or a column's title. */
 export type Box = { cardId: string; itemId?: string } | { columnId: string };
 
-export type TextSize = 'small' | 'normal' | 'large';
 export type TextFont = 'sans' | 'serif' | 'rounded' | 'hand' | 'mono';
 
-/** One change from the format bar or a shortcut. */
-export type StyleChange = { bold: boolean } | { italic: boolean } | { size: TextSize } | { font: TextFont };
+/** One change from the format bar or a shortcut: `size` is a size in px from the list, `sizeStep` its − / +. */
+export type StyleChange = { bold: boolean } | { italic: boolean } | { size: number } | { sizeStep: 1 | -1 } | { font: TextFont };
 
-const SIZES: TextSize[] = ['small', 'normal', 'large'];
-const TEXT_SCALE: Record<TextSize, number> = { small: 0.85, normal: 1, large: 1.3 };
+/** The usual size of a box's text in px at the A− / A+ Normal step (styles.css): a checklist's or link's title, and every other box. */
+export const TITLE_PX = 15;
+export const TEXT_PX = 14;
+/** The words saved before the size box, as a share of the box's usual size: still drawn exactly so. */
+const OLD_SCALE = { small: 0.85, large: 1.3 };
 
 /** The typefaces, in the order the Font menu lists them. */
 export const FONTS: { key: TextFont; label: string }[] = [
@@ -30,21 +34,41 @@ export const FONTS: { key: TextFont; label: string }[] = [
 /** Keeps only what differs from the usual look; undefined when nothing does. */
 function tidy(s: TextStyle): TextStyle | undefined {
   const out: TextStyle = {};
-  if (s.size) out.size = s.size;
+  if (s.size !== undefined) out.size = s.size;
   if (s.bold) out.bold = true;
   if (s.italic) out.italic = true;
   if (s.font) out.font = s.font;
   return Object.keys(out).length ? out : undefined;
 }
 
-/** A box's format after a change. */
-function changed(style: TextStyle | undefined, change: StyleChange): TextStyle | undefined {
+/** A box's format after a change; `plain` is the box's usual px (the usual size is saved as no size). */
+function changed(style: TextStyle | undefined, change: StyleChange, plain: number): TextStyle | undefined {
   const next: TextStyle = { ...style };
   if ('bold' in change) next.bold = change.bold || undefined;
   if ('italic' in change) next.italic = change.italic || undefined;
-  if ('size' in change) next.size = change.size === 'normal' ? undefined : change.size;
+  const px = 'size' in change ? change.size : 'sizeStep' in change ? nextSize(shownPx(style, plain), change.sizeStep) : null;
+  if (px !== null) next.size = px === plain ? undefined : px;
   if ('font' in change) next.font = change.font === 'sans' ? undefined : change.font;
   return tidy(next);
+}
+
+/** A box's usual size in px: a checklist's or link's title is 15, a note's text, an item and a container's title 14. */
+export function plainPx(board: Board, box: Box): number {
+  if ('columnId' in box || box.itemId) return TEXT_PX;
+  return board.cards[box.cardId]?.kind === 'note' ? TEXT_PX : TITLE_PX;
+}
+
+/** The size in px the size box shows for a box: its number, its usual px, or the old Small / Large as the nearest whole px. */
+export function shownPx(style: TextStyle | undefined, plain: number): number {
+  const size = style?.size;
+  if (size === undefined) return plain;
+  return typeof size === 'number' ? size : Math.round(plain * OLD_SCALE[size]);
+}
+
+/** The size the size box shows for these boxes, or null when they differ (the box is then empty). */
+export function sizesOf(board: Board, boxes: Box[]): number | null {
+  const all = new Set(boxes.map((box) => shownPx(styleOf(board, box), plainPx(board, box))));
+  return all.size === 1 ? [...all][0] : null;
 }
 
 const sameStyle = (a?: TextStyle, b?: TextStyle) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -70,22 +94,23 @@ export function applyStyle(board: Board, boxes: Box[], change: StyleChange): Boa
   let out = boxes.reduce((b, box) => {
     if ('columnId' in box) {
       const col = b.columns[box.columnId];
-      const next = col && withStyle(col, changed(col.style, change));
+      const next = col && withStyle(col, changed(col.style, change, TEXT_PX));
       return col && next !== col ? { ...b, columns: { ...b.columns, [col.id]: next } } : b;
     }
     if (box.itemId) {
       itemsOf.set(box.cardId, [...(itemsOf.get(box.cardId) ?? []), box.itemId]);
       return b;
     }
-    return updateCard(b, box.cardId, (c) => withStyle(c, changed(c.style, change)));
+    const plain = plainPx(b, box);
+    return updateCard(b, box.cardId, (c) => withStyle(c, changed(c.style, change, plain)));
   }, board);
   for (const [cardId, ids] of itemsOf) {
     out = editItems(out, cardId, (items) => {
-      if (!ids.some((id) => { const now = findItem(items, id)?.item; return now && !sameStyle(now.style, changed(now.style, change)); })) return null;
+      if (!ids.some((id) => { const now = findItem(items, id)?.item; return now && !sameStyle(now.style, changed(now.style, change, TEXT_PX)); })) return null;
       const next = structuredClone(items);
       for (const id of ids) {
         const loc = findItem(next, id);
-        if (loc) loc.list[loc.index] = withStyle(loc.item, changed(loc.item.style, change));
+        if (loc) loc.list[loc.index] = withStyle(loc.item, changed(loc.item.style, change, TEXT_PX));
       }
       return next;
     });
@@ -97,12 +122,6 @@ export function applyStyle(board: Board, boxes: Box[], change: StyleChange): Boa
 export function toggleChange(board: Board, boxes: Box[], what: 'bold' | 'italic'): StyleChange {
   const on = boxes.length > 0 && boxes.every((box) => styleOf(board, box)?.[what]);
   return what === 'bold' ? { bold: !on } : { italic: !on };
-}
-
-/** Ctrl+Shift+> / <: one size up or down from the first box's size, for all of them. */
-export function sizeStepChange(board: Board, boxes: Box[], dir: 1 | -1): StyleChange {
-  const now = SIZES.indexOf(styleOf(board, boxes[0])?.size ?? 'normal');
-  return { size: SIZES[Math.min(SIZES.length - 1, Math.max(0, now + dir))] };
 }
 
 /**
@@ -131,11 +150,14 @@ export function boxesOf(board: Board, ids: string[]): Box[] {
   });
 }
 
-/** The CSS for a text box with this format (sizes go through `--ts`, which the stylesheet multiplies in). */
-export function styleCss(style: TextStyle | undefined): Record<string, string | number> {
+/**
+ * The CSS for a text box with this format, whose usual size is `plain` px. Sizes go through `--ts`, which the
+ * stylesheet multiplies in (with the A− / A+ step): a number is its px over the usual px, the old words their share.
+ */
+export function styleCss(style: TextStyle | undefined, plain = TEXT_PX): Record<string, string | number> {
   if (!style) return {};
   const css: Record<string, string | number> = {};
-  if (style.size) css['--ts'] = TEXT_SCALE[style.size];
+  if (style.size !== undefined) css['--ts'] = typeof style.size === 'number' ? style.size / plain : OLD_SCALE[style.size];
   if (style.bold) css.fontWeight = 600;
   if (style.italic) css.fontStyle = 'italic';
   if (style.font) css.fontFamily = `var(--font-${style.font})`;
@@ -147,7 +169,7 @@ export function parseStyle(v: unknown): TextStyle | undefined {
   if (typeof v !== 'object' || v === null) return undefined;
   const s = v as Record<string, unknown>;
   return tidy({
-    size: s.size === 'small' || s.size === 'large' ? s.size : undefined,
+    size: s.size === 'small' || s.size === 'large' || (typeof s.size === 'number' && s.size >= MIN_SIZE && s.size <= MAX_SIZE) ? s.size : undefined,
     bold: s.bold === true || undefined,
     italic: s.italic === true || undefined,
     font: s.font === 'serif' || s.font === 'rounded' || s.font === 'hand' || s.font === 'mono' ? s.font : undefined,

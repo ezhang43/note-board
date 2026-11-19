@@ -1,4 +1,4 @@
-import { applyStyle, boxesOf, sizeStepChange, toggleChange, type Box, type StyleChange } from '../../model/textStyle';
+import { applyStyle, boxesOf, toggleChange, type Box, type StyleChange } from '../../model/textStyle';
 import type { StoreContext } from '../core';
 
 // Formatting whole text boxes (owner request): from the format bar and from Ctrl+B / Ctrl+I /
@@ -14,11 +14,11 @@ export function formatActions(ctx: StoreContext) {
     formatBoxes(boxes: Box[], ask: FormatAsk) {
       if (!boxes.length) return;
       commit((b) => {
-        const change =
+        const change: StyleChange =
           ask === 'bold' || ask === 'italic'
             ? toggleChange(b, boxes, ask)
             : ask === 'larger' || ask === 'smaller'
-              ? sizeStepChange(b, boxes, ask === 'larger' ? 1 : -1)
+              ? { sizeStep: ask === 'larger' ? 1 : -1 } // each box steps from its own size
               : ask;
         return applyStyle(b, boxes, change);
       });

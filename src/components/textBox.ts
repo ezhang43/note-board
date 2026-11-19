@@ -1,5 +1,5 @@
 import { createContext, type CSSProperties } from 'react';
-import { styleCss, type Box } from '../model/textStyle';
+import { styleCss, TEXT_PX, type Box } from '../model/textStyle';
 import type { TextStyle } from '../model/types';
 
 // Text boxes carry `data-box` (on the wrapper around the field) so the format bar and the
@@ -30,7 +30,7 @@ export function focusedBox(): { box: Box; field: HTMLInputElement | HTMLTextArea
 /** Every text box on a read-only board is read-only (job 161): the Canvas says which, for all of them. */
 export const BoardReadOnly = createContext(false);
 
-/** Props for a text box: its name and its format. */
-export function boxProps(box: Box, style: TextStyle | undefined): { box: string; boxStyle: CSSProperties } {
-  return { box: boxKey(box), boxStyle: styleCss(style) as CSSProperties };
+/** Props for a text box: its name and its format. `plain` is its usual size in px (TITLE_PX for a checklist's or link's title). */
+export function boxProps(box: Box, style: TextStyle | undefined, plain = TEXT_PX): { box: string; boxStyle: CSSProperties } {
+  return { box: boxKey(box), boxStyle: styleCss(style, plain) as CSSProperties };
 }

@@ -1,5 +1,5 @@
 import { BoardReadOnly, boxProps } from './textBox';
-import { styleCss } from '../model/textStyle';
+import { styleCss, TITLE_PX } from '../model/textStyle';
 import { openLinkOnCtrlClick } from './TextLinks';
 import { memo, use, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { canFold, canMoveItem, doneCount, hasFoldable, isFolded, ITEM_INDENT } from '../model/checklist';
@@ -38,7 +38,7 @@ export function TodoTitle({ card }: { card: TodoCard }) {
         ref={title}
         aria-label="List title"
         aria-describedby={total ? countId : undefined}
-        {...boxProps({ cardId: card.id }, card.style)}
+        {...boxProps({ cardId: card.id }, card.style, TITLE_PX)}
         find={`title:${card.id}`}
         placeholder="List title"
         value={card.title}
@@ -51,7 +51,7 @@ export function TodoTitle({ card }: { card: TodoCard }) {
       />
       {total > 0 && (
         <>
-          <span className={done === total ? 'title-count all-done' : 'title-count'} style={{ '--ts': styleCss(card.style)['--ts'] } as CSSProperties} aria-hidden="true">
+          <span className={done === total ? 'title-count all-done' : 'title-count'} style={{ '--ts': styleCss(card.style, TITLE_PX)['--ts'] } as CSSProperties} aria-hidden="true">
             {done}/{total}
           </span>
           <span id={countId} hidden>

@@ -24,7 +24,8 @@ const link: Required<LinkCard> = { ...base, id: 'l1', kind: 'link', x: 400, y: 4
 const entry: Required<CompletedEntry> = { item: { ...subItem, id: 'i9' }, fromCardId: 't1', fromTitle: 'List', fromParentId: 'i1' };
 const completed: Required<CompletedCard> = { ...base, id: 'k1', kind: 'completed', x: 800, y: 0, groups: [{ date: '2026-10-20', entries: [entry] }] };
 const boardCard: Required<BoardCard> = { ...base, id: 'b1', kind: 'board', x: 800, y: 300, boardId: 'sub' };
-const column: Required<Column> = { id: 'c1', title: 'Col', x: 0, y: 500, w: 360, h: 500, color: 'ocean', collapsed: true, cardIds: ['n1'], style };
+// A size in px (the size box, owner request 2026-11-19) beside the old words above.
+const column: Required<Column> = { id: 'c1', title: 'Col', x: 0, y: 500, w: 360, h: 500, color: 'ocean', collapsed: true, cardIds: ['n1'], style: { ...style, size: 24 } };
 
 const board: Required<Board> = {
   name: 'Everything',
@@ -72,7 +73,8 @@ same<BlockType, (typeof BLOCK_TYPES)[number]>(true);
 const SIZES = ['large', 'small'] as const;
 // A Journal run's size is also a number of px (owner pick, 2026-10-30), from SIZE_STEPS' first to its last.
 same<RunSize, (typeof SIZES)[number] | number>(true);
-same<NonNullable<TextStyle['size']>, (typeof SIZES)[number]>(true);
+// A whole box's size is a number of px too (the size box, owner request 2026-11-19).
+same<NonNullable<TextStyle['size']>, (typeof SIZES)[number] | number>(true);
 const FONTS = ['hand', 'mono', 'rounded', 'serif'] as const;
 same<RunFont, (typeof FONTS)[number]>(true);
 same<NonNullable<TextStyle['font']>, (typeof FONTS)[number]>(true);
@@ -95,7 +97,7 @@ function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}, safe
     }
   };
   walk(JSON.parse(raw), '');
-  const values = { kind: KINDS, color: [...COLOR_KEYS].sort(), 'rich type': BLOCK_TYPES, size: SIZES, font: FONTS, highlight: HIGHLIGHTS, 'rich size': [...SIZES, `${SIZE_STEPS[0]}-${SIZE_STEPS[SIZE_STEPS.length - 1]}`] };
+  const values = { kind: KINDS, color: [...COLOR_KEYS].sort(), 'rich type': BLOCK_TYPES, size: [...SIZES, `${SIZE_STEPS[0]}-${SIZE_STEPS[SIZE_STEPS.length - 1]}`], font: FONTS, highlight: HIGHLIGHTS, 'rich size': [...SIZES, `${SIZE_STEPS[0]}-${SIZE_STEPS[SIZE_STEPS.length - 1]}`] };
   return [...[...paths].sort(), ...Object.entries(values).map(([k, v]) => `${k}: ${v.filter((x) => !safe[k]?.includes(x)).join(' ')}`)];
 }
 
@@ -282,8 +284,12 @@ SAVED_SHAPES[6] = [
  *   doesn't know as a plain line with its words, and a divider's words are always `---`, its plain
  *   text. So it shows `---` and keeps the note's other formatting; if it saves, the divider becomes
  *   the words `---` (richText.test.ts, "an older app ...").
+ * - Sizes in px on a whole text box, 10 to 36 (the size box, owner request 2026-11-19; owner answer: "Old app
+ *   versions: accepted ... An older app version drops them to normal, and the owner reloads devices"): an
+ *   older copy reads a number it doesn't know as the usual size and keeps the box's words, bold, italic and
+ *   font; if it saves, only the size is lost (textStyle.test.ts, "an older app ...").
  */
-const READ_SAFELY: Record<number, Record<string, readonly string[]>> = { 4: { 'rich type': ['hr'] } };
+const READ_SAFELY: Record<number, Record<string, readonly string[]>> = { 4: { 'rich type': ['hr'] }, 6: { size: ['10-36'] } };
 /**
  * Checklist item fields added under a version number without raising it, on the same terms as READ_SAFELY.
  * - `folded` on a checklist item (owner request, 2026-11-09; no bump, the worker's recommended call, put

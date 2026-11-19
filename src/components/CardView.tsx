@@ -1,4 +1,5 @@
 import { BoardReadOnly, boxProps } from './textBox';
+import { TITLE_PX } from '../model/textStyle';
 import { EstimateChip } from './Estimate';
 import { memo, use, useRef, useState, type CSSProperties } from 'react';
 import { shownName } from '../model/board';
@@ -285,7 +286,7 @@ function LinkTitle({ card }: { card: LinkCard }) {
       ref={title}
       className="card-title"
       aria-label="Link title"
-      {...boxProps({ cardId: card.id }, card.style)}
+      {...boxProps({ cardId: card.id }, card.style, TITLE_PX)}
       find={`title:${card.id}`}
       placeholder="Title"
       value={card.title}

@@ -150,13 +150,30 @@ describe('L7: a format that changes nothing', () => {
     const s = store();
     const id = list(s, ['a']);
     const first = card(s, id).items[0].id;
-    s.formatBoxes([{ cardId: id, itemId: first }], { size: 'large' });
+    s.formatBoxes([{ cardId: id, itemId: first }], { size: 36 });
     const board = s.getState().board;
-    s.formatBoxes([{ cardId: id, itemId: first }], { size: 'large' });
-    s.formatBoxes([{ cardId: id }], { size: 'normal' });
+    s.formatBoxes([{ cardId: id, itemId: first }], { size: 36 });
+    s.formatBoxes([{ cardId: id, itemId: first }], 'larger'); // already the largest
+    s.formatBoxes([{ cardId: id }], { size: 15 }); // a title's usual size
     s.formatBoxes([{ cardId: id }], { font: 'sans' });
     expect(s.getState().board).toBe(board);
     s.undo(); // undoes the one real change
     expect(card(s, id).items[0].style).toBeUndefined();
+  });
+});
+
+describe('the size box keys (owner request 2026-11-19)', () => {
+  it('Ctrl+Shift+. steps each item from its own size, in one undo step', () => {
+    const s = store();
+    const id = list(s, ['a', 'b']);
+    const [a, b] = card(s, id).items.map((i) => ({ cardId: id, itemId: i.id }));
+    s.formatBoxes([b], { size: 20 });
+    s.formatBoxes([a, b], 'larger');
+    expect(card(s, id).items.map((i) => i.style)).toEqual([{ size: 16 }, { size: 24 }]);
+    s.formatBoxes([a, b], 'smaller');
+    expect(card(s, id).items.map((i) => i.style)).toEqual([undefined, { size: 20 }]);
+    s.undo();
+    s.undo();
+    expect(card(s, id).items.map((i) => i.style)).toEqual([undefined, { size: 20 }]);
   });
 });

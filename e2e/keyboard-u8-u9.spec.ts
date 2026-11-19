@@ -32,7 +32,7 @@ test('Alt+F10 moves into the format bar; arrows and Tab stay inside it; the Font
   }
   await page.keyboard.press('Shift+Tab');
   expect(await inside(page, '.format-bar')).toBe(true);
-  // Arrows walk along it: Bold, Italic, the three sizes, then Font.
+  // Arrows walk along it: Bold, Italic, the size box's −, number and +, then Font.
   await bar(page).getByRole('button', { name: 'Bold' }).focus();
   for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
   const font = bar(page).getByRole('button', { name: 'Font' });

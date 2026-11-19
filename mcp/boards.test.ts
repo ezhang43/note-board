@@ -3,7 +3,7 @@ import { recolour, resizeCard, setCollapsedFor, updateCard } from '../src/model/
 import { editItems, toggleFold } from '../src/model/checklist';
 import { serializeBoard } from '../src/model/persist';
 import { fromPlain, insertDivider, plainOf, setMark, toggleList, toggleMark } from '../src/model/richText';
-import { applyStyle, boxesOf, sizeStepChange } from '../src/model/textStyle';
+import { applyStyle, boxesOf } from '../src/model/textStyle';
 import type { Board, NoteCard, TodoCard } from '../src/model/types';
 import { readWorkspace, serializeWorkspace } from '../src/model/workspace';
 import { boardOutline, collectBoards, findBoard, listBoardsText, safeToEdit } from './boards';
@@ -241,7 +241,9 @@ describe('boards the app makes stay editable by the connector (guard: safeToEdit
       ['collapsed', (x) => setCollapsedFor(x, ['noteIdea', 'listGroceries', 'colIdeas'], true)],
       ['resized', (x) => resizeCard(x, 'linkDocs', 333, 222)],
       ['bold', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), { bold: true })],
-      ['size step', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), sizeStepChange(x, boxesOf(x, ['noteIdea', 'listGroceries']), 1))],
+      ['size step', (x) => applyStyle(x, boxesOf(x, ['noteIdea', 'listGroceries']), { sizeStep: 1 })],
+      // A size in px from the size box (owner request 2026-11-19).
+      ['size in px', (x) => applyStyle(x, boxesOf(x, ['noteIdea']), { size: 28 })],
       ['rich text', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(rich), rich }))],
       ['journal divider', (x) => updateCard(x, 'noteIdea', (c) => ({ ...c, text: plainOf(divided), rich: divided }))],
       ['card colour', (x) => recolour(x, ['noteCall'], 'ocean')],

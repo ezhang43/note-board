@@ -179,15 +179,17 @@ export function CalendarPanel() {
         </div>
       </div>
       <div className="cal-bar">
-        <button type="button" className="icon-button cal-step" aria-label={`Previous ${unit}`} title={`Previous ${unit}`} onClick={() => void calendar.step(-1)}>
-          ‹
-        </button>
+        <span className="habit-steps">
+          <button type="button" className="habit-step" aria-label={`Previous ${unit}`} title={`Previous ${unit}`} onClick={() => void calendar.step(-1)}>
+            ‹
+          </button>
+          <button type="button" className="habit-step" aria-label={`Next ${unit}`} title={`Next ${unit}`} onClick={() => void calendar.step(1)}>
+            ›
+          </button>
+        </span>
         <h3 className="cal-range" aria-live="polite">
           {rangeLabel(s.view, s.day)}
         </h3>
-        <button type="button" className="icon-button cal-step" aria-label={`Next ${unit}`} title={`Next ${unit}`} onClick={() => void calendar.step(1)}>
-          ›
-        </button>
       </div>
 
       {s.search?.text.trim() ? (

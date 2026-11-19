@@ -2020,7 +2020,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .checklist-panel .history-head { gap: 6px; }
 .checklist-panel .history-head h2 { margin-right: 0; }
-.checklist-panel .checklist-count { margin-right: auto; font-size: 13px; }
+.checklist-panel .checklist-count { margin-right: auto; font-size: 13px; top: 0; } /* no card-title nudge here: the digits' middle sits on the title's cap-height middle (owner 2026-11-19) */
+/* Clean up reads as big as the title: its size, ink and a bolder weight (owner 2026-11-19); the width is its text's, as --hb is not set here. */
+.checklist-panel .list-clean-up { font-size: 16px; font-weight: 600; color: var(--ink); width: auto; padding: 0 8px; }
 /* While Version history shows an old version (PR 274 check): read-only, like a read-only board, with its badge. */
 .checklist-panel .checklist-old { margin-right: auto; height: 24px; font-size: 12px; }
 .app.previewing .checklist-panel .checklist-count { margin-right: 0; }
@@ -3397,8 +3399,7 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
 .cal-search input::-webkit-search-cancel-button { display: none; }
 .cal-results { display: flex; flex-direction: column; gap: 8px; }
-.cal-range { flex: 1; margin: 0; text-align: center; font-size: 14px; font-weight: 600; }
-.cal-step { font-size: 20px; line-height: 1; color: var(--ink); }
+.cal-range { flex: 1; margin: 0; text-align: left; font-size: 14px; font-weight: 600; }
 .cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .cal-note .history-note { margin: 4px; }
 .cal-day { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; border-top: 1px solid var(--line); }

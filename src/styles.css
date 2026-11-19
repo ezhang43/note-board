@@ -2020,7 +2020,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 .checklist-panel .history-head { gap: 6px; }
 .checklist-panel .history-head h2 { margin-right: 0; }
-.checklist-panel .checklist-count { margin-right: auto; font-size: 13px; }
+.checklist-panel .checklist-count { margin-right: auto; font-size: 13px; top: 0; } /* no card-title nudge here: the digits' middle sits on the title's cap-height middle (owner 2026-11-19) */
+/* Clean up reads as big as the title: its size, ink and a bolder weight (owner 2026-11-19); the width is its text's, as --hb is not set here. */
+.checklist-panel .list-clean-up { font-size: 16px; font-weight: 600; color: var(--ink); width: auto; padding: 0 8px; }
 /* While Version history shows an old version (PR 274 check): read-only, like a read-only board, with its badge. */
 .checklist-panel .checklist-old { margin-right: auto; height: 24px; font-size: 12px; }
 .app.previewing .checklist-panel .checklist-count { margin-right: 0; }

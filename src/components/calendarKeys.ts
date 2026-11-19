@@ -6,11 +6,11 @@ import { isTextField, panelCovers } from './textField';
 
 /**
  * Keys in the Google Calendar panel (owner request 2026-11-17): N adds an event on the day looked at (12:00 to 13:00, as
- * its + does), T goes to today, ← and → show the week or month before or after. Only with the keyboard in the panel, never
+ * its + does), T goes to today, ← and → show the week or month before or after, / opens the search box (owner request 2026-11-19). Only with the keyboard in the panel, never
  * while typing in a text field, and not while the event form or the guest-email question is open (`off`).
  * `add` opens the form for that day from the button given, as a click on the day's + would.
  */
-export function useCalendarKeys(off: boolean, add: (day: DayKey, opener: HTMLElement) => void) {
+export function useCalendarKeys(off: boolean, add: (day: DayKey, opener: HTMLElement) => void, search: () => void) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const { shortcutsOpen, confirm, deleteCompleted, sidePanel } = appStore.getState().ui;
@@ -23,6 +23,9 @@ export function useCalendarKeys(off: boolean, add: (day: DayKey, opener: HTMLEle
         if (e.repeat) return; // a held key opens one form
         const day = calendar.get().day;
         add(day, document.querySelector<HTMLElement>(`.side-panel section[data-day="${day}"] .cal-add`) ?? (e.target as HTMLElement));
+      } else if (k === '/') {
+        e.preventDefault();
+        search();
       } else if (k === 't') {
         e.preventDefault();
         void calendar.goToday();

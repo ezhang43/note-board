@@ -2593,3 +2593,190 @@ test.describe('calendar keys', () => {
     expect(errors).toEqual([]);
   });
 });
+
+// Search (owner request, 2026-11-19): a magnifier by Today, or "/" with the keyboard in the panel, opens a box at the top. Google's own
+// search of the whole calendar (the dev calendar matches the q text as Google does) replaces the Week / Month list while there is text.
+test.describe('calendar search', () => {
+  const range = (page: Page) => panel(page).locator('.cal-range');
+  const box = (page: Page) => panel(page).getByRole('searchbox', { name: 'Search events' });
+  const searchButton = (page: Page) => panel(page).getByRole('button', { name: 'Search events' });
+  const heads = (page: Page) => panel(page).locator('.cal-results .cal-day h3');
+
+  async function openPanel(page: Page) {
+    const errors = await openAs(page);
+    await button(page).click();
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    return errors;
+  }
+
+  test('the magnifier by Today opens the box with the keyboard in it; Escape and × close it and the week is as it was', async ({ page }) => {
+    const errors = await openPanel(page);
+    await expect(searchButton(page)).toHaveAttribute('title', 'Search events');
+    const week = await range(page).textContent();
+    await searchButton(page).click();
+    await expect(box(page)).toBeFocused();
+    await box(page).fill('Kayaking');
+    await expect(panel(page).getByRole('button', { name: /Kayaking lesson/ })).toBeVisible();
+    // The week's list is replaced while there is text.
+    await expect(day(page, nowDate())).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(box(page)).toHaveCount(0);
+    await expect(panel(page)).toBeVisible();
+    await expect(range(page)).toHaveText(week!);
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    await searchButton(page).click();
+    await box(page).fill('Kayaking');
+    await panel(page).getByRole('button', { name: 'Close search' }).click();
+    await expect(box(page)).toHaveCount(0);
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('/ opens the box from the panel but not while typing in a text field; Ctrl+F stays the board’s Find', async ({ page }) => {
+    const errors = await openPanel(page);
+    await panel(page).getByRole('button', { name: 'Today' }).focus();
+    await page.keyboard.press('/');
+    await expect(box(page)).toBeFocused();
+    // Typing a slash in the box types it.
+    await page.keyboard.type('a/b');
+    await expect(box(page)).toHaveValue('a/b');
+    await page.keyboard.press('Escape');
+    await expect(box(page)).toHaveCount(0);
+    await page.keyboard.press('Control+f');
+    await expect(page.locator('.find-bar')).toBeVisible();
+    await expect(box(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('finds a past and a future event, by name and by guest; a deleted one is not found', async ({ page }) => {
+    const errors = await openPanel(page);
+    await searchButton(page).click();
+    await box(page).fill('lunch');
+    await expect(panel(page).getByRole('region', { name: label(daysFromToday(1)) }).getByRole('button', { name: /Lunch with Sam/ })).toBeVisible();
+    await box(page).fill('Kayaking');
+    await expect(panel(page).getByRole('region', { name: label(daysFromToday(-3)) }).getByRole('button', { name: '2 – 3pm Kayaking lesson' })).toBeVisible();
+    // Google searches guests too.
+    await box(page).fill('sam@example');
+    await expect(panel(page).getByRole('button', { name: /Lunch with Sam/ })).toBeVisible();
+    await box(page).fill('Pottery');
+    await expect(panel(page).getByText('No events found')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('results are grouped by date: today and later, soonest first, then earlier days, most recent first', async ({ page }) => {
+    const errors = await openPanel(page);
+    await searchButton(page).click();
+    await box(page).fill('stand-up');
+    await expect(heads(page).first()).toBeVisible();
+    const names = (await heads(page).allTextContents()).map((t) => t.replace(/\s*· Today\s*$/, '').trim());
+    // The dev stand-ups run from 45 days before today to 45 days after: 46 days from today on, then 45 back.
+    const expected = [...Array.from({ length: 46 }, (_, i) => i), ...Array.from({ length: 45 }, (_, i) => -(i + 1))].map((n) => label(daysFromToday(n)));
+    expect(names.length).toBe(91);
+    expect(names.map((n) => n.replace(/ 20\d\d$/, ''))).toEqual(expected);
+    await expect(panel(page).locator('.cal-results .cal-day.today h3')).toContainText('Today');
+    expect(errors).toEqual([]);
+  });
+
+  test('says Searching… while it waits, and No events found when there are none', async ({ page }) => {
+    const errors = await openPanel(page);
+    await page.route(
+      (url) => url.pathname.includes('__calendar') && url.searchParams.has('q'),
+      async (route) => {
+        await new Promise((r) => setTimeout(r, 600));
+        await route.continue();
+      },
+    );
+    await searchButton(page).click();
+    await box(page).fill('zzzz');
+    await expect(panel(page).getByText('Searching…')).toBeVisible();
+    await expect(panel(page).getByText('No events found')).toBeVisible();
+    await expect(panel(page).getByText('Searching…')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('waits for typing to stop before asking Google', async ({ page }) => {
+    const errors = await openPanel(page);
+    const asked: string[] = [];
+    await page.route(
+      (url) => url.pathname.includes('__calendar') && url.searchParams.has('q'),
+      (route) => {
+        asked.push(new URL(route.request().url()).searchParams.get('q')!);
+        return route.continue();
+      },
+    );
+    await searchButton(page).click();
+    await page.keyboard.type('dent', { delay: 60 });
+    await expect(panel(page).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    expect([...new Set(asked)]).toEqual(['dent']);
+    expect(errors).toEqual([]);
+  });
+
+  test('clicking a result leaves the search, goes to that day and opens the event’s card', async ({ page }) => {
+    const errors = await openPanel(page);
+    const week = await range(page).textContent();
+    await searchButton(page).click();
+    await box(page).fill('Kayaking');
+    await panel(page).getByRole('button', { name: /Kayaking lesson/ }).click();
+    await expect(box(page)).toHaveCount(0);
+    // 12 Nov is in the week before the one shown (the pinned today is Sunday 15 Nov).
+    await expect(range(page)).not.toHaveText(week!);
+    await expect(day(page, daysFromToday(-3)).getByRole('button', { name: '2 – 3pm Kayaking lesson' })).toBeVisible();
+    await expect(card(page)).toBeVisible();
+    await expect(card(page)).toContainText('Kayaking lesson');
+    // One Escape closes the card, the next the panel, as without a search.
+    await page.keyboard.press('Escape');
+    await expect(card(page)).toHaveCount(0);
+    await expect(panel(page)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('in the Month view a result goes to its day there', async ({ page }) => {
+    const errors = await openPanel(page);
+    await panel(page).getByRole('button', { name: 'Month' }).click();
+    await expect(panel(page).getByRole('grid')).toBeVisible();
+    await searchButton(page).click();
+    await box(page).fill('Book club');
+    await panel(page).getByRole('button', { name: /Book club/ }).click();
+    await expect(box(page)).toHaveCount(0);
+    await expect(panel(page).getByRole('grid')).toBeVisible();
+    await expect(card(page)).toContainText('Book club');
+    await expect(panel(page).getByRole('gridcell', { selected: true })).toHaveAttribute('data-day', key(daysFromToday(2)));
+    expect(errors).toEqual([]);
+  });
+
+  test('a failed search shows the usual note and Try again asks again', async ({ page }) => {
+    const errors = await openPanel(page);
+    const refuse = (url: URL) => url.pathname.includes('__calendar') && url.searchParams.has('q');
+    await page.route(refuse, (route) => route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":{"code":403,"message":"accessNotConfigured"}}' }));
+    await searchButton(page).click();
+    await box(page).fill('Dentist');
+    await expect(panel(page).getByText('Google Calendar isn’t connected yet. Try again later.')).toBeVisible();
+    await page.unroute(refuse);
+    await panel(page).getByRole('button', { name: 'Try again' }).click();
+    await expect(panel(page).getByRole('button', { name: /Dentist/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test.describe('on a phone', () => {
+    test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+
+    test('works on a phone-sized screen', async ({ page }) => {
+      const errors = await openAs(page);
+      await page.getByRole('toolbar', { name: 'Board actions' }).getByRole('button', { name: 'More', exact: true }).tap();
+      await page.getByRole('dialog', { name: 'More' }).getByRole('button', { name: 'Google Calendar' }).tap();
+      await expect(searchButton(page)).toBeVisible();
+      await searchButton(page).tap();
+      await box(page).fill('Lunch');
+      await panel(page).getByRole('button', { name: /Lunch with Sam/ }).tap();
+      await expect(card(page)).toContainText('Lunch with Sam');
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test('the shortcuts list has the / key', async ({ page }) => {
+    await page.goto('/');
+    await fontsLoaded(page);
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toContainText('Search the calendar');
+  });
+});

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess } from '../model/calendar';
 import { tick } from './undoClock';
-import { calendarApi, canRetry, CalendarApiError, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
+import { SEARCH_WAIT, calendarApi, canRetry, CalendarApiError, createCalendar, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 
 // Google Calendar side panel (owner request, 2026-10-06): the panel's state and the calls it makes.
 // Calendar events aren't board data: not synced with boards or kept in versions; undone by the Undo
@@ -27,7 +27,7 @@ const mail = (notify?: boolean) => (notify === undefined ? '' : notify ? ' (emai
 
 function fakeApi(events: CalEvent[] = [ev('a')]) {
   const calls: string[] = [];
-  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null; down: boolean; status: number | null; reason?: string } = {
+  const api: CalendarApi & { calls: string[]; bodies: Partial<EventBody>[]; fail: boolean; noAccess: 'window' | 'refused' | null; series: Partial<CalEvent>; failId: string | null; down: boolean; status: number | null; reason?: string; found: CalEvent[] } = {
     calls,
     fail: false,
     down: false,
@@ -35,6 +35,13 @@ function fakeApi(events: CalEvent[] = [ev('a')]) {
     noAccess: null,
     series: {},
     failId: null,
+    found: [],
+    async search(text, day) {
+      calls.push(`search ${text} ${day}`);
+      if (api.noAccess) throw new NoAccess(api.noAccess);
+      if (api.fail) throw new CalendarApiError(403);
+      return api.found;
+    },
     async list(from, to) {
       calls.push(`list ${from} ${to}`);
       if (api.noAccess) throw new NoAccess(api.noAccess);
@@ -2120,5 +2127,204 @@ describe('Ctrl+Z and Ctrl+Y on events (owner request 2026-11-17)', () => {
       expect(cal.get().done).toMatchObject({ text: UNDO_PART, undo: null });
       expect(cal.marks()).toEqual({ undo: 0, redo: 0 });
     });
+  });
+});
+
+describe('searching the calendar (owner request, 2026-11-19)', () => {
+  const opened = async () => {
+    const api = fakeApi();
+    const cal = createCalendar(api, today);
+    await cal.open();
+    return { api, cal };
+  };
+
+  it('opens an empty box and closes it, leaving the week as it was', async () => {
+    const { api, cal } = await opened();
+    cal.openSearch();
+    expect(cal.get().search).toEqual({ text: '', results: null, note: null, needsAccess: false });
+    cal.closeSearch();
+    expect(cal.get().search).toBeNull();
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['a']);
+    expect(api.calls).toEqual(['list 2026-10-04 2026-10-11']);
+  });
+
+  it('asks Google only once typing has stopped for 300ms, and shows the answer for the last text', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, cal } = await opened();
+      api.found = [ev('hit')];
+      cal.openSearch();
+      cal.setSearchText('de');
+      await vi.advanceTimersByTimeAsync(SEARCH_WAIT - 100);
+      cal.setSearchText('dentist');
+      await vi.advanceTimersByTimeAsync(SEARCH_WAIT - 1);
+      expect(api.calls.filter((c) => c.startsWith('search'))).toEqual([]);
+      expect(cal.get().search).toMatchObject({ text: 'dentist', results: null });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(api.calls.filter((c) => c.startsWith('search'))).toEqual(['search dentist 2026-10-06']);
+      expect(cal.get().search?.results?.map((e) => e.id)).toEqual(['hit']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends nothing for a box with only spaces, and nothing once it is closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, cal } = await opened();
+      cal.openSearch();
+      cal.setSearchText('   ');
+      await vi.advanceTimersByTimeAsync(SEARCH_WAIT * 2);
+      cal.setSearchText('x');
+      cal.closeSearch();
+      await vi.advanceTimersByTimeAsync(SEARCH_WAIT * 2);
+      expect(api.calls.filter((c) => c.startsWith('search'))).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an empty answer is an empty list, not "still searching"', async () => {
+    const { api, cal } = await opened();
+    api.found = [];
+    cal.openSearch();
+    cal.setSearchText('zzz');
+    await cal.searchNow();
+    expect(cal.get().search?.results).toEqual([]);
+  });
+
+  it('a failure gives the usual calendar message, and Try again asks again', async () => {
+    const { api, cal } = await opened();
+    cal.openSearch();
+    cal.setSearchText('x');
+    api.fail = true;
+    await cal.searchNow();
+    expect(cal.get().search).toMatchObject({ results: null, note: NOT_CONNECTED, needsAccess: false });
+    api.fail = false;
+    api.found = [ev('hit')];
+    await cal.searchNow();
+    expect(cal.get().search).toMatchObject({ note: null });
+    expect(cal.get().search?.results).toHaveLength(1);
+  });
+
+  it('no calendar access asks to connect', async () => {
+    const { api, cal } = await opened();
+    cal.openSearch();
+    cal.setSearchText('x');
+    api.noAccess = 'refused';
+    await cal.searchNow();
+    expect(cal.get().search).toMatchObject({ note: NOT_GIVEN, needsAccess: true });
+    api.noAccess = 'window';
+    await cal.searchNow();
+    expect(cal.get().search?.note).toBe(NO_WINDOW);
+  });
+
+  it('an answer for text that was typed over is dropped', async () => {
+    const { api, cal } = await opened();
+    cal.openSearch();
+    cal.setSearchText('a');
+    let release = () => {};
+    const gate = new Promise<void>((done) => (release = done));
+    const slow = api.search;
+    api.search = async (t, d) => {
+      const r = await slow(t, d);
+      await gate;
+      return r;
+    };
+    api.found = [ev('old')];
+    const first = cal.searchNow();
+    cal.setSearchText('ab');
+    release();
+    await first;
+    expect(cal.get().search).toMatchObject({ text: 'ab', results: null });
+  });
+
+  it('opening the panel again starts without a search', async () => {
+    const { cal } = await opened();
+    cal.openSearch();
+    await cal.open();
+    expect(cal.get().search).toBeNull();
+  });
+});
+
+describe('the search call to Google', () => {
+  const item = (id: string, start: string) => ({ id, summary: id, start: { dateTime: `${start}:00` }, end: { dateTime: `${start}:00` }, organizer: { self: true } });
+  function routed(answer: (url: URL) => unknown) {
+    const urls: URL[] = [];
+    const fn = vi.fn(async (url: string) => {
+      const u = new URL(url);
+      urls.push(u);
+      return new Response(JSON.stringify(answer(u)), { status: 200 });
+    });
+    const api = calendarApi({ base: 'https://api.test/calendar/v3', token: async () => 'tok', forget: () => {} }, fn as unknown as typeof fetch);
+    return { api, urls, fn };
+  }
+
+  it('uses Google’s own search (q) on the primary calendar, as single events, reading only', async () => {
+    const { api, urls, fn } = routed(() => ({ items: [] }));
+    await api.search('dent ist', '2026-10-06');
+    expect(urls.length).toBeGreaterThan(1);
+    for (const u of urls) {
+      expect(u.pathname).toBe('/calendar/v3/calendars/primary/events');
+      expect(u.searchParams.get('q')).toBe('dent ist');
+      expect(u.searchParams.get('singleEvents')).toBe('true');
+    }
+    for (const [, init] of fn.mock.calls as unknown as [string, RequestInit | undefined][]) expect(init?.method ?? 'GET').toBe('GET');
+  });
+
+  it('reads from today onward for the future and back in years from today for the past, 250 events at most', async () => {
+    const { api, urls } = routed(() => ({ items: [] }));
+    await api.search('x', '2026-10-06');
+    const spans = urls.map((u) => [u.searchParams.get('timeMin')!, u.searchParams.get('timeMax')!, u.searchParams.get('maxResults')!]);
+    const ahead = spans.find(([from]) => new Date(from).getTime() === new Date(2026, 9, 6).getTime())!;
+    expect(new Date(ahead[1]).getTime()).toBe(new Date(2031, 9, 6).getTime());
+    expect(Number(ahead[2])).toBeLessThanOrEqual(125);
+    expect(spans.some(([from, to]) => new Date(from).getTime() === new Date(2025, 9, 6).getTime() && new Date(to).getTime() === new Date(2026, 9, 6).getTime())).toBe(true);
+    expect(spans.some(([from]) => new Date(from).getTime() === new Date(2021, 9, 6).getTime())).toBe(true);
+  });
+
+  it('keeps the newest past events and the soonest future ones within the cap, with each event once', async () => {
+    const past = Array.from({ length: 200 }, (_, i) => item(`p${String(i).padStart(3, '0')}`, `2026-03-${String((i % 28) + 1).padStart(2, '0')}T${String(Math.floor(i / 28)).padStart(2, '0')}:00`));
+    const { api } = routed((u) => {
+      const from = new Date(u.searchParams.get('timeMin')!).getTime();
+      if (from === new Date(2025, 9, 6).getTime()) return { items: past };
+      if (from === new Date(2026, 9, 6).getTime()) return { items: [item('f1', '2026-10-07T09:00'), item('p199', '2026-10-07T09:00')] };
+      return { items: [] };
+    });
+    const found = await api.search('x', '2026-10-06');
+    expect(found.length).toBeLessThanOrEqual(250);
+    expect(new Set(found.map((e) => e.id)).size).toBe(found.length);
+    expect(found.filter((e) => e.start < '2026-10-06').length).toBe(125);
+    // The newest 125 of the 200 past events: the oldest 75 (by start time) are left out.
+    const kept = new Set(found.map((e) => e.id));
+    const newest = [...past].sort((a, b) => a.start.dateTime.localeCompare(b.start.dateTime)).slice(-125).map((e) => e.id);
+    for (const id of newest) expect(kept.has(id)).toBe(true);
+    expect(kept.has('f1')).toBe(true);
+  });
+
+  it('an event Google gives for two neighbouring years is counted once towards the cap', async () => {
+    const both = item('both', '2025-10-05T09:00');
+    const { api } = routed((u) => {
+      const from = new Date(u.searchParams.get('timeMin')!).getTime();
+      return from === new Date(2025, 9, 6).getTime() || from === new Date(2024, 9, 6).getTime() ? { items: [both] } : { items: [] };
+    });
+    expect((await api.search('x', '2026-10-06')).map((e) => e.id)).toEqual(['both']);
+  });
+
+  it('follows a year’s next page of matches', async () => {
+    const { api, urls } = routed((u) => {
+      const from = new Date(u.searchParams.get('timeMin')!).getTime();
+      if (from !== new Date(2025, 9, 6).getTime()) return { items: [] };
+      return u.searchParams.get('pageToken') ? { items: [item('second', '2026-05-01T09:00')] } : { items: [item('first', '2026-04-01T09:00')], nextPageToken: 'more' };
+    });
+    const found = await api.search('x', '2026-10-06');
+    expect(found.map((e) => e.id).sort()).toEqual(['first', 'second']);
+    expect(urls.some((u) => u.searchParams.get('pageToken') === 'more')).toBe(true);
+  });
+
+  it('a refusal by Google fails the search', async () => {
+    const fn = vi.fn(async () => new Response('{}', { status: 500 }));
+    const api = calendarApi({ base: 'https://api.test/calendar/v3', token: async () => 'tok', forget: () => {} }, fn as unknown as typeof fetch);
+    await expect(api.search('x', '2026-10-06')).rejects.toBeInstanceOf(CalendarApiError);
   });
 });

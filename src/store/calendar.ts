@@ -85,6 +85,8 @@ export interface CalendarSource {
 /** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
 export interface CalendarApi {
   list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
+  /** Google's own search of the whole primary calendar, past and future (owner request, 2026-11-19); `today` splits the two. Only reads. */
+  search(text: string, today: DayKey): Promise<CalEvent[]>;
   /** One event: a repeating event's series, to find its first day. */
   get(id: string): Promise<CalEvent | null>;
   /** Resolves to the new event's id (null if Google gave none). */
@@ -100,6 +102,14 @@ export interface CalendarApi {
    */
   restore(id: string): Promise<void>;
 }
+
+/** How long typing must stop before a search is sent (owner decision, 2026-11-19). */
+export const SEARCH_WAIT = 300;
+// Search looks this far back and forward from today (a call of the build, 2026-11-19), at most this many events each way.
+const SEARCH_YEARS = 5;
+const SEARCH_CAP = 125;
+// simple: a year with more than SEARCH_PAGES pages of 250 matches loses its newest ones; upgrade if a search ever matches that often.
+const SEARCH_PAGES = 4;
 
 /** The person's answers to the questions the form asks before saving or deleting (job #85). */
 export interface Choice {
@@ -142,6 +152,32 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       await ok(res);
       const body = (await res.json()) as { items?: unknown };
       return Array.isArray(body.items) ? body.items.map(parseEvent).filter((e): e is CalEvent => e !== null) : [];
+    },
+    async search(text, today) {
+      const [y, m, d] = today.split('-').map(Number);
+      const year = (n: number) => dayKey(new Date(y + n, m - 1, d));
+      // Google can only sort oldest first, so the past is read a year at a time, each year whole, to keep the newest matches.
+      const read = async (from: DayKey, to: DayKey, max: number) => {
+        const found: CalEvent[] = [];
+        let page: string | undefined;
+        for (let n = 0; n < SEARCH_PAGES; n++) {
+          const q = new URLSearchParams({ q: text, timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: String(max) });
+          if (page) q.set('pageToken', page);
+          const res = await call(`${events}?${q}`);
+          await ok(res);
+          const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
+          if (Array.isArray(body.items)) found.push(...body.items.map(parseEvent).filter((e): e is CalEvent => e !== null));
+          if (max < 250 || typeof body.nextPageToken !== 'string') break;
+          page = body.nextPageToken;
+        }
+        return found;
+      };
+      const years = Array.from({ length: SEARCH_YEARS }, (_, i) => i);
+      const [ahead, ...before] = await Promise.all([read(today, year(SEARCH_YEARS), SEARCH_CAP), ...years.map((i) => read(year(-i - 1), year(-i), 250))]);
+      // An event running over a boundary comes from two requests: listed once, before the cap is applied.
+      const seen = new Set(ahead.map((e) => e.id));
+      const past = [...new Map(before.flat().map((e) => [e.id, e])).values()].filter((e) => !seen.has(e.id)).sort((a, b) => a.start.localeCompare(b.start)).slice(-SEARCH_CAP);
+      return [...ahead, ...past];
     },
     async get(id) {
       const res = await call(one(id));
@@ -200,6 +236,11 @@ export interface CalendarState {
    * is here under its stand-in id until Google gives it its own.
    */
   sending: string[];
+  /**
+   * The search box (owner request, 2026-11-19), null while closed. `results` is null until Google has answered the
+   * text now typed; the text is sent SEARCH_WAIT ms after typing stops. `note` is why a search failed.
+   */
+  search: { text: string; results: CalEvent[] | null; note: string | null; needsAccess: boolean } | null;
 }
 
 /** A change to the list of events shown. */
@@ -243,7 +284,7 @@ const WIDTH_KEY = 'note-board:calendar-width';
 
 export function createCalendar(api: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null) {
   const widthStore = createWidthStore(WIDTH_KEY, PANEL_DEFAULT, storage);
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [] };
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null };
   let said = 0;
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
@@ -462,6 +503,28 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
     }
   }
 
+  // The search typed (owner request, 2026-11-19): sent once typing stops; only the answer to the text now in the box is used.
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let searched = 0;
+  function stopSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = undefined;
+    searched++;
+  }
+  async function runSearch() {
+    const box = state.search;
+    if (!api || !box) return;
+    const n = ++searched;
+    try {
+      const results = await api.search(box.text.trim(), today());
+      if (n === searched) set({ search: { ...box, results, note: null, needsAccess: false } });
+    } catch (e) {
+      const needsAccess = e instanceof NoAccess;
+      const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
+      if (n === searched) set({ search: { ...box, results: null, note, needsAccess } });
+    }
+  }
+
   return {
     /** False when no one is signed in (running locally without a demo person). */
     available: api !== null,
@@ -476,11 +539,30 @@ export function createCalendar(api: CalendarApi | null, today: () => DayKey = ()
       shownEarly.clear();
       undos = [];
       redos = [];
-      set({ day: today(), events: null, done: null });
+      stopSearch();
+      set({ day: today(), events: null, done: null, search: null });
       return load();
     },
     /** Try again (or Connect Google Calendar) after a note. */
     load,
+    openSearch() {
+      if (!state.search) set({ search: { text: '', results: null, note: null, needsAccess: false } });
+    },
+    /** Closes the box; the week or month is as it was. */
+    closeSearch() {
+      stopSearch();
+      set({ search: null });
+    },
+    setSearchText(text: string) {
+      stopSearch();
+      set({ search: { text, results: null, note: null, needsAccess: false } });
+      if (text.trim()) searchTimer = setTimeout(() => void runSearch(), SEARCH_WAIT);
+    },
+    /** Try again (or Connect Google Calendar) after a search failed: at once, straight from the click. */
+    searchNow() {
+      stopSearch();
+      if (state.search?.text.trim()) return runSearch();
+    },
     setView(view: CalView) {
       set({ view });
       return load();

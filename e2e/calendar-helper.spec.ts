@@ -58,6 +58,11 @@ test('Disconnect calendar forgets the connection; Connect Google Calendar connec
   const { asked, errors } = await open(page, name);
   await expect(dentist(page)).toBeVisible();
   const link = panel(page).getByRole('button', { name: 'Disconnect calendar' });
+  // At the bottom of the panel, under the scrolling week list (not scrolled away inside it).
+  await expect(link).toBeInViewport();
+  const weeks = await panel(page).locator('.cal-weeks').boundingBox();
+  const at = await link.boundingBox();
+  expect(at!.y).toBeGreaterThanOrEqual(weeks!.y + weeks!.height);
   await link.click();
   await expect(panel(page).getByText(DISCONNECTED)).toBeVisible();
   await expect(dentist(page)).toHaveCount(0);

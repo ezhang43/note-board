@@ -3418,7 +3418,7 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal-range { flex: 1; margin: 0; text-align: left; font-size: 14px; font-weight: 600; }
 .cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .cal-note .history-note { margin: 4px; }
-.cal-disconnect { display: flex; flex-direction: column; align-items: flex-start; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.cal-disconnect { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
 .cal-disconnect .history-note { margin: 4px; }
 .cal-disconnect-link { padding: 6px 4px; border: none; border-radius: 6px; background: none; color: var(--ink-soft); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 .cal-disconnect-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -3534,6 +3534,24 @@ button.estimate-chip:active { transform: scale(0.97); }
 .cal-day[data-drop], .cal-cell[data-drop] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
 .cal-event[data-dragging], .cal-chip[data-dragging] { opacity: 0.45; }
 body.cal-dragging { user-select: none; -webkit-user-select: none; }
+/*
+ * Days already gone are faded (owner request, 2026-11-20), in the Week list and the Month grid, by color rather than opacity so
+ * every text keeps WCAG AA contrast in light and dark: the date in the placeholder gray, events on a plain gray chip in the soft ink.
+ * They still open, change and drag as before.
+ */
+.cal-day.past h3, .cal-cell.past .cal-date { color: var(--placeholder); }
+.cal-day.past .cal-event { background: var(--hover); border-left-color: var(--control-edge); color: var(--ink-soft); }
+.cal-cell.past .cal-chip { color: var(--ink-soft); }
+.cal-cell.past .cal-chip.all-day { background: var(--hover); color: var(--ink-soft); }
+.cal-cell.past .cal-chip-dot { background: var(--control-edge); }
+/* The scrolling Week list (owner request, 2026-11-20): its own scroll area under the bars, which stay put; anchoring is done in code (Safari has none). */
+.cal.weekly { flex: 1; min-height: 0; }
+.history-panel:has(.cal-weeks) { overflow-y: hidden; }
+.cal-weeks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.cal-week { display: flex; flex-direction: column; gap: 8px; }
+.cal-week > .cal-day:first-child { border-top-width: 2px; }
+.cal-slot { grid-column: 2; height: 24px; border-radius: 6px; background: var(--hover); }
+
 .cal-ghost {
   position: fixed;
   left: 0;

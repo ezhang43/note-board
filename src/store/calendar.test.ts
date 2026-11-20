@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
-import { NoAccess, eventInRange } from '../model/calendar';
+import { NoAccess, eventInRange, viewRange } from '../model/calendar';
 import { tick } from './undoClock';
 import { SEARCH_WAIT, calendarApi, canRetry, CalendarApiError, createCalendar as createWithAhead, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, WRONG_ACCOUNT, ONE_MORE_STEP, DISCONNECTED, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 // Most tests count the calls to Google, so they run without the weeks fetched ahead; the last describe turns it on.
@@ -247,7 +247,7 @@ describe('the calendar panel', () => {
     expect(cal.get().events?.length).toBe(1);
     await cal.disconnect();
     expect(disconnected).toBe(1);
-    expect(cal.get()).toMatchObject({ note: DISCONNECTED, needsAccess: true, events: null, loading: false });
+    expect(cal.get()).toMatchObject({ note: DISCONNECTED, needsAccess: true, events: null, loaded: [], loading: false });
     await cal.load();
     expect(cal.get().note).toBeNull();
     expect(cal.get().events?.length).toBe(1);
@@ -431,7 +431,8 @@ describe('repeating events and guests (job #85)', () => {
       if (hold) await new Promise<void>((r) => (answer = r));
       return list(from, to);
     };
-    const cal = createCalendar(api, today);
+    // Its week is shown (the Week list holds only the events of the weeks it shows).
+    const cal = createCalendar(api, () => '2026-10-16');
     await cal.open();
     hold = true;
     expect(await cal.save(at(cal, 'su_1016'), { ...change, title: 'Daily sync' }, { all: true })).toBeNull();
@@ -444,7 +445,7 @@ describe('repeating events and guests (job #85)', () => {
     expect(await cal.save(at(cal, 'su_1016'), { ...change, title: 'Again' })).toBe(SAVE_FAILED);
     answer();
     await cal.settled();
-    expect(api.calls.at(-1)).toBe('list 2026-10-04 2026-10-11');
+    expect(api.calls.at(-1)).toBe('list 2026-10-11 2026-10-18');
     expect(cal.get()).toMatchObject({ loading: false, sending: [], events: [{ id: 'su_1016~' }] });
   });
 
@@ -2468,6 +2469,13 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     return { api, state };
   }
   const NEXT = '2026-10-11';
+  /** The week (or month) looked at, as the panel draws it: null while it isn't there yet (a placeholder in the Week list). */
+  const shown = (cal: ReturnType<typeof createWithAhead>) => {
+    const s = cal.get();
+    const { from, to } = viewRange(s.view, s.day);
+    const there = s.view === 'month' || s.loaded.includes(from);
+    return { loading: s.loading, events: there ? (s.events?.filter((e) => eventInRange(e, from, to)).sort((a, b) => a.start.localeCompare(b.start)) ?? null) : null };
+  };
   /** Every Sunday from 4 weeks before this week (4 Oct) to 8 after. */
   const weeks = Array.from({ length: 13 }, (_, i) => new Date(Date.UTC(2026, 9, 4 + 7 * (i - 4), 12)).toISOString().slice(0, 10));
 
@@ -2487,11 +2495,11 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     state.hold = true;
     for (let i = 0; i < 8; i++) {
       void cal.step(1);
-      expect(cal.get()).toMatchObject({ loading: false, events: [{ id: `w${5 + i}` }] });
+      expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: `w${5 + i}` }] });
     }
     for (let i = 0; i < 12; i++) void cal.step(-1);
     void cal.pickDay('2026-09-08');
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'w0' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'w0' }] });
   });
 
   it('an event over two weeks shows in both, as a direct fetch of each week shows it', async () => {
@@ -2509,15 +2517,15 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     await flush();
     state.hold = true;
     void cal.step(1);
-    const next = cal.get().events?.map((e) => e.id);
+    const next = shown(cal).events?.map((e) => e.id);
     // Google lists by start; a direct fetch of the week says the same.
     const direct = (from: string, to: string) => all.filter((e) => eventInRange(e, from, to)).sort((a, b) => a.start.localeCompare(b.start)).map((e) => e.id);
     expect(next).toEqual(direct(NEXT, '2026-10-18'));
     expect(next).toEqual(['long', 'trip', 'night', 'early']);
     void cal.step(-1);
     // The one ending at midnight is only in the week before; the one starting at midnight only in the week after.
-    expect(cal.get().events?.map((e) => e.id)).toEqual(direct('2026-10-04', NEXT));
-    expect(cal.get().events?.map((e) => e.id)).toEqual(['long', 'trip', 'sat', 'late', 'night']);
+    expect(shown(cal).events?.map((e) => e.id)).toEqual(direct('2026-10-04', NEXT));
+    expect(shown(cal).events?.map((e) => e.id)).toEqual(['long', 'trip', 'sat', 'late', 'night']);
   });
 
   it('a window cut short caches only the weeks it covered whole', async () => {
@@ -2528,11 +2536,11 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     await flush();
     state.hold = true;
     void cal.pickDay('2026-10-13');
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'a' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'a' }] });
     void cal.pickDay('2026-10-21');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
     void cal.pickDay('2026-09-08');
-    expect(cal.get()).toMatchObject({ loading: false, events: [] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [] });
   });
 
   it('stepping near the end of the window fetches the next window in one call', async () => {
@@ -2559,9 +2567,9 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     expect(cal.get().events?.map((e) => e.id)).toEqual(['this']);
     state.hold = true;
     void cal.pickDay('2027-03-10');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
     void cal.setView('month');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
   });
 
   it('a month loads, then the month before and the month after come in one call', async () => {
@@ -2573,9 +2581,9 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     expect(api.calls.slice(-2)).toEqual(['list 2026-09-27 2026-11-01', 'wide 2026-08-30 2026-12-06']);
     state.hold = true;
     void cal.step(1);
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'nov' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'nov' }] });
     void cal.step(-2);
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'sep' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'sep' }] });
   });
 
   it('refreshes a shown week in the background and swaps in what Google now has', async () => {
@@ -2600,10 +2608,11 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     await cal.settled();
   });
 
-  it('a change forgets every fetched week while it is on its way, so a deleted event does not come back', async () => {
-    const { api, state } = held([timed('gone', '2026-10-12')]);
+  it('a change forgets every fetched month while it is on its way, so a deleted event does not come back', async () => {
+    const { api, state } = held([timed('gone', '2026-11-12')]);
     const cal = createWithAhead(api, today);
     await cal.open();
+    await cal.setView('month');
     await flush();
     let answer!: () => void;
     api.create = async () => {
@@ -2613,11 +2622,26 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     expect(await cal.save(null, draft)).toBeNull();
     state.all = [];
     state.hold = true;
-    void cal.pickDay('2026-10-13');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
-    void cal.pickDay('2026-09-08');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    void cal.step(1);
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
+    void cal.step(-2);
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
     answer();
+  });
+
+  it('in the Week list, an event deleted here stays gone in every week shown while Google is told', async () => {
+    const { api, state } = held([timed('gone', '2026-10-12')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    api.remove = () => new Promise<boolean>(() => {});
+    state.hold = true;
+    expect(await cal.remove('gone')).toBeNull();
+    void cal.pickDay('2026-10-13');
+    expect(shown(cal)).toMatchObject({ loading: false, events: [] });
+    void cal.pickDay('2026-09-08');
+    void cal.pickDay('2026-10-13');
+    expect(shown(cal)).toMatchObject({ loading: false, events: [] });
   });
 
   it('once Google has a change, the weeks around are fetched again quietly, so stepping after a save shows them at once (calendar-save-speed)', async () => {
@@ -2635,12 +2659,12 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     // One wide call, this week included, made after Google answered; the week shown is never blanked or marked loading.
     expect(api.calls.filter((c) => c.startsWith('wide'))).toEqual(['wide 2026-09-06 2026-12-06']);
     expect(api.calls.filter((c) => c.startsWith('list'))).toEqual([]);
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
     state.hold = true;
     void cal.step(1);
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'next' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'next' }] });
     void cal.step(-1);
-    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
   });
 
   it('a deleted event stays gone in the weeks fetched again after Google has it', async () => {
@@ -2658,7 +2682,7 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     state.hold = true;
     void cal.step(1);
     void cal.step(-1);
-    expect(cal.get()).toMatchObject({ loading: false, events: [] });
+    expect(shown(cal)).toMatchObject({ loading: false, events: [] });
   });
 
   it('opening the panel afresh forgets every fetched week', async () => {
@@ -2669,10 +2693,10 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     state.hold = true;
     void cal.open();
     void cal.pickDay('2026-10-13');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
   });
 
-  it('keeps only the most recent weeks (about twenty)', async () => {
+  it('keeps only the most recent weeks (about forty)', async () => {
     const { api, state } = held();
     const cal = createWithAhead(api, today);
     await cal.open();
@@ -2683,7 +2707,7 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     }
     state.hold = true;
     void cal.pickDay('2026-10-06');
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
   });
 
   it('a week that could not be fetched ahead is fetched when stepped to', async () => {
@@ -2730,9 +2754,9 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     state.all = [timed('bobs', '2026-10-12')];
     state.hold = true;
     void cal.step(-1);
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
     void cal.step(-1);
-    expect(cal.get()).toMatchObject({ loading: true, events: null });
+    expect(shown(cal)).toMatchObject({ loading: true, events: null });
     state.hold = false;
     late();
     await flush();
@@ -2837,5 +2861,232 @@ describe('another person signing in with the panel open (owner request, 2026-11-
     api.calls.length = 0;
     await cal.undo();
     expect(api.calls.filter((c) => c.startsWith('update') || c.startsWith('create') || c.startsWith('restore'))).toEqual([]);
+  });
+});
+
+describe('the Week list scrolls on into earlier and later weeks (owner request, 2026-11-20)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const timed = (id: string, day: string) => ev(id, { start: `${day}T10:00`, end: `${day}T11:00` });
+  /** Answers like Google: every event overlapping the days asked for; `hold` makes every answer wait. */
+  function google(all: CalEvent[]) {
+    const api = fakeApi([]);
+    const state = { hold: false, all };
+    const find = (from: string, to: string) => state.all.filter((e) => eventInRange(e, from, to)).sort((a, b) => a.start.localeCompare(b.start));
+    api.list = async (from, to) => {
+      api.calls.push(`list ${from} ${to}`);
+      if (state.hold) await new Promise<void>(() => {});
+      return find(from, to);
+    };
+    api.listWide = async (from, to) => {
+      api.calls.push(`wide ${from} ${to}`);
+      if (state.hold) await new Promise<void>(() => {});
+      return { events: find(from, to), covered: to };
+    };
+    return { api, state };
+  }
+  /** A Sunday `n` weeks from 4 Oct 2026 (the week of `today`). */
+  const sunday = (n: number) => new Date(Date.UTC(2026, 9, 4 + 7 * n, 12)).toISOString().slice(0, 10);
+  const ids = (cal: ReturnType<typeof createWithAhead>) => cal.get().events?.map((e) => e.id).sort();
+
+  it('lists the events of every week fetched around the one looked at, and which weeks those are', async () => {
+    const { api } = google([timed('before', '2026-09-15'), timed('this', '2026-10-06'), timed('later', '2026-11-25')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    expect(ids(cal)).toEqual(['before', 'later', 'this']);
+    // 4 weeks before this one and 8 after, as fetched ahead.
+    expect(cal.get().loaded).toEqual(Array.from({ length: 13 }, (_, i) => sunday(i - 4)));
+    expect(cal.get()).toMatchObject({ day: '2026-10-06', loading: false });
+  });
+
+  it('scrolling to another week makes it the one looked at, without asking the list to move', async () => {
+    const { api } = google([timed('later', '2026-10-27')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    const jump = cal.get().jump;
+    void cal.scrolledTo('2026-10-25');
+    // The weekday is kept, as ‹ and › keep it.
+    expect(cal.get()).toMatchObject({ day: '2026-10-27', jump, loading: false });
+    // ‹ ›, Today and a picked day ask the list to scroll there.
+    void cal.step(1);
+    expect(cal.get()).toMatchObject({ day: '2026-11-03', jump: jump + 1 });
+    void cal.goToday();
+    expect(cal.get()).toMatchObject({ day: '2026-10-06', jump: jump + 2 });
+    void cal.pickDay('2026-12-01');
+    expect(cal.get()).toMatchObject({ day: '2026-12-01', jump: jump + 3 });
+  });
+
+  it('keeps fetching weeks as it is scrolled, either way, with no end', async () => {
+    const { api } = google([timed('past', '2026-03-03'), timed('future', '2027-06-08')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    for (let n = -1; n >= -32; n--) {
+      await cal.scrolledTo(sunday(n));
+      await flush();
+    }
+    expect(cal.get().events?.map((e) => e.id)).toContain('past');
+    expect(cal.get().loaded).toContain(sunday(-31));
+    for (let n = -31; n <= 36; n++) {
+      await cal.scrolledTo(sunday(n));
+      await flush();
+    }
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['future']);
+    expect(cal.get().loaded).toContain(sunday(39));
+  });
+
+  it('a week not fetched yet is left out of the list (a placeholder), never blanking the weeks shown', async () => {
+    const { api, state } = google([timed('this', '2026-10-06')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    state.hold = true;
+    void cal.scrolledTo(sunday(9));
+    // 9 weeks on: just past the 8 fetched ahead, so it is loading, but the weeks around are still shown.
+    expect(cal.get()).toMatchObject({ day: '2026-12-08', loading: true });
+    expect(cal.get().loaded).not.toContain(sunday(9));
+    expect(cal.get().loaded).toContain(sunday(8));
+    expect(ids(cal)).toEqual(['this']);
+  });
+
+  it('keeps memory bounded: only the weeks near the one looked at are listed', async () => {
+    const { api } = google([timed('this', '2026-10-06')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    for (let n = 1; n <= 30; n++) {
+      await cal.scrolledTo(sunday(n));
+      await flush();
+    }
+    expect(ids(cal)).toEqual([]);
+    expect(cal.get().loaded.every((w) => w >= sunday(20))).toBe(true);
+    expect(cal.get().loaded.length).toBeLessThanOrEqual(21);
+  });
+
+  it('weeks already shown stay shown while a change is on its way and after Google has it', async () => {
+    const { api, state } = google([timed('a', '2026-10-06'), timed('next', '2026-10-13')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    let answer!: () => void;
+    api.update = async () => {
+      await new Promise<void>((r) => (answer = r));
+    };
+    expect(await cal.save(at(cal, 'a'), { title: 'Renamed', allDay: false, startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00', guests: [] })).toBeNull();
+    state.hold = true;
+    void cal.scrolledTo(sunday(1));
+    expect(cal.get()).toMatchObject({ loading: false });
+    expect(cal.get().loaded).toContain(sunday(0));
+    expect(ids(cal)).toEqual(['a', 'next']);
+    expect(at(cal, 'a').title).toBe('Renamed');
+    answer();
+    await flush();
+    expect(at(cal, 'a').title).toBe('Renamed');
+    expect(cal.get().loaded).toContain(sunday(0));
+  });
+
+  it('an event dragged into the next week shows there at once', async () => {
+    const { api, state } = google([timed('a', '2026-10-06')]);
+    api.update = async (id) => {
+      state.all = state.all.map((e) => (e.id === id ? timed('a', '2026-10-14') : e));
+    };
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    void cal.move('a', '2026-10-06', '2026-10-14');
+    expect(at(cal, 'a').start).toBe('2026-10-14T10:00');
+    await cal.settled();
+    await flush();
+    expect(at(cal, 'a').start).toBe('2026-10-14T10:00');
+  });
+
+  it('an answer that set out before a change is never shown over it (a deleted event stays gone)', async () => {
+    const { api, state } = google([timed('a', '2026-10-06'), timed('next', '2026-10-13')]);
+    api.remove = async (id) => {
+      state.all = state.all.filter((e) => e.id !== id);
+      return true;
+    };
+    // The fetch of next week afresh (stepped to) is slow: it answers with what was there before the delete.
+    let late: (() => void) | null = null;
+    let slow = false;
+    const before = [...state.all];
+    const list = api.list;
+    api.list = async (from, to) => {
+      if (!slow || from !== sunday(1)) return list(from, to);
+      api.calls.push(`list ${from} ${to}`);
+      await new Promise<void>((r) => (late = r));
+      return before.filter((e) => eventInRange(e, from, to));
+    };
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    slow = true;
+    void cal.step(1);
+    await flush();
+    expect(await cal.remove('next')).toBeNull();
+    await cal.settled();
+    await flush();
+    expect(ids(cal)).toEqual(['a']);
+    slow = false;
+    late!();
+    await flush();
+    expect(ids(cal)).toEqual(['a']);
+  });
+
+  it('a week that fails to fetch while scrolling leaves the weeks shown in place', async () => {
+    const { api } = google([timed('a', '2026-10-06')]);
+    let failing: 'week 9' | 'all' | null = null;
+    const list = api.list;
+    const wide = api.listWide;
+    api.list = async (from, to) => {
+      if (failing === 'all' || (failing && from === sunday(9))) throw new CalendarApiError(500);
+      return list(from, to);
+    };
+    api.listWide = async (from, to) => {
+      if (failing) throw new CalendarApiError(500);
+      return wide(from, to);
+    };
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    failing = 'week 9';
+    await cal.scrolledTo(sunday(9));
+    await flush();
+    // That week stays a placeholder; the list, and what it shows, stay.
+    expect(cal.get()).toMatchObject({ day: '2026-12-08', loading: false });
+    expect(cal.get().loaded).toContain(sunday(8));
+    expect(cal.get().loaded).not.toContain(sunday(9));
+    expect(cal.get().events).not.toBeNull();
+    // With nothing shown, the note is shown as before.
+    failing = 'all';
+    await cal.open();
+    await flush();
+    expect(cal.get()).toMatchObject({ events: null, loaded: [], note: NOT_CONNECTED });
+  });
+
+  it('scrolling into a week already fetched asks Google nothing more for it; ‹ › still fetch it afresh', async () => {
+    const { api } = google([timed('a', '2026-10-06')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    api.calls.length = 0;
+    for (let n = 1; n <= 5; n++) await cal.scrolledTo(sunday(n));
+    await flush();
+    expect(api.calls.filter((c) => c.startsWith('list'))).toEqual([]);
+    await cal.step(1);
+    expect(api.calls.filter((c) => c.startsWith('list'))).toEqual([`list ${sunday(6)} ${sunday(7)}`]);
+  });
+
+  it('the Month view is as before: only its month, and no weeks listed', async () => {
+    const { api } = google([timed('sep', '2026-09-15'), timed('oct', '2026-10-15')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    await cal.setView('month');
+    expect(ids(cal)).toEqual(['oct']);
+    expect(cal.get().loaded).toEqual([]);
+    void cal.scrolledTo('2026-11-03');
+    expect(cal.get().day).toBe('2026-10-06');
   });
 });

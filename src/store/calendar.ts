@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { HELPER_URL } from '../calendar/helper';
 import { demoUser } from '../sync/demo';
 import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
+import { weeksBetween } from '../model/weekList';
 import type { DoneItem, VizRange } from '../model/visualizer';
 import { announce } from './announce';
 import { deviceStorage } from './env';
@@ -287,6 +288,14 @@ export interface CalendarState {
    * text now typed; the text is sent SEARCH_WAIT ms after typing stops. `note` is why a search failed.
    */
   search: { text: string; results: CalEvent[] | null; note: string | null; needsAccess: boolean } | null;
+  /**
+   * The Week list scrolls on (owner request, 2026-11-20): `events` then holds the events of every week near the one looked at
+   * (`day`) whose events are known, and `loaded` those weeks' Sundays; a week near it that isn't there yet shows a placeholder.
+   * Empty in the Month view.
+   */
+  loaded: DayKey[];
+  /** Counts the asks to bring the week of `day` into view (‹ ›, Today, a picked day), not a scroll to it. */
+  jump: number;
 }
 
 /** A change to the list of events shown. */
@@ -328,8 +337,13 @@ interface Taken {
 
 const WIDTH_KEY = 'note-board:calendar-width';
 
-/** The most ranges kept to show at once (owner request, 2026-11-19; 20 for a wide window of 13 weeks, 2026-11-20): the ones looked at or fetched ahead most recently. */
-export const CACHE_LIMIT = 20;
+/**
+ * The most ranges kept to show at once (owner request, 2026-11-19; 20 for a wide window of 13 weeks, 2026-11-20; 40 for the
+ * scrolling Week list, 2026-11-20, which lists WEEKS_AROUND weeks each side): the ones looked at or fetched ahead most recently.
+ */
+export const CACHE_LIMIT = 40;
+/** How many weeks before and after the one looked at the scrolling Week list holds (it draws fewer): the rest are let go. */
+export const WEEKS_AROUND = 10;
 
 /** `ahead`: fetch the range before and after the one shown (the tests count calls, so most turn it off). */
 export function createCalendar(realApi: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null, ahead = true) {
@@ -386,10 +400,10 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     undos = [];
     redos = [];
     stopSearch();
-    set({ events: null, done: null, search: null });
+    set({ events: null, loaded: [], done: null, search: null });
     return true;
   };
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null };
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null, loaded: [], jump: 0 };
   let said = 0;
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
@@ -626,6 +640,8 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         for (const n of [...need].sort((x, y) => Math.abs(y.k) - Math.abs(x.k))) {
           if (n.to <= covered) keep(n.key, events.filter((e) => eventInRange(e, n.from, n.to)));
         }
+        // The scrolling Week list shows them straight away, in place of their placeholders.
+        if (view === 'week' && state.view === 'week' && state.events !== null) set(weeksShown());
       },
       () => {}, // quiet: stepping there asks again, and shows why if it fails
     ).finally(() => {
@@ -633,7 +649,35 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     });
   }
 
-  async function load(): Promise<void> {
+  /**
+   * The scrolling Week list (owner request, 2026-11-20): the events of the weeks within WEEKS_AROUND of the one looked at,
+   * each week from what was fetched (`fresh` first, then the cache), else as it is shown now (a change forgets the cache, and
+   * the weeks on screen must not turn back into placeholders meanwhile). Weeks further away are let go, so memory stays bounded.
+   */
+  function weeksShown(answer?: { key: string; events: CalEvent[] }) {
+    const shown = state.events ?? [];
+    const seen = new Set<string>();
+    const events: CalEvent[] = [];
+    const loaded: DayKey[] = [];
+    const add = (list: CalEvent[]) => {
+      for (const e of list) if (!seen.has(e.id)) seen.add(e.id), events.push(e);
+    };
+    const weeks = Array.from({ length: 2 * WEEKS_AROUND + 1 }, (_, i) => {
+      const key = rangeKey('week', moveView('week', state.day, i - WEEKS_AROUND));
+      return { key, ...viewRange('week', moveView('week', state.day, i - WEEKS_AROUND)), raw: answer?.key === key ? answer.events : cache.get(key) };
+    });
+    // What Google gave first; then, for a week shown but not fetched since, what is shown now, except what is also in a week
+    // Google has given (it may have moved or deleted it since).
+    const fresh = weeks.filter((w) => w.raw);
+    for (const w of fresh) add(w.raw!);
+    const kept = weeks.filter((w) => !w.raw && state.loaded.includes(w.from));
+    add(shown.filter((e) => kept.some((w) => eventInRange(e, w.from, w.to)) && !fresh.some((w) => eventInRange(e, w.from, w.to))));
+    for (const w of weeks) if (w.raw || kept.includes(w)) loaded.push(w.from);
+    return { events: loaded.length ? withEarly(events) : null, loaded };
+  }
+
+  /** `scrolled`: the Week list was scrolled there by hand (a week that fails to come then stays a placeholder). */
+  async function load(scrolled = false): Promise<void> {
     if (!api) return;
     const n = ++asked;
     changedPerson();
@@ -642,6 +686,33 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     const key = rangeKey(view, day);
     const early = cache.get(key);
     const at = generation;
+    if (view === 'week') {
+      // Every week near it at once; this week is fetched afresh, and is loading (a placeholder) only when it isn't shown yet.
+      if (early) keep(key, early);
+      const near = weeksShown();
+      shownKey = null;
+      set({ ...near, loading: !near.loaded.includes(from), note: null, needsAccess: false });
+      try {
+        const events = await api.list(from, to);
+        if (changedPerson()) return n === asked ? load() : undefined;
+        if (at === generation) keep(key, events);
+        // An answer for a week since scrolled past is still shown, if it is still near; never one that set out before a change
+        // (it may hold an event since deleted or moved: the weeks shown stay as they are until the fetch after the change).
+        if (state.view === 'week') set({ ...weeksShown(at === generation ? { key, events } : undefined), ...(n === asked && { loading: false }) });
+        if (n === asked) fetchAhead(view, day);
+      } catch (e) {
+        if (changedPerson()) return n === asked ? load() : undefined;
+        cache.delete(key);
+        const { note, needsAccess } = accessNote(e);
+        if (n !== asked) return;
+        // Scrolled into a week that didn't come: it stays a placeholder (asked again when scrolled back to) and the weeks
+        // shown stay. Stepped to (‹ ›, Today), with nothing shown, or when Google needs connecting again: the usual note.
+        if (scrolled && !needsAccess && state.loaded.length) set({ loading: false });
+        else set({ events: null, loaded: [], loading: false, note, needsAccess });
+      }
+      return;
+    }
+    if (state.loaded.length) set({ loaded: [] });
     if (early) {
       // Shown at once; the fresh list replaces it when it arrives. Looked at, so it is kept longest.
       keep(key, early);
@@ -718,7 +789,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       undos = [];
       redos = [];
       stopSearch();
-      set({ events: null, loading: false, note: DISCONNECTED, needsAccess: true, search: null, done: null });
+      set({ events: null, loaded: [], loading: false, note: DISCONNECTED, needsAccess: true, search: null, done: null });
     },
     get: () => state,
     subscribe(listener: () => void) {
@@ -734,7 +805,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       undos = [];
       redos = [];
       stopSearch();
-      set({ day: today(), events: null, done: null, search: null });
+      set({ day: today(), events: null, loaded: [], done: null, search: null, jump: state.jump + 1 });
       return load();
     },
     /** Try again (or Connect Google Calendar) after a note. */
@@ -762,16 +833,36 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       return load();
     },
     step(n: number) {
-      set({ day: moveView(state.view, state.day, n) });
+      set({ day: moveView(state.view, state.day, n), jump: state.jump + 1 });
       return load();
     },
     goToday() {
-      set({ day: today() });
+      set({ day: today(), jump: state.jump + 1 });
       return load();
+    },
+    /**
+     * The Week list was scrolled to the week of `day` (owner request, 2026-11-20): it is the one looked at now (its heading,
+     * N's day), keeping the weekday as ‹ and › do, and the weeks around it are fetched. The list isn't asked to move.
+     */
+    scrolledTo(day: DayKey): Promise<void> {
+      const from = viewRange('week', day).from;
+      const was = viewRange('week', state.day).from;
+      if (state.view !== 'week' || from === was) return Promise.resolve();
+      set({ day: addDays(state.day, weeksBetween(was, from) * 7) });
+      // A week already fetched is shown as fetched, with no request of its own (a fling through weeks would send one per
+      // week); the weeks beyond are fetched ahead as usual. ‹ ›, Today, a change and a fresh open still fetch it afresh.
+      const key = rangeKey('week', state.day);
+      const cached = !changedPerson() && cache.get(key);
+      if (!cached) return load(true);
+      asked++;
+      keep(key, cached);
+      set({ ...weeksShown(), loading: false, note: null, needsAccess: false });
+      fetchAhead('week', state.day);
+      return Promise.resolve();
     },
     pickDay(day: DayKey) {
       const before = viewRange(state.view, state.day);
-      set({ day });
+      set({ day, jump: state.jump + 1 });
       // A greyed day from the month before or after shows that month: fetch it.
       const after = viewRange(state.view, day);
       return after.from === before.from && after.to === before.to ? Promise.resolve() : load();

@@ -44,6 +44,14 @@ const button = (page: Page) => page.locator('.corner-controls').getByRole('butto
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Google Calendar' });
 const day = (page: Page, d: Date) => panel(page).getByRole('region', { name: label(d) });
 const form = (page: Page) => panel(page).getByRole('form');
+/** The scrolling Week list (owner request, 2026-11-20). */
+const weekList = (page: Page) => panel(page).locator('.cal-weeks');
+/** The week starting on this Sunday is the one at the top of the list (once any smooth scroll has ended). */
+async function atTop(page: Page, sunday: string) {
+  await expect
+    .poll(() => weekList(page).evaluate((el, w) => Math.round(el.querySelector(`[data-week="${w}"]`)!.getBoundingClientRect().top - el.getBoundingClientRect().top), sunday))
+    .toBe(0);
+}
 /** The small card an event opens (job #108). */
 const card = (page: Page) => panel(page).getByRole('dialog');
 /** Types a time (24-hour, "07:00") into a time box and takes it with Enter. */
@@ -908,8 +916,8 @@ test('the card moves with the panel’s edge when the panel or the window is res
   await expect(card(page)).toBeVisible();
   // It keeps the height it opened at, also when the list has scrolled since.
   const top = (await card(page).boundingBox())!.y;
-  await panel(page).evaluate((el) => el.scrollBy(0, 80));
-  expect(await panel(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await weekList(page).evaluate((el) => el.scrollBy(0, 80));
+  expect(await weekList(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   const gap = async () => {
     const [p, c] = [(await panel(page).boundingBox())!, (await card(page).boundingBox())!];
     return Math.round(p.x - 8 - (c.x + c.width));
@@ -970,20 +978,22 @@ test('week and month views, back and forward, and Today', async ({ page }) => {
   await expect(panel(page).getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const heading = panel(page).locator('.cal-range');
   // The week runs Sunday to Saturday (owner request 2026-11-17); the clock is pinned to Sunday 15 Nov 2026.
-  const days = panel(page).locator('.cal-day');
+  // The week shown is the one at the top of the scrolling list, Sunday first.
+  const days = weekList(page).locator('[data-week="2026-11-15"] .cal-day');
   await expect(days).toHaveCount(7);
   await expect(days.first()).toHaveAttribute('aria-label', 'Sun 15 Nov');
   await expect(days.last()).toHaveAttribute('aria-label', 'Sat 21 Nov');
+  await atTop(page, '2026-11-15');
   await expect(heading).toHaveText('15–21 Nov 2026');
   await panel(page).getByRole('button', { name: 'Next week' }).click();
   await expect(heading).toHaveText('22–28 Nov 2026');
-  await expect(days.first()).toHaveAttribute('aria-label', 'Sun 22 Nov');
+  await atTop(page, '2026-11-22');
   await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
   await expect(heading).toHaveText('15–21 Nov 2026');
+  await atTop(page, '2026-11-15');
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
   await expect(heading).toHaveText('8–14 Nov 2026');
-  await expect(days.first()).toHaveAttribute('aria-label', 'Sun 8 Nov');
-  await expect(days.last()).toHaveAttribute('aria-label', 'Sat 14 Nov');
+  await atTop(page, '2026-11-08');
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
   await expect(heading).toHaveText('1–7 Nov 2026');
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
@@ -2906,8 +2916,159 @@ test('stepping to the next or the previous week shows its events at once, with n
   await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
   // Every week of the window shows at once; the 9th week on was not fetched ahead: it is loading, and shows none of this week's events under its heading.
   for (let i = 0; i < 9; i++) await panel(page).getByRole('button', { name: 'Next week' }).click();
-  await expect(panel(page).getByText('Loading…')).toBeVisible();
-  await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
+  await expect(panel(page).locator('.cal-range')).toHaveText('17–23 Jan 2027');
+  const ninth = weekList(page).locator('[data-week="2027-01-17"]');
+  await expect(ninth.locator('.placeholder')).toHaveCount(7);
+  await expect(panel(page).getByText('Loading…')).toHaveCount(0);
+  await expect(ninth.getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
   await page.unroute('**/__calendar/**');
+  expect(errors).toEqual([]);
+});
+
+test.describe('the Week list scrolls on into earlier and later weeks (owner request, 2026-11-20)', () => {
+  const heading = (page: Page) => panel(page).locator('.cal-range');
+  /** Scrolls the list by hand so the week starting on this Sunday is at its top. */
+  const scrollToWeek = (page: Page, sunday: string) =>
+    weekList(page).evaluate((el, w) => {
+      const week = el.querySelector(`[data-week="${w}"]`)!;
+      el.scrollTop += week.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    }, sunday);
+  const sunday = (n: number) => key(daysFromToday(7 * n));
+  const opened = async (page: Page) => {
+    await button(page).click();
+    await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
+  };
+
+  test('scrolling down shows later weeks, the heading following, with no end', async ({ page }) => {
+    const errors = await openAs(page);
+    await opened(page);
+    await expect(heading(page)).toHaveText('15–21 Nov 2026');
+    await scrollToWeek(page, sunday(1));
+    await expect(heading(page)).toHaveText('22–28 Nov 2026');
+    for (let n = 2; n <= 14; n++) {
+      await scrollToWeek(page, sunday(n));
+      await expect(weekList(page).locator(`[data-week="${sunday(n + 1)}"]`)).toHaveCount(1);
+    }
+    await expect(heading(page)).toHaveText('21–27 Feb 2027');
+    // Fourteen weeks on, past the weeks fetched when the panel opened: the week is fetched, its placeholders go.
+    await expect(weekList(page).locator(`[data-week="${sunday(14)}"] .placeholder`)).toHaveCount(0);
+    await expect(weekList(page).locator(`[data-week="${sunday(14)}"] .cal-day`)).toHaveCount(7);
+    await expect(panel(page).getByText('Loading…')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('scrolling up shows earlier weeks, and the list never jumps when weeks are added above', async ({ page }) => {
+    const errors = await openAs(page);
+    await opened(page);
+    for (let n = -1; n >= -12; n--) {
+      await scrollToWeek(page, sunday(n));
+      // Weeks added or filled in above, and weeks let go below, leave the week scrolled to where it is.
+      await page.waitForTimeout(100);
+      await atTop(page, sunday(n));
+    }
+    await expect(heading(page)).toHaveText('23–29 Aug 2026');
+    await expect(weekList(page).locator(`[data-week="${sunday(-13)}"]`)).toHaveCount(1);
+    // Six weeks back the repeating stand-up is there, fetched as it came into view.
+    await scrollToWeek(page, sunday(-6));
+    await expect(day(page, daysFromToday(-6 * 7 + 1)).getByRole('button', { name: /Team stand-up/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('‹ › and Today, and the keys ← → and T, scroll to the week before, after, or this one', async ({ page }) => {
+    // With motion on, as most people have it: the list glides there.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const errors = await openAs(page);
+    await opened(page);
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    await atTop(page, sunday(1));
+    await expect(heading(page)).toHaveText('22–28 Nov 2026');
+    await panel(page).getByRole('button', { name: 'Previous week' }).click();
+    await atTop(page, sunday(0));
+    await panel(page).getByRole('button', { name: 'Previous week' }).click();
+    await atTop(page, sunday(-1));
+    await expect(heading(page)).toHaveText('8–14 Nov 2026');
+    // Scrolled far away by hand, Today comes back.
+    for (let n = 1; n <= 10; n++) await scrollToWeek(page, sunday(n));
+    await expect(heading(page)).toHaveText('24–30 Jan 2027');
+    await panel(page).getByRole('button', { name: 'Today', exact: true }).click();
+    await atTop(page, sunday(0));
+    await expect(heading(page)).toHaveText('15–21 Nov 2026');
+    await panel(page).getByRole('button', { name: 'Today', exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await atTop(page, sunday(1));
+    await page.keyboard.press('ArrowLeft');
+    await atTop(page, sunday(0));
+    await page.keyboard.press('ArrowLeft');
+    await atTop(page, sunday(-1));
+    await page.keyboard.press('t');
+    await atTop(page, sunday(0));
+    await expect(heading(page)).toHaveText('15–21 Nov 2026');
+    expect(errors).toEqual([]);
+  });
+
+  test('with reduced motion, › moves at once', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const errors = await openAs(page);
+    await opened(page);
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    // No smooth scroll in between: the week is at the top straight away.
+    const offset = await weekList(page).evaluate(
+      (el, w) => Math.round(el.querySelector(`[data-week="${w}"]`)!.getBoundingClientRect().top - el.getBoundingClientRect().top),
+      sunday(1),
+    );
+    expect(offset).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('a search result in a week far from the one shown goes there and opens its card', async ({ page }) => {
+    const errors = await openAs(page);
+    await opened(page);
+    // Three weeks back: the weeks drawn now end well before 29 Dec.
+    for (let n = -1; n >= -3; n--) await scrollToWeek(page, sunday(n));
+    await expect(heading(page)).toHaveText('25–31 Oct 2026');
+    await expect(weekList(page).locator(`[data-week="${sunday(6)}"]`)).toHaveCount(0);
+    await panel(page).getByRole('button', { name: 'Search events' }).click();
+    await panel(page).getByRole('searchbox', { name: 'Search events' }).fill('stand-up');
+    const result = panel(page).locator('.cal-results .cal-day').filter({ has: page.getByRole('heading', { name: 'Tue 29 Dec', exact: true }) });
+    await result.getByRole('button', { name: /Team stand-up/ }).click();
+    await expect(card(page)).toBeVisible();
+    await expect(card(page)).toContainText('Tue 29 Dec');
+    await expect(heading(page)).toHaveText('27 Dec 2026 – 2 Jan 2027');
+    expect(errors).toEqual([]);
+  });
+
+  test('an event in a later week opens its card, and the card stays while the list scrolls', async ({ page }) => {
+    const errors = await openAs(page);
+    await opened(page);
+    await scrollToWeek(page, sunday(3));
+    await day(page, daysFromToday(7 * 3 + 1)).getByRole('button', { name: /Team stand-up/ }).click();
+    await expect(card(page)).toBeVisible();
+    await weekList(page).evaluate((el) => (el.scrollTop += 40));
+    await expect(card(page)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});
+
+test('days already gone are faded in the Week list and the Month grid, and still open (owner request, 2026-11-20)', async ({ page }) => {
+  const errors = await openAs(page);
+  await button(page).click();
+  const yesterday = day(page, daysFromToday(-1));
+  const tomorrow = day(page, daysFromToday(1));
+  await expect(yesterday.getByRole('button', { name: /Team stand-up/ })).toBeVisible();
+  await expect(yesterday).toHaveClass(/\bpast\b/);
+  await expect(day(page, nowDate())).not.toHaveClass(/\bpast\b/);
+  await expect(tomorrow).not.toHaveClass(/\bpast\b/);
+  const color = (l: Locator) => l.evaluate((el) => getComputedStyle(el).color);
+  expect(await color(yesterday.locator('h3'))).not.toBe(await color(tomorrow.locator('h3')));
+  expect(await color(yesterday.getByRole('button', { name: /Team stand-up/ }))).not.toBe(await color(tomorrow.getByRole('button', { name: /Team stand-up/ })));
+  await yesterday.getByRole('button', { name: /Team stand-up/ }).click();
+  await expect(card(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(card(page)).toHaveCount(0);
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const past = panel(page).locator('.cal-cell.past');
+  // Sun 1 to Sat 14 Nov have gone; the grid also shows the end of October.
+  await expect(past).not.toHaveCount(0);
+  expect(await panel(page).locator('.cal-cell.today.past').count()).toBe(0);
   expect(errors).toEqual([]);
 });

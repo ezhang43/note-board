@@ -1,0 +1,3 @@
+- 2026-11-20 Panel widths are still saved to this device on every resize move (a tiny write), not only on release: after the board-restyle fix it is not measurable, and it keeps the saved width right if the tab closes mid-drag.
+- 2026-11-20 Only the Visualizer loads on demand. The Journal, Habits and Calendar panels take typing the instant they open, so keys pressed while one was still loading would be lost (about 30 e2e specs showed it). Their code stays in the main file.
+- 2026-11-20 The 8 build warnings about src/sync/demo.ts are left alone: fixing them means editing a sync file, which would make this a high-risk change (the dynamic imports there work as intended).

@@ -18,7 +18,7 @@ import { TextSizeButtons } from './ZoomControl';
 import { DONATE_URL } from '../model/constants';
 import { keepsBlockCursor } from './textField';
 import { CompletedButton } from './CompletedPanel';
-import { VisualizerButton } from './Visualizer';
+import { VisualizerButton } from './VisualizerButton';
 import { HistoryButton } from './HistoryPanel';
 import { PomodoroButton } from './PomodoroPanel';
 import { CalendarButton } from './CalendarPanel';

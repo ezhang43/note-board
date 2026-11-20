@@ -8,9 +8,9 @@ import { aiLabels } from '../store/aiLabels';
 import { fetchCalendarDone } from '../store/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { collab, useSharing } from '../sync/collabSession';
-import { CloseIcon, VisualizerIcon } from './icons';
+import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
-import { closeVisualizer, closeWhenGone, openVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy, useVisualizerOpen } from './visualizerState';
+import { closeVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy } from './visualizerState';
 import { readPalette, startDisc } from './visualizerDraw';
 import { VizAiSort } from './VizAiSort';
 
@@ -19,30 +19,6 @@ import { VizAiSort } from './VizAiSort';
  * moved into the Completed panels, oldest to newest. It only reads the boards: nothing here changes, saves
  * or syncs them, and whether it is open is not part of the board either (see visualizerState).
  */
-
-/** Opens the Visualizer: a row in the ⋯ More menu on a computer, a full-width tile in the ⋯ sheet on a phone. */
-export function VisualizerButton({ onOpen }: { onOpen?: () => void }) {
-  return (
-    <button
-      type="button"
-      className="tb-button"
-      aria-label="Visualizer"
-      title="Visualizer: completed items, replayed"
-      onClick={() => {
-        openVisualizer();
-        onOpen?.();
-      }}
-    >
-      <VisualizerIcon />
-      Visualizer
-    </button>
-  );
-}
-
-export function Visualizer() {
-  useEffect(closeWhenGone, []);
-  return useVisualizerOpen() ? <Overlay /> : null;
-}
 
 const RANGE_NOUN: Record<VizRange, string> = { '7': 'Last 7 days', '30': 'Last 30 days', all: 'All time' };
 /** How many "Just finished" rows show at once. */
@@ -53,7 +29,7 @@ const CHART_H = 64;
 /** "Nov 12" from a day key. */
 const shortDay = (key: string) => `${MONTHS[Number(key.slice(5, 7)) - 1]} ${Number(key.slice(8, 10))}`;
 
-function Overlay() {
+export function VisualizerOverlay() {
   const backdrop = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);

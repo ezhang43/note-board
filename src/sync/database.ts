@@ -1,4 +1,5 @@
 import { deleteUser, type User } from 'firebase/auth';
+import { HELPER_URL, helperDisconnect } from '../calendar/helper';
 import {
   addDoc,
   clearIndexedDbPersistence,
@@ -98,6 +99,8 @@ export function accountRemote(user: User, shares: CollabBackend, client: string)
       }
     },
     markDeleted: () => setDoc(own, { deleting: 'done', client, updatedAt: serverTimestamp() }),
+    // The calendar helper's connection (owner decision 2026-11-20), only when the helper is on.
+    disconnectCalendar: HELPER_URL ? async () => helperDisconnect(await user.getIdToken()) : undefined,
     deleteUser: () => deleteUser(user),
   };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CalEvent, EventBody } from '../model/calendar';
 import { NoAccess, eventInRange } from '../model/calendar';
 import { tick } from './undoClock';
-import { SEARCH_WAIT, calendarApi, canRetry, CalendarApiError, createCalendar as createWithAhead, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
+import { SEARCH_WAIT, calendarApi, canRetry, CalendarApiError, createCalendar as createWithAhead, fetchCalendarDone, UNDO_FAILED, UNDO_REFUSED, REDO_FAILED, REDO_REFUSED, SERIES_REDO_PART, UNDO_PART, NOT_CONNECTED, NO_WINDOW, NOT_GIVEN, WRONG_ACCOUNT, ONE_MORE_STEP, DISCONNECTED, SAVE_FAILED, BAD_TIMES, BAD_EMAIL, SERIES_ZONE, SERIES_ALL_DAY, SERIES_FAILED, type CalendarApi, type CalendarSource } from './calendar';
 // Most tests count the calls to Google, so they run without the weeks fetched ahead; the last describe turns it on.
 const createCalendar: typeof createWithAhead = (api, today, storage) => createWithAhead(api, today, storage, false);
 
@@ -224,6 +224,81 @@ describe('the calendar panel', () => {
     const cal = createCalendar(api, today);
     await cal.open();
     expect(cal.get()).toMatchObject({ note: NOT_GIVEN, needsAccess: true });
+  });
+
+  it('with the calendar helper: another Google account picked, or one more step needed, each say so with Connect', async () => {
+    for (const [reason, note] of [['account', WRONG_ACCOUNT], ['again', ONE_MORE_STEP], ['disconnected', DISCONNECTED]] as const) {
+      const api = fakeApi();
+      (api as { noAccess: unknown }).noAccess = reason;
+      const cal = createCalendar(api, today);
+      await cal.open();
+      expect(cal.get()).toMatchObject({ note, needsAccess: true, events: null });
+    }
+  });
+
+  it('Disconnect calendar (only offered with the helper): the events go, the panel says it is disconnected, and Connect asks again', async () => {
+    expect(createCalendar(fakeApi(), today).canDisconnect).toBe(false);
+    const api = fakeApi();
+    let disconnected = 0;
+    api.disconnect = async () => void disconnected++;
+    const cal = createCalendar(api, today);
+    expect(cal.canDisconnect).toBe(true);
+    await cal.open();
+    expect(cal.get().events?.length).toBe(1);
+    await cal.disconnect();
+    expect(disconnected).toBe(1);
+    expect(cal.get()).toMatchObject({ note: DISCONNECTED, needsAccess: true, events: null, loading: false });
+    await cal.load();
+    expect(cal.get().note).toBeNull();
+    expect(cal.get().events?.length).toBe(1);
+  });
+
+  it('Disconnect waits for changes still on their way to Google, so nothing asks for access after it (code review 2026-11-20)', async () => {
+    const api = fakeApi([ev('a')]);
+    const order: string[] = [];
+    api.disconnect = async () => void order.push('disconnect');
+    const cal = createCalendar(api, today);
+    await cal.open();
+    let release!: () => void;
+    const slow = api.update;
+    api.update = async (...args) => {
+      await new Promise<void>((r) => (release = r));
+      order.push('saved');
+      return slow(...args);
+    };
+    const moving = cal.move('a', '2026-10-06', '2026-10-09');
+    await vi.waitFor(() => expect(release).toBeDefined());
+    const going = cal.disconnect();
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    release();
+    await going;
+    await moving;
+    expect(order).toEqual(['saved', 'disconnect']);
+    expect(cal.get()).toMatchObject({ note: DISCONNECTED, events: null });
+    const calls = api.calls.length;
+    await cal.settled();
+    expect(api.calls.slice(calls).filter((c) => /^(list|wide) /.test(c))).toEqual([]);
+  });
+
+  it('a Disconnect that fails rejects and leaves the calendar as it was', async () => {
+    const api = fakeApi();
+    api.disconnect = async () => {
+      throw new Error('helper down');
+    };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    await expect(cal.disconnect()).rejects.toThrow();
+    expect(cal.get().events?.length).toBe(1);
+    expect(cal.get().note).toBeNull();
+  });
+
+  it('calendarApi passes the source’s disconnect through', async () => {
+    let n = 0;
+    const api = calendarApi({ base: '', token: async () => 't', forget() {}, disconnect: async () => void n++ });
+    await api.disconnect?.();
+    expect(n).toBe(1);
+    expect(calendarApi({ base: '', token: async () => 't', forget() {} }).disconnect).toBeUndefined();
   });
 
   it('opening it again forgets what was shown before (a different person may have signed in)', async () => {

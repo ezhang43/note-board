@@ -92,6 +92,26 @@ describe('deleteAccountData', () => {
     expect(state).toEqual(gone);
   });
 
+  it('disconnects the Google Calendar helper’s connection first, and stops with nothing deleted if that fails (owner decision 2026-11-20)', async () => {
+    const { backend, calls, state, fail } = fakeAccount([]);
+    const withCalendar: AccountBackend = {
+      ...backend,
+      async disconnectCalendar() {
+        calls.push('disconnectCalendar');
+        if (fail.has('disconnectCalendar')) throw Object.assign(new Error('offline'), { code: 'unavailable' });
+      },
+    };
+    fail.add('disconnectCalendar');
+    await expect(deleteAccountData('me', withCalendar)).rejects.toMatchObject({ partial: false });
+    expect(calls).toEqual(['disconnectCalendar']);
+    expect(state).toMatchObject({ board: 'boards', ownData: true, user: true }); // nothing deleted: trying again works
+    fail.delete('disconnectCalendar');
+    calls.length = 0;
+    await deleteAccountData('me', withCalendar);
+    expect(calls).toEqual(['disconnectCalendar', 'markDeleting', 'myShares', 'markDeleted', 'deleteOwnData', 'deleteUser']);
+    expect(state).toEqual(gone);
+  });
+
   it('another device still open can’t put a version back online as a shared board goes (review 137-A H5)', async () => {
     const { backend, state, other } = fakeAccount([{ id: 's1', owner: 'me' }]);
     other.open = true;

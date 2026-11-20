@@ -136,6 +136,25 @@ export function devCalendarPlugin(): Plugin {
       // Each series' first time of day, as "person/id": its events' ids are made from the series' time.
       const firstTime = new Map<string, string>();
       let next = 1;
+      // A pretend calendar helper (calendar-helper/, owner decision 2026-11-20), for ?demo-helper=on: it only remembers who
+      // connected (until the dev server stops), and gives them an access when asked, as the real one does from its refresh token.
+      const connected = new Set<string>();
+      vite.middlewares.use('/__calendar-helper', (req, res) => {
+        const who = /^Bearer (demo-.{1,60})$/u.exec(req.headers.authorization ?? '')?.[1];
+        const send = (status: number, body: unknown) => {
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(body));
+        };
+        if (req.method !== 'POST') return send(405, { error: 'method' });
+        if (!who) return send(401, { error: 'sign_in' });
+        const path = (req.url ?? '').split('?')[0];
+        if (path === '/connect') connected.add(who);
+        else if (path === '/disconnect') return connected.delete(who), send(200, { ok: true });
+        else if (path !== '/access') return send(404, { error: 'path' });
+        if (!connected.has(who)) return send(404, { error: 'not_connected' });
+        send(200, { access_token: who, expires_in: 3599 });
+      });
       vite.middlewares.use('/__calendar', (req, res) => void handle(req, res));
 
       async function handle(req: IncomingMessage, res: ServerResponse) {

@@ -210,6 +210,7 @@ export function CalendarPanel() {
             {dayList(s.day)}
           </>
         ))}
+      {calendar.canDisconnect && !s.search?.text.trim() && s.events !== null && <Disconnect />}
       {openEvent && open && (
         <EventCard
           key={openEvent.id}
@@ -222,6 +223,41 @@ export function CalendarPanel() {
       )}
       {editing && <EventForm event={editing.event} start={editing.draft} opener={editing.opener} onClose={() => setEditing(null)} />}
       {moving && <MoveAsk key={moving.event.id} {...moving} onClose={() => setMoving(null)} />}
+    </div>
+  );
+}
+
+/** A small Disconnect calendar link at the bottom (owner decision 2026-11-20): the helper forgets the connection, on every device. */
+function Disconnect() {
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const link = useRef<HTMLButtonElement>(null);
+  const go = () => {
+    // Found now: once disconnected this link is gone with the events.
+    const panel = link.current?.closest('.cal');
+    setBusy(true);
+    setFailed(false);
+    calendar.disconnect().then(
+      () => {
+        // Keyboard focus moves to Connect Google Calendar in the note that replaces the events.
+        requestAnimationFrame(() => panel?.querySelector<HTMLButtonElement>('.cal-connect')?.focus());
+      },
+      () => {
+        setBusy(false);
+        setFailed(true);
+      },
+    );
+  };
+  return (
+    <div className="cal-disconnect">
+      <button ref={link} type="button" className="cal-disconnect-link" aria-disabled={busy} onClick={busy ? undefined : go}>
+        Disconnect calendar
+      </button>
+      {failed && (
+        <p className="history-note" role="status">
+          Couldn't disconnect. Try again.
+        </p>
+      )}
     </div>
   );
 }

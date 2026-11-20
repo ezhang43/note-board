@@ -1,0 +1,25 @@
+# The calendar helper (Cloudflare Workers, free plan). Setup: docs/calendar-helper-setup.md.
+# The repo is public: no account id, KV id or secret goes in this file. Wrangler (4.45 or newer)
+# creates the KV store on the first deploy and remembers it; if it writes an `id = ...` line here,
+# don't commit it (a unit test fails if one is). Secrets are set with `npx wrangler secret put`.
+name = "busyants-calendar-helper"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+GOOGLE_CLIENT_ID = "1016497512471-db35rklceu3shb8kouku7bs6hcuj888t.apps.googleusercontent.com"
+FIREBASE_PROJECT_ID = "note-board-a672a"
+# Only the published site (code review 2026-11-20). To try a local build against it, add its address here
+# for that deploy only, e.g. "https://ezhang43.github.io http://localhost:4173", and deploy again after.
+ALLOWED_ORIGINS = "https://ezhang43.github.io"
+CODE_REDIRECT_URI = "postmessage"
+
+[[kv_namespaces]]
+binding = "TOKENS"
+
+# A light limit per person: 30 calls a minute. namespace_id is any number you choose, not an account detail.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "4301"
+simple = { limit = 30, period = 60 }

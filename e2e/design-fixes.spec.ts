@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { add, appearance, arrange, cards, clickEmpty, columns, dragTo, freshBoardEachTest, importLinkCard, toggleDark } from './helpers';
 
 // Design fixes from the 2026-10-02 Impeccable review.
@@ -242,9 +242,12 @@ test('card and column delete buttons show the same trash can as checklist items,
   await clickEmpty(page);
   await add(page, 'Checklist');
   await page.keyboard.type('first item');
-  const trash = await page.locator('.item-trash svg').first().innerHTML();
+  // (The icon is drawn by CSS, as a mask on the button's ::after: job perf-fewer-elements.)
+  const icon = (l: Locator) => l.evaluate((el) => getComputedStyle(el, '::after').maskImage);
+  const trash = await icon(page.locator('.item-trash').first());
+  expect(trash).toContain('svg');
   const card = cards(page).first();
-  expect(await card.getByRole('button', { name: 'Delete card' }).locator('svg').innerHTML()).toBe(trash);
+  expect(await icon(card.getByRole('button', { name: 'Delete card' }))).toBe(trash);
   const faint = await page.locator('.item-trash').first().evaluate((el) => getComputedStyle(el).color);
   await expect(card.getByRole('button', { name: 'Delete card' })).toHaveCSS('color', faint);
 
@@ -252,7 +255,7 @@ test('card and column delete buttons show the same trash can as checklist items,
   await add(page, 'New container');
   const col = columns(page).first();
   const colDelete = col.getByRole('button', { name: 'Delete container and its cards' });
-  expect(await colDelete.locator('svg').innerHTML()).toBe(trash);
+  expect(await icon(colDelete)).toBe(trash);
   await expect(colDelete).toHaveCSS('color', faint);
 
   await colDelete.click(); // empty: it goes without asking, with Undo (owner, 2026-10-22)

@@ -2,7 +2,6 @@ import { use, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore
 import { estimateLabel, MAX_ESTIMATE, readEstimate } from '../model/estimate';
 import { findItem } from '../model/checklist';
 import { appStore, BoardScope, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
-import { TimerIcon } from './icons';
 import { BoardReadOnly } from './textBox';
 
 // Time estimates on notes and checklist items (job saved-estimate-doneon): a small chip (the estimate, or a faint clock
@@ -40,7 +39,7 @@ export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; ite
   return (
     <button
       type="button"
-      className={label ? 'estimate-chip' : 'estimate-chip add'}
+      className={label ? 'estimate-chip' : 'estimate-chip add ci ci-clock'} // the clock is drawn by CSS (styles.css: .ci)
       aria-label={label ? `Time estimate: ${label}` : 'Add a time estimate'}
       title={label ? 'Time estimate' : 'Add a time estimate'}
       aria-haspopup="dialog"
@@ -55,7 +54,7 @@ export function EstimateChip({ cardId, itemId, estimate }: { cardId: string; ite
         } else setOpen({ cardId, itemId });
       }}
     >
-      {label ?? <TimerIcon />}
+      {label}
     </button>
   );
 }

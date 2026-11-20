@@ -8,7 +8,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useTakeFocus } from './useTakeFocus';
 import { CardView } from './CardView';
 import { COLUMN_MIN_H } from '../model/constants';
-import { ChevronIcon, PlusIcon, ResizeIcon, TrashIcon } from './icons';
+import { PlusIcon } from './icons';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
@@ -112,23 +112,19 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           </button>
           <button
             type="button"
-            className="icon-button"
+            className="icon-button ci ci-chevron" // icons drawn by CSS (styles.css: .ci)
             aria-label={col.collapsed ? 'Expand container' : 'Collapse container'}
             title={col.collapsed ? 'Expand container' : 'Collapse container'}
             aria-expanded={!col.collapsed}
             onClick={() => appStore.toggleCollapsed(id)}
-          >
-            <ChevronIcon collapsed={col.collapsed} />
-          </button>
+          />
           <button
             type="button"
-            className="icon-button block-trash"
+            className="icon-button block-trash ci ci-trash"
             aria-label="Delete container and its cards"
             title="Delete container and its cards"
             onClick={() => appStore.askDeleteColumn(id)}
-          >
-            <TrashIcon />
-          </button>
+          />
         </div>
       </div>
 
@@ -161,13 +157,11 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         <>
           <button
             type="button"
-            className="resize-corner"
+            className="resize-corner ci ci-resize"
             aria-label="Resize container"
             onPointerDown={resizePointerDown('column', id, cardIds.length ? 'e' : 'se')}
             onKeyDown={resizeKeyDown('column', id, cardIds.length ? 'e' : 'se')}
-          >
-            <ResizeIcon />
-          </button>
+          />
         </>
       )}
     </section>

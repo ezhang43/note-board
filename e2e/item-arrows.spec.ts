@@ -146,7 +146,8 @@ const size = async (l: Locator) => {
   const b = (await l.boundingBox())!;
   return { w: b.width, h: b.height };
 };
-const iconSize = (l: Locator) => l.locator('svg').evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }));
+// The icon is the button's ::after, drawn by CSS (job perf-fewer-elements).
+const iconSize = (l: Locator) => l.evaluate((el) => ({ w: parseFloat(getComputedStyle(el, '::after').width), h: parseFloat(getComputedStyle(el, '::after').height) }));
 
 /** At the biggest text sizes a list is taller than the window: scroll the board until the row sits clear of the toolbar and the bottom bar. */
 async function panIntoView(row: Locator) {

@@ -1,4 +1,7 @@
 // Small inline icons used by the toolbar and zoom control.
+// The hover-only buttons on checklist rows and card headers draw theirs with CSS instead (styles.css, .ci-trash and the
+// others, job perf-fewer-elements). simple: the trash can, arrows, clock and collapse arrow there are hand copies of the
+// drawings here; change both together (a build step could generate them if the icons start changing often).
 
 const common = {
   fill: 'none',
@@ -141,14 +144,6 @@ export function ExternalIcon() {
   );
 }
 
-export function ResizeIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" strokeWidth="1.4" {...common} style={{ stroke: 'var(--placeholder)' }}>
-      <path d="M9 3L3 9M9 6.5L6.5 9" />
-    </svg>
-  );
-}
-
 export function TrashIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
@@ -162,14 +157,6 @@ export function PencilIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.5" {...common}>
       <path d="M10.5 2.5l3 3L5.5 13.5 2 14l.5-3.5 8-8zM9 4l3 3" />
-    </svg>
-  );
-}
-
-export function GripIcon() {
-  return (
-    <svg width="8" height="12" viewBox="0 0 12 18" style={{ fill: 'var(--placeholder)' }} aria-hidden="true">
-      {[3, 9, 15].flatMap((cy) => [3, 9].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.7" />))}
     </svg>
   );
 }

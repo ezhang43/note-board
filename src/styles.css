@@ -736,6 +736,37 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 @media (hover: hover) {
   .icon-button:hover { background: var(--hover); }
 }
+
+/*
+ * Icons drawn by CSS (job perf-fewer-elements). The hover-only buttons on every checklist row (Move up / down, trash
+ * can, drag grip, estimate clock) and on every card's and container's header (collapse arrow, trash can, estimate
+ * clock, resize corner) draw their icon as the button's ::after: the same drawing as the SVG icon in icons.tsx, used as
+ * a mask filled with the button's color. One box per button instead of an SVG tree: on a big board those trees were
+ * half of the page's elements, and every element slows typing, dragging and panning. Each button's rules size its ::after.
+ */
+.ci::after {
+  content: '';
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / 100% 100% no-repeat;
+  mask: var(--icon) center / 100% 100% no-repeat;
+}
+.ci-trash { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4'/%3E%3C/svg%3E"); }
+.ci-grip { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 18' fill='%23000'%3E%3Ccircle cx='3' cy='3' r='1.7'/%3E%3Ccircle cx='9' cy='3' r='1.7'/%3E%3Ccircle cx='3' cy='9' r='1.7'/%3E%3Ccircle cx='9' cy='9' r='1.7'/%3E%3Ccircle cx='3' cy='15' r='1.7'/%3E%3Ccircle cx='9' cy='15' r='1.7'/%3E%3C/svg%3E"); }
+.ci-up { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M6 11l6-6 6 6'/%3E%3C/svg%3E"); }
+.ci-down { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M6 13l6 6 6-6'/%3E%3C/svg%3E"); }
+.ci-clock { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='7.5'/%3E%3Cpath d='M12 9.5v4l2.5 2M10 3h4M12 3v3'/%3E%3C/svg%3E"); }
+.ci-chevron { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E"); }
+.ci-resize { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3L3 9M9 6.5L6.5 9'/%3E%3C/svg%3E"); }
+/* As the SVGs were: the grip and the resize corner in the placeholder color, the collapse arrow in the faint ink. */
+.ci-grip::after, .ci-resize::after { background: var(--placeholder); }
+.ci-chevron::after { background: var(--ink-faint); }
+.ci-chevron[aria-expanded='false']::after { transform: rotate(-90deg); }
+.ci-resize::after { width: 10px; height: 10px; }
+/* Forced colors (Windows High Contrast) would paint the mask's fill the background color: the icons take the button text color instead, as the SVGs' strokes did. */
+@media (forced-colors: active) {
+  .ci::after { forced-color-adjust: none; background: ButtonText; }
+}
 /* A card's or column's delete button: the same faint trash can as a checklist item's, red on hover. */
 .block-trash { color: var(--ink-faint); }
 /*
@@ -840,8 +871,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
 .app.phone :is(.card, .column) { --bs: 1; }
 /* A card's and a container's header buttons (owner request, 2026-10-22): 32px with a 16px icon, up from 28px and 12-14px. */
 :is(.card-header, .column-actions) > .icon-button { width: var(--btn); height: var(--btn); }
-:is(.card-header, .column-actions) > .icon-button svg { width: calc(16px * var(--hb)); height: calc(16px * var(--hb)); }
-:is(.card-header, .column-actions) .collapse-arrow { stroke-width: 1.4; }
+:is(.card-header, .column-actions) > .icon-button svg,
+:is(.card-header, .column-actions) > .icon-button.ci::after { width: calc(16px * var(--hb)); height: calc(16px * var(--hb)); }
 /*
  * The button row. A list's, link's or board's title shares it (owner pick, 2026-10-22: no empty band above the
  * title): the title takes what the buttons leave and shrinks before they move; the row grows with a bigger title.
@@ -1459,9 +1490,9 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .item-trash:focus-visible { opacity: 1; }
 /* The buttons' widths and icons below multiply by --bb (the text size step, capped; see .todo-item); their height follows the item's first line. */
 .item-grip { top: 3px; right: var(--clock); width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
-.item-grip svg { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
+.item-grip::after { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
 .item-trash { top: 2px; right: calc(16px * var(--bb) + var(--clock)); width: calc(24px * var(--bb)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
-.item-trash svg { width: calc(14px * var(--bb)); height: calc(14px * var(--bb)); }
+.item-trash::after { width: calc(14px * var(--bb)); height: calc(14px * var(--bb)); }
 @media (hover: hover) {
   .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 }
@@ -1475,9 +1506,9 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
   .todo-item { padding-right: calc(46px * var(--bb) + var(--clock)); }
   .item-grip, .item-trash { top: 0; height: var(--bh); }
   .item-grip { width: calc(18px * var(--bb)); }
-  .item-grip svg { width: calc(10px * var(--bb)); height: calc(15px * var(--bb)); }
+  .item-grip::after { width: calc(10px * var(--bb)); height: calc(15px * var(--bb)); }
   .item-trash { right: calc(18px * var(--bb) + var(--clock)); width: calc(28px * var(--bb)); }
-  .item-trash svg { width: calc(16px * var(--bb)); height: calc(16px * var(--bb)); }
+  .item-trash::after { width: calc(16px * var(--bb)); height: calc(16px * var(--bb)); }
   /*
    * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
    * strip the row above keeps free (never over its text; two 22px arrows fit the 46px strip). The first row of a list
@@ -1515,7 +1546,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
     justify-content: center;
     transition: transform 100ms var(--ease-out);
   }
-  .item-arrow svg { width: calc(18px * var(--bb)); height: calc(18px * var(--bb)); }
+  .item-arrow::after { width: calc(18px * var(--bb)); height: calc(18px * var(--bb)); }
   .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
   /* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
   .item-arrow[aria-disabled='true'] { opacity: 0.3; cursor: default; }
@@ -2607,7 +2638,7 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 }
 button.estimate-chip { cursor: pointer; }
 button.estimate-chip:active { transform: scale(0.97); }
-.estimate-chip svg { width: 14px; height: 14px; }
+.estimate-chip.ci::after { width: 14px; height: 14px; }
 .estimate-chip.add { width: 26px; padding: 0; background: transparent; color: var(--ink-faint); }
 .card-header > .estimate-chip { margin-right: 4px; }
 /* A collapsed card's one-line header keeps its room for the preview: no clock to add an estimate (expand the card
@@ -3774,8 +3805,8 @@ a.cal-open { align-self: flex-start; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .collapse-arrow { transition: transform 150ms var(--ease-out); }
-  html[data-input='keys'] .collapse-arrow { transition: none; }
+  .collapse-arrow, .ci-chevron::after { transition: transform 150ms var(--ease-out); }
+  html[data-input='keys'] .collapse-arrow, html[data-input='keys'] .ci-chevron::after { transition: none; }
 
   /* Menus, panels and the phone sheet. */
   html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast, .comment-thread) {

@@ -594,3 +594,17 @@ export function readWidths<K extends string>(raw: string | null, defaults: Recor
 export type SidePanelId = 'history' | 'pomodoro' | 'completed' | 'journal' | 'habits' | 'checklist';
 export const SIDE_DEFAULT: Record<SidePanelId, number> = { history: 300, pomodoro: 300, completed: 300, journal: PANEL_DEFAULT.week, habits: PANEL_DEFAULT.week, checklist: PANEL_DEFAULT.week };
 
+
+/**
+ * Whether the event shows in the days `from` to `to` (not included), as Google's own list of that window does
+ * (owner request, 2026-11-20): it overlaps them. An all-day event ends the day after its last; a timed one that ends at
+ * midnight is not in the next day. Times are local, so a wide fetch can be cut into weeks without asking again.
+ */
+export function eventInRange(e: Pick<CalEvent, 'start' | 'end'>, from: DayKey, to: DayKey): boolean {
+  const at = (t: string) => (t.length === 10 ? `${t}T00:00` : t);
+  const start = at(e.start);
+  const end = at(e.end);
+  const lo = `${from}T00:00`;
+  // A zero-length event on the first minute still counts, as Google lists it.
+  return start < `${to}T00:00` && (end > lo || start >= lo);
+}

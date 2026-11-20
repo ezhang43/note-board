@@ -2827,8 +2827,8 @@ test('stepping to the next or the previous week shows its events at once, with n
   const listed: string[] = [];
   page.on('request', (r) => r.method() === 'GET' && r.url().includes('/__calendar/') && listed.push(r.url()));
   await button(page).click();
-  // The weeks before and after are fetched quietly once this one has loaded.
-  await expect.poll(() => listed.length).toBeGreaterThanOrEqual(3);
+  // The weeks before and after are fetched quietly once this one has loaded: 4 before and 8 after in one wide request.
+  await expect.poll(() => listed.length).toBeGreaterThanOrEqual(2);
   // From now on Google never answers a read: only what was already fetched can show.
   await page.route('**/__calendar/**', (route) => (route.request().method() === 'GET' ? new Promise<void>(() => {}) : route.continue()));
   await panel(page).getByRole('button', { name: 'Next week' }).click();
@@ -2836,9 +2836,8 @@ test('stepping to the next or the previous week shows its events at once, with n
   await expect(panel(page).getByText('Loading…')).toHaveCount(0);
   await panel(page).getByRole('button', { name: 'Previous week' }).click();
   await expect(day(page, nowDate()).getByRole('button', { name: /Dentist/ })).toBeVisible();
-  // A week that was not fetched ahead is loading, and shows none of this week's events under its heading.
-  await panel(page).getByRole('button', { name: 'Next week' }).click();
-  await panel(page).getByRole('button', { name: 'Next week' }).click();
+  // Every week of the window shows at once; the 9th week on was not fetched ahead: it is loading, and shows none of this week's events under its heading.
+  for (let i = 0; i < 9; i++) await panel(page).getByRole('button', { name: 'Next week' }).click();
   await expect(panel(page).getByText('Loading…')).toBeVisible();
   await expect(panel(page).getByRole('button', { name: /Team stand-up/ })).toHaveCount(0);
   await page.unroute('**/__calendar/**');

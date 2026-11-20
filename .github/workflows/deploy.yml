@@ -28,6 +28,10 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          # The calendar helper's address (docs/calendar-helper-setup.md), a repository variable, not a secret.
+          # Unset: the calendar asks Google for an hour's access as before.
+          VITE_CALENDAR_HELPER_URL: ${{ vars.CALENDAR_HELPER_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

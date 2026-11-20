@@ -500,7 +500,7 @@ test('the legal pages name BusyAnts, the date, the law and a way to get in touch
 
   await page.goto('/privacy/');
   const privacy = page.locator('main');
-  await expect(privacy).toContainText('Effective from November 13, 2026');
+  await expect(privacy).toContainText('Effective from November 20, 2026');
   await expect(privacy).toContainText('australia-southeast1 (Sydney, Australia)');
   await expect(privacy).toContainText('may be processed outside your own country');
   await expect(privacy).not.toContainText('us-central');
@@ -554,7 +554,7 @@ test('the Privacy policy has a short, true section about the optional Claude con
 test('the Privacy policy says what an AI button sends, to whom, and with whose key', async ({ page }) => {
   await page.goto('/privacy/');
   const privacy = page.locator('main');
-  await expect(privacy).toContainText('Effective from November 13, 2026');
+  await expect(privacy).toContainText('Effective from November 20, 2026');
   const section = privacy.locator('details:has(h2:text("An AI key you enter"))');
   await section.locator('summary').click();
   await expect(section).toContainText('used only when you press an AI button or Test key, or when the Visualizer sorts your finished items by itself');

@@ -33,10 +33,15 @@ export interface CalEvent {
 /** A guest of an event: the fields of Google's attendee kept, so an unchanged guest is sent back as it was. */
 export type Guest = { email: string; self?: boolean } & Record<string, string | number | boolean>;
 
-/** No calendar access: Google's window was blocked or closed, or access wasn't given. */
+/**
+ * No calendar access: Google's window was blocked or closed, or access wasn't given. With the calendar
+ * helper (owner decision 2026-11-20) also: another Google account was picked than the one signed in
+ * (`account`), Google needs to be asked once more to keep the connection (`again`), or the person
+ * pressed Disconnect calendar (`disconnected`).
+ */
 export class NoAccess extends Error {
-  constructor(readonly reason: 'window' | 'refused') {
-    super(reason === 'window' ? 'Google window blocked or closed' : 'Calendar access not given');
+  constructor(readonly reason: 'window' | 'refused' | 'account' | 'again' | 'disconnected') {
+    super(`No calendar access (${reason})`);
   }
 }
 

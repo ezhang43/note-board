@@ -39,7 +39,7 @@ export default defineConfig(({ command, isPreview, mode }) => ({
   // reload the page the first time that happens.
   optimizeDeps: { include: ['pdfjs-dist'] },
   test: {
-    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'mcp/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'mcp/**/*.test.ts', 'calendar-helper/src/**/*.test.ts'],
     environment: 'node',
   },
 }));

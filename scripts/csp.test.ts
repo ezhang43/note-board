@@ -24,6 +24,19 @@ describe('Content Security Policy', () => {
     expect(built['script-src'].filter((s: string) => s.startsWith("'sha256-"))).toHaveLength(1);
   });
 
+  it('lets pages reach the calendar helper only when its address is set at build time (owner decision 2026-11-20)', () => {
+    expect(built['connect-src'].some((s: string) => s.includes('workers.dev'))).toBe(false);
+    const withHelper = parse(cspPolicy({ dev: false, helper: 'https://calendar-helper.example.workers.dev/' }));
+    // Its origin only, in requests only.
+    expect(withHelper['connect-src']).toContain('https://calendar-helper.example.workers.dev');
+    for (const [name, sources] of Object.entries(withHelper))
+      if (name !== 'connect-src') expect((sources as string[]).some((s) => s.includes('workers.dev'))).toBe(false);
+    expect(parse(cspPolicy({ dev: false, helper: '' }))).toEqual(parse(cspPolicy({ dev: false })));
+    // A bad address stops the build rather than widening the policy.
+    expect(() => cspPolicy({ dev: false, helper: 'https://*.workers.dev' })).toThrow();
+    expect(() => cspPolicy({ dev: false, helper: 'http://evil.example' })).toThrow();
+  });
+
   it('allows no script host by wildcard or whole scheme, and no plugins or base changes', () => {
     for (const p of [built, dev]) {
       expect(p['script-src'].some((s: string) => s === 'https:' || s === '*' || s.includes('*'))).toBe(false);

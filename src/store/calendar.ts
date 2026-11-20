@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { HELPER_URL } from '../calendar/helper';
 import { demoUser } from '../sync/demo';
 import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
 import { weeksBetween } from '../model/weekList';
@@ -19,6 +20,18 @@ export const NOT_CONNECTED = 'Google Calendar isn’t connected yet. Try again l
 /** Without access yet (`needsAccess`), the panel offers Connect Google Calendar instead of Try again. */
 export const NO_WINDOW = 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.';
 export const NOT_GIVEN = 'Calendar access wasn’t given. Click Connect Google Calendar to allow it.';
+/** With the calendar helper (owner decision 2026-11-20): another Google account was picked in Google's window than the one signed in. */
+export const WRONG_ACCOUNT = 'That was a different Google account. Click Connect Google Calendar and pick the one you signed in with.';
+/** With the helper: Google gave no lasting access (an earlier hourly one), which was taken back so the next window gives one. */
+export const ONE_MORE_STEP = 'One more step: click Connect Google Calendar to stay connected.';
+/** After Disconnect calendar. */
+export const DISCONNECTED = 'Google Calendar is disconnected. Click Connect Google Calendar to connect it again.';
+/** What the panel says when there is no access, by why (`NoAccess.reason`); anything else can't reach Google. */
+function accessNote(e: unknown): { note: string; needsAccess: boolean } {
+  if (!(e instanceof NoAccess)) return { note: NOT_CONNECTED, needsAccess: false };
+  const notes = { window: NO_WINDOW, refused: NOT_GIVEN, account: WRONG_ACCOUNT, again: ONE_MORE_STEP, disconnected: DISCONNECTED };
+  return { note: notes[e.reason], needsAccess: true };
+}
 export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try again later.';
 export const BAD_TIMES = 'The end must be after the start.';
 export const BAD_EMAIL = 'That doesn’t look like an email address.';
@@ -83,6 +96,8 @@ export interface CalendarSource {
   keptToken?(): Promise<string | null>;
   /** Who is signed in now (their uid), or null: what is kept in memory belongs to one person (owner request, 2026-11-20). */
   person?(): string | null | undefined;
+  /** Only with the calendar helper (owner decision 2026-11-20): revokes and forgets the lasting connection. */
+  disconnect?(): Promise<void>;
 }
 
 /** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
@@ -95,6 +110,8 @@ export interface CalendarApi {
   listWide(from: DayKey, to: DayKey): Promise<{ events: CalEvent[]; covered: DayKey }>;
   /** Who the calendar belongs to now (the signed-in person's uid), or null; the store forgets what it kept when this changes. */
   person?(): string | null | undefined;
+  /** Disconnect calendar, when the source has it (the calendar helper). */
+  disconnect?(): Promise<void>;
   /** Google's own search of the whole primary calendar, past and future (owner request, 2026-11-19); `today` splits the two. Only reads. */
   search(text: string, today: DayKey): Promise<CalEvent[]>;
   /** One event: a repeating event's series, to find its first day. */
@@ -176,6 +193,7 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
   }
   return {
     person: () => source.person?.(),
+    disconnect: source.disconnect && (() => source.disconnect!()),
     async list(from, to) {
       // Repeating events come as single events (each with its series' id), in time order.
       // simple: one page of up to 250 events, plenty for a week or month; the wide call below follows more pages.
@@ -685,8 +703,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       } catch (e) {
         if (changedPerson()) return n === asked ? load() : undefined;
         cache.delete(key);
-        const needsAccess = e instanceof NoAccess;
-        const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
+        const { note, needsAccess } = accessNote(e);
         if (n !== asked) return;
         // Scrolled into a week that didn't come: it stays a placeholder (asked again when scrolled back to) and the weeks
         // shown stay. Stepped to (‹ ›, Today), with nothing shown, or when Google needs connecting again: the usual note.
@@ -722,11 +739,9 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     } catch (e) {
       if (changedPerson()) return n === asked ? load() : undefined;
       cache.delete(key);
-      const needsAccess = e instanceof NoAccess;
-      const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
       if (n === asked) {
         shownKey = null;
-        set({ events: null, loading: false, note, needsAccess });
+        set({ events: null, loading: false, ...accessNote(e) });
       }
     }
   }
@@ -747,15 +762,35 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       const results = await api.search(box.text.trim(), today());
       if (n === searched) set({ search: { ...box, results, note: null, needsAccess: false } });
     } catch (e) {
-      const needsAccess = e instanceof NoAccess;
-      const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
-      if (n === searched) set({ search: { ...box, results: null, note, needsAccess } });
+      if (n === searched) set({ search: { ...box, results: null, ...accessNote(e) } });
     }
   }
 
   return {
     /** False when no one is signed in (running locally without a demo person). */
     available: api !== null,
+    /** The panel offers Disconnect calendar: only with the calendar helper (owner decision 2026-11-20). */
+    canDisconnect: Boolean(api?.disconnect),
+    /**
+     * Disconnect calendar: the helper revokes the connection at Google and forgets it, this device's access goes,
+     * and the panel says it is disconnected, with Connect. Rejects, leaving everything as it was, when that failed.
+     */
+    async disconnect() {
+      if (!api?.disconnect) return;
+      // Changes still on their way to Google finish first: their answers fetch again, which after it would ask for access.
+      while (flights.size) await Promise.all(flights.values());
+      await api.disconnect();
+      // As opening the panel afresh does: nothing of the connection's is kept or shown.
+      session++;
+      asked++;
+      forget();
+      shownKey = null;
+      shownEarly.clear();
+      undos = [];
+      redos = [];
+      stopSearch();
+      set({ events: null, loaded: [], loading: false, note: DISCONNECTED, needsAccess: true, search: null, done: null });
+    },
     get: () => state,
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -1079,6 +1114,8 @@ function defaultSource(): CalendarSource | null {
       prepare: () => void google().then((g) => g.prepare()),
       keptToken: () => (ready ? Promise.resolve(ready.keptToken()) : google().then((g) => g.keptToken())),
       person: () => ready?.person(),
+      // Only with the calendar helper (owner decision 2026-11-20); its address is fixed when the site is built.
+      disconnect: HELPER_URL ? () => google().then((g) => g.disconnect()) : undefined,
     };
   }
   const demo = demoUser();
@@ -1088,6 +1125,20 @@ function defaultSource(): CalendarSource | null {
   let noAccess = new URLSearchParams(location.search).get('demo-calendar');
   // Kept on this device for an hour, as on the published site, so a reload or new tab doesn't ask again.
   const device = deviceStorage;
+  const helper = new URLSearchParams(location.search).get('demo-helper') === 'on';
+  let notConnected = false;
+  /** The pretend helper's answer: the access, or null when it has no connection. */
+  const askHelper = async (path: 'access' | 'connect' | 'disconnect'): Promise<string | null> => {
+    const res = await fetch(`${import.meta.env.BASE_URL}__calendar-helper/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${demo.uid}` } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Calendar helper answered ${res.status}`);
+    return path === 'disconnect' ? null : ((await res.json()) as { access_token: string }).access_token;
+  };
+  const keepDemo = (token: string | null) => {
+    if (!token) throw new NoAccess('window');
+    keepAccess(device, { token, expiresAt: Date.now() + 3599_000, user: demo.uid });
+    return token;
+  };
   return {
     base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
     async token() {
@@ -1095,10 +1146,24 @@ function defaultSource(): CalendarSource | null {
       const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
       noAccess = null; // only the first ask: once connected (kept for every tab, job 107), the setting has no effect
       if (kept) return kept.token;
+      // ?demo-helper=on: the dev server's pretend calendar helper keeps the connection, so after the
+      // first time a new access comes without the pretend window (as the published site's helper does).
+      // As on the published site, once it said there is no connection, Connect goes straight to the window.
+      const fresh = helper && !notConnected ? await askHelper('access') : null;
+      if (fresh) return keepDemo(fresh);
+      notConnected = helper;
       if (reason) throw new NoAccess(reason);
-      keepAccess(device, { token: demo.uid, expiresAt: Date.now() + 3599_000, user: demo.uid });
-      return demo.uid;
+      const token = keepDemo(helper ? await askHelper('connect') : demo.uid);
+      notConnected = false;
+      return token;
     },
+    disconnect: helper
+      ? async () => {
+          await askHelper('disconnect');
+          dropAccess(device);
+          notConnected = true;
+        }
+      : undefined,
     forget: () => dropAccess(device),
     keptToken: async () => readAccess(device, demo.uid)?.token ?? null,
     person: () => demo.uid,

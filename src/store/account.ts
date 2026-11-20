@@ -125,6 +125,11 @@ export interface AccountBackend {
   markDeleted(): Promise<void>;
   /** Their version history and list of shares (the marker stays). */
   deleteOwnData(): Promise<void>;
+  /**
+   * The Google Calendar connection the calendar helper keeps (owner decision 2026-11-20): revoked at Google
+   * and deleted there. Only when the helper is on; first, before anything else is deleted.
+   */
+  disconnectCalendar?(): Promise<void>;
   /** The sign-in itself. */
   deleteUser(): Promise<void>;
 }
@@ -150,6 +155,12 @@ export async function deleteAccountData(uid: string, backend: AccountBackend): P
       throw Object.assign(new Error('Deleting the account stopped', { cause: e }), { code: (e as { code?: string })?.code, partial: partial || severalSaves });
     }
   };
+  // The calendar connection first (code review 2026-11-20), while nothing is deleted: a helper that can't be
+  // reached stops here with everything kept, and trying again works, rather than leave the connection behind.
+  if (backend.disconnectCalendar) {
+    await step(() => backend.disconnectCalendar!());
+    partial = false; // nothing of theirs on BusyAnts is gone yet
+  }
   // Marked first, so no page of theirs saves or joins a share after they are listed.
   await step(() => backend.markDeleting());
   // Not "part-way": until the boards are marked done, a failure takes the mark off (below).

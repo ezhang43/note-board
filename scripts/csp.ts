@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 // The Firebase project's sign-in domain: sign-in's hidden frame comes from it.
 import { AUTH_DOMAIN } from '../src/sync/firebaseProject';
+import { helperUrl } from '../src/calendar/helperUrl';
 
 // Content Security Policy (job 11, high-risk): which sites the pages may load scripts, frames and
 // styles from and send requests to, so a script slipped into a page can't load more code from
@@ -95,20 +96,23 @@ export function inlineScripts(html: string): string[] {
  * GoatCounter loader, the About page's clip picker) and no other inline script; `npm run dev`
  * allows inline scripts, which a hash can't cover there.
  */
-export function cspPolicy(opts: { dev: boolean; inline?: string[] }): string {
+export function cspPolicy(opts: { dev: boolean; inline?: string[]; helper?: string }): string {
   const extra = opts.dev ? DEV_ONLY : BUILD_ONLY;
   const hashes = opts.dev ? [] : [...new Set((opts.inline ?? []).map(scriptHash))];
+  // The calendar helper (VITE_CALENDAR_HELPER_URL, owner decision 2026-11-20): its origin, in requests only, when set.
+  const url = helperUrl(opts.helper);
+  const helper = url ? [new URL(url).origin] : [];
   return Object.entries(BASE)
     .map(([name, sources]) => {
-      const all = [...sources, ...(name === 'script-src' ? hashes : []), ...(extra[name] ?? [])];
+      const all = [...sources, ...(name === 'script-src' ? hashes : []), ...(extra[name] ?? []), ...(name === 'connect-src' ? helper : [])];
       return `${name} ${all.join(' ')}`;
     })
     .join('; ');
 }
 
 /** Adds the policy to a page's HTML, right after <meta charset>. */
-export function withCsp(html: string, dev: boolean): string {
-  const tag = `<meta http-equiv="Content-Security-Policy" content="${cspPolicy({ dev, inline: inlineScripts(html) })}" />`;
+export function withCsp(html: string, dev: boolean, helper?: string): string {
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${cspPolicy({ dev, inline: inlineScripts(html), helper })}" />`;
   const charset = /<meta charset="[^"]*"\s*\/?>/i;
   if (!charset.test(html)) throw new Error('A page without <meta charset> would get no Content Security Policy');
   return html.replace(charset, (m) => `${m}\n    ${tag}`);
@@ -116,11 +120,16 @@ export function withCsp(html: string, dev: boolean): string {
 
 // Vite runs this last on every HTML page, built (after GoatCounter's loader is added) and in `npm run dev`.
 export function csp(): Plugin {
+  let helper: string | undefined;
   return {
     name: 'csp',
+    // The same value the page is built with (.env files or the build's environment).
+    configResolved(config) {
+      helper = config.env.VITE_CALENDAR_HELPER_URL;
+    },
     transformIndexHtml: {
       order: 'post',
-      handler: (html, ctx) => withCsp(html, Boolean(ctx.server)),
+      handler: (html, ctx) => withCsp(html, Boolean(ctx.server), helper),
     },
   };
 }

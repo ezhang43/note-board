@@ -1,0 +1,13 @@
+{
+  "name": "busyants-calendar-helper",
+  "private": true,
+  "type": "module",
+  "description": "Keeps the Google Calendar connection for BusyAnts (docs/calendar-helper-setup.md). Its tests run with the app's: npm test at the top folder.",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "secret": "wrangler secret put"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.0"
+  }
+}

@@ -346,6 +346,33 @@ describe('repeating events and guests (job #85)', () => {
     expect(api.bodies[0].end).toMatchObject({ dateTime: '2026-09-01T09:45:00' });
   });
 
+  it('“All events in the series” is done (the form can close, “Event saved” shows) once Google has it, without waiting for the calendar to be fetched again (calendar-save-speed)', async () => {
+    const api = fakeApi([standUp]);
+    api.series = { title: 'Stand-up' };
+    const list = api.list;
+    let hold = false;
+    let answer!: () => void;
+    api.list = async (from, to) => {
+      if (hold) await new Promise<void>((r) => (answer = r));
+      return list(from, to);
+    };
+    const cal = createCalendar(api, today);
+    await cal.open();
+    hold = true;
+    expect(await cal.save(at(cal, 'su_1016'), { ...change, title: 'Daily sync' }, { all: true })).toBeNull();
+    expect(api.calls.at(-1)).toBe('update su Daily sync');
+    expect(cal.get().done?.text).toBe('Event saved');
+    // The list is refreshed in the background: what is shown stays, never blanked.
+    expect(cal.get().events?.map((e) => e.id)).toEqual(['su_1016']);
+    // Until then the series' events show as on their way and can't be changed again (they may have new ids at Google).
+    expect(cal.get().sending).toEqual(['su_1016']);
+    expect(await cal.save(at(cal, 'su_1016'), { ...change, title: 'Again' })).toBe(SAVE_FAILED);
+    answer();
+    await cal.settled();
+    expect(api.calls.at(-1)).toBe('list 2026-10-04 2026-10-11');
+    expect(cal.get()).toMatchObject({ loading: false, sending: [], events: [{ id: 'su_1016~' }] });
+  });
+
   it('“All events” sends the series only what was changed: one event moved on its own doesn’t move the series (finding 1)', async () => {
     // Today's stand-up was moved to 10:00 on its own; the series (first on 1 Sep) is at 09:00.
     const moved = ev('su_1016', { title: 'Stand-up', series: 'su', start: '2026-10-16T10:00', end: '2026-10-16T10:15' });
@@ -2498,20 +2525,65 @@ describe('showing a week at once when it was fetched ahead (owner request, 2026-
     await cal.settled();
   });
 
-  it('a change forgets every fetched week, so a deleted event does not come back', async () => {
+  it('a change forgets every fetched week while it is on its way, so a deleted event does not come back', async () => {
     const { api, state } = held([timed('gone', '2026-10-12')]);
     const cal = createWithAhead(api, today);
     await cal.open();
     await flush();
+    let answer!: () => void;
+    api.create = async () => {
+      await new Promise<void>((r) => (answer = r));
+      return 'new1';
+    };
     expect(await cal.save(null, draft)).toBeNull();
-    await cal.settled();
-    await flush();
     state.all = [];
     state.hold = true;
     void cal.pickDay('2026-10-13');
     expect(cal.get()).toMatchObject({ loading: true, events: null });
     void cal.pickDay('2026-09-08');
     expect(cal.get()).toMatchObject({ loading: true, events: null });
+    answer();
+  });
+
+  it('once Google has a change, the weeks around are fetched again quietly, so stepping after a save shows them at once (calendar-save-speed)', async () => {
+    const { api, state } = held([timed('a', '2026-10-06'), timed('next', '2026-10-12')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    api.update = async (id, body) => {
+      state.all = state.all.map((e) => (e.id === id ? { ...e, title: body.summary! } : e));
+    };
+    api.calls.length = 0;
+    expect(await cal.save(at(cal, 'a'), { ...draft, title: 'Renamed', startDate: '2026-10-06', startTime: '10:00', endDate: '2026-10-06', endTime: '11:00' })).toBeNull();
+    await cal.settled();
+    await flush();
+    // One wide call, this week included, made after Google answered; the week shown is never blanked or marked loading.
+    expect(api.calls.filter((c) => c.startsWith('wide'))).toEqual(['wide 2026-09-06 2026-12-06']);
+    expect(api.calls.filter((c) => c.startsWith('list'))).toEqual([]);
+    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
+    state.hold = true;
+    void cal.step(1);
+    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'next' }] });
+    void cal.step(-1);
+    expect(cal.get()).toMatchObject({ loading: false, events: [{ id: 'a', title: 'Renamed' }] });
+  });
+
+  it('a deleted event stays gone in the weeks fetched again after Google has it', async () => {
+    const { api, state } = held([timed('gone', '2026-10-06')]);
+    const cal = createWithAhead(api, today);
+    await cal.open();
+    await flush();
+    api.remove = async (id) => {
+      state.all = state.all.filter((e) => e.id !== id);
+      return true;
+    };
+    expect(await cal.remove('gone')).toBeNull();
+    await cal.settled();
+    await flush();
+    state.hold = true;
+    void cal.step(1);
+    void cal.step(-1);
+    expect(cal.get()).toMatchObject({ loading: false, events: [] });
   });
 
   it('opening the panel afresh forgets every fetched week', async () => {

@@ -22,4 +22,3 @@ export function VisualizerButton({ onOpen }: { onOpen?: () => void }) {
     </button>
   );
 }
-

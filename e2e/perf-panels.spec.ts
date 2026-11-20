@@ -3,7 +3,8 @@ import { freshBoardEachTest, togglePanel } from './helpers';
 
 // Opening and resizing a side panel stays quick on a big board (job perf-panels): the panel's width
 // variables are not inherited by the board (every card would restyle on each mouse move), and the
-// heavy panels (Journal, Habits, Visualizer) are loaded on first use, not at startup.
+// Visualizer is loaded on first use, not at startup (that request check works on the dev server, which
+// serves one file per module).
 
 freshBoardEachTest();
 
@@ -31,6 +32,18 @@ test('the Visualizer loads when first opened, not at startup', async ({ page }) 
   expect(urls.some((u) => u.includes('/VisualizerOverlay.tsx'))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Visualizer' })).toHaveCount(0);
+});
+
+test('if the Visualizer code cannot be fetched, the board stays and says so', async ({ page }) => {
+  await page.route('**/VisualizerOverlay.tsx*', (r) => r.abort());
+  await page.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
+  await expect(page.getByText('Couldn’t open the Visualizer')).toBeVisible();
+  await expect(page.locator('.canvas')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Visualizer' })).toHaveCount(0);
+  // Back online: the next try opens it.
+  await page.unroute('**/VisualizerOverlay.tsx*');
+  await page.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Visualizer' })).toBeVisible();
 });
 
 test('Habits opens with the keyboard at its usual width', async ({ page }) => {

@@ -40,8 +40,9 @@ test('if the Visualizer code cannot be fetched, the board stays and says so', as
   await expect(page.getByText('Couldn’t open the Visualizer')).toBeVisible();
   await expect(page.locator('.canvas')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Visualizer' })).toHaveCount(0);
-  // Back online: the next try opens it.
+  // (A browser keeps a failed module import until the page is reloaded, so a reload is what brings it back.)
   await page.unroute('**/VisualizerOverlay.tsx*');
+  await page.reload();
   await page.locator('header.toolbar').getByRole('button', { name: 'Visualizer', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Visualizer' })).toBeVisible();
 });

@@ -6,7 +6,8 @@ import { closeVisualizer, closeWhenGone, useVisualizerOpen } from './visualizerS
 // it opens, so the app starts without it (job perf-panels). Its button calls `prefetchVisualizer` on hover
 // and focus, so the code is usually there before the click. Nothing is drawn while it loads, and nothing
 // else on the screen shifts, since it covers the board. If it can't be fetched (offline, or the site was
-// updated since this page opened) it closes again with a notice, and the next try fetches it afresh.
+// updated since this page opened) it closes again with a notice; a reload brings it back (a browser keeps a
+// failed module import for the life of the page).
 // simple: the Journal, Habits and Calendar panels stay in the main code. They take typing the moment they
 // open, and a panel still loading would drop those first keys. Revisit with a way to hold keys until ready.
 
@@ -29,7 +30,7 @@ export function Visualizer() {
       (m) => live && setOverlay(() => m.VisualizerOverlay),
       () => {
         closeVisualizer();
-        collab.setNotice('Couldn’t open the Visualizer. Check your connection and try again.');
+        collab.setNotice('Couldn’t open the Visualizer. Check your connection and reload the page.');
       },
     );
     return () => {

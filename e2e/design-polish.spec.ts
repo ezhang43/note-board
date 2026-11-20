@@ -122,11 +122,12 @@ test.describe('with motion allowed', () => {
 
   test('the collapse arrow turns smoothly, but not when the keyboard did it', async ({ page }) => {
     await add(page, 'Note');
-    const arrow = looseCards(page).first().locator('.collapse-arrow');
-    await expect(arrow).toHaveCount(1);
-    expect(await style(arrow, 'transition-duration')).toMatch(/^0\.15s/);
+    // The arrow is the button's ::after, drawn by CSS (job perf-fewer-elements).
+    const button = looseCards(page).first().getByRole('button', { name: 'Collapse card' });
+    const turn = () => button.evaluate((el) => getComputedStyle(el, '::after').transitionDuration);
+    expect(await turn()).toMatch(/^0\.15s/);
     await page.keyboard.press('Escape');
-    expect(await style(arrow, 'transition-duration')).toBe('0s');
+    expect(await turn()).toBe('0s');
   });
 });
 

@@ -100,7 +100,8 @@ test('the item buttons and the strip kept free for them grow with the text size,
     await row.hover();
     const sizeOf = async (name: string) => {
       const b = row.getByRole('button', { name });
-      const icon = await b.locator('svg').evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }));
+      // The icon is the button's ::after, drawn by CSS (job perf-fewer-elements).
+      const icon = await b.evaluate((el) => ({ w: parseFloat(getComputedStyle(el, '::after').width), h: parseFloat(getComputedStyle(el, '::after').height) }));
       return { b: await box(b), icon };
     };
     const [up, down, trash, grip] = await Promise.all(['Move up', 'Move down', 'Delete item', 'Drag item'].map(sizeOf));

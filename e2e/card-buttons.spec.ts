@@ -20,8 +20,14 @@ const largest = async (page: Page) => {
 /** A button's drawn box and its icon, in px. */
 async function sizes(btn: Locator) {
   const b = await box(btn);
-  const i = await box(btn.locator('svg'));
-  return { w: b.width, h: b.height, icon: i.width, iconH: i.height };
+  // An SVG icon, or (the hover-only buttons, job perf-fewer-elements) one drawn by CSS as the button's ::after.
+  const i = await btn.evaluate((el) => {
+    const svg = el.querySelector('svg');
+    if (svg) return { w: svg.getBoundingClientRect().width, h: svg.getBoundingClientRect().height };
+    const s = getComputedStyle(el, '::after');
+    return { w: parseFloat(s.width), h: parseFloat(s.height) };
+  });
+  return { w: b.width, h: b.height, icon: i.w, iconH: i.h };
 }
 
 async function check(blocks: { block: Locator; buttons: string[]; cap?: number }[], scale: number) {

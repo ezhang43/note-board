@@ -16,7 +16,7 @@ import { CommentChip } from './Comments';
 import { GrowTextarea } from './GrowTextarea';
 import { NoteLinks, openLinkOnCtrlClick } from './TextLinks';
 import { useTakeFocus } from './useTakeFocus';
-import { ChevronIcon, ExternalIcon, ResizeIcon, TrashIcon } from './icons';
+import { ExternalIcon } from './icons';
 import { TodoBody, TodoTitle } from './TodoList';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
@@ -110,25 +110,21 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         {card.kind === 'note' && <EstimateChip cardId={id} itemId={null} estimate={card.estimate} />}
         <button
           type="button"
-          className="icon-button"
+          className="icon-button ci ci-chevron" // icons drawn by CSS (styles.css: .ci)
           aria-label={card.collapsed ? 'Expand card' : 'Collapse card'}
           title={card.collapsed ? 'Expand card' : 'Collapse card'}
           aria-expanded={!card.collapsed}
           onClick={() => appStore.toggleCollapsed(id)}
-        >
-          <ChevronIcon collapsed={card.collapsed} />
-        </button>
+        />
         {/* Board cards: the Completed record (never drawn) is the only card with no trash can. */}
         {!isPermanent(card) && (
           <button
             type="button"
-            className="icon-button block-trash"
+            className="icon-button block-trash ci ci-trash"
             aria-label="Delete card"
             title="Delete card (Ctrl+Z brings it back)"
             onClick={() => appStore.deleteCard(id)}
-          >
-            <TrashIcon />
-          </button>
+          />
         )}
         {/* Last in the page order, so Tab still goes buttons, title, items as before; drawn first (see .card-header > .card-title). */}
         {!card.collapsed && <CardTitle card={card} boardName={boardName} />}
@@ -138,15 +134,11 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
       {!inColumn && card.collapsed && (
         <>
           <button type="button" className="resize-edge" aria-label="Resize card width" onPointerDown={resizePointerDown('card', id, 'e')} onKeyDown={resizeKeyDown('card', id, 'e')} />
-          <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se', COLLAPSED_MIN_H)} onKeyDown={resizeKeyDown('card', id, 'se', COLLAPSED_MIN_H)}>
-            <ResizeIcon />
-          </button>
+          <button type="button" className="resize-corner ci ci-resize" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se', COLLAPSED_MIN_H)} onKeyDown={resizeKeyDown('card', id, 'se', COLLAPSED_MIN_H)} />
         </>
       )}
       {!inColumn && !card.collapsed && (
-        <button type="button" className="resize-corner" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se')} onKeyDown={resizeKeyDown('card', id, 'se')}>
-          <ResizeIcon />
-        </button>
+        <button type="button" className="resize-corner ci ci-resize" aria-label="Resize card" onPointerDown={resizePointerDown('card', id, 'se')} onKeyDown={resizeKeyDown('card', id, 'se')} />
       )}
     </article>
   );

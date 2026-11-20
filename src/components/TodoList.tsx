@@ -9,7 +9,7 @@ import { ITEMS_MARKER, JOURNAL_MARKER } from '../store/env';
 import { AutoSizeInput } from './AutoSizeInput';
 import { GrowTextarea } from './GrowTextarea';
 import { useTakeFocus } from './useTakeFocus';
-import { ArrowIcon, ChevronIcon, GripIcon, TrashIcon } from './icons';
+import { ChevronIcon } from './icons';
 import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
 import { followEdges } from './edgeFollow';
@@ -273,16 +273,14 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
               <button
                 key={dir}
                 type="button"
-                className="item-arrow"
+                className={dir < 0 ? 'item-arrow ci ci-up' : 'item-arrow ci ci-down'} // icons drawn by CSS (styles.css: .ci)
                 aria-label={label}
                 title={label}
                 aria-disabled={!can || undefined}
                 tabIndex={can ? undefined : -1}
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => can && storeOfCard(cardId).moveItem(cardId, item.id, dir, document.activeElement === ref.current ? (ref.current?.selectionStart ?? 0) : item.text.length)}
-              >
-                <ArrowIcon down={dir > 0} />
-              </button>
+              />
             );
           })}
         </span>
@@ -291,7 +289,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       {/* A press doesn't take the cursor out of a text box (on a touch screen the trash only shows while the item has it); once the item is gone the cursor goes to the item above, else below (job 222). */}
       <button
         type="button"
-        className="item-trash"
+        className="item-trash ci ci-trash"
         aria-label="Delete item"
         title="Delete item"
         onPointerDown={(e) => e.preventDefault()}
@@ -301,12 +299,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
           if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) e.preventDefault(); // does nothing (the browser would press it)
           else removeItemByKey(e, () => storeOfCard(cardId).trashItem(cardId, item.id));
         }}
-      >
-        <TrashIcon />
-      </button>
-      <button type="button" className="item-grip" aria-label="Drag item" tabIndex={-1} onPointerDown={gripPointerDown(cardId, item.id)}>
-        <GripIcon />
-      </button>
+      />
+      <button type="button" className="item-grip ci ci-grip" aria-label="Drag item" tabIndex={-1} onPointerDown={gripPointerDown(cardId, item.id)} />
     </div>
   );
 });

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { canChangeSeries, dayKey, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { demoUser } from '../sync/demo';
 import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
 import type { DoneItem, VizRange } from '../model/visualizer';
@@ -80,11 +80,20 @@ export interface CalendarSource {
   prepare?(): void;
   /** The token already kept on this device (over a minute left), or null — never opening Google's window (the Visualizer, owner 2026-11-13). */
   keptToken?(): Promise<string | null>;
+  /** Who is signed in now (their uid), or null: what is kept in memory belongs to one person (owner request, 2026-11-20). */
+  person?(): string | null | undefined;
 }
 
 /** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
 export interface CalendarApi {
   list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
+  /**
+   * Many weeks in one request (owner request, 2026-11-20): pages followed, at most WIDE_PAGES of 250. `covered` is the day
+   * up to which (not included) every event is in `events`: `to` when Google had no more, else the day of the last one found.
+   */
+  listWide(from: DayKey, to: DayKey): Promise<{ events: CalEvent[]; covered: DayKey }>;
+  /** Who the calendar belongs to now (the signed-in person's uid), or null; the store forgets what it kept when this changes. */
+  person?(): string | null | undefined;
   /** Google's own search of the whole primary calendar, past and future (owner request, 2026-11-19); `today` splits the two. Only reads. */
   search(text: string, today: DayKey): Promise<CalEvent[]>;
   /** One event: a repeating event's series, to find its first day. */
@@ -107,6 +116,8 @@ export interface CalendarApi {
 export const SEARCH_WAIT = 300;
 // Search looks this far back and forward from today (a call of the build, 2026-11-19), at most this many events each way.
 const SEARCH_YEARS = 5;
+/** The most pages a wide fetch follows (250 events each). */
+export const WIDE_PAGES = 4;
 const SEARCH_CAP = 125;
 // simple: a year with more than SEARCH_PAGES pages of 250 matches loses its newest ones; upgrade if a search ever matches that often.
 const SEARCH_PAGES = 4;
@@ -143,16 +154,33 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
   };
   const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
   const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
-  return {
-    async list(from, to) {
-      // Repeating events come as single events (each with its series' id), in time order.
-      // simple: one page of up to 250 events, plenty for a month; more would need nextPageToken.
+  // Up to `pages` pages of events overlapping the days from `from` to `to`, oldest start first (so a cut-short answer is whole up to its last event).
+  async function listRange(from: DayKey, to: DayKey, pages: number) {
+    const found: CalEvent[] = [];
+    let page: string | undefined;
+    let more = false;
+    for (let n = 0; n < pages; n++) {
       const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
+      if (page) q.set('pageToken', page);
       const res = await call(`${events}?${q}`);
       await ok(res);
-      const body = (await res.json()) as { items?: unknown };
-      return Array.isArray(body.items) ? body.items.map(parseEvent).filter((e): e is CalEvent => e !== null) : [];
+      const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
+      if (Array.isArray(body.items)) found.push(...body.items.map(parseEvent).filter((e): e is CalEvent => e !== null));
+      more = typeof body.nextPageToken === 'string' && body.nextPageToken !== '';
+      if (!more) break;
+      page = body.nextPageToken as string;
+    }
+    // A single page that was cut short has always been shown as it came (a week or month rarely has 250).
+    return { events: found, covered: more && pages > 1 && found.length ? found[found.length - 1].start.slice(0, 10) : to };
+  }
+  return {
+    person: () => source.person?.(),
+    async list(from, to) {
+      // Repeating events come as single events (each with its series' id), in time order.
+      // simple: one page of up to 250 events, plenty for a week or month; the wide call below follows more pages.
+      return (await listRange(from, to, 1)).events;
     },
+    listWide: (from, to) => listRange(from, to, WIDE_PAGES),
     async search(text, today) {
       const [y, m, d] = today.split('-').map(Number);
       const year = (n: number) => dayKey(new Date(y + n, m - 1, d));
@@ -282,8 +310,8 @@ interface Taken {
 
 const WIDTH_KEY = 'note-board:calendar-width';
 
-/** The most ranges kept to show at once (owner request, 2026-11-19): the ones looked at or fetched ahead most recently. */
-export const CACHE_LIMIT = 12;
+/** The most ranges kept to show at once (owner request, 2026-11-19; 20 for a wide window of 13 weeks, 2026-11-20): the ones looked at or fetched ahead most recently. */
+export const CACHE_LIMIT = 20;
 
 /** `ahead`: fetch the range before and after the one shown (the tests count calls, so most turn it off). */
 export function createCalendar(realApi: CalendarApi | null, today: () => DayKey = () => dayKey(new Date()), storage: Pick<Storage, 'getItem' | 'setItem'> | null = null, ahead = true) {
@@ -316,6 +344,28 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     update: (...a) => changing(realApi.update(...a)),
     remove: (...a) => changing(realApi.remove(...a)),
     restore: (...a) => changing(realApi.restore(...a)),
+  };
+  // The person the kept weeks belong to (owner request, 2026-11-20): when another signs in (or out) with the panel still open,
+  // everything kept, and every answer still on its way, is dropped before anything is shown or kept.
+  // undefined: not known yet (Google's sign-in code is still loading), which is never a change.
+  let cacheFor = api?.person?.();
+  const changedPerson = () => {
+    const now = api?.person?.();
+    if (now === undefined || now === cacheFor) return false;
+    const first = cacheFor === undefined;
+    cacheFor = now;
+    // Learning who it is for the first time is no change, unless something was already kept (then whose it is can't be known).
+    if (first && !cache.size && !state.events) return false;
+    // As opening the panel afresh does, except showing the new person's week: the caller loads it.
+    session++;
+    forget();
+    shownKey = null;
+    shownEarly.clear();
+    undos = [];
+    redos = [];
+    stopSearch();
+    set({ events: null, done: null, search: null });
+    return true;
   };
   let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null };
   let said = 0;
@@ -526,25 +576,44 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   /** The key of the range whose events are on show, to tell a reload from a move to another range. */
   let shownKey: string | null = null;
 
-  // Fetches the range before and the range after the one shown, quietly, unless already kept or on their way.
+  // Weeks and months fetched ahead of the one shown, in one request (owner request, 2026-11-20): in the week view 4 weeks
+  // before and 8 after, in the month view the month before and after. `near`: the next window is fetched once any range within
+  // that many steps of the one shown is missing, so stepping to 2 weeks from the end of the window fetches the next one.
+  const WINDOW = { week: { back: 4, ahead: 8, near: 2 }, month: { back: 1, ahead: 1, near: 1 } };
   function fetchAhead(view: CalView, day: DayKey) {
-    for (const step of [-1, 1]) {
-      const near = moveView(view, day, step);
-      const key = rangeKey(view, near);
-      if (!api || !ahead || cache.has(key) || fetching.has(key)) continue;
-      const { from, to } = viewRange(view, near);
-      const at = generation;
-      fetching.add(key);
-      api.list(from, to).then(
-        (events) => void (at === generation && keep(key, events)),
-        () => {}, // quiet: stepping there asks again, and shows why if it fails
-      ).finally(() => fetching.delete(key));
+    if (!api || !ahead) return;
+    const w = WINDOW[view];
+    const need: { key: string; k: number; from: DayKey; to: DayKey }[] = [];
+    for (let k = -w.back; k <= w.ahead; k++) {
+      const key = rangeKey(view, moveView(view, day, k));
+      if (k === 0 || cache.has(key) || fetching.has(key)) continue;
+      need.push({ key, k, ...viewRange(view, moveView(view, day, k)) });
     }
+    if (!need.some((n) => Math.abs(n.k) <= w.near)) return;
+    const from = need.reduce((a, n) => (n.from < a ? n.from : a), need[0].from);
+    const to = need.reduce((a, n) => (n.to > a ? n.to : a), need[0].to);
+    const at = generation;
+    for (const n of need) fetching.add(n.key);
+    api.listWide(from, to).then(
+      ({ events, covered }) => {
+        // An answer for the person who has since gone is dropped by the clearing, and the panel shows the new person's week.
+        if (changedPerson()) return void load();
+        if (at !== generation) return;
+        // Only the ranges the answer covered whole; the farthest first, so the nearest are kept longest.
+        for (const n of [...need].sort((x, y) => Math.abs(y.k) - Math.abs(x.k))) {
+          if (n.to <= covered) keep(n.key, events.filter((e) => eventInRange(e, n.from, n.to)));
+        }
+      },
+      () => {}, // quiet: stepping there asks again, and shows why if it fails
+    ).finally(() => {
+      if (at === generation) for (const n of need) fetching.delete(n.key);
+    });
   }
 
-  async function load() {
+  async function load(): Promise<void> {
     if (!api) return;
     const n = ++asked;
+    changedPerson();
     const { view, day } = state;
     const { from, to } = viewRange(view, day);
     const key = rangeKey(view, day);
@@ -565,6 +634,8 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     }
     try {
       const events = await api.list(from, to);
+      // Another person since: this is not theirs, so it is neither kept nor shown; ask again for them.
+      if (changedPerson()) return n === asked ? load() : undefined;
       if (at === generation) keep(key, events);
       if (n === asked) {
         shownKey = key;
@@ -572,6 +643,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         fetchAhead(view, day);
       }
     } catch (e) {
+      if (changedPerson()) return n === asked ? load() : undefined;
       cache.delete(key);
       const needsAccess = e instanceof NoAccess;
       const note = !needsAccess ? NOT_CONNECTED : e.reason === 'window' ? NO_WINDOW : NOT_GIVEN;
@@ -898,6 +970,7 @@ function defaultSource(): CalendarSource | null {
       forget: () => ready?.forget(),
       prepare: () => void google().then((g) => g.prepare()),
       keptToken: () => (ready ? Promise.resolve(ready.keptToken()) : google().then((g) => g.keptToken())),
+      person: () => ready?.person(),
     };
   }
   const demo = demoUser();
@@ -920,6 +993,7 @@ function defaultSource(): CalendarSource | null {
     },
     forget: () => dropAccess(device),
     keptToken: async () => readAccess(device, demo.uid)?.token ?? null,
+    person: () => demo.uid,
   };
 }
 

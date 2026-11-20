@@ -129,6 +129,9 @@ export function token(): Promise<string> {
   return pending;
 }
 
+/** Who is signed in now (the uid), or null: the calendar store keeps nothing across a change of person. */
+export const person = (): string | null => getAuth().currentUser?.uid ?? null;
+
 /**
  * The token kept in memory or on this device, if it still has over a minute left, and null otherwise —
  * never opening Google's window. The Visualizer uses this to read past events only when access is already

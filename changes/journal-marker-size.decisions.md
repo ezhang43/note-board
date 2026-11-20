@@ -1,0 +1,2 @@
+- 2026-11-20 (call, recommended) A list item's bullet or number takes the size of the item's first character (as Google Docs does), not the biggest or the line's own size. Why: it is the simplest rule to predict, and a plain item stays at 14. It is drawn only (a style on the rendered line, nothing saved), so saved notes and older copies of the app are unaffected.
+- 2026-11-20 (call, recommended) The marker now sits in the item's first line (inline) instead of floating over it, so it stays on the text's baseline at any size. Its width and indent are the same as before.

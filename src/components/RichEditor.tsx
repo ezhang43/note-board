@@ -69,6 +69,9 @@ function drawBlock(blk: Block, marker: string): HTMLDivElement {
     div.append(span);
   }
   if (!blk.runs.length) div.append(document.createElement('br'));
+  // The bullet or number takes the size of the item's first character (drawing only, nothing saved).
+  const first = marker ? blk.runs.find((r) => r.text) : undefined;
+  if (first?.size) div.style.setProperty('--ms', String(R.sizeEm(first.size, blk.type)));
   return div;
 }
 

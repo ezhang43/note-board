@@ -2989,9 +2989,15 @@ button.estimate-chip:active { transform: scale(0.97); }
 .rich > [data-type='hr'] > span { display: none; }
 .rich > [data-marker]::before {
   content: attr(data-marker);
-  position: absolute;
-  left: calc(var(--indent) * 1.4em);
-  width: 1.3em;
+  /* In the first line, so it sits on the text's baseline whatever its size, and pulled back into the
+     padding. --ms: the first character's size as a share of the line's (set when drawn, 1 when plain).
+     The em here is the marker's own, so the offsets divide it back out and the indent steps stay put. */
+  display: inline-block;
+  font-size: calc(var(--ms, 1) * 1em);
+  margin-left: calc(-1.6em / var(--ms, 1));
+  width: calc(1.3em / var(--ms, 1));
+  margin-right: calc(0.3em / var(--ms, 1));
+  white-space: nowrap;
   text-align: right;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;

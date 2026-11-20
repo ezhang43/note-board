@@ -565,3 +565,54 @@ test('pressing the greyed − at 10 or + at 36 keeps the words selected in the n
     await expect(editor(page).locator(`[data-size="${size}"]`)).toHaveText('quiet');
   }
 });
+
+// A list item's bullet or number takes the size of the item's first character (owner report 2026-11-20).
+test('the bullet or number of a list item is as big as the first character of its text', async ({ page }) => {
+  await openJournal(page);
+  const marker = (n: number) =>
+    blocks(page).nth(n).evaluate((el) => {
+      const s = getComputedStyle(el, '::before');
+      return { size: s.fontSize, left: parseFloat(s.marginLeft), width: parseFloat(s.width) };
+    });
+  const setSize = async (name: string) => {
+    if (!(await styleMenu(page).isVisible())) await tool(page, 'Text style').click();
+    await sizeBox(page).click();
+    await sizeList(page).getByRole('button', { name, exact: true }).click();
+  };
+  await page.keyboard.type('plain');
+  await page.keyboard.press('Control+Shift+8');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('big bullet');
+  await selectLetters(page, 0, 10);
+  await setSize('24');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('x');
+  await page.keyboard.press('Tab');
+  await selectLetters(page, 0, 1);
+  await setSize('10');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Control+Shift+7');
+  await page.keyboard.type('big number');
+  await selectLetters(page, 0, 10);
+  await setSize('24');
+  const plain = await marker(0);
+  const big = await marker(1);
+  expect(plain.size).toBe('14px');
+  expect(big.size).toBe('24px');
+  expect((await marker(2)).size).toBe('10px');
+  expect((await marker(3)).size).toBe('24px');
+  // The marker keeps its place: same pull-back into the indent and width, whatever its size.
+  expect(big.left).toBeCloseTo(plain.left, 0);
+  expect(big.width).toBeCloseTo(plain.width, 0);
+  // Only the first character counts: a sized word later in the line leaves the marker alone.
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('small first');
+  await selectLetters(page, 0, 5);
+  await setSize('14');
+  await selectLetters(page, 6, 11);
+  await setSize('32');
+  expect((await marker(4)).size).toBe('14px');
+});

@@ -333,10 +333,14 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     for (const old of cache.keys()) if (cache.size > CACHE_LIMIT) cache.delete(old);
   };
   // simple: any change to Google (add, save, delete, undo, redo, restore) forgets every fetched range, before and after Google
-  // answers, instead of working out which ranges it touches; upgrade if stepping right after a change is ever too slow.
+  // answers, instead of working out which ranges it touches. Once Google has answered, the window around the range shown is
+  // fetched again quietly (calendar-save-speed, 2026-11-20), so stepping right after a save shows the weeks at once.
   const changing = <T,>(call: Promise<T>): Promise<T> => {
     forget();
-    return call.finally(forget);
+    return call.finally(() => {
+      forget();
+      fetchAhead(state.view, state.day);
+    });
   };
   const api: CalendarApi | null = realApi && {
     ...realApi,
@@ -579,6 +583,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   // Weeks and months fetched ahead of the one shown, in one request (owner request, 2026-11-20): in the week view 4 weeks
   // before and 8 after, in the month view the month before and after. `near`: the next window is fetched once any range within
   // that many steps of the one shown is missing, so stepping to 2 weeks from the end of the window fetches the next one.
+  // The range shown is in it too when it isn't kept (after a change), so stepping back to it is at once as well.
   const WINDOW = { week: { back: 4, ahead: 8, near: 2 }, month: { back: 1, ahead: 1, near: 1 } };
   function fetchAhead(view: CalView, day: DayKey) {
     if (!api || !ahead) return;
@@ -586,7 +591,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     const need: { key: string; k: number; from: DayKey; to: DayKey }[] = [];
     for (let k = -w.back; k <= w.ahead; k++) {
       const key = rangeKey(view, moveView(view, day, k));
-      if (k === 0 || cache.has(key) || fetching.has(key)) continue;
+      if (cache.has(key) || fetching.has(key)) continue;
       need.push({ key, k, ...viewRange(view, moveView(view, day, k)) });
     }
     if (!need.some((n) => Math.abs(n.k) <= w.near)) return;
@@ -848,10 +853,21 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         await load();
         return SERIES_FAILED;
       }
-      await load();
+      // Done once Google has it (calendar-save-speed): the form closes now, and the calendar is fetched again behind it, quietly.
+      // Until then the series' events show as on their way and can't be changed again (Google may have given them new ids).
       const e = remember(started);
       e.settle(step);
       tell('Event saved', step ? e : null);
+      const key = `reload ${++standIns}`;
+      const ids = (state.events ?? []).filter((x) => x.id === event.id || x.series === seriesId).map((x) => x.id);
+      sendingSeries.set(key, seriesId);
+      set({ sending: [...state.sending, ...ids] });
+      const reload = load().finally(() => {
+        flights.delete(key);
+        sendingSeries.delete(key);
+        set({ sending: state.sending.filter((s) => !ids.includes(s)) });
+      });
+      flights.set(key, reload);
       return null;
     },
     /**

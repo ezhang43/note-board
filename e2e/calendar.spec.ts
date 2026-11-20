@@ -716,6 +716,74 @@ test.describe('a change shows at once while Google is told (owner request 2026-1
     expect(errors).toEqual([]);
   });
 
+  /** The fetch of the weeks around the one shown (a list over more than a month), once Google has answered it. */
+  const wideFetch = (page: Page) =>
+    page.waitForResponse((r) => {
+      const q = new URL(r.url()).searchParams;
+      return r.request().method() === 'GET' && r.url().includes('/events?') && Date.parse(q.get('timeMax') ?? '') - Date.parse(q.get('timeMin') ?? '') > 30 * 86400000;
+    });
+
+  test('after a save, the next week shows at once: the weeks around are fetched again quietly once Google has it (calendar-save-speed)', async ({ page }) => {
+    const errors = await openAs(page);
+    const opened = wideFetch(page);
+    await button(page).click();
+    await opened;
+    // The wide fetch after the save: the weeks around, this one included.
+    const refetched = wideFetch(page);
+    await edit(page, day(page, nowDate()).getByRole('button', { name: /Dentist/ }));
+    await form(page).getByLabel('Title').fill('Dentist visit');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await expect(form(page)).toHaveCount(0);
+    await answered(page);
+    await refetched;
+    // Google is now slow: the next week, and this one again, come from what was fetched, with no Loading….
+    await page.route('**/__calendar/**', () => new Promise<void>(() => {}));
+    await panel(page).getByRole('button', { name: 'Next week' }).click();
+    await expect(day(page, daysFromToday(7)).getByRole('button', { name: /Team stand-up/ })).toBeVisible();
+    await expect(panel(page).getByText('Loading…')).toHaveCount(0);
+    await panel(page).getByRole('button', { name: 'Previous week' }).click();
+    await expect(day(page, nowDate()).getByRole('button', { name: '10 – 11am Dentist visit' })).toBeVisible();
+    await page.unroute('**/__calendar/**');
+    expect(errors).toEqual([]);
+  });
+
+  test('“All events in the series”: Save says Saving… while Google answers, and the form closes once Google has it, before the list is fetched again (calendar-save-speed)', async ({ page }) => {
+    const errors = await openAs(page);
+    const opened = wideFetch(page);
+    await button(page).click();
+    await opened;
+    const held: { kind: string; go: () => void }[] = [];
+    const waiting = (kind: string) => held.some((h) => h.kind === kind);
+    const letThrough = (kind: string) => held.splice(held.findIndex((h) => h.kind === kind), 1)[0].go();
+    await page.route('**/__calendar/**', (route) => {
+      const r = route.request();
+      const kind = r.method() === 'GET' ? (r.url().includes('/events?') ? 'list' : 'get') : r.method();
+      return new Promise<void>((done) => held.push({ kind, go: () => done(void route.continue()) }));
+    });
+    await edit(page, day(page, daysFromToday(1)).getByRole('button', { name: /Team stand-up/ }));
+    await form(page).getByLabel('Title').fill('Daily sync');
+    await form(page).getByRole('button', { name: 'Save' }).click();
+    await asked(page, WHICH).getByRole('button', { name: 'All events in the series' }).click();
+    const save = form(page).getByRole('button', { name: 'Saving…' });
+    await expect(save).toBeVisible();
+    await expect(save).toBeDisabled();
+    await expect.poll(() => waiting('get')).toBe(true);
+    letThrough('get');
+    await expect.poll(() => waiting('PATCH')).toBe(true);
+    letThrough('PATCH');
+    // Closed with "Event saved", while the list Google is asked for is still on its way.
+    await expect(form(page)).toHaveCount(0);
+    await expect(toast(page)).toHaveText(/Event saved\s*Undo/);
+    await expect.poll(() => waiting('list')).toBe(true);
+    await expect(panel(page).getByText('Loading…')).toHaveCount(0);
+    // Until the list comes, the series' events show as on their way (they can't be changed again yet).
+    await expect(day(page, daysFromToday(2)).getByRole('button', { name: /Team stand-up/ })).toHaveAttribute('aria-busy', 'true');
+    for (const h of held.splice(0)) h.go();
+    await page.unroute('**/__calendar/**');
+    await expect(day(page, daysFromToday(2)).getByRole('button', { name: /Daily sync/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('saving: the new name shows at once; if Google refuses, the old one comes back and the message says so, with no Undo', async ({ page }) => {
     const errors = await openAs(page);
     await button(page).click();

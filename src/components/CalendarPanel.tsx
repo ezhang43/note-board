@@ -646,12 +646,16 @@ type Next = (action: Ask['action'], d: Draft, choice: Choice, step: 'start' | As
 function useChange(event: CalEvent | null, onDone: () => void) {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // "All events in the series" waits for Google with the form open, so its Save says Saving… (one event is shown at once).
+  const [saving, setSaving] = useState(false);
   const [ask, setAsk] = useState<Ask | null>(null);
 
-  async function run(action: () => Promise<string | null>) {
+  async function run(waits: boolean, action: () => Promise<string | null>) {
     setBusy(true);
+    setSaving(waits);
     const problem = await action();
     setBusy(false);
+    setSaving(false);
     if (problem) setNote(problem);
     else onDone();
   }
@@ -661,10 +665,11 @@ function useChange(event: CalEvent | null, onDone: () => void) {
     if (step === 'start' && event?.series) return setAsk({ action, step: 'which' });
     if (step !== 'emails' && emailGuests(event, action === 'save' ? d : null)) return setAsk({ action, step: 'emails', all: choice.all });
     setAsk(null);
-    void run(() => (action === 'save' ? calendar.save(event, d, choice) : calendar.remove(event!.id, choice)));
+    const waits = action === 'save' && choice.all === true && !!event?.series;
+    void run(waits, () => (action === 'save' ? calendar.save(event, d, choice) : calendar.remove(event!.id, choice)));
   };
 
-  return { note, setNote, busy, ask, setAsk, next };
+  return { note, setNote, busy, saving, ask, setAsk, next };
 }
 
 /**
@@ -687,7 +692,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
     (opener.isConnected ? opener : document.querySelector<HTMLElement>('.side-panel'))?.focus();
     onClose();
   };
-  const { note, setNote, busy, ask, setAsk, next } = useChange(event, finish);
+  const { note, setNote, busy, saving, ask, setAsk, next } = useChange(event, finish);
   const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const endTimes = endTimeOptions(draft.startTime, draft.endDate === draft.startDate);
   const cancel = () => {
@@ -859,7 +864,7 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
         )}
         <div className="cal-actions">
           <button type="submit" className="tb-button cal-save" disabled={busy}>
-            Save
+            {saving ? 'Saving…' : 'Save'}
           </button>
           {more ? (
             <button type="button" className="tb-button" onClick={finish}>

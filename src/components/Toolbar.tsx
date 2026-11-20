@@ -17,7 +17,7 @@ import { useNewCardDrag } from './useNewCardDrag';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { RoleBadge } from './ViewOnly';
 import { CompletedButton, useCompletedFindTarget } from './CompletedPanel';
-import { VisualizerButton } from './Visualizer';
+import { VisualizerButton } from './VisualizerButton';
 import { HistoryButton } from './HistoryPanel';
 import { activeVersionStore, historyFull, restoreFromBackup } from '../store/versions';
 import { collab } from '../sync/collabSession';

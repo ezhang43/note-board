@@ -2002,6 +2002,9 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
  * No open or close motion, like the right-hand panels.
  */
 .app { --left-width: 420px; }
+/* The board doesn't use the panels' widths. Setting them on .app (they change on every resize move) would
+   make each card on the board restyle; resetting them here stops the change at this element. */
+.world { --side-width: 0px; --left-width: 0px; }
 .app.checklist-open .corner-controls { left: calc(var(--left-width) + 12px); }
 .checklist-panel {
   position: fixed;

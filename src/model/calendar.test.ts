@@ -26,6 +26,7 @@ import {
   guestChanges,
   isEmail,
   monthGrid,
+  myAnswer,
   moveDraftStart,
   moveDraftStartTime,
   endTimeOptions,
@@ -195,6 +196,7 @@ describe('reading events from Google', () => {
       guests: [],
       timeZone: null,
       moved: false,
+      answer: 'going',
     });
   });
 
@@ -819,7 +821,53 @@ describe('a change shown before Google answers (owner request 2026-11-17)', () =
       guests: [],
       timeZone: null,
       moved: false,
+      answer: 'going',
     });
+  });
+});
+
+describe('the person’s answer to an event, for its color (owner request, 2026-11-21)', () => {
+  const ev = (over: Record<string, unknown> = {}) => ({ id: 'x', organizer: { email: 'me@example.com', self: true }, ...over });
+  const invite = (responseStatus?: string) =>
+    ev({ organizer: { email: 'pat@example.com' }, attendees: [{ email: 'pat@example.com', organizer: true, responseStatus: 'accepted' }, { email: 'me@example.com', self: true, ...(responseStatus && { responseStatus }) }] });
+
+  it('the person’s own event is going, with or without guests', () => {
+    expect(myAnswer(ev())).toBe('going');
+    expect(myAnswer({ id: 'x' })).toBe('going'); // no organizer given: it is on their own calendar
+    expect(myAnswer({ id: 'x', attendees: [{ email: 'me@example.com', self: true }] })).toBe('going');
+    // No organizer given, but their own entry says they haven't answered: it still waits for a reply.
+    expect(myAnswer({ id: 'x', attendees: [{ email: 'me@example.com', self: true, responseStatus: 'needsAction' }] })).toBe('unsure');
+    expect(myAnswer(ev({ attendees: [{ email: 'me@example.com', self: true, organizer: true, responseStatus: 'accepted' }, { email: 'sam@example.com', responseStatus: 'needsAction' }] }))).toBe('going');
+  });
+
+  it('an invite they accepted is going; a maybe or no reply yet is unsure; one they said no to is declined', () => {
+    expect(myAnswer(invite('accepted'))).toBe('going');
+    expect(myAnswer(invite('tentative'))).toBe('unsure');
+    expect(myAnswer(invite('needsAction'))).toBe('unsure');
+    expect(myAnswer(invite())).toBe('unsure');
+    expect(myAnswer(invite('declined'))).toBe('declined');
+  });
+
+  it('someone else’s event with no guest list (or without the person on it) is going: there is nothing to answer', () => {
+    expect(myAnswer(ev({ organizer: { email: 'pat@example.com' } }))).toBe('going');
+    expect(myAnswer(ev({ organizer: { email: 'pat@example.com' }, attendees: [{ email: 'pat@example.com' }] }))).toBe('going');
+  });
+
+  it('Google’s special kinds (birthdays, out of office, focus time, working location) keep their usual look', () => {
+    for (const eventType of ['birthday', 'outOfOffice', 'focusTime', 'workingLocation', 'fromGmail']) expect(myAnswer(ev({ eventType }))).toBeNull();
+    expect(myAnswer(ev({ eventType: 'default' }))).toBe('going');
+  });
+
+  it('odd guest lists from outside are read safely', () => {
+    expect(myAnswer(ev({ organizer: { email: 'pat@example.com' }, attendees: 'everyone' }))).toBe('going');
+    expect(myAnswer(ev({ organizer: { email: 'pat@example.com' }, attendees: [null, 5, { self: true, responseStatus: 'declined' }] }))).toBe('declined');
+  });
+
+  it('is kept on the event read from Google, and a changed event keeps its answer', () => {
+    expect(parseEvent({ ...invite('tentative'), start: { dateTime: '2026-10-06T10:00:00' }, end: { dateTime: '2026-10-06T11:00:00' } })?.answer).toBe('unsure');
+    const was = timed({ answer: 'unsure' });
+    const body = draftBody(draftFor(was), 'Europe/London')!;
+    expect(savedEvent(was, body, 'e1').answer).toBe('unsure');
   });
 });
 

@@ -180,4 +180,27 @@ describe('colour themes', () => {
       }
     }
   });
+
+  it('calendar events not declined are green and readable, light and dark; past ones a paler green (owner request, 2026-11-21)', () => {
+    for (const dark of [false, true]) {
+      const v = { ...vars('base', false), ...(dark ? vars('base', true) : {}) };
+      const where = dark ? 'dark' : 'light';
+      for (const name of ['--cal-green', '--cal-green-soft', '--cal-green-ink', '--cal-green-past', '--cal-green-past-edge']) expect(v[name], `${where} ${name}`).toMatch(/^#[0-9a-f]{6}$/i);
+      // Week events: the name in ink, the time in soft ink; past ones in soft ink. All-day chips in the green ink.
+      expect(contrast(v['--ink'], v['--cal-green-soft']), `${where} name`).toBeGreaterThanOrEqual(7);
+      expect(contrast(v['--ink-soft'], v['--cal-green-soft']), `${where} time`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(v['--cal-green-ink'], v['--cal-green-soft']), `${where} all-day chip`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(v['--ink-soft'], v['--cal-green-past']), `${where} past event`).toBeGreaterThanOrEqual(4.5);
+      // The bar, dot and dashed edge are seen (3:1, WCAG non-text) on the tint and on the panel.
+      expect(contrast(v['--cal-green'], v['--cal-green-soft']), `${where} edge on tint`).toBeGreaterThanOrEqual(3);
+      for (const t of COLOR_THEMES) {
+        const surface = (t.key === 'honey' ? v : { ...v, ...vars(t.key, dark) })['--surface'];
+        expect(contrast(v['--cal-green'], surface), `${where} ${t.key} dot on panel`).toBeGreaterThanOrEqual(3);
+        expect(contrast(v['--cal-green-past-edge'], surface), `${where} ${t.key} past dot on panel`).toBeGreaterThanOrEqual(3);
+      }
+      expect(contrast(v['--cal-green-past-edge'], v['--cal-green-past']), `${where} past edge`).toBeGreaterThanOrEqual(3);
+      // Paler than the current green, so the past still reads as faded.
+      expect(v['--cal-green-past']).not.toBe(v['--cal-green-soft']);
+    }
+  });
 });

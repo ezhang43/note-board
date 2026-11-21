@@ -76,16 +76,17 @@ test('a card\'s hover-only header buttons draw their icons only while shown: poi
   expect(await drawn(trash)).toBe(false);
   expect(await drawn(clock)).toBe(false);
   await card.hover();
-  expect(await drawn(trash)).toBe(true);
-  expect(await drawn(clock)).toBe(true);
+  // The icons switch on when the fade-in starts; ask until they have (reading at once raced it on CI).
+  await expect.poll(() => drawn(trash)).toBe(true);
+  await expect.poll(() => drawn(clock)).toBe(true);
   await page.mouse.move(1300, 800);
   await expect.poll(() => drawn(trash)).toBe(false);
   // Selected (clicked), with the pointer away again.
   await card.locator('.card-header').click({ position: { x: 40, y: 14 } });
   await page.mouse.move(1300, 800);
   await expect(card).toHaveClass(/selected/);
-  expect(await drawn(trash)).toBe(true);
-  expect(await drawn(clock)).toBe(true);
+  await expect.poll(() => drawn(trash)).toBe(true);
+  await expect.poll(() => drawn(clock)).toBe(true);
   // The collapse arrow keeps its icon always (it turns when collapsed).
   expect(await drawn(card.getByRole('button', { name: 'Collapse card' }))).toBe(true);
 });

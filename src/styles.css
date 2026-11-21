@@ -2982,6 +2982,28 @@ button.estimate-chip:active { transform: scale(0.97); }
 .app.phone .jn-name { min-width: 44px; min-height: 44px; font-size: 16px; }
 .app.phone .jn-rename { min-height: 44px; font-size: 16px; }
 .app.phone .journal-notes .jn-tools { margin-right: -10px; }
+/* Rearranging the general notes (owner request, 2026-11-21): the grip on a header drags its note; while
+   dragging, the note is lifted and follows the pointer, and the others slide aside to make room. */
+.jn-grip { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px; background: none; cursor: default; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.jn-grip::after { width: 8px; height: 12px; }
+@media (hover: hover) {
+  .jn-grip:hover { background: var(--hover); }
+  .jn-grip:hover::after { background: var(--ink-soft); }
+}
+@media (pointer: coarse) {
+  .jn-grip { width: 44px; height: 44px; }
+}
+.app.phone .jn-grip { width: 44px; height: 44px; }
+.journal-notes.lifted {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 14px 28px rgba(31, 29, 26, 0.2), 0 3px 8px rgba(31, 29, 26, 0.12);
+}
+.journal-notes.lifted .jn-grip { background: var(--hover); }
+.journal-notes.lifted .jn-grip::after { background: var(--ink-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .journal-notes.sorting { transition: transform 200ms var(--ease-out); }
+}
 /* Today's page. */
 .journal-page { margin: 12px 0 2px; padding: 18px 20px 12px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
 .journal-page h3 { margin-bottom: 8px; }

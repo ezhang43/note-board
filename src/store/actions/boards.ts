@@ -3,7 +3,7 @@ import { createBoardCard, createCard, newId } from '../../model/cards';
 import { CARD_W, NEW_BLOCK_H } from '../../model/constants';
 import { CHECKLIST_NAME, CHECKLIST_TITLE, checklistCardOf, findChecklistBoard, hiddenChecklist } from '../../model/mainChecklist';
 import { HABITS_NAME, findHabitsBoard, hiddenHabits, isHabit, tickedDays, withDay } from '../../model/habits';
-import { JOURNAL_KNOWN_KEY, JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
+import { JOURNAL_KNOWN_KEY, JOURNAL_NAME, JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, hiddenJournal, moveGeneralNote, noteName, renameGeneralNote, journalDateLine, journalBody, journalSpot, todaysNote, withJournalBody } from '../../model/journal';
 import { deepEqual } from '../../model/merge';
 import { hasFormatting, plainOf, withinLimits, type Rich } from '../../model/richText';
 import { spotForNewBlock, type MeasuredHeight } from '../../model/layout';
@@ -11,6 +11,7 @@ import type { Board, NoteCard, Point, TodoCard } from '../../model/types';
 import { boardNeighbor, pathTo, withoutBoard, type Workspace } from '../../model/workspace';
 import { restorable } from '../../model/sharing';
 import type { StoreContext } from '../core';
+import { announce } from '../announce';
 
 // Several boards, and boards inside boards (owner request, 2026-10-05): opening, adding and
 // deleting boards. Undo belongs to each board; adding or deleting a board itself isn't undone
@@ -283,6 +284,23 @@ export function boardActions(ctx: StoreContext) {
       const id = journalId();
       if (id) ctx.deleting('Deleted 1 note', () => ctx.commitTo(id, (b) => deleteGeneralNote(b, noteId, knownNotes())), id);
       remember();
+    },
+    /**
+     * Rearranging the general notes (owner request, 2026-11-21): the note `noteId` goes to place `to`
+     * (0 is the top), dragged by its grip or with Alt+arrows, as one undo step on the Journal board.
+     * Only the places (`general`) change, so it saves and syncs like any change. A screen reader hears the new place.
+     */
+    moveJournalNote(noteId: string, to: number) {
+      const id = journalId();
+      const board = id ? ctx.workspace().boards[id] : undefined;
+      if (!id || !board) return;
+      ctx.commitTo(id, (b) => moveGeneralNote(b, noteId, to, knownNotes()));
+      const after = ctx.workspace().boards[id];
+      if (after === board) return;
+      remember();
+      const ids = generalNotes(after, knownNotes());
+      const c = after.cards[noteId];
+      if (c?.kind === 'note') announce(`Moved “${noteName(c.text) || UNTITLED_NOTE}” to place ${ids.indexOf(noteId) + 1} of ${ids.length}`);
     },
     /** The Journal panel's general notes, in order (see generalNotes), with what this device remembers of them. */
     journalGeneralNotes(board: Board | undefined = journalBoardNow()): string[] {

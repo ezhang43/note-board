@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCard, createBoard } from './board';
 import { createBoardCard, createCard } from './cards';
 import { CARD_W, NEW_BLOCK_H } from './constants';
-import { JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, cleanNoteName, deleteGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, noteName, readsAsDay, renameGeneralNote, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
+import { JOURNAL_NOTES, UNTITLED_NOTE, addGeneralNote, cleanNoteName, deleteGeneralNote, moveGeneralNote, findJournalBoard, generalNotes, generalSpot, generalSpotBelow, noteName, readsAsDay, renameGeneralNote, groupJournal, hiddenJournal, isGroupOpen, journalBody, journalDateLine, journalDayKey, isoWeek, journalEntries, journalLongDate, journalPeek, journalWords, journalSpot, openToday, parseJournalOpen, todaysNote, toggleGroup, withJournalBody } from './journal';
 import { dayKey as calendarDayKey } from './calendar';
 import { dayKey as completedDayKey } from './completed';
 import { overlaps } from './geometry';
@@ -690,5 +690,68 @@ describe('several general notes', () => {
     expect(readsAsDay('Tue 10 Nov 2026 trip\n\nx')).toBe(true);
     expect(readsAsDay('Recipes')).toBe(false);
     expect(readsAsDay(`${JOURNAL_NOTES}\n\n`)).toBe(false);
+  });
+});
+
+// Rearranging the general notes (owner request, 2026-11-21: "give the ability to re-arrange them"):
+// a note moved by its grip or Alt+arrows gets a new place, and they are all numbered 1, 2, 3… again.
+describe('moving a general note', () => {
+  const legacy = () => {
+    let b = createBoard();
+    ({ board: b } = noteAt(b, 'Sun 18 Oct 2026\n\nday', 0, 0));
+    const g = noteAt(b, `${JOURNAL_NOTES}\n\nmy list`, 400, 0);
+    return { board: g.board, id: g.id };
+  };
+  const untitled = (id: string) => ({ ...createCard('note', id), text: `${UNTITLED_NOTE}\n\n` }) as NoteCard;
+  const three = () => {
+    const { board, id } = legacy();
+    const b = addGeneralNote(addGeneralNote(board, untitled('n-b'), { x: 400, y: 300 }), untitled('n-a'), { x: 400, y: 600 });
+    return { board: b, id };
+  };
+  const places = (b: Board, ids: string[]) => ids.map((k) => (b.cards[k] as NoteCard).general);
+
+  it('moves a note to a new place in the list and numbers them all again', () => {
+    const { board, id } = three();
+    expect(generalNotes(board)).toEqual(['n-a', 'n-b', id]);
+    const down = moveGeneralNote(board, 'n-a', 2);
+    expect(generalNotes(down)).toEqual(['n-b', id, 'n-a']);
+    expect(places(down, ['n-b', id, 'n-a'])).toEqual([1, 2, 3]);
+    expect(generalNotes(moveGeneralNote(board, id, 0))).toEqual([id, 'n-a', 'n-b']);
+    expect(generalNotes(moveGeneralNote(board, 'n-a', 1))).toEqual(['n-b', 'n-a', id]);
+  });
+
+  it('changes only the places: no words, formatting, spots on the board or other cards', () => {
+    const { board, id } = three();
+    const moved = moveGeneralNote(board, id, 0);
+    expect(Object.keys(moved.cards).sort()).toEqual(Object.keys(board.cards).sort());
+    for (const k of Object.keys(board.cards)) {
+      const { general: _a, ...before } = board.cards[k] as NoteCard;
+      const { general: _b, ...after } = moved.cards[k] as NoteCard;
+      expect(after).toEqual(before);
+    }
+    expect(moved.order).toEqual(board.order);
+  });
+
+  it('a place past either end goes to that end; the same place, one note, or a note not in the list changes nothing', () => {
+    const { board, id } = three();
+    expect(generalNotes(moveGeneralNote(board, 'n-a', 99))).toEqual(['n-b', id, 'n-a']);
+    expect(generalNotes(moveGeneralNote(board, id, -5))).toEqual([id, 'n-a', 'n-b']);
+    expect(moveGeneralNote(board, 'n-b', 1)).toBe(board);
+    expect(moveGeneralNote(board, 'nope', 0)).toBe(board);
+    const day = Object.keys(board.cards).find((k) => !generalNotes(board).includes(k))!;
+    expect(moveGeneralNote(board, day, 0)).toBe(board);
+    const { board: one, id: only } = legacy();
+    expect(moveGeneralNote(one, only, 1)).toBe(one);
+  });
+
+  it('an old unnumbered "General notes" note gets its number on the first move', () => {
+    const { board, id } = legacy();
+    // A second note this device knew as a general note after an older app dropped the places.
+    const b = noteAt(board, 'Recipes\n\nflour', 800, 0);
+    expect((board.cards[id] as NoteCard).general).toBeUndefined();
+    const moved = moveGeneralNote(b.board, b.id, 0, [id, b.id]);
+    expect(generalNotes(moved)).toEqual([b.id, id]);
+    expect(places(moved, [b.id, id])).toEqual([1, 2]);
+    expect((moved.cards[id] as NoteCard).text).toBe(`${JOURNAL_NOTES}\n\nmy list`);
   });
 });

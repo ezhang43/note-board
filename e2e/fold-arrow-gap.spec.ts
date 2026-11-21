@@ -9,7 +9,7 @@ import { THEME_KEY } from '../src/model/theme';
 // open and folded, top-level and sub-items. It must also stay inside the card (a top-level arrow sits in the card's padding)
 // and, for a sub-item, inside its indent (right of its parent's tick box's left edge).
 
-// The rule: about 4px at Normal, growing with the item buttons' step like the rest (SPEC.md). The test asks for 3px at
+// The rule: about 4px at Normal, growing with the item buttons' step like the rest, plus a fixed 5px (owner, 2026-11-21: "a bit more space"; SPEC.md). The test asks for 3px at
 // Normal, times the step, so it is a floor under the rule and not the rule itself.
 const MIN_GAP = 3;
 
@@ -96,7 +96,7 @@ async function run(page: Page, layout: 'desktop' | 'phone', theme: 'light' | 'da
       if (r.contrast < MIN_CONTRAST) failures.push(`Too faint: ${r.id}, ${where}: contrast ${r.contrast.toFixed(1)}:1 on the card, should be at least ${MIN_CONTRAST}:1`);
       if (Math.abs(r.midOff) > 1) failures.push(`Off the middle of the first line: ${r.id}, ${where}: ${r.midOff.toFixed(2)}px`);
       if (r.glyphToIndent !== null && r.glyphToIndent < 0) failures.push(`Out of its indent: ${r.id}, ${where}: the arrow starts ${(-r.glyphToIndent).toFixed(1)}px left of its parent's tick box`);
-      if (size === 'normal' && !r.folded && Math.abs(r.gap - 4) > 0.6) failures.push(`Not about 4px at Normal: ${r.id}, ${where}: ${r.gap.toFixed(2)}px`);
+      if (size === 'normal' && !r.folded && Math.abs(r.gap - 9) > 0.6) failures.push(`Not about 9px at Normal: ${r.id}, ${where}: ${r.gap.toFixed(2)}px`);
     }
   }
   if (process.env.FOLD_GAP_TABLE) console.log(table.join('\n'));

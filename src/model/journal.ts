@@ -165,6 +165,22 @@ export function renameGeneralNote(board: Board, id: string, name: string, known:
   return numbered(updateCard(board, id, (card) => ({ ...card, text }) as NoteCard), ids);
 }
 
+/**
+ * Moves the general note `id` to place `to` in the list (0 is the top; past either end is that end) and
+ * numbers them all again (owner request, 2026-11-21: rearranging them), so an old unnumbered "General
+ * notes" note, or one only `known`, gets its number too. Only `general` changes: no words, no spot on the
+ * board. Unchanged when it is already there, is the only one, or isn't a general note.
+ */
+export function moveGeneralNote(board: Board, id: string, to: number, known: readonly string[] = []): Board {
+  const ids = generalNotes(board, known);
+  const from = ids.indexOf(id);
+  const at = Math.max(0, Math.min(ids.length - 1, Math.trunc(to)));
+  if (from < 0 || from === at) return board;
+  const next = ids.filter((k) => k !== id);
+  next.splice(at, 0, id);
+  return numbered(board, next);
+}
+
 /** Deletes the general note `id`, unless it is the last one (or isn't a general note). */
 export function deleteGeneralNote(board: Board, id: string, known: readonly string[] = []): Board {
   const ids = generalNotes(board, known);

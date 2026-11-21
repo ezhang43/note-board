@@ -739,4 +739,43 @@ describe('placing general notes on the open Journal board', () => {
     expect(n.y).toBeGreaterThanOrEqual(a.y + a.h);
   });
 });
+
+// Rearranging the general notes (owner request, 2026-11-21): each move is one undo step on the Journal board.
+describe('moving a Journal general note', () => {
+  const ids = (s: Store) => generalNotes(s.workspace().boards[s.getState().ui.journalBoard!]);
+  const texts = (s: Store) => {
+    const b = s.workspace().boards[s.getState().ui.journalBoard!];
+    return generalNotes(b).map((k) => (b.cards[k] as NoteCard).text);
+  };
+
+  it('moves a note as one undo step; Ctrl+Y moves it again; the words stay with their notes', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('first'));
+    const [first] = ids(s);
+    const b = s.addJournalNote(first)!;
+    s.setJournalNotes(fromPlain('typed'), true, b);
+    expect(ids(s)).toEqual([b, first]);
+    s.moveJournalNote(b, 1);
+    expect(ids(s)).toEqual([first, b]);
+    expect(texts(s)).toEqual(['General notes\n\nfirst', 'Untitled note\n\ntyped']);
+    s.undoJournal();
+    expect(ids(s)).toEqual([b, first]);
+    expect(texts(s)).toEqual(['Untitled note\n\ntyped', 'General notes\n\nfirst']); // the typing is a step of its own
+    s.redoJournal();
+    expect(ids(s)).toEqual([first, b]);
+  });
+
+  it('a move to the same place, of the only note, or of a note that went adds no undo step', () => {
+    const s = setup();
+    s.openJournal();
+    s.setJournalNotes(fromPlain('only'));
+    const [first] = ids(s);
+    s.moveJournalNote(first, 1);
+    s.moveJournalNote('gone', 0);
+    expect(texts(s)).toEqual(['General notes\n\nonly']);
+    s.undoJournal();
+    expect(ids(s)).toEqual([]); // the undo took the first typing away, not a move
+  });
+});
 });

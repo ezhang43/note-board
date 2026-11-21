@@ -3,11 +3,12 @@ import { JOURNAL_KNOWN_KEY, JOURNAL_NOTES, NOTE_NAME_MAX, UNTITLED_NOTE, groupJo
 import { newId } from '../model/cards';
 import { dayKey } from '../model/completed';
 import { deepEqual } from '../model/merge';
+import { dropPlace, placeAmong, sortShift, type ListDrag } from '../model/listDrag';
 import { HIGHLIGHTS, journalRich, sizePx, type Look, type Toggle } from '../model/richText';
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
-import { CaretIcon, PlusIcon, TrashIcon } from './icons';
+import { CaretIcon, CollapseAllIcon, PlusIcon, TrashIcon } from './icons';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { SidePanel } from './SidePanel';
 import { SizeBox } from './SizeBox';
@@ -104,6 +105,16 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
   }, []);
   /** The general note whose name button takes the keyboard back once its name field goes (Enter or Escape). */
   const refocusName = useRef<string | null>(null);
+  /** The general note just moved with Alt+arrows, and which of its header buttons gets the keyboard back. */
+  const refocusMove = useRef<{ key: string; cls: 'jg-notes' | 'jn-name' } | null>(null);
+  /**
+   * The general note being dragged by its grip (owner request, 2026-11-21; view state): its place when the
+   * drag began, the place it would land in, how far the pointer has gone and its height (the others make that much room).
+   */
+  const [drag, setDrag] = useState<(ListDrag & { key: string }) | null>(null);
+  /** Ends the drag under way (its listeners and the shifts), if there is one. */
+  const dragEnd = useRef<(() => void) | null>(null);
+  useEffect(() => () => dragEnd.current?.(), []);
   // Days whose fold was turned over this visit (view state: not saved, not undoable, gone when the panel closes):
   // today starts open and every earlier day starts folded, showing its first line.
   const [turned, setTurned] = useState<ReadonlySet<string>>(new Set());
@@ -139,6 +150,12 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
     if (refocusName.current && !renaming) {
       root.current?.querySelector<HTMLElement>(`[data-note="${CSS.escape(refocusName.current)}"] .jn-name`)?.focus();
       refocusName.current = null;
+    }
+    // A note moved with Alt+arrows keeps the keyboard on the header button it was pressed on.
+    if (refocusMove.current) {
+      const { key, cls } = refocusMove.current;
+      refocusMove.current = null;
+      root.current?.querySelector<HTMLElement>(`[data-note="${CSS.escape(key)}"] .${cls}`)?.focus();
     }
     if (typing.current && !typing.current.isConnected) {
       typing.current = null;
@@ -288,7 +305,77 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
     );
   };
 
-  /** One general note's sheet: an arrow that folds it, its name (click to rename) and the trash. */
+  /**
+   * Dragging a general note by its grip (owner request, 2026-11-21): the note follows the pointer, up or down,
+   * the others make room for it, and letting go moves it there (one undo step). A press that doesn't move, or a
+   * drag back to where it was, moves nothing. Mouse, pen and touch alike (the grip takes no scrolling).
+   */
+  const startDrag = (key: string) => (ev: React.PointerEvent<HTMLButtonElement>) => {
+    if (ev.button !== 0 || dragEnd.current) return;
+    const ids = generals;
+    const els = ids.map((k) => root.current?.querySelector<HTMLElement>(`section[data-note="${CSS.escape(k)}"]`));
+    const from = ids.indexOf(key);
+    if (from < 0 || els.some((el) => !el)) return;
+    ev.preventDefault(); // no text selected, and the cursor stays where it was typing
+    // simple: the sheets' places are read once, when the drag starts; scrolling the panel while dragging isn't followed.
+    const rects = els.map((el) => el!.getBoundingClientRect());
+    const others = ids.filter((k) => k !== key);
+    const h = rects[from].height;
+    const startY = ev.clientY;
+    const pointer = ev.pointerId;
+    const grip = ev.currentTarget;
+    grip.setPointerCapture(pointer);
+    let to = from;
+    let moved = false;
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== pointer) return;
+      const dy = e.clientY - startY;
+      if (!moved && Math.abs(dy) < 4) return; // a small wobble is still a press
+      moved = true;
+      to = dropPlace(rects, from, dy);
+      setDrag({ key, from, to, dy, h });
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      grip.removeEventListener('lostpointercapture', end);
+      dragEnd.current = null;
+      setDrag(null);
+    };
+    function end(e: PointerEvent) {
+      if (e.pointerId !== pointer) return;
+      stop();
+      if (e.type !== 'pointerup' || !moved || to === from) return;
+      // The cursor stays where it was typing, even if the browser dropped it while the sheets took their new order.
+      const doc = grip.ownerDocument;
+      const now = doc.activeElement;
+      const was = now instanceof HTMLElement && root.current?.contains(now) ? now : null;
+      const sel = doc.getSelection();
+      const range = was && sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      // Before the same neighbour as when the drag began, so a note added meanwhile (another device) doesn't shift it.
+      appStore.moveJournalNote(key, placeAmong(appStore.journalGeneralNotes(), key, others, to));
+      if (was?.isConnected && doc.activeElement !== was) {
+        was.focus();
+        if (range && was.contains(range.startContainer)) {
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      }
+    }
+    // On the window, so the drag ends even when the grip goes mid-drag (Ctrl+Z took its note away; see also dragEnd).
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    grip.addEventListener('lostpointercapture', end);
+    dragEnd.current = stop;
+  };
+  // The dragged note went (undo, another device): the drag ends, and nothing stays shifted.
+  useEffect(() => {
+    if (drag && !generals.includes(drag.key)) dragEnd.current?.();
+  });
+
+  /** One general note's sheet: an arrow that folds it, its name (click to rename), the grip that drags it and the trash. */
   const generalSheet = (key: string, count: number) => {
     const card = board?.cards[key];
     const text = card?.kind === 'note' ? card.text : `${JOURNAL_NOTES}\n\n`;
@@ -304,9 +391,29 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
       if (save) appStore.renameJournalNote(key, editing.draft);
       setRenaming(null);
     };
+    const place = generals.indexOf(key);
+    const shift = drag ? sortShift(place, drag, 8) : 0; // 8px between sheets
+    const lifted = drag?.key === key;
+    /** Alt+Up / Alt+Down on the header's buttons move the note one place, the keyboard staying on that button. */
+    const moveKeys = (ev: React.KeyboardEvent<HTMLElement>) => {
+      if (!ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+      // Only on the arrow and the name (the name field keeps its own keys).
+      if (!(ev.target instanceof HTMLElement) || !ev.target.matches('.jg-notes, .jn-name')) return;
+      ev.preventDefault();
+      const to = place + (ev.key === 'ArrowUp' ? -1 : 1);
+      if (count < 2 || to < 0 || to >= count) return;
+      refocusMove.current = { key, cls: ev.target.classList.contains('jn-name') ? 'jn-name' : 'jg-notes' };
+      appStore.moveJournalNote(key, to);
+      if (appStore.journalGeneralNotes()[to] !== key) refocusMove.current = null; // it didn't move
+    };
     return (
-      <section key={key} data-note={key} className={`journal-notes${open ? '' : ' shut'}`}>
-        <h3 className="jn-head">
+      <section
+        key={key}
+        data-note={key}
+        className={`journal-notes${open ? '' : ' shut'}${lifted ? ' lifted' : drag ? ' sorting' : ''}`}
+        style={shift ? { transform: `translateY(${shift}px)` } : undefined}
+      >
+        <h3 className="jn-head" onKeyDown={moveKeys}>
           <button
             type="button"
             className="jg-head jg-notes"
@@ -353,6 +460,10 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
           )}
           {!open && !editing && peek && <span className="jg-peek">{peek}</span>}
           <span className="jn-tools">
+            {count > 1 && (
+              // Not in the Tab order: the keyboard moves a note with Alt+Up / Alt+Down on its header instead.
+              <button type="button" className="jn-grip ci ci-grip" aria-label={`Drag to move “${name}”`} title="Drag to move (Alt+↑ / Alt+↓)" tabIndex={-1} onPointerDown={startDrag(key)} />
+            )}
             {count > 1 && (
               <button
                 type="button"
@@ -446,8 +557,38 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
     </button>
   );
 
+  // Fold all (owner request, 2026-11-21: "General notes only"): directly left of the +, it folds every general
+  // note at once, or, when every one is folded, opens them all. The days are left as they are. View state, as each fold is.
+  const allShut = generals.every((k) => shutNotes.has(k));
+  const foldAllLabel = allShut ? 'Unfold all general notes' : 'Fold all general notes';
+  const foldAllButton = board && (
+    <button
+      type="button"
+      className="icon-button jn-fold-all"
+      aria-label={foldAllLabel}
+      title={foldAllLabel}
+      onClick={(ev) => {
+        // Folding the note that holds the cursor: the keyboard stays on this button (a click doesn't focus a button in Safari).
+        if (!allShut && typing.current?.closest('.journal-notes')) typing.current = null;
+        ev.currentTarget.focus();
+        setShutNotes(allShut ? new Set() : new Set(generals));
+      }}
+    >
+      <CollapseAllIcon expand={allShut} />
+    </button>
+  );
+
   return (
-    <SidePanel title="Journal" onClose={onClose} actions={addButton}>
+    <SidePanel
+      title="Journal"
+      onClose={onClose}
+      actions={
+        <>
+          {foldAllButton}
+          {addButton}
+        </>
+      }
+    >
       <div className="journal-panel" tabIndex={-1} ref={root}>
         <div className="journal-tools" role="toolbar" aria-label="Formatting" ref={tools} onPointerDown={keep} onMouseDown={keep}>
           {markButton('b', 'Bold', 'Ctrl+B', 'B')}

@@ -390,7 +390,9 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
         if (listed) {
           e.preventDefault();
           props.current.onChange(listed.typed.rich, true);
-          pending.current = marks ? { marks, at: listed.list.at } : null;
+          // A look chosen for the next letters stays chosen; an empty item keeps the size the typed letters had.
+          const next = marks ?? listed.look;
+          pending.current = next ? { marks: next, at: listed.list.at } : null;
           apply(listed.list.rich, at(listed.list.at), false);
           beforeList.current = listed.typed;
           return;

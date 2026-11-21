@@ -345,10 +345,13 @@ export function isoWeek(key: DayKey): number {
   return Math.floor((Date.parse(`${thursday}T12:00:00Z`) - jan1) / 86400000 / 7) + 1;
 }
 
-/** The words in a note's text under its date line; the "• " and "1. " list markers are not words. */
+/**
+ * The words in a note's text under its date line; the list markers ("• ", "1. ", "1) ", and on deeper,
+ * indented levels "a. " and "iv) ") are not words.
+ */
 export function journalWords(body: string): number {
   // A divider's line is not a word.
-  return body.split('\n').flatMap((l) => (l === DIVIDER ? [] : l.replace(/^\s*(•|\d+\.)\s/, '').split(/\s+/))).filter(Boolean).length;
+  return body.split('\n').flatMap((l) => (l === DIVIDER ? [] : l.replace(/^\s*(•|\d+[.)])\s|^\s+[a-z]+[.)]\s/, '').split(/\s+/))).filter(Boolean).length;
 }
 
 /** What the person chose to open (true) or shut (false), by group id; only choices that differ from the default are kept. */

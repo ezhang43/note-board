@@ -95,6 +95,14 @@ describe('typedList: the typed trigger', () => {
     expect(typedList([p('10.')], sel(0, 3), ' ')).toBeNull();
     expect(typedList([p('1.')], sel(0, 2), 'x')).toBeNull();
     expect(typedList([p('1.')], { start: at(0, 0), end: at(0, 2) }, ' ')).toBeNull();
+    // Words that are names on every object (review finding) are words too.
+    for (const word of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) expect(typedList([p(word)], sel(0, word.length), ' ')).toBeNull();
+  });
+  it('an item that starts empty keeps the size the typed letters had', () => {
+    const big: Rich = [{ type: 'p', runs: [{ text: '1.', size: 24 }] }];
+    expect(typedList(big, sel(0, 2), ' ')?.look).toEqual({ size: 24 });
+    expect(typedList([{ type: 'p', runs: [{ text: '1.', size: 24 }, { text: 'x' }] }], sel(0, 2), ' ')?.look).toBeUndefined();
+    expect(typedList([p('1.')], sel(0, 2), ' ')?.look).toBeUndefined();
   });
 });
 

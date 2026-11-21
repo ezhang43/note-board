@@ -629,28 +629,30 @@ export function toggleList(rich: Rich, b0: number, b1: number, type: 'bullet' | 
 }
 
 /** What typed at the very start of a plain line, then a space, starts a list (owner request 2026-11-21, as in Google Docs). */
-const TYPED_LISTS: Record<string, { type: 'bullet' | 'number'; paren?: boolean }> = {
-  '1.': { type: 'number' },
-  '1)': { type: 'number', paren: true },
-  '-': { type: 'bullet' },
-  '*': { type: 'bullet' },
-};
+const TYPED_LISTS = new Map<string, { type: 'bullet' | 'number'; paren?: boolean }>([
+  ['1.', { type: 'number' }],
+  ['1)', { type: 'number', paren: true }],
+  ['-', { type: 'bullet' }],
+  ['*', { type: 'bullet' }],
+]);
 
 /**
  * A space typed right after "1.", "1)", "-" or "*" at the very start of a plain line: `typed` is the line with
  * the space typed (the undo step it goes back to), `list` the line made a list item without those letters, the
- * cursor at its start. Null for anything else (mid-line, a heading, a list line, other numbers, other keys).
+ * cursor at its start. `look`: when the item starts empty, the size the typed letters had, for its first
+ * letters (as Enter keeps it). Null for anything else (mid-line, a heading, a list line, other numbers, other keys).
  */
-export function typedList(rich: Rich, sel: Sel, data: string): { typed: Edit; list: Edit } | null {
+export function typedList(rich: Rich, sel: Sel, data: string): { typed: Edit; list: Edit; look?: Marks } | null {
   if (data !== ' ' || !samePlace(sel)) return null;
   const { b, o } = sel.start;
   const blk = rich[b];
   if (blk?.type !== 'p') return null;
-  const kind = TYPED_LISTS[slice(blk.runs, 0, o).map((r) => r.text).join('')];
+  const kind = TYPED_LISTS.get(slice(blk.runs, 0, o).map((r) => r.text).join(''));
   if (!kind) return null;
   const out = [...rich];
   out[b] = block(kind.type, 0, slice(blk.runs, o), kind.paren);
-  return { typed: insertText(rich, sel, ' '), list: { rich: out, at: { b, o: 0 } } };
+  const size = len(out[b]) ? undefined : marksBefore(blk, o).size;
+  return { typed: insertText(rich, sel, ' '), list: { rich: out, at: { b, o: 0 } }, ...(size === undefined ? {} : { look: { size } }) };
 }
 const samePlace = (sel: Sel) => sel.start.b === sel.end.b && sel.start.o === sel.end.o;
 

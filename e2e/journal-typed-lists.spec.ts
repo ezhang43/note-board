@@ -101,6 +101,30 @@ test('"1. " mid-line, on a heading or inside a list, and "2. ", stay words', asy
   await expect(blocks(page).nth(4)).toHaveText('1. b');
 });
 
+test('a long marker (viii.) grows to the left of its item, not over the words', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('1. top');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('mid');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  for (let i = 1; i <= 8; i++) {
+    await page.keyboard.type(`w${i}`);
+    if (i < 8) await page.keyboard.press('Enter');
+  }
+  const item = blocks(page).nth(9);
+  await expect(item).toHaveAttribute('data-marker', 'viii.');
+  // Its words start where the short markers' items' words start, and the marker ends before them.
+  const lefts = await blocks(page).evaluateAll((els) => els.slice(2).map((el) => el.querySelector('span')!.getBoundingClientRect().left));
+  expect(new Set(lefts).size).toBe(1);
+  const style = await item.evaluate((el) => {
+    const s = getComputedStyle(el, '::before');
+    return `${s.display} ${s.justifyContent}`;
+  });
+  expect(style).toBe('inline-flex flex-end');
+});
+
 test('the Numbered list button nests with letters too, and Backspace outdents then ends the item', async ({ page }) => {
   await openJournal(page);
   await page.keyboard.press('Control+Shift+7');

@@ -14,6 +14,7 @@ import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { EmptyStart } from './TemplatePicker';
 import { wakeAll } from './farAway';
+import { markMoving } from './movingHint';
 import { HOLD_MS } from './touchHold';
 import { useBoxButtons } from './useBoxButtons';
 import { usePhone } from './usePhone';
@@ -25,6 +26,8 @@ export function Canvas() {
   const view = useAppState((s) => s.view);
   const snap = useAppState((s) => s.board.snap);
   const ref = useRef<HTMLDivElement>(null);
+  // The layer that pans and zooms; marked while a gesture moves it (movingHint.ts).
+  const world = useRef<HTMLDivElement>(null);
 
   const order = useAppState((s) => s.board.order);
   const phone = usePhone();
@@ -113,12 +116,14 @@ export function Canvas() {
         if (!overCanvas) return;
         const r = el.getBoundingClientRect();
         const { dy } = wheelPixels(e, el.clientHeight);
+        markMoving(world.current);
         appStore.zoomAt({ x: e.clientX - r.left, y: e.clientY - r.top }, wheelZoomFactor(dy));
         return;
       }
       if (!overCanvas) return;
       e.preventDefault();
       const { x, y } = wheelPan(e, el.clientHeight);
+      markMoving(world.current);
       appStore.panBy(x, y);
     };
     window.addEventListener('wheel', onWheel, { passive: false });
@@ -229,7 +234,9 @@ export function Canvas() {
       e.stopPropagation();
       fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // A third finger is ignored; the first two steer. One finger left over does nothing.
-      if (fingers.size >= 2) appStore.pinchTo(pinch.view, pinch.from, pair());
+      if (fingers.size < 2) return;
+      markMoving(world.current);
+      appStore.pinchTo(pinch.view, pinch.from, pair());
     };
     const onUp = (e: PointerEvent) => {
       if (!fingers.delete(e.pointerId) || !pinch) return;
@@ -294,6 +301,7 @@ export function Canvas() {
       return appStore.updateMarquee(d.start, clientToCanvas(e.clientX, e.clientY));
     }
     if (e.pointerType === 'mouse') setPanning(true); // the closed glove, from the first move
+    markMoving(world.current);
     appStore.panBy(e.clientX - d.x, e.clientY - d.y);
     d.x = e.clientX;
     d.y = e.clientY;
@@ -382,7 +390,7 @@ export function Canvas() {
       } as CSSProperties}
     >
       {empty && !readOnly && <EmptyStart />}
-      <div className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
+      <div ref={world} className="world" style={{ transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})` }}>
         <BoardReadOnly value={readOnly}>
           {blockIds.map((id) => (columns[id] ? <ColumnView key={id} id={id} /> : <CardView key={id} id={id} inColumn={false} />))}
         </BoardReadOnly>

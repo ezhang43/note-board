@@ -1,0 +1,1 @@
+- 2026-11-21 Board layer hint while panning or zooming (job perf-pan-layer): every pan or zoom step restarts a 150 ms countdown, and the hint comes off when it runs out, even if the finger or mouse is still held down. Nothing waits for the gesture to end, so a lost finger lift can never leave the text blurry.

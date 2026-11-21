@@ -558,6 +558,11 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   height: 1px;
   transform-origin: 0 0;
 }
+/* Only while a pan or zoom gesture moves it, and a moment after (movingHint.ts): the browser slides the drawn
+   picture instead of drawing every card again each frame. Off at rest, so text is drawn sharp at the new zoom. */
+.world.moving {
+  will-change: transform;
+}
 
 /* ---------- zoom control ---------- */
 

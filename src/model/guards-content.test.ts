@@ -200,8 +200,8 @@ describe('small pure functions', () => {
       { type: 'bullet', runs: run('b') },
       { type: 'number', runs: run('three') },
     ];
-    expect(numbers(rich)).toEqual(['1.', '1.', '2.', '', '1.']);
-    expect(plainOf(rich)).toBe('1. one\n  1. sub\n2. two\n• b\n1. three');
+    expect(numbers(rich)).toEqual(['1.', 'a.', '2.', '', '1.']);
+    expect(plainOf(rich)).toBe('1. one\n  a. sub\n2. two\n• b\n1. three');
   });
 
   it('marksOfLook keeps only what is on', () => {

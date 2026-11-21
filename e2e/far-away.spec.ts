@@ -189,3 +189,94 @@ test('Download as picture draws far cards too, with their text', async ({ page }
   // The card still isn't drawn on the board itself afterwards.
   await expect(block(page, 'f')).toHaveAttribute('data-far', '');
 });
+
+/** A long row of notes, 300px apart, from the left of the screen to 60,000px to the right. */
+function row() {
+  const cards: Record<string, unknown> = {};
+  const order: string[] = [];
+  for (let k = 0; k < 200; k++) {
+    cards[`r${k}`] = { ...base, id: `r${k}`, kind: 'note', text: `Row note ${k}`, x: 40 + k * 300, y: 40 };
+    order.push(`r${k}`);
+  }
+  return { name: 'Row', snap: true, cards, columns: {}, order };
+}
+
+/** Pans the board sideways one wheel step a frame (`dx` screen pixels each) for `frames` frames, from inside the page. */
+async function panFrames(page: Page, dx: number, frames: number) {
+  return page.evaluate(
+    ([dx, frames, speed]) =>
+      new Promise<{ hiddenOnScreen: string[]; wakeGaps: number[]; hideBatches: number; ms: number }>((done) => {
+        const canvas = document.querySelector<HTMLElement>('.canvas')!;
+        const c = canvas.getBoundingClientRect();
+        const hiddenOnScreen = new Set<string>();
+        const wakes: number[] = [];
+        let hideBatches = 0;
+        // Each time the page takes data-far off blocks (a wake) or puts it on (a hide).
+        const mo = new MutationObserver((records) => {
+          const far = records.filter((r) => r.attributeName === 'data-far');
+          if (far.some((r) => !(r.target as Element).hasAttribute('data-far'))) wakes.push(performance.now());
+          if (far.some((r) => (r.target as Element).hasAttribute('data-far'))) hideBatches++;
+        });
+        mo.observe(canvas, { attributes: true, attributeFilter: ['data-far'], subtree: true });
+        // What each frame is about to paint (a ResizeObserver runs after layout, before paint): no
+        // block on the screen may be left undrawn. A small box is resized each frame to get the call.
+        const tick = document.body.appendChild(document.createElement('div'));
+        new ResizeObserver(() => {
+          for (const el of canvas.querySelectorAll<HTMLElement>('[data-far]')) {
+            const r = el.getBoundingClientRect();
+            if (r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) hiddenOnScreen.add(el.dataset.cardId ?? el.dataset.colId ?? '?');
+          }
+        }).observe(tick);
+        const t0 = performance.now();
+        let i = 0;
+        const step = () => {
+          if (i++ >= frames) {
+            mo.disconnect();
+            tick.remove();
+            const gaps = wakes.slice(1).map((t, k) => t - wakes[k]);
+            return done({ hiddenOnScreen: [...hiddenOnScreen], wakeGaps: gaps, hideBatches, ms: performance.now() - t0 });
+          }
+          canvas.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: dx / speed, clientX: c.left + 700, clientY: c.top + 400 }));
+          tick.style.width = `${i % 2}px`;
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    [dx, frames, WHEEL_PAN_SPEED] as const,
+  );
+}
+
+async function seedRow(page: Page) {
+  await page.evaluate((b) => localStorage.setItem('note-board:v1', JSON.stringify({ version: 2, board: b })), row());
+  await page.reload();
+  await fontsLoaded(page);
+  await expect(block(page, 'r199')).toHaveAttribute('data-far', '');
+}
+
+test('a fast pan never leaves a card on the screen undrawn', async ({ page }) => {
+  await seedRow(page);
+  const before = await saved(page);
+  // 600 screen pixels a frame (36,000 a second): far faster than a flick, and faster than the batches, so cards come
+  // two screens near and onto the screen between two batches; the one-screen watch must wake them in time.
+  const { hiddenOnScreen } = await panFrames(page, 600, 40);
+  expect(hiddenOnScreen).toEqual([]);
+  // Once the pan settles the cards left behind are not drawn again, and the board is unchanged.
+  await expect(block(page, 'r0')).toHaveAttribute('data-far', '');
+  await page.waitForTimeout(400);
+  expect(await saved(page)).toEqual(before);
+});
+
+test('while panning, cards coming near are drawn in batches and the ones left behind are put away in few batches', async ({ page }) => {
+  await seedRow(page);
+  // A steady pan of 100 screen pixels a frame: a new card comes near every three frames.
+  const { hiddenOnScreen, wakeGaps, hideBatches, ms } = await panFrames(page, 100, 150);
+  expect(hiddenOnScreen).toEqual([]);
+  expect(wakeGaps.length).toBeGreaterThan(2); // it did wake cards on the way
+  // At most one batch of cards woken every ~100ms (a few ms of timer slack), not one each frame.
+  // (Cards are woken two screens ahead, so the one-screen catch for very fast pans never comes first here.)
+  expect(Math.min(...wakeGaps)).toBeGreaterThan(90);
+  // Cards left behind are put away at most once a second while the pan goes on, not each frame.
+  expect(hideBatches).toBeLessThanOrEqual(Math.ceil(ms / 1000) + 1);
+  // The cards left behind are put away after it stops.
+  await expect(block(page, 'r0')).toHaveAttribute('data-far', '');
+});

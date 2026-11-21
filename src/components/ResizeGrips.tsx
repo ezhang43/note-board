@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { ResizeDir } from '../model/sizing';
 import { resizePointerDown } from './useResize';
 
@@ -8,7 +9,7 @@ import { resizePointerDown } from './useResize';
  * like the other handles. They are switched off on touch screens (styles.css). `heightFree` false (a container with cards, which is as tall as
  * its cards) makes every grip set the width only.
  */
-export function ResizeGrips({ kind, id, dirs, heightFree = true, minH }: { kind: 'card' | 'column'; id: string; dirs: ResizeDir[]; heightFree?: boolean; minH?: number }) {
+export const ResizeGrips = memo(function ResizeGrips({ kind, id, dirs, heightFree = true, minH }: { kind: 'card' | 'column'; id: string; dirs: readonly ResizeDir[]; heightFree?: boolean; minH?: number }) {
   return (
     <>
       {dirs.map((d) => (
@@ -24,4 +25,4 @@ export function ResizeGrips({ kind, id, dirs, heightFree = true, minH }: { kind:
       ))}
     </>
   );
-}
+});

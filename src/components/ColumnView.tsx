@@ -12,7 +12,12 @@ import { PlusIcon } from './icons';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
-import { useMeasuredHeight } from './useMeasure';
+import { useFarAway, useMeasuredHeight } from './useMeasure';
+import type { ResizeDir } from '../model/sizing';
+
+// The edges and corners a container resizes from (the same arrays each time, so the grips aren't drawn again for nothing).
+const GRIPS_OPEN: readonly ResizeDir[] = ['w', 'nw', 'ne', 'sw'];
+const GRIPS_COLLAPSED: readonly ResizeDir[] = ['w'];
 
 /** A column: a titled stack of cards. */
 export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
@@ -45,6 +50,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const title = useRef<HTMLInputElement>(null);
   useTakeFocus(id, title, true);
   useMeasuredHeight(id, ref);
+  useFarAway(ref, col);
   // Search: the current match is out of sight inside this collapsed column, so the column is marked.
   const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   // Every hook is above this: while a block is dragged a version can show without it, and it must still draw nothing.
@@ -82,7 +88,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
       onPointerDownCapture={blockHoldPointerDown('column', id)}
     >
       {/* The left edge and the other corners set the width too (owner request 2026-10-21); the corners of an empty one also set its minimum height. First, so the buttons paint above them. */}
-      <ResizeGrips kind="column" id={id} dirs={col.collapsed ? ['w'] : ['w', 'nw', 'ne', 'sw']} heightFree={!cardIds.length} />
+      <ResizeGrips kind="column" id={id} dirs={col.collapsed ? GRIPS_COLLAPSED : GRIPS_OPEN} heightFree={!cardIds.length} />
       {/* Title and count on the left; collapse arrow and trash can on the right. */}
       <div className="column-header">
         <div className="column-heading">

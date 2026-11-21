@@ -1,4 +1,5 @@
 import { EXPORT_MARGIN, exportArea, exportScale, pdfFromJpeg } from '../model/exportImage';
+import { wakeAll } from './farAway';
 
 // Download as picture (PNG) / PDF (job 163): draws the open board, every card and container and not
 // just what is on screen, into a picture. The board is copied into a hidden, unzoomed, unselected
@@ -81,6 +82,8 @@ export async function boardPicture(kind: 'png' | 'pdf'): Promise<Blob | null> {
   const canvas = document.querySelector<HTMLElement>('.canvas');
   const world = canvas?.querySelector<HTMLElement>('.world');
   if (!canvas || !world) return null;
+  // Cards far off the screen aren't drawn (farAway.ts): the picture shows every one, at its real size.
+  wakeAll(world);
   const zoom = Number(canvas.dataset.zoom) || 1;
   const origin = world.getBoundingClientRect();
   const blocks = [...world.querySelectorAll<HTMLElement>(':scope > [data-card-id], :scope > [data-col-id]')].map((el) => {
@@ -100,6 +103,8 @@ export async function boardPicture(kind: 'png' | 'pdf'): Promise<Blob | null> {
   Object.assign(copy.style, { width: `${area.w}px`, height: `${area.h}px`, backgroundImage: 'none' });
   copy.querySelector<HTMLElement>('.world')!.style.transform = `translate(${-area.x}px, ${-area.y}px)`;
   copy.querySelectorAll('.' + WORKING.join(', .')).forEach((el) => el.classList.remove(...WORKING));
+  // In case the watcher marked a block again before the copy was made.
+  copy.querySelectorAll('[data-far]').forEach((el) => el.removeAttribute('data-far'));
   // A copy doesn't carry what was typed into a text box, only its starting text.
   const typed = (root: Element) => [...root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')];
   const live = typed(canvas);

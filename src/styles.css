@@ -49,6 +49,8 @@
   --nest-mark-bg: rgba(176, 122, 14, 0.14);
   --colour-dot: #efece6;
   --toolbar-height: 64px;
+  /* How far the Checklist panel's list sits in from the panel's own padding (owner, 2026-11-21). */
+  --checklist-inset: 12px;
   /* Layers, lowest first: a side panel, then the toolbar with its menus (File, Appearance, Boards, ⋯) and the Share panel, which open over it. */
   --z-side-panel: 5;
   --z-toolbar: 8;
@@ -2076,7 +2078,8 @@ a.help-button, a.tb-button { text-decoration: none; box-sizing: border-box; }
 .app.previewing .checklist-panel .checklist-count { margin-right: 0; }
 .app.previewing .checklist-panel :is(.item-arrows, .item-trash, .item-grip, .estimate-chip.add, .list-clean-up) { display: none; }
 /* The list itself: a checklist card without its frame, as wide as the panel. */
-.checklist-sheet.card { width: auto; padding: 0 2px 12px; background: transparent; border: none; box-shadow: none; }
+/* The list starts --checklist-inset in from the panel's padding, so a parent's fold arrow lines up with the title "Checklist" and the tick boxes sit clear of the edge (owner, 2026-11-21). */
+.checklist-sheet.card { width: auto; padding: 0 2px 12px calc(2px + var(--checklist-inset)); background: transparent; border: none; box-shadow: none; }
 /* Its drag ghost is drawn on the page, above the panel. */
 .item-ghost.panel-ghost { position: fixed; z-index: 45; }
 .history-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 8px; }

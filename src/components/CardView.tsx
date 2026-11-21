@@ -21,7 +21,12 @@ import { TodoBody, TodoTitle } from './TodoList';
 import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBlockDrag';
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
-import { useMeasuredHeight } from './useMeasure';
+import { useFarAway, useMeasuredHeight } from './useMeasure';
+import type { ResizeDir } from '../model/sizing';
+
+// The edges and corners a card resizes from (the same arrays each time, so the grips aren't drawn again for nothing).
+const GRIPS_OPEN: readonly ResizeDir[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw'];
+const GRIPS_COLLAPSED: readonly ResizeDir[] = ['n', 's', 'w', 'nw', 'ne', 'sw'];
 
 const KIND_LABEL = { note: 'Note', todo: 'Checklist', link: 'Link', completed: 'Completed', board: 'Board' } as const;
 
@@ -54,6 +59,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
   const findTarget = useAppState((s) => s.ui.find?.current?.showInstead === id);
   const ref = useRef<HTMLElement>(null);
   useMeasuredHeight(id, ref);
+  useFarAway(ref, card, !inColumn);
   // Every hook is above this: while a block is dragged a version can show without it, and it must still draw nothing.
   // The Completed record shows in the Completed panel, never on the board.
   if (!card || card.kind === 'completed') return null;
@@ -99,7 +105,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
         <ResizeGrips
           kind="card"
           id={id}
-          dirs={card.collapsed ? ['n', 's', 'w', 'nw', 'ne', 'sw'] : ['n', 's', 'e', 'w', 'nw', 'ne', 'sw']}
+          dirs={card.collapsed ? GRIPS_COLLAPSED : GRIPS_OPEN}
           minH={card.collapsed ? COLLAPSED_MIN_H : undefined}
         />
       )}
@@ -145,7 +151,7 @@ export const CardView = memo(function CardView({ id, inColumn }: { id: string; i
 });
 
 /** A list's, link's or board's title, on the card's button row (a note has none; a collapsed card shows its preview there instead). */
-function CardTitle({ card, boardName }: { card: Card; boardName: string }) {
+const CardTitle = memo(function CardTitle({ card, boardName }: { card: Card; boardName: string }) {
   switch (card.kind) {
     case 'todo':
       // The cell lets Clean up share the title's line when there is room and drop to a line of its own, under the title, when there is not (owner request 2026-10-24, job 208); the arrow and trash can stay on the title's line either way.
@@ -167,9 +173,10 @@ function CardTitle({ card, boardName }: { card: Card; boardName: string }) {
     default:
       return null;
   }
-}
+});
 
-function CardBody({ card }: { card: Card }) {
+// Drawn again only when the card itself changes, not each time a drag moves it (performance).
+const CardBody = memo(function CardBody({ card }: { card: Card }) {
   switch (card.kind) {
     case 'note':
       return <NoteBody card={card} />;
@@ -182,7 +189,7 @@ function CardBody({ card }: { card: Card }) {
     case 'board':
       return <BoardBody card={card} />;
   }
-}
+});
 
 /** The name of board `boardId`, kept up to date (on the board itself it is renamed). */
 function BoardCardName({ boardId }: { boardId: string }) {

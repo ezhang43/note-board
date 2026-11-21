@@ -2,6 +2,7 @@ import { COLUMN_DROP_REACH } from '../model/constants';
 import { columnAt, insertIndex } from '../model/geometry';
 import { screenToBoard, zoomForFind } from '../model/view';
 import { appStore } from '../store/appStore';
+import { wake } from './farAway';
 
 // Reading positions from what is drawn on screen. Kept here so components stay simple.
 
@@ -38,7 +39,8 @@ export function isOverCanvas(clientX: number, clientY: number) {
 export function otherBlockSizes(block: HTMLElement) {
   if (!canvasEl) return [];
   return Array.from(canvasEl.querySelectorAll<HTMLElement>('[data-card-id], [data-col-id]'))
-    .filter((el) => el !== block && !block.contains(el))
+    // A card inside a far container isn't laid out (farAway.ts): reading it would lay it out; the container counts.
+    .filter((el) => el !== block && !block.contains(el) && !el.parentElement?.closest('[data-far]'))
     .map((el) => ({ id: (el.dataset.cardId ?? el.dataset.colId)!, w: el.offsetWidth, h: el.offsetHeight }));
 }
 
@@ -68,6 +70,8 @@ export function listUnder(clientX: number, clientY: number, dragId: string): str
     const id = el.dataset.todoOf!;
     const card = board.cards[id];
     if (id === dragId || !card || !board.order.includes(id)) continue;
+    // A list far off the screen (farAway.ts) can't be under the pointer, and measuring inside it would lay it out.
+    if (el.closest('[data-far]')) continue;
     const pushed = ui.drag?.bumped[id];
     const dx = pushed ? (card.x - pushed.x) * view.zoom : 0;
     const dy = pushed ? (card.y - pushed.y) * view.zoom : 0;
@@ -129,6 +133,7 @@ export function glideBoard(move: () => void) {
 export function revealOnBoard(el: Element) {
   const canvas = canvasEl ?? document.querySelector<HTMLElement>('[data-testid="canvas"]');
   if (!canvas) return;
+  wake(el); // a match in a far card: draw the card, so the match is where it really is
   const c = canvas.getBoundingClientRect();
   const v = window.visualViewport;
   const bottom = Math.min(c.bottom, v ? v.offsetTop + v.height : c.bottom);

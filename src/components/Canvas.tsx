@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DRAG_THRESHOLD, ZOOM_STEP } from '../model/constants';
 import { FONT_SCALE } from '../model/font';
 import { isDoubleTap, pressKind, type Touch } from '../model/tapZoom';
@@ -13,6 +13,7 @@ import { followEdges } from './edgeFollow';
 import { CardView } from './CardView';
 import { ColumnView } from './ColumnView';
 import { EmptyStart } from './TemplatePicker';
+import { wakeAll } from './farAway';
 import { HOLD_MS } from './touchHold';
 import { useBoxButtons } from './useBoxButtons';
 import { usePhone } from './usePhone';
@@ -73,6 +74,18 @@ export function Canvas() {
       el.removeEventListener('scroll', unscroll);
       setCanvasElement(null);
     };
+  }, []);
+
+  // Blocks far off the screen aren't drawn (farAway.ts) and keep their size: a new text size, the phone
+  // layout, view-only (no add rows) or a web font arriving changes every block's height, so draw them all again to measure them.
+  useLayoutEffect(() => {
+    if (ref.current) wakeAll(ref.current);
+  }, [view.fontSize, phone, readOnly]);
+  useEffect(() => {
+    const fonts = document.fonts;
+    const redraw = () => ref.current && wakeAll(ref.current);
+    fonts?.addEventListener('loadingdone', redraw);
+    return () => fonts?.removeEventListener('loadingdone', redraw);
   }, []);
 
   // Opening the board shows what's on it, centred (owner request): once when the page loads, and

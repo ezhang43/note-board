@@ -822,6 +822,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   font-size: calc(14px * var(--fs, 1));
 }
 .card.loose { position: absolute; }
+/* A loose card or container more than a screen outside the visible board isn't drawn, at the size it had (src/components/farAway.ts). */
+:is(.card, .column)[data-far] { content-visibility: auto; contain-intrinsic-size: var(--far-w) var(--far-h); }
 
 /*
  * No title band (owner decision 2026-10-16): cards are white with a bold title. A colour picked in

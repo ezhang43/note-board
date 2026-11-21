@@ -309,8 +309,8 @@ const READ_SAFELY_ITEM_FIELDS: Record<number, readonly string[]> = { 4: ['folded
 const READ_SAFELY_NOTE_FIELDS: Record<number, readonly string[]> = { 4: ['general'] };
 /**
  * Journal line fields added under a version number without raising it, on the same terms as READ_SAFELY.
- * - `paren` on a numbered item, the 1) style typed as "1) " (owner request 2026-11-21; no bump, the worker's
- *   recommended call, put to the owner in the pull request): an older copy leaves the field out, so the
+ * - `paren` on a numbered item, the 1) style typed as "1) " (owner request 2026-11-21; no bump, owner
+ *   decision 2026-11-21, "Keep it simple"): an older copy leaves the field out, so the
  *   note's formatting no longer matches its text ("1) "), and it shows the note as that plain text, every
  *   word kept; if it saves the note, only the formatting of that note is lost (richTextTypedLists.test.ts,
  *   "an older app ...").

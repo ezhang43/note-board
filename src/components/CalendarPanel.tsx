@@ -79,6 +79,12 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
   );
 }
 
+/** Every event not declined is green, and one still to answer (Maybe or no reply) also dashed (owner request, 2026-11-21; see myAnswer). */
+const answerLook = (e: CalEvent) => (e.answer === 'going' ? ' green' : e.answer === 'unsure' ? ' green unsure' : '');
+
+/** What a screen reader hears of the same: the dashed edge's "not yet accepted", and "declined". */
+const answerSaid = (e: CalEvent) => (e.answer === 'unsure' ? ', not yet accepted' : e.answer === 'declined' ? ', declined' : '');
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** What the side panel shows for Google Calendar. */
@@ -327,7 +333,7 @@ function SearchResults({ search, today, onPick }: { search: NonNullable<Calendar
             {day === today && <span className="cal-today">· Today</span>}
           </h3>
           {events.map((e) => (
-            <button key={e.id} type="button" className={`cal-event${e.editable ? '' : ' read-only'}`} aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`} onClick={() => onPick(e)}>
+            <button key={e.id} type="button" className={`cal-event${e.editable ? '' : ' read-only'}${answerLook(e)}`} aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}${answerSaid(e)}`} onClick={() => onPick(e)}>
               <span className="cal-time">{timeLabel(e)}</span>
               <span className="cal-title">{e.title}</span>
               {!e.editable && <ExternalIcon />}
@@ -390,10 +396,10 @@ function DayEvents({
         <button
           key={e.id}
           type="button"
-          className={`cal-event${e.editable ? '' : ' read-only'}`}
+          className={`cal-event${e.editable ? '' : ' read-only'}${answerLook(e)}`}
           data-event={e.id}
           aria-busy={sending.includes(e.id) || undefined}
-          aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
+          aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}${answerSaid(e)}`}
           onClick={(ev) => onPick(e, ev.currentTarget)}
           onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
         >
@@ -601,10 +607,10 @@ function MonthGrid({
                     <button
                       key={e.id}
                       type="button"
-                      className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}`}
+                      className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}${answerLook(e)}`}
                       data-event={e.id}
                       aria-busy={sending.includes(e.id) || undefined}
-                      aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}`}
+                      aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}${answerSaid(e)}`}
                       title={`${time && `${time} `}${e.title}`}
                       onClick={(ev) => {
                         ev.stopPropagation();

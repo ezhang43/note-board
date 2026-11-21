@@ -28,6 +28,32 @@ export interface CalEvent {
   timeZone: string | null;
   /** One event of a series whose start was changed on its own (it isn't where the series put it). */
   moved: boolean;
+  /** The person's answer to it, for its color (myAnswer); absent for Google's special kinds, which keep their usual look. */
+  answer?: Answer;
+}
+
+/**
+ * How the person stands with an event (owner request, 2026-11-21: "can accepted meetings be turned into green
+ * color please?"; owner's answers: everything not declined is green, an unanswered or Maybe one also gets a
+ * dashed edge). `going`: their own event, or an invite they accepted; `unsure`: an invite they answered Maybe
+ * to, or haven't answered; `declined`: they said No.
+ */
+export type Answer = 'going' | 'unsure' | 'declined';
+
+/**
+ * The person's answer to a raw Google event (it comes from outside, so it is checked), or null for one of
+ * Google's special kinds (birthday, out of office, focus time, working location…), which keep their usual look.
+ * Their own event, or one with no answer from them on it (no guest list, or they aren't on it), is `going`:
+ * there is nothing to reply to. See vizCalendar's `attends` for the Visualizer's similar rule.
+ */
+export function myAnswer(e: Record<string, unknown>): Answer | null {
+  if (e.eventType !== undefined && e.eventType !== 'default') return null;
+  const attendees = Array.isArray(e.attendees) ? e.attendees : [];
+  const me = attendees.find((a): a is Record<string, unknown> => typeof a === 'object' && a !== null && (a as { self?: unknown }).self === true);
+  if (me?.responseStatus === 'declined') return 'declined';
+  const organizer = e.organizer as { self?: unknown } | undefined;
+  if (organizer?.self === true || !me) return 'going';
+  return me.responseStatus === 'accepted' || (!organizer && me.responseStatus === undefined) ? 'going' : 'unsure';
 }
 
 /** A guest of an event: the fields of Google's attendee kept, so an unchanged guest is sent back as it was. */
@@ -212,8 +238,12 @@ export function parseEvent(raw: unknown): CalEvent | null {
     guests: Array.isArray(e.attendees) ? e.attendees.map(readGuest).filter((g): g is Guest => g !== null) : [],
     timeZone: start.allDay ? null : zoneOf(e.start),
     moved: first !== null && first.at !== start.at,
+    ...withAnswer(myAnswer(e)),
   };
 }
+
+/** The answer as an optional field: left out for Google's special kinds. */
+const withAnswer = (answer: Answer | null | undefined) => (answer ? { answer } : {});
 
 const zoneOf = (w: unknown) => {
   const zone = (w as { timeZone?: unknown }).timeZone;
@@ -517,6 +547,8 @@ export function savedEvent(e: CalEvent | null, body: EventBody, id: string): Cal
     guests: body.attendees ?? e?.guests ?? [],
     timeZone: 'timeZone' in body.start ? body.start.timeZone : null,
     moved: e?.moved ?? false,
+    // A new event is the person's own; a changed one keeps the answer it had.
+    ...withAnswer(e ? e.answer : 'going'),
   };
 }
 

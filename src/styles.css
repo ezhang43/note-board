@@ -3127,7 +3127,8 @@ button.estimate-chip:active { transform: scale(0.97); }
   width: calc(1.3em / var(--ms, 1));
   margin-right: calc(0.3em / var(--ms, 1));
   white-space: nowrap;
-  color: var(--ink-soft);
+  /* The note's own text color (--ink), never gray, for every list type (owner request 2026-11-21); a highlight is on the words, not the line, so it isn't taken. */
+  color: inherit;
   font-variant-numeric: tabular-nums;
 }
 .rich [data-b] { font-weight: 600; }

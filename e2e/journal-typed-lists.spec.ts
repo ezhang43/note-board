@@ -139,3 +139,44 @@ test('the Numbered list button nests with letters too, and Backspace outdents th
   await page.keyboard.press('Backspace');
   await expect(blocks(page).nth(1)).toHaveAttribute('data-type', 'p');
 });
+
+// Owner request (2026-11-21): "for all types of lists, it shouldn't become grey, it should stay white". Every
+// marker is drawn in the note's text color (--ink), in light and dark.
+test('every list marker is the text color, in light and dark', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.type('- dot');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('1. one');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('sub');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('deep');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('1) paren');
+  await expect.poll(() => markers(page)).toEqual(['•', '1.', 'a.', 'i.', '2)']); // the ) item counts on from the 1. above it (no plain line between)
+  const colors = () => blocks(page).evaluateAll((els) => els.map((el) => [getComputedStyle(el, '::before').color, getComputedStyle(el).color]));
+  const ink = () =>
+    page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ink)';
+      document.body.append(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    });
+  const seen = new Set<string>();
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+    const want = await ink();
+    seen.add(want);
+    for (const [marker, text] of await colors()) {
+      expect(marker).toBe(want);
+      expect(text).toBe(want);
+    }
+  }
+  expect(seen.size).toBe(2); // the two themes really were checked
+});

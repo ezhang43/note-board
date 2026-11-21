@@ -51,6 +51,10 @@
   --toolbar-height: 64px;
   /* How far the Checklist panel's list sits in from the panel's own padding (owner, 2026-11-21). */
   --checklist-inset: 12px;
+  /* The extra room between a parent item's fold arrow and its tick box, on top of the 4px (times the button step) it always had (owner, 2026-11-21). */
+  --fold-extra-gap: 5px;
+  /* The smallest area a fold arrow can be pressed from on a computer (WCAG 2.5.8 target size; owner, 2026-11-21: "hard to click precisely"). */
+  --fold-hit: 24px;
   /* Layers, lowest first: a side panel, then the toolbar with its menus (File, Appearance, Boards, ⋯) and the Share panel, which open over it. */
   --z-side-panel: 5;
   --z-toolbar: 8;
@@ -1028,12 +1032,14 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
  * The button is as wide as the icon. The open chevron's stroke ends 0.8375 of the icon in (10.05 of its 12 units), so the
  * button's left edge sits 4 + 10.89 = 14.89 units from the box, its right edge 1.89 short of it. The chevron's left end
  * is 12.78 units from the box.
+ * Owner request 2026-11-21: "a bit more space" between them, so the arrow sits --fold-extra-gap further left (the tick box,
+ * the text and the 32px indents stay put; a top-level arrow's list gets the same extra room on its left, below).
  */
 .item-fold {
   position: absolute;
   z-index: 2;
   top: calc(var(--line) / 2 + 4px - 8px * var(--bb));
-  left: calc(var(--inset) - 14.89px * var(--bb));
+  left: calc(var(--inset) - 14.89px * var(--bb) - var(--fold-extra-gap));
   width: calc(13px * var(--bb));
   height: calc(16px * var(--bb));
   padding: 0;
@@ -1047,8 +1053,27 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   cursor: pointer;
 }
 .item-fold svg { width: calc(13px * var(--bb)); height: calc(13px * var(--bb)); stroke-width: 2.1; }
-/* The room a top-level arrow needs left of the boxes (12.78 units, less the card's 12px padding, plus 2px kept clear of its border), given to a list that has one. */
-.todo-items.has-fold { --bb: min(var(--bs), 1.9); padding-left: calc(12.78px * var(--bb) - 10px); }
+/* The room a top-level arrow needs left of the boxes (12.78 units, less the card's 12px padding, plus 2px kept clear of its border, plus --fold-extra-gap), given to a list that has one. */
+.todo-items.has-fold { --bb: min(var(--bs), 1.9); --fold-room: calc(12.78px * var(--bb) - 10px + var(--fold-extra-gap)); padding-left: var(--fold-room); }
+/*
+ * The arrow's press area (owner request, 2026-11-21: "hard to click precisely right on it"): the drawn arrow keeps its size,
+ * but it can be pressed from an area at least --fold-hit tall and 4px wider, from the tick box's own press area (4px left of
+ * the box, times the step) leftwards over the indent. A top-level arrow's stops at the card's (or panel's) padding edge, where the button
+ * itself starts, so it never reaches outside the card. Never over the tick box, the text or the item grip (on the right).
+ */
+.item-fold::after {
+  --reach: max(0px, calc(1.89px * var(--bb) + var(--fold-extra-gap) - 4px * var(--bs)));
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--reach));
+  translate: 0 -50%;
+  width: min(
+    max(calc(var(--fold-hit) + 4px), calc(100% + var(--reach))),
+    calc(var(--indent, 0px) - 1.89px * var(--bb) - var(--fold-extra-gap) + var(--reach) + var(--fold-room, 0px) + 12px)
+  );
+  height: max(var(--fold-hit), 100%);
+}
 .item-fold:disabled { cursor: default; }
 .todo-item.find-target { outline: 3px solid var(--find-outline); outline-offset: 2px; }
 /* On a phone the buttons keep their size, and a line is never under 22px. */

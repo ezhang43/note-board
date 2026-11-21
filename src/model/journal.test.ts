@@ -375,6 +375,8 @@ describe('journal page heading', () => {
     expect(journalWords('')).toBe(0);
     expect(journalWords('  \n ')).toBe(0);
     expect(journalWords('Quiet start.\n\n• Sam’s soup\n1.  Ten  quiet minutes')).toBe(7);
+    // The Google Docs markers (2026-11-21): 1), and letters or roman numerals on indented levels.
+    expect(journalWords('1) one\n  a. two\n    iv) three\nso. four')).toBe(5);
     // A divider's line (---) is not a word (owner decision 2026-10-31).
     expect(journalWords('one\n---\ntwo -- three')).toBe(4);
   });

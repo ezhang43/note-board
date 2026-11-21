@@ -25,10 +25,14 @@ export interface Run {
   font?: RunFont;
   hl?: Highlight;
 }
-/** One line: a paragraph, a heading, a list item or a divider. `indent` (1 to 4) only on list items. */
+/**
+ * One line: a paragraph, a heading, a list item or a divider. `indent` (1 to 4) only on list items.
+ * `paren` only on numbered items: the 1) style, typed as "1) " (owner request 2026-11-21); without it, 1.
+ */
 export interface Block {
   type: BlockType;
   indent?: number;
+  paren?: true;
   runs: Run[];
 }
 export type Rich = Block[];
@@ -121,13 +125,16 @@ function slice(runs: Run[], from: number, to = Infinity): Run[] {
   return out;
 }
 
-/** A block with the given type, dropping `indent` where it does not belong. */
-function block(type: BlockType, indent: number | undefined, runs: Run[]): Block {
+/** A block with the given type, dropping `indent` and `paren` where they do not belong. */
+function block(type: BlockType, indent: number | undefined, runs: Run[], paren?: boolean): Block {
   if (type === 'hr') return { type, runs: [{ text: DIVIDER }] }; // its words and looks are never its own
   const n = isList(type) ? Math.min(MAX_INDENT, Math.max(0, indent ?? 0)) : 0;
-  return n ? { type, indent: n, runs: norm(runs) } : { type, runs: norm(runs) };
+  return { type, ...(n ? { indent: n } : {}), ...(paren && type === 'number' ? { paren: true as const } : {}), runs: norm(runs) };
 }
-const withRuns = (blk: Block, runs: Run[]) => block(blk.type, blk.indent, runs);
+/** The same kind of line (type, indent and number style) with other runs. */
+const withRuns = (blk: Block, runs: Run[]) => block(blk.type, blk.indent, runs, blk.paren);
+/** The same kind of line with another indent. */
+const withIndent = (blk: Block, indent: number) => block(blk.type, indent, blk.runs, blk.paren);
 
 /** Start before end. */
 function ordered(sel: Sel): Sel {
@@ -164,8 +171,33 @@ export function fromPlain(text: string): Rich {
   return text.split('\n').map((line) => block('p', 0, [{ text: line }]));
 }
 
-/** The plain text of the formatting, as search, export, copy and the board card see it. */
-export function plainOf(rich: Rich): string {
+const ROMAN: [number, string][] = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']];
+function roman(n: number): string {
+  let out = '';
+  for (const [v, s] of ROMAN) for (; n >= v; n -= v) out += s;
+  return out;
+}
+/** a, b, … z, aa, ab, … as in a spreadsheet's columns. */
+function letters(n: number): string {
+  let out = '';
+  for (; n > 0; n = Math.floor((n - 1) / 26)) out = String.fromCharCode(97 + ((n - 1) % 26)) + out;
+  return out;
+}
+
+/**
+ * The marker of numbered item `n` at an indent level, as in Google Docs (owner request 2026-11-21):
+ * 1. at the top, a. one level in, i. the next, then 1. again; `paren` puts ) in place of the dot.
+ */
+export function listMarker(n: number, indent: number, paren = false): string {
+  const level = indent % 3;
+  return (level === 0 ? String(n) : level === 1 ? letters(n) : roman(n)) + (paren ? ')' : '.');
+}
+
+/**
+ * The plain text of the formatting, as search, export, copy and the board card see it. `old`: as the app
+ * wrote it before 2026-11-21, every level numbered 1. 2. 3., for notes saved then (see `journalRich`).
+ */
+export function plainOf(rich: Rich, old = false): string {
   const counts: number[] = [];
   return rich
     .map((blk) => {
@@ -178,7 +210,7 @@ export function plainOf(rich: Rich): string {
       counts.length = Math.min(counts.length, indent + 1);
       while (counts.length < indent + 1) counts.push(0);
       let marker = '• ';
-      if (blk.type === 'number') marker = `${++counts[indent]}. `;
+      if (blk.type === 'number') marker = old ? `${++counts[indent]}. ` : `${listMarker(++counts[indent], indent, blk.paren)} `;
       else counts[indent] = 0;
       return '  '.repeat(indent) + marker + text;
     })
@@ -205,7 +237,9 @@ export function hasFormatting(rich: Rich): boolean {
 /** A Journal note's body to show: its saved formatting while that still matches its text, else the text, plain. */
 export function journalRich(text: string, rich: Rich | undefined): Rich {
   const body = journalBody(text);
-  return rich && rich.length && plainOf(rich) === body ? rich : fromPlain(body);
+  // A note saved before the lettered levels (2026-11-21) still has 1. 2. under its numbers: its formatting
+  // is kept, shown with the letters, and the text is written with them at the next edit.
+  return rich && rich.length && (plainOf(rich) === body || plainOf(rich, true) === body) ? rich : fromPlain(body);
 }
 
 /** The plain text of a selection, without list markers (for copy and cut). */
@@ -235,7 +269,7 @@ export function sliceSel(rich: Rich, sel: Sel): Rich {
     const from = b === start.b ? start.o : 0;
     const to = b === end.b ? end.o : Infinity;
     const keepsKind = b !== start.b || (from === 0 && (start.b !== end.b || to >= len(blk)));
-    out.push(keepsKind ? block(blk.type, blk.indent, slice(blk.runs, from, to)) : block('p', 0, slice(blk.runs, from, to)));
+    out.push(keepsKind ? withRuns(blk, slice(blk.runs, from, to)) : block('p', 0, slice(blk.runs, from, to)));
   }
   return out;
 }
@@ -272,7 +306,7 @@ export function parseRich(v: unknown): Rich | undefined {
     const o = x as Record<string, unknown>;
     const runs = Array.isArray(o.runs) ? o.runs.slice(0, MAX_RUNS).map(parseRun).filter((r): r is Run => r !== null) : [];
     const indent = typeof o.indent === 'number' && Number.isFinite(o.indent) ? Math.round(o.indent) : 0;
-    out.push(block(pick(o.type, TYPES) ?? 'p', indent, runs));
+    out.push(block(pick(o.type, TYPES) ?? 'p', indent, runs, o.paren === true));
   }
   return out.length ? out : undefined;
 }
@@ -377,7 +411,7 @@ export function insertRich(rich: Rich, sel: Sel, pasted: Rich): Edit {
   if (!others.length && !isHr(first)) {
     const bare = blk.type === 'p' && len(blk) === 0;
     const at = { b, o: o + len(first) };
-    return rest([bare ? block(first.type, first.indent, first.runs) : withRuns(blk, [...before, ...first.runs, ...after])], at);
+    return rest([bare ? withRuns(first, first.runs) : withRuns(blk, [...before, ...first.runs, ...after])], at);
   }
   const made: Block[] = [];
   // The first line: joined to the words before the caret, or its own when it is a divider or the caret is at a line's start.
@@ -385,18 +419,18 @@ export function insertRich(rich: Rich, sel: Sel, pasted: Rich): Edit {
     if (before.length) made.push(withRuns(blk, before));
     made.push(block('hr', 0, []));
   } else {
-    made.push(!before.length && first.type !== 'p' ? block(first.type, first.indent, first.runs) : withRuns(blk, [...before, ...first.runs]));
+    made.push(!before.length && first.type !== 'p' ? withRuns(first, first.runs) : withRuns(blk, [...before, ...first.runs]));
   }
   // The lines between come whole; the last joins the words after the caret.
   const last = others[others.length - 1];
   if (!last) return finishAfterDivider(cleared.rich, b, made, blk, after);
-  for (const m of others.slice(0, -1)) made.push(isHr(m) ? block('hr', 0, []) : block(m.type, m.indent, m.runs));
+  for (const m of others.slice(0, -1)) made.push(isHr(m) ? block('hr', 0, []) : withRuns(m, m.runs));
   if (isHr(last)) {
     made.push(block('hr', 0, []));
     made.push(after.length ? withRuns(blk, after) : block('p', 0, []));
     return rest(made, { b: b + made.length - 1, o: 0 });
   }
-  made.push(block(last.type, last.indent, [...last.runs, ...after]));
+  made.push(withRuns(last, [...last.runs, ...after]));
   return rest(made, { b: b + made.length - 1, o: len(last) });
 }
 
@@ -431,7 +465,7 @@ export function splitAt(rich: Rich, sel: Sel, marks?: Marks): Edit & { look?: Ma
   }
   const atEnd = o >= len(blk);
   const nextType = atEnd && (blk.type === 'h1' || blk.type === 'h2') ? 'p' : blk.type;
-  out.splice(b, 1, withRuns(blk, slice(blk.runs, 0, o)), block(nextType, blk.indent, slice(blk.runs, o)));
+  out.splice(b, 1, withRuns(blk, slice(blk.runs, 0, o)), block(nextType, blk.indent, slice(blk.runs, o), blk.paren));
   return { rich: out, at: { b: b + 1, o: 0 }, ...(atEnd ? look : {}) };
 }
 
@@ -451,7 +485,7 @@ export function joinBackward(rich: Rich, b: number): Edit {
   const out = [...rich];
   if (isHr(blk)) return dropDivider(rich, b, true);
   if (isList(blk.type)) {
-    out[b] = blk.indent ? block(blk.type, blk.indent - 1, blk.runs) : block('p', 0, blk.runs);
+    out[b] = blk.indent ? withIndent(blk, blk.indent - 1) : block('p', 0, blk.runs);
     return { rich: out, at: { b, o: 0 } };
   }
   if (b === 0) return { rich, at: { b, o: 0 } };
@@ -474,7 +508,7 @@ export function joinForward(rich: Rich, b: number): Edit {
 
 /** Tab / Shift+Tab: indents or outdents the list items in blocks b0..b1 (0 to 4 levels). */
 export function indentBlocks(rich: Rich, b0: number, b1: number, dir: 1 | -1): Rich {
-  return rich.map((blk, b) => (b >= b0 && b <= b1 && isList(blk.type) ? block(blk.type, (blk.indent ?? 0) + dir, blk.runs) : blk));
+  return rich.map((blk, b) => (b >= b0 && b <= b1 && isList(blk.type) ? withIndent(blk, (blk.indent ?? 0) + dir) : blk));
 }
 
 // ---- formatting ----
@@ -584,7 +618,8 @@ function withSize(r: Run, size: RunSize | undefined): Run {
 
 /** Normal, Heading 1 or Heading 2 (or a list kind) on blocks b0..b1. */
 export function setBlockType(rich: Rich, b0: number, b1: number, type: BlockType): Rich {
-  return rich.map((blk, b) => (b >= b0 && b <= b1 && !isHr(blk) ? block(type, blk.indent, blk.runs) : blk));
+  // A numbered item made numbered again keeps its style; any other line made numbered gets the 1. style.
+  return rich.map((blk, b) => (b >= b0 && b <= b1 && !isHr(blk) ? block(type, blk.indent, blk.runs, type === blk.type && blk.paren) : blk));
 }
 
 /** The list buttons: make blocks b0..b1 that kind of list, or back to paragraphs when all already are (dividers stay). */
@@ -593,7 +628,35 @@ export function toggleList(rich: Rich, b0: number, b1: number, type: 'bullet' | 
   return setBlockType(rich, b0, b1, all ? 'p' : type);
 }
 
-const letters = new Intl.Segmenter();
+/** What typed at the very start of a plain line, then a space, starts a list (owner request 2026-11-21, as in Google Docs). */
+const TYPED_LISTS = new Map<string, { type: 'bullet' | 'number'; paren?: boolean }>([
+  ['1.', { type: 'number' }],
+  ['1)', { type: 'number', paren: true }],
+  ['-', { type: 'bullet' }],
+  ['*', { type: 'bullet' }],
+]);
+
+/**
+ * A space typed right after "1.", "1)", "-" or "*" at the very start of a plain line: `typed` is the line with
+ * the space typed (the undo step it goes back to), `list` the line made a list item without those letters, the
+ * cursor at its start. `look`: when the item starts empty, the size the typed letters had, for its first
+ * letters (as Enter keeps it). Null for anything else (mid-line, a heading, a list line, other numbers, other keys).
+ */
+export function typedList(rich: Rich, sel: Sel, data: string): { typed: Edit; list: Edit; look?: Marks } | null {
+  if (data !== ' ' || !samePlace(sel)) return null;
+  const { b, o } = sel.start;
+  const blk = rich[b];
+  if (blk?.type !== 'p') return null;
+  const kind = TYPED_LISTS.get(slice(blk.runs, 0, o).map((r) => r.text).join(''));
+  if (!kind) return null;
+  const out = [...rich];
+  out[b] = block(kind.type, 0, slice(blk.runs, o), kind.paren);
+  const size = len(out[b]) ? undefined : marksBefore(blk, o).size;
+  return { typed: insertText(rich, sel, ' '), list: { rich: out, at: { b, o: 0 } }, ...(size === undefined ? {} : { look: { size } }) };
+}
+const samePlace = (sel: Sel) => sel.start.b === sel.end.b && sel.start.o === sel.end.o;
+
+const graphemes = new Intl.Segmenter();
 
 /** Backspace (`back`) or Delete of one letter at the cursor; at a line's edge it joins lines, and next to a divider it takes the divider out. */
 export function deleteChar(rich: Rich, p: Pos, back: boolean): Edit {
@@ -610,7 +673,7 @@ export function deleteChar(rich: Rich, p: Pos, back: boolean): Edit {
   const text = blk.runs.map((r) => r.text).join('');
   if (back ? p.o === 0 : p.o >= text.length) return back ? joinBackward(rich, p.b) : joinForward(rich, p.b);
   // One letter as the reader sees it: a whole emoji, skin tone and flag included.
-  const starts = Array.from(letters.segment(text), (g) => g.index);
+  const starts = Array.from(graphemes.segment(text), (g) => g.index);
   const q = { b: p.b, o: back ? starts.filter((i) => i < p.o).pop()! : (starts.find((i) => i > p.o) ?? text.length) };
   return deleteSel(rich, back ? { start: q, end: p } : { start: p, end: q });
 }

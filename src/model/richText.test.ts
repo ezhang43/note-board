@@ -59,7 +59,7 @@ describe('plain text', () => {
       p('after'),
       { type: 'number', runs: [{ text: 'again' }] },
     ];
-    expect(plainOf(rich)).toBe('Plan\n• milk\n  • oat\n1. first\n  1. inner\n2. second\nafter\n1. again');
+    expect(plainOf(rich)).toBe('Plan\n• milk\n  • oat\n1. first\n  a. inner\n2. second\nafter\n1. again');
   });
 });
 

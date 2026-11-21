@@ -48,6 +48,7 @@ function drawBlock(blk: Block, marker: string): HTMLDivElement {
   const div = document.createElement('div');
   div.dataset.type = blk.type;
   if (blk.indent) div.dataset.indent = String(blk.indent);
+  if (blk.paren) div.dataset.paren = ''; // the 1) style, read back with the line
   if (marker) div.dataset.marker = marker;
   if (blk.type === 'hr') {
     // A line, not text: the cursor goes before or after it, never in. Its words (---) are drawn hidden,
@@ -139,7 +140,8 @@ function parse(root: HTMLElement): Rich {
       }
     }
     const indent = top instanceof HTMLElement ? Number(top.dataset.indent ?? 0) : 0;
-    return { type: group.length === 1 ? blockTypeOf(top) : 'p', indent, runs };
+    const paren = top instanceof HTMLElement && top.dataset.paren !== undefined;
+    return { type: group.length === 1 ? blockTypeOf(top) : 'p', indent, paren, runs };
   });
   return R.parseRich(raw) ?? R.fromPlain('');
 }
@@ -233,6 +235,8 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
   /** The last key pressed was Ctrl+Shift+V (paste as plain text). */
   const plainPaste = useRef(false);
   const altI = useRef<number | null>(null); // when Alt+I was pressed, for Alt+I then R
+  /** The words typed before a typed list ("1. "), so Ctrl+Z right after puts the cursor back after them. */
+  const beforeList = useRef<R.Edit | null>(null);
   const props = useRef({ onChange, onLook, onEscape });
   props.current = { onChange, onLook, onEscape };
 
@@ -329,7 +333,13 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
     const el = root.current!;
     if (el.childNodes.length && deepEqual(value, cur.current)) return;
     const sel = document.activeElement === el ? readSel(el) : null;
+    const back = beforeList.current;
+    beforeList.current = null;
     cur.current = value;
+    if (back && sel && deepEqual(value, back.rich)) {
+      draw(el, value);
+      return setSel(el, at(back.at)); // the typed list undone: the cursor after the "1. " it brought back
+    }
     if (draw(el, value) && sel) {
       const clamp = (p: Pos): Pos => {
         const b = Math.min(p.b, value.length - 1);
@@ -373,6 +383,20 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
         return;
       }
       if (t === 'insertText') {
+        // "1. ", "1) ", "- " or "* " typed at the very start of a plain line starts a list (owner request
+        // 2026-11-21, as in Google Docs). The typed words are saved first as typing, so the list is an undo
+        // step of its own and Ctrl+Z right after brings back "1. " as words.
+        const listed = across || onHr ? null : R.typedList(rich, sel, e.data ?? '');
+        if (listed) {
+          e.preventDefault();
+          props.current.onChange(listed.typed.rich, true);
+          // A look chosen for the next letters stays chosen; an empty item keeps the size the typed letters had.
+          const next = marks ?? listed.look;
+          pending.current = next ? { marks: next, at: listed.list.at } : null;
+          apply(listed.list.rich, at(listed.list.at), false);
+          beforeList.current = listed.typed;
+          return;
+        }
         // Plain typing within a line is the browser's own, so spelling, autocorrect and phone
         // keyboards' suggestions keep working; it is read back after.
         // A cursor on a divider (it has no words of its own) types beside it, through the model.

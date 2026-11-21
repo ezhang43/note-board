@@ -17,7 +17,7 @@ const subItem: Required<TodoItem> = { id: 'i2', text: 'sub', done: true, childre
 const item: Required<TodoItem> = { id: 'i1', text: 'top', done: false, children: [subItem], style, folded: true, estimate: 90, doneOn: '2026-11-09' };
 
 const run: Required<Run> = { text: 'Hi', b: true, i: true, u: true, s: true, size: 'small', font: 'hand', hl: 'yellow' };
-const block: Required<Block> = { type: 'bullet', indent: 1, runs: [run, { text: ' there', size: 24 }] };
+const block: Required<Block> = { type: 'number', indent: 1, paren: true, runs: [run, { text: ' there', size: 24 }] };
 const note: Required<NoteCard> = { ...base, id: 'n1', kind: 'note', x: 20, y: 40, text: 'Hi', rich: [block, { type: 'hr', runs: [{ text: '---' }] }], general: 1, estimate: 30 };
 const todo: Required<TodoCard> = { ...base, id: 't1', kind: 'todo', x: 400, y: 80, title: 'List', items: [item], completedOpen: true };
 const link: Required<LinkCard> = { ...base, id: 'l1', kind: 'link', x: 400, y: 400, title: 'Docs', url: 'https://example.com' };
@@ -83,7 +83,7 @@ same<Highlight, (typeof HIGHLIGHTS)[number]>(true);
 same<ColorKey, (typeof COLOR_KEYS)[number]>(true);
 
 /** The saved shape: each field's path (ids as `*`, a card's as its kind, list entries as `[]`), then the allowed values. */
-function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}, safeItemFields: readonly string[] = [], safeNoteFields: readonly string[] = []): string[] {
+function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}, safeItemFields: readonly string[] = [], safeNoteFields: readonly string[] = [], safeRichFields: readonly string[] = []): string[] {
   const paths = new Set<string>();
   const walk = (v: unknown, path: string) => {
     if (Array.isArray(v)) return v.length ? v.forEach((x) => walk(x, `${path}[]`)) : void paths.add(`${path}[]`);
@@ -92,6 +92,7 @@ function shapeOf(raw: string, safe: Record<string, readonly string[]> = {}, safe
     for (const [k, x] of Object.entries(v)) {
       if (safeItemFields.includes(k) && Array.isArray((v as { children?: unknown }).children)) continue; // a checklist item's
       if (safeNoteFields.includes(k) && (v as { kind?: unknown }).kind === 'note') continue; // a note's
+      if (safeRichFields.includes(k) && path.endsWith('.rich[]')) continue; // a Journal line's
       const key = !ids ? k : path.endsWith('cards') ? (x as Card).kind : '*';
       walk(x, path ? `${path}.${key}` : key);
     }
@@ -306,10 +307,19 @@ const READ_SAFELY_ITEM_FIELDS: Record<number, readonly string[]> = { 4: ['folded
  *   its general notes again (journal.test.ts, "an older app ...").
  */
 const READ_SAFELY_NOTE_FIELDS: Record<number, readonly string[]> = { 4: ['general'] };
+/**
+ * Journal line fields added under a version number without raising it, on the same terms as READ_SAFELY.
+ * - `paren` on a numbered item, the 1) style typed as "1) " (owner request 2026-11-21; no bump, owner
+ *   decision 2026-11-21, "Keep it simple"): an older copy leaves the field out, so the
+ *   note's formatting no longer matches its text ("1) "), and it shows the note as that plain text, every
+ *   word kept; if it saves the note, only the formatting of that note is lost (richTextTypedLists.test.ts,
+ *   "an older app ...").
+ */
+const READ_SAFELY_RICH_FIELDS: Record<number, readonly string[]> = { 6: ['paren'] };
 
 describe('the saved version number goes up whenever the saved shape changes (review 137-A M1)', () => {
   it('the shape matches the one recorded for WORKSPACE_VERSION', () => {
-    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }), READ_SAFELY[WORKSPACE_VERSION], READ_SAFELY_ITEM_FIELDS[WORKSPACE_VERSION], READ_SAFELY_NOTE_FIELDS[WORKSPACE_VERSION]);
+    const shape = shapeOf(serializeWorkspace({ home: 'home', boards: { home: board } }), READ_SAFELY[WORKSPACE_VERSION], READ_SAFELY_ITEM_FIELDS[WORKSPACE_VERSION], READ_SAFELY_NOTE_FIELDS[WORKSPACE_VERSION], READ_SAFELY_RICH_FIELDS[WORKSPACE_VERSION]);
     expect(shape, 'The saved shape changed: raise WORKSPACE_VERSION and record the new shape under it').toEqual(SAVED_SHAPES[WORKSPACE_VERSION]);
   });
 

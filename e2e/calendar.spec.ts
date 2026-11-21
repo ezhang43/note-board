@@ -85,7 +85,7 @@ test('opens beside the board with this week’s events; someone else’s event i
   await expect(today.getByRole('button', { name: /9 – 9:15am Team stand-up/ })).toBeVisible();
 
   // Someone else's event shows its details in the card, read-only (no pencil or trash), with a link to change it in Google Calendar.
-  await day(page, daysFromToday(2)).getByRole('button', { name: '6 – 7pm Book club, read-only' }).click();
+  await day(page, daysFromToday(2)).getByRole('button', { name: '6 – 7pm Book club, read-only, not yet accepted' }).click();
   await expect(card(page).getByText(/can only be changed in Google Calendar/)).toBeVisible();
   const link = card(page).getByRole('link', { name: 'Open in Google Calendar' });
   await expect(link).toHaveAttribute('href', /^https:\/\/(calendar|www)\.google\.com\//);
@@ -3070,5 +3070,100 @@ test('days already gone are faded in the Week list and the Month grid, and still
   // Sun 1 to Sat 14 Nov have gone; the grid also shows the end of October.
   await expect(past).not.toHaveCount(0);
   expect(await panel(page).locator('.cal-cell.today.past').count()).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('events not said no to are green: an unanswered or maybe one dashed, past ones a paler green, a declined one as before (owner request, 2026-11-21)', async ({ page }) => {
+  const errors = await openAs(page);
+  // Invites from someone else, answered in each way, added to the pretend calendar's answers.
+  const at = (n: number, h: number) => {
+    const d = daysFromToday(n);
+    d.setHours(h, 0, 0, 0);
+    return { dateTime: d.toISOString() };
+  };
+  const invite = (id: string, summary: string, n: number, responseStatus: string) => ({
+    id,
+    summary,
+    status: 'confirmed',
+    organizer: { email: 'pat@example.com' },
+    htmlLink: 'https://calendar.google.com/calendar/event?eid=x',
+    start: at(n, 14),
+    end: at(n, 15),
+    attendees: [
+      { email: 'pat@example.com', organizer: true, responseStatus: 'accepted' },
+      { email: 'you@example.com', self: true, responseStatus },
+    ],
+  });
+  const extra = [
+    invite('inv-yes', 'Design review', 1, 'accepted'),
+    invite('inv-maybe', 'Team lunch', 4, 'tentative'),
+    invite('inv-no', 'Budget talk', 5, 'declined'),
+    invite('inv-old', 'Old review', -1, 'tentative'),
+  ];
+  await page.route('**/__calendar/**', async (route) => {
+    const url = new URL(route.request().url());
+    const min = Date.parse(url.searchParams.get('timeMin') ?? '');
+    if (route.request().method() !== 'GET' || Number.isNaN(min) || url.searchParams.get('q') || url.searchParams.get('pageToken')) return route.continue();
+    const max = Date.parse(url.searchParams.get('timeMax') ?? '');
+    const res = await route.fetch();
+    const body = await res.json();
+    const inWindow = extra.filter((e) => Date.parse(e.end.dateTime) > min && Date.parse(e.start.dateTime) < max);
+    await route.fulfill({ response: res, json: { ...body, items: [...(body.items ?? []), ...inWindow] } });
+  });
+  await button(page).click();
+  const tomorrow = day(page, daysFromToday(1));
+  const yes = tomorrow.getByRole('button', { name: /Design review/ });
+  const maybe = day(page, daysFromToday(4)).getByRole('button', { name: /Team lunch/ });
+  const no = day(page, daysFromToday(5)).getByRole('button', { name: /Budget talk/ });
+  const own = day(page, nowDate()).getByRole('button', { name: /Dentist/ });
+  const unanswered = day(page, daysFromToday(2)).getByRole('button', { name: /Book club/ });
+  const old = day(page, daysFromToday(-1)).getByRole('button', { name: /Old review/ });
+  await expect(no).toBeVisible();
+  await expect(old).toBeVisible();
+  const look = (l: Locator) =>
+    l.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { bg: s.backgroundColor, bar: s.borderLeftColor, edge: s.borderTopStyle };
+    });
+  const green = { bg: 'rgb(223, 241, 230)', bar: 'rgb(47, 125, 91)' };
+  expect(await look(own)).toEqual({ ...green, edge: 'solid' });
+  expect(await look(yes)).toEqual({ ...green, edge: 'solid' });
+  expect(await look(maybe)).toEqual({ ...green, edge: 'dashed' });
+  expect(await look(unanswered)).toEqual({ ...green, edge: 'dashed' });
+  // Gone by: a paler green, not the plain gray of before, so the past still reads as faded.
+  const faded = await look(old);
+  expect(faded.bg).toBe('rgb(238, 247, 241)');
+  // Declined: unchanged, the read-only gray.
+  const declined = await look(no);
+  expect(declined.bg).not.toBe(green.bg);
+  expect(declined.bar).not.toBe(green.bar);
+  expect(declined.edge).toBe('solid');
+  await expect(no).toHaveClass(/\bread-only\b/);
+  // Screen readers hear the same.
+  await expect(maybe).toHaveAccessibleName('2 – 3pm Team lunch, read-only, not yet accepted');
+  await expect(no).toHaveAccessibleName('2 – 3pm Budget talk, read-only, declined');
+  await expect(yes).toHaveAccessibleName('2 – 3pm Design review, read-only');
+  // Past day headings keep their gray fade.
+  const color = (l: Locator) => l.evaluate((el) => getComputedStyle(el).color);
+  expect(await color(day(page, daysFromToday(-1)).locator('h3'))).not.toBe(await color(tomorrow.locator('h3')));
+
+  // The Month grid: a green dot for timed events, dashed when unanswered, the all-day Holiday on green.
+  await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
+  const cell = (n: number) => panel(page).locator(`.cal-cell[data-day="${key(daysFromToday(n))}"]`);
+  const dot = (l: Locator) => l.locator('.cal-chip-dot').evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect(cell(1).getByRole('button', { name: /Design review/ })).toBeVisible();
+  expect(await dot(cell(1).getByRole('button', { name: /Design review/ }))).toBe(green.bar);
+  expect(await dot(cell(5).getByRole('button', { name: /Budget talk/ }))).not.toBe(green.bar);
+  expect(await cell(4).getByRole('button', { name: /Team lunch/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');
+  expect(await cell(3).getByRole('button', { name: /Holiday/ }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(green.bg);
+  expect(await dot(cell(-1).getByRole('button', { name: /Old review/ }))).not.toBe(green.bar);
+  // A keyboard focus on an unanswered chip, past or not, shows the usual ring, not the dashed edge.
+  expect(await cell(-1).getByRole('button', { name: /Old review/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');
+  for (const lunch of [cell(4).getByRole('button', { name: /Team lunch/ }), cell(-1).getByRole('button', { name: /Old review/ })]) {
+    await lunch.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    expect(await lunch.evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).outlineWidth, getComputedStyle(el).outlineColor])).toEqual(['solid', '2px', 'rgb(138, 90, 0)']);
+  }
   expect(errors).toEqual([]);
 });

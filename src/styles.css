@@ -30,6 +30,12 @@
   --drop-bg: #fbf0cf;
   --link-url-bg: rgba(255, 255, 255, 0.75);
   --checkbox: #2f7d5b;
+  /* Calendar events not declined (owner request, 2026-11-21): the bar, dot and dashed edge; the tint behind; the all-day chip's text; and their paler past-day shades. Text on each keeps 4.5:1, edges 3:1 (unit test). */
+  --cal-green: #2f7d5b;
+  --cal-green-soft: #dff1e6;
+  --cal-green-ink: #1b5a3c;
+  --cal-green-past: #eef7f1;
+  --cal-green-past-edge: #5f9a7a;
   /* Checklist tick boxes ("Honey well", owner pick 2026-10-23): the border of an unticked box, 3:1 against the card. */
   --tick-edge: color-mix(in srgb, var(--accent) 75%, var(--card-bg));
   /* How far a tick box sits below the middle of its row's first line, as a share of the line (owner request 2026-11-13: 2.5%, 0.5px at Normal, to match the look the owner liked; 7.5% from 2026-11-10, 5% before). Used by a checklist's boxes and the Completed panel's. */
@@ -98,6 +104,11 @@
   --drop-bg: #3a3020;
   --link-url-bg: rgba(0, 0, 0, 0.22);
   --checkbox: #5fb38a;
+  --cal-green: #5fb38a;
+  --cal-green-soft: #1f3a2c;
+  --cal-green-ink: #a8e0c0;
+  --cal-green-past: #232b26;
+  --cal-green-past-edge: #4f8a6b;
   --tick-edge: color-mix(in srgb, var(--accent) 60%, var(--card-bg));
   --honey: #f2c14e;
   --toast-action: #8a5a00;
@@ -3578,6 +3589,29 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 .cal-cell.past .cal-chip { color: var(--ink-soft); }
 .cal-cell.past .cal-chip.all-day { background: var(--hover); color: var(--ink-soft); }
 .cal-cell.past .cal-chip-dot { background: var(--control-edge); }
+/*
+ * Events not declined are green (owner request, 2026-11-21: "can accepted meetings be turned into green color please?"): the
+ * person's own, accepted, and Maybe or unanswered invites (those also get a dashed edge, a reminder to reply). Past ones take a
+ * paler green; declined ones and Google's special kinds keep the look above. The class comes from myAnswer (src/model/calendar.ts).
+ */
+.cal-event.green { background: var(--cal-green-soft); border-left-color: var(--cal-green); }
+.cal-event.unsure { border-style: dashed; border-color: var(--cal-green); }
+.cal-day.past .cal-event.green { background: var(--cal-green-past); border-left-color: var(--cal-green-past-edge); }
+.cal-day.past .cal-event.unsure { border-color: var(--cal-green-past-edge); }
+@media (hover: hover) {
+  .cal-event.green:hover, .cal-day.past .cal-event.green:hover { border-color: var(--cal-green); }
+}
+.cal-chip.green .cal-chip-dot { background: var(--cal-green); }
+.cal-chip.all-day.green { background: var(--cal-green-soft); color: var(--cal-green-ink); }
+/* The dashed edge is drawn as an outline, so the chip keeps its size; a keyboard focus still shows the usual ring (rule 6). */
+.cal-chip.unsure { outline: 1px dashed var(--cal-green); outline-offset: -1px; }
+.cal-chip.unsure:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .cal-chip.all-day.green:hover { box-shadow: inset 0 0 0 1px var(--cal-green); }
+}
+.cal-cell.past .cal-chip.green .cal-chip-dot { background: var(--cal-green-past-edge); }
+.cal-cell.past .cal-chip.all-day.green { background: var(--cal-green-past); color: var(--ink-soft); }
+.cal-cell.past .cal-chip.unsure:not(:focus-visible) { outline-color: var(--cal-green-past-edge); }
 /* The scrolling Week list (owner request, 2026-11-20): its own scroll area under the bars, which stay put; anchoring is done in code (Safari has none). */
 .cal.weekly { flex: 1; min-height: 0; }
 .history-panel:has(.cal-weeks) { overflow-y: hidden; }

@@ -28,6 +28,31 @@ async function openWith(page: Page, list: string[]) {
   }
 }
 
+/**
+ * Owner, 2026-11-21 ("everything is indented too far to the left"): with a parent's fold arrow showing, the arrow
+ * starts at least as far from the panel's left edge as its title does, and the tick boxes further in still.
+ */
+async function expectInset(page: Page) {
+  await page.keyboard.type('Groceries');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('milk');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('eggs');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.type('Call the bank');
+  const left = (await box(panel(page))).x;
+  const title = (await box(panel(page).getByRole('heading', { name: 'Checklist' }))).x - left;
+  expect(title).toBeGreaterThanOrEqual(12);
+  const arrow = (await box(panel(page).locator('.item-fold svg'))).x - left;
+  expect(arrow).toBeGreaterThanOrEqual(title - 0.5);
+  const ticks = await panel(page).getByRole('checkbox').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().x));
+  for (const x of ticks) expect(x - left).toBeGreaterThan(arrow);
+  // A sub-item stays one 32px step further in.
+  expect(Math.round(ticks[1] - ticks[0])).toBe(32);
+}
+
 async function noteOnBoard(page: Page, text: string) {
   await add(page, 'Note');
   await page.keyboard.type(text);
@@ -66,6 +91,12 @@ test('Checklist opens on the left, 420px wide; its items are kept, on every boar
   await button(page).click();
   expect(await texts(panel(page))).toEqual(['buy stamps', 'call the bank']);
   await expect(boardCards(page)).toHaveCount(1);
+});
+
+test('the list sits inset from the panel edge: the fold arrow and tick boxes no closer to it than the title', async ({ page }) => {
+  await button(page).click();
+  await expect(panel(page)).toBeVisible();
+  await expectInset(page);
 });
 
 test('in the bottom pill Checklist comes right after Search and Timer, in sight order and in Tab order', async ({ page }) => {
@@ -535,6 +566,13 @@ test.describe('on a phone', () => {
     await tile(page, 'Journal').tap();
     await expect(journal(page)).toBeVisible();
     await expect(panel(page)).toHaveCount(0);
+  });
+
+  test('the list sits inset from the screen edge, as on a computer', async ({ page }) => {
+    await moreButton(page).tap();
+    await tile(page, 'Checklist').tap();
+    await items(panel(page)).tap();
+    await expectInset(page);
   });
 
   test('typing in its empty list makes the list, without the keyboard being lost', async ({ page }) => {

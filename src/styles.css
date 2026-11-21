@@ -795,6 +795,28 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .card-header > .icon-button, .column-actions > .icon-button { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .icon-button,
   :is(.column:hover, .column.selected, .column-header:focus-within) .column-actions > .icon-button { opacity: 1; }
+  /* (A new way to show them also shows their icons: the rule just below.) */
+}
+/*
+ * Panning a big board (job perf-paint-chunks): a faded-out hover-only button draws no icon. Each icon is a masked piece
+ * the browser paints and stacks on every frame of a pan, even at opacity 0, and a big board has thousands. The icon
+ * comes back the moment its button starts to show and stays until the button has faded out (a visibility transition
+ * stays visible for its whole 120ms, the fade's length), so nothing looks different. The button itself stays visible,
+ * so the keyboard and screen readers still reach it. The "shown" selectors repeat each button's opacity: 1 rules
+ * (above, and for the row buttons and estimate clocks further down): a new way to show one of these buttons goes in both.
+ * Not the collapse arrow, which has its own turning transition on its ::after. Touch screens (no hover) show these
+ * buttons by other rules and keep their icons.
+ */
+@media (hover: hover) {
+  :is(.card-header, .column-actions) > .block-trash::after,
+  .card-header > .estimate-chip.add::after,
+  :is(.item-grip, .item-trash, .item-arrow)::after,
+  .todo-item > .estimate-chip.add::after { visibility: hidden; transition: visibility 120ms; }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > :is(.block-trash, .estimate-chip.add)::after,
+  :is(.column:hover, .column.selected, .column-header:focus-within) .column-actions > .block-trash::after,
+  :is(.todo-item:hover .item-grip, .todo-item:hover .item-trash, .item-grip:focus-visible, .item-trash:focus-visible)::after,
+  :is(.todo-item:hover .item-arrows, .item-arrows:focus-within) .item-arrow::after,
+  :is(.estimate-chip.add:focus-visible, .todo-item:hover > .estimate-chip.add, .estimate-chip.add[aria-expanded='true'])::after { visibility: inherit; }
 }
 
 .card, .column { cursor: default; }
@@ -1528,6 +1550,7 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
 .todo-item:hover .item-trash,
 .item-grip:focus-visible,
 .item-trash:focus-visible { opacity: 1; }
+/* (A new way to show them also shows their icons: see "draws no icon" in the icon-button rules.) */
 /* The buttons' widths and icons below multiply by --bb (the text size step, capped; see .todo-item); their height follows the item's first line. */
 .item-grip { top: 3px; right: var(--clock); width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
 .item-grip::after { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
@@ -1563,14 +1586,20 @@ dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparen
     display: flex;
     border-radius: 8px;
     background: var(--surface);
-    box-shadow: 0 0 0 1px var(--control-edge), 0 4px 12px rgba(31, 29, 26, 0.12);
+    /* No shadow while faded out (job perf-paint-chunks: one less piece to paint per row); it goes once the fade has ended. */
+    box-shadow: none;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 120ms;
+    transition: opacity 120ms, box-shadow 0s 120ms;
   }
   .todo-items > .todo-item:first-child .item-arrows { bottom: auto; top: calc(100% - 2px); }
   .todo-item:hover .item-arrows,
-  .item-arrows:focus-within { opacity: 1; pointer-events: auto; }
+  .item-arrows:focus-within {
+    box-shadow: 0 0 0 1px var(--control-edge), 0 4px 12px rgba(31, 29, 26, 0.12);
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 120ms;
+  }
   .item-arrow {
     flex-shrink: 0;
     width: calc(22px * var(--bb));
@@ -2714,6 +2743,7 @@ button.estimate-chip:active { transform: scale(0.97); }
   :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
   .estimate-chip.add:focus-visible { opacity: 1; }
   .todo-item:hover > .estimate-chip.add { opacity: 1; }
+  /* (A new way to show the clock also shows its icon: see "draws no icon" in the icon-button rules.) */
 }
 /* Touch screens have no hover: the clock shows while the item is being typed in, like the grip and trash can. */
 @media (hover: none) {

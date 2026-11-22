@@ -77,6 +77,26 @@ test('an earlier day opened in place: a fresh line and the first line under the 
   await expect(lines(page, TUESDAY).first()).toHaveAttribute('data-marker', '1)');
 });
 
+// Owner decision (2026-11-22, "yes follow google docs way"): on a line that already is a list item, a
+// trigger of another kind switches it, as in Google Docs.
+test("today's page: a trigger at the start of a list item switches its kind", async ({ page }) => {
+  await box(page, TODAY).click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('- one');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('two');
+  await page.keyboard.press('Home');
+  await page.keyboard.type('1. ');
+  await expect.poll(() => types(page, TODAY)).toEqual(['p:morning', 'bullet:one', 'number:two']);
+  await expect(lines(page, TODAY).nth(2)).toHaveAttribute('data-marker', '1.');
+  await page.keyboard.type('- ');
+  await expect.poll(() => types(page, TODAY)).toEqual(['p:morning', 'bullet:one', 'bullet:two']);
+  // The kind it already has stays words.
+  await page.keyboard.type('- ');
+  await expect.poll(() => types(page, TODAY)).toEqual(['p:morning', 'bullet:one', 'bullet:- two']);
+});
+
 test('an empty earlier day: "1. " on its first line starts a list', async ({ page }) => {
   await day(page, MONDAY).click();
   await box(page, MONDAY).click();

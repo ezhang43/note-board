@@ -384,7 +384,7 @@ export function RichEditor({ value, onChange, onLook, onEscape, onFocus, onBlur,
       }
       if (t === 'insertText') {
         // "1. ", "1) ", "- " or "* " typed at the very start of a plain line starts a list (owner request
-        // 2026-11-21, as in Google Docs). The typed words are saved first as typing, so the list is an undo
+        // 2026-11-21, as in Google Docs), and on a list item of another kind switches it (2026-11-22). The typed words are saved first as typing, so the list is an undo
         // step of its own and Ctrl+Z right after brings back "1. " as words.
         const listed = across || onHr ? null : R.typedList(rich, sel, e.data ?? '');
         if (listed) {

@@ -85,7 +85,7 @@ describe('typedList: the typed trigger', () => {
     const got = typedList([{ type: 'p', runs: [{ text: '1.' }, { text: 'big', b: true }] }], sel(0, 2), ' ');
     expect(got?.list.rich).toEqual([{ type: 'number', runs: [{ text: 'big', b: true }] }]);
   });
-  it('stays words mid-line, on a heading or a list line, for other numbers, or other keys', () => {
+  it('stays words mid-line, on a heading, on a list line of the same kind, for other numbers, or other keys', () => {
     expect(typedList([p('a 1.')], sel(0, 4), ' ')).toBeNull();
     expect(typedList([p('1.')], sel(0, 1), ' ')).toBeNull();
     expect(typedList([{ type: 'h1', runs: [{ text: '1.' }] }], sel(0, 2), ' ')).toBeNull();
@@ -103,6 +103,37 @@ describe('typedList: the typed trigger', () => {
     expect(typedList(big, sel(0, 2), ' ')?.look).toEqual({ size: 24 });
     expect(typedList([{ type: 'p', runs: [{ text: '1.', size: 24 }, { text: 'x' }] }], sel(0, 2), ' ')?.look).toBeUndefined();
     expect(typedList([p('1.')], sel(0, 2), ' ')?.look).toBeUndefined();
+  });
+});
+
+describe('typedList on a list item: switches its kind, as in Google Docs (owner decision 2026-11-22)', () => {
+  const bul = (text: string, indent = 0): Rich[number] => ({ type: 'bullet', ...(indent ? { indent } : {}), runs: text ? [{ text }] : [] });
+  it('"1. " or "1) " at the start of a bulleted item makes it numbered, keeping its level', () => {
+    const got = typedList([bul('1.milk', 2)], sel(0, 2), ' ');
+    expect(got?.typed.rich).toEqual([bul('1. milk', 2)]);
+    expect(got?.list).toEqual({ rich: [num('milk', 2)], at: at(0, 0) });
+    expect(typedList([bul('1)milk', 1)], sel(0, 2), ' ')?.list.rich).toEqual([num('milk', 1, true)]);
+  });
+  it('"- " or "* " at the start of a numbered item makes it bulleted, keeping its level', () => {
+    expect(typedList([num('-eggs', 3)], sel(0, 1), ' ')?.list.rich).toEqual([bul('eggs', 3)]);
+    expect(typedList([num('*eggs', 0, true)], sel(0, 1), ' ')?.list.rich).toEqual([bul('eggs')]);
+  });
+  it('"1)" on a 1. item switches to the ) style, "1." on a 1) item back', () => {
+    expect(typedList([num('1)x', 1)], sel(0, 2), ' ')?.list.rich).toEqual([num('x', 1, true)]);
+    expect(typedList([num('1.x', 1, true)], sel(0, 2), ' ')?.list.rich).toEqual([num('x', 1)]);
+  });
+  it('only the line typed on switches, not the items around it', () => {
+    const rich: Rich = [bul('a'), bul('1.b'), bul('c')];
+    expect(typedList(rich, sel(1, 2), ' ')?.list.rich).toEqual([bul('a'), num('b'), bul('c')]);
+  });
+  it('the kind the item already has stays words', () => {
+    expect(typedList([bul('-x')], sel(0, 1), ' ')).toBeNull();
+    expect(typedList([bul('*x')], sel(0, 1), ' ')).toBeNull();
+    expect(typedList([num('1.x')], sel(0, 2), ' ')).toBeNull();
+    expect(typedList([num('1)x', 0, true)], sel(0, 2), ' ')).toBeNull();
+  });
+  it('an empty item keeps the size the typed letters had', () => {
+    expect(typedList([{ type: 'bullet', runs: [{ text: '1.', size: 24 }] }], sel(0, 2), ' ')?.look).toEqual({ size: 24 });
   });
 });
 

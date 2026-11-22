@@ -72,6 +72,13 @@ describe('dragging a sub-item out of a parent re-ticks it like deleting would', 
     expect(outline(itemsOf(r, 'M'))).toBe('m x');
   });
 
+  it('a drag out to a new list on the board', () => {
+    const b = boardWith({ L: [t('p', [t('a', [], true), t('x')]), t('q')] });
+    const r = C.moveItems(b, 'L', ['x'], { newList: { id: 'N', x: 0, y: 400 } });
+    expect(outline(itemsOf(r, 'L'))).toBe('+p(+a) q');
+    expect(outline(itemsOf(r, 'N'))).toBe('x');
+  });
+
   it('a drag that stays inside the same parent leaves it open', () => {
     const b = boardWith({ L: [t('p', [t('a', [], true), t('x')])] });
     const r = C.moveItems(b, 'L', ['x'], { cardId: 'L', drop: { mode: 'before', targetId: 'a' } });

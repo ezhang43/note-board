@@ -30,12 +30,14 @@ export interface CalEvent {
   moved: boolean;
   /** The person's answer to it, for its color (myAnswer); absent for Google's special kinds, which keep their usual look. */
   answer?: Answer;
+  /** A meeting (isMeeting): someone else is on it or runs it; only meetings are green (greenLook). Absent: not one. */
+  meeting?: true;
 }
 
 /**
  * How the person stands with an event (owner request, 2026-11-21: "can accepted meetings be turned into green
  * color please?"; owner's answers: everything not declined is green, an unanswered or Maybe one also gets a
- * dashed edge). `going`: their own event, or an invite they accepted; `unsure`: an invite they answered Maybe
+ * dashed edge; narrowed to meetings on 2026-11-22, see isMeeting and greenLook). `going`: their own event, or an invite they accepted; `unsure`: an invite they answered Maybe
  * to, or haven't answered; `declined`: they said No.
  */
 export type Answer = 'going' | 'unsure' | 'declined';
@@ -54,6 +56,33 @@ export function myAnswer(e: Record<string, unknown>): Answer | null {
   const organizer = e.organizer as { self?: unknown } | undefined;
   if (organizer?.self === true || !me) return 'going';
   return me.responseStatus === 'accepted' || (!organizer && me.responseStatus === undefined) ? 'going' : 'unsure';
+}
+
+/**
+ * Whether a raw Google event is a real meeting (owner request, 2026-11-22: "the green color should only be
+ * used for actual meetings/events, when I create things like reminders just for myself, it should remain
+ * blue"): a person other than them is on its guest list (a booked room doesn't count), or someone else
+ * organizes it and the person is invited (on its guest list). The person's own event with no other guests
+ * (a reminder or block for themself), or one copied or imported from elsewhere with no guest list, is not.
+ * Only guests with an email count, as on the event read (readGuest), so a change shown here keeps its color.
+ */
+export function isMeeting(e: Record<string, unknown>): boolean {
+  const organizer = e.organizer as { self?: unknown } | undefined;
+  const byOther = typeof organizer === 'object' && organizer !== null && organizer.self !== true;
+  const guests = (Array.isArray(e.attendees) ? e.attendees : []).filter(
+    (a): a is Record<string, unknown> => typeof a === 'object' && a !== null && typeof (a as { email?: unknown }).email === 'string' && (a as { email: string }).email !== '',
+  );
+  return guests.some((g) => (g.self !== true && g.resource !== true) || (byOther && g.self === true));
+}
+
+/**
+ * How an event is colored: `green` for a meeting the person is going to, `unsure` (green, dashed) for one
+ * they haven't accepted yet, null for the normal look (their own reminders in blue, declined ones and
+ * Google's special kinds as before).
+ */
+export function greenLook(e: CalEvent): 'green' | 'unsure' | null {
+  if (!e.meeting) return null;
+  return e.answer === 'going' ? 'green' : e.answer === 'unsure' ? 'unsure' : null;
 }
 
 /** A guest of an event: the fields of Google's attendee kept, so an unchanged guest is sent back as it was. */
@@ -239,6 +268,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     timeZone: start.allDay ? null : zoneOf(e.start),
     moved: first !== null && first.at !== start.at,
     ...withAnswer(myAnswer(e)),
+    ...(isMeeting(e) && { meeting: true as const }),
   };
 }
 
@@ -535,6 +565,7 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
  */
 export function savedEvent(e: CalEvent | null, body: EventBody, id: string): CalEvent {
   const when = (w: EventBody['start']) => ('date' in w ? w.date : w.dateTime.slice(0, 16));
+  const guests = body.attendees ?? e?.guests ?? [];
   return {
     id,
     title: body.summary.trim() ? body.summary : UNTITLED,
@@ -544,11 +575,13 @@ export function savedEvent(e: CalEvent | null, body: EventBody, id: string): Cal
     editable: true,
     link: e?.link ?? CALENDAR_HOME,
     series: e?.series ?? null,
-    guests: body.attendees ?? e?.guests ?? [],
+    guests,
     timeZone: 'timeZone' in body.start ? body.start.timeZone : null,
     moved: e?.moved ?? false,
     // A new event is the person's own; a changed one keeps the answer it had.
     ...withAnswer(e ? e.answer : 'going'),
+    // Only the person's own events are changed here, so it is a meeting once it has another guest.
+    ...(isMeeting({ attendees: guests }) && { meeting: true as const }),
   };
 }
 

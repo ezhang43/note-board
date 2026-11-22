@@ -3073,7 +3073,7 @@ test('days already gone are faded in the Week list and the Month grid, and still
   expect(errors).toEqual([]);
 });
 
-test('events not said no to are green: an unanswered or maybe one dashed, past ones a paler green, a declined one as before (owner request, 2026-11-21)', async ({ page }) => {
+test('meetings not said no to are green (own reminders stay blue): an unanswered or maybe one dashed, past ones a paler green, a declined one as before (owner requests, 2026-11-21 and 2026-11-22)', async ({ page }) => {
   const errors = await openAs(page);
   // Invites from someone else, answered in each way, added to the pretend calendar's answers.
   const at = (n: number, h: number) => {
@@ -3126,7 +3126,14 @@ test('events not said no to are green: an unanswered or maybe one dashed, past o
       return { bg: s.backgroundColor, bar: s.borderLeftColor, edge: s.borderTopStyle };
     });
   const green = { bg: 'rgb(223, 241, 230)', bar: 'rgb(47, 125, 91)' };
-  expect(await look(own)).toEqual({ ...green, edge: 'solid' });
+  // Only meetings are green (owner request, 2026-11-22): the person's own Dentist, with no guests, keeps the
+  // normal blue event look; their own Lunch with Sam has a guest, so it is a meeting.
+  const ownLook = await look(own);
+  expect(ownLook.bg).not.toBe(green.bg);
+  expect(ownLook.bar).not.toBe(green.bar);
+  expect(ownLook.edge).toBe('solid');
+  await expect(own).not.toHaveClass(/\bgreen\b/);
+  expect(await look(tomorrow.getByRole('button', { name: /Lunch with Sam/ }))).toEqual({ ...green, edge: 'solid' });
   expect(await look(yes)).toEqual({ ...green, edge: 'solid' });
   expect(await look(maybe)).toEqual({ ...green, edge: 'dashed' });
   expect(await look(unanswered)).toEqual({ ...green, edge: 'dashed' });
@@ -3155,7 +3162,10 @@ test('events not said no to are green: an unanswered or maybe one dashed, past o
   expect(await dot(cell(1).getByRole('button', { name: /Design review/ }))).toBe(green.bar);
   expect(await dot(cell(5).getByRole('button', { name: /Budget talk/ }))).not.toBe(green.bar);
   expect(await cell(4).getByRole('button', { name: /Team lunch/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');
-  expect(await cell(3).getByRole('button', { name: /Holiday/ }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(green.bg);
+  // The person's own all-day Holiday, with no guests, is not a meeting: not green (owner request, 2026-11-22).
+  expect(await cell(3).getByRole('button', { name: /Holiday/ }).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(green.bg);
+  expect(await dot(cell(1).getByRole('button', { name: /Lunch with Sam/ }))).toBe(green.bar);
+  expect(await dot(cell(0).getByRole('button', { name: /Dentist/ }))).not.toBe(green.bar);
   expect(await dot(cell(-1).getByRole('button', { name: /Old review/ }))).not.toBe(green.bar);
   // A keyboard focus on an unanswered chip, past or not, shows the usual ring, not the dashed edge.
   expect(await cell(-1).getByRole('button', { name: /Old review/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');

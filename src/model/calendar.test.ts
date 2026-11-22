@@ -27,6 +27,8 @@ import {
   isEmail,
   monthGrid,
   myAnswer,
+  isMeeting,
+  greenLook,
   moveDraftStart,
   moveDraftStartTime,
   endTimeOptions,
@@ -868,6 +870,78 @@ describe('the person’s answer to an event, for its color (owner request, 2026-
     const was = timed({ answer: 'unsure' });
     const body = draftBody(draftFor(was), 'Europe/London')!;
     expect(savedEvent(was, body, 'e1').answer).toBe('unsure');
+  });
+});
+
+describe('only meetings are green; the person’s own reminders stay blue (owner request, 2026-11-22)', () => {
+  const span = { start: { dateTime: '2026-10-06T10:00:00' }, end: { dateTime: '2026-10-06T11:00:00' } };
+  const mine = { id: 'x', organizer: { email: 'me@example.com', self: true }, ...span };
+  const me = (responseStatus?: string) => ({ email: 'me@example.com', self: true, ...(responseStatus && { responseStatus }) });
+  const invite = (responseStatus?: string) => ({
+    id: 'x',
+    ...span,
+    organizer: { email: 'pat@example.com' },
+    attendees: [{ email: 'pat@example.com', organizer: true, responseStatus: 'accepted' }, me(responseStatus)],
+  });
+  const look = (raw: Record<string, unknown>) => greenLook(parseEvent(raw)!);
+
+  it('the person’s own event without guests is not a meeting: blue', () => {
+    expect(isMeeting(mine)).toBe(false);
+    expect(isMeeting({ id: 'x' })).toBe(false); // no organizer given: on their own calendar
+    expect(look(mine)).toBeNull();
+    expect(look({ id: 'x', ...span })).toBeNull();
+  });
+
+  it('their own event with only themself on the guest list is not a meeting: blue', () => {
+    const solo = { ...mine, attendees: [{ ...me('accepted'), organizer: true }] };
+    expect(isMeeting(solo)).toBe(false);
+    expect(look(solo)).toBeNull();
+  });
+
+  it('their own event with a guest is a meeting: green', () => {
+    const withSam = { ...mine, attendees: [{ ...me('accepted'), organizer: true }, { email: 'sam@example.com', responseStatus: 'needsAction' }] };
+    expect(isMeeting(withSam)).toBe(true);
+    expect(look(withSam)).toBe('green');
+  });
+
+  it('an invite they accepted is green; one with no reply or a maybe is green and dashed', () => {
+    expect(isMeeting(invite('accepted'))).toBe(true);
+    expect(look(invite('accepted'))).toBe('green');
+    expect(look(invite('needsAction'))).toBe('unsure');
+    expect(look(invite())).toBe('unsure');
+    expect(look(invite('tentative'))).toBe('unsure');
+    // Invited with only themself listed (the organizer left off the list) is still an invite.
+    expect(isMeeting({ id: 'x', organizer: { email: 'pat@example.com' }, attendees: [me('needsAction')] })).toBe(true);
+  });
+
+  it('a booked room, a guest without an email, or a copied/imported event with no guest list is not a meeting (code review)', () => {
+    const room = { email: 'conf-3@resource.calendar.google.com', resource: true, responseStatus: 'accepted' };
+    expect(isMeeting({ ...mine, attendees: [{ ...me('accepted'), organizer: true }, room] })).toBe(false);
+    expect(isMeeting({ ...mine, attendees: [me('accepted'), { displayName: 'No email' }] })).toBe(false);
+    // An .ics import or a copy from another calendar: someone else's organizer, but nobody invited.
+    expect(isMeeting({ id: 'x', organizer: { email: 'other-calendar@group.calendar.google.com' } })).toBe(false);
+    // A drag of such an own event keeps its color: the shown change reads the same guest list.
+    const roomed = parseEvent({ ...mine, attendees: [me('accepted'), room] })!;
+    expect(greenLook(savedEvent(roomed, draftBody(draftFor(roomed), 'Europe/London')!, 'x'))).toBeNull();
+  });
+
+  it('declined stays as it is (the read-only gray), and so do Google’s special kinds', () => {
+    expect(look(invite('declined'))).toBeNull();
+    expect(parseEvent(invite('declined'))?.answer).toBe('declined');
+    expect(look({ ...invite('accepted'), eventType: 'outOfOffice' })).toBeNull();
+  });
+
+  it('odd guest lists from outside are read safely', () => {
+    expect(isMeeting({ ...mine, attendees: 'everyone' })).toBe(false);
+    expect(isMeeting({ ...mine, attendees: [null, 5, me()] })).toBe(false);
+  });
+
+  it('an event changed here follows its new guest list', () => {
+    const solo = parseEvent(mine)!;
+    const body = draftBody(draftFor(solo), 'Europe/London')!;
+    expect(greenLook(savedEvent(solo, body, 'x'))).toBeNull();
+    expect(greenLook(savedEvent(solo, { ...body, attendees: [{ email: 'sam@example.com' }] }, 'x'))).toBe('green');
+    expect(greenLook(savedEvent(null, body, 'new'))).toBeNull();
   });
 });
 

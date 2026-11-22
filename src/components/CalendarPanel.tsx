@@ -12,6 +12,7 @@ import {
   emailGuests,
   endTimeOptions,
   eventsOnDay,
+  greenLook,
   isEmail,
   monthGrid,
   moveDraftStart,
@@ -79,11 +80,14 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
   );
 }
 
-/** Every event not declined is green, and one still to answer (Maybe or no reply) also dashed (owner request, 2026-11-21; see myAnswer). */
-const answerLook = (e: CalEvent) => (e.answer === 'going' ? ' green' : e.answer === 'unsure' ? ' green unsure' : '');
+/** Meetings not declined are green, and one still to answer also dashed; the person's own reminders stay blue (owner requests, 2026-11-21 and 2026-11-22; see greenLook). */
+const answerLook = (e: CalEvent) => {
+  const look = greenLook(e);
+  return look === 'green' ? ' green' : look === 'unsure' ? ' green unsure' : '';
+};
 
 /** What a screen reader hears of the same: the dashed edge's "not yet accepted", and "declined". */
-const answerSaid = (e: CalEvent) => (e.answer === 'unsure' ? ', not yet accepted' : e.answer === 'declined' ? ', declined' : '');
+const answerSaid = (e: CalEvent) => (greenLook(e) === 'unsure' ? ', not yet accepted' : e.answer === 'declined' ? ', declined' : '');
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

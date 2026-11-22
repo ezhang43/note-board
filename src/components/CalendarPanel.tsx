@@ -31,6 +31,7 @@ import {
 } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { cardPosition, whenLabel } from '../model/eventCard';
+import { titleTime } from '../model/calendarTitleTime';
 import { WEEKS_DRAWN, recenterOn, weekAtLine } from '../model/weekList';
 import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type CalendarState, type Choice } from '../store/calendar';
 import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from './icons';
@@ -949,8 +950,12 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
       style={phone && cover ? { bottom: cover, maxHeight: (window.visualViewport?.height ?? 0) - 16 } : place}
       onSubmit={(e) => {
         e.preventDefault();
-        const d = addGuest();
-        if (!d) return;
+        const typed = addGuest();
+        if (!typed) return;
+        // A time typed in the title ("Dinner 8pm") becomes the start, and leaves the title (owner request, 2026-11-22):
+        // only when the title was changed in this form, so an old name holding a time never moves the event. The form
+        // keeps what was typed, so a Save again after a question's Cancel saves the same.
+        const d = typed.title === start.title ? typed : titleTime(typed);
         // Wrong times are said before any question.
         if (!draftBody(d, 'UTC')) return setNote(BAD_TIMES);
         next('save', d, {}, 'start');

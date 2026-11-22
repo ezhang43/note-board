@@ -84,7 +84,7 @@ test('Ctrl+Z right after brings back "1. " as words, the cursor after them', asy
   await expect(editor(page)).toHaveText('1. x');
 });
 
-test('"1. " mid-line, on a heading or inside a list, and "2. ", stay words', async ({ page }) => {
+test('"1. " mid-line or on a heading, "2. ", and the kind a list item already has, stay words', async ({ page }) => {
   await openJournal(page);
   await page.keyboard.type('see 1. here');
   await page.keyboard.press('Enter');
@@ -96,9 +96,39 @@ test('"1. " mid-line, on a heading or inside a list, and "2. ", stay words', asy
   await page.keyboard.press('Enter');
   await page.keyboard.type('- a');
   await page.keyboard.press('Enter');
-  await page.keyboard.type('1. b');
+  await page.keyboard.type('- b');
+  // The kind the item already has stays words (another kind switches it: see below).
   await expect(blocks(page).nth(4)).toHaveAttribute('data-type', 'bullet');
-  await expect(blocks(page).nth(4)).toHaveText('1. b');
+  await expect(blocks(page).nth(4)).toHaveText('- b');
+});
+
+// Owner decision (2026-11-22, "yes follow google docs way"): a trigger typed at the start of a list item of
+// another kind switches that item's kind, keeping its level; only that item, one Ctrl+Z step.
+test('in a general note, a trigger at the start of a list item switches its kind, keeping its level', async ({ page }) => {
+  const kinds = () => blocks(page).evaluateAll((els) => els.map((el) => `${(el as HTMLElement).dataset.type}:${(el as HTMLElement).dataset.indent ?? 0}:${el.textContent}`));
+  await openJournal(page);
+  await page.keyboard.type('- a');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('b');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('c');
+  await page.keyboard.press('Home');
+  await page.keyboard.type('1. ');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'number:1:c']);
+  await page.keyboard.type('x');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'number:1:xc']);
+  await page.keyboard.press('Home');
+  await page.keyboard.type('1) ');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'number:1:xc']);
+  await expect(blocks(page).nth(2)).toHaveAttribute('data-marker', 'a)');
+  await page.keyboard.type('* ');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'bullet:1:xc']);
+  // One Ctrl+Z step: back to the "* " typed as words on the numbered item, the cursor after them.
+  await page.keyboard.press('Control+z');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'number:1:* xc']);
+  await page.keyboard.type('y');
+  await expect.poll(kinds).toEqual(['bullet:0:a', 'bullet:1:b', 'number:1:* yxc']);
 });
 
 test('a long marker (viii.) grows to the left of its item, not over the words', async ({ page }) => {

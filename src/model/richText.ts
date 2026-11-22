@@ -639,18 +639,21 @@ const TYPED_LISTS = new Map<string, { type: 'bullet' | 'number'; paren?: boolean
 /**
  * A space typed right after "1.", "1)", "-" or "*" at the very start of a plain line: `typed` is the line with
  * the space typed (the undo step it goes back to), `list` the line made a list item without those letters, the
- * cursor at its start. `look`: when the item starts empty, the size the typed letters had, for its first
- * letters (as Enter keeps it). Null for anything else (mid-line, a heading, a list line, other numbers, other keys).
+ * cursor at its start. On a list item of another kind (bulleted, numbered, or the other numbered style) it
+ * switches that item's kind and keeps its level, as in Google Docs (owner decision 2026-11-22). `look`: when the
+ * item starts empty, the size the typed letters had, for its first letters (as Enter keeps it). Null for anything
+ * else (mid-line, a heading, a list item of the same kind, other numbers, other keys).
  */
 export function typedList(rich: Rich, sel: Sel, data: string): { typed: Edit; list: Edit; look?: Marks } | null {
   if (data !== ' ' || !samePlace(sel)) return null;
   const { b, o } = sel.start;
   const blk = rich[b];
-  if (blk?.type !== 'p') return null;
+  if (blk?.type !== 'p' && blk?.type !== 'bullet' && blk?.type !== 'number') return null;
   const kind = TYPED_LISTS.get(slice(blk.runs, 0, o).map((r) => r.text).join(''));
   if (!kind) return null;
+  if (kind.type === blk.type && (kind.type === 'bullet' || !!kind.paren === !!blk.paren)) return null; // already that kind: words
   const out = [...rich];
-  out[b] = block(kind.type, 0, slice(blk.runs, o), kind.paren);
+  out[b] = block(kind.type, blk.indent, slice(blk.runs, o), kind.paren);
   const size = len(out[b]) ? undefined : marksBefore(blk, o).size;
   return { typed: insertText(rich, sel, ' '), list: { rich: out, at: { b, o: 0 } }, ...(size === undefined ? {} : { look: { size } }) };
 }

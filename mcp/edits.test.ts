@@ -188,6 +188,14 @@ describe('move_items', () => {
     expect(list(r.ws, 'listWork').items.map((i) => i.id)).toEqual(['d1', 'iBread', 'o1']);
   });
 
+  it('moving the last open sub-item out from under a parent ticks the parent again, as deleting it would (2026-11-22)', () => {
+    const ws = sample();
+    const sub = (id: string, done: boolean) => ({ id, text: id, done, children: [] });
+    list(ws, 'listGroceries').items = [{ id: 'p', text: 'Trip', done: false, children: [sub('a', true), sub('x', false)] }, sub('q', false)];
+    const r = ok(moveItems('home', ['x'], { list: 'Groceries', after: 'q' }), ws);
+    expect(list(r.ws, 'listGroceries').items.map((i) => [i.id, i.done])).toEqual([['p', true], ['q', false], ['x', false]]);
+  });
+
   it('moves items (with their sub-items) to another list on the board, at its end', () => {
     const ws = ok(addItems('home', 'Groceries', [{ text: 'x' }], ['n'])).ws;
     ws.boards.home.cards.listOther = { ...list(ws, 'listGroceries'), id: 'listOther', title: 'Other', items: [{ id: 'o1', text: 'One', done: false, children: [] }] };

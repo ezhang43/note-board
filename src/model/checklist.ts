@@ -278,6 +278,8 @@ function outdentIn(items: TodoItem[], id: string): boolean {
   const parentLoc = findItem(items, loc.parent.id)!;
   loc.list.splice(loc.index, 1);
   parentLoc.list.splice(parentLoc.index + 1, 0, loc.item);
+  // Leaving its parent counts as deleting it there (owner request 2026-11-22): a parent whose sub-items are now all ticked ticks again.
+  if (!loc.item.done) tickCompleteParents(items, [loc.parent.id]);
   return true;
 }
 
@@ -668,16 +670,21 @@ function passTarget({ list, index }: ItemLocation, dir: -1 | 1): number | null {
   return j < 0 || j >= list.length ? null : j;
 }
 
-/** Take items (with their sub-items) out of a list. */
+/**
+ * Take items (with their sub-items) out of a list. What is left is judged as after deleting them
+ * (owner request 2026-11-22): a parent whose remaining sub-items are all ticked ticks again. If they
+ * go back under that parent, `insertItems` unticks it, so a move within the parent changes no tick.
+ */
 export function extractItems(items: TodoItem[], rootIds: string[]): { rest: TodoItem[]; moving: TodoItem[] } {
   const rest = cloned(items);
   const moving: TodoItem[] = [];
-  for (const id of rootIds) {
+  const parents = rootIds.map((id) => {
     const loc = findItem(rest, id);
-    if (!loc) continue;
-    loc.list.splice(loc.index, 1);
+    if (!loc) return null;
     moving.push(loc.item);
-  }
+    return removeItemInPlace(rest, id, false);
+  });
+  tickCompleteParents(rest, parents);
   return { rest, moving };
 }
 

@@ -3,6 +3,7 @@ import { shownName } from '../model/board';
 import { findMatches, findMatchesAcross, inFoldedItem, type BoardMatch, type Match } from '../model/search';
 import { appStore, useAppState } from '../store/appStore';
 import { revealOnBoard } from './canvasDom';
+import { useEscapeLayer } from './escapeLayer';
 import { ArrowIcon, CloseIcon } from './icons';
 import { panelCovers } from './textField';
 
@@ -105,6 +106,12 @@ export function FindBar() {
     return () => cancelAnimationFrame(frame);
   }, [open, currentId, at, panelOpen, openId]);
 
+  useEscapeLayer(open, (e) => {
+    if (!(e.target instanceof Element && e.target.closest('.find-bar'))) return false;
+    appStore.closeFind();
+    return true;
+  });
+
   if (!open) return null;
   // Enter goes to the current match first when it is on another board (it has not been opened yet).
   const go = (n: number) => {
@@ -115,12 +122,7 @@ export function FindBar() {
   const where = current && !here ? ` · ${shownName(appStore.boardName(current.boardId))}` : '';
   const count = !query.trim() ? '' : matches.length ? `${at + 1} of ${matches.length}${where || (inPanel ? (panelOpen ? '' : ' · in Completed') : current?.showInstead ? (here && inFoldedItem(board, current) ? ' · in a folded item' : ' · in a closed card') : '')}` : 'No matches';
   return (
-    <div className="find-bar" role="search" aria-label="Search the board" onKeyDown={(e) => {
-        if (e.key !== 'Escape') return;
-        e.stopPropagation(); // nothing else answers this Escape
-        appStore.closeFind();
-      }}
-    >
+    <div className="find-bar" role="search" aria-label="Search the board">
       <input
         ref={input}
         type="search"
@@ -135,9 +137,6 @@ export function FindBar() {
           } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             step(e.key === 'ArrowDown' ? 1 : -1);
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            appStore.closeFind();
           }
           // The board's own keys stay out of the search box, except the zoom keys (or the browser zooms the whole page).
           if (!((e.ctrlKey || e.metaKey) && ['=', '+', '-', '_', '0'].includes(e.key))) e.stopPropagation();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FEEDBACK_MAX, feedbackText } from '../model/feedback';
 import { feedback, useFeedbackPanel, useFeedbackSender, useFeedbackStatus } from '../sync/feedback';
 import { useOnline } from './DeleteAccountPanel';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 
@@ -30,11 +31,14 @@ function Panel() {
     if (status === 'failed') box.current?.focus();
   }, [status]);
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [close]);
+  useEscapeLayer(
+    true,
+    () => {
+      close();
+      return true;
+    },
+    'modal',
+  );
 
   const note = feedbackText(text);
   const submit = () => note && feedback.send(note);

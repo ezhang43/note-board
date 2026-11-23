@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { shownName } from '../model/board';
 import { UPDATED_NOTICE } from '../model/updated';
 import { above, lowers, ROLES, type Person, type Role } from '../store/collab';
 import { appStore, useAppState } from '../store/appStore';
 import { copyText } from '../store/env';
 import { collab, useNotice, useSharing } from '../sync/collabSession';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { CaretIcon, CheckIcon, CloseIcon, LinkIcon, PlusIcon, ShareIcon } from './icons';
 import { ask } from './ConfirmDialog';
 
@@ -50,20 +51,12 @@ export function ShareButton({ phone = false, onOpen }: { phone?: boolean; onOpen
     setOpen(false);
     if (inside) wrap.current?.querySelector('button')?.focus();
   };
-  // A click anywhere else, or Escape, closes the panel.
-  useEffect(() => {
-    if (!open) return;
-    // A press in a question the panel asked (Remove, Leave) isn't outside it.
-    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && !(e.target as Element).closest?.('dialog.ask') && setOpen(false);
-    // Escape in a role menu closes only that menu.
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && close();
-    window.addEventListener('pointerdown', away, true);
-    window.addEventListener('keydown', key);
-    return () => {
-      window.removeEventListener('pointerdown', away, true);
-      window.removeEventListener('keydown', key);
-    };
-  }, [open]);
+  // A click anywhere else (not in a question the panel asked), or Escape, closes the panel.
+  useOutsidePointerDown(open, wrap, () => setOpen(false), (t) => Boolean(t?.closest('dialog.ask')));
+  useEscapeLayer(open, () => {
+    close();
+    return true;
+  });
 
   if (!sharing) return null;
   return (
@@ -287,19 +280,15 @@ function RoleMenu({ label, role, onPick, quiet = false, disabled = false, childr
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
-    window.addEventListener('pointerdown', away, true);
-    return () => window.removeEventListener('pointerdown', away, true);
-  }, [open]);
+  useOutsidePointerDown(open, wrap, () => setOpen(false));
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    button.current?.focus();
+    return true;
+  });
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!open) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpen(false);
-      button.current?.focus();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const items = [...(wrap.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
       const at = items.indexOf(document.activeElement as HTMLElement);

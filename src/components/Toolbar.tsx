@@ -11,6 +11,7 @@ import { readPdf } from './readPdf';
 import { boardPicture } from './exportBoard';
 import { serializeWorkspace } from '../model/workspace';
 import { BoardPath, BoardsMenu } from './BoardsMenu';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { ShareButton } from './SharePanel';
 import type { CardKind } from '../model/types';
 import { useNewCardDrag } from './useNewCardDrag';
@@ -27,7 +28,7 @@ import { AutoSizeInput } from './AutoSizeInput';
 import { useMedia, usePhone } from './usePhone';
 import { ask } from './ConfirmDialog';
 import { arrowThroughMenu } from './menuArrows';
-import { keepsBlockCursor } from './textField';
+import { isTextField, keepsBlockCursor } from './textField';
 import { AppearanceIcon, ArrangeIcon, BrainDumpIcon, ChecklistIcon, CollapseAllIcon, CaretIcon, ContainerIcon, FileIcon, SameWidthIcon, FeedbackIcon, GridIcon, KeyIcon, MoonIcon, MoreIcon, NoteIcon, RedoIcon, SignOutIcon, UndoIcon } from './icons';
 
 /** Add Note / Checklist: click to add, or press and drag onto the board to place it. */
@@ -129,18 +130,14 @@ async function downloadPicture(kind: 'png' | 'pdf') {
 function usePopover() {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
-    window.addEventListener('pointerdown', away, true);
-    return () => window.removeEventListener('pointerdown', away, true);
-  }, [open]);
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (open && arrowThroughMenu(e)) return;
-    if (e.key !== 'Escape' || !open) return;
-    e.stopPropagation();
+  useOutsidePointerDown(open, wrap, () => setOpen(false));
+  useEscapeLayer(open, () => {
     setOpen(false);
     wrap.current?.querySelector('button')?.focus();
+    return true;
+  });
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (open) arrowThroughMenu(e);
   };
   return { open, setOpen, wrap, onKeyDown };
 }
@@ -299,6 +296,11 @@ export function AiSettingsButton({ onOpen }: { onOpen?: () => void }) {
 export function ColourControl() {
   const count = useAppState((s) => s.ui.selection.length);
   const open = useAppState((s) => s.ui.colourMenuOpen);
+  useEscapeLayer(open, (e) => {
+    if (isTextField(e.target)) return false;
+    appStore.clearSelection();
+    return true;
+  });
   const hasColumns = useAppState((s) => Object.keys(s.board.columns).length > 0);
   // The colour of the last selected block, shown on the button and ringed in the menu.
   const current = useAppState((s): ColorKey | null | undefined => {

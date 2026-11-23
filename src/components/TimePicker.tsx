@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { nearestTimeOption, parseTypedTime, timeText, type TimeOption } from '../model/calendar';
+import { useEscapeLayer } from './escapeLayer';
 
 // A time box like Google Calendar's (job 219, owner request 2026-10-29): a text box showing "2:00 PM"
 // that opens a list of times (every 15 minutes) when clicked or focused, and also takes a typed time.
@@ -11,16 +12,6 @@ import { nearestTimeOption, parseTypedTime, timeText, type TimeOption } from '..
 const LIST_HEIGHT = 240;
 const LIST_WIDTH = 220;
 const EDGE = 8;
-
-// The one open list, so the form's Escape (which closes the whole form) can close just this first.
-let closeOpenList: (() => void) | null = null;
-
-/** Closes the open time list, if there is one; true when it did, so that Escape is used up. */
-export function closeTimeList(): boolean {
-  if (!closeOpenList) return false;
-  closeOpenList();
-  return true;
-}
 
 type Props = { label: string; value: string; options: TimeOption[]; onChange: (hhmm: string) => void };
 
@@ -75,12 +66,9 @@ export function TimePicker({ label, value, options, onChange }: Props) {
     hide();
   };
 
-  useEffect(() => {
-    if (!open) return;
-    closeOpenList = hide;
-    return () => {
-      if (closeOpenList === hide) closeOpenList = null;
-    };
+  useEscapeLayer(open, () => {
+    hide();
+    return true;
   });
   // The list follows its box when the window changes size, as when a phone's keyboard comes up, or the card scrolls.
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HOTKEY_NAMES, hotkeyFromEvent, labelOf, type HotkeyAction } from '../model/hotkeys';
 import { appStore, useAppState } from '../store/appStore';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 
@@ -121,9 +122,17 @@ function Panel() {
   useEffect(() => panel.current?.focus({ preventScroll: true }), []);
   // Escape or ? closes it (the board's keys are off while it covers the board, so it listens itself).
   // While a key is being recorded, that handler (below) takes the keys first.
+  useEscapeLayer(
+    true,
+    () => {
+      appStore.closeShortcuts();
+      return true;
+    },
+    'modal',
+  );
   useEffect(() => {
     const close = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' && !(e.key === '?' && !e.ctrlKey && !e.metaKey)) return;
+      if (!(e.key === '?' && !e.ctrlKey && !e.metaKey)) return;
       e.preventDefault();
       appStore.closeShortcuts();
     };
@@ -133,6 +142,15 @@ function Panel() {
   // Which key is waiting for a new one, and the short note under the heading (why a key was refused).
   const [recording, setRecording] = useState<HotkeyAction | null>(null);
   const [note, setNote] = useState('');
+  useEscapeLayer(
+    recording !== null,
+    () => {
+      setRecording(null);
+      setNote('');
+      return true;
+    },
+    'capture',
+  );
   // While recording, the next key press goes here and nowhere else (so it can't also act on the board).
   useEffect(() => {
     if (!recording) return;
@@ -140,10 +158,6 @@ function Panel() {
       e.stopPropagation();
       e.preventDefault();
       if (e.repeat) return;
-      if (e.key === 'Escape') {
-        setRecording(null);
-        return setNote('');
-      }
       const got = hotkeyFromEvent(e);
       if (!got) return; // only Ctrl, Shift or ⌘ so far: keep waiting
       setNote('error' in got ? got.error : appStore.setHotkey(recording, got) ?? '');

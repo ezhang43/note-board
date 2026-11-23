@@ -2,6 +2,7 @@ import { use, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore
 import { estimateLabel, MAX_ESTIMATE, readEstimate } from '../model/estimate';
 import { findItem } from '../model/checklist';
 import { appStore, BoardScope, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { BoardReadOnly } from './textBox';
 
 // Time estimates on notes and checklist items (job saved-estimate-doneon): a small chip (the estimate, or a faint clock
@@ -167,24 +168,17 @@ function Picker({ target, estimate }: { target: Target; estimate: number | null 
     else ref.current?.focus({ preventScroll: true });
   }, []);
 
-  // A press anywhere else closes it (not on its own chip, which closes it itself).
-  useEffect(() => {
-    const down = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (!ref.current?.contains(t) && !chipOf(target)?.contains(t)) setOpen(null);
-    };
-    window.addEventListener('pointerdown', down, true);
-    return () => window.removeEventListener('pointerdown', down, true);
-  }, [target]);
+  // A press anywhere else, or Escape, closes it (not on its own chip, which closes it itself).
+  useOutsidePointerDown(true, ref, () => setOpen(null), (t) => Boolean(t && chipOf(target)?.contains(t)));
+  useEscapeLayer(true, () => {
+    close();
+    return true;
+  });
 
   const keys = (e: ReactKeyEvent) => {
     // The board's keys never act behind it (Delete, arrows…); undo and redo always do (rule 7).
     const undo = (e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase());
     if (!undo) e.stopPropagation();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
   };
   const submit = () => {
     const minutes = readEstimate(Number(text));

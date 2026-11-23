@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { collab } from "../sync/collabSession";
 import { ai, AI_MODELS, useAiSettings } from "../store/ai";
 import { appStore, useAppState } from "../store/appStore";
+import { useEscapeLayer } from "./escapeLayer";
 import { CloseIcon } from "./icons";
 import { useCoverBoard } from "./textField";
 import { usePhone } from "./usePhone";
@@ -34,12 +35,15 @@ function Dialog() {
   const [busy, setBusy] = useState(false);
   useEffect(() => () => testing.current?.abort(), []);
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) =>
-      e.key === "Escape" && !e.isComposing && close();
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [close]);
+  useEscapeLayer(
+    true,
+    (e) => {
+      if (e.isComposing) return false;
+      close();
+      return true;
+    },
+    "modal",
+  );
 
   const remember = ai.hasAnyKey() ? ai.isRemembered() : pending;
   const masked = ai.maskedKey(uid);

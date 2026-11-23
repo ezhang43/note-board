@@ -6,6 +6,7 @@ import { BOLD_KEYS, PALETTE, type BoldKey } from '../model/palette';
 import type { TodoCard } from '../model/types';
 import { appStore, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { CheckIcon, HabitsIcon, MoreIcon, PlusIcon } from './icons';
 import { usePhone } from './usePhone';
 import { WeightCard } from './WeightCard';
@@ -68,23 +69,13 @@ function HabitMenu({ habit, onRename }: { habit: TodoCard; onRename: () => void 
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const color = habitColor(habit);
-  useEffect(() => {
-    if (!open) return;
-    // A press outside, or Escape, shuts it (Escape leaves the panel open while a menu is, see escapeIsForPanel).
-    const press = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      setOpen(false);
-      button.current?.focus();
-    };
-    document.addEventListener('pointerdown', press, true);
-    document.addEventListener('keydown', key, true);
-    return () => {
-      document.removeEventListener('pointerdown', press, true);
-      document.removeEventListener('keydown', key, true);
-    };
-  }, [open]);
+  // A press outside, or Escape, shuts it.
+  useOutsidePointerDown(open, root, () => setOpen(false));
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    button.current?.focus();
+    return true;
+  });
   const pick = (key: BoldKey | null) => {
     appStore.setHabitColor(habit.id, key);
     setOpen(false);

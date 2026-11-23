@@ -8,6 +8,7 @@ import { HIGHLIGHTS, journalRich, sizePx, type Look, type Toggle } from '../mode
 import { FONTS } from '../model/textStyle';
 import { appStore, useAppState } from '../store/appStore';
 import { BOARD_SAVE_DELAY } from '../store/store';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { CaretIcon, CollapseAllIcon, PlusIcon, TrashIcon } from './icons';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { SidePanel } from './SidePanel';
@@ -168,22 +169,12 @@ export function JournalPanel({ onClose }: { onClose: () => void }) {
     }
   });
 
-  useEffect(() => {
-    if (!styleOpen) return;
-    // A press outside the bar, or Escape, shuts the menu (Escape leaves the panel open while it is open, see escapeIsForPanel).
-    const press = (e: PointerEvent) => !tools.current?.contains(e.target as Node) && setStyleOpen(false);
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      setStyleOpen(false);
-    };
-    document.addEventListener('pointerdown', press, true);
-    document.addEventListener('keydown', key, true);
-    return () => {
-      document.removeEventListener('pointerdown', press, true);
-      document.removeEventListener('keydown', key, true);
-    };
-  }, [styleOpen]);
+  // A press outside the bar, or Escape, shuts the menu.
+  useOutsidePointerDown(styleOpen, tools, () => setStyleOpen(false));
+  useEscapeLayer(styleOpen, () => {
+    setStyleOpen(false);
+    return true;
+  });
 
   const act = (fn: (h: RichEditorHandle) => void) => {
     const h = active.current?.el?.isConnected ? active.current : first.current;

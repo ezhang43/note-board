@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
-import { escapeIsForPanel } from './textField';
+import { isTextField } from './textField';
 
 /**
  * A panel beside the board, in the right-hand spot Version history also uses (one at a
@@ -8,13 +9,17 @@ import { escapeIsForPanel } from './textField';
  * `actions` are icon buttons in the header, just left of the × (the Journal's +).
  */
 export function SidePanel({ title, onClose, actions, children }: { title: string; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
-  useEffect(() => {
-    // Escape meant for something else (see escapeIsForPanel) leaves it open.
-    const key = (e: KeyboardEvent) => escapeIsForPanel(e) && onClose();
-    // Capture: seen before the page's own shortcuts close the list that Escape was for.
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  }, [onClose]);
+  useEscapeLayer(
+    true,
+    (e) => {
+      if (isTextField(e.target)) return false;
+      // Escape pressed inside the Checklist panel on the left belongs to that panel.
+      if (e.target instanceof Element && e.target.closest('.checklist-panel')) return false;
+      onClose();
+      return true;
+    },
+    'panel',
+  );
 
   return (
     // tabIndex -1: a click on its heading or blank space keeps the keyboard in the panel instead

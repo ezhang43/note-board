@@ -6,6 +6,7 @@ import { useAppState } from '../store/appStore';
 import type { ShareInfo } from '../store/store';
 import { collab, useSharing } from '../sync/collabSession';
 import { ask } from './ConfirmDialog';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { CheckIcon, CloseIcon, CommentIcon, TrashIcon } from './icons';
 import { Avatar } from './SharePanel';
 import { usePhone } from './usePhone';
@@ -149,24 +150,11 @@ function Thread({ share, cardId, title, opener }: { share: ShareInfo; cardId: st
   }, []); // only when it opens
 
   // Escape closes it; a press anywhere else too (not on its own chip, which closes it itself, nor in a question it asked).
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || document.querySelector('dialog.ask[open]')) return;
-      e.stopImmediatePropagation();
-      close();
-    };
-    const down = (e: PointerEvent) => {
-      const t = e.target as Element;
-      // The phone's scrim closes it on its own click, so that tap never reaches what is under it.
-      if (!ref.current?.contains(t) && !opener?.contains(t) && !t.closest?.('dialog.ask, .comment-scrim')) setOpen(null);
-    };
-    window.addEventListener('keydown', key, true);
-    window.addEventListener('pointerdown', down, true);
-    return () => {
-      window.removeEventListener('keydown', key, true);
-      window.removeEventListener('pointerdown', down, true);
-    };
-  }, [opener]); // simple: `close` only uses `opener`
+  useEscapeLayer(true, () => {
+    close();
+    return true;
+  });
+  useOutsidePointerDown(true, ref, () => setOpen(null), (t) => Boolean((t && opener?.contains(t)) || t?.closest('dialog.ask, .comment-scrim')));
 
   const send = () => {
     const text = draft;

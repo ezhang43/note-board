@@ -13,6 +13,8 @@ import { blockHoldPointerDown, blockPointerDown, useDragPosition } from './useBl
 import { ResizeGrips } from './ResizeGrips';
 import { resizeKeyDown, resizePointerDown } from './useResize';
 import { useFarAway, useMeasuredHeight } from './useMeasure';
+import { useEscapeLayer } from './escapeLayer';
+import { isTextField } from './textField';
 import type { ResizeDir } from '../model/sizing';
 
 // The edges and corners a container resizes from (the same arrays each time, so the grips aren't drawn again for nothing).
@@ -33,6 +35,13 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const confirmColumns = useAppState((s) =>
     s.ui.confirm?.columnId === id ? s.ui.confirm.ids.filter((x) => s.board.columns[x]).length : 0,
   );
+  useEscapeLayer(confirmColumns > 0, (e) => {
+    if (isTextField(e.target)) return false;
+    // With checklist items selected, keep the item selection and only cancel the question; otherwise clearSelection clears both.
+    if (appStore.getState().ui.itemSel) appStore.cancelDelete();
+    else appStore.clearSelection();
+    return true;
+  });
   // …and how many cards go with them.
   const confirmCards = useAppState((s) =>
     s.ui.confirm?.columnId === id

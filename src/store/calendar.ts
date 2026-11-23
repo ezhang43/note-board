@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { parseRecurrence, sameRepeat, toRecurrence, validateRepeat } from '../model/calendarRepeat';
 import { HELPER_URL } from '../calendar/helper';
 import { demoUser } from '../sync/demo';
 import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
@@ -38,6 +39,7 @@ export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
 export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
+export const REPEAT_SERIES_ONLY = 'Changing how it repeats applies to the whole series, so keep the same day and all-day setting.';
 /** A Ctrl+Z or Ctrl+Y that didn't get through: its step is kept, and the message has Try again (owner decision 2026-11-17). */
 export const UNDO_FAILED = 'Undo didn’t reach Google Calendar.';
 export const REDO_FAILED = 'Redo didn’t reach Google Calendar.';
@@ -353,10 +355,13 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   // that was asked for before a change or a fresh open is never kept.
   const cache = new Map<string, CalEvent[]>();
   const fetching = new Set<string>();
+  /** The series master being read for an open event form, reused once by Save so "All events" doesn't ask Google twice. */
+  const seriesReads = new Map<string, { req: Promise<CalEvent | null>; done: boolean; at: number }>();
   let generation = 0;
   const forget = () => {
     cache.clear();
     fetching.clear();
+    seriesReads.clear();
     generation++;
   };
   const keep = (key: string, events: CalEvent[]) => {
@@ -554,10 +559,10 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
    * guests (as Google gave them) when the change sent guests. Never emails them.
    * simple: the time is written in this device's time zone (the same moment), as saving does.
    */
-  const putBack = (id: string, was: CalEvent, guests: boolean) => {
+  const putBack = (id: string, was: CalEvent, guests: boolean, recurrence?: string[]) => {
     const body = draftBody(draftFor(was), timeZone());
     // Old times Google allows but the form doesn't (an end not after its start): no Undo.
-    return body && (() => api!.update(id, guests ? { ...body, attendees: was.guests } : body, false));
+    return body && (() => api!.update(id, { ...body, ...(guests && { attendees: was.guests }), ...(recurrence !== undefined && { recurrence }) }, false));
   };
   /** A save's step: none when it can't be put back. */
   const undoSave = (id: string, series: string | undefined, undo: (() => Promise<unknown>) | null, redo: () => Promise<unknown>): Step | null =>
@@ -875,6 +880,34 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     resetWidth(view: CalView) {
       this.setWidth(view, PANEL_DEFAULT[view]);
     },
+    /** Reads a repeating event's master record (including its recurrence rules), or null on failure. */
+    async getSeries(seriesId: string): Promise<CalEvent | null> {
+      if (!api) return null;
+      const existing = seriesReads.get(seriesId);
+      // Reuse an in-flight read (StrictMode double-mount) or one that just finished; older reads fetch fresh.
+      if (existing && (!existing.done || Date.now() - existing.at < 2000)) {
+        try {
+          return await existing.req;
+        } catch {
+          return null;
+        }
+      }
+      const entry = { req: api.get(seriesId), done: false, at: Date.now() };
+      seriesReads.set(seriesId, entry);
+      try {
+        const res = await entry.req;
+        if (res === null) {
+          if (seriesReads.get(seriesId) === entry) seriesReads.delete(seriesId);
+          return null;
+        }
+        entry.done = true;
+        entry.at = Date.now();
+        return res;
+      } catch {
+        if (seriesReads.get(seriesId) === entry) seriesReads.delete(seriesId);
+        return null;
+      }
+    },
     /**
      * Adds (`opened` null) or changes an event, with the person's answers to "Only this event / All
      * events in the series" and "Send update emails to guests?". Resolves to a note to show, or null.
@@ -889,6 +922,13 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       if (!draft.guests.every(isEmail)) return BAD_EMAIL;
       // The whole series keeps its days: only offered while the event is still on its own day.
       const all = choice.all === true;
+      if (!event?.series && draft.repeat) {
+        const repeatErr = validateRepeat(draft.repeat, draft.startDate);
+        if (repeatErr) return repeatErr;
+      }
+      if (all && event?.series && !canChangeSeries(event, draft)) {
+        return draft.repeat && draft.repeat.kind !== 'unsupported' ? REPEAT_SERIES_ONLY : SAVE_FAILED;
+      }
       if (all && (!canChangeSeries(event, draft) || (event?.series && seriesBusy(event.series)))) return SAVE_FAILED;
       // Guests are sent only when the person changed them here (from what this event had).
       let attendees = guestChanges(event, draft);
@@ -896,31 +936,38 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       if (!all || !event?.series) {
         // Shown at once; Google is asked in this same tick (no wait before it, so asking for access isn't held back).
         if (attendees) body = { ...body, attendees };
+        const addRecurrence =
+          !event?.series && draft.repeat && draft.repeat.kind !== 'none' && draft.repeat.kind !== 'unsupported'
+            ? toRecurrence(draft.repeat, draft.startDate, draft.allDay)
+            : null;
+        if (addRecurrence && addRecurrence.length > 0) body = { ...body, recurrence: addRecurrence };
         const sent = body;
         if (event === null) {
           const standIn = `local-${++standIns}`;
           const shown = savedEvent(null, sent, standIn);
+          const createdSeries = sent.recurrence !== undefined && sent.recurrence.length > 0;
           const answer = api.create(sent, notify).then(
             (id): Taken => ({
               text: 'Event added',
               // Redo brings the same event back, so a step made after it (an edit) still finds it.
-              step: id ? { undo: () => api.remove(id, false), redo: () => api.restore(id), ids: [id] } : null,
+              step: id ? { undo: () => api.remove(id, false), redo: () => api.restore(id), ids: [id], ...(createdSeries && { series: id }) } : null,
               // Already listed by Google's id (a fetch in between): shown once. No id: shown as Google has it.
               after: (l) => (id && !l.some((e) => e.id === id) ? l.map((e) => (e.id === standIn ? { ...e, id } : e)) : l.filter((e) => e.id !== standIn)),
-              reload: !id || attendees !== null,
+              reload: !id || attendees !== null || createdSeries,
             }),
           );
           instant(standIn, null, (l) => (l.some((e) => e.id === standIn) ? l : [...l, shown]), (l) => l.filter((e) => e.id !== standIn), answer);
           return null;
         }
         const shown = savedEvent(event, sent, event.id);
+        const addedRepeat = sent.recurrence !== undefined && sent.recurrence.length > 0;
         const answer = api.update(event.id, sent, notify).then(
           (): Taken => ({
             text: 'Event saved',
-            step: undoSave(event.id, undefined, putBack(event.id, event, sent.attendees !== undefined), () => api.update(event.id, sent, false)),
+            step: undoSave(event.id, addedRepeat ? event.id : undefined, putBack(event.id, event, sent.attendees !== undefined, addedRepeat ? [] : undefined), () => api.update(event.id, sent, false)),
             after: (l) => l,
-            // Guests' answers, or an event of a series (its id may change), as Google has them.
-            reload: sent.attendees !== undefined || event.series !== null,
+            // Guests' answers, an event of a series (its id may change), or a newly repeating event as Google has them.
+            reload: sent.attendees !== undefined || event.series !== null || addedRepeat,
           }),
         );
         // Only this event goes back, and only while it is still shown as changed.
@@ -933,20 +980,39 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       const seriesId = event.series;
       let own: Partial<EventBody> | null;
       let series: CalEvent | null;
+      let oldRecurrence: string[] | undefined;
       try {
-        series = await api.get(seriesId);
+        const loaded = seriesReads.get(seriesId);
+        seriesReads.delete(seriesId);
+        const fresh = loaded && (!loaded.done || Date.now() - loaded.at < 2000) ? loaded.req : null;
+        series = await (fresh ?? api.get(seriesId));
         if (!series) return SAVE_FAILED;
         // simple: the series' times are written in this device's time zone, so one kept in
         // another zone (which its repeat rule follows) is left to Google Calendar.
         if (!series.allDay && series.timeZone !== timeZone()) return SERIES_ZONE;
         // This event made all-day (or timed) on its own: its times don't fit the series.
         if (series.allDay !== event.allDay) return SERIES_ALL_DAY;
-        body = draftBody(seriesDraft(draft, draftFor(event), draftFor(series)), timeZone());
+        const seriesStart = draftFor(series);
+        body = draftBody(seriesDraft(draft, draftFor(event), seriesStart), timeZone());
         if (!body) return SAVE_FAILED;
         // Only the guests added or removed here change the series' own list (and its guests' answers stay).
         if (attendees) attendees = guestChanges(event, draft, series);
-        own = exceptionChange(event, draft, series);
         if (attendees) body = { ...body, attendees };
+        if (draft.repeat !== undefined && draft.repeat.kind !== 'unsupported') {
+          const anchor = seriesStart.startDate;
+          const current = parseRecurrence(series.recurrence, anchor);
+          if (!sameRepeat(current, draft.repeat, anchor, series.allDay)) {
+            const repeatErr = validateRepeat(draft.repeat, anchor);
+            if (repeatErr) return repeatErr;
+            const nextRec = toRecurrence(draft.repeat, anchor, series.allDay);
+            if (nextRec !== null) {
+              oldRecurrence = series.recurrence ?? [];
+              body = { ...body, recurrence: nextRec };
+            }
+          }
+        }
+        // Changing recurrence regenerates the series' occurrences, so don't patch an old exception id separately.
+        own = oldRecurrence !== undefined ? null : exceptionChange(event, draft, series);
         // The edited event's own change goes first, since the series' change can give it a new id (job #88).
         if (own) await api.update(event.id, own, notify);
       } catch {
@@ -957,7 +1023,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         const seriesBody = body;
         await api.update(seriesId, seriesBody, notify);
         // The series first, which also gives its events back their old ids, then the edited event's own change.
-        const seriesBack = putBack(seriesId, series, attendees !== null);
+        const seriesBack = putBack(seriesId, series, attendees !== null, oldRecurrence);
         const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
         step = undoSave(
           event.id,

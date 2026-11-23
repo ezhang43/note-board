@@ -1,11 +1,13 @@
 import { useEffect, useState, type RefObject } from 'react';
 import { appStore } from '../store/appStore';
 
-/** True while the user is typing in a text box (checkboxes don't count). */
+/** True while the user is typing in a text box (checkboxes and radio buttons don't count). */
 export function isTextField(target: EventTarget | null): target is HTMLElement {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
-  return target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'checkbox';
+  if (target.tagName !== 'INPUT') return false;
+  const type = (target as HTMLInputElement).type;
+  return type !== 'checkbox' && type !== 'radio';
 }
 
 /**

@@ -33,8 +33,26 @@ import {
 import { appStore, useAppState } from '../store/appStore';
 import { cardPosition, whenLabel } from '../model/eventCard';
 import { titleTime } from '../model/calendarTitleTime';
+import {
+  customFrom,
+  defaultEndDate,
+  monthlyLabels,
+  parseRecurrence,
+  presetLabels,
+  sameRepeat,
+  validateRepeat,
+  WEEKDAY_CODES,
+  WEEKDAY_INITIALS,
+  WEEKDAY_NAMES,
+  weekdayCodeOf,
+  type CustomRepeat,
+  type PresetKind,
+  type Repeat,
+  type RepeatUnit,
+  type WeekdayCode,
+} from '../model/calendarRepeat';
 import { WEEKS_DRAWN, recenterOn, weekAtLine } from '../model/weekList';
-import { BAD_EMAIL, BAD_TIMES, calendar, useCalendar, type CalendarState, type Choice } from '../store/calendar';
+import { BAD_EMAIL, BAD_TIMES, REPEAT_SERIES_ONLY, calendar, useCalendar, type CalendarState, type Choice } from '../store/calendar';
 import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from './icons';
 import { isTextField, panelCovers } from './textField';
 import { keyboardCover } from './ItemBar';
@@ -873,10 +891,29 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
   const [draft, setDraft] = useState(start);
   const [guest, setGuest] = useState('');
   const [more, setMore] = useState(event !== null);
+  const [seriesRepeat, setSeriesRepeat] = useState<{ status: 'loading' | 'ready' | 'error'; initial: Repeat; anchor: DayKey }>(() =>
+    event?.series ? { status: 'loading', initial: { kind: 'none' }, anchor: start.startDate } : { status: 'ready', initial: { kind: 'none' }, anchor: start.startDate },
+  );
   const ref = useRef<HTMLFormElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const phone = usePhone();
   const cover = useKeyboardCover(phone);
+  // Load the series' repeat rule when editing an existing repeating event (anchored to the series' own first day).
+  useEffect(() => {
+    if (!event?.series) return;
+    let alive = true;
+    void calendar.getSeries(event.series).then((series) => {
+      if (!alive) return;
+      if (!series) return setSeriesRepeat({ status: 'error', initial: { kind: 'none' }, anchor: start.startDate });
+      const anchor = draftFor(series).startDate;
+      const parsed = parseRecurrence(series.recurrence, anchor);
+      setSeriesRepeat({ status: 'ready', initial: parsed, anchor });
+      setDraft((d) => (d.repeat === undefined ? { ...d, repeat: parsed } : d));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [event?.series, start.startDate]);
   // Focus goes back to the button it came from (the panel when that is gone, after a change moved the event).
   const finish = () => {
     (opener.isConnected ? opener : document.querySelector<HTMLElement>('.side-panel'))?.focus();
@@ -889,7 +926,16 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
     setAsk(null);
     ref.current?.focus();
   };
-  const place = useCardPlace(ref, opener, [more, ask, note, draft.allDay, draft.guests.length]);
+  const repeatAnchor = event?.series && seriesRepeat.status === 'ready' ? seriesRepeat.anchor : draft.startDate;
+  const currentRepeat: Repeat = draft.repeat ?? seriesRepeat.initial;
+  const repeatChanged =
+    Boolean(event?.series) &&
+    seriesRepeat.status === 'ready' &&
+    seriesRepeat.initial.kind !== 'unsupported' &&
+    draft.repeat !== undefined &&
+    !sameRepeat(seriesRepeat.initial, draft.repeat, repeatAnchor, start.allDay);
+  const repeatUnit = currentRepeat.kind === 'custom' ? currentRepeat.rule.unit : '';
+  const place = useCardPlace(ref, opener, [more, ask, note, draft.allDay, draft.guests.length, seriesRepeat.status, currentRepeat.kind, repeatUnit]);
 
   // Escape closes it (first the question, if one is open), wherever the keyboard is, even in the title
   // (capture and stopImmediatePropagation, as for the card: the board's shortcuts and the panel's own Escape never see it).
@@ -960,8 +1006,14 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
         // only when the title was changed in this form, so an old name holding a time never moves the event. The form
         // keeps what was typed, so a Save again after a question's Cancel saves the same.
         const d = typed.title === start.title ? typed : titleTime(typed);
-        // Wrong times are said before any question.
+        // Wrong times or repeat settings are said before any question (repeat is validated only when it will be saved).
         if (!draftBody(d, 'UTC')) return setNote(BAD_TIMES);
+        if (!event?.series || repeatChanged) {
+          const repeatErr = d.repeat ? validateRepeat(d.repeat, repeatAnchor) : null;
+          if (repeatErr) return setNote(repeatErr);
+        }
+        if (event?.series && repeatChanged && !canChangeSeries(event, d)) return setNote(REPEAT_SERIES_ONLY);
+        setNote(null);
         next('save', d, {}, 'start');
       }}
     >
@@ -997,6 +1049,16 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
                 {!draft.allDay && <TimePicker label="End time" value={draft.endTime} options={endTimes} onChange={(t) => change({ endTime: t })} />}
               </div>
             </div>
+            <RepeatField
+              repeat={currentRepeat}
+              status={seriesRepeat.status}
+              startDate={repeatAnchor}
+              labelled={true}
+              onChange={(repeat) => {
+                setNote(null);
+                change({ repeat });
+              }}
+            />
             <div className="cal-field">
               <span>Guests</span>
               {draft.guests.length > 0 && (
@@ -1049,6 +1111,16 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
               <input type="checkbox" checked={draft.allDay} onChange={(e) => change({ allDay: e.currentTarget.checked })} />
               All day
             </label>
+            <RepeatField
+              repeat={currentRepeat}
+              status={seriesRepeat.status}
+              startDate={repeatAnchor}
+              labelled={false}
+              onChange={(repeat) => {
+                setNote(null);
+                change({ repeat });
+              }}
+            />
           </>
         )}
         {note && (
@@ -1083,8 +1155,193 @@ function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; 
           )}
         </div>
       </fieldset>
-      {ask && <Question event={event} draft={draft} ask={ask} next={next} onCancel={cancel} />}
+      {ask && <Question event={event} draft={draft} ask={ask} repeatChanged={repeatChanged} next={next} onCancel={cancel} />}
     </form>
+  );
+}
+
+const PRESET_ORDER: PresetKind[] = ['none', 'daily', 'weekly', 'monthly-weekday', 'yearly', 'weekday', 'custom'];
+
+/** Repeat dropdown (Google Calendar presets + Custom…) for quick-add and full event forms (owner request, 2026-11-22). */
+function RepeatField({
+  repeat,
+  status,
+  startDate,
+  labelled,
+  onChange,
+}: {
+  repeat: Repeat;
+  status: 'loading' | 'ready' | 'error';
+  startDate: DayKey;
+  labelled: boolean;
+  onChange: (next: Repeat) => void;
+}) {
+  if (status === 'loading') {
+    return (
+      <label className="cal-field">
+        {labelled && <span>Repeat</span>}
+        <select className="cal-select" aria-label="Repeat" disabled value="loading">
+          <option value="loading">Loading repeat…</option>
+        </select>
+      </label>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <div className="cal-field">
+        {labelled && <span>Repeat</span>}
+        <p className="cal-repeat-readonly">Repeat couldn’t be loaded (left unchanged)</p>
+      </div>
+    );
+  }
+  if (repeat.kind === 'unsupported') {
+    return (
+      <div className="cal-field">
+        {labelled && <span>Repeat</span>}
+        <p className="cal-repeat-readonly">Custom repeat (edit in Google Calendar)</p>
+      </div>
+    );
+  }
+
+  const labels = presetLabels(startDate);
+  const selectPreset = (kind: PresetKind) => {
+    if (kind === 'custom') onChange({ kind: 'custom', rule: customFrom(repeat, startDate) });
+    else onChange({ kind });
+  };
+  const updateCustom = (patch: Partial<CustomRepeat>) => {
+    if (repeat.kind !== 'custom') return;
+    onChange({ kind: 'custom', rule: { ...repeat.rule, ...patch } });
+  };
+  const changeUnit = (unit: RepeatUnit) => {
+    if (repeat.kind !== 'custom') return;
+    const base: CustomRepeat = { interval: repeat.rule.interval, unit, end: repeat.rule.end };
+    if (unit === 'week') base.days = repeat.rule.days?.length ? repeat.rule.days : [weekdayCodeOf(startDate)];
+    if (unit === 'month') base.monthlyBy = repeat.rule.monthlyBy ?? 'day';
+    onChange({ kind: 'custom', rule: base });
+  };
+  const toggleDay = (code: WeekdayCode) => {
+    if (repeat.kind !== 'custom') return;
+    const current = repeat.rule.days ?? [];
+    const has = current.includes(code);
+    if (has && current.length <= 1) return;
+    const nextDays = has ? current.filter((d) => d !== code) : [...current, code];
+    updateCustom({ days: WEEKDAY_CODES.filter((c) => nextDays.includes(c)) });
+  };
+
+  const monthly = monthlyLabels(startDate);
+  const plural = repeat.kind === 'custom' && repeat.rule.interval !== 1;
+
+  return (
+    <div className="cal-field">
+      {labelled && <span>Repeat</span>}
+      <select className="cal-select" aria-label="Repeat" value={repeat.kind} onChange={(e) => selectPreset(e.currentTarget.value as PresetKind)}>
+        {PRESET_ORDER.map((k) => (
+          <option key={k} value={k}>
+            {labels[k]}
+          </option>
+        ))}
+      </select>
+      {repeat.kind === 'custom' && (
+        <div className="cal-repeat-custom">
+          <div className="cal-repeat-row">
+            <span className="cal-repeat-label">Every</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={99}
+              className="cal-repeat-num"
+              aria-label="Repeat interval"
+              value={repeat.rule.interval > 0 ? repeat.rule.interval : ''}
+              onChange={(e) => updateCustom({ interval: e.currentTarget.value === '' ? 0 : Math.trunc(Number(e.currentTarget.value)) })}
+            />
+            <select className="cal-select cal-repeat-unit" aria-label="Repeat unit" value={repeat.rule.unit} onChange={(e) => changeUnit(e.currentTarget.value as RepeatUnit)}>
+              <option value="day">{plural ? 'days' : 'day'}</option>
+              <option value="week">{plural ? 'weeks' : 'week'}</option>
+              <option value="month">{plural ? 'months' : 'month'}</option>
+              <option value="year">{plural ? 'years' : 'year'}</option>
+            </select>
+          </div>
+          {repeat.rule.unit === 'week' && (
+            <div className="cal-repeat-days" role="group" aria-label="Repeat on">
+              {WEEKDAY_CODES.map((code, i) => {
+                const on = repeat.rule.days?.includes(code) ?? false;
+                return (
+                  <button key={code} type="button" className={`cal-repeat-day${on ? ' on' : ''}`} aria-label={WEEKDAY_NAMES[i]} aria-pressed={on} onClick={() => toggleDay(code)}>
+                    {WEEKDAY_INITIALS[i]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {repeat.rule.unit === 'month' && (
+            <select
+              className="cal-select"
+              aria-label="Monthly on"
+              value={repeat.rule.monthlyBy ?? 'day'}
+              onChange={(e) => updateCustom({ monthlyBy: e.currentTarget.value as 'day' | 'weekday' })}
+            >
+              <option value="day">{monthly.day}</option>
+              <option value="weekday">{monthly.weekday}</option>
+            </select>
+          )}
+          <div className="cal-repeat-ends" role="radiogroup" aria-label="Ends">
+            <span className="cal-repeat-label">Ends</span>
+            <div className="cal-repeat-end">
+              <label className="cal-repeat-radio">
+                <input type="radio" name="cal-repeat-end" checked={repeat.rule.end.kind === 'never'} onChange={() => updateCustom({ end: { kind: 'never' } })} />
+                <span>Never</span>
+              </label>
+            </div>
+            <div className="cal-repeat-end">
+              <label className="cal-repeat-radio">
+                <input
+                  type="radio"
+                  name="cal-repeat-end"
+                  checked={repeat.rule.end.kind === 'on'}
+                  onChange={() => updateCustom({ end: { kind: 'on', date: repeat.rule.end.kind === 'on' ? repeat.rule.end.date : defaultEndDate(startDate) } })}
+                />
+                <span>On</span>
+              </label>
+              <input
+                type="date"
+                aria-label="Repeat end date"
+                value={repeat.rule.end.kind === 'on' ? repeat.rule.end.date : defaultEndDate(startDate)}
+                onFocus={() => {
+                  if (repeat.rule.end.kind !== 'on') updateCustom({ end: { kind: 'on', date: defaultEndDate(startDate) } });
+                }}
+                onChange={(e) => updateCustom({ end: { kind: 'on', date: e.currentTarget.value } })}
+              />
+            </div>
+            <div className="cal-repeat-end">
+              <label className="cal-repeat-radio">
+                <input
+                  type="radio"
+                  name="cal-repeat-end"
+                  checked={repeat.rule.end.kind === 'after'}
+                  onChange={() => updateCustom({ end: { kind: 'after', count: repeat.rule.end.kind === 'after' ? repeat.rule.end.count : 10 } })}
+                />
+                <span>After</span>
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={999}
+                className="cal-repeat-num"
+                aria-label="Repeat occurrences"
+                value={repeat.rule.end.kind === 'after' ? (repeat.rule.end.count > 0 ? repeat.rule.end.count : '') : 10}
+                onFocus={() => {
+                  if (repeat.rule.end.kind !== 'after') updateCustom({ end: { kind: 'after', count: 10 } });
+                }}
+                onChange={(e) => updateCustom({ end: { kind: 'after', count: e.currentTarget.value === '' ? 0 : Math.trunc(Number(e.currentTarget.value)) } })}
+              />
+              <span className="cal-repeat-suffix">{repeat.rule.end.kind === 'after' && repeat.rule.end.count === 1 ? 'time' : 'times'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1150,13 +1407,14 @@ function MoveAsk({ event, from, to, opener, onClose }: { event: CalEvent; from: 
 }
 
 /** The question open before a save or delete goes ahead: which events, then whether to email the guests. */
-function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | null; draft: Draft; ask: Ask; next: Next; onCancel: () => void }) {
+function Question({ event, draft, ask, repeatChanged = false, next, onCancel }: { event: CalEvent | null; draft: Draft; ask: Ask; repeatChanged?: boolean; next: Next; onCancel: () => void }) {
   const seriesOk = canChangeSeries(event, draft);
   const title = ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;
   const pick = (all: boolean) => () => next(ask.action, draft, { all }, 'which');
   // A series' delete question takes the keyboard itself, not a delete button, so a held Enter's auto-repeat
   // (from the trash or the form's Delete) can't delete "Only this event" (job #209). Tab reaches the buttons.
   const pair = ask.step === 'which' && ask.action === 'delete';
+  const seriesOnly = ask.step === 'which' && ask.action === 'save' && repeatChanged;
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (pair) box.current?.focus();
@@ -1174,6 +1432,7 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
     >
       <div className="confirm-title">{title}</div>
       {ask.step === 'which' && ask.action === 'save' && !seriesOk && <p className="history-note">Moving it to another day, or to or from all day, changes only this event.</p>}
+      {seriesOnly && seriesOk && <p className="history-note">Changing how it repeats updates all events in the series.</p>}
       <div className={pair ? 'confirm-actions cal-pair' : 'confirm-actions'}>
         {ask.step === 'emails' ? (
           <>
@@ -1192,11 +1451,13 @@ function Question({ event, draft, ask, next, onCancel }: { event: CalEvent | nul
                 Cancel
               </button>
             )}
-            <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={!pair} onClick={pick(false)}>
-              Only this event
-            </button>
+            {!seriesOnly && (
+              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={!pair} onClick={pick(false)}>
+                Only this event
+              </button>
+            )}
             {(ask.action === 'delete' || seriesOk) && (
-              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} onClick={pick(true)}>
+              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={seriesOnly} onClick={pick(true)}>
                 All events in the series
               </button>
             )}

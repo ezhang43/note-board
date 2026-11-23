@@ -213,8 +213,8 @@ body {
 input, textarea, button { font-family: inherit; color: inherit; }
 input:focus, input:focus-visible, textarea:focus, textarea:focus-visible { outline: none; box-shadow: none; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Tick boxes are controls, not text fields: they keep the keyboard focus ring. */
-input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Tick boxes, radios and dropdowns are controls, not text fields: they keep the keyboard focus ring. */
+input[type='checkbox']:focus-visible, input[type='radio']:focus-visible, .cal-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--placeholder); }
 
 .app {
@@ -3747,7 +3747,7 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 .cal-detail-when { margin: 0 2px; color: var(--ink-soft); }
 a.cal-open { align-self: flex-start; }
 .cal-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
-.cal-field input {
+.cal-field input, .cal-select {
   height: 34px;
   padding: 0 8px;
   border: 1px solid var(--control-edge);
@@ -3757,6 +3757,46 @@ a.cal-open { align-self: flex-start; }
   font: inherit;
   font-size: 14px;
 }
+.cal-select { width: 100%; cursor: pointer; }
+.cal-select:disabled { opacity: 0.6; cursor: default; }
+.cal-repeat-readonly { margin: 0; padding: 6px 8px; border-radius: 6px; background: var(--canvas); border: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; }
+.cal-repeat-custom { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; padding: 10px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); }
+.cal-repeat-row { display: flex; align-items: center; gap: 6px; }
+.cal-repeat-label { font-size: 13px; color: var(--ink-soft); flex-shrink: 0; }
+.cal-repeat-num { width: 60px; text-align: center; }
+.cal-repeat-unit { flex: 1; min-width: 0; width: auto; }
+.cal-repeat-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-repeat-day {
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--control-edge);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.cal-repeat-day.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .cal-repeat-day:hover { background: var(--hover); color: var(--ink); }
+  .cal-repeat-day.on:hover { background: var(--accent); color: var(--on-accent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cal-repeat-day:active { transform: scale(0.95); }
+}
+.cal-repeat-ends { display: flex; flex-direction: column; gap: 6px; }
+.cal-repeat-end { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); min-height: 30px; }
+.cal-repeat-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; flex-shrink: 0; }
+.cal-repeat-radio input[type='radio'] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); flex-shrink: 0; }
+.cal-repeat-end input[type='date'] { flex: 1; min-width: 0; height: 30px; font-size: 13px; }
+.cal-repeat-end .cal-repeat-num { height: 30px; font-size: 13px; }
+.cal-repeat-suffix { color: var(--ink-soft); font-size: 13px; }
 .cal-when { display: flex; gap: 6px; }
 .cal-when input[type='date'] { flex: 1; min-width: 0; }
 .cal-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -3820,14 +3860,23 @@ a.cal-open { align-self: flex-start; }
 .cal-form { width: 340px; gap: 8px; }
 .cal-card-head { display: flex; align-items: center; gap: 6px; margin-right: -6px; color: var(--ink-soft); }
 .cal-card-head .cal-detail-title { flex: 1; min-width: 0; margin: 4px 2px 0; color: var(--ink); }
-.cal-form:not(.more) .cal-field input { height: 38px; font-size: 15px; }
+.cal-form:not(.more) .cal-field input, .cal-form:not(.more) .cal-select { height: 38px; font-size: 15px; }
+.cal-form:not(.more) .cal-repeat-custom input:not([type='radio']), .cal-form:not(.more) .cal-repeat-custom .cal-select { height: 34px; font-size: 14px; }
 .cal-times { align-items: center; color: var(--ink-soft); }
 .cal-times input { flex: 1; min-width: 0; }
 .app.phone .cal-form { width: auto; }
 /* Phone: 16px fields (the page doesn't zoom in when one is tapped) and 44px touch targets. */
-.app.phone .cal-form input:not([type='checkbox']) { height: 44px; font-size: 16px; }
+.app.phone .cal-form input:not([type='checkbox']):not([type='radio']), .app.phone .cal-form .cal-select { height: 44px; font-size: 16px; }
+.app.phone .cal-form .cal-repeat-day { height: 44px; font-size: 14px; }
+.app.phone .cal-form .cal-repeat-end { min-height: 44px; font-size: 15px; }
 .app.phone .cal-form .tb-button { height: 44px; }
 .app.phone .cal-form .cal-check { min-height: 44px; }
+/* Touch tablets in desktop layout also get 16px fields and 44px repeat controls. */
+@media (pointer: coarse) {
+  .cal-form input:not([type='checkbox']):not([type='radio']), .cal-form .cal-select { height: 44px; font-size: 16px; }
+  .cal-form .cal-repeat-day { height: 44px; font-size: 14px; }
+  .cal-form .cal-repeat-end { min-height: 44px; font-size: 15px; }
+}
 /* The time boxes (job 219): a text box that opens a list of times, drawn on the page (not inside the card, which would cut it off), in front of the overlay. */
 .time-box { flex: 1; min-width: 0; }
 .time-list {

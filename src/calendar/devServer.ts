@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
-import { dayKey as dateKey } from '../model/calendar';
+import { addDays, dayKey as dateKey } from '../model/calendar';
+import { expandRecurrence } from '../model/calendarRepeat';
 
 // A pretend Google Calendar inside `npm run dev` (never in the published site), so the calendar
 // panel can be tried and tested without Google: with ?demo-user=Alice the page calls
@@ -125,6 +126,35 @@ function seed(base: Date): Event[] {
   return events;
 }
 
+/** Builds occurrences for a repeating master event over a generous window around its start and the demo day. */
+function buildInstances(master: Event, base: Date, stamp: string): Event[] {
+  const recurrence = Array.isArray(master.recurrence) ? (master.recurrence as string[]) : [];
+  if (!recurrence.length) return [];
+  const startDay = master.start.date ?? dateKey(new Date(ms(master.start)));
+  const spanDays = recurrence.some((r) => /FREQ=YEARLY/i.test(r)) ? 366 * 3 : 180;
+  const endWindow = addDays(startDay > dateKey(base) ? startDay : dateKey(base), spanDays);
+  const days = expandRecurrence(startDay, recurrence, startDay, endWindow);
+  const out: Event[] = [];
+  for (const occDay of days) {
+    let start: When;
+    let end: When;
+    if (master.start.date && master.end.date) {
+      const span = Math.max(1, Math.round((day(master.end).getTime() - day(master.start).getTime()) / 86_400_000));
+      start = { date: occDay };
+      end = { date: addDays(occDay, span) };
+    } else {
+      const s = new Date(ms(master.start));
+      const [y, m, d] = occDay.split('-').map(Number);
+      const at = new Date(y, m - 1, d, s.getHours(), s.getMinutes());
+      start = { dateTime: at.toISOString() };
+      end = { dateTime: new Date(at.getTime() + ms(master.end) - ms(master.start)).toISOString() };
+    }
+    const { recurrence: _r, ...rest } = master;
+    out.push({ ...rest, id: `${master.id}_${occDay}`, recurringEventId: master.id, originalStartTime: start, start, end, updated: stamp });
+  }
+  return out;
+}
+
 export function devCalendarPlugin(): Plugin {
   return {
     name: 'note-board-dev-calendar',
@@ -165,7 +195,8 @@ export function devCalendarPlugin(): Plugin {
         };
         const who = /^Bearer (demo-.{1,60})$/u.exec(req.headers.authorization ?? '')?.[1];
         if (!who) return send(401, { error: { code: 401, message: 'Invalid Credentials' } });
-        if (!calendars.has(who)) calendars.set(who, seed(seedDay(req.headers['x-demo-today'])));
+        const baseDay = seedDay(req.headers['x-demo-today']);
+        if (!calendars.has(who)) calendars.set(who, seed(baseDay));
         const events = calendars.get(who)!;
         const url = new URL(req.url ?? '', 'http://dev');
         if (!url.pathname.startsWith(PATH)) return send(404, { error: { code: 404 } });
@@ -199,6 +230,8 @@ export function devCalendarPlugin(): Plugin {
           if (req.method === 'POST' && !id) {
             const body = JSON.parse(await readBody(req)) as Partial<Event>;
             if (badGuests(body.attendees)) return send(400, { error: { code: 400, message: 'Invalid attendee email.' } });
+            const recurrence = Array.isArray(body.recurrence) ? (body.recurrence as string[]).filter((r) => typeof r === 'string' && r.trim() !== '') : [];
+            const now = stamp();
             const event: Event = {
               organizer: { self: true },
               reminders: { useDefault: true },
@@ -207,10 +240,12 @@ export function devCalendarPlugin(): Plugin {
               start: body.start ?? {},
               end: body.end ?? {},
               ...(body.attendees !== undefined && { attendees: body.attendees }),
+              ...(recurrence.length > 0 && { recurrence }),
               id: `ev${next++}`,
-              updated: stamp(),
+              updated: now,
             };
             events.push(event);
+            if (recurrence.length > 0) events.push(...buildInstances(event, baseDay, now));
             return send(200, event);
           }
           if (found < 0) return send(id ? 410 : 404, { error: { code: 410, message: 'Resource has been deleted' } });
@@ -235,16 +270,34 @@ export function devCalendarPlugin(): Plugin {
             const newTime = ms(start) !== ms(events[found].start);
             const clock = (w: When) => new Date(ms(w)).toTimeString().slice(0, 5);
             if (!firstTime.has(`${who}/${id}`)) firstTime.set(`${who}/${id}`, clock(events[found].start));
-            events[found] = { ...events[found], ...fields, start, end, updated: stamp() };
+            const hasRecPatch = body.recurrence !== undefined;
+            const nextRec = hasRecPatch && Array.isArray(body.recurrence) ? (body.recurrence as string[]).filter((r) => typeof r === 'string' && r.trim() !== '') : null;
+            if (hasRecPatch && nextRec === null) return send(400, { error: { code: 400, message: 'Invalid recurrence.' } });
+            const now = stamp();
+            const updated: Event = { ...events[found], ...fields, start, end, updated: now };
+            if (hasRecPatch) {
+              if (nextRec!.length > 0) updated.recurrence = nextRec!;
+              else delete updated.recurrence;
+            }
+            events[found] = updated;
             if (events[found].recurringEventId) changedAlone.add(`${who}/${id}`);
-            // The whole series: its events not changed on their own follow, each on its own day.
-            if (events[found].recurrence) {
+            if (hasRecPatch) {
+              // Recurrence added, changed, or cleared: drop old instances and rebuild if still repeating.
+              for (let i = events.length - 1; i >= 0; i--) {
+                if (events[i].recurringEventId === id) {
+                  changedAlone.delete(`${who}/${events[i].id}`);
+                  events.splice(i, 1);
+                }
+              }
+              if (nextRec!.length > 0) events.push(...buildInstances(updated, baseDay, now));
+            } else if (events[found].recurrence) {
+              // The whole series: its events not changed on their own follow, each on its own day.
               for (const [i, e] of events.entries()) {
                 if (e.recurringEventId !== id) continue;
                 const alone = changedAlone.has(`${who}/${e.id}`);
                 if (!alone) {
                   const to = shift(e.originalStartTime as When, start, end);
-                  events[i] = { ...e, ...fields, ...to, updated: stamp(), ...(newTime && { originalStartTime: to.start }) };
+                  events[i] = { ...e, ...fields, ...to, updated: now, ...(newTime && { originalStartTime: to.start }) };
                 }
                 // Like Google, an event's id comes from its series' time: a new time gives every event a new id (job #88).
                 if (newTime) {
@@ -258,7 +311,7 @@ export function devCalendarPlugin(): Plugin {
                 }
               }
             }
-            return send(200, events[found]);
+            return send(200, updated);
           }
           if (req.method === 'DELETE') {
             // Kept as cancelled; a whole series hides its events with it. `updated` is the deletion time.

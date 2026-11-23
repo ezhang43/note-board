@@ -1,0 +1,190 @@
+/* ---------- canvas ---------- */
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--canvas);
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+/* Dragging the board with the left button from empty space (owner request, job 193, swapping job 188): a closed glove. */
+.canvas.panning, .canvas.panning * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27white%27%20stroke-width%3D%274%27%2F%3E%3Cpath%20d%3D%27M18%2011V9.5a2%202%200%200%200-4%200V11%20M14%2010V8.5a2%202%200%200%200-4%200V10%20M10%2010.5V9.5a2%202%200%200%200-4%200V14%20M18%2010a2%202%200%201%201%204%200v4a8%208%200%200%201-8%208h-2c-2.8%200-4.5-.86-5.99-2.34l-3.6-3.6a2%202%200%200%201%202.83-2.82L7%2015%27%20stroke%3D%27%231F1D1A%27%20stroke-width%3D%271.7%27%2F%3E%3C%2Fsvg%3E") 12 12, grabbing !important; }
+
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  transform-origin: 0 0;
+}
+
+/* ---------- zoom control ---------- */
+
+/* Shown on the published site when the last upload was refused (e.g. the board is too big). */
+.save-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 3;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+/*
+ * The bottom-right bar fills the room left of the board's right edge (or of an open side panel, which
+ * moves `right`), right-aligned, so a container query can tell how much room there is (owner request
+ * 2026-10-21): short of room, the pill drops its words; still short, the bar wraps into rows.
+ * The bar itself lets clicks through to the board; its controls take them.
+ */
+.corner-controls {
+  position: fixed;
+  left: 12px;
+  right: 24px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  container-type: inline-size;
+  pointer-events: none;
+}
+.corner-controls > * { pointer-events: auto; }
+.help-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+@media (hover: hover) {
+  .help-button:hover { color: var(--ink); }
+}
+
+/* Search, Completed, History, Timer and Calendar: labelled, in one pill. */
+.dock-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+.corner-controls .dock-tools .help-button.dock-tool {
+  width: auto;
+  height: 32px;
+  gap: 6px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 7px;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+@media (hover: hover) {
+  .corner-controls .dock-tools .help-button.dock-tool:hover { background: var(--hover); }
+}
+
+/* Short of room: icons only (the word stays as the accessible name and tooltip); the timer keeps its time. */
+@container (max-width: 1120px) {
+  .corner-controls .dock-tools .help-button.dock-tool { width: 32px; padding: 0; gap: 0; font-size: 0; }
+  .corner-controls .dock-tools .help-button.pomodoro-button.with-time { width: auto; padding: 0 8px; gap: 6px; }
+}
+/* Still short: two rows, the pill on top, right-aligned; the rest wraps below it. */
+@container (max-width: 600px) {
+  .corner-controls::before { content: ''; order: 1; flex-basis: 100%; height: 0; }
+  .corner-controls > * { order: 2; }
+  .corner-controls > .save-note, .corner-controls > .dock-tools { order: 0; }
+}
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(31, 29, 26, 0.08);
+}
+
+.zoom-control button {
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (hover: hover) {
+  .zoom-control button:hover { background: var(--hover); }
+}
+.zoom-control .zoom-label { min-width: 56px; padding: 0 6px; }
+
+/* ---------- colour menu ---------- */
+
+.colour-control { position: relative; }
+
+.colour-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid;
+  cursor: pointer;
+}
+/* Name of the swatch under the pointer: several swatches are close in tone. */
+.swatch-name { grid-column: 1 / -1; min-height: 18px; font-size: 12px; color: var(--ink-soft); text-align: center; }
+.swatch-default {
+  grid-column: 1 / -1;
+  height: 28px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+.swatch-default[aria-pressed='true'] { border-color: var(--accent); color: var(--accent-ink); }
+.swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor; }
+/* With nothing selected the swatches and Default are faded and do nothing; Auto-color still works. */
+.swatch[aria-disabled='true'], .swatch-default[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+:root[data-theme='dark'] .swatch[aria-disabled='true'], :root[data-theme='dark'] .swatch-default[aria-disabled='true'] { opacity: 0.55; }

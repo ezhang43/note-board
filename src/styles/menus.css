@@ -1,0 +1,363 @@
+/* ---------- File menu (owner request: backup, restore, import) ---------- */
+
+.file-menu-wrap { position: relative; }
+.file-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.file-menu button {
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.file-menu button:focus-visible { background: var(--hover); }
+@media (hover: hover) {
+  .file-menu button:hover { background: var(--hover); }
+}
+.phone-more .file-menu { position: static; box-shadow: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.file-menu button.file-menu-danger { color: var(--danger); }
+
+/*
+ * Appearance menu (job 112): the Dark mode switch, then the color themes as two columns of dot + name.
+ * It hangs from the button's right edge (the button sits near the toolbar's right end), and stays open
+ * while it is used. The switch is drawn like the ones in the phone ⋯ panel.
+ */
+.appearance-wrap .file-menu { left: auto; right: 0; min-width: 232px; gap: 4px; padding: 6px; transform-origin: top right; }
+.file-menu.appearance-menu > .tb-button { width: 100%; height: 40px; padding: 0 10px; gap: 10px; justify-content: flex-start; border: 0; background: none; font-size: 14px; }
+.appearance-menu > .tb-button svg { color: var(--ink-soft); }
+.theme-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.file-menu .theme-chip { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--control-edge); background: var(--surface); font-size: 13px; font-weight: 500; }
+.file-menu .theme-chip[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.theme-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(31, 29, 26, 0.22); }
+/* On a phone the menu opens inside the ⋯ panel: full width rows and the chips as big as the other rows. */
+.phone-more .appearance-wrap .file-menu { min-width: 0; padding: 0; gap: 0; }
+.phone-more .appearance-menu > .tb-button { height: 48px; padding: 0 12px; font-size: 15px; }
+.phone-more .theme-chips { padding: 10px 12px 12px; }
+.phone-more .file-menu .theme-chip { height: 44px; font-size: 15px; }
+
+/* Delete your account (job #63): in the keyboard shortcuts panel's frame. */
+.delete-account { font-size: 14px; line-height: 1.5; }
+.delete-account p, .delete-account ul { margin: 10px 0; }
+.delete-account ul { padding-left: 20px; }
+.delete-account-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink-soft); }
+.delete-account-type { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.delete-account-type input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+}
+.delete-account-note { color: var(--ink-soft); font-size: 13px; }
+.delete-account .confirm-actions { margin-top: 12px; }
+.confirm-actions button:disabled { opacity: 0.5; cursor: default; }
+
+/* Send feedback (job #69): in the same frame as Delete your account. */
+.feedback-text {
+  padding: 8px 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+  outline: none;
+}
+.delete-account .feedback-count { margin-top: 2px; text-align: right; }
+
+/* Brain dump (wow plan, job 3): a text box, the cards it will make, and Add. The shortcuts panel's frame; a bottom sheet on a phone. */
+.brain-dump { width: min(620px, 100%); }
+.brain-dump-text { display: block; width: 100%; margin-top: 10px; box-sizing: border-box; }
+.brain-dump-preview { margin: 12px 0; }
+.brain-dump-preview ul { list-style: none; margin: 0 0 6px; padding: 0; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.brain-dump-preview li { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: 14px; }
+.brain-dump-preview li + li { border-top: 1px solid var(--line); }
+.brain-dump-kind { flex: none; width: 66px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.brain-dump-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.brain-dump-time { flex: none; padding: 0 7px; font-size: 12px; line-height: 18px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 999px; }
+.brain-dump .confirm-actions button { height: 36px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--ink); }
+.brain-dump .confirm-actions .confirm-send { color: var(--on-accent); }
+@media (max-width: 599px) {
+  .brain-dump-backdrop { align-items: flex-end; padding: 0; }
+  .brain-dump { width: 100%; max-height: 92vh; max-height: 92dvh; padding: 14px 16px max(16px, env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; transform-origin: bottom center; }
+  .brain-dump .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  /* 16px so the phone does not zoom the page when the box takes the cursor. */
+  .brain-dump-text { font-size: 16px; }
+  .brain-dump-preview ul { max-height: 28vh; }
+  .brain-dump .confirm-actions button { height: 48px; font-size: 15px; }
+}
+/* AI settings (wow plan, job 12a): the shortcuts panel's frame; a bottom sheet on a phone. */
+.ai-settings { width: min(520px, 100%); }
+.ai-warning { margin: 12px 0; padding: 10px 12px; font-size: 13px; color: var(--ink); background: var(--accent-soft); border-radius: 8px; }
+.ai-warning ul { margin: 4px 0 0; padding-left: 18px; }
+.ai-warning li + li { margin-top: 2px; }
+.ai-field { display: block; min-width: 0; margin: 14px 0 0; padding: 0; border: 0; font-size: 14px; }
+.ai-field > label, .ai-field > legend { padding: 0; font-weight: 600; }
+.ai-saved { margin: 2px 0 6px; font-size: 13px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.ai-key-row, .ai-key-actions { display: flex; gap: 8px; }
+.ai-key-row input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; }
+.ai-settings :is(.confirm-send, .ai-forget) { height: 36px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; }
+.ai-settings .ai-forget { border: 1px solid var(--control-edge); background: var(--surface); color: var(--ink); }
+.ai-settings .confirm-send { color: var(--on-accent); }
+.ai-settings :is(.confirm-send, .ai-forget):disabled { opacity: 0.5; cursor: default; }
+.ai-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; font-weight: 400; }
+.ai-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.ai-check-hint { margin: 2px 0 0 24px; }
+.ai-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+.ai-bad { color: var(--danger); }
+.ai-model { margin-top: 6px; }
+.ai-model-note { margin-left: auto; font-size: 12px; color: var(--ink-soft); }
+.ai-cap { display: block; width: 110px; height: 36px; margin-top: 6px; padding: 0 10px; box-sizing: border-box; }
+@media (max-width: 599px) {
+  .ai-settings-backdrop { align-items: flex-end; padding: 0; }
+  .ai-settings { width: 100%; max-height: 92vh; max-height: 92dvh; padding: 14px 16px max(16px, env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; transform-origin: bottom center; }
+  .ai-settings .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  /* 16px so the phone does not zoom the page when a box takes the cursor. */
+  .ai-settings .feedback-text { font-size: 16px; }
+  .ai-key-row input, .ai-cap { height: 44px; }
+  .ai-settings :is(.confirm-send, .ai-forget) { height: 48px; font-size: 15px; }
+  .ai-check { min-height: 44px; margin-top: 0; }
+  .ai-check input { width: 20px; height: 20px; }
+}
+
+.confirm-send { border: none; background: var(--accent); color: var(--on-accent); }
+
+/* Web addresses in a note, as links under its text (owner request). */
+.note-links { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }
+.note-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--accent-ink);
+  font-size: calc(13px * var(--fs, 1));
+  text-decoration: none;
+}
+.note-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-link svg { flex-shrink: 0; }
+@media (hover: hover) {
+  .note-link:hover span { text-decoration: underline; }
+}
+
+/* Several boards (owner request): the Boards menu, the path back up, and board cards. */
+.boards-menu-wrap { position: relative; flex-shrink: 0; }
+.boards-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.boards-list { max-height: min(60vh, 420px); max-height: min(60dvh, 420px); overflow-y: auto; }
+.boards-row { display: flex; align-items: center; gap: 2px; }
+.boards-menu button[role='menuitem'] {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.boards-menu button[role='menuitem']:focus-visible { background: var(--hover); }
+@media (hover: hover) {
+  .boards-menu button[role='menuitem']:hover { background: var(--hover); }
+}
+.boards-menu .boards-open[aria-current='true'] { background: var(--accent-soft); font-weight: 600; }
+.boards-actions { display: flex; flex-direction: column; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+.boards-actions button[role='menuitem'] { flex: none; }
+.board-path { display: flex; align-items: center; min-width: 0; flex-shrink: 1; overflow: hidden; }
+.board-path-step { display: flex; align-items: center; min-width: 0; }
+.board-path-link {
+  max-width: 120px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.board-path-link:focus-visible { background: var(--hover); color: var(--ink); }
+@media (hover: hover) {
+  .board-path-link:hover { background: var(--hover); color: var(--ink); }
+}
+.board-path-sep { color: var(--ink-faint); padding: 0 2px; }
+/* A board card: its name is the title on the button row (.board-title); the count and Open board sit under it, in line with the title's text. */
+.board-body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0 4px; }
+.board-card-count { color: var(--ink-faint); font-size: calc(13px * var(--fs, 1)); }
+.board-open { height: calc(32px * var(--bs, 1)); font-size: calc(14px * var(--fs, 1)); }
+
+
+/* Sharing a board (owner request: editing together). */
+.share-wrap { position: relative; }
+.share-panel {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 340px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+  color: var(--ink);
+  font-size: 14px;
+}
+.share-wrap.phone .share-panel { position: static; width: auto; box-shadow: none; margin-top: 6px; }
+.share-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.share-head h2 { margin: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-panel h3 { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.share-text { margin: 0; line-height: 1.45; color: var(--ink-soft); }
+.share-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.share-panel > .tb-button.add-column { align-self: stretch; justify-content: center; }
+.share-link { display: flex; gap: 6px; }
+.share-link input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.share-link-toggle, .share-leave { align-self: flex-start; }
+.share-people { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.share-people li { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.share-person-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-tag { font-size: 12px; color: var(--ink-soft); }
+/* Roles (job 161): which role's link is shown, and each person's role, picked from a small menu. */
+.share-link-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.share-link-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
+.share-link-label svg { flex-shrink: 0; color: var(--ink-soft); }
+.role-wrap { position: relative; flex-shrink: 0; }
+.role-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.role-button.quiet { border-color: transparent; background: transparent; color: var(--ink-soft); }
+.role-button[aria-expanded='true'] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.role-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: 272px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(31, 29, 26, 0.18);
+}
+.role-option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 1px 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.role-option:focus-visible { outline-offset: -2px; }
+.role-option b { font-size: 14px; font-weight: 500; }
+.role-option small { grid-column: 2; font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.role-option svg { width: 16px; height: 16px; margin-top: 2px; color: var(--accent); }
+.role-option[aria-checked='true'] { background: var(--accent-soft); }
+.role-option[aria-checked='true'] b { color: var(--accent-ink); }
+.role-remove { margin-top: 4px; }
+.role-remove b { color: var(--danger); }
+@media (hover: hover) {
+  .role-button.quiet:hover:not(:disabled) { background: var(--hover); }
+  .role-option:hover:not([aria-checked='true']) { background: var(--hover); }
+}
+/* On a phone (the ⋯ sheet): 44px to press, and 16px text so the link box doesn't zoom the page. */
+.share-wrap.phone .role-button, .share-wrap.phone .role-option, .share-wrap.phone .share-link .tb-button { min-height: 44px; }
+.share-wrap.phone .share-link input { height: 44px; font-size: 16px; }
+.share-error { margin: 0; color: var(--danger); }
+/* Read-only boards (job 161): the badge beside the board's name, in the accent tint (follows every theme and dark mode). */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+.toolbar.phone .role-badge { height: 26px; padding: 0 9px 0 7px; font-size: 12px; }
+/* Nothing that changes a read-only board is shown on it: collapse, delete, resize, move and tidy buttons. */
+.app.view-only :is(.card-header > .icon-button, .column-actions, .resize-grip, .resize-edge, .resize-corner, .item-arrows, .item-trash, .item-grip, .estimate-chip.add, .list-clean-up) { display: none; }

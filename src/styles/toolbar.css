@@ -1,0 +1,320 @@
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  position: relative;
+  z-index: var(--z-toolbar);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-edge);
+  /* Never wider than the window: the board name and the path to it shrink instead. */
+  min-width: 0;
+}
+/* The BusyAnts ant, as on the app icon. */
+.toolbar-logo { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; }
+/* The ant opens the website (job #53): a subtle hover like the toolbar buttons, and a keyboard focus ring (rule 6). */
+.toolbar-logo-link { display: flex; flex-shrink: 0; border-radius: 8px; }
+@media (hover: hover) {
+  .toolbar-logo-link:hover { filter: brightness(0.96); }
+}
+.toolbar-logo-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.toolbar-spacer { flex-grow: 1; }
+
+/* Narrower windows: tighter still, so every button (Sign out too) fits. */
+@media (max-width: 1500px) {
+  .toolbar { gap: 3px; padding: 0 10px; }
+  /* (.toolbar raises it above the plain .tb-button rule further down; icon-only buttons stay square.) */
+  .toolbar .tb-button:not(.icon-only) { padding: 0 6px; font-size: 13px; }
+  .toolbar-label { display: none; }
+  /* Room for Share beside Sign out (owner request: editing together). */
+  .toolbar .toolbar-divider { margin: 0 1px; }
+}
+
+/*
+ * Medium windows (owner pick, 2026-10-22): under 1180px wide the less-used buttons fold into ⋯ (see
+ * Toolbar.tsx), a popover made of the phone's ⋯ rows; at 880px and below Note, Checklist, Container
+ * and Color show only their icons (their names stay as tooltips and accessible names).
+ */
+.toolbar-more {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 4;
+  width: 288px;
+  max-height: calc(100dvh - var(--toolbar-height) - 16px);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+  transform-origin: top right;
+}
+/* (More specific than the phone sheet's 48px rows, which this menu borrows.) */
+.toolbar .toolbar-more .phone-rows .tb-button { height: 40px; font-size: 14px; }
+@media (pointer: coarse) {
+  .toolbar .toolbar-more .phone-rows .tb-button { height: 44px; }
+}
+@media (max-width: 880px) {
+  .toolbar .tb-label { display: none; }
+  .toolbar .tb-button:has(> .tb-label) { padding: 0 9px; }
+  .toolbar .colour-control > .tb-button > svg:last-child { display: none; }
+}
+/* The 600-660px strip (just over a phone): the board name may shrink further to leave room for the buttons. */
+@media (max-width: 660px) {
+  .toolbar .board-name { min-width: 64px; }
+}
+
+/*
+ * Phone layout (owner request; windows under 600px): a slim top bar with the board name, and a bar
+ * along the bottom (PhoneBar) with Undo, Redo, + and ⋯. Its menus open above it.
+ */
+.app.phone { grid-template-rows: 52px 1fr auto; }
+.toolbar.phone { padding: 0 8px; }
+.toolbar.phone .board-name { min-width: 0; max-width: none; flex: 1 1 auto; }
+.phone-bar-wrap { position: relative; z-index: 3; }
+.phone-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 60px;
+  padding: 0 8px env(safe-area-inset-bottom);
+  box-sizing: content-box;
+  background: var(--toolbar-bg);
+  border-top: 1px solid var(--line);
+}
+.phone-bar > button {
+  width: 52px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.phone-bar > button[aria-disabled='true'] { opacity: 0.4; }
+/* Pressed: shows the moment a finger lands (the shrink is in the motion block at the end). */
+.phone-bar > button:active:not([aria-disabled='true'], .phone-add-button, [aria-expanded='true']) { background: var(--hover); }
+.phone-bar > button[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+.phone-bar > .phone-add-button { background: var(--accent); color: var(--on-accent); }
+.phone-bar > .phone-add-button[aria-expanded='true'] { background: var(--accent-ink); color: var(--on-accent); }
+.phone-sheet {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 8px);
+  max-height: 70vh;
+  max-height: 70dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  overscroll-behavior: contain; /* a sheet that scrolls keeps its scroll to itself (the page already has none) */
+}
+.phone-add > button {
+  height: 48px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.phone-add > button:active { background: var(--hover); }
+/* The ⋯ menu (job 74, option B): tiles for what opens, an Arrange group, then a More group of rows. */
+.phone-more { gap: 10px; }
+.phone-label { margin: 0 0 6px 2px; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+.phone-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.phone-more .zoom-control button { min-width: 44px; height: 44px; font-size: 15px; }
+/* Text size is the only thing on its row: two even halves, like the row of three below. */
+.phone-row > .zoom-control, .phone-row > .zoom-control button { flex: 1; }
+/* A small grab handle marks it as a sheet (it closes on a tap outside, as before). */
+.phone-grab { flex: none; align-self: center; width: 36px; height: 4px; margin: -2px 0 -2px; border-radius: 2px; background: var(--control-edge); }
+/* Tiles: icon over a short label, three across (Share's panel opens under them, full width). */
+.phone-tiles, .phone-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+/* Never an empty tile: nine sit three across (three full rows), eight four across (two full rows), and seven four
+   across with the last one two wide (signed out: no Share or Calendar). Feedback (signed in) is not counted: it is a
+   full-width last row of its own (icon beside the label). */
+.phone-tiles:has(> :nth-child(7 of :not(.tile-wide))) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.phone-tiles:has(> :nth-child(9 of :not(.tile-wide))) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.phone-tiles > :nth-child(7 of :not(.tile-wide)):nth-last-child(1 of :not(.tile-wide)) { grid-column: span 2; }
+.phone-tiles > .tb-button.tile-wide { grid-column: 1 / -1; flex-direction: row; min-height: 48px; gap: 8px; }
+.phone-trio { margin-top: 6px; }
+.phone-more .share-wrap.phone { display: contents; }
+.phone-more .share-wrap.phone .share-panel { grid-column: 1 / -1; order: 1; margin-top: 0; }
+.phone-tiles > .tb-button, .phone-tiles > .share-wrap > .tb-button, .phone-trio .tb-button {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+  height: auto;
+  padding: 6px 4px;
+  font-size: 13px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.phone-trio .tb-button { min-height: 52px; }
+.phone-tiles > .tb-button svg, .phone-tiles > .share-wrap > .tb-button svg, .phone-trio .tb-button svg { width: 20px; height: 20px; color: var(--ink-soft); }
+.phone-tiles > .tb-button[aria-expanded='true'], .phone-tiles > .share-wrap > .tb-button[aria-expanded='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.phone-tiles .pomodoro-left { color: var(--accent-ink); font-size: 12px; }
+.phone-trio .tb-button.quiet { border-color: var(--control-edge); background: var(--surface); }
+/* Rows: one bordered group, a line between rows, icon at the left. */
+.phone-rows { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.phone-more .phone-rows .tb-button { width: 100%; height: 48px; padding: 0 12px; gap: 10px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font-size: 15px; }
+.phone-more .phone-rows > * + * { border-top: 1px solid var(--line); }
+.phone-rows .tb-button > svg:first-child { color: var(--ink-soft); }
+.phone-rows .colour-control > .tb-button svg:last-child, .phone-rows .appearance-wrap > .tb-button svg:last-child { margin-left: auto; }
+/* Snap to grid and Dark mode (in the Appearance menu) read as switches: a track and knob after the label, amber while on. */
+.phone-rows > .tb-button[aria-pressed]:not(.opens-panel)::after, .appearance-menu > .tb-button[aria-pressed]::after {
+  content: '';
+  margin-left: auto;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 99px;
+  background: radial-gradient(circle 9px at 12px 12px, var(--surface) 97%, transparent) var(--control-edge);
+}
+.phone-rows > .tb-button[aria-pressed='true']:not(.opens-panel)::after, .appearance-menu > .tb-button[aria-pressed='true']::after {
+  background: radial-gradient(circle 9px at 28px 12px, var(--on-accent) 97%, transparent) var(--accent);
+}
+/* Version history and Completed in ⋯ open a panel and shut the menu, so they are no switch: while their panel is open the row says "Open". */
+.phone-rows > .tb-button.opens-panel[aria-pressed='true']::after { content: 'Open'; margin-left: auto; font-size: 13px; color: var(--ink-soft); }
+/* The color swatches and the File menu open inside the sheet, below their row. */
+.phone-more .colour-menu { position: static; padding: 10px 12px 12px; grid-template-columns: repeat(8, minmax(0, 32px)); gap: 6px; justify-content: space-between; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+.phone-more .swatch { width: 100%; height: auto; aspect-ratio: 1; }
+.item-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  background: var(--toolbar-bg);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 12px rgba(31, 29, 26, 0.06);
+}
+.item-bar > button {
+  /* Eight buttons share the width, so they fit a 320px phone (about 39px each at the narrowest). */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 52px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.item-bar > button:active { background: var(--hover); }
+.item-bar > button[aria-disabled='true'] { opacity: 0.35; }
+/* Done is a word, not a picture: it puts the keyboard away. */
+.item-bar > button[aria-label='Done typing'] { font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-ink); }
+.item-bar > button[aria-label='Delete item'] { color: var(--danger); }
+.app.phone ~ .save-banner, .app.phone .save-banner { bottom: calc(76px + env(safe-area-inset-bottom)); }
+.app.phone .corner-controls { bottom: calc(76px + env(safe-area-inset-bottom)); right: 12px; }
+
+.toolbar-divider { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+
+.toolbar-label { font-size: 13px; color: var(--ink-soft); margin-right: 2px; }
+
+/* Text box that is exactly as wide as its text: an invisible copy of the text sets the width. */
+.autosize {
+  display: inline-grid;
+  min-width: 0;
+}
+.autosize::after,
+.autosize > input {
+  grid-area: 1 / 1;
+  font: inherit;
+  padding: var(--pad, 6px 8px);
+  border: none;
+  min-width: 2ch;
+  width: auto;
+}
+.autosize::after {
+  content: attr(data-value) ' ';
+  visibility: hidden;
+  white-space: pre;
+  overflow: hidden;
+}
+.autosize > input { background: transparent; border-radius: 6px; }
+
+.board-name {
+  font-weight: 600;
+  font-size: 17px;
+  /* Shrinks before any button does (down to 140px), ending in … when the name doesn't fit. */
+  min-width: 140px;
+  max-width: 460px;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.board-name > input { text-overflow: ellipsis; }
+.toolbar > :not(.board-name):not(.board-path):not(.toolbar-spacer) { flex-shrink: 0; }
+
+
+.tb-button {
+  height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--control-edge);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .tb-button:hover:not([aria-disabled='true']) { filter: brightness(0.96); }
+}
+.tb-button.icon-only { width: 40px; padding: 0; justify-content: center; }
+.tb-button[aria-disabled='true'] { cursor: default; }
+.tb-button.faded-undo[aria-disabled='true'] { opacity: 0.4; }
+.tb-button.faded-colour[aria-disabled='true'] { opacity: 0.45; }
+/* Faded buttons are harder to see on the dark toolbar, so they fade a little less there. */
+:root[data-theme='dark'] .tb-button.faded-undo[aria-disabled='true'] { opacity: 0.5; }
+:root[data-theme='dark'] .tb-button.faded-colour[aria-disabled='true'] { opacity: 0.55; }
+
+/* On / off buttons (Snap to grid, Dark mode) look pressed while on. */
+.tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+
+.colour-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--colour-dot); border: 1.5px solid var(--grid-dot); }
+
+/* Rarely used buttons (Auto-colour, Collapse all, Import, Clean up): no border until hovered. */
+.tb-button.quiet { border-color: transparent; background: transparent; }
+@media (hover: hover) {
+  .tb-button.quiet:hover:not([aria-disabled='true']) { border-color: var(--control-edge); background: var(--surface); filter: none; }
+}
+
+.tb-button.add-column { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* In the toolbar the three Add buttons look alike, outlined with an icon; Share is the one solid honey button. */
+/* (Only the toolbar's own button: the Share panel's "Share this board" also uses .add-column.) */
+.toolbar > .tb-button.add-column { background: var(--surface); border-color: var(--control-edge); color: var(--ink); }
+.toolbar .share-wrap:not(.phone) > .tb-button { background: var(--honey); border-color: var(--honey); color: var(--honey-ink); }

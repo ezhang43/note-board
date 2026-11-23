@@ -1,0 +1,342 @@
+/* ---------- sign-in screen (published site only; owner pick 2026-10-22, job #165b) ---------- */
+
+.sign-in {
+  height: 100%;
+  display: flex;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* A short window (a phone on its side) scrolls rather than cutting the card off; the card's auto margins center it otherwise. */
+  overflow-y: auto;
+}
+.sign-in-panel {
+  width: 100%;
+  max-width: 400px;
+  margin: auto;
+  padding: 36px 32px 16px;
+  background: var(--toolbar-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.sign-in-logo { margin-bottom: 4px; border-radius: 14px; }
+.sign-in-title { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+.sign-in-pitch { margin: 0 0 8px; max-width: 280px; font-size: 15px; line-height: 1.45; color: var(--ink-soft); }
+.sign-in-text { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.sign-in-note { margin: 4px 0 0; max-width: 300px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.sign-in-error { margin: 0; font-size: 13px; color: var(--danger); }
+.sign-in-deleted { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--hover); font-size: 14px; }
+/* Google's standard button (their Sign in with Google branding guidelines): white with a gray edge, Roboto Medium 14px, the multicolor G, 4px corners; the dark version in dark mode. 44px tall so it is a full touch target. */
+.google-button {
+  --g-fill: #ffffff;
+  --g-edge: #747775;
+  --g-ink: #1f1f1f;
+  --g-state: rgba(48, 48, 48, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-edge);
+  border-radius: 4px;
+  color: var(--g-ink);
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+:root[data-theme='dark'] .google-button { --g-fill: #131314; --g-edge: #8e918f; --g-ink: #e3e3e3; --g-state: rgba(255, 255, 255, 0.08); }
+.google-button svg { flex: none; }
+@media (hover: hover) {
+  .google-button:hover { background-image: linear-gradient(var(--g-state), var(--g-state)); }
+}
+.google-button:active { background-image: linear-gradient(var(--g-state), var(--g-state)); }
+.google-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sign-in-links { display: flex; justify-content: center; gap: 4px; width: 100%; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
+.sign-in-links a { padding: 10px 10px; border-radius: 6px; color: var(--ink-soft); text-decoration: none; }
+.sign-in-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) {
+  .sign-in-links a:hover { color: var(--ink); text-decoration: underline; }
+}
+@media (max-width: 599px) {
+  .sign-in-panel { padding: 28px 20px 12px; }
+}
+
+/* ---------- keyboard shortcuts panel (? button or ? key) ---------- */
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.shortcuts-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(31, 29, 26, 0.2);
+}
+/* The panel itself takes the keyboard when it opens (a text field's no-rectangle rule, applied to a box with no keys of its own). */
+.shortcuts-panel:focus { outline: none; }
+.shortcuts-header { display: flex; align-items: center; gap: 8px; }
+.shortcuts-hint { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+.shortcuts-note { min-height: 20px; margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+.shortcuts-header h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
+.shortcuts-group h3 { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.shortcuts-group dl { margin: 0; }
+.shortcuts-site { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.shortcuts-site a { color: var(--accent-ink); }
+.shortcut { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 4px 0; font-size: 14px; }
+.shortcut dd { margin: 0; color: var(--ink-soft); }
+.key-button { padding: 0; border: none; background: none; font: inherit; color: inherit; cursor: pointer; border-radius: 5px; }
+.key-button[aria-pressed='true'] kbd { border-color: var(--accent); background: var(--accent-soft); }
+@media (hover: hover) { .key-button:hover kbd { border-color: var(--ink-soft); } }
+.shortcut kbd {
+  font: inherit;
+  font-size: 13px;
+  padding: 1px 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: 5px;
+  background: var(--canvas);
+}
+
+/*
+ * Starting from a template (owner request, job #162, 2026-10-22): shown on an empty board in place of the
+ * one-line hint, and in the "Start a board" dialog. Colors, radii and motion are the app's own.
+ */
+.empty-start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: none;
+  cursor: default;
+}
+.empty-start-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(704px, 100%);
+  margin: auto;
+  padding-bottom: 64px;
+  text-align: center;
+  pointer-events: auto;
+  touch-action: pan-y;
+  cursor: default;
+}
+.empty-start svg { width: 24px; height: 24px; color: var(--ink-soft); }
+.empty-start h2 { margin: 8px 0 2px; font-size: 17px; font-weight: 600; }
+.empty-start p { margin: 0; font-size: 13px; line-height: 19px; color: var(--ink-soft); }
+.empty-start .tpl-grid { width: 100%; margin-top: 18px; }
+.empty-start .tpl-example { margin-top: 12px; }
+.empty-start .tpl-hint { max-width: 440px; margin-top: 16px; }
+.tpl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; text-align: left; }
+.tpl-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 8px 10px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--card-bg);
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.tpl-tile .tpl-thumb { margin-bottom: 6px; }
+.tpl-thumb { position: relative; display: block; overflow: hidden; background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; }
+.tpl-thumb i { position: absolute; box-sizing: border-box; border: 1px solid; border-radius: 3px; }
+.tpl-thumb b { position: absolute; left: 8%; right: 8%; background: var(--card-bg); border-radius: 2px; box-shadow: 0 0 0 0.5px var(--card-edge); }
+.tpl-name { display: block; padding: 0 2px; font-size: 14px; font-weight: 600; line-height: 18px; }
+.tpl-blurb { display: block; padding: 0 2px; font-size: 12px; line-height: 16px; color: var(--ink-soft); }
+.tpl-example {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.tpl-example .tpl-thumb { flex: none; width: 96px; }
+.tpl-example-text { flex: 1; min-width: 0; }
+.tpl-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: 1px; color: var(--accent-ink); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; }
+.tpl-go { flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; font-size: 14px; font-weight: 500; background: var(--surface); border: 1px solid var(--control-edge); border-radius: 8px; }
+.tpl-tile:focus-visible, .tpl-example:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .tpl-tile:hover { border-color: var(--control-edge); box-shadow: 0 2px 8px rgba(31, 29, 26, 0.08); }
+  .tpl-example:hover .tpl-go { border-color: var(--ink-soft); }
+}
+/* The dialog: the shortcuts panel's look, a bottom sheet on a phone. */
+.templates-panel { width: min(704px, 100%); }
+.templates-panel .shortcuts-hint { margin-bottom: 12px; }
+.tpl-label { margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.tpl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-soft); }
+@media (max-width: 599px) {
+  .tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tpl-go { display: none; }
+  .tpl-example .tpl-thumb { width: 92px; }
+  .empty-start { padding: 12px 16px; }
+  .empty-start-inner { padding-bottom: 0; }
+  .templates-backdrop { align-items: flex-end; padding: 0; }
+  .templates-panel { width: 100%; max-height: 88vh; max-height: 88dvh; padding: 14px 16px max(20px, env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; transform-origin: bottom center; }
+  .templates-panel .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  .templates-panel .tpl-foot .tb-button { height: 44px; }
+}
+/* Pressing a tile shrinks it a little, like the app's buttons (also with reduced motion: in place, no movement). */
+.tpl-tile, .tpl-example { transition: transform 100ms var(--ease-out), border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out); }
+.tpl-tile:active { transform: scale(0.97); }
+.tpl-example:active { transform: scale(0.985); }
+
+/* Bottom-right corner: save note and text size. */
+.save-note { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.zoom-control button.text-size { min-width: 36px; font-weight: 600; font-size: 13px; }
+.zoom-control button.text-size[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+
+/* Alignment guides while dragging a block (thin teal lines across the blocks that line up). */
+.align-guide { position: absolute; pointer-events: none; z-index: 5; background: var(--accent); }
+.align-guide.x { width: 1.5px; margin-left: -0.75px; }
+.align-guide.y { height: 1.5px; margin-top: -0.75px; }
+
+/* Text format bar (owner request): above highlighted text or selected checklist items. */
+.format-bar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+/* Fades in after the highlight settles: opacity and a few pixels of movement, ease-out; none with reduced motion.
+   It goes at once (no fade-out), so it never lingers over what the person clicks next. */
+@media (prefers-reduced-motion: no-preference) {
+  .format-bar { animation: fb-in 150ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .format-bar.below { animation-name: fb-in-below; }
+}
+@keyframes fb-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes fb-in-below { from { opacity: 0; transform: translateY(-4px); } }
+.format-bar button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .format-bar button:hover { background: var(--hover); }
+}
+.format-bar button[aria-pressed='true'],
+.format-bar .fb-font-menu button[aria-checked='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.format-bar .fb-bold { font-weight: 700; }
+.format-bar .fb-italic { font-style: italic; font-family: Georgia, serif; }
+.fb-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
+.fb-font { position: relative; }
+.fb-font > button { white-space: nowrap; }
+.fb-font-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.fb-font-menu button { justify-content: flex-start; text-align: left; height: 32px; font-size: 16px; }
+/* While the bar is hovered: the text boxes it will change. */
+.format-target { outline: 1.5px dashed var(--accent); outline-offset: 1px; border-radius: 4px; }
+
+/*
+ * Touch screens: bigger invisible areas to press around the small card controls (owner request,
+ * phone steps 4 and 7; the drawn controls stay as they are). Each area is 44px, except where a
+ * neighbour is in the way, and no area covers another control's drawn box:
+ *  - a header's collapse and delete buttons grow up into the space above the header, never down into
+ *    the card's text; sideways, collapse takes the gap between them and delete grows outwards, so
+ *    delete never grows over another control;
+ *  - the resize corner and the width strip grow outwards, away from the card;
+ *  - the grip grows to the right and up/down, away from the delete can beside it.
+ */
+@media (pointer: coarse) {
+  .icon-button { position: relative; }
+  .icon-button::before { content: ''; position: absolute; inset: -6px; }
+  .card-header > .icon-button::before { top: -12px; bottom: -2px; }
+  /* The first icon button (not :first-of-type: a note's estimate clock is a button too and comes before it). */
+  .card-header > .icon-button:not(.icon-button ~ .icon-button)::before { left: -10px; right: -4px; }
+  /* A note's estimate clock leaves a gap that this wider press area fills, so it never covers the clock (more specific than its 4px below). */
+  .card > .card-header > .estimate-chip { margin-right: 10px; }
+  /* A comment chip before them keeps its own press area (job 161, PR 4). */
+  .comment-slot + .icon-button::before { left: -4px; }
+  /* Clean up (job 200): its press area reaches up like theirs. It comes later in the page order than the arrow and the comment chip, so where the areas overlap it wins and its drawn box is never taken by a neighbor. */
+  .list-clean-up::before { content: ''; position: absolute; top: -12px; bottom: -2px; left: -10px; right: -2px; }
+  .comment-chip::before { content: ''; position: absolute; top: -10px; bottom: -4px; left: -8px; right: -4px; }
+  .canvas .card:not(.selected, :focus-within) .comment-chip.add { visibility: hidden; }
+  .card-header > .block-trash::before { left: 0; right: -16px; }
+  .column-actions > .icon-button::before { top: -8px; bottom: -6px; }
+  .column-actions > .icon-button:first-of-type::before { left: -14px; right: -4px; }
+  /* The add button comes first; the collapse arrow's area starts at its own box so it never covers the add button's right edge. */
+  .column-actions > .icon-button:nth-of-type(2)::before { left: 0; }
+  .column-actions > .block-trash::before { left: 0; right: -16px; }
+  /* On a collapsed block the width strip runs down the edge beside the buttons, so delete stops short of it. */
+  .card.collapsed:not(.in-column) > .card-header > .block-trash::before { right: -1px; }
+  .column.collapsed .column-actions > .block-trash::before { right: -3px; }
+  .item-trash::before { content: ''; position: absolute; top: -8px; bottom: -8px; left: -8px; right: 0; }
+  /* The strip's clock is the card's last button, so the grip's area runs the other way, over the end of the row's text, and stops at the clock's own edge. */
+  .item-grip::before { top: -10px; bottom: -10px; left: -30px; right: 0; }
+  /* Where the row has a trash can beside the grip (not the phone layout), the grip's area stops at its own edge rather than cover it. */
+  .app:not(.phone) .item-grip::before { left: 0; }
+  /* (Its area reaches down rather than up, so it never covers the card header's buttons above the first item.) */
+  .todo-item > .estimate-chip.add::before { content: ''; position: absolute; top: -2px; bottom: -14px; left: 0; right: -18px; }
+  /* Inside a container the card's right side is close to the container's width strip. */
+  .card.in-column .todo-item > .estimate-chip.add::before { right: -12px; }
+  .canvas[data-big-text] .item-grip::before { left: -2px; right: -28px; }
+  .canvas[data-big-text] .card.in-column .item-grip::before { right: -22px; }
+  /* Outwards, past the card's corner, so it never takes presses meant for the last item's grip. */
+  .resize-corner::before { inset: 0 -26px -26px 0; }
+  .resize-edge::before { top: 0; bottom: 0; left: 0; right: -34px; }
+}
+@media (pointer: coarse) and (hover: hover) {
+  /* Nothing beside the trash can but the row's text, so its press area stops at its own edge rather than cover words. */
+  .item-trash::before { left: 0; }
+  /* ...and the trash can sits beside the grip, so the grip's area doesn't run over it. */
+  .item-grip::before { left: -4px; }
+  .canvas[data-big-text] .item-grip::before { left: -2px; }
+}

@@ -1,0 +1,644 @@
+/* ---------- blocks shared ---------- */
+
+.icon-button {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (hover: hover) {
+  .icon-button:hover { background: var(--hover); }
+}
+
+/*
+ * Icons drawn by CSS (job perf-fewer-elements). The hover-only buttons on every checklist row (Move up / down, trash
+ * can, drag grip, estimate clock) and on every card's and container's header (collapse arrow, trash can, estimate
+ * clock, resize corner) draw their icon as the button's ::after: the same drawing as the SVG icon in icons.tsx, used as
+ * a mask filled with the button's color. One box per button instead of an SVG tree: on a big board those trees were
+ * half of the page's elements, and every element slows typing, dragging and panning. Each button's rules size its ::after.
+ */
+.ci::after {
+  content: '';
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / 100% 100% no-repeat;
+  mask: var(--icon) center / 100% 100% no-repeat;
+}
+.ci-trash { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8L12 4M6.8 6.8v4.4M9.2 6.8v4.4'/%3E%3C/svg%3E"); }
+.ci-grip { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 18' fill='%23000'%3E%3Ccircle cx='3' cy='3' r='1.7'/%3E%3Ccircle cx='9' cy='3' r='1.7'/%3E%3Ccircle cx='3' cy='9' r='1.7'/%3E%3Ccircle cx='9' cy='9' r='1.7'/%3E%3Ccircle cx='3' cy='15' r='1.7'/%3E%3Ccircle cx='9' cy='15' r='1.7'/%3E%3C/svg%3E"); }
+.ci-up { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M6 11l6-6 6 6'/%3E%3C/svg%3E"); }
+.ci-down { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M6 13l6 6 6-6'/%3E%3C/svg%3E"); }
+.ci-clock { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='7.5'/%3E%3Cpath d='M12 9.5v4l2.5 2M10 3h4M12 3v3'/%3E%3C/svg%3E"); }
+.ci-chevron { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E"); }
+.ci-resize { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3L3 9M9 6.5L6.5 9'/%3E%3C/svg%3E"); }
+/* As the SVGs were: the grip and the resize corner in the placeholder color, the collapse arrow in the faint ink. */
+.ci-grip::after, .ci-resize::after { background: var(--placeholder); }
+.ci-chevron::after { background: var(--ink-faint); }
+.ci-chevron[aria-expanded='false']::after { transform: rotate(-90deg); }
+.ci-resize::after { width: 10px; height: 10px; }
+/* Forced colors (Windows High Contrast) would paint the mask's fill the background color: the icons take the button text color instead, as the SVGs' strokes did. */
+@media (forced-colors: active) {
+  .ci::after { forced-color-adjust: none; background: ButtonText; }
+}
+/* A card's or column's delete button: the same faint trash can as a checklist item's, red on hover. */
+.block-trash { color: var(--ink-faint); }
+/*
+ * A card's and a container's header buttons show only while pointing at it, while it is selected, or
+ * while it has keyboard focus (owner decision 2026-10-16). Touch screens have no pointing, so there
+ * they always show.
+ */
+@media (hover: hover) {
+  .card-header > .icon-button, .column-actions > .icon-button { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .icon-button,
+  :is(.column:hover, .column.selected, .column-header:focus-within) .column-actions > .icon-button { opacity: 1; }
+  /* (A new way to show them also shows their icons: the rule just below.) */
+}
+/*
+ * Panning a big board (job perf-paint-chunks): a faded-out hover-only button draws no icon. Each icon is a masked piece
+ * the browser paints and stacks on every frame of a pan, even at opacity 0, and a big board has thousands. The icon
+ * comes back the moment its button starts to show and stays until the button has faded out (a visibility transition
+ * stays visible for its whole 120ms, the fade's length), so nothing looks different. The button itself stays visible,
+ * so the keyboard and screen readers still reach it. The "shown" selectors repeat each button's opacity: 1 rules
+ * (above, and for the row buttons and estimate clocks further down): a new way to show one of these buttons goes in both.
+ * Not the collapse arrow, which has its own turning transition on its ::after. Touch screens (no hover) show these
+ * buttons by other rules and keep their icons.
+ */
+@media (hover: hover) {
+  :is(.card-header, .column-actions) > .block-trash::after,
+  .card-header > .estimate-chip.add::after,
+  :is(.item-grip, .item-trash, .item-arrow)::after,
+  .todo-item > .estimate-chip.add::after { visibility: hidden; transition: visibility 120ms; }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > :is(.block-trash, .estimate-chip.add)::after,
+  :is(.column:hover, .column.selected, .column-header:focus-within) .column-actions > .block-trash::after,
+  :is(.todo-item:hover .item-grip, .todo-item:hover .item-trash, .item-grip:focus-visible, .item-trash:focus-visible)::after,
+  :is(.todo-item:hover .item-arrows, .item-arrows:focus-within) .item-arrow::after,
+  :is(.estimate-chip.add:focus-visible, .todo-item:hover > .estimate-chip.add, .estimate-chip.add[aria-expanded='true'])::after { visibility: inherit; }
+}
+
+.card, .column { cursor: default; }
+.card input:not([type='checkbox']), .card textarea, .column input { cursor: text; }
+
+/* Text box that grows taller with its text: an invisible copy of the text sets the height. */
+.grow { display: grid; min-width: 0; }
+.grow::after,
+.grow > textarea {
+  grid-area: 1 / 1;
+  font: inherit;
+  line-height: inherit;
+  padding: var(--pad, 2px 4px);
+  border: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.grow::after { content: attr(data-value) ' '; visibility: hidden; }
+.grow > textarea {
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border-radius: 6px;
+  color: inherit;
+  min-height: 0;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
+  /* Cards are always white; only columns are coloured. */
+  --edge: var(--card-edge);
+  background: var(--card-bg);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06);
+  color: var(--ink);
+  font-size: calc(14px * var(--fs, 1));
+}
+.card.loose { position: absolute; }
+/* A loose card or container more than a screen outside the visible board isn't drawn, at the size it had (src/components/farAway.ts). */
+:is(.card, .column)[data-far] { content-visibility: auto; contain-intrinsic-size: var(--far-w) var(--far-h); }
+
+/*
+ * No title band (owner decision 2026-10-16): cards are white with a bold title. A colour picked in
+ * the Color menu tints the header, which holds a list's or link's title, lightly; the ink stays usual.
+ */
+.card.tinted .card-header {
+  margin: 0 -12px;
+  padding: 0 6px 0 12px;
+  background: var(--tint);
+  border-radius: 9px 9px 0 0;
+}
+/* A collapsed card is all header: its color fills the whole card, whatever its height, into the rounded corners (owner request, 2026-10-21). */
+.card.tinted.collapsed { background: var(--tint); }
+.card.tinted.collapsed .card-header { border-radius: 9px; }
+/* A bold tint is too deep for the soft greys: its icons and title placeholder use the colour's own text colour. */
+.card.bold-tint .card-header {
+  --ink-soft: var(--tint-text);
+  --ink-faint: var(--tint-text);
+  --placeholder: var(--tint-text);
+}
+.card.in-column { width: auto; margin: 0 16px 10px; }
+.card.collapsed { padding-bottom: 0; }
+/* A collapsed loose card is as tall as a collapsed column (owner request); made taller, it keeps its header in the middle. */
+.card.loose.collapsed { justify-content: center; min-height: 60px; }
+
+.card.selected, .column.selected { outline: 2px solid var(--accent); }
+.card.selected { outline-offset: 2px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--honey) 28%, transparent); }
+.column.selected { outline-offset: 3px; }
+
+.card.dragging, .column.dragging {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent), 0 14px 30px rgba(31, 29, 26, 0.16);
+  z-index: 10;
+}
+
+.card, .column {
+  /* The header buttons' size step, the same one the item buttons use (see .todo-item): they grow with A+ and never go under today's size. */
+  --bs: max(1, var(--fs, 1));
+  /* The header buttons stop growing at 250% (80px): two of them must fit a 200px card (at 400% they would be 128px each). */
+  --hb: min(var(--bs), 2.5);
+  --btn: calc(32px * var(--hb));
+}
+/* A container has three of them (add a checklist, collapse, delete): they stop growing where the three still leave room for the title (about 56px) in the container's own width (--col-n, unitless px), so a narrow container at a huge text size keeps its title. */
+.column { --hb: max(1, min(var(--bs), 2.5, calc((var(--col-n, 240) - 84) / 96))); }
+/* On a phone they keep their size, like the item buttons. */
+.app.phone :is(.card, .column) { --bs: 1; }
+/* A card's and a container's header buttons (owner request, 2026-10-22): 32px with a 16px icon, up from 28px and 12-14px. */
+:is(.card-header, .column-actions) > .icon-button { width: var(--btn); height: var(--btn); }
+:is(.card-header, .column-actions) > .icon-button svg,
+:is(.card-header, .column-actions) > .icon-button.ci::after { width: calc(16px * var(--hb)); height: calc(16px * var(--hb)); }
+/*
+ * The button row. A list's, link's or board's title shares it (owner pick, 2026-10-22: no empty band above the
+ * title): the title takes what the buttons leave and shrinks before they move; the row grows with a bigger title.
+ */
+.card-header {
+  min-height: max(36px, calc(var(--btn) + 4px));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: -6px;
+}
+/* Drawn first, but last in the page order: Tab goes collapse, delete, title, items, as it did when the buttons were above the title. */
+/* From 225% up (the canvas has data-big-text) the buttons can be so wide that a 200px card has no room for its title beside them: the title keeps about two and a half letters, and the buttons drop to a line of their own, at the right, instead of covering it. */
+.canvas[data-big-text] .card:not(.collapsed) > .card-header { flex-wrap: wrap; justify-content: flex-end; }
+.canvas[data-big-text] .card-header > .card-title { max-width: max(2.5em, calc(100% - 2 * var(--btn) - 12px)); }
+.canvas[data-big-text] .card-header > .title-cell { min-width: calc(2.5 * 15px * var(--fs, 1)); }
+/*
+ * A list's Clean up button (job 200): in the title row while something in the list is ticked. It grows with
+ * the other header buttons (up to 250%) and has a set width; where it sits is set by the title cell below.
+ */
+.list-clean-up {
+  position: relative;
+  flex-shrink: 0;
+  width: calc(60px * var(--hb));
+  height: var(--btn);
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: calc(12px * var(--hb));
+  font-weight: 500;
+  /* No overflow clipping: it would clip the touch press area (::before). The label fits its width at every text step. */
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .list-clean-up:hover { background: var(--hover); color: var(--ink); }
+}
+.card-header > .card-title { order: -1; flex: 0 1 auto; min-width: 0; align-self: center; }
+/*
+ * A list's title and its Clean up share a cell (owner request 2026-10-24, job 208: Clean up never squeezes the title). The cell
+ * wraps: when the title and Clean up fit beside the arrow and trash can they sit on one line; when they don't, Clean up drops to
+ * a short line of its own under the title, at the right, and the title keeps the width it has without Clean up. The arrow and
+ * trash can stay on the title's line (a row of the header's height, so they line up with the title, not with the whole cell).
+ */
+.card-header > .title-cell { order: -1; flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; }
+/* Above Clean up's touch press area, which reaches up 12px: when Clean up is on its own line the title's lower edge keeps its taps. */
+.title-cell > .card-title { align-self: center; position: relative; z-index: 1; }
+/*
+ * A list's "3/5" count (owner request 2026-11-03) sits right after the title in the title cell. The title keeps its whole width (job 208): when
+ * title and count don't fit side by side, the count drops to the line under it, ahead of Clean up. Quiet gray; the calm tick green once everything
+ * is ticked; not selectable.
+ */
+.title-count {
+  flex: none;
+  position: relative;
+  top: 0.12em; /* see .item-count below */
+  padding-right: 2px;
+  font-size: calc(12px * var(--fs, 1) * var(--ts, 1));
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink-faint);
+  user-select: none;
+}
+.item-count { position: relative; top: 0.03em; margin-left: 0.5em; font-size: 0.8em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); user-select: none; }
+/* A parent item's count takes no room in the text's wrapping (owner decision 2026-11-11): its slot is a zero-width box that the count spills out of, so the count can never drop to a line of its own or make the item taller. When the last line is full it reaches into the room the row keeps free at its right end for the hover buttons; the card and its width are untouched. */
+.tail-slot { display: inline-block; width: 0; white-space: nowrap; line-height: 0; }
+.title-count.all-done, .item-count.all-done { color: var(--checkbox); }
+/* The counts' digits sit with their middle on the middle of the lowercase letters of the text (owner requests 2026-11-10 and 2026-11-11: first on the capitals, then lowered); relative, in em of their own size, so it holds at every text step and moves nothing else. */
+/* A bold tint is too deep for the green: the count keeps the color's own text color, a little heavier. */
+.card.bold-tint .title-count.all-done { color: var(--tint-text); font-weight: 600; }
+.title-cell > .list-clean-up { margin-left: auto; }
+/* Empty on an open card: it would only take a few pixels of the title's room. */
+.card-header:has(> .title-cell) > .card-meta { display: none; }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) { align-items: flex-start; --row: max(36px, calc(var(--btn) + 4px)); flex-wrap: wrap; justify-content: flex-end; }
+/* The cell is never narrower than Clean up, so the arrow and trash can drop to a line of their own, at the right, when the two won't fit side by side (as they did before). */
+.card .card-header > .title-cell:has(> .list-clean-up) { min-width: calc(60px * var(--hb)); }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) > .icon-button { margin-top: calc((var(--row) - var(--btn)) / 2); }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) > .comment-slot { height: var(--row); align-items: center; }
+.card-header:has(> .title-cell > :is(.list-clean-up, .title-count)) .title-cell > .card-title { min-height: var(--row); align-content: center; }
+/* A little air under the button row, as the band under the old title gave (and so the first item's grip, whose press area reaches up 10px on a touch screen, stays off the header's buttons). */
+.card-header + :is(.todo-body, .link-body, .board-body) { padding-top: calc(8px * min(var(--bs), 1.75)); }
+/* A board card's name is plain text, so it wraps (a long board name) rather than being cut off. */
+.board-title { padding: 6px 4px; overflow-wrap: anywhere; }
+.card-meta {
+  flex-grow: 1;
+  min-width: 0;
+  padding-left: 2px;
+  font-size: calc(12px * var(--fs, 1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card.collapsed .card-meta { font-size: calc(13px * var(--fs, 1)); font-weight: 500; }
+/* A collapsed loose card shows its title in the middle: the left padding matches the buttons on the right (never more than 30%, so big buttons at A+ don't push past a narrow card). */
+.card.loose.collapsed .card-meta { padding-left: min(calc(2 * var(--btn) + 2px), 30%, calc(100% - 2 * var(--btn) - 10px)); text-align: center; }
+.card.loose.collapsed[data-kind='completed'] .card-meta { padding-left: min(calc(var(--btn) - 2px), 30%, calc(100% - 2 * var(--btn) - 10px)); }
+
+.note-text { font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: 1.55; }
+.note-text > textarea { min-height: 104px; }
+
+.card-title { --pad: 2px 4px; font-weight: 600; font-size: calc(15px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; align-self: flex-start; }
+
+.todo-body, .link-body { display: flex; flex-direction: column; gap: 6px; }
+
+.todo-items { display: flex; flex-direction: column; }
+.todo-item {
+  /* The item's first line of text, and the item buttons' size step: they grow with A+ (never under today's, so Small keeps it). */
+  --line: calc(20px * var(--fs, 1) * var(--ts, 1));
+  /* The item text's font size (see .item-text), for what has to be as wide as some of its letters. */
+  --tfs: calc(14px * var(--fs, 1) * var(--ts, 1));
+  --bs: max(1, var(--fs, 1));
+  --bh: calc(20px * var(--bs) + 8px);
+  /* The buttons' widths, icons and the strip kept free for them stop growing at 190%, so that at 400% the tick box (80px), its gap and the strip still fit the 174px row of a 200px card without the box covering a button. */
+  --bb: min(var(--bs), 1.9);
+  /* The space under every row, so rows sit 1.5px further apart at Normal (owner request 2026-10-24; 2px was "a bit too large", 1px then went to 1.5px on 2026-10-26), growing with the text step. It is part of the row, so a drop there still lands on this row; the tick box and the buttons are placed from the row's top and do not move. */
+  --row-gap: calc(1.5px * var(--fs, 1));
+  padding-bottom: var(--row-gap);
+  min-height: calc(30px + var(--row-gap));
+  display: flex;
+  align-items: flex-start;
+  /* The gap from the tick box to the text grows with A+, by the item buttons' step. */
+  gap: calc(6px * var(--bb));
+  border-radius: 4px;
+  /* Each level is indented 32px (--indent, set by the row: 32px times its level), but in a narrow list the deepest levels stop short so the text keeps 32px: the row's width less the tick box, the gap and the buttons' strip (the widest, 46px, plus the clock's 26px). */
+  --inset: min(var(--indent, 0px), calc(100% - 52px * var(--bb) - var(--clock) - 20px * var(--bs) - 32px));
+  padding-left: var(--inset);
+}
+/*
+ * A parent item's fold arrow (owner request, 2026-11-09): just left of its tick box, in the indent (a top-level
+ * item's sits in the list's own left room, below), on the middle of the first line. Above the tick box's widened press area.
+ * Owner request 2026-11-11: it touched the box's border (now 4px clear of it, times --bb), then "a bit bigger and darker":
+ * the icon is 13 units (30% over the old 10), its stroke 2.1 icon units (was 1.8), in the full ink color; it grows with the
+ * item buttons' step (--bb) again.
+ * The button is as wide as the icon. The open chevron's stroke ends 0.8375 of the icon in (10.05 of its 12 units), so the
+ * button's left edge sits 4 + 10.89 = 14.89 units from the box, its right edge 1.89 short of it. The chevron's left end
+ * is 12.78 units from the box.
+ * Owner request 2026-11-21: "a bit more space" between them, so the arrow sits --fold-extra-gap further left (the tick box,
+ * the text and the 32px indents stay put; a top-level arrow's list gets the same extra room on its left, below).
+ */
+.item-fold {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--line) / 2 + 4px - 8px * var(--bb));
+  left: calc(var(--inset) - 14.89px * var(--bb) - var(--fold-extra-gap));
+  width: calc(13px * var(--bb));
+  height: calc(16px * var(--bb));
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.item-fold svg { width: calc(13px * var(--bb)); height: calc(13px * var(--bb)); stroke-width: 2.1; }
+/* The room a top-level arrow needs left of the boxes (12.78 units, less the card's 12px padding, plus 2px kept clear of its border, plus --fold-extra-gap), given to a list that has one. */
+.todo-items.has-fold { --bb: min(var(--bs), 1.9); --fold-room: calc(12.78px * var(--bb) - 10px + var(--fold-extra-gap)); padding-left: var(--fold-room); }
+/*
+ * The arrow's press area (owner request, 2026-11-21: "hard to click precisely right on it"): the drawn arrow keeps its size,
+ * but it can be pressed from an area at least --fold-hit tall and 4px wider, from the tick box's own press area (4px left of
+ * the box, times the step) leftwards over the indent. A top-level arrow's stops at the card's (or panel's) padding edge, where the button
+ * itself starts, so it never reaches outside the card. Never over the tick box, the text or the item grip (on the right).
+ */
+.item-fold::after {
+  --reach: max(0px, calc(1.89px * var(--bb) + var(--fold-extra-gap) - 4px * var(--bs)));
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--reach));
+  translate: 0 -50%;
+  width: min(
+    max(calc(var(--fold-hit) + 4px), calc(100% + var(--reach))),
+    calc(var(--indent, 0px) - 1.89px * var(--bb) - var(--fold-extra-gap) + var(--reach) + var(--fold-room, 0px) + 12px)
+  );
+  height: max(var(--fold-hit), 100%);
+}
+.item-fold:disabled { cursor: default; }
+.todo-item.find-target { outline: 3px solid var(--find-outline); outline-offset: 2px; }
+/* On a phone the buttons keep their size, and a line is never under 22px. */
+.app.phone .todo-item { --bs: 1; }
+.app.phone .todo-item input[type='checkbox'] { --box: 16px; }
+/* A tick box's pressable area: 4px of padding around the 20px box (28px), taken back by the margin. */
+.tick { display: flex; align-self: flex-start; flex-shrink: 0; padding: calc(4px * var(--bs)); margin: calc(-4px * var(--bs)); cursor: pointer; }
+.todo-item input[type='checkbox'] {
+  /* The box is 20px at Normal and grows with the A− / A+ step like the item buttons (up to 80px; never under 20px). */
+  --box: calc(20px * var(--bs));
+  /* "Honey well" (owner pick, 2026-10-23): the app draws the box (still a real checkbox, so the keyboard and screen readers work); its border and corners grow with the step. */
+  appearance: none;
+  box-sizing: border-box;
+  width: var(--box);
+  height: var(--box);
+  /* Centered on the first line: the text box's 4px of padding, then half a line, less half the box. */
+  margin: calc(var(--line) / 2 + 4px - var(--box) / 2) 0 0;
+  /* Then nudged down by --tick-nudge of the line (2.5%: 0.5px at Normal, 1px at 200%): the middle of lowercase text, which most items are, sits a little lower than the middle of capitals. */
+  translate: 0 calc(var(--line) * var(--tick-nudge));
+  flex-shrink: 0;
+  border: calc(1.5px * var(--bs)) solid var(--tick-edge);
+  border-radius: calc(6px * var(--bs));
+  background: var(--accent-soft) center / 100% no-repeat;
+  cursor: pointer;
+  /* Pressing shrinks it a little; ticking has no animation of its own (it happens many times a day). */
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms var(--ease-out);
+}
+@media (hover: hover) { .todo-item input[type='checkbox']:hover { border-color: var(--accent); } }
+.todo-item input[type='checkbox']:active { transform: scale(0.9); }
+.todo-item input[type='checkbox']:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.4l3.3 3.3L15 6.6' fill='none' stroke='%23fff' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* The tick is dark on the lighter amber of dark mode. */
+:root[data-theme='dark'] .todo-item input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.4l3.3 3.3L15 6.6' fill='none' stroke='%23241a08' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* The text box may be narrower than one letter (at 400% a narrow card has almost no room beside the tick box and the strip): the grid track gives way instead of pushing the text over the item buttons. */
+.item-text { grid-template-columns: minmax(0, 1fr); flex: 1 1 0; min-width: 0; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); line-height: var(--line); --pad: 4px; }
+/* Ticked: a softer strike line, and the text faded. */
+.todo-item.done .item-text { opacity: 0.55; }
+.todo-item.done .item-text > textarea { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
+/* The tick animation (owner request, 2026-11-13): only on the row the person just ticked (.tick-pop, set in TodoList.tsx).
+   The box presses and settles (transform) while its tick grows in; the strike and the fade ease in. About 200ms, ease-out,
+   nothing moves. It plays with reduced motion too (owner request, 2026-11-13), so there is no prefers-reduced-motion rule here. */
+.todo-item.tick-pop input[type='checkbox'] { animation: tick-press 200ms var(--ease-out); }
+.todo-item.tick-pop .item-text { animation: tick-fade 200ms var(--ease-out); }
+.todo-item.tick-pop .item-text > textarea { animation: tick-strike 200ms var(--ease-out); }
+@keyframes tick-press {
+  from { transform: scale(0.85); background-size: 0% 0%; }
+  to { transform: scale(1); background-size: 100% 100%; }
+}
+@keyframes tick-fade { from { opacity: 1; } }
+@keyframes tick-strike { from { text-decoration-color: transparent; } }
+
+.link-url {
+  height: calc(30px * var(--bs, 1));
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--link-url-bg);
+  font-size: calc(13px * var(--fs, 1));
+}
+/* Pictures, videos and players on a link card (job 124): they fit the card's width. */
+.link-media { position: relative; border-radius: 6px; overflow: hidden; background: var(--link-url-bg); line-height: 0; }
+.link-media :is(img, video) { display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain; }
+.link-media iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
+.media-cover { position: absolute; inset: 0; }
+.link-open {
+  height: calc(32px * var(--bs, 1));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: calc(13px * var(--fs, 1));
+  text-decoration: none;
+}
+.link-open span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-open[aria-disabled='true'] { cursor: default; opacity: 0.45; }
+.link-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- the Completed panel (Clean up) ---------- */
+
+.completed-panel { display: flex; flex-direction: column; gap: 6px; padding: 0 2px; }
+.completed-empty { padding: 4px; font-size: calc(13px * var(--fs, 1)); line-height: 1.45; color: var(--ink-soft); }
+.completed-empty b { color: var(--ink); font-weight: 600; }
+.completed-day { display: flex; flex-direction: column; }
+.completed-date {
+  margin: 6px 0 2px;
+  padding: 0 4px;
+  font-size: calc(12px * var(--fs, 1));
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.completed-row { min-height: 28px; display: flex; align-items: flex-start; gap: 6px; padding-right: 2px; }
+.completed-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 6px 0 0;
+  /* The same nudge as a checklist's boxes (--tick-nudge of the 20px line; this panel's text does not grow with A− / A+). */
+  translate: 0 calc(20px * var(--tick-nudge));
+  flex-shrink: 0;
+  accent-color: var(--checkbox);
+  cursor: pointer;
+}
+.completed-row input[type='checkbox']:disabled { cursor: default; }
+.completed-text {
+  flex-grow: 1;
+  min-width: 0;
+  padding: 4px 0;
+  font-size: calc(14px * var(--fs, 1) * var(--ts, 1));
+  line-height: calc(20px * var(--fs, 1) * var(--ts, 1));
+  text-decoration: line-through;
+  overflow-wrap: anywhere;
+}
+.completed-row.sub:not(.done) .completed-text { text-decoration: none; }
+.completed-from {
+  flex-shrink: 0;
+  max-width: 40%;
+  padding: 6px 0 0;
+  font-size: calc(12px * var(--fs, 1));
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- columns ---------- */
+
+.column {
+  position: absolute;
+  min-height: 220px;
+  padding-bottom: 6px;
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+.column.collapsed { min-height: 0; }
+/* On a bold column the soft greys would be too faint: the count, hints, icons and placeholder use the colour's own dark (or, in dark mode, light) text. */
+.column.bold :is(.column-header, .column-empty) {
+  --ink-soft: var(--col-text);
+  --ink-faint: var(--col-text);
+  --placeholder: color-mix(in srgb, var(--col-text) 80%, var(--bg));
+}
+.column.bold .column-empty { border-color: color-mix(in srgb, var(--col-text) 45%, var(--bg)); }
+.column.drop-target { background: var(--drop-bg); border: 1.5px dashed var(--accent); }
+
+.column-header {
+  height: max(52px, calc(var(--btn) + 20px));
+  padding: 8px 8px 6px;
+  display: grid;
+  /* Title and count on the left, the two buttons on the right. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+}
+.column-heading { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.column-actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 4px; /* clear of the top-right corner's resize grip */ }
+.column-title { --pad: 4px 6px; font-weight: 600; font-size: calc(14px * var(--fs, 1) * var(--ts, 1)); max-width: 100%; flex-shrink: 1; min-width: 32px; }
+.column-count {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--hover);
+  font-size: calc(12px * var(--fs, 1));
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.column-empty {
+  margin: 2px 16px 10px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--grid-dot);
+  border-radius: 8px;
+  font-size: calc(13px * var(--fs, 1));
+  color: var(--ink-soft);
+}
+
+.confirm {
+  margin: 0 12px 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(31, 29, 26, 0.14);
+}
+.confirm-title { font-size: 14px; font-weight: 600; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-actions button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.confirm-cancel { border: 1px solid var(--control-edge); background: var(--surface); }
+.confirm-delete { border: none; background: var(--danger); color: var(--on-accent); }
+/* A question inside a card or container (delete it? delete the completed items?) grows with the text size, too. */
+:is(.card, .column) .confirm-title { font-size: calc(14px * var(--fs, 1)); }
+:is(.card, .column) .confirm-actions button { height: max(calc(34px * var(--bs)), calc(2.6 * 13px * var(--fs, 1))); font-size: calc(13px * var(--fs, 1)); }
+
+/*
+ * The app's questions (job 170, owner's option 3A): the browser's modal <dialog>, filling the window so
+ * a press beside the card (on the scrim) answers "no"; a card in the middle, a bottom sheet on a phone.
+ */
+dialog.ask {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+dialog.ask[open] { display: flex; align-items: center; justify-content: center; }
+dialog.ask::backdrop { background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.ask-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14);
+}
+.ask-card h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.ask-card p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
+.ask-card .confirm-actions { margin-top: 12px; }
+.ask-card .confirm-actions button { height: 40px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--ink); }
+.ask-card .confirm-actions :is(.confirm-delete, .confirm-send) { color: var(--on-accent); }
+.app.phone dialog.ask[open] { align-items: flex-end; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
+.app.phone .ask-card { max-width: none; padding: 20px 16px 16px; border-radius: 14px; }
+/* The action nearest the thumb comes first; the safe button under it. */
+.app.phone .ask-card .confirm-actions { flex-direction: column-reverse; gap: 8px; }
+.app.phone .ask-card .confirm-actions button { height: 48px; font-size: 15px; }
+
+/* The Undo message after a delete (job 170): a dark pill at the bottom center (light in dark mode), above the bottom controls. */
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  z-index: 9; /* over a side panel (on a phone it covers the board), so a habit's Undo shows */
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* As wide as its words (else, centred from the middle, a phone gives it only half the screen and cuts them short). */
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 4px 4px 4px 16px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.24);
+  font-size: 14px;
+  font-weight: 500;
+}
+.undo-toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast button { flex: none; height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-weight: 600; color: var(--toast-action); cursor: pointer; }
+.undo-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.app.phone .undo-toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
+.app.phone .undo-toast button { height: 44px; }
+/* On a phone the words wrap onto a second line rather than end in "…": the screen is too narrow for the longer messages (and fonts differ by phone). */
+.app.phone .undo-toast span { white-space: normal; }

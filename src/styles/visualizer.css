@@ -1,0 +1,181 @@
+/*
+ * Visualizer (owner request 2026-11-12): a full-screen, always dark, glowing replay of the Completed panels'
+ * items. Dark and honey whatever the light / dark choice, so its colors are defined once here (hex only: the
+ * ring's drawing makes see-through versions of them). The ring is a canvas; the rest is ordinary page.
+ */
+.viz {
+  --viz-bg: #0a0618;
+  --viz-ink: #f3eeff;
+  --viz-soft: #b9acd8;
+  --viz-faint: #8f82b4;
+  --viz-line: rgba(220, 205, 255, 0.13);
+  --viz-honey: #e48bff; /* the accent (pressed buttons, the chart): the core's light magenta */
+  --viz-core: #d94ee8; /* the glow of the core, the pillar, the beams and the lit cells */
+  --viz-spark: #fff3ff; /* white-hot */
+  --viz-lead: #9dffb8; /* the first particle of each burst */
+  --viz-pink: #ffc2f2; /* the other particles */
+  --viz-disc: #3a1c78; /* the disc and the floor under it */
+  --viz-rim: #8a74d0;
+  /* One small dot per wedge name: boards go round the first eight; each category keeps its own (Other is the ninth, neutral). */
+  --viz-hue-0: #f2b62b;
+  --viz-hue-1: #3fc1b0;
+  --viz-hue-2: #ef7b62;
+  --viz-hue-3: #5aa9f0;
+  --viz-hue-4: #a98bf0;
+  --viz-hue-5: #9fcf4f;
+  --viz-hue-6: #ef6fa5;
+  --viz-hue-7: #d9c58f;
+  --viz-hue-8: #a79f90; /* the neutral one: Other */
+  /* The app's own buttons and icons inside it take the dark look. */
+  --accent: var(--viz-honey);
+  --placeholder: var(--viz-soft);
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background-color: var(--viz-bg);
+  /* Near-black deep purple with a violet haze and faint vertical streaks (three fine stripe patterns, none lining up with another). */
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 37px, rgba(190, 150, 255, 0.025) 37px 38px, transparent 38px 93px, rgba(190, 150, 255, 0.018) 93px 94px),
+    repeating-linear-gradient(90deg, transparent 0 151px, rgba(255, 150, 240, 0.02) 151px 153px),
+    radial-gradient(60% 70% at 30% 55%, rgba(110, 50, 200, 0.22), transparent 70%);
+  color: var(--viz-ink);
+  font-family: var(--font);
+}
+.viz-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 400px);
+  overflow: hidden;
+}
+.viz-panel:focus { outline: none; }
+.viz-stage { position: relative; min-width: 0; min-height: 0; }
+.viz-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.viz-empty {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  width: min(320px, 80%);
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--viz-soft);
+  text-shadow: 0 0 6px var(--viz-bg), 0 0 14px var(--viz-bg); /* keeps the words readable where the pillar of light runs behind them */
+}
+.viz-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  padding: 64px 28px 28px 8px;
+}
+.viz-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-self: flex-start; }
+.viz-range { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--viz-line); border-radius: 10px; align-self: flex-start; }
+.viz-range button {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--viz-soft);
+  font-size: 14px;
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-range button[aria-pressed='true'] { background: var(--viz-honey); color: var(--viz-bg); }
+.viz-range button:active, .viz-close:active { transform: scale(0.97); }
+/* Sort with AI (shown only while a key is saved): one button, a status, and the line saying what is sent. */
+.viz-ai { display: flex; flex-direction: column; gap: 6px; margin-top: -12px; }
+.viz-ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 32px; }
+/* "Sort automatically" (job viz-ai-autosort): a native checkbox beside the button, like "Remember on this device" in AI settings. */
+.viz-ai-auto { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--viz-soft); cursor: default; }
+.viz-ai-auto input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--viz-honey); }
+.viz-ai-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--viz-line);
+  border-radius: 8px;
+  background: rgba(246, 239, 224, 0.05);
+  color: var(--viz-ink);
+  font-size: 14px;
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-ai-button:active:not(:disabled) { transform: scale(0.97); }
+.viz-ai-button:disabled { color: var(--viz-faint); cursor: default; }
+.viz-ai-status { margin: 0; font-size: 13px; color: var(--viz-soft); font-variant-numeric: tabular-nums; }
+.viz-ai-hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--viz-faint); }
+.viz-ai-error { margin: 0; font-size: 13px; line-height: 1.4; color: var(--viz-hue-2); }
+.viz-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.viz-count { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }
+.viz-count-number { margin: 0; font-size: clamp(36px, 4.4vw, 56px); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--viz-ink); }
+.viz-count-label { font-size: 12px; color: var(--viz-soft); }
+.viz-chart h3, .viz-feed-wrap h3 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--viz-soft); }
+.viz-chart svg { display: block; width: 100%; height: 72px; overflow: visible; }
+.viz-chart-base { stroke: var(--viz-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.viz-chart-area { fill: var(--viz-honey); opacity: 0.16; }
+.viz-chart-line { fill: none; stroke: var(--viz-honey); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.viz-chart-now { stroke: var(--viz-spark); stroke-width: 1; opacity: 0.7; vector-effect: non-scaling-stroke; }
+.viz-chart-dates { display: flex; justify-content: space-between; margin: 4px 0 0; font-size: 12px; color: var(--viz-faint); }
+.viz-feed-wrap { flex: 1; min-height: 0; overflow: hidden; }
+.viz-feed { list-style: none; margin: 0; padding: 0; }
+.viz-feed li { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-top: 1px solid var(--viz-line); }
+.viz-feed li:first-child { border-top-color: transparent; }
+.viz-feed-text { font-size: 15px; color: var(--viz-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-feed-where { font-size: 12px; color: var(--viz-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-feed li:first-child .viz-feed-text { color: var(--viz-honey); }
+/* The small calendar mark before an event's title in the feed (owner, 2026-11-13). */
+.viz-feed-mark { flex: none; margin-right: 6px; vertical-align: -1px; color: var(--viz-faint); }
+.viz-feed li:first-child .viz-feed-mark { color: var(--viz-honey); }
+/* The quiet line under the controls: no kept access, or a failed fetch (never when signed out). */
+.viz-cal-note { margin: 0 0 4px; font-size: 12px; color: var(--viz-faint); }
+.viz-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--viz-line);
+  border-radius: 50%;
+  background: rgba(246, 239, 224, 0.05);
+  color: var(--viz-ink);
+  touch-action: manipulation;
+  transition: background-color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.viz-close svg { width: 14px; height: 14px; }
+@media (hover: hover) and (pointer: fine) {
+  .viz-range button:not([aria-pressed='true']):hover { background: rgba(246, 239, 224, 0.08); color: var(--viz-ink); }
+  .viz-close:hover, .viz-ai-button:not(:disabled):hover { background: rgba(246, 239, 224, 0.12); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .viz { animation: viz-in 220ms var(--ease-out); }
+  .viz-feed li { animation: viz-feed-in 260ms var(--ease-out); }
+}
+@keyframes viz-in { from { opacity: 0; } }
+@keyframes viz-feed-in { from { opacity: 0; transform: translateY(-8px); } }
+/* A phone: the ring on top, the numbers, chart and feed under it, scrolling together. */
+@media (max-width: 599px) {
+  /* The ring is the thing (owner request 2026-11-13): a slim row of switches on top, the ring taking about 70% of the screen's height, and the numbers, chart and feed below it, scrolled to. */
+  .viz-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .viz-info { display: contents; } /* its parts are the panel's own rows, so the switches can come before the ring */
+  .viz-controls { order: -1; flex: none; align-self: stretch; gap: 6px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 64px 0 calc(env(safe-area-inset-left, 0px) + 12px); } /* the right side is left clear for the × */
+  .viz-stage { flex: none; height: clamp(300px, 70dvh, 700px); }
+  .viz-info > :not(.viz-controls) { margin-inline: 16px; }
+  .viz-panel > :last-child { margin-bottom: 24px; }
+  .viz-panel { gap: 16px; }
+  .viz-range { padding: 2px; }
+  .viz-range button { height: 44px; padding: 0 12px; }
+  .viz-counts { gap: 8px; }
+  .viz-count-number { font-size: 28px; }
+  .viz-ai { margin-top: 0; }
+  .viz-ai-button { height: 44px; padding: 0 16px; }
+  .viz-ai-auto { min-height: 44px; }
+  .viz-ai-auto input { width: 20px; height: 20px; }
+  .viz-feed-wrap { flex: none; overflow: visible; }
+  .viz-close { position: fixed; right: 8px; } /* stays in reach while the numbers are scrolled to */
+}

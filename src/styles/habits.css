@@ -1,0 +1,279 @@
+/*
+ * The Habits panel, the Ledger design (owner pick, 2026-10-22, jobs 166 + 167): one white sheet, the weekdays
+ * once at the top, a soft band down today's column, a row for each habit with a tick for each day. Green
+ * only means "done" (the habit's own color, default green); the accent only marks today. The layout follows
+ * the panel's own width (container queries): names beside the ticks from about 400px, two calendars from 440px.
+ */
+.habits-panel {
+  --hc: var(--checkbox);
+  --hc-on: #fff;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+:root[data-theme='dark'] .habits-panel { --hc-on: #14130f; }
+.habits-panel:focus { outline: none; }
+/* The 8 bold swatches as habit colors; dark mode uses the light tints, with a dark check on them. */
+:root {
+  --hc-tomato: #d9482f; --hc-tangerine: #d96a0f; --hc-sunflower: #c99700; --hc-grass: #4f9a1c;
+  --hc-emerald: #168a5f; --hc-ocean: #2a78c8; --hc-violet: #7550dc; --hc-magenta: #c23b9b;
+}
+:root[data-theme='dark'] {
+  --hc-tomato: #f2806c; --hc-tangerine: #f0954a; --hc-sunflower: #f2c14e; --hc-grass: #9ad45e;
+  --hc-emerald: #5fd6a4; --hc-ocean: #5aa6f0; --hc-violet: #a48af5; --hc-magenta: #ec72c8;
+}
+.habits-panel [data-hc='tomato'], .habit-swatch[data-hc='tomato'] { --hc: var(--hc-tomato); }
+.habits-panel [data-hc='tangerine'], .habit-swatch[data-hc='tangerine'] { --hc: var(--hc-tangerine); }
+.habits-panel [data-hc='sunflower'], .habit-swatch[data-hc='sunflower'] { --hc: var(--hc-sunflower); --hc-on: #2b2000; }
+.habits-panel [data-hc='grass'], .habit-swatch[data-hc='grass'] { --hc: var(--hc-grass); }
+.habits-panel [data-hc='emerald'], .habit-swatch[data-hc='emerald'] { --hc: var(--hc-emerald); }
+.habits-panel [data-hc='ocean'], .habit-swatch[data-hc='ocean'] { --hc: var(--hc-ocean); }
+.habits-panel [data-hc='violet'], .habit-swatch[data-hc='violet'] { --hc: var(--hc-violet); }
+.habits-panel [data-hc='magenta'], .habit-swatch[data-hc='magenta'] { --hc: var(--hc-magenta); }
+:root[data-theme='dark'] .habits-panel [data-hc='sunflower'] { --hc-on: #14130f; }
+
+/* Under the panel's title: the weekday and how today is going. */
+.habits-sub { margin: -8px 2px 0; font-size: 12px; line-height: 16px; color: var(--ink-soft); }
+.habits-alldone { display: inline-flex; align-items: center; gap: 3px; color: var(--checkbox); font-weight: 500; }
+.habits-alldone svg { width: 12px; height: 12px; padding: 1.5px; border-radius: 50%; background: var(--checkbox); color: var(--hc-on); stroke-width: 3; }
+.app.phone .habits-sub { font-size: 13px; }
+
+/* Week | Month | Year and the arrows: a bar that stays at the top while the habits scroll. */
+.habit-viewbar { position: sticky; top: -8px; z-index: 2; display: flex; flex-direction: column; gap: 10px; margin: 0 -10px; padding: 8px 10px; background: var(--surface); }
+.habit-seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border-radius: 10px; background: var(--hover); }
+.habit-seg-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 8px; background: var(--raised); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12), 0 0 0 0.5px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .habit-seg-thumb { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+.habit-seg button { position: relative; height: 30px; padding: 0; border: none; border-radius: 8px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.habit-seg button[aria-pressed='true'] { color: var(--ink); }
+.habit-nav { display: flex; align-items: center; gap: 8px; }
+.habit-nav-label { flex: 1; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.habit-steps { display: flex; overflow: hidden; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); }
+.habit-step { width: 34px; height: 30px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.habit-step + .habit-step { border-left: 1px solid var(--control-edge); }
+.habit-today { height: 30px; padding: 0 10px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+@media (hover: hover) {
+  .habit-seg button[aria-pressed='false']:hover { color: var(--ink); }
+  .habit-step:hover, .habit-today:hover { background: var(--hover); }
+}
+.app.phone .habit-seg button { height: 40px; font-size: 15px; }
+.app.phone .habit-step { width: 46px; height: 42px; font-size: 20px; }
+.app.phone .habit-today { height: 42px; font-size: 15px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .habit-seg-thumb { transition: transform 200ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-seg button, html:not([data-input='keys']) .habit-step, html:not([data-input='keys']) .habit-today { transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-seg button:active, html:not([data-input='keys']) .habit-step:active, html:not([data-input='keys']) .habit-today:active { transform: scale(0.97); }
+}
+
+/* The Weight card above the habits ("weight B", owner pick 2026-10-22): the latest weight big and how it changed, a chart,
+   one input strip (day, weight, Save), then a read-only History list. */
+.weight { padding: 12px 14px 8px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.weight-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.weight-title { font-size: 13px; font-weight: 600; }
+.weight-change { color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.weight-hero { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
+.weight-num { color: var(--ink-soft); font-size: 14px; font-variant-numeric: tabular-nums; }
+.weight-num b { color: var(--ink); font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 34px; }
+.weight-when { margin-left: auto; color: var(--ink-soft); font-size: 12px; }
+.weight-chart { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.weight-grid { stroke: var(--line); stroke-width: 1; }
+.weight-area { fill: var(--accent); opacity: 0.09; }
+.weight-line { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.weight-point { fill: var(--accent); stroke: none; }
+.weight-point.faint { fill: transparent; }
+.weight-point.selected { fill: var(--card-bg); stroke: var(--accent); stroke-width: 2; }
+.weight-today-line { stroke: var(--ink-soft); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; }
+.weight-axis text { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+.weight-axis .weight-today-label { fill: var(--ink); font-weight: 500; }
+/* The input strip */
+.weight-new { margin-top: 10px; padding: 8px; border-radius: 10px; background: var(--canvas); }
+.weight-new.editing { background: var(--accent-soft); }
+.weight-new-row { display: flex; gap: 6px; }
+.weight-day { position: relative; flex: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px 0 10px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.weight-day svg { color: var(--ink-soft); }
+.weight-new.editing .weight-day { border-color: var(--accent); color: var(--accent-ink); }
+.weight-day:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The real date box, invisible over the button (16px so iOS doesn't zoom when it takes the cursor). */
+.weight-day input { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 16px; opacity: 0; cursor: pointer; }
+.weight-kg { flex: 1 1 70px; min-width: 70px; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); cursor: text; }
+.weight-kg input { flex: 1; align-self: stretch; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+.weight-new:has(.weight-msg[role='alert']) .weight-kg { border-color: var(--danger); }
+.weight-kg input::placeholder { color: var(--placeholder); }
+.weight-kg span { color: var(--ink-soft); font-size: 12px; }
+.weight-save { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.weight-save.ready { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.weight-acts { display: flex; gap: 6px; margin-top: 6px; }
+.weight-acts button { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.weight-acts .weight-remove { margin-right: auto; padding-left: 4px; color: var(--danger); }
+.weight-acts .weight-cancel { color: var(--ink-soft); }
+.weight-msg { display: flex; align-items: center; gap: 6px; min-height: 18px; margin: 6px 2px 0; color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.weight-msg[role='alert'] { color: var(--danger); }
+.weight-msg-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weight-undo { flex: none; height: 24px; margin: -3px 0; padding: 0 2px; border: 0; background: none; color: var(--accent-ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+/* History: a plain list; tapping a day puts it in the strip. */
+.weight-history { margin-top: 10px; border-top: 1px solid var(--line); }
+.weight-history summary { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px 8px; color: var(--ink-soft); font-size: 12px; font-weight: 500; cursor: pointer; list-style: none; }
+.weight-history summary::-webkit-details-marker { display: none; }
+.weight-history summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.weight-history[open] summary svg { transform: rotate(180deg); }
+.weight-history ul { max-height: 288px; margin: 0 0 4px; padding: 0; overflow-y: auto; list-style: none; }
+.weight-row { display: grid; grid-template-columns: 1fr auto 44px; align-items: center; width: 100%; height: 32px; padding: 0 6px 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; text-align: left; cursor: pointer; }
+.weight-row b { font-weight: 500; }
+.weight-row-change { color: var(--ink-soft); font-size: 12px; text-align: right; }
+.weight-row[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+@media (hover: hover) {
+  .weight-row:hover { background: var(--hover); }
+  .weight-row[aria-pressed='true']:hover { background: var(--accent-soft); }
+  .weight-save.ready:hover { filter: brightness(1.08); }
+  .weight-save:not(.ready):hover { background: var(--hover); }
+  .weight-day:hover, .weight-acts button:hover { background: var(--hover); }
+  .weight-undo:hover { text-decoration: underline; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .weight-new { transition: background-color 150ms var(--ease-out); }
+  html:not([data-input='keys']) .weight-day, html:not([data-input='keys']) .weight-save, html:not([data-input='keys']) .weight-acts button { transition: transform 120ms var(--ease-out), background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+  html:not([data-input='keys']) .weight-day:active, html:not([data-input='keys']) .weight-save:active, html:not([data-input='keys']) .weight-acts button:active { transform: scale(0.97); }
+}
+/* A phone: 44px controls, 16px text in the box (so the page doesn't zoom), rows of 46px. */
+.app.phone .weight-num b { font-size: 34px; line-height: 40px; }
+.app.phone .weight-day, .app.phone .weight-kg, .app.phone .weight-save, .app.phone .weight-acts button { height: 44px; font-size: 15px; }
+.app.phone .weight-kg input { font-size: 16px; }
+.app.phone .weight-msg, .app.phone .weight-undo { font-size: 13px; }
+.app.phone .weight-undo { height: 44px; margin: -13px 0; padding: 0 6px; }
+.app.phone .weight-history summary { padding: 14px 2px 6px; font-size: 14px; }
+.app.phone .weight-row { height: 46px; font-size: 15px; }
+
+/* The sheet: the weekdays once, then a row for each habit, then a quiet "New habit" row. */
+.habit-sheet { background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.habit-days-head { position: sticky; top: var(--bar-h, 0px); z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 4px 12px 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: var(--card-bg); }
+.habit-dh { display: flex; flex-direction: column; align-items: center; padding: 6px 0 7px; border-radius: 8px 8px 0 0; line-height: 17px; }
+.habit-wd { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-soft); }
+.habit-dn { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.habit-dh.today { background: var(--accent-soft); }
+.habit-dh.today .habit-wd, .habit-dh.today .habit-dn { color: var(--accent-ink); }
+.habit-dh.today .habit-dn { font-weight: 600; }
+.habit { position: relative; padding: 10px 12px 8px; border-top: 1px solid var(--line); }
+.habit:first-child { border-top: 0; }
+.habit-head { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+.habit-head input[type='text'] { flex: 1; min-width: 0; height: 28px; margin-left: -4px; padding: 0 4px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; letter-spacing: -0.005em; }
+.habit-head input[type='text']:focus { border-color: var(--control-edge); }
+.habit-head input[type='text'] { text-overflow: ellipsis; }
+.habit-count { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.habit-count-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.habit-menu-wrap { position: relative; flex: none; }
+.habit-more { width: 28px; height: 28px; opacity: 0; color: var(--ink-soft); }
+.habit:focus-within .habit-more, .habit-more[aria-expanded='true'] { opacity: 1; }
+@media (hover: hover) { .habit:hover .habit-more { opacity: 1; } }
+@media (hover: none) { .habit-more { opacity: 0.7; } }
+.habit-menu { position: absolute; z-index: 6; right: 0; top: 32px; width: 232px; padding: 6px; border-radius: 12px; background: var(--surface); box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .habit-menu { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.habit-menu-item { display: flex; align-items: center; width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.habit-menu-delete { color: var(--danger); }
+.habit-menu-label { padding: 6px 10px 0; font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+.habit-swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.habit-swatch { position: relative; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%; background: var(--hc, var(--checkbox)); cursor: pointer; }
+.habit-swatch[aria-checked='true']::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }
+.app.phone .habit-menu-item { height: 44px; }
+.app.phone .habit-swatch { width: 26px; height: 26px; }
+@media (hover: hover) { .habit-menu-item:hover { background: var(--hover); } }
+
+/* A week: seven ticks under the shared weekdays; today's column has the soft band. */
+.habit-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.habit-day { display: grid; place-items: center; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.habit-week .habit-day[aria-current='date'] { background: var(--accent-soft); }
+.habit-tk { display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--control-edge); border-radius: 50%; color: var(--hc-on); }
+.habit-tk svg { width: 14px; height: 14px; }
+.habit-tk path { stroke-width: 2.6; stroke-dasharray: 20; stroke-dashoffset: 20; }
+.habit-day[aria-pressed='true'] .habit-tk { background: var(--hc); border-color: var(--hc); }
+.habit-day[aria-pressed='true'] .habit-tk path { stroke-dashoffset: 0; }
+.habit-day[aria-current='date'][aria-pressed='false'] .habit-tk { border-color: var(--ink-soft); background: var(--card-bg); }
+.habit-day.ahead[aria-pressed='false'] .habit-tk { border-style: dashed; opacity: 0.6; }
+@media (hover: hover) { .habit-week .habit-day[aria-pressed='false']:hover .habit-tk { border-color: var(--ink-faint); } }
+.app.phone .habit-day { height: 48px; }
+.app.phone .habit-tk { width: 30px; height: 30px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .habit-tk { transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-tk path { transition: stroke-dashoffset 180ms var(--ease-out); }
+  html:not([data-input='keys']) .habit-day:active .habit-tk, html:not([data-input='keys']) .habit-day:active .habit-num { transform: scale(0.92); }
+}
+/* From about 400px the names sit beside the ticks and the columns line up under the weekdays. */
+@container (min-width: 400px) {
+  .habit-count-short { display: none; }
+  .habit-count-long { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .habit-sheet-week .habit-days-head { grid-template-columns: minmax(0, 1fr) repeat(7, 32px); padding: 4px 10px 0 16px; }
+  .habit-sheet-week .habit-dh:first-child { grid-column: 2; }
+  .habit-sheet-week .habit { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, 32px); padding: 0 10px 0 16px; }
+  .habit-sheet-week .habit-week { display: contents; }
+  .habit-sheet-week .habit-day { height: auto; min-height: 58px; border-radius: 0; }
+  .habit-sheet-week .habit-head { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 1px; padding: 9px 4px 9px 0; }
+  .habit-sheet-week .habit-menu-wrap { position: absolute; left: calc(100% - 7 * 32px - 10px - 32px); bottom: 6px; }
+}
+
+/* A month: one calendar for each habit, two side by side from 440px. */
+.habit-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; margin-top: 6px; }
+.habit-cal-wd { text-align: center; font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.habit-cal .habit-day { height: 34px; border-radius: 0; }
+.habit-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.habit-day[aria-pressed='true'] .habit-num { background: var(--hc); color: var(--hc-on); font-weight: 500; }
+.habit-day[aria-current='date'][aria-pressed='false'] .habit-num { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent-ink); font-weight: 600; }
+.habit-day.ahead[aria-pressed='false'] .habit-num { color: var(--ink-faint); opacity: 0.7; }
+.habit-sheet-month .habit, .habit-sheet-year .habit { padding: 14px 14px 8px; }
+.habit-sheet-month .habit-head, .habit-sheet-year .habit-head { padding-bottom: 0; }
+.habit-rows { display: grid; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 440px) {
+  .habit-sheet-month .habit-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+  .habit-sheet-month .habit { padding: 12px 10px 8px; border-top: 0; background: var(--card-bg); }
+  .habit-num { width: 24px; height: 24px; font-size: 12px; }
+}
+.app.phone .habit-cal .habit-day { height: 44px; }
+.app.phone .habit-num { width: 32px; height: 32px; font-size: 14px; }
+
+/* A year: twelve rows of tiny squares, one per day; view only. */
+.habit-year { display: grid; grid-template-columns: 30px repeat(31, minmax(0, 1fr)); gap: 1.5px; align-items: center; margin-top: 8px; }
+.habit-year-day { margin-bottom: 4px; font-size: 9px; text-align: center; white-space: nowrap; color: var(--ink-faint); font-variant-numeric: tabular-nums; overflow: visible; }
+.habit-year-month { height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 11px; font-weight: 500; text-align: left; cursor: pointer; }
+.habit-year-month[aria-current='date'] { color: var(--accent-ink); font-weight: 600; }
+.habit-sq { aspect-ratio: 1; border-radius: 2px; background: var(--hover); }
+.habit-sq.on { background: var(--hc); }
+.habit-sq.none { background: transparent; }
+.habit-sq.ahead:not(.on) { background: transparent; box-shadow: inset 0 0 0 1px var(--hover); }
+.habit-sq.today { box-shadow: 0 0 0 1.5px var(--accent); }
+.app.phone .habit-year-month { height: 22px; font-size: 12px; }
+
+/* The last row adds a habit; the box is the row. */
+.habit-new { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 16px; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; color: var(--ink-soft); }
+.habit-new:focus-within { color: var(--ink); }
+.habit-new input[type='text'] { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; }
+.habit-new input::placeholder { color: var(--placeholder); }
+.app.phone .habit-new { height: 56px; }
+.app.phone .habit-new input[type='text'], .app.phone .habit-head input[type='text'] { font-size: 16px; }
+.app.phone .habit-head input[type='text'] { height: 36px; }
+.habits-empty { display: flex; flex-direction: column; align-items: center; padding: 28px 24px 22px; text-align: center; }
+.habits-empty-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 14px; border-radius: 16px; background: var(--accent-soft); color: var(--accent-ink); }
+.habits-empty-icon svg { width: 24px; height: 24px; }
+.habits-empty h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.habits-empty p { max-width: 220px; margin: 0 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.habits-empty-add { gap: 6px; height: 36px; border-color: transparent; background: var(--honey); color: var(--honey-ink); }
+.app.phone .habits-empty-add { height: 44px; }
+/* With no habits the box for the first one stands in for the button, inside the card. */
+.habits-empty .habit-new { align-self: stretch; border: 1px solid var(--control-edge); border-radius: 10px; }
+@container (min-width: 400px) {
+  .habit-viewbar { flex-direction: row; align-items: center; }
+  .habit-seg { flex: none; width: 210px; }
+  .habit-nav-label { text-align: right; }
+}
+
+
+/* Ctrl+Shift+Backspace: the column-style confirmation, below the toolbar in the middle. */
+.confirm.delete-completed {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--toolbar-height) + 12px);
+  z-index: 30;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+}
+.delete-completed-note { padding: 8px 14px; }

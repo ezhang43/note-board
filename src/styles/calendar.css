@@ -1,0 +1,400 @@
+/* Google Calendar side panel (owner request, 2026-10-06): a week (one row of events per day) or a month grid. */
+.cal { display: flex; flex-direction: column; gap: 8px; padding: 0 2px; font-size: 14px; }
+.cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cal .tb-button { height: 32px; font-size: 13px; }
+.cal .tb-button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.cal-views { display: flex; gap: 4px; }
+.cal-tools { display: flex; align-items: center; gap: 4px; }
+/* The search box (owner request, 2026-11-19): no focus rectangle on the text field (rule 6); the box's edge shows it instead. */
+.cal-search { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; height: 36px; border: 1px solid var(--control-edge); border-radius: 8px; background: var(--surface); color: var(--ink-soft); }
+.cal-search:focus-within { border-color: var(--accent); }
+.cal-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 16px; }
+.cal-search input::-webkit-search-cancel-button { display: none; }
+.cal-results { display: flex; flex-direction: column; gap: 8px; }
+.cal-range { flex: 1; margin: 0; text-align: left; font-size: 14px; font-weight: 600; }
+.cal-note { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.cal-note .history-note { margin: 4px; }
+.cal-disconnect { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.cal-disconnect .history-note { margin: 4px; }
+.cal-disconnect-link { padding: 6px 4px; border: none; border-radius: 6px; background: none; color: var(--ink-soft); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.cal-disconnect-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cal-disconnect-link[aria-disabled='true'] { opacity: 0.6; cursor: default; }
+@media (hover: hover) { .cal-disconnect-link:hover:not([aria-disabled='true']) { color: var(--ink); } }
+.cal-day { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; border-top: 1px solid var(--line); }
+.cal-day h3 { display: flex; align-items: center; margin: 0; padding: 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.cal-day.today h3 { color: var(--accent-ink); }
+.cal-today { margin-left: 4px; font-weight: 500; }
+.cal-add { margin-left: auto; width: 24px; height: 24px; color: var(--ink-soft); }
+/* Week list (job 210): the date and its + on the left, the events in a column to its right, the first level with the date and the rest below it; nothing sits under the date. */
+.cal-day.columns { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 6px; align-items: start; }
+.cal-day.columns h3 { grid-column: 1; grid-row: 1; height: 24px; }
+.cal-day.columns .cal-event { grid-column: 2; }
+.cal-day.columns.today h3 { font-weight: 700; }
+.cal-event {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .cal-event:hover { border-color: var(--accent); }
+}
+.cal-event.read-only { background: var(--hover); border-left-color: var(--control-edge); }
+.cal-event svg { flex-shrink: 0; align-self: center; color: var(--ink-soft); }
+.cal-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
+/* A name may wrap onto a second line, then it is cut (job #56). */
+.cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+/* Under the Month grid the picked day's names show in full (job #131); the Week view keeps the two lines. */
+.cal-month ~ .cal-day .cal-title { overflow: visible; display: block; -webkit-line-clamp: none; line-clamp: none; }
+.cal-month { display: flex; flex-direction: column; gap: 2px; }
+.cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+/* A day in the month grid: its date, then up to 3 event names (2 in a narrow panel), like Google Calendar's month (job #47). */
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 1px 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .cal-cell:hover { background: var(--hover); }
+}
+.cal-cell.outside { color: var(--placeholder); }
+.cal-cell[aria-selected='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.cal-date {
+  align-self: center;
+  padding: 1px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.cal-cell.today .cal-date { font-weight: 600; color: var(--accent-ink); }
+.cal-chip {
+  position: relative;
+  display: -webkit-box; /* the one child, the line of text, is cut at two lines with … (owner pick 2026-10-24, job #207) */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-width: 0;
+  padding: 0 3px;
+  overflow-wrap: break-word; /* words break only at spaces; one longer than the line still breaks, so nothing leaves the cell (job #207) */
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .cal-chip:hover { background: var(--hover); }
+}
+.cal-chip.all-day { background: var(--accent-soft); color: var(--accent-ink); font-weight: 500; }
+.cal-cell[aria-selected='true'] .cal-chip.all-day { background: var(--surface); }
+@media (hover: hover) {
+  .cal-chip.all-day:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+}
+.cal-chip:not(.all-day) { padding-left: 11px; }
+.cal-chip-dot { position: absolute; left: 3px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+/* The time and the name are one run of text: the name follows the time and wraps under it, two lines at most (jobs #131, #207). */
+.cal-chip-time { margin-right: 3px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.cal-month.narrow .cal-chip-time, .cal-month.narrow .cal-chip-dot { display: none; }
+.cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
+.cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }
+.cal-chip.all-day.read-only { background: var(--hover); color: var(--ink); }
+/* Dragging an event onto another day (owner request, 2026-11-11): the chip's copy follows the pointer, the day under it is outlined, the chip left behind dims. Normal arrow cursor throughout (rule 6). */
+.cal-day[data-drop], .cal-cell[data-drop] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
+.cal-event[data-dragging], .cal-chip[data-dragging] { opacity: 0.45; }
+body.cal-dragging { user-select: none; -webkit-user-select: none; }
+/*
+ * Days already gone are faded (owner request, 2026-11-20), in the Week list and the Month grid, by color rather than opacity so
+ * every text keeps WCAG AA contrast in light and dark: the date in the placeholder gray, events on a plain gray chip in the soft ink.
+ * They still open, change and drag as before.
+ */
+.cal-day.past h3, .cal-cell.past .cal-date { color: var(--placeholder); }
+.cal-day.past .cal-event { background: var(--hover); border-left-color: var(--control-edge); color: var(--ink-soft); }
+.cal-cell.past .cal-chip { color: var(--ink-soft); }
+.cal-cell.past .cal-chip.all-day { background: var(--hover); color: var(--ink-soft); }
+.cal-cell.past .cal-chip-dot { background: var(--control-edge); }
+/*
+ * Events not declined are green (owner request, 2026-11-21: "can accepted meetings be turned into green color please?"): the
+ * person's own, accepted, and Maybe or unanswered invites (those also get a dashed edge, a reminder to reply). Past ones take a
+ * paler green; declined ones and Google's special kinds keep the look above. The class comes from myAnswer (src/model/calendar.ts).
+ */
+.cal-event.green { background: var(--cal-green-soft); border-left-color: var(--cal-green); }
+.cal-event.unsure { border-style: dashed; border-color: var(--cal-green); }
+.cal-day.past .cal-event.green { background: var(--cal-green-past); border-left-color: var(--cal-green-past-edge); }
+.cal-day.past .cal-event.unsure { border-color: var(--cal-green-past-edge); }
+@media (hover: hover) {
+  .cal-event.green:hover, .cal-day.past .cal-event.green:hover { border-color: var(--cal-green); }
+}
+.cal-chip.green .cal-chip-dot { background: var(--cal-green); }
+.cal-chip.all-day.green { background: var(--cal-green-soft); color: var(--cal-green-ink); }
+/* The dashed edge is drawn as an outline, so the chip keeps its size; a keyboard focus still shows the usual ring (rule 6). */
+.cal-chip.unsure { outline: 1px dashed var(--cal-green); outline-offset: -1px; }
+.cal-chip.unsure:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .cal-chip.all-day.green:hover { box-shadow: inset 0 0 0 1px var(--cal-green); }
+}
+.cal-cell.past .cal-chip.green .cal-chip-dot { background: var(--cal-green-past-edge); }
+.cal-cell.past .cal-chip.all-day.green { background: var(--cal-green-past); color: var(--ink-soft); }
+.cal-cell.past .cal-chip.unsure:not(:focus-visible) { outline-color: var(--cal-green-past-edge); }
+/* The scrolling Week list (owner request, 2026-11-20): its own scroll area under the bars, which stay put; anchoring is done in code (Safari has none). */
+.cal.weekly { flex: 1; min-height: 0; }
+.history-panel:has(.cal-weeks) { overflow-y: hidden; }
+.cal-weeks { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.cal-week { display: flex; flex-direction: column; gap: 8px; }
+.cal-week > .cal-day:first-child { border-top-width: 2px; }
+.cal-slot { grid-column: 2; height: 24px; border-radius: 6px; background: var(--hover); }
+
+.cal-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10; /* over the toolbar (8) and the comment scrim (9) */
+  box-sizing: border-box;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ink) 22%, transparent);
+  scale: 1.03;
+}
+.cal-ghost.cal-chip:not(.all-day) { background: var(--surface); }
+.cal-ghost.narrow .cal-chip-time, .cal-ghost.narrow .cal-chip-dot { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .cal-ghost { animation: cal-lift 120ms var(--ease-out); }
+  @keyframes cal-lift { from { scale: 1; box-shadow: none; } }
+  body.cal-dragging .cal-day, body.cal-dragging .cal-cell { transition: background-color 120ms var(--ease-out), box-shadow 120ms var(--ease-out); }
+}
+.cal-more {
+  min-width: 0;
+  padding: 0 3px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .cal-more:hover { background: var(--hover); color: var(--ink); }
+}
+/* Room for every line, so the rows of the month stay even. */
+.cal-month:not(.narrow) .cal-cell { min-height: 77px; }
+.cal-detail-title { margin: 4px 2px 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.cal-detail-when { margin: 0 2px; color: var(--ink-soft); }
+a.cal-open { align-self: flex-start; }
+.cal-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.cal-field input, .cal-select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.cal-select { width: 100%; cursor: pointer; }
+.cal-select:disabled { opacity: 0.6; cursor: default; }
+.cal-repeat-readonly { margin: 0; padding: 6px 8px; border-radius: 6px; background: var(--canvas); border: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; }
+.cal-repeat-custom { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; padding: 10px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); }
+.cal-repeat-row { display: flex; align-items: center; gap: 6px; }
+.cal-repeat-label { font-size: 13px; color: var(--ink-soft); flex-shrink: 0; }
+.cal-repeat-num { width: 60px; text-align: center; }
+.cal-repeat-unit { flex: 1; min-width: 0; width: auto; }
+.cal-repeat-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-repeat-day {
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--control-edge);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.cal-repeat-day.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .cal-repeat-day:hover { background: var(--hover); color: var(--ink); }
+  .cal-repeat-day.on:hover { background: var(--accent); color: var(--on-accent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cal-repeat-day:active { transform: scale(0.95); }
+}
+.cal-repeat-ends { display: flex; flex-direction: column; gap: 6px; }
+.cal-repeat-end { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); min-height: 30px; }
+.cal-repeat-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; flex-shrink: 0; }
+.cal-repeat-radio input[type='radio'] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); flex-shrink: 0; }
+.cal-repeat-end input[type='date'] { flex: 1; min-width: 0; height: 30px; font-size: 13px; }
+.cal-repeat-end .cal-repeat-num { height: 30px; font-size: 13px; }
+.cal-repeat-suffix { color: var(--ink-soft); font-size: 13px; }
+.cal-when { display: flex; gap: 6px; }
+.cal-when input[type='date'] { flex: 1; min-width: 0; }
+.cal-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cal-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.cal-error { margin: 0 2px; color: var(--danger); font-size: 13px; }
+.cal-actions { display: flex; gap: 6px; }
+.tb-button.cal-save, .tb-button.cal-connect { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tb-button.cal-delete { margin-left: auto; color: var(--danger); }
+.confirm.cal-confirm { margin: 4px 0 0; }
+/* A series' delete question holds the keyboard itself (job #209); like the side panel, no ring on the box, its buttons keep theirs. */
+.cal-confirm:focus { outline: none; }
+.cal-confirm .confirm-actions { flex-wrap: wrap; }
+/* A series' delete question (job #209): its two answers the same width, side by side, or one above
+   the other at full width when the longer label doesn't fit in half. */
+/* simple: 12.5em is the width "All events in the series" needs (158px at 14px), with room for a wider fallback font; a longer label needs a wider column. */
+.cal-confirm .confirm-actions.cal-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5em, 1fr)); }
+.cal-pair button { white-space: nowrap; }
+.cal-confirm .history-note { margin: 0; }
+.cal-fields { display: contents; }
+/* An event's guests (job #85): one line each, with a button to remove them. */
+.cal-guests { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.cal-guests li { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px; }
+.cal-guest { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cal-when input[type='email'] { flex: 1; min-width: 0; }
+/* An event's card (job #108): beside the event, over the board, with the list still in view; on a phone, a sheet from the bottom. */
+.cal-card {
+  position: fixed;
+  /* Above the panel's own lists only: it is inside the panel's layer, so the resize strip and the find
+     bar are drawn over it where they meet; eventCard.ts keeps it clear of the strip. */
+  z-index: 7;
+  width: 300px;
+  /* Narrow enough to fit inside the panel, beside its strip, when there is no room left of it. */
+  max-width: min(calc(100vw - 16px), calc(var(--side-width) - 16px));
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+}
+.cal-card:focus { outline: none; }
+.cal-card-tools { display: flex; justify-content: flex-end; gap: 2px; margin-right: -6px; color: var(--ink-soft); }
+.app.phone .cal-card {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: 70vh;
+  max-height: 70dvh;
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+/* The form for a new event or a change is an overlay like the card (job 211): a title row with the ×, then quick-add's few fields, or the full form. */
+.cal-form { width: 340px; gap: 8px; }
+.cal-card-head { display: flex; align-items: center; gap: 6px; margin-right: -6px; color: var(--ink-soft); }
+.cal-card-head .cal-detail-title { flex: 1; min-width: 0; margin: 4px 2px 0; color: var(--ink); }
+.cal-form:not(.more) .cal-field input, .cal-form:not(.more) .cal-select { height: 38px; font-size: 15px; }
+.cal-form:not(.more) .cal-repeat-custom input:not([type='radio']), .cal-form:not(.more) .cal-repeat-custom .cal-select { height: 34px; font-size: 14px; }
+.cal-times { align-items: center; color: var(--ink-soft); }
+.cal-times input { flex: 1; min-width: 0; }
+.app.phone .cal-form { width: auto; }
+/* Phone: 16px fields (the page doesn't zoom in when one is tapped) and 44px touch targets. */
+.app.phone .cal-form input:not([type='checkbox']):not([type='radio']), .app.phone .cal-form .cal-select { height: 44px; font-size: 16px; }
+.app.phone .cal-form .cal-repeat-day { height: 44px; font-size: 14px; }
+.app.phone .cal-form .cal-repeat-end { min-height: 44px; font-size: 15px; }
+.app.phone .cal-form .tb-button { height: 44px; }
+.app.phone .cal-form .cal-check { min-height: 44px; }
+/* Touch tablets in desktop layout also get 16px fields and 44px repeat controls. */
+@media (pointer: coarse) {
+  .cal-form input:not([type='checkbox']):not([type='radio']), .cal-form .cal-select { height: 44px; font-size: 16px; }
+  .cal-form .cal-repeat-day { height: 44px; font-size: 14px; }
+  .cal-form .cal-repeat-end { min-height: 44px; font-size: 15px; }
+}
+/* The time boxes (job 219): a text box that opens a list of times, drawn on the page (not inside the card, which would cut it off), in front of the overlay. */
+.time-box { flex: 1; min-width: 0; }
+.time-list {
+  position: fixed;
+  z-index: 50;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  transform-origin: top left;
+  font-size: 14px;
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.time-option { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; white-space: nowrap; cursor: pointer; }
+.time-hint { margin-left: 0.3em; color: var(--ink-soft); }
+.time-option[aria-selected='true'] { background: var(--hover); }
+.time-option.current { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.time-option.current .time-hint { color: inherit; }
+@media (hover: hover) { .time-option:hover { background: var(--hover); } .time-option.current:hover { background: var(--accent-soft); } }
+/* A finger needs 44px rows, and 16px text so the page doesn't zoom in. */
+@media (max-width: 599px), (pointer: coarse) { .time-list { font-size: 16px; } .time-option { min-height: 44px; } }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .time-list { transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out); }
+  @starting-style { html:not([data-input='keys']) .time-list { opacity: 0; transform: scale(0.98); } }
+}
+
+/* The side panels' drag strip (owner request, 2026-10-16 for the calendar, 2026-10-20 for all): on the panel's left edge, not inside it
+   (the panel scrolls and would clip it). The col-resize cursor is only on this strip. */
+.panel-resize {
+  position: fixed;
+  top: var(--toolbar-height);
+  bottom: 0;
+  right: calc(var(--side-width) - 4px);
+  width: 8px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  outline: none;
+}
+.panel-resize:active { background: var(--accent-soft); }
+@media (hover: hover) {
+  .panel-resize:hover { background: var(--accent-soft); }
+}
+.panel-resize:focus-visible { background: var(--accent); opacity: 0.6; }
+/* The Checklist panel's strip is on its right edge. */
+.panel-resize.left { right: auto; left: calc(var(--left-width) - 4px); }

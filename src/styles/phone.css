@@ -1,0 +1,71 @@
+/*
+ * Phone touch fixes (owner-approved after a mobile review; windows under 600px, the same width as
+ * the phone layout): 16px text boxes, bars a pinch cannot zoom, and 44px touch targets. Last in the
+ * file so it wins over the plain rules above.
+ */
+@media (max-width: 599px) {
+  /*
+   * Text boxes are at least 16px, or iOS Safari zooms the page in when one is tapped. Page zoom stays
+   * allowed. A bigger text size (A+, or a format size) still makes them bigger; the smaller one stops at 16.
+   */
+  .note-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .card-title { font-size: max(16px, calc(15px * var(--fs, 1) * var(--ts, 1))); }
+  .todo-item { --line: max(22px, calc(20px * var(--fs, 1) * var(--ts, 1))); --tfs: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .item-text { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .column-title { font-size: max(16px, calc(14px * var(--fs, 1) * var(--ts, 1))); }
+  .pomodoro-length input { font-size: 16px; }
+
+  /* A pinch on the bars would zoom the whole page (it got stuck at 5x): they take no page gestures. */
+  .toolbar.phone, .phone-bar, .item-bar { touch-action: none; }
+
+  /* A tick box is pressed from 44px wide (22px to its left, over the card's padding), as tall as its row. */
+  .tick { align-self: stretch; padding: 0 6px 0 22px; margin: 0 -6px 0 -22px; }
+  /*
+   * The fold arrow is pressed from 44px square, reaching left of it (over the indent or the card's padding), never over
+   * its own tick box, whose press area then starts at the box. Where it reaches over the rows above and below, their
+   * tick boxes' press areas stay on top.
+   */
+  .item-fold { z-index: 1; }
+  .item-fold::after { content: ''; position: absolute; top: 50%; right: 0; width: 44px; height: 44px; translate: 0 -50%; }
+  .tick { position: relative; z-index: 2; }
+  .todo-item:has(> .item-fold) > .tick { padding-left: 6px; margin-left: -6px; }
+
+  /*
+   * A card's or container's collapse arrow and trash can show only on the selected one (owner request,
+   * job 113), whether or not the screen can hover. Hidden (not just faded) so the 44px press areas
+   * around them take no taps: a tap on another card selects it, never deletes it.
+   */
+  .canvas .card:not(.selected, :focus-within) > .card-header > .icon-button,
+  .canvas .card:not(.selected, :focus-within) > .card-header > .estimate-chip.add,
+  .canvas .card:not(.selected, :focus-within) > .card-header > .title-cell > .list-clean-up,
+  .canvas .column:not(.selected) .column-header:not(:focus-within) .column-actions > .icon-button { visibility: hidden; }
+
+  /* The welcome tour. */
+  .tour-head .icon-button { width: 44px; height: 44px; margin: -8px -10px -8px 0; }
+  .tour-actions button { height: 44px; }
+
+  /* Version history and the side panels. */
+  .history-head .icon-button, .cal-card-tools .icon-button, .cal-card-head .icon-button { width: 44px; height: 44px; }
+  .pomodoro-actions .tb-button { height: 44px; }
+
+  /* Search: the box takes what the buttons leave; the count takes no room until there is one. */
+  .app.phone .find-bar { gap: 8px; }
+  .app.phone .find-bar .icon-button { width: 44px; height: 44px; }
+  .app.phone .find-bar input { height: 44px; }
+  .app.phone .find-count { min-width: 0; max-width: 34vw; }
+  .app.phone .find-scope-option { height: 44px; font-size: 15px; }
+  .app.phone .find-count:empty { position: absolute; }
+
+  /* The Boards and File menus. */
+  .boards-menu button[role='menuitem'], .file-menu button { height: 44px; }
+  .boards-list { display: flex; flex-direction: column; }
+  .boards-list, .boards-actions, .file-menu { gap: 4px; }
+
+  /* ⋯ More: A- / A+, the colors. */
+  .phone-more .zoom-control { gap: 8px; }
+  .phone-more .zoom-control button.text-size { min-width: 44px; }
+  /* Eight 44px swatches in a row would not fit: as many as fit (six on a 390px phone, five at 320px). */
+  .phone-more .colour-menu { grid-template-columns: repeat(auto-fill, 44px); gap: 8px; }
+  .phone-more .swatch { width: 44px; height: 44px; aspect-ratio: auto; }
+  .phone-more .swatch-default { height: 44px; }
+}

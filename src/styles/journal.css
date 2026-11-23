@@ -1,0 +1,310 @@
+/* The Journal panel: each day's note as a white card, newest first, its date above it. */
+/*
+ * The Journal panel, the page-and-timeline design (owner pick, 2026-10-22, jobs 166 + 167): today is a white
+ * page with its date as the heading; below it the earlier days are a timeline, each day a row with a big date
+ * number and its first lines, opening in place to edit. Month and week headers fold, as before.
+ */
+.journal-panel { display: flex; flex-direction: column; gap: 0; }
+.journal-panel:focus, .side-panel:focus, .completed-panel:focus { outline: none; }
+/* Month and week groups (and a year, for years other than this one): each header is a button that opens and shuts what is under it. */
+.jg-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jg-head::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.jg-head[aria-expanded='true']::before { transform: rotate(45deg); }
+@media (hover: hover) {
+  .jg-head:hover { background: var(--hover); }
+}
+.jg-year { padding-top: 12px; font-size: 14px; font-weight: 600; }
+.jg-month { padding-top: 14px; font-size: 13px; font-weight: 600; }
+.jg-week { padding-top: 10px; padding-bottom: 2px; color: var(--ink-soft); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.jg-week::after { content: ''; order: 2; flex: 1; height: 1px; margin-left: 6px; background: var(--line); }
+.jg-count { margin-left: auto; color: var(--ink-soft); font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.jg-week .jg-count { order: 3; margin-left: 0; }
+.app.phone .jg-head { min-height: 44px; font-size: 16px; }
+.app.phone .jg-week { font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .jg-head::before { transition: transform 150ms ease-out; }
+}
+.journal-entry h3, .journal-notes h3 { margin: 0; font-size: inherit; font-weight: inherit; }
+/* A day is a header button like the groups above it: the date, then (folded) its first lines, in gray. */
+.jg-day { color: var(--ink-soft); }
+/* A day's header shows the same small arrow as the groups (owner request, 2026-11-10). */
+.jg-peek { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; color: var(--ink); font-size: 15px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+.journal-entry .rich, .journal-notes .rich {
+  min-height: 1.4em; /* one 14px line (1.6 of 14px) */
+  padding: 0;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+.journal-entry .rich, .journal-notes .rich { position: relative; }
+.rich[data-placeholder]:not(:has(> div + div))::before { content: attr(data-placeholder); position: absolute; left: 0; top: 0; color: var(--placeholder); font-size: var(--journal-text); pointer-events: none; }
+/* Normal Journal text is 14px (owner request 2026-11-11). The box itself stays 16px, so headings (1.45em and
+   1.2em of it) and dividers keep their size and a phone doesn't zoom in on the box; sized words draw by sizeEm. */
+.rich > :not([data-type='h1'], [data-type='h2'], [data-type='hr']) { font-size: var(--journal-text); }
+.app.phone .journal-entry .rich, .app.phone .journal-notes .rich { font-size: 16px; }
+/* The general notes (owner request, 2026-10-29): a quieter sheet above today's page, its header a fold button with the groups' arrow. */
+.journal-notes { margin: 12px 0 0; padding: 12px 20px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; }
+.journal-notes h3 { margin-bottom: 6px; }
+.journal-notes.shut h3 { margin-bottom: 0; }
+.journal-notes .jg-head { gap: 8px; padding: 0; border-radius: 4px; }
+.journal-notes .jg-head::before { color: var(--ink-soft); }
+.journal-notes .jp-title { flex: none; font-size: 15px; }
+/* Folded, one line of what is written follows the title. */
+.journal-notes .jg-peek { -webkit-line-clamp: 1; line-clamp: 1; color: var(--ink-soft); }
+.journal-notes .rich { min-height: calc(3 * 1.4em); }
+/* Several general notes (owner request, 2026-11-10): the arrow folds, the name renames, the trash deletes; the one + sits in the panel header beside the ×, and adds a note at the top (2026-11-11). */
+.journal-notes + .journal-notes { margin-top: 8px; }
+.journal-notes .jn-head { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.journal-notes .jg-notes { flex: none; justify-content: center; width: 24px; height: 24px; margin-left: -6px; }
+.journal-notes .jn-name { flex: 0 1 auto; min-width: 0; overflow: hidden; padding: 2px 4px; border: none; border-radius: 4px; background: none; font-family: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.jn-rename { flex: 1; min-width: 0; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; }
+.journal-notes .jn-head .jg-peek { padding-left: 4px; }
+.jn-tools { display: flex; flex: none; gap: 2px; margin-left: auto; }
+.jn-del { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px; background: none; color: var(--ink-soft); cursor: pointer; }
+@media (hover: hover) {
+  .jn-name:hover, .jn-del:hover { background: var(--hover); }
+  .jn-del:hover { color: var(--ink); }
+}
+/* On touch, each is at least 44px to press. */
+@media (pointer: coarse) {
+  .journal-notes .jg-notes, .jn-del { width: 44px; height: 44px; }
+  .jn-name { min-width: 44px; min-height: 44px; }
+  .jn-rename { min-height: 44px; font-size: 16px; }
+}
+.app.phone .journal-notes .jg-notes, .app.phone .jn-del { width: 44px; height: 44px; }
+.app.phone .jn-name { min-width: 44px; min-height: 44px; font-size: 16px; }
+.app.phone .jn-rename { min-height: 44px; font-size: 16px; }
+.app.phone .journal-notes .jn-tools { margin-right: -10px; }
+/* Rearranging the general notes (owner request, 2026-11-21): the grip on a header drags its note; while
+   dragging, the note is lifted and follows the pointer, and the others slide aside to make room. */
+.jn-grip { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px; background: none; cursor: default; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.jn-grip::after { width: 8px; height: 12px; }
+@media (hover: hover) {
+  .jn-grip:hover { background: var(--hover); }
+  .jn-grip:hover::after { background: var(--ink-soft); }
+}
+@media (pointer: coarse) {
+  .jn-grip { width: 44px; height: 44px; }
+}
+.app.phone .jn-grip { width: 44px; height: 44px; }
+.journal-notes.lifted {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 14px 28px rgba(31, 29, 26, 0.2), 0 3px 8px rgba(31, 29, 26, 0.12);
+}
+.journal-notes.lifted .jn-grip { background: var(--hover); }
+.journal-notes.lifted .jn-grip::after { background: var(--ink-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .journal-notes.sorting { transition: transform 200ms var(--ease-out); }
+}
+/* Today's page. */
+.journal-page { margin: 12px 0 2px; padding: 18px 20px 12px; background: var(--card-bg); border: 1px solid var(--card-edge); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06); }
+.journal-page h3 { margin-bottom: 8px; }
+.journal-page .jg-head { align-items: baseline; padding: 0; border-radius: 4px; }
+.journal-page .jg-head::before { align-self: center; }
+.jp-title { color: var(--ink); font-size: 17px; font-weight: 600; letter-spacing: -0.005em; }
+.jp-week { margin-left: auto; color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+.journal-page .jg-peek { padding-left: 8px; }
+.journal-page .rich { min-height: 140px; }
+.journal-page.shut .jg-head { flex-wrap: wrap; }
+.journal-page.shut h3 { margin-bottom: 0; }
+.journal-foot { display: flex; gap: 8px; margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.journal-saved { margin-left: auto; color: var(--ink-soft); opacity: 0; }
+.journal-saved.on { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .journal-saved { transition: opacity 150ms var(--ease-out); }
+}
+/* An earlier day: its date on the left, its words on the right. */
+.journal-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 12px; margin: 0; padding: 0 8px; border-radius: 10px; }
+.journal-row + .journal-row { box-shadow: inset 0 1px 0 var(--line); }
+.journal-row h3 { grid-column: 1; }
+.journal-row.shut h3 { grid-column: 1 / -1; }
+.journal-row .jg-head { align-items: flex-start; padding: 12px 0; border-radius: 10px; }
+.journal-row .jg-head::before { margin-top: 8px; }
+.jd { flex: none; width: 44px; }
+.jd b { display: block; color: var(--ink); font-size: 20px; font-weight: 600; line-height: 24px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.jd span { display: block; margin-top: 1px; color: var(--ink-soft); font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+.jg-peek { padding-top: 1px; }
+.journal-row .rich { grid-column: 2; grid-row: 1; padding: 12px 0; }
+.journal-row:not(.shut) { margin: 6px 0; padding: 0 12px; background: var(--card-bg); border-radius: 12px; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+.journal-row:not(.shut) + .journal-row, .journal-row + .journal-row:not(.shut) { box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+.journal-row + .journal-row.shut:has(+ .journal-row:not(.shut)) { box-shadow: none; }
+.journal-row.shut + .journal-row:not(.shut) { box-shadow: 0 1px 2px rgba(31, 29, 26, 0.06), 0 0 0 1px var(--card-edge); }
+@media (hover: hover) {
+  .journal-row .jg-head:hover { background: none; }
+  .journal-row.shut:hover { background: var(--hover); }
+}
+.app.phone .journal-row .jg-head { min-height: 44px; }
+
+
+/* Rich text in the Journal (owner request, 2026-10-19): lines, list items and the looks of words. */
+.rich > div { position: relative; }
+.rich > [data-type='h1'] { font-size: 1.45em; font-weight: 600; line-height: 1.3; margin: 0.2em 0; }
+.rich > [data-type='h2'] { font-size: 1.2em; font-weight: 600; line-height: 1.35; margin: 0.15em 0; }
+.rich > :is([data-type='bullet'], [data-type='number']) { --indent: 0; padding-left: calc(1.6em + var(--indent) * 1.4em); }
+.rich > [data-indent='1'] { --indent: 1; }
+.rich > [data-indent='2'] { --indent: 2; }
+.rich > [data-indent='3'] { --indent: 3; }
+.rich > [data-indent='4'] { --indent: 4; }
+/* The divider (owner decision 2026-10-31): a thin line across the note, half a line of room above and below; its words (---) are not shown. */
+.rich > [data-type='hr'] { height: 1px; margin: calc(0.8em - 0.5px) 0; background: var(--line); }
+.rich > [data-type='hr'] > span { display: none; }
+.rich > [data-marker]::before {
+  content: attr(data-marker);
+  /* In the first line, so it sits on the text's baseline whatever its size, and pulled back into the
+     padding. --ms: the first character's size as a share of the line's (set when drawn, 1 when plain).
+     The em here is the marker's own, so the offsets divide it back out and the indent steps stay put. */
+  /* inline-flex with flex-end: a marker wider than its box ("viii.", "aa)") grows to the left, never over the words. */
+  display: inline-flex;
+  justify-content: flex-end;
+  font-size: calc(var(--ms, 1) * 1em);
+  margin-left: calc(-1.6em / var(--ms, 1));
+  width: calc(1.3em / var(--ms, 1));
+  margin-right: calc(0.3em / var(--ms, 1));
+  white-space: nowrap;
+  /* The note's own text color (--ink), never gray, for every list type (owner request 2026-11-21); a highlight is on the words, not the line, so it isn't taken. */
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.rich [data-b] { font-weight: 600; }
+.rich [data-i] { font-style: italic; }
+.rich [data-u] { text-decoration-line: underline; }
+.rich [data-s] { text-decoration-line: line-through; }
+.rich [data-u][data-s] { text-decoration-line: underline line-through; }
+.rich [data-font='serif'] { font-family: var(--font-serif); }
+.rich [data-font='rounded'] { font-family: var(--font-rounded); }
+.rich [data-font='hand'] { font-family: var(--font-hand); }
+.rich [data-font='mono'] { font-family: var(--font-mono); }
+.rich [data-hl] { border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.rich [data-hl='yellow'] { background: var(--hl-yellow); }
+.rich [data-hl='green'] { background: var(--hl-green); }
+.rich [data-hl='blue'] { background: var(--hl-blue); }
+.rich [data-hl='pink'] { background: var(--hl-pink); }
+
+/* Its Formatting bar stays at the top of the panel while the notes scroll under it: quiet icon buttons, and one Aa menu for the rest. */
+.journal-tools {
+  position: sticky;
+  top: -8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  margin: -8px -10px 0;
+  padding: 6px 10px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.journal-tools > button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .journal-tools > button:hover { background: var(--hover); color: var(--ink); }
+}
+.journal-tools > button[aria-pressed='true'], .journal-tools > button[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+.journal-tools .jt-b { font-weight: 700; }
+.journal-tools .jt-i { font-style: italic; font-family: Georgia, serif; }
+.journal-tools .jt-u { text-decoration: underline; }
+.journal-tools .jt-s { text-decoration: line-through; }
+.jt-sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line); }
+.journal-tools .jt-aa { display: inline-flex; align-items: center; gap: 2px; padding: 0 8px; }
+.jt-aa b { font-size: 14px; font-weight: 600; }
+.jt-aa small { font-size: 11px; font-weight: 500; }
+.jt-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 10px;
+  right: 10px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06);
+}
+:root[data-theme='dark'] .jt-menu { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.jt-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; }
+.jt-label { color: var(--ink-soft); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.jt-mini { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 8px; background: var(--hover); }
+.jt-mini button { height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.jt-mini button[aria-pressed='true'] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12); }
+/* The size box (owner pick, 2026-10-30): − [16] +, like Google Docs; the number opens the list of sizes under it. */
+.jt-size { position: relative; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); justify-self: start; }
+.jt-size > button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font: inherit; font-size: 15px; cursor: pointer; }
+.jt-size > button[aria-disabled='true'] { opacity: 0.35; cursor: default; }
+.jt-size > .jt-size-box { width: 44px; background: var(--raised); color: var(--ink); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; box-shadow: 0 1px 2px rgba(31, 29, 26, 0.12); }
+@media (hover: hover) {
+  .jt-size > button:not([aria-disabled='true']):hover { color: var(--ink); }
+}
+.jt-sizes { position: absolute; top: calc(100% + 4px); left: 30px; z-index: 1; display: flex; flex-direction: column; width: 56px; max-height: 240px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--surface); box-shadow: 0 10px 28px rgba(31, 29, 26, 0.14), 0 0 0 1px rgba(31, 29, 26, 0.06); }
+:root[data-theme='dark'] .jt-sizes { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.jt-sizes button { flex: none; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.jt-sizes button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+@media (hover: hover) {
+  .jt-sizes button:hover { background: var(--hover); }
+}
+.jt-fonts, .jt-hls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.jt-fonts button, .jt-hls button:not(.jt-dot) { height: 28px; padding: 0 9px; border: 0; border-radius: 7px; background: var(--hover); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.jt-fonts button[aria-pressed='true'], .jt-hls button[aria-pressed='true']:not(.jt-dot) { background: var(--accent-soft); color: var(--accent-ink); }
+.jt-hls { gap: 8px; }
+.jt-hls button:not(.jt-dot) { font-size: 12px; background: transparent; color: var(--ink-soft); }
+.jt-dot { position: relative; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); cursor: pointer; }
+.jt-dot[data-hl='yellow'] { background: var(--hl-yellow); }
+.jt-dot[data-hl='green'] { background: var(--hl-green); }
+.jt-dot[data-hl='blue'] { background: var(--hl-blue); }
+.jt-dot[data-hl='pink'] { background: var(--hl-pink); }
+.jt-dot[aria-pressed='true']::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--ink); }
+.app.phone .journal-tools > button { min-width: 44px; height: 44px; font-size: 16px; }
+.app.phone .journal-tools .jt-aa { min-width: 52px; }
+.app.phone .jt-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.app.phone .jt-size > button, .app.phone .jt-sizes button { min-width: 44px; height: 44px; }
+.app.phone .jt-sizes { width: 64px; max-height: 50vh; left: 48px; }
+/* The same size box in the small format bar (owner request 2026-11-19): flat, so it fits the bar's 28px row, on a phone too; its list stays as in the Journal. */
+.format-bar .jt-size { padding: 0; background: none; }
+.format-bar .jt-size > button { min-width: 0; }
+.app.phone .format-bar .jt-size > button { min-width: 0; height: 28px; }
+.app.phone .format-bar .jt-size > .jt-size-box { width: 44px; }
+.app.phone .format-bar .jt-sizes { left: 30px; }
+@media (hover: hover) {
+  .format-bar .jt-size > button[aria-disabled='true']:hover { background: transparent; }
+}
+.app.phone .jt-mini button, .app.phone .jt-fonts button, .app.phone .jt-hls button:not(.jt-dot) { min-height: 44px; }
+.app.phone .jt-dot { width: 36px; height: 36px; }

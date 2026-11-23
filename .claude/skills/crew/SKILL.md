@@ -6,7 +6,7 @@ argument-hint: "[new request | status]"
 
 # Crew coordinator
 
-You are the coordinator. The owner talks only to you; workers do the building. The coordinator is the **crew coordinator** of CLAUDE.md rule 9: the session named in the Crew Board's `meta/crew`, on the owner's Windows computer or in a Claude Code cloud session. It stays in the project folder, never edits app code there, and never builds a job itself, so the project folder stays free for the owner.
+You are the coordinator. The owner talks only to you; workers do the building. The coordinator is the **crew coordinator** of CLAUDE.md rule 9: the session named in the Crew Board's `meta/crew`, on the owner's Windows computer, in a Claude Code cloud session, or in an Antigravity session the owner has named (see "In Antigravity" below for what differs there). It stays in the project folder, never edits app code there, and never builds a job itself, so the project folder stays free for the owner.
 
 The owner's words for this: `/crew <request>` adds work, `/crew` or `/crew status` gives the status. A plain request in the coordinator session ("fix the dots", "also add X") counts as `/crew <request>` too.
 
@@ -81,6 +81,17 @@ In a cloud session the proxy refuses every `gh` subcommand that uses GitHub's Gr
 **Waiting for "All tests"** (instead of `gh pr checks <n> --watch`): if `subscribe_pr_activity` is available, call it for the pull request and carry on; the result arrives as a message. Otherwise poll the check-runs route for the job named `All tests` until its `status` is `completed`, then read its `conclusion` (`success` merges; anything else is read, fixed, pushed, and waited for again). Poll with a few spaced calls (`sleep` in the foreground is blocked; run the loop in the background and read its output), not a tight loop. A run takes about 5 minutes on GitHub (browser tests in 4 shards).
 
 Auto-merge, review threads and "ready for review" have their own routes, which the 403 message names; the crew doesn't need them. Merging is still only for a worker with a low-risk pull request, or the coordinator on the owner's word (rule 9).
+
+## In Antigravity
+
+Owner decision, 2026-11-23: an Antigravity session can be the coordinator. The rest of this skill applies as written, except:
+
+- **The log.** Antigravity can't reach the Crew Board, because the ArtifactData tool exists only in Claude. The Antigravity coordinator keeps the same data (`jobs`, `needs`, `meta/crew`, `meta/handoff`) on a private **Crew Log** page in its own Antigravity conversation. It is never kept in the repo, which is public. The batching rule above still applies: one update per event. There is no local mirror.
+- **Switching back to Claude Code.** A Claude coordinator can't read the Antigravity Crew Log, and Antigravity can't read the Crew Board. When the owner moves the wheel, the coordinator they leave gives a short handoff: open jobs with branch and pull request, Needs you, parked items, picks and reminders. The owner pastes it into the new coordinator chat, which writes it to its own log and names itself in `meta/crew`. With no handoff, the new coordinator starts from GitHub (open pull requests and branches) and asks the owner.
+- **GitHub.** `gh pr ...` works here (it signs in through the GitHub plugin), so use the normal commands, not the cloud REST forms.
+- **Workers** are Antigravity subagents on the same machine and in the same checkout. Each worker therefore first makes its own worktree (`git worktree add ../wt-<branch> -b <branch> origin/build/v1`) and works only there; add that to the template's setup. The 4-worker limit stays. The Sonnet/model rule doesn't apply; workers use the coordinator's model. Desktop-session tracking (`list_sessions`) isn't available.
+- **Skills.** `.claude/skills/` isn't loaded automatically. Read a skill's `SKILL.md` before following it (`/finish-step`, `/check-pr`, `spec-check`, the design skills). `code-review` comes from a Claude Code plugin. Here a separate reviewer subagent reviews the change at the same level, and the report says so.
+- **Hooks don't run.** The `.claude/settings.json` hooks (`scripts/claude-hooks.mjs`) are Claude Code only, so nothing stops a wrong push here. The coordinator keeps their limits by hand and tells every worker to do the same: only the coordinator pushes to `build/v1` or `main`, never a force push to either, and no `pkill`/`killall` (stop only a process you started, with `kill <pid>`). `CREW_COORDINATOR=1` doesn't apply: the owner naming the session is the permission.
 
 ## 1. Take in a request
 

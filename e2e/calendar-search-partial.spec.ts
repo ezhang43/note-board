@@ -72,3 +72,25 @@ test('a newly added event is found by a partial match right after saving', async
   await expect(panel(page).getByRole('button', { name: '12 – 1pm Physiotherapy' })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('instant results appear immediately while typing even when Google q search is slow', async ({ page }) => {
+  const errors = await openPanel(page);
+  // Hold all Google `q` searches so only the preloaded local index can answer immediately.
+  let releaseQ = () => {};
+  const qGate = new Promise<void>((done) => (releaseQ = done));
+  await page.route(
+    (url) => url.pathname.includes('__calendar') && url.searchParams.has('q'),
+    async (route) => {
+      await qGate;
+      await route.continue();
+    },
+  );
+  await searchButton(page).click();
+  // Let the preload finish (a few ms against local dev server), then type a partial query.
+  await page.waitForTimeout(150);
+  await box(page).fill('dent');
+  // Dentist shows right away without waiting for the held `q` request.
+  await expect(panel(page).getByRole('button', { name: '10 – 11am Dentist' })).toBeVisible({ timeout: 1000 });
+  releaseQ();
+  expect(errors).toEqual([]);
+});

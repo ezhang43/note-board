@@ -149,10 +149,11 @@ export const WIDE_PAGES = 4;
 const SEARCH_CAP = 125;
 // simple: a year with more than SEARCH_PAGES pages of 250 matches loses its newest ones; upgrade if a search ever matches that often.
 const SEARCH_PAGES = 4;
-// Partial-match index (owner request, 2026-11-23): reads 2 years forward and 2 past years a year at a time without `q`
-// (`maxResults=2500`, up to PARTIAL_PAGES pages per window) and keeps it in memory for the session.
+// Partial-match index (owner request, 2026-11-23; widened to 5 years + preloaded on openSearch for instant results):
+// reads SEARCH_YEARS forward and SEARCH_YEARS past years a year at a time without `q` (`maxResults=2500`, up to
+// PARTIAL_PAGES pages per window) and keeps it in memory for the session.
 // simple: a single window exceeding PARTIAL_PAGES * 2500 events loses its newest entries; upgrade if a calendar ever has >5,000 events in one year.
-const PARTIAL_YEARS = 2;
+const PARTIAL_YEARS = SEARCH_YEARS;
 const PARTIAL_PAGES = 2;
 
 /** Searchable text fields of a raw Google event (outside data, checked): title, description, location, guest emails & display names. */
@@ -419,12 +420,14 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   const seriesReads = new Map<string, { req: Promise<CalEvent | null>; done: boolean; at: number }>();
   /** Per-session index of events for partial-match search; cleared on any change, fresh open, or person switch. */
   let searchIndex: Promise<SearchItem[]> | null = null;
+  let cachedIndex: SearchItem[] | null = null;
   let generation = 0;
   const forget = () => {
     cache.clear();
     fetching.clear();
     seriesReads.clear();
     searchIndex = null;
+    cachedIndex = null;
     generation++;
   };
   const keep = (key: string, events: CalEvent[]) => {
@@ -822,13 +825,39 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     searchTimer = undefined;
     searched++;
   }
+  function matchCached(query: string, day: DayKey): CalEvent[] | null {
+    if (!cachedIndex || !query) return null;
+    const partial = cachedIndex.filter((item) => matchesSearch(item.fields, query)).map((item) => item.event);
+    return partial.length ? mergeSearchResults([], partial, day, SEARCH_CAP) : null;
+  }
   function getSearchIndex(day: DayKey): Promise<SearchItem[]> {
     if (!api?.listForSearch) return Promise.resolve([]);
     if (!searchIndex) {
-      const req = api.listForSearch(day).catch(() => {
-        if (searchIndex === req) searchIndex = null;
-        return [] as SearchItem[];
-      });
+      const req = api.listForSearch(day).then(
+        (items) => {
+          if (changedPerson()) {
+            void load();
+            return [] as SearchItem[];
+          }
+          if (searchIndex === req) {
+            cachedIndex = items;
+            // If the person already typed while the preload was in flight, show matching hits right away.
+            const box = state.search;
+            if (box && box.results === null && !box.note && box.text.trim()) {
+              const instant = matchCached(box.text.trim(), day);
+              if (instant) set({ search: { ...box, results: instant } });
+            }
+          }
+          return items;
+        },
+        () => {
+          if (searchIndex === req) {
+            searchIndex = null;
+            cachedIndex = null;
+          }
+          return [] as SearchItem[];
+        },
+      );
       searchIndex = req;
     }
     return searchIndex;
@@ -898,7 +927,11 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     /** Try again (or Connect Google Calendar) after a note. */
     load,
     openSearch() {
-      if (!state.search) set({ search: { text: '', results: null, note: null, needsAccess: false } });
+      if (!state.search) {
+        set({ search: { text: '', results: null, note: null, needsAccess: false } });
+        // Preload the partial-match index quietly as soon as the search box opens so results show instantly while typing.
+        void getSearchIndex(today());
+      }
     },
     /** Closes the box; the week or month is as it was. */
     closeSearch() {
@@ -907,8 +940,10 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     },
     setSearchText(text: string) {
       stopSearch();
-      set({ search: { text, results: null, note: null, needsAccess: false } });
-      if (text.trim()) searchTimer = setTimeout(() => void runSearch(), SEARCH_WAIT);
+      const query = text.trim();
+      const instant = matchCached(query, today());
+      set({ search: { text, results: instant, note: null, needsAccess: false } });
+      if (query) searchTimer = setTimeout(() => void runSearch(), SEARCH_WAIT);
     },
     /** Try again (or Connect Google Calendar) after a search failed: at once, straight from the click. */
     searchNow() {

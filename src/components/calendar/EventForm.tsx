@@ -13,7 +13,7 @@ import {
   type Draft,
 } from '../../model/calendar';
 import { titleTime } from '../../model/calendarTitleTime';
-import { parseRecurrence, sameRepeat, type Repeat } from '../../model/calendarRepeat';
+import { parseRecurrence, sameRepeat, validateRepeat, type Repeat } from '../../model/calendarRepeat';
 import { appStore } from '../../store/appStore';
 import { BAD_EMAIL, calendar } from '../../store/calendar';
 import { CloseIcon } from '../icons';
@@ -193,7 +193,7 @@ export function EventForm({ event, start, opener, onClose }: { event: CalEvent |
         // keeps what was typed, so a Save again after a question's Cancel saves the same.
         const d = typed.title === start.title ? typed : titleTime(typed);
         // Wrong times or repeat settings are said before any question (repeat is validated only when it will be saved).
-        const problem = validateDraft(d, { event, repeatChanged, repeatAnchor });
+        const problem = validateDraft(d, { event, repeatChanged, repeatAnchor, validateRepeat });
         if (problem) return setNote(problem);
         setNote(null);
         next('save', d, {}, 'start');

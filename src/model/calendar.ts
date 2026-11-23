@@ -1,4 +1,4 @@
-import { validateRepeat, type Repeat } from './calendarRepeat';
+import type { Repeat } from './calendarRepeat';
 
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD' keys
 // in the person's own time zone, times 'HH:MM' on the 24-hour clock (shown as 10am, 10:30am). The calendar's weeks run Sunday to Saturday (owner
@@ -608,16 +608,17 @@ export interface DraftValidation {
   event: CalEvent | null;
   repeatChanged: boolean;
   repeatAnchor: DayKey;
+  validateRepeat?: (repeat: Repeat, startDate: DayKey) => string | null;
 }
 
 /**
  * Plain-English validation error for a form draft before saving, or null when valid.
  * Repeat rules are checked for new/one-off events or when a series' repeat changed.
  */
-export function validateDraft(d: Draft, { event, repeatChanged, repeatAnchor }: DraftValidation): string | null {
+export function validateDraft(d: Draft, { event, repeatChanged, repeatAnchor, validateRepeat }: DraftValidation): string | null {
   if (!draftBody(d, 'UTC')) return BAD_TIMES;
   if (!event?.series || repeatChanged) {
-    const repeatErr = d.repeat ? validateRepeat(d.repeat, repeatAnchor) : null;
+    const repeatErr = d.repeat && validateRepeat ? validateRepeat(d.repeat, repeatAnchor) : null;
     if (repeatErr) return repeatErr;
   }
   if (event?.series && repeatChanged && !canChangeSeries(event, d)) return REPEAT_SERIES_ONLY;

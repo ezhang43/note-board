@@ -1,0 +1,5 @@
+## Tidy-up in the Calendar store code (2026-11-23)
+- Split the large Calendar store file (`src/store/calendar.ts`) into four focused modules: `src/calendar/api.ts` (Google Calendar REST client and shared `paginateEvents` helper), `src/calendar/source.ts` (Google and local demo token source), `src/calendar/vizFetch.ts` (Visualizer past-events fetcher), and `src/store/calendar.ts` (store state and actions, re-exporting public symbols so existing callers stay unchanged).
+- Replaced four copy-pasted Calendar API pagination loops with one shared `paginateEvents` helper, covered by new unit tests in `src/calendar/api.test.ts`.
+- Simplified the store's internals by collapsing three session resets into `resetSession()`, unifying undo and redo execution into `runHistoryEntry()`, wrapping in-flight tracking in `trackFlight()`, reusing `validateDraft` from `src/model/calendar.ts`, and splitting `save()` into `saveSingle()` and `saveSeries()`.
+- Nothing changes in how Calendar sync, search, repeats, undo/redo, demo mode, or the Visualizer behave.

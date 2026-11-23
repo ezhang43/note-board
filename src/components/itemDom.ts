@@ -3,7 +3,7 @@ import { DRAG_THRESHOLD } from '../model/constants';
 import type { ItemDrag, ItemHint } from '../store/store';
 import { appStore, storeOfCard } from '../store/appStore';
 import { clientToBoard, clientToCanvas, isOverCanvas } from './canvasDom';
-import { followEdges } from './edgeFollow';
+import { followEdges, NO_EDGES } from './edgeFollow';
 import { isTextField } from './textField';
 import { pressKind, type Touch } from '../model/tapZoom';
 import { HOLD_MS, onLostFinger } from './touchHold';
@@ -117,9 +117,9 @@ export function heldAfterRemoving(e: Key): boolean {
  * 2026-11-12), whose rows are drawn at full size and whose items never leave its list.
  */
 type DragPlace = { store: ReturnType<typeof storeOfCard>; zoom: number; panel: boolean };
-function placeOf(cardId: string, start: { x: number; y: number }): DragPlace {
+function placeOf(cardId: string, start: { x: number; y: number }, inPanel?: boolean): DragPlace {
   // Where the press was, not which board the list is on: while the Main checklist board is itself open, its list is in both.
-  const panel = !!document.elementFromPoint(start.x, start.y)?.closest('.checklist-panel');
+  const panel = inPanel ?? !!document.elementFromPoint(start.x, start.y)?.closest('.checklist-panel');
   return { store: storeOfCard(cardId), zoom: panel ? 1 : appStore.getState().view.zoom, panel };
 }
 
@@ -201,9 +201,9 @@ function measureLift(cardId: string, ids: string[], zoom: number) {
  * once after a press-and-hold on a phone (`hold`: where the finger is now, and `done` to call when
  * it lets go), when the item is lifted and the other rows slide aside. Letting go drops it.
  */
-export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }) {
+export function trackItemDrag(cardId: string, itemId: string, start: { x: number; y: number }, pointerId: number, hold?: { at: { x: number; y: number }; done: () => void }, inPanel?: boolean) {
   let started = false;
-  const at = placeOf(cardId, start);
+  const at = placeOf(cardId, start, inPanel);
   const st = at.store;
   // In the panel the ghost is drawn on the page itself (it would be under the panel on the board's layer).
   const point = (x: number, y: number) => (at.panel ? { x, y } : clientToCanvas(x, y));
@@ -217,7 +217,7 @@ export function trackItemDrag(cardId: string, itemId: string, start: { x: number
     if (d) st.moveItemDrag(point(ev.clientX, ev.clientY), itemHintAt(ev.clientX, ev.clientY, d, at));
   };
   // At the edge of the screen the board keeps moving, and the drag with it (not in the panel: the board stays put behind it).
-  const edges = at.panel ? { track: () => {}, stop: () => {} } : followEdges((p) => started && onMove(p));
+  const edges = at.panel ? NO_EDGES : followEdges((p) => onMove(p), () => started);
   // Only the finger that pressed drags; a second one touching or lifting does not move or drop it.
   // (By id, not isPrimary: a pinch cancels this finger with a made-up event, which is not primary.)
   const onPointerMove = (ev: PointerEvent) => {

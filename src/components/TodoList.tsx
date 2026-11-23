@@ -12,7 +12,7 @@ import { useTakeFocus } from './useTakeFocus';
 import { ChevronIcon } from './icons';
 import { heldAfterRemoving, removeItemByKey, rowAt, rowUnder, tickBoxClick, tickBoxPress, trackItemDrag } from './itemDom';
 import { columnOf } from '../model/board';
-import { followEdges } from './edgeFollow';
+import { followEdges, NO_EDGES } from './edgeFollow';
 import { marksOf } from '../model/wordRange';
 import { anchorOf, nearestPoint, offsetAt } from './wordPoint';
 import { leaveField } from './lostCursor';
@@ -395,8 +395,9 @@ function rowPointerDown(cardId: string, itemId: string) {
       window.getSelection()?.removeAllRanges();
       if (over) storeOfCard(cardId).selectItemRange(cardId, itemId, over);
     };
-    // At the edge of the screen the board keeps moving and the selection keeps growing (owner request).
-    const edges = followEdges((p) => selecting && onMove(p));
+    const inPanel = !!e.currentTarget.closest('.checklist-panel');
+    // At the edge of the screen the board keeps moving and the selection keeps growing (not in the panel: the board stays put behind it).
+    const edges = inPanel ? NO_EDGES : followEdges((p) => onMove(p), () => selecting);
     const onPointerMove = (ev: PointerEvent) => {
       edges.track(ev);
       onMove(ev);
@@ -421,6 +422,6 @@ function gripPointerDown(cardId: string, itemId: string) {
     e.stopPropagation();
     storeOfCard(cardId).select(cardId);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY }, e.pointerId);
+    trackItemDrag(cardId, itemId, { x: e.clientX, y: e.clientY }, e.pointerId, undefined, !!e.currentTarget.closest('.checklist-panel'));
   };
 }

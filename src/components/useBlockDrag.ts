@@ -131,7 +131,7 @@ function trackDrag(kind: 'card' | 'column', id: string, el: HTMLElement, start: 
   };
 
   // At the edge of the screen the board keeps moving, and the block with it (owner request).
-  const edges = followEdges((p) => offset && onMove(p));
+  const edges = followEdges((p) => onMove(p), () => !!offset);
   const onPointerMove = (ev: PointerEvent) => {
     edges.track(ev);
     onMove(ev);

@@ -110,7 +110,7 @@ export interface StoreContext {
    * old version is shown.
    */
   commitTo(id: string, fn: (b: Board) => Board, merge?: string): void;
-  /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. `typing`: the item the cursor is in on the open board (see stepOpen; read from the page when left out, unused for other boards). */
+  /** Undo or redo on board `id`'s own history, open or not; other boards are left alone. `typing`: the item the cursor is in on the open board (read from the page when left out, unused for other boards). */
   undoOn(id: string, which: 'undo' | 'redo', typing?: TypingAt): void;
   /**
    * Board `id`'s undo history (open or not), or undefined when it has none. A new object after every change that can
@@ -242,9 +242,14 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   let swaps = 0;
   /** Board changes made by the app itself (tidying blocks out of each other's way), not by the person (job #148). */
   let tidies = 0;
-  let history: History = emptyHistory;
-  /** Undo history of each board that isn't open (undo belongs to each board). */
+  /** Undo history of every board, including the open one (undo belongs to each board). */
   const histories = new Map<string, History>();
+  const boardHistory = (id = state.boards.open) => histories.get(id) ?? emptyHistory;
+  const boardOf = (id: string) => (id === state.boards.open ? state.board : state.boards.others[id]);
+  const withBoard = (id: string, board: Board) =>
+    id === state.boards.open
+      ? { board, boards: state.boards }
+      : { board: state.board, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } };
   // On the counter shared with the calendar's undo (undoClock.ts): when each undo step was made (or redone) and each redo
   // step undone, keyed by its board, kept beside the history (never in the board, which is saved), and the last new change.
   const madeAt = new WeakMap<Board, number>();
@@ -306,9 +311,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
   }
 
   /** New ui with `change` applied, or the same object when nothing changes. */
-  function uiWith(change: Partial<Ui>): Ui {
+  function uiWith(change: Partial<Ui>, open = state.boards.open): Ui {
     const ui = state.ui;
-    const full = { ...change, canUndo: history.past.length > 0, canRedo: history.future.length > 0 };
+    const h = boardHistory(open);
+    const full = { ...change, canUndo: h.past.length > 0, canRedo: h.future.length > 0 };
     return (Object.keys(full) as (keyof Ui)[]).every((k) => ui[k] === full[k]) ? ui : { ...ui, ...full };
   }
 
@@ -322,10 +328,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return null;
   }
 
-  const commit: StoreContext['commit'] = (fn, opts = {}) => {
+  /** One commit path for every board (open or not), with screen changes, fold cleanup, undo recording and lock guard. */
+  function commitBoard(id: string, fn: (b: Board) => Change, opts: { ui?: Partial<Ui>; merge?: string } = {}): Board | null {
     // Looking at an old version: nothing can be changed (the board shown isn't the real one).
     if (state.ui.preview) return refuse(opts.ui);
-    const before = state.board;
+    const before = boardOf(id);
+    if (!before) return refuse(opts.ui);
     const result = fn(before);
     if (!result) return null;
     const { board: changed, ui } = 'board' in result ? result : { board: result, ui: undefined };
@@ -333,17 +341,20 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     const board = changed === before ? before : dropEmptyFolds(before, changed);
     // A board this person may only view or comment on (job 161): every change to it stops here,
     // whatever asked for it (a button, a key, a paste, a drop); screen-only changes still apply.
-    if (board !== before && locked()) {
+    if (board !== before && locked(id)) {
       announce('You can’t change this board.');
       return refuse({ ...opts.ui, ...ui });
     }
     if (board !== before) {
-      history = record(history, before, opts.merge ?? null);
+      histories.set(id, record(boardHistory(id), before, opts.merge ?? null));
       edits++;
     }
-    set({ ...state, board, ui: uiWith({ ...opts.ui, ...ui }) });
+    const next = board === before ? { board: state.board, boards: state.boards } : withBoard(id, board);
+    set({ ...state, ...next, ui: uiWith({ ...opts.ui, ...ui }) });
     return board;
-  };
+  }
+
+  const commit: StoreContext['commit'] = (fn, opts) => commitBoard(state.boards.open, fn, opts);
 
   /**
    * Call before collapsing (`collapse` does it): remembers the heights drawn now, then after the
@@ -432,23 +443,24 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
    * heights known here are from before it and would move blocks wrongly). Blocks that change size
    * here are tidied once they have been drawn.
    */
-  function restore(result: { history: History; board: Board } | null, tidy = true, boards = state.boards, ui: Partial<Ui> = {}) {
-    if (!result) return;
-    history = result.history;
+  function restore(board: Board, tidy = true, boards = state.boards, ui: Partial<Ui> = {}) {
     set({
       ...state,
-      board: result.board,
+      board,
       boards,
-      ui: uiWith({
-        selection: liveSelection(result.board),
-        confirm: null,
-        drag: null,
-        resize: null,
-        marquee: null,
-        itemSel: null,
-        itemDrag: null,
-        ...ui,
-      }),
+      ui: uiWith(
+        {
+          selection: liveSelection(board),
+          confirm: null,
+          drag: null,
+          resize: null,
+          marquee: null,
+          itemSel: null,
+          itemDrag: null,
+          ...ui,
+        },
+        boards.open,
+      ),
     });
     if (tidy) requestSettle();
   }
@@ -478,7 +490,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (id === boards.open || !boards.others[id]) return;
     forgetShownBoard();
     const left = boards.open;
-    histories.set(left, history);
     const others = { ...boards.others, [left]: state.board };
     const board = others[id];
     delete others[id];
@@ -488,12 +499,10 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       delete others[left];
       histories.delete(left);
     }
-    history = histories.get(id) ?? emptyHistory;
-    histories.delete(id);
     centreOnArrival = true;
     // Search keeps its words, but its match was on the other board.
     const find = state.ui.find && { ...state.ui.find, current: null };
-    set({ ...state, board, boards: { ...boards, open: id, others }, ui: uiWith({ ...BOARD_SWITCH_UI, find }) });
+    set({ ...state, board, boards: { ...boards, open: id, others }, ui: uiWith({ ...BOARD_SWITCH_UI, find }, id) });
     write(OPEN_BOARD_KEY, id);
   }
 
@@ -513,8 +522,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     }
     outsideChanges++;
     histories.clear();
-    history = emptyHistory;
-    restore({ history, board: next.board }, false, next.boards);
+    restore(next.board, false, next.boards);
   }
 
   /**
@@ -546,15 +554,12 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
       forgetShownBoard();
       const home = others[boards.home];
       delete others[boards.home];
-      history = histories.get(boards.home) ?? emptyHistory;
-      histories.delete(boards.home);
       centreOnArrival = true;
       write(OPEN_BOARD_KEY, boards.home);
-      set({ ...state, board: home, boards: { ...boards, open: boards.home, others }, ui: uiWith(BOARD_SWITCH_UI) });
+      set({ ...state, board: home, boards: { ...boards, open: boards.home, others }, ui: uiWith(BOARD_SWITCH_UI, boards.home) });
       return;
     }
-    if (board !== state.board) history = emptyHistory;
-    restore({ history, board }, false, { ...boards, others });
+    restore(board, false, { ...boards, others });
   }
 
   function setOthers(fn: (others: Record<string, Board>) => Record<string, Board>) {
@@ -562,50 +567,35 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     if (others !== state.boards.others) set({ ...state, boards: { ...state.boards, others } });
   }
 
+  const commitTo: StoreContext['commitTo'] = (id, fn, merge) => void commitBoard(id, fn, { merge });
+
   /**
-   * Undo or redo on the open board. `typing` is the checklist item the cursor is in (read from the page unless given),
-   * with `caret`, where it is in the text. The item is asked to take the cursor again, as the step can redraw or move its
-   * row (which loses the cursor); when the step takes it off the screen, the cursor goes to the nearest item still drawn,
-   * never to the page, where Backspace would delete the card (job undo-keeps-cursor). Only the open board has a cursor.
+   * Undo or redo on board `id` (open or not). On the open board, `typing` is the checklist item the cursor is in
+   * (read from the page unless given), with `caret`, where it is in the text. The item is asked to take the cursor
+   * again, as the step can redraw or move its row (which loses the cursor); when the step takes it off the screen,
+   * the cursor goes to the nearest item still drawn, never to the page, where Backspace would delete the card
+   * (job undo-keeps-cursor). Only the open board has a cursor.
    */
-  function stepOpen(which: 'undo' | 'redo', typing: TypingAt | null = typingAt()) {
-    if (state.ui.preview || locked()) return;
-    const before = state.board;
-    const step = (which === 'undo' ? undoStep : redoStep)(history, before);
-    if (step) marked(which, step.history);
-    if (step && step.board !== before) edits++; // counted before it shows, for version history
-    const to = step && step.board !== before && typing?.itemId ? cursorAfterStep(before, step.board, typing) : undefined;
-    // No item of that list is drawn now (it was collapsed, or the card is gone): nothing stays selected, so Backspace on the page deletes nothing.
-    // Moved to another list: that list is the one selected, as while typing in it, so Delete after Escape never takes the other card.
-    const moved = to && to.cardId !== typing!.cardId ? { selection: [to.cardId] } : {};
-    const ui: Partial<Ui> = to ? { focusItem: to.itemId, focusOffset: caretAfterStep(before, step!.board, typing!, to), ...moved } : to === null ? { selection: [] } : {};
-    restore(step, true, state.boards, ui);
-  }
-
-  function commitTo(id: string, fn: (b: Board) => Board, merge?: string) {
-    if (id === state.boards.open) return void commit(fn, { merge });
-    const before = state.boards.others[id];
-    if (!before || state.ui.preview || locked(id)) return;
-    const changed = fn(before);
-    if (changed === before) return;
-    const board = dropEmptyFolds(before, changed); // as in commit
-    histories.set(id, record(histories.get(id) ?? emptyHistory, before, merge ?? null));
-    edits++;
-    set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: board } } });
-  }
-
   function undoOn(id: string, which: 'undo' | 'redo', typing?: TypingAt) {
-    if (id === state.boards.open) return stepOpen(which, typing);
-    const before = state.boards.others[id];
+    const before = boardOf(id);
     const h = histories.get(id);
     if (!before || !h || state.ui.preview || locked(id)) return;
     const step = (which === 'undo' ? undoStep : redoStep)(h, before);
     if (!step) return;
     marked(which, step.history);
     histories.set(id, step.history);
-    if (step.board === before) return;
-    edits++;
-    set({ ...state, boards: { ...state.boards, others: { ...state.boards.others, [id]: step.board } } });
+    if (step.board !== before) edits++; // counted before it shows, for version history
+    if (id !== state.boards.open) {
+      if (step.board !== before) set({ ...state, ...withBoard(id, step.board) });
+      return;
+    }
+    const cursor = typing === undefined ? typingAt() : typing;
+    const to = step.board !== before && cursor?.itemId ? cursorAfterStep(before, step.board, cursor) : undefined;
+    // No item of that list is drawn now (it was collapsed, or the card is gone): nothing stays selected, so Backspace on the page deletes nothing.
+    // Moved to another list: that list is the one selected, as while typing in it, so Delete after Escape never takes the other card.
+    const moved = to && to.cardId !== cursor!.cardId ? { selection: [to.cardId] } : {};
+    const ui: Partial<Ui> = to ? { focusItem: to.itemId, focusOffset: caretAfterStep(before, step.board, cursor!, to), ...moved } : to === null ? { selection: [] } : {};
+    restore(step.board, true, state.boards, ui);
   }
 
   function deleting(text: string, run: () => unknown, board = state.boards.open) {
@@ -635,29 +625,6 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     return to;
   }
 
-  /** A change to board `id` (open or not), with screen changes, as `commit` does for the open board. */
-  function commitOn(id: string, fn: (b: Board) => Change, opts: { ui?: Partial<Ui>; merge?: string } = {}): Board | null {
-    if (id === state.boards.open) return commit(fn, opts);
-    if (state.ui.preview) return refuse(opts.ui);
-    const before = state.boards.others[id];
-    if (!before) return refuse(opts.ui);
-    const result = fn(before);
-    if (!result) return null;
-    const { board: changed, ui } = 'board' in result ? result : { board: result, ui: undefined };
-    const board = changed === before ? before : dropEmptyFolds(before, changed); // as in commit
-    if (board !== before && locked(id)) {
-      announce('You can’t change this board.');
-      return refuse({ ...opts.ui, ...ui });
-    }
-    if (board !== before) {
-      histories.set(id, record(histories.get(id) ?? emptyHistory, before, opts.merge ?? null));
-      edits++;
-    }
-    const others = board === before ? state.boards.others : { ...state.boards.others, [id]: board };
-    set({ ...state, boards: { ...state.boards, others }, ui: uiWith({ ...opts.ui, ...ui }) });
-    return board;
-  }
-
   const scopes = new Map<string, StoreContext>();
   function scoped(id: string): StoreContext {
     if (id === state.boards.open) return ctx;
@@ -667,7 +634,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     const s: StoreContext = {
       ...ctx,
       get state() {
-        return id === state.boards.open ? state : projected(id);
+        return projected(id);
       },
       set(next) {
         // Only the screen state and the board's own change come back; the projection's board stays where it is.
@@ -675,7 +642,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
         const others = next.board === projected(id).board ? next.boards.others : { ...next.boards.others, [id]: next.board };
         set({ ...state, ui: next.ui, view: next.view, boards: { ...state.boards, others } });
       },
-      commit: (fn, opts) => commitOn(id, fn, opts),
+      commit: (fn, opts) => commitBoard(id, fn, opts),
       // simple: not drawn on the canvas, so no overlaps to clear and no gaps to close; upgrade if the panel ever shows several blocks.
       requestSettle: () => (id === state.boards.open ? requestSettle() : undefined),
       startClosing: (collapse) => collapse(),
@@ -715,7 +682,7 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     replaceWorkspace,
     commitTo,
     undoOn,
-    historyOf: (id) => (id === state.boards.open ? history : histories.get(id)),
+    historyOf: (id) => histories.get(id),
     deleting,
     viewOnly: locked,
     scoped,
@@ -771,14 +738,17 @@ export function createCore(storage: StorageLike | null, schedule: Schedule) {
     setShares(shares: Ui['shares'], sharesKnown: boolean) {
       set({ ...state, ui: uiWith({ shares, sharesKnown }) });
     },
-    undo: () => stepOpen('undo'),
-    redo: () => stepOpen('redo'),
+    undo: () => undoOn(state.boards.open, 'undo'),
+    redo: () => undoOn(state.boards.open, 'redo'),
     /** The open board's newest undo and redo steps and the last new change on any board, on the counter shared with the calendar (0: none). */
-    undoMarks: (): BoardMarks => ({
-      undo: (history.past.length && madeAt.get(history.past[history.past.length - 1])) || 0,
-      redo: (history.future.length && undoneAt.get(history.future[history.future.length - 1])) || 0,
-      changed: changedAt,
-    }),
+    undoMarks: (): BoardMarks => {
+      const h = boardHistory();
+      return {
+        undo: (h.past.length && madeAt.get(h.past[h.past.length - 1])) || 0,
+        redo: (h.future.length && undoneAt.get(h.future[h.future.length - 1])) || 0,
+        changed: changedAt,
+      };
+    },
     undoToast,
     /** Whether the open board is shared with this person to view or comment on only (job 161). */
     viewOnly: () => locked(),

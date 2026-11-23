@@ -1,0 +1,291 @@
+/*
+ * Comments on cards (job 161, PR 4). The chip on a card's header, in the accent tint (smaller than the
+ * 32px header buttons, with room before them); a dot when a comment arrived since this device last
+ * opened the thread. With no open thread, "Add comment" shows like the header's other buttons.
+ */
+.comment-slot { display: flex; flex-shrink: 0; margin-right: 4px; }
+.comment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 100ms var(--ease-out);
+}
+.comment-chip svg { width: 14px; height: 14px; }
+.comment-chip:active { transform: scale(0.97); }
+.comment-chip.add { width: 28px; padding: 0; justify-content: center; background: transparent; color: var(--ink-faint); }
+@media (hover: hover) {
+  .comment-chip.add:hover { background: var(--hover); color: var(--ink-soft); }
+  .comment-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header .comment-chip.add { opacity: 1; }
+}
+.comment-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-ink); box-shadow: 0 0 0 2px var(--card-bg); }
+
+/*
+ * Time estimates (job saved-estimate-doneon). A quiet chip with the estimate ("30m", "1h 30m"): on a note's header, and
+ * right after a checklist item's text, centered on its first line. With no estimate, a faint clock shows like the
+ * header's other buttons. On an item (owner decision 2026-11-11) it is the last button of the row's hover strip, at the
+ * card's edge beyond the drag grip and the trash can (the strip is 26px wider for it), so it takes no room from the text
+ * and hovering never re-wraps it. A parent's "0/2" count may reach into the strip (see .tail-slot) but not that far.
+ */
+.estimate-chip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 11px;
+  background: var(--hover);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 100ms var(--ease-out);
+}
+button.estimate-chip { cursor: pointer; }
+button.estimate-chip:active { transform: scale(0.97); }
+.estimate-chip.ci::after { width: 14px; height: 14px; }
+.estimate-chip.add { width: 26px; padding: 0; background: transparent; color: var(--ink-faint); }
+.card-header > .estimate-chip { margin-right: 4px; }
+/* A collapsed card's one-line header keeps its room for the preview: no clock to add an estimate (expand the card
+   first), and from 225% up no pill either, so the buttons still fit a 200px card. */
+.card.collapsed > .card-header > .estimate-chip.add,
+.canvas[data-big-text] .card-header > .estimate-chip.add,
+.canvas[data-big-text] .card.collapsed > .card-header > .estimate-chip { display: none; }
+/* From 225% up an open note's two buttons fill its header: a set pill goes after them, so it wraps below, at the right. */
+.canvas[data-big-text] .card:not(.collapsed) > .card-header > .estimate-chip { order: 1; }
+/* On an item, once set: on the first line, after the text. */
+.todo-item > .estimate-chip:not(.add) { margin-top: calc(var(--line) / 2 + 4px - 11px); }
+/* On an item, to add one: in the strip, as tall as the item's first line like the grip and trash can; shown with them. */
+.todo-item > .estimate-chip.add {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: var(--clock);
+  height: var(--bh);
+  border-radius: 5px;
+  opacity: 0;
+  transition: opacity 120ms, transform 100ms var(--ease-out);
+}
+/* The row's other estimate-less case: the strip has no room for it at 225% and up (--clock is 0 there). */
+.canvas[data-big-text] .todo-item > .estimate-chip.add { display: none; }
+@media (hover: hover) {
+  button.estimate-chip:hover { background: var(--hover); color: var(--ink); }
+  .card-header > .estimate-chip.add { opacity: 0; transition: opacity 120ms, transform 100ms var(--ease-out); }
+  :is(.card:hover, .card.selected, .card:focus-within) > .card-header > .estimate-chip.add,
+  .estimate-chip.add:focus-visible { opacity: 1; }
+  .todo-item:hover > .estimate-chip.add { opacity: 1; }
+  /* (A new way to show the clock also shows its icon: see "draws no icon" in the icon-button rules.) */
+}
+/* Touch screens have no hover: the clock shows while the item is being typed in, like the grip and trash can. */
+@media (hover: none) {
+  .todo-item > .estimate-chip.add { visibility: hidden; }
+  .todo-item:focus-within > .estimate-chip.add { visibility: visible; opacity: 1; }
+}
+/* While its box is open, the chip stays shown (the box sits under it and the keyboard comes back to it). */
+.estimate-chip.add[aria-expanded='true'] { visibility: visible; opacity: 1; }
+
+/* The box it opens: under its chip, over the board. */
+.estimate-picker {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.18);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.estimate-quick, .estimate-own { display: flex; gap: 4px; }
+.estimate-option {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 100ms var(--ease-out);
+}
+.estimate-option:active { transform: scale(0.97); }
+.estimate-option.current { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+.estimate-clear { color: var(--ink-soft); }
+@media (hover: hover) { .estimate-option:hover { background: var(--hover); } .estimate-option.current:hover { background: var(--accent-soft); } }
+.estimate-own input { width: 84px; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--control-edge); border-radius: 7px; background: var(--card-bg); color: var(--ink); font: inherit; outline: none; }
+.estimate-own input[aria-invalid='true'] { border-color: var(--danger); }
+.estimate-hint { margin: 0; font-size: 12px; color: var(--danger); }
+/* Touch screens: 16px text, so iOS doesn't zoom in on the box, and bigger targets. */
+@media (max-width: 599px), (pointer: coarse) {
+  .estimate-picker { font-size: 16px; }
+  .estimate-option, .estimate-own input { height: 40px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-input='keys']) .estimate-picker { transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out); transform-origin: top right; }
+  @starting-style { html:not([data-input='keys']) .estimate-picker { opacity: 0; transform: scale(0.98); } }
+}
+
+/* The thread: beside the card, over the board; on a phone, a sheet from the bottom over a light scrim. */
+.comment-thread {
+  position: fixed;
+  z-index: 6;
+  width: 330px;
+  max-width: calc(100vw - 16px);
+  max-height: min(560px, calc(100vh - var(--toolbar-height) - 24px));
+  max-height: min(560px, calc(100dvh - var(--toolbar-height) - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(31, 29, 26, 0.16);
+  color: var(--ink);
+  font-size: 14px;
+  transform-origin: top left;
+}
+.comment-thread:focus { outline: none; }
+.comment-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line); }
+.comment-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comment-resolve.tb-button { height: 32px; padding: 0 8px; border-color: transparent; background: transparent; font-size: 13px; }
+.comment-resolve svg { width: 14px; height: 14px; }
+.comment-resolved { margin: 8px 14px 0; align-self: flex-start; padding: 4px 0; border: none; background: none; color: var(--accent-ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.comment-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px 14px; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.comment { display: flex; gap: 10px; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-by { display: flex; align-items: center; gap: 6px; min-height: 24px; font-size: 13px; }
+.comment-by strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-by span { color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
+.comment-by .icon-button { margin-left: auto; width: 28px; height: 28px; }
+.comment-by .icon-button svg { width: 14px; height: 14px; }
+.comment-text { margin: 2px 0 0; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-text a { color: var(--accent-ink); }
+.comment-empty, .comment-error { margin: 0; padding: 12px 14px 4px; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.comment-error { color: var(--danger); }
+.comment-write { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
+.comment-write textarea {
+  min-height: 52px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--control-edge);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+}
+.comment-write textarea:focus { outline: none; border-color: var(--accent); }
+.comment-send { display: flex; align-items: center; gap: 10px; }
+.comment-send span { flex: 1; color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
+.comment-send button { height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+.comment-send button:disabled { opacity: 0.45; cursor: default; }
+.comment-scrim { position: fixed; inset: 0; z-index: 9; /* over the toolbar, which is above side panels */ background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.app.phone .comment-thread {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: 75vh;
+  max-height: 75dvh;
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  transform-origin: bottom center;
+  z-index: 9;
+}
+/* 16px so a phone doesn't zoom in on the box; 44px buttons. */
+.app.phone .comment-write textarea { font-size: 16px; }
+.app.phone .comment-send button { height: 44px; padding: 0 18px; }
+.app.phone .comment-head .icon-button, .app.phone .comment-by .icon-button { width: 44px; height: 44px; }
+.app.phone .comment-resolve.tb-button { height: 44px; }
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  object-fit: cover;
+}
+.boards-shared { display: inline-flex; margin-left: 6px; vertical-align: -2px; color: var(--ink-soft); }
+.preview-note { font-size: 13px; color: var(--ink-soft); }
+
+/* A note for the person (a board is no longer shared with them, say), until dismissed. */
+.notice-banner {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--toolbar-height) + 12px);
+  z-index: 5;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 6px 6px 6px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(31, 29, 26, 0.12);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+/* Focus timer (owner request: Pomodoro), shown in the side panel (the right-hand spot, like Version history). */
+.pomodoro { display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 0; font-size: 14px; }
+.pomodoro-phase { margin: 0; font-weight: 600; color: var(--accent-ink); }
+.pomodoro-clock { font-size: 56px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; padding: 8px 0; }
+.pomodoro-actions { display: flex; gap: 8px; justify-content: center; }
+.tb-button.pomodoro-start { min-width: 88px; justify-content: center; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pomodoro-heading { margin: 14px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.pomodoro-length { display: flex; align-items: center; gap: 8px; }
+.pomodoro-length > span:first-child { flex: 1; }
+.pomodoro-length input {
+  width: 64px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--control-edge);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  text-align: right;
+}
+.pomodoro-unit { color: var(--ink-soft); font-size: 13px; }
+.pomodoro-chime { display: flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer; }
+.pomodoro-chime input { width: 16px; height: 16px; accent-color: var(--accent); }
+/* Its round button by the zoom control widens to show the time left while a round runs or is paused. */
+.help-button.pomodoro-button.with-time { width: auto; padding: 0 10px; gap: 6px; border-radius: 17px; color: var(--accent-ink); }
+.pomodoro-left { font-variant-numeric: tabular-nums; font-weight: 600; }

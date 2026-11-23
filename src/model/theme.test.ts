@@ -118,7 +118,10 @@ describe('bold colours (owner request, 2026-10-15)', () => {
 
 // Colour themes (job 112): each changes the accent and the board's tint; the colours live in styles.css only.
 describe('colour themes', () => {
-  const css = readFileSync('src/styles.css', 'utf8');
+  const css = readFileSync('src/styles.css', 'utf8').replace(
+    /^@import\s+['"]([^'"]+)['"];/gm,
+    (_, p: string) => readFileSync(`src/${p.replace(/^\.\//, '')}`, 'utf8'),
+  );
   const DARK = "\\[data-theme='dark'\\]";
   /** The variables a theme sets in styles.css ('base' = the plain Honey look), for its light or dark version. */
   function vars(root: string, dark: boolean) {

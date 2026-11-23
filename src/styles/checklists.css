@@ -1,0 +1,343 @@
+/* ---------- layout and resizing (step 3) ---------- */
+
+/* A resized card's note area fills the extra height, so the whole card is writable. */
+.card.loose .note-text { flex-grow: 1; }
+
+.resize-corner {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: nwse-resize;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.column .resize-corner { right: 2px; bottom: 2px; }
+@media (hover: hover) {
+  .resize-corner:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+}
+
+.resize-edge {
+  position: absolute;
+  right: -5px;
+  top: 52px;
+  bottom: 22px;
+  width: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.card .resize-edge, .column.collapsed .resize-edge { top: 4px; bottom: 4px; }
+/* On a collapsed block the edge is the only resize handle, so hint at it on hover. */
+@media (hover: hover) {
+  .card.collapsed:hover .resize-edge, .column.collapsed:hover .resize-edge { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .card.collapsed .resize-edge:hover, .column.collapsed .resize-edge:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+}
+/*
+ * Resize grips (owner request 2026-10-21): invisible strips 6px wide along the edges and 12px squares
+ * at the corners, inside the outline. The resize cursors show only on these (and on the older handles
+ * above); everywhere else a block keeps the normal arrow. They stop short of the bottom-right handle.
+ */
+.resize-grip { position: absolute; padding: 0; border: none; background: none; touch-action: none; }
+/* The grips come first in a block, so its header buttons (raised here) paint above them where they meet. */
+.card-header > .icon-button, .column-actions > .icon-button { position: relative; }
+.grip-n, .grip-s { left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
+.grip-n { top: 0; }
+.grip-s { bottom: 0; right: 20px; }
+.grip-e, .grip-w { top: 12px; bottom: 20px; width: 6px; cursor: ew-resize; }
+.grip-e { right: 0; }
+.grip-w { left: 0; }
+.grip-nw, .grip-ne, .grip-sw { width: 12px; height: 12px; }
+.grip-nw { top: 0; left: 0; cursor: nwse-resize; }
+.grip-ne { top: 0; right: 0; cursor: nesw-resize; }
+.grip-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+/* Not on touch screens: a 6px strip is too thin for a finger, and next to the bigger touch areas of the buttons it would take presses meant for the board. There the older handles stay. */
+@media (pointer: coarse) {
+  .resize-grip { display: none; }
+}
+/* A container with cards is as tall as its cards: its corners only set the width. */
+.resize-grip.width-only { cursor: ew-resize; }
+/* Like the right-edge strip: below a container's header, and clear of the bottom-right handle. */
+.column .grip-w { top: 52px; bottom: 22px; }
+.column.collapsed .grip-w { top: 4px; bottom: 4px; }
+
+/* Bigger invisible areas to press (at least 24px, for touch screens); the drawn handles stay small. */
+.resize-corner::before, .resize-edge::before, .item-grip::before { content: ''; position: absolute; }
+.resize-corner::before { inset: -3px; }
+.resize-edge::before { top: 0; bottom: 0; left: -7px; right: -7px; }
+.item-grip::before { top: 0; bottom: 0; left: -5px; right: -5px; }
+@media (hover: hover) {
+  .resize-edge:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+}
+
+.card.size-match, .column.size-match { outline: 2px dashed var(--accent); }
+.card.size-match { outline-offset: 2px; }
+.column.size-match { outline-offset: 3px; }
+
+.landing-spot {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  pointer-events: none;
+}
+
+.size-label {
+  position: absolute;
+  z-index: 3;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------- selection box (step 4) ---------- */
+
+.marquee {
+  position: absolute;
+  z-index: 3;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+}
+
+/* ---------- checklists (step 5) ---------- */
+
+.todo-body { border-radius: 6px; }
+/* Items (or a whole dragged list) about to be added to the end of a list, open or collapsed: the whole card is ringed, top included (owner request). Dashed, like a column taking a card, so
+   it never looks like the solid ring of a selected card. */
+.card.append-target { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+.todo-item { position: relative; }
+.todo-item.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.todo-item.picked .item-text > textarea { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+/* A Word-style highlight of exact letters across items (owner request, 2026-11-01): only the letters, never the whole row. */
+.todo-item.picked.words, .todo-item.picked.words .item-text > textarea { background: transparent; }
+.word-mark { background: color-mix(in srgb, var(--accent) 26%, transparent); color: transparent; border-radius: 2px; }
+/* The marks, and the copy asked for a moment where the pointer is in the text (wordPoint.ts), are laid out like the search marks (.find-marks); the copy sits over the text box. */
+.item-text > .text-mirror { position: relative; z-index: 2147483647; pointer-events: auto; }
+.todo-item.mark-before { box-shadow: inset 0 2px 0 var(--accent); }
+.todo-item.mark-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.todo-item.mark-nest { box-shadow: inset 0 -2px 0 var(--nest-mark); background: var(--nest-mark-bg); }
+.todo-item.dimmed { opacity: 0.35; }
+/*
+ * Lifted by press-and-hold on a phone (owner request, job 114): the item leaves its place (hidden), the
+ * rows around it slide to close that space and to open one where it would land (an inline translateY),
+ * and its label, drawn as a floating row with a shadow, follows the finger. Only transform and opacity move.
+ */
+.todo-item.dimmed.lifting { visibility: hidden; }
+
+/*
+ * Grip and trash only show while the pointer is over the row. They sit in a strip kept free at the
+ * right end of every row (owner request), so they never cover the text and hovering never re-wraps it.
+ * Move up / Move down are not in that strip: they float in a small pill over the free end of the row above
+ * (owner pick, 2026-10-22, replacing the 92px strip that held all four and left the text 97px of a 226px card).
+ */
+.todo-item { --clock: 26px; padding-right: calc(40px * var(--bb) + var(--clock)); }
+/* From 225% up the strip keeps no room for the clock (as a note's header shows none then). */
+.canvas[data-big-text] .todo-item { --clock: 0px; }
+.item-grip,
+.item-trash {
+  position: absolute;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms, transform 100ms var(--ease-out);
+}
+.todo-item:hover .item-grip,
+.todo-item:hover .item-trash,
+.item-grip:focus-visible,
+.item-trash:focus-visible { opacity: 1; }
+/* (A new way to show them also shows their icons: see "draws no icon" in the icon-button rules.) */
+/* The buttons' widths and icons below multiply by --bb (the text size step, capped; see .todo-item); their height follows the item's first line. */
+.item-grip { top: 3px; right: var(--clock); width: calc(14px * var(--bb)); height: calc(var(--bh) - 4px); cursor: default; touch-action: none; }
+.item-grip::after { width: calc(8px * var(--bb)); height: calc(12px * var(--bb)); }
+.item-trash { top: 2px; right: calc(16px * var(--bb) + var(--clock)); width: calc(24px * var(--bb)); height: calc(var(--bh) - 4px); border-radius: 5px; cursor: pointer; color: var(--ink-faint); }
+.item-trash::after { width: calc(14px * var(--bb)); height: calc(14px * var(--bb)); }
+@media (hover: hover) {
+  .item-trash:hover, .block-trash:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+}
+/*
+ * On a computer the controls are bigger (owner request, 2026-10-19): trash 28px, grip 18px, flush with each other, so
+ * the strip kept free for them is 46px. The arrows are 22px wide. All of them grow with the text size step (owner
+ * request, 2026-10-21), as tall as the item's first line, so at Small and Normal they are as before. Touch screens
+ * (no hover) keep the sizes above and have no arrows here.
+ */
+@media (hover: hover) {
+  .todo-item { padding-right: calc(46px * var(--bb) + var(--clock)); }
+  .item-grip, .item-trash { top: 0; height: var(--bh); }
+  .item-grip { width: calc(18px * var(--bb)); }
+  .item-grip::after { width: calc(10px * var(--bb)); height: calc(15px * var(--bb)); }
+  .item-trash { right: calc(18px * var(--bb) + var(--clock)); width: calc(28px * var(--bb)); }
+  .item-trash::after { width: calc(16px * var(--bb)); height: calc(16px * var(--bb)); }
+  /*
+   * The Move up / Move down pill: at the row's right end, touching the row's top edge from above, so it sits over the
+   * strip the row above keeps free (never over its text; two 22px arrows fit the 46px strip). The first row of a list
+   * has the card's buttons above it, so its pill is below it.
+   * It stays in the layout, faded and out of the pointer's way, so the keyboard can still reach it and show it.
+   */
+  .item-arrows {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: calc(100% - 2px);
+    display: flex;
+    border-radius: 8px;
+    background: var(--surface);
+    /* No shadow while faded out (job perf-paint-chunks: one less piece to paint per row); it goes once the fade has ended. */
+    box-shadow: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms, box-shadow 0s 120ms;
+  }
+  .todo-items > .todo-item:first-child .item-arrows { bottom: auto; top: calc(100% - 2px); }
+  .todo-item:hover .item-arrows,
+  .item-arrows:focus-within {
+    box-shadow: 0 0 0 1px var(--control-edge), 0 4px 12px rgba(31, 29, 26, 0.12);
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 120ms;
+  }
+  .item-arrow {
+    flex-shrink: 0;
+    width: calc(22px * var(--bb));
+    height: var(--bh);
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 100ms var(--ease-out);
+  }
+  .item-arrow::after { width: calc(18px * var(--bb)); height: calc(18px * var(--bb)); }
+  .item-arrow:hover:not([aria-disabled='true']) { background: var(--hover); color: var(--ink); }
+  /* At the top or bottom of its level there is nowhere to go (Ctrl+Shift+Up / Down do nothing there either). */
+  .item-arrow[aria-disabled='true'] { opacity: 0.3; cursor: default; }
+}
+/*
+ * Touch screens have no hover (owner request): only the item being typed in shows its grip and trash.
+ * The others are hidden outright, so a tap near the end of a row can't hit an invisible trash can.
+ */
+@media (hover: none) {
+  .item-grip, .item-trash { visibility: hidden; }
+  .todo-item:hover .item-grip, .todo-item:hover .item-trash { opacity: 0; }
+  .todo-item:focus-within .item-grip, .todo-item:focus-within .item-trash { visibility: visible; opacity: 1; }
+  /* The phone already has Move up / Move down in the row above the keyboard, so the pill never shows and keeps no room. */
+  .item-arrows { display: none; }
+  .todo-item { padding-right: calc(40px * var(--bb) + var(--clock)); }
+}
+/*
+ * Phone layout on a touch screen (owner request, 2026-10-19): no trash can on each row. Delete is in the
+ * item bar above the keyboard, which keeps the cursor in a text box, and the strip kept free at the
+ * right end of a row shrinks to the grip alone. Tablets (600px and wider) and mouse users keep the trash can.
+ */
+@media (hover: none) {
+  .app.phone .item-trash { display: none; }
+  .app.phone .todo-item { padding-right: calc(24px + var(--clock)); }
+  /* On every row that has the clock (all rows, so text wraps the same with or without a count), the room before it holds a whole parent count ("0/12" and its gap come to 2.2em of the text's size; here 2.5em, 40px at Normal): the text can end at its right edge, so the count (which spills out of the text, see .tail-slot) must never reach the clock. The strip grows with the text, as the count does. The indent's limit (--inset) keeps its 32px of text when that is wider than the 46px it counts on. */
+  /* simple: a count of 100 or more sub-items ("0/100") is wider than 2.2em and can still touch the clock on a phone; widen the factor, or measure the count, if that ever matters. */
+  .app.phone .canvas:not([data-big-text]) .todo-item {
+    padding-right: calc(2.5 * var(--tfs) + var(--clock));
+    --inset: min(var(--indent, 0px), calc(100% - max(0px, 2.5 * var(--tfs) - 46px) - 52px * var(--bb) - var(--clock) - 20px * var(--bs) - 32px));
+  }
+}
+
+.item-ghost {
+  position: absolute;
+  z-index: 4;
+  max-width: calc(260px * max(1, var(--fs, 1)));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 10px 24px rgba(31, 29, 26, 0.16);
+  font-size: calc(13px * var(--fs, 1));
+  pointer-events: none;
+}
+.item-ghost.moving { left: 0; top: 0; }
+.item-ghost.lifted {
+  max-width: none;
+  scale: 1.02;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 14px 28px rgba(31, 29, 26, 0.28), 0 3px 8px rgba(31, 29, 26, 0.18);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .todo-item.lifting { transition: transform 200ms var(--ease-out); }
+  .item-ghost.lifted { animation: lift-in 140ms var(--ease-out); }
+}
+@keyframes lift-in {
+  from { opacity: 0; scale: 0.96; }
+}
+.item-ghost-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-ghost-extra { flex-shrink: 0; font-size: calc(12px * var(--fs, 1)); color: var(--ink-soft); }
+
+/* ---------- smooth movement ---------- */
+
+/*
+ * Loose blocks glide to where they land: into the grid spot after a drag, to the grid size after a
+ * resize, and out of the way when something pushes them. Not while following the pointer.
+ */
+.card.loose,
+.column {
+  transition:
+    left 160ms var(--ease-out),
+    top 160ms var(--ease-out),
+    width 160ms var(--ease-out);
+}
+.card.dragging,
+.column.dragging,
+.card.following,
+.column.following,
+/* Nothing glides when a key moved it (arrow keys, undo): see src/main.tsx. */
+html[data-input='keys'] .card.loose,
+html[data-input='keys'] .column {
+  transition: none;
+}
+
+/* Tapping into a card on a phone slides the board to put the card's top under the top bar (glideBoard, canvasDom.ts). */
+html[data-glide] .world {
+  transition: transform 200ms var(--ease-out);
+}
+
+/* The landing outline slides between grid spots instead of jumping. */
+.landing-spot {
+  transition:
+    left 90ms var(--ease-out),
+    top 90ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.loose,
+  .column,
+  .landing-spot,
+  html[data-glide] .world {
+    transition: none;
+  }
+}

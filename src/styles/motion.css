@@ -1,0 +1,86 @@
+/* Welcome tour (owner request, 2026-10-16): the dimmed board with one control lit up, and a small card. */
+.tour-shield { position: fixed; inset: 0; z-index: 60; }
+.tour-spot {
+  position: fixed;
+  z-index: 61;
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 100vmax color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.tour-card {
+  position: fixed;
+  z-index: 62;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(31, 29, 26, 0.3);
+}
+.tour-head { display: flex; align-items: center; justify-content: space-between; }
+.tour-step { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.tour-card h2 { margin: 6px 0 4px; font-size: 16px; font-weight: 600; }
+.tour-card p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
+.tour-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-spacer { flex: 1; }
+.tour-actions button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--control-edge);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tour-actions button:disabled { opacity: 0.4; cursor: default; }
+.tour-actions .tour-skip { border-color: transparent; background: none; color: var(--ink-soft); padding: 0 6px; }
+.tour-actions .tour-next { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .tour-spot { transition: left 200ms var(--ease-in-out), top 200ms var(--ease-in-out), width 200ms var(--ease-in-out), height 200ms var(--ease-in-out); }
+  .tour-card { transition: left 200ms var(--ease-in-out), top 200ms var(--ease-in-out); }
+}
+
+/*
+ * Motion (owner request 2026-10-19, Emil Kowalski's skills; the table is docs/design-polish-review.md).
+ * Only for people who allow motion, and only for what the pointer does: html[data-input='keys'] (set in
+ * src/main.tsx while the keyboard is in use) switches it off, so shortcuts and Enter on a button act at once.
+ * Things that open grow from the button that opened them, never from nothing (scale 0.96, not 0), and
+ * are on screen faster than they leave (they leave at once). Only transform and opacity move.
+ */
+.file-menu, .boards-menu, .colour-menu, .fb-font-menu { transform-origin: top left; }
+.share-panel, .toolbar-more, .role-menu { transform-origin: top right; }
+.phone-sheet, .app.phone .cal-card { transform-origin: bottom center; }
+.cal-card { transform-origin: top right; }
+
+/* A pressed button shrinks a little, so it feels like it heard the press (a faded one does nothing, so it stays still). Also with reduced motion (owner, 2026-10-19): a tiny scale in place, not movement. */
+:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .list-clean-up, .habit-day, .habit-seg button, .habit-step, .habit-today) {
+  transition: transform 100ms var(--ease-out);
+}
+:is(.tb-button, .role-button, .help-button, .icon-button, .zoom-control button, .phone-bar > button, .item-bar > button, .phone-add > button, .confirm-actions button, .tour-actions button, .swatch, .theme-chip, .format-bar button, .list-clean-up, .item-trash, .item-arrow, .habit-day, .habit-seg button, .habit-step, .habit-today):not([aria-disabled='true'], :disabled):active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .collapse-arrow, .ci-chevron::after { transition: transform 150ms var(--ease-out); }
+  html[data-input='keys'] .collapse-arrow, html[data-input='keys'] .ci-chevron::after { transition: none; }
+
+  /* Menus, panels and the phone sheet. */
+  html:not([data-input='keys']) :is(.file-menu, .boards-menu, .colour-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .history-panel, .find-bar, .confirm:not(.delete-completed), .shortcuts-backdrop, .shortcuts-panel, .ask-card, .undo-toast, .comment-thread) {
+    transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  }
+  @starting-style {
+    html:not([data-input='keys']) :is(.file-menu, .boards-menu, .fb-font-menu, .share-panel, .role-menu, .toolbar-more, .phone-sheet, .cal-card, .shortcuts-panel, .comment-thread) { opacity: 0; transform: scale(0.96); }
+    /* The Color menu only fades: the board is moved aside by where its box is the moment it opens. */
+    html:not([data-input='keys']) :is(.colour-menu, .shortcuts-backdrop) { opacity: 0; }
+    html:not([data-input='keys']) .history-panel { opacity: 0; transform: translateX(16px); }
+    html:not([data-input='keys']) .find-bar { opacity: 0; transform: translateY(-8px); }
+    html:not([data-input='keys']) .confirm:not(.delete-completed) { opacity: 0; transform: translateY(-4px); }
+    /* A question and the Undo message rise a few pixels as they fade in. */
+    html:not([data-input='keys']) .ask-card { opacity: 0; transform: translateY(4px); }
+    html:not([data-input='keys']) .undo-toast { opacity: 0; transform: translate(-50%, 4px); }
+  }
+}

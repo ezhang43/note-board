@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+/* Phone-native feel (mobile-native skill): no grey flash on a tap, no wait for a double-tap, labels of controls can't be selected by a long press. */
+html { -webkit-tap-highlight-color: transparent; }
+button, a, summary, label, [role='button'] { touch-action: manipulation; }
+button { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--canvas);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+input, textarea, button { font-family: inherit; color: inherit; }
+input:focus, input:focus-visible, textarea:focus, textarea:focus-visible { outline: none; box-shadow: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Tick boxes, radios and dropdowns are controls, not text fields: they keep the keyboard focus ring. */
+input[type='checkbox']:focus-visible, input[type='radio']:focus-visible, .cal-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: var(--toolbar-height) 1fr;
+}

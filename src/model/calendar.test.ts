@@ -48,6 +48,9 @@ import {
   savedEvent,
   seriesDraft,
   timeLabel,
+  BAD_TIMES,
+  REPEAT_SERIES_ONLY,
+  validateDraft,
   viewRange,
   weekDays,
   sundayStart,
@@ -1014,3 +1017,50 @@ describe('search results (owner request, 2026-11-19)', () => {
     expect(mergeSearchResults([u1, p1], [u2, p2], today, 0)).toEqual([]);
   });
 });
+
+describe('validateDraft', () => {
+  const base = () => newDraft('2026-10-06');
+  const seriesEvent = () => timed({ series: 's1' });
+
+  it('accepts a valid timed or all-day draft', () => {
+    expect(validateDraft(base(), { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toBeNull();
+    expect(validateDraft({ ...base(), allDay: true }, { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toBeNull();
+  });
+
+  it('rejects an end not after the start', () => {
+    expect(validateDraft({ ...base(), endTime: '12:00' }, { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toBe(BAD_TIMES);
+    expect(validateDraft({ ...base(), endTime: '11:00' }, { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toBe(BAD_TIMES);
+    expect(validateDraft({ ...base(), allDay: true, endDate: '2026-10-05' }, { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toBe(BAD_TIMES);
+  });
+
+  it('validates custom repeat rules for new events and non-series events', () => {
+    const badInterval = { ...base(), repeat: { kind: 'custom' as const, rule: { interval: 0, unit: 'day' as const, end: { kind: 'never' as const } } } };
+    expect(validateDraft(badInterval, { event: null, repeatChanged: false, repeatAnchor: '2026-10-06' })).toMatch(/interval/i);
+    const badEnd = { ...base(), repeat: { kind: 'custom' as const, rule: { interval: 1, unit: 'day' as const, end: { kind: 'on' as const, date: '2026-10-01' } } } };
+    expect(validateDraft(badEnd, { event: timed(), repeatChanged: false, repeatAnchor: '2026-10-06' })).toMatch(/end date/i);
+  });
+
+  it('skips repeat validation on a series when the repeat setting did not change', () => {
+    const e = seriesEvent();
+    const d = { ...draftFor(e), repeat: { kind: 'custom' as const, rule: { interval: 0, unit: 'day' as const, end: { kind: 'never' as const } } } };
+    expect(validateDraft(d, { event: e, repeatChanged: false, repeatAnchor: '2026-10-01' })).toBeNull();
+  });
+
+  it('validates repeat against the series anchor when a series repeat changed', () => {
+    const e = seriesEvent();
+    const d = { ...draftFor(e), repeat: { kind: 'custom' as const, rule: { interval: 1, unit: 'day' as const, end: { kind: 'on' as const, date: '2026-10-02' } } } };
+    expect(validateDraft(d, { event: e, repeatChanged: true, repeatAnchor: '2026-10-05' })).toMatch(/end date/i);
+    expect(validateDraft(d, { event: e, repeatChanged: true, repeatAnchor: '2026-10-01' })).toBeNull();
+  });
+
+  it('rejects changing repeat on a series if the day or all-day setting also changed', () => {
+    const e = seriesEvent();
+    const movedDay = { ...draftFor(e), startDate: '2026-10-07', endDate: '2026-10-07', repeat: { kind: 'daily' as const } };
+    expect(validateDraft(movedDay, { event: e, repeatChanged: true, repeatAnchor: '2026-10-01' })).toBe(REPEAT_SERIES_ONLY);
+    const toggledAllDay = { ...draftFor(e), allDay: true, repeat: { kind: 'daily' as const } };
+    expect(validateDraft(toggledAllDay, { event: e, repeatChanged: true, repeatAnchor: '2026-10-01' })).toBe(REPEAT_SERIES_ONLY);
+    // Moving a single occurrence without changing repeat is still allowed.
+    expect(validateDraft(movedDay, { event: e, repeatChanged: false, repeatAnchor: '2026-10-01' })).toBeNull();
+  });
+});
+

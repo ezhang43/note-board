@@ -200,7 +200,7 @@ Start every status, and every reply when something needs the owner, with a short
 
 ## 5. High-risk pull requests
 
-As soon as a worker reports one ready, run `/check-pr <n>` yourself without waiting to be asked (owner decision, 2026-10-06); it reports, never merges. Check one at a time, and re-run any browser test that fails while other worktrees are testing before calling it a failure. Then give the owner the verdict and ask whether to merge (a `[decision]` line). Merge only when the owner says so, then mark it `merged`. A merged high-risk one holds auto-publish back until the owner says "publish".
+As soon as a worker reports one ready, run `/check-pr <n>` yourself without waiting to be asked (owner decision, 2026-10-06); it reports, never merges. Check one at a time, and re-run any browser test that fails while other worktrees are testing before calling it a failure. Per owner decision (2026-11-23), once `/check-pr` passes cleanly (no unresolved findings, no clashes, safe for saved boards) and GitHub's "All tests" passes, the coordinator merges it (merge commit) without waiting for the owner, marks it `merged`, and fast-forwards `main` once `build/v1`'s "All tests" passes (owner decision, 2026-11-21). If `/check-pr` finds a real bug, clash, or data-loss concern, send findings back to the worker or stop at `waiting-owner` and ask the owner.
 
 ## Rules for the coordinator
 

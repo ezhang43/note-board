@@ -1249,4 +1249,68 @@ describe('a share never takes one of the person’s own boards (whole-app review
     expect({ shareOfY: alice.sharing.shareOf(y), inOne: online(s1).includes(y), inTwo: online(s2).includes(y) }).toEqual({ shareOfY: s1, inOne: true, inTwo: false });
     alice.sharing.stop();
   });
+
+  it('if deleteShare fails while an upload is in flight, later edits wait for the in-flight upload instead of running concurrently', async () => {
+    const storage = memoryStorage();
+    const store = createStore(storage, (fn) => fn());
+    const real = server.backendFor(person('alice'));
+    let releaseUpload!: () => void;
+    let concurrent = 0;
+    let maxConcurrent = 0;
+    let firstUploadHeld = false;
+    const wrapped = {
+      ...real,
+      updateShare: (id: string, combine: (latest: string) => string | null, client: string) => {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        if (!firstUploadHeld) {
+          firstUploadHeld = true;
+          return new Promise<{ data: string; rev: number }>((resolve, reject) => {
+            releaseUpload = () => {
+              real.updateShare(id, combine, client).then(
+                (doc) => {
+                  concurrent--;
+                  resolve(doc);
+                },
+                (err) => {
+                  concurrent--;
+                  reject(err);
+                },
+              );
+            };
+          });
+        }
+        return real.updateShare(id, combine, client).finally(() => {
+          concurrent--;
+        });
+      },
+      deleteShare: () => Promise.reject(new Error('offline')),
+    };
+    const sharing = startSharing(store, wrapped, { client: 'alice-1', storage });
+    await settle();
+    const trip = store.newBoard();
+    store.renameBoard('Trip');
+    const shareId = await sharing.share(trip);
+    await settle();
+
+    // Start an upload and hold it in flight.
+    store.renameBoard('Trip 1');
+    await vi.advanceTimersByTimeAsync(SYNC_DELAY_MS + 10);
+    expect(concurrent).toBe(1);
+
+    // Queue a follow-up edit (`again = true`) before deleteShare fails while the first upload is still in flight.
+    store.renameBoard('Trip 1b');
+    await vi.advanceTimersByTimeAsync(SYNC_DELAY_MS + 10);
+    expect(maxConcurrent).toBe(1);
+
+    // deleteShare fails while that upload is still in flight.
+    await expect(sharing.deleteShare(shareId)).rejects.toThrow('offline');
+
+    // Once the first upload finishes, the queued edit (`Trip 1b`) uploads without any concurrent upload.
+    releaseUpload();
+    await settle();
+    expect(maxConcurrent).toBe(1);
+    expect(readWorkspace(server.shares.get(shareId)!.data)!.ws.boards[trip].name).toBe('Trip 1b');
+    sharing.stop();
+  });
 });

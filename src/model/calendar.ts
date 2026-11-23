@@ -336,6 +336,38 @@ export function searchDayLabel(key: DayKey, today: DayKey): string {
   return key.slice(0, 4) === today.slice(0, 4) ? dayLabel(key) : `${dayLabel(key)} ${key.slice(0, 4)}`;
 }
 
+/**
+ * Partial-match calendar search (owner request, 2026-11-23): every whitespace-separated term typed
+ * must appear as a case-insensitive substring in at least one searchable field of the event.
+ */
+export function matchesSearch(fields: string[], query: string): boolean {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length || !fields.length) return false;
+  const lowered = fields.map((f) => f.toLowerCase());
+  return terms.every((term) => lowered.some((f) => f.includes(term)));
+}
+
+/**
+ * Combines Google's full-text search results with local partial-match hits: deduplicated by id,
+ * keeping at most `cap` soonest upcoming events (today and later) and `cap` most recent past events.
+ */
+export function mergeSearchResults(primary: CalEvent[], extra: CalEvent[], today: DayKey, cap = 125): CalEvent[] {
+  if (cap <= 0) return [];
+  const byId = new Map<string, CalEvent>();
+  for (const e of primary) byId.set(e.id, e);
+  for (const e of extra) if (!byId.has(e.id)) byId.set(e.id, e);
+  const all = [...byId.values()];
+  const ahead = all
+    .filter((e) => e.start.slice(0, 10) >= today)
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .slice(0, cap);
+  const past = all
+    .filter((e) => e.start.slice(0, 10) < today)
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .slice(-cap);
+  return [...ahead, ...past];
+}
+
 /** A day in the month grid shows up to `max` lines; when more events than that, the last line says "+n more". */
 export function cellLines(events: CalEvent[], max: number): { shown: CalEvent[]; more: number } {
   if (events.length <= max) return { shown: events, more: 0 };

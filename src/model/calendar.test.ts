@@ -29,6 +29,8 @@ import {
   myAnswer,
   isMeeting,
   greenLook,
+  matchesSearch,
+  mergeSearchResults,
   moveDraftStart,
   moveDraftStartTime,
   endTimeOptions,
@@ -984,5 +986,31 @@ describe('search results (owner request, 2026-11-19)', () => {
     expect(searchDayLabel('2026-10-12', today)).toBe('Mon 12 Oct');
     expect(searchDayLabel('2025-10-12', today)).toBe('Sun 12 Oct 2025');
     expect(searchDayLabel('2027-01-04', today)).toBe('Mon 4 Jan 2027');
+  });
+
+  it('matchesSearch matches partial substrings, case-insensitively, across all terms and fields', () => {
+    expect(matchesSearch(['Dentist'], 'dent')).toBe(true);
+    expect(matchesSearch(['Dentist'], 'IST')).toBe(true);
+    expect(matchesSearch(['Kayaking lesson'], 'yak')).toBe(true);
+    expect(matchesSearch(['Kayaking lesson'], 'kayak less')).toBe(true);
+    expect(matchesSearch(['Lunch with Sam', 'sam@example.com'], 'sam@ex')).toBe(true);
+    expect(matchesSearch(['Lunch with Sam', 'Room 4B'], 'lunch 4b')).toBe(true);
+    expect(matchesSearch(['Dentist'], 'dent xyz')).toBe(false);
+    expect(matchesSearch(['Dentist'], '   ')).toBe(false);
+    expect(matchesSearch([], 'dent')).toBe(false);
+  });
+
+  it('mergeSearchResults deduplicates and caps upcoming (soonest) and past (most recent) events', () => {
+    const u1 = at('u1', '2026-10-12T09:00');
+    const u2 = at('u2', '2026-10-15T09:00');
+    const u3 = at('u3', '2026-10-20T09:00');
+    const p1 = at('p1', '2026-10-01T09:00');
+    const p2 = at('p2', '2026-10-05T09:00');
+    const p3 = at('p3', '2026-10-08T09:00');
+    // Cap 2 each way: keeps soonest 2 upcoming (u1, u2) and most recent 2 past (p2, p3), deduping u2.
+    const merged = mergeSearchResults([u2, p1], [u1, u2, u3, p2, p3], today, 2);
+    expect(merged.map((e) => e.id)).toEqual(['u1', 'u2', 'p2', 'p3']);
+    // Non-positive cap returns empty (including past events).
+    expect(mergeSearchResults([u1, p1], [u2, p2], today, 0)).toEqual([]);
   });
 });

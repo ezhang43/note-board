@@ -5,10 +5,11 @@ import { BoardReadOnly } from './textBox';
 import { doneCount, hasTicked } from '../model/checklist';
 import { checklistCardOf } from '../model/mainChecklist';
 import type { ItemDrag } from '../store/store';
-import { appStore, BoardScope, useAppState } from '../store/appStore';
+import { appStore, BoardScope, storeOfCard, useAppState } from '../store/appStore';
 import { collab } from '../sync/collabSession';
+import { useEscapeLayer } from './escapeLayer';
 import { ClipboardCheckIcon, CloseIcon } from './icons';
-import { escapeIsForChecklist, isTextField } from './textField';
+import { isTextField } from './textField';
 import { TodoBody } from './TodoList';
 import { usePhone } from './usePhone';
 
@@ -29,13 +30,22 @@ export function ChecklistPanel() {
   const close = () => appStore.openChecklist();
   // While Version history shows an old version nothing can be changed (as on the board), so the panel says so (PR 274 check).
   const previewing = useAppState((s) => s.ui.preview !== null);
-  useEffect(() => {
-    // Escape in the panel closes it (one in a panel on the right closes that one: escapeIsForChecklist).
-    const key = (e: KeyboardEvent) => escapeIsForChecklist(e) && close();
-    // Capture: seen before the page's own shortcuts close the list that Escape was for.
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  }, []);
+  useEscapeLayer(
+    true,
+    (e) => {
+      if (isTextField(e.target)) return false;
+      // Items selected in it: this Escape drops the selection (as on the board); the next one closes the panel.
+      const sel = appStore.getState().ui.itemSel;
+      if (sel && storeOfCard(sel.cardId) !== appStore) return false;
+      // With a panel open on the right, Escape outside the Checklist closes that one instead (owner request, 2026-11-12).
+      const inChecklist = e.target instanceof Element && e.target.closest('.checklist-panel') !== null;
+      const { sidePanel, historyOpen } = appStore.getState().ui;
+      if (!inChecklist && (sidePanel !== null || historyOpen)) return false;
+      close();
+      return true;
+    },
+    'panel',
+  );
   const phone = usePhone();
   // The item box the keyboard was in. When a step (Ctrl+Z on a new item) takes it off the page, focus goes to the panel itself,
   // not to the page, so the next Ctrl+Z is still the checklist's and never the board's (as in the Journal panel).

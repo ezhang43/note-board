@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { appStore } from '../store/appStore';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { ExampleStrip, TemplateGrid } from './TemplatePicker';
 import { useCoverBoard } from './textField';
@@ -13,10 +14,15 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
   useCoverBoard(backdrop);
   useEffect(() => {
     backdrop.current?.querySelector<HTMLElement>('.tpl-tile')?.focus({ preventScroll: true });
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+  }, []);
+  useEscapeLayer(
+    true,
+    () => {
+      onClose();
+      return true;
+    },
+    'modal',
+  );
   return (
     <div className="shortcuts-backdrop templates-backdrop" ref={backdrop} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <section className="shortcuts-panel templates-panel" role="dialog" aria-modal="true" aria-label="Start a board">

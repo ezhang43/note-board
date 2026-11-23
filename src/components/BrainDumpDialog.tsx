@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { IMPORT_MAX_CARDS } from '../model/importFile';
 import { minutesLabel, parseBrainDump } from '../model/brainDump';
 import { appStore, useAppState } from '../store/appStore';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 
@@ -21,11 +22,15 @@ function Dialog() {
   useCoverBoard(backdrop);
   const close = appStore.closeBrainDump;
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && !e.isComposing && close();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [close]);
+  useEscapeLayer(
+    true,
+    (e) => {
+      if (e.isComposing) return false;
+      close();
+      return true;
+    },
+    'modal',
+  );
 
   const drafts = parseBrainDump(text);
   const n = drafts.length;

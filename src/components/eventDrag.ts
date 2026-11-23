@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { DayKey } from '../model/calendar';
+import { pushEscapeLayer } from './escapeLayer';
 
 // Dragging a calendar event onto another day (owner request, 2026-11-11). The days it can land on
 // (a Week row, a Month cell) carry `data-day`; the one under the pointer gets `data-drop` and the grabbed
@@ -68,7 +69,7 @@ export function beginEventDrag(down: ReactPointerEvent<HTMLElement>, onDrop: (fr
     window.removeEventListener('pointermove', move, true);
     window.removeEventListener('pointerup', up, true);
     window.removeEventListener('pointercancel', abort, true);
-    window.removeEventListener('keydown', key, true);
+    popEscape();
     window.removeEventListener('blur', abort);
   };
 
@@ -101,19 +102,17 @@ export function beginEventDrag(down: ReactPointerEvent<HTMLElement>, onDrop: (fr
     stop();
     clean();
   }
-  function key(e: KeyboardEvent) {
-    if (e.key !== 'Escape' || !ghost) return;
-    // The drag's own Escape: no panel, card or form sees it.
-    e.stopImmediatePropagation();
-    e.preventDefault();
+  // The drag's own Escape: no panel, card or form sees it.
+  const popEscape = pushEscapeLayer(() => {
+    if (!ghost) return false;
     cancelled = true;
     clean();
-  }
+    return true;
+  }, 'capture');
 
   window.addEventListener('pointermove', move, true);
   window.addEventListener('pointerup', up, true);
   window.addEventListener('pointercancel', abort, true);
-  window.addEventListener('keydown', key, true);
   // Another window or tab took over mid-drag: the release would never reach this page.
   window.addEventListener('blur', abort);
 }

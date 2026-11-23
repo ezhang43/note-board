@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as 
 import { FONTS, sizesOf, styleOf, type Box, type TextFont } from '../model/textStyle';
 import type { FormatAsk } from '../store/actions/format';
 import { appStore, storeOfCard, useAppState, useViewOnly } from '../store/appStore';
+import { useEscapeLayer } from './escapeLayer';
 import { SizeBox } from './SizeBox';
 import { boxKey, focusedBox } from './textBox';
 import { isTextField, panelCovers } from './textField';
@@ -224,6 +225,33 @@ export function FormatBar() {
     if (fontsOpen && focusInBar()) (fontMenu.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? fontMenu.current?.querySelector('button'))?.focus();
   }, [fontsOpen]);
 
+  /** Shut the size list; from the keyboard, the keyboard goes back to the size number, as the Font menu's does to Font. */
+  const closeSizes = () => {
+    if (focusInBar()) document.querySelector<HTMLElement>('.format-bar .jt-size-box')?.focus();
+    setSizesOpen(false);
+  };
+  useEscapeLayer(visible, (e) => {
+    if (!(e.target instanceof Element && e.target.closest('.format-bar'))) return false;
+    if (fontsOpen) {
+      setFontsOpen(false);
+      fontButton.current?.focus();
+      return true;
+    }
+    if (sizesOpen) {
+      closeSizes();
+      return true;
+    }
+    const to = back.current;
+    back.current = null;
+    if (to && to.el !== document.body && to.el.isConnected) {
+      to.el.focus();
+      if (to.start !== null && to.end !== null) (to.el as HTMLTextAreaElement).setSelectionRange(to.start, to.end);
+    } else if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    return true;
+  });
+
   if (!visible) return null; // not yet (or no longer) due; nothing is formatted on a read-only board (job 161)
   const shownBoard = storeOfCard(boxCard(target.boxes[0])).getState().board;
   const now = styleOf(shownBoard, target.boxes[0]) ?? {};
@@ -236,36 +264,11 @@ export function FormatBar() {
   const top = up ? above : Math.max(72, Math.min(target.bottom + 6, window.innerHeight - BAR_H - 8));
   const style: CSSProperties = { left: Math.max(8, target.left), top };
   const apply = (ask: FormatAsk) => storeOfCard(boxCard(target.boxes[0])).formatBoxes(target.boxes, ask);
-  /** Shut the size list; from the keyboard, the keyboard goes back to the size number, as the Font menu's does to Font. */
-  const closeSizes = () => {
-    if (focusInBar()) document.querySelector<HTMLElement>('.format-bar .jt-size-box')?.focus();
-    setSizesOpen(false);
-  };
   // Pressing a button must not take the cursor (or the highlighted text) away from the box.
   const keep = (e: React.MouseEvent) => e.preventDefault();
-  // Keyboard inside the bar: Escape goes back to the text (or closes the open Font menu), Tab goes round, arrows walk along.
+  // Keyboard inside the bar: Tab goes round, arrows walk along (Escape is handled by useEscapeLayer above).
   const onKeyDown = (e: ReactKeyEvent<HTMLDivElement>) => {
     const here = document.activeElement as HTMLElement;
-    if (e.key === 'Escape') {
-      e.stopPropagation(); // not for a panel or the selection behind it
-      e.preventDefault();
-      if (fontsOpen) {
-        setFontsOpen(false);
-        fontButton.current?.focus();
-        return;
-      }
-      if (sizesOpen) {
-        closeSizes();
-        return;
-      }
-      const to = back.current;
-      back.current = null;
-      if (to && to.el !== document.body && to.el.isConnected) {
-        to.el.focus();
-        if (to.start !== null && to.end !== null) (to.el as HTMLTextAreaElement).setSelectionRange(to.start, to.end);
-      } else here.blur();
-      return;
-    }
     // Tab goes round every button; in the open Font menu the arrows go up and down it, otherwise left and right along the bar.
     const buttons = (within: ParentNode) => [...within.querySelectorAll<HTMLButtonElement>('button')];
     const inMenu = !!fontMenu.current?.contains(here);

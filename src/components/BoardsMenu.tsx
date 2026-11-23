@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { shownName } from '../model/board';
 import { boardRights } from '../model/sharing';
@@ -7,6 +7,7 @@ import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { activeVersionStore, deleteBoardSafely, historyFull } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { ask } from './ConfirmDialog';
+import { useEscapeLayer, useOutsidePointerDown } from './escapeLayer';
 import { arrowThroughMenu } from './menuArrows';
 import { BoardsIcon, CaretIcon, CloseIcon, ShareIcon } from './icons';
 import { TemplatesDialog } from './TemplatesDialog';
@@ -35,13 +36,13 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
   const others = useAppState((s) => s.boards.others);
   const shares = useAppState((s) => s.ui.shares);
 
-  // A click anywhere else closes the menu.
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
-    window.addEventListener('pointerdown', away, true);
-    return () => window.removeEventListener('pointerdown', away, true);
-  }, [open]);
+  // A click anywhere else, or Escape, closes the menu.
+  useOutsidePointerDown(open, wrap, () => setOpen(false));
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    button.current?.focus();
+    return true;
+  });
 
   // The Journal and Habits panels' own boards stay out of the list (owner, 2026-10-18 and 2026-10-19).
   const hidden = open ? appStore.hiddenBoards() : [];
@@ -75,12 +76,7 @@ export function BoardsMenu({ labelled = true }: { labelled?: boolean }) {
       className="boards-menu-wrap"
       ref={wrap}
       onKeyDown={(e) => {
-        // Escape shuts the menu (and goes no further, so a side panel behind it stays open).
-        if (open && arrowThroughMenu(e)) return;
-        if (e.key !== 'Escape' || !open) return;
-        e.stopPropagation();
-        setOpen(false);
-        button.current?.focus();
+        if (open) arrowThroughMenu(e);
       }}
     >
       <button

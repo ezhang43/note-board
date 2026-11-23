@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { deletionCounts } from '../model/account';
 import { useAppState } from '../store/appStore';
 import { account, useAccountPanel, useAccountRemover } from '../sync/account';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 import { downloadBackup } from './Toolbar';
@@ -48,11 +49,14 @@ function Panel({ remove }: { remove: () => Promise<void> }) {
     if (!busy) field.current?.focus();
   }, [busy]);
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  });
+  useEscapeLayer(
+    true,
+    () => {
+      close();
+      return true;
+    },
+    'modal',
+  );
 
   const ready = typed.trim() === 'DELETE' && online && known && !busy;
   const confirm = async () => {

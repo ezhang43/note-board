@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TOUR_KEY, placeCard, tourPending } from '../model/tour';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { isPhone } from './usePhone';
 
@@ -145,17 +146,14 @@ export function Tour() {
   }, [ready, avail, at]);
 
   // Escape ends the tour and goes no further, so it doesn't also clear the board's selection.
-  useEffect(() => {
-    if (!open) return;
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      e.preventDefault();
+  useEscapeLayer(
+    open,
+    () => {
       close();
-    };
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  }, [open, close]);
+      return true;
+    },
+    'modal',
+  );
 
   const rect = rects[at];
   useLayoutEffect(() => {

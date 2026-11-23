@@ -8,6 +8,7 @@ import { aiLabels } from '../store/aiLabels';
 import { fetchCalendarDone } from '../store/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { collab, useSharing } from '../sync/collabSession';
+import { useEscapeLayer } from './escapeLayer';
 import { CloseIcon } from './icons';
 import { useCoverBoard } from './textField';
 import { closeVisualizer, readCalm, readGroupBy, saveCalm, saveGroupBy } from './visualizerState';
@@ -35,17 +36,15 @@ export function VisualizerOverlay() {
   const canvas = useRef<HTMLCanvasElement>(null);
   useCoverBoard(backdrop);
   useEffect(() => dialog.current?.focus({ preventScroll: true }), []);
-  useEffect(() => {
-    const close = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.isComposing) return;
-      e.preventDefault();
-      e.stopPropagation();
+  useEscapeLayer(
+    true,
+    (e) => {
+      if (e.isComposing) return false;
       closeVisualizer();
-    };
-    // Captured first and kept to itself, so Escape closes only this and does not also reach the board behind it.
-    window.addEventListener('keydown', close, true);
-    return () => window.removeEventListener('keydown', close, true);
-  }, []);
+      return true;
+    },
+    'modal',
+  );
 
   // Always full motion, whatever the system says (owner, 2026-11-13); only the Calm button turns the quiet drawing on.
   const [calm, setCalm] = useState(readCalm);

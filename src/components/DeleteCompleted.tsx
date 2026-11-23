@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { tickedCount } from '../model/completed';
 import { appStore, useAppState } from '../store/appStore';
+import { useEscapeLayer } from './escapeLayer';
+import { isTextField } from './textField';
 
 /** How long "No completed items on this board" shows (ms). */
 const NONE_MS = 2500;
@@ -14,6 +16,11 @@ export function DeleteCompleted() {
   const count = useAppState((s) => (s.ui.deleteCompleted === 'ask' ? tickedCount(s.board) : 0));
   // Also when the items went while asking (deleted on another device, say).
   const none = mode === 'none' || (mode === 'ask' && !count);
+  useEscapeLayer(mode !== null, (e) => {
+    if (isTextField(e.target)) return false;
+    appStore.cancelDeleteCompleted();
+    return true;
+  });
   useEffect(() => {
     if (!none) return;
     const t = setTimeout(appStore.cancelDeleteCompleted, NONE_MS);

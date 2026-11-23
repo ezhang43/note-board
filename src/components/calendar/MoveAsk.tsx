@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { dragDraft, type CalEvent, type DayKey } from '../../model/calendar';
 import { calendar } from '../../store/calendar';
-import { panelCovers } from '../textField';
+import { useEscapeLayer, useOutsidePointerDown } from '../escapeLayer';
 import { Question } from './Question';
 import { useCardPlace } from './shared';
 
@@ -17,22 +17,11 @@ export function MoveAsk({ event, from, to, opener, onClose }: { event: CalEvent;
     onClose();
     if (opener.isConnected) opener.focus();
   };
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || panelCovers()) return;
-      e.stopImmediatePropagation();
-      cancel();
-    };
-    const down = (e: PointerEvent) => {
-      if (e.target instanceof Node && !ref.current?.contains(e.target)) onClose();
-    };
-    window.addEventListener('keydown', key, true);
-    document.addEventListener('pointerdown', down, true);
-    return () => {
-      window.removeEventListener('keydown', key, true);
-      document.removeEventListener('pointerdown', down, true);
-    };
+  useEscapeLayer(true, () => {
+    cancel();
+    return true;
   });
+  useOutsidePointerDown(true, ref, onClose);
   return (
     <div ref={ref} className="cal-card" style={place}>
       <Question

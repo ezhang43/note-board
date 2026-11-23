@@ -3,6 +3,7 @@ import { draftFor, type CalEvent } from '../../model/calendar';
 import { whenLabel } from '../../model/eventCard';
 import { appStore } from '../../store/appStore';
 import { calendar } from '../../store/calendar';
+import { useEscapeLayer, useOutsidePointerDown } from '../escapeLayer';
 import { CloseIcon, ExternalIcon, PencilIcon, TrashIcon } from '../icons';
 import { isTextField, panelCovers } from '../textField';
 import { Question, useChange } from './Question';
@@ -45,71 +46,68 @@ export function EventCard({ event, sending, opener, onClose, onEdit }: { event: 
 
   // preventScroll: the first focus can come before the card has its place.
   useEffect(() => ref.current?.focus({ preventScroll: true }), []);
-  // Escape and Delete belong to the card while it is open, wherever the keyboard is (capture: before
-  // the board's own shortcuts, so a block selected on the board is never deleted behind it; and
-  // stopImmediatePropagation, so the side panel's own Escape never runs after it, whichever was added first).
-  // While a delete of all of a series is on its way the card stays, so Google's answer (or refusal) can show in it.
+  // Escape closes the card (or its open question first), except while a series delete is on its way.
+  useEscapeLayer(true, (e) => {
+    if (isTextField(e.target)) return false;
+    if (busy) return true;
+    if (ask) cancel();
+    else close();
+    return true;
+  });
+  // Delete, E, Enter, Ctrl+D and blocked calendar keys belong to the card while it is open (capture: before
+  // the board's own shortcuts, so a block selected on the board is never deleted behind it).
+  const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyRef.current = (e: KeyboardEvent) => {
+    const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
+    if (shortcutsOpen || confirm || deleteCompleted || panelCovers() || isTextField(e.target)) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      // Only a fresh press: a held key's auto-repeat never deletes or answers.
+      if (!event.editable || busy || sending || e.repeat) return;
+      if (!ask) remove();
+      // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
+      else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
+    } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.toLowerCase() === 'e' || (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a'))))) {
+      // E, or Enter on the card itself (a button keeps its own Enter), edits it as the pencil does (owner request 2026-11-17).
+      if (!event.editable || busy || sending || ask || e.repeat) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onEdit();
+    } else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
+      // Ctrl+D: a copy at the same time, without its guests, so no one is invited unasked (owner request 2026-11-17).
+      // Never the board's duplicate or the browser's bookmark behind the card.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!event.editable || busy || sending || ask || e.repeat) return;
+      void calendar.copy(event.id);
+      close();
+    } else if ((busy || ask) && !e.ctrlKey && !e.metaKey && !e.altKey && ['n', 't', 'ArrowLeft', 'ArrowRight'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) {
+      // N, T, ← and → wait while its question is open or a series delete is on its way (they would close the card).
+      e.stopImmediatePropagation();
+    }
+  };
   useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
-      if (shortcutsOpen || confirm || deleteCompleted || panelCovers() || isTextField(e.target)) return;
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        if (busy) return;
-        if (ask) cancel();
-        else close();
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        // Only a fresh press: a held key's auto-repeat never deletes or answers.
-        if (!event.editable || busy || sending || e.repeat) return;
-        if (!ask) remove();
-        // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
-        else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.toLowerCase() === 'e' || (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a'))))) {
-        // E, or Enter on the card itself (a button keeps its own Enter), edits it as the pencil does (owner request 2026-11-17).
-        if (!event.editable || busy || sending || ask || e.repeat) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        onEdit();
-      } else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
-        // Ctrl+D: a copy at the same time, without its guests, so no one is invited unasked (owner request 2026-11-17).
-        // Never the board's duplicate or the browser's bookmark behind the card.
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        if (!event.editable || busy || sending || ask || e.repeat) return;
-        void calendar.copy(event.id);
-        close();
-      } else if ((busy || ask) && !e.ctrlKey && !e.metaKey && !e.altKey && ['n', 't', 'ArrowLeft', 'ArrowRight'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) {
-        // N, T, ← and → wait while its question is open or a series delete is on its way (they would close the card).
-        e.stopImmediatePropagation();
-      }
-    };
+    const key = (e: KeyboardEvent) => keyRef.current(e);
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
-  });
+  }, []);
   // A click or tap anywhere else closes it, except on the panel's resize strip, so the card can follow
-  // the edge, and on its own event's button, whose click edits it (job #131). While all of a series is being deleted, clicks elsewhere in the panel (another event, another
+  // the edge, and on its own event's button, whose click edits it (job #131).
+  useOutsidePointerDown(!busy, ref, onClose, (t) => t?.closest('[data-event]')?.getAttribute('data-event') === event.id || Boolean(t?.closest('.panel-resize')));
+  // While all of a series is being deleted, clicks elsewhere in the panel (another event, another
   // week, the panel's ×) wait too, so the card stays to show Google's answer.
   useEffect(() => {
-    const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
-    const down = (e: PointerEvent) => {
-      const on = e.target instanceof Element ? e.target : null;
-      if (!busy && outside(e.target) && on?.closest('[data-event]')?.getAttribute('data-event') !== event.id && !on?.closest('.panel-resize')) onClose();
-    };
+    if (!busy) return;
     const click = (e: MouseEvent) => {
-      if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
+      if (e.target instanceof Node && !ref.current?.contains(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
         e.preventDefault();
         e.stopPropagation();
       }
     };
-    document.addEventListener('pointerdown', down, true);
     document.addEventListener('click', click, true);
-    return () => {
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('click', click, true);
-    };
-  });
+    return () => document.removeEventListener('click', click, true);
+  }, [busy]);
 
   return (
     <div ref={ref} className="cal-card" role="dialog" aria-label={event.title} tabIndex={-1} style={place}>

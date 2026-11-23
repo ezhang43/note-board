@@ -7,7 +7,8 @@ import { appStore, useAppState } from '../store/appStore';
 import { activeVersionStore, restoreVersion, TooBigError } from '../store/versions';
 import { collab } from '../sync/collabSession';
 import { CloseIcon, HistoryIcon } from './icons';
-import { escapeIsForPanel } from './textField';
+import { useEscapeLayer } from './escapeLayer';
+import { isTextField } from './textField';
 import { usePhone } from './usePhone';
 
 /**
@@ -97,20 +98,23 @@ export function HistoryPanel() {
     };
   }, [open]);
 
-  // Escape: back to the current board first, then close the history (not one meant for something
-  // else: see escapeIsForPanel). Capture, like SidePanel: seen before the shortcuts list closes on it.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
+  // Escape: back to the current board first, then close the history.
+  useEscapeLayer(
+    open,
+    (e) => {
       const looking = appStore.getState().ui.preview !== null;
-      if (!escapeIsForPanel(e, looking)) return;
+      if (!looking && isTextField(e.target)) return false;
+      if (e.target instanceof Element && e.target.closest('.checklist-panel')) return false;
       if (looking) back();
       else appStore.toggleHistory();
-    };
-    window.addEventListener('keydown', onKey, true);
-    // Closing the history in any way drops a version still loading.
+      return true;
+    },
+    'panel',
+  );
+  // Closing the history in any way drops a version still loading.
+  useEffect(() => {
+    if (!open) return;
     return () => {
-      window.removeEventListener('keydown', onKey, true);
       asked++;
     };
   }, [open]);

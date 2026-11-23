@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { dayKey, draftFor, dragDraft, emailGuests, newDraft, rangeLabel, searchDayLabel, searchGroups, timeLabel, type CalEvent, type DayKey, type Draft } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
 import { calendar, useCalendar, type CalendarState } from '../store/calendar';
+import { useEscapeLayer } from './escapeLayer';
 import { CalendarDaysIcon, CloseIcon, ExternalIcon, SearchIcon } from './icons';
 import { beginEventDrag } from './eventDrag';
 import { useCalendarKeys } from './calendarKeys';
@@ -251,16 +252,13 @@ function SearchBox({ search }: { search: NonNullable<CalendarState['search']> })
     // The keyboard stays in the panel, so its keys still work.
     document.querySelector<HTMLElement>('.cal-tools button')?.focus();
   };
+  useEscapeLayer(true, (e) => {
+    if (!(e.target instanceof Element && e.target.closest('.cal-search'))) return false;
+    close();
+    return true;
+  });
   return (
-    <div
-      className="cal-search"
-      onKeyDown={(e) => {
-        if (e.key !== 'Escape') return;
-        e.preventDefault();
-        e.stopPropagation();
-        close();
-      }}
-    >
+    <div className="cal-search">
       <SearchIcon />
       <input type="search" aria-label="Search events" placeholder="Search events" autoComplete="off" value={search.text} onChange={(e) => calendar.setSearchText(e.target.value)} />
       <button type="button" className="icon-button" aria-label="Close search" title="Close search (Esc)" onClick={close}>

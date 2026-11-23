@@ -1,0 +1,1 @@
+- 2026-11-23 (my call): Gave the central Escape stack four priority tiers (`capture` > `modal` > `overlay` > `panel`), with LIFO order within each tier, so overlays opened before a side panel (such as the Find bar or Format bar) still take Escape before persistent panels without CSS-class sniffing.

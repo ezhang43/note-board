@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useOutsidePointerDown } from './escapeLayer';
 import { ShareButton } from './SharePanel';
 import { appStore, useAppState, useViewOnly } from '../store/appStore';
 import { CoffeeIcon, InfoIcon, MoreIcon, PlusIcon, RedoIcon, SearchIcon, SignOutIcon, UndoIcon } from './icons';
@@ -38,15 +39,7 @@ export function PhoneBar({ onSignOut }: { onSignOut?: () => void }) {
   const [open, setOpen] = useState<'add' | 'more' | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      // A press in a question asked from the sheet (the Share panel's Remove, Leave) isn't outside it.
-      if (!root.current?.contains(e.target as Node) && !(e.target as Element).closest?.('dialog.ask')) setOpen(null);
-    };
-    window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
-  }, [open]);
+  useOutsidePointerDown(open !== null, root, () => setOpen(null), (t) => Boolean(t?.closest('dialog.ask')));
 
   const toggle = (menu: 'add' | 'more') => setOpen((o) => (o === menu ? null : menu));
   const add = (kind: 'note' | 'todo' | 'column' | 'board') => {

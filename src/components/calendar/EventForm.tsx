@@ -14,12 +14,11 @@ import {
 } from '../../model/calendar';
 import { titleTime } from '../../model/calendarTitleTime';
 import { parseRecurrence, sameRepeat, validateRepeat, type Repeat } from '../../model/calendarRepeat';
-import { appStore } from '../../store/appStore';
 import { BAD_EMAIL, calendar } from '../../store/calendar';
+import { useEscapeLayer, useOutsidePointerDown } from '../escapeLayer';
 import { CloseIcon } from '../icons';
 import { keyboardCover } from '../ItemBar';
-import { panelCovers } from '../textField';
-import { TimePicker, closeTimeList } from '../TimePicker';
+import { TimePicker } from '../TimePicker';
 import { usePhone } from '../usePhone';
 import { Question, useChange } from './Question';
 import { RepeatField } from './RepeatField';
@@ -101,43 +100,29 @@ export function EventForm({ event, start, opener, onClose }: { event: CalEvent |
   const repeatUnit = currentRepeat.kind === 'custom' ? currentRepeat.rule.unit : '';
   const place = useCardPlace(ref, opener, [more, ask, note, draft.allDay, draft.guests.length, seriesRepeat.status, currentRepeat.kind, repeatUnit]);
 
-  // Escape closes it (first the question, if one is open), wherever the keyboard is, even in the title
-  // (capture and stopImmediatePropagation, as for the card: the board's shortcuts and the panel's own Escape never see it).
+  // Escape closes it (first the question, if one is open), wherever the keyboard is, even in the title.
   // While a change to all of a series is on its way it stays, so Google's answer (or refusal) can show in it.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
-      if (e.key !== 'Escape' || shortcutsOpen || confirm || deleteCompleted || panelCovers()) return;
-      e.stopImmediatePropagation();
-      // An open time list takes this Escape; the form stays.
-      if (closeTimeList() || busy) return;
-      if (ask) cancel();
-      else finish();
-    };
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
+  useEscapeLayer(true, () => {
+    if (busy) return true;
+    if (ask) cancel();
+    else finish();
+    return true;
   });
   // A click or tap anywhere else closes it, as for the card, except on the panel's resize strip (so the
-  // overlay can follow the edge). Nothing typed is asked about: it closes, as Google Calendar's does.
+  // overlay can follow the edge) or the open time list portal. Nothing typed is asked about: it closes, as Google Calendar's does.
+  useOutsidePointerDown(!busy, ref, onClose, (t) => Boolean(t?.closest('.panel-resize, .time-list')));
   // While a change to all of a series is on its way, clicks elsewhere in the panel wait too.
   useEffect(() => {
-    const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
-    const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize, .time-list'))) onClose();
-    };
+    if (!busy) return;
     const click = (e: MouseEvent) => {
-      if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
+      if (e.target instanceof Node && !ref.current?.contains(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
         e.preventDefault();
         e.stopPropagation();
       }
     };
-    document.addEventListener('pointerdown', down, true);
     document.addEventListener('click', click, true);
-    return () => {
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('click', click, true);
-    };
-  });
+    return () => document.removeEventListener('click', click, true);
+  }, [busy]);
 
   /** Adds the guest typed in: the draft with it, or null (and a note) when it isn't an email address. */
   function addGuest(): Draft | null {

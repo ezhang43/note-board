@@ -155,12 +155,41 @@ describe('partial-match calendar search (owner request, 2026-11-23)', () => {
     expect(cal.get().search).toBeNull();
     expect(api.calls.filter((c) => c.startsWith('list ')).length).toBe(listsBefore + 1);
     expect(api.calls.filter((c) => c.startsWith('listForSearch'))).toHaveLength(3);
-    // A new search as u2 fetches fresh index for u2.
+    // A new search as u2 fetches fresh index for u2 as soon as the box opens.
     cal.openSearch();
     cal.setSearchText('dent');
     await cal.searchNow();
     expect(api.calls.filter((c) => c.startsWith('listForSearch'))).toHaveLength(4);
     expect(cal.get().search?.results?.map((e) => e.id)).toEqual(['u2e']);
+  });
+
+  it('preloads on openSearch and shows matching results synchronously while typing (0ms lag); 0 local hits wait for Google', async () => {
+    vi.useFakeTimers();
+    try {
+      const romance = ev('r1', 'my siblings romance', '2023-06-10T10:00');
+      const api = fakeApi([{ event: romance, fields: ['my siblings romance'] }]);
+      const cal = createCalendar(api, today);
+      await cal.open();
+
+      // Opening the search box starts preloading the index immediately, before any typing.
+      cal.openSearch();
+      expect(api.calls.filter((c) => c.startsWith('listForSearch'))).toHaveLength(1);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Typing a partial match shows results immediately (0ms, before debounce or api.search).
+      cal.setSearchText('roman');
+      expect(cal.get().search?.results?.map((e) => e.id)).toEqual(['r1']);
+      expect(api.calls.filter((c) => c.startsWith('search '))).toEqual([]);
+
+      // Typing something with 0 local hits keeps results: null ("Searching…") until Google finishes.
+      cal.setSearchText('zzz');
+      expect(cal.get().search?.results).toBeNull();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(cal.get().search?.results).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('still returns Google q matches if listForSearch fails, and still fails when Google search fails', async () => {
@@ -246,13 +275,14 @@ describe('partial-match calendar search (owner request, 2026-11-23)', () => {
     });
     const api = calendarApi({ base: 'https://api.test/calendar/v3', token: async () => 'tok', forget: () => {} }, fn as unknown as typeof fetch);
     const items = await api.listForSearch!('2026-11-15');
-    // 2 pages for future + 1 page for past year 1 + 1 page for past year 2 = 4 requests (stops at PARTIAL_PAGES=2).
-    expect(urls.length).toBe(4);
+    // 2 pages for future (5y) + 1 page each for 5 past years = 7 requests (stops at PARTIAL_PAGES=2).
+    expect(urls.length).toBe(7);
     expect(urls.some((u) => u.searchParams.get('pageToken') === 'p2')).toBe(true);
     expect(urls.some((u) => u.searchParams.get('pageToken') === 'p3-ignored')).toBe(false);
-    // Past is split by year so recent year isn't starved by older year's volume.
+    // Covers 5 years forward and 5 past years a year at a time.
+    expect(urls.some((u) => new Date(u.searchParams.get('timeMin')!).getTime() === new Date(2026, 10, 15).getTime() && new Date(u.searchParams.get('timeMax')!).getTime() === new Date(2031, 10, 15).getTime())).toBe(true);
     expect(urls.some((u) => new Date(u.searchParams.get('timeMin')!).getTime() === new Date(2025, 10, 15).getTime() && new Date(u.searchParams.get('timeMax')!).getTime() === new Date(2026, 10, 15).getTime())).toBe(true);
-    expect(urls.some((u) => new Date(u.searchParams.get('timeMin')!).getTime() === new Date(2024, 10, 15).getTime() && new Date(u.searchParams.get('timeMax')!).getTime() === new Date(2025, 10, 15).getTime())).toBe(true);
+    expect(urls.some((u) => new Date(u.searchParams.get('timeMin')!).getTime() === new Date(2021, 10, 15).getTime() && new Date(u.searchParams.get('timeMax')!).getTime() === new Date(2022, 10, 15).getTime())).toBe(true);
     for (const u of urls) {
       expect(u.searchParams.has('q')).toBe(false);
       expect(u.searchParams.get('singleEvents')).toBe('true');

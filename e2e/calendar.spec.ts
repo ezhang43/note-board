@@ -2785,7 +2785,8 @@ test.describe('calendar search', () => {
     await searchButton(page).click();
     await page.keyboard.type('dent', { delay: 60 });
     await expect(panel(page).getByRole('button', { name: /Dentist/ })).toBeVisible();
-    expect([...new Set(asked)]).toEqual(['dent']);
+    // Dentist shows immediately from the preloaded index; Google's q search still waits for typing to stop and fires once.
+    await expect.poll(() => [...new Set(asked)]).toEqual(['dent']);
     expect(errors).toEqual([]);
   });
 

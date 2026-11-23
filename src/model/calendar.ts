@@ -1,3 +1,5 @@
+import type { Repeat } from './calendarRepeat';
+
 // Google Calendar side panel (owner request, 2026-10-06): the pure part. Days are 'YYYY-MM-DD' keys
 // in the person's own time zone, times 'HH:MM' on the 24-hour clock (shown as 10am, 10:30am). The calendar's weeks run Sunday to Saturday (owner
 // request, 2026-11-17): the week view shows the week of the picked day, the month grid starts each row on Sunday.
@@ -32,6 +34,8 @@ export interface CalEvent {
   answer?: Answer;
   /** A meeting (isMeeting): someone else is on it or runs it; only meetings are green (greenLook). Absent: not one. */
   meeting?: true;
+  /** The series' repeat rule lines (RRULE:…), present only on a series master fetched by id. */
+  recurrence?: string[];
 }
 
 /**
@@ -110,6 +114,8 @@ export interface Draft {
   endTime: string;
   /** The other guests' email addresses (not the person themself). */
   guests: string[];
+  /** How the event repeats (owner request, 2026-11-22); absent means unchanged / does not repeat. */
+  repeat?: Repeat;
 }
 
 /** What is sent to Google to add or change an event. */
@@ -119,6 +125,8 @@ export interface EventBody {
   end: { date: string } | { dateTime: string; timeZone: string };
   /** Only when the guest list changed (or a new event has guests). */
   attendees?: Guest[];
+  /** Only when the repeat rule is set or changed ([] clears recurrence on a series). */
+  recurrence?: string[];
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -255,6 +263,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     (e.eventType === undefined || e.eventType === 'default');
   // Where the series put it (one event of a series): a different start means it was moved on its own.
   const first = readWhen(e.originalStartTime);
+  const recurrence = Array.isArray(e.recurrence) ? e.recurrence.filter((r): r is string => typeof r === 'string' && r.trim() !== '') : [];
   return {
     id: e.id,
     title: typeof e.summary === 'string' && e.summary.trim() ? e.summary : UNTITLED,
@@ -269,6 +278,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     moved: first !== null && first.at !== start.at,
     ...withAnswer(myAnswer(e)),
     ...(isMeeting(e) && { meeting: true as const }),
+    ...(recurrence.length > 0 && { recurrence }),
   };
 }
 

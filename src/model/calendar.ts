@@ -601,6 +601,30 @@ export function draftBody(d: Draft, timeZone: string): EventBody | null {
   return { summary, start: { dateTime: start, timeZone }, end: { dateTime: end, timeZone } };
 }
 
+export const BAD_TIMES = 'The end must be after the start.';
+export const REPEAT_SERIES_ONLY = 'Changing how it repeats applies to the whole series, so keep the same day and all-day setting.';
+
+export interface DraftValidation {
+  event: CalEvent | null;
+  repeatChanged: boolean;
+  repeatAnchor: DayKey;
+  validateRepeat?: (repeat: Repeat, startDate: DayKey) => string | null;
+}
+
+/**
+ * Plain-English validation error for a form draft before saving, or null when valid.
+ * Repeat rules are checked for new/one-off events or when a series' repeat changed.
+ */
+export function validateDraft(d: Draft, { event, repeatChanged, repeatAnchor, validateRepeat }: DraftValidation): string | null {
+  if (!draftBody(d, 'UTC')) return BAD_TIMES;
+  if (!event?.series || repeatChanged) {
+    const repeatErr = d.repeat && validateRepeat ? validateRepeat(d.repeat, repeatAnchor) : null;
+    if (repeatErr) return repeatErr;
+  }
+  if (event?.series && repeatChanged && !canChangeSeries(event, d)) return REPEAT_SERIES_ONLY;
+  return null;
+}
+
 /**
  * The event as the panel shows it while a change (`body`) is still on its way to Google (owner
  * request, 2026-11-17): `e` is the event as it was (null for a new one, then shown under `id`).

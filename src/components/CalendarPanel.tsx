@@ -1,67 +1,16 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
-import {
-  addDays,
-  canChangeSeries,
-  cellLines,
-  cellTime,
-  dayKey,
-  dayLabel,
-  draftBody,
-  dragDraft,
-  draftFor,
-  emailGuests,
-  endTimeOptions,
-  eventsOnDay,
-  greenLook,
-  isEmail,
-  monthGrid,
-  moveDraftStart,
-  moveDraftStartTime,
-  newDraft,
-  rangeLabel,
-  searchDayLabel,
-  searchGroups,
-  sundayStart,
-  startTimeOptions,
-  timeLabel,
-  weekDays,
-  withGuest,
-  type CalEvent,
-  type DayKey,
-  type Draft,
-} from '../model/calendar';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { dayKey, draftFor, dragDraft, emailGuests, newDraft, rangeLabel, searchDayLabel, searchGroups, timeLabel, type CalEvent, type DayKey, type Draft } from '../model/calendar';
 import { appStore, useAppState } from '../store/appStore';
-import { cardPosition, whenLabel } from '../model/eventCard';
-import { titleTime } from '../model/calendarTitleTime';
-import {
-  customFrom,
-  defaultEndDate,
-  monthlyLabels,
-  parseRecurrence,
-  presetLabels,
-  sameRepeat,
-  validateRepeat,
-  WEEKDAY_CODES,
-  WEEKDAY_INITIALS,
-  WEEKDAY_NAMES,
-  weekdayCodeOf,
-  type CustomRepeat,
-  type PresetKind,
-  type Repeat,
-  type RepeatUnit,
-  type WeekdayCode,
-} from '../model/calendarRepeat';
-import { WEEKS_DRAWN, recenterOn, weekAtLine } from '../model/weekList';
-import { BAD_EMAIL, BAD_TIMES, REPEAT_SERIES_ONLY, calendar, useCalendar, type CalendarState, type Choice } from '../store/calendar';
-import { CalendarDaysIcon, CloseIcon, ExternalIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from './icons';
-import { isTextField, panelCovers } from './textField';
-import { keyboardCover } from './ItemBar';
-import { usePhone } from './usePhone';
-import { TimePicker, closeTimeList } from './TimePicker';
+import { calendar, useCalendar, type CalendarState } from '../store/calendar';
+import { CalendarDaysIcon, CloseIcon, ExternalIcon, SearchIcon } from './icons';
 import { beginEventDrag } from './eventDrag';
 import { useCalendarKeys } from './calendarKeys';
-
-const START_TIMES = startTimeOptions();
+import { EventCard } from './calendar/EventCard';
+import { EventForm } from './calendar/EventForm';
+import { MonthGrid } from './calendar/MonthGrid';
+import { MoveAsk } from './calendar/MoveAsk';
+import { Note, answerLook, answerSaid, type OnDrag } from './calendar/shared';
+import { DayEvents, WeekList } from './calendar/WeekList';
 
 // Google Calendar side panel (owner request, 2026-10-06): the signed-in person's primary calendar,
 // a week or a month, beside the board. The person's own events can be added, moved, renamed and
@@ -99,32 +48,24 @@ export function CalendarButton({ labelled = false, onOpen }: { labelled?: boolea
   );
 }
 
-/** Meetings not declined are green, and one still to answer also dashed; the person's own reminders stay blue (owner requests, 2026-11-21 and 2026-11-22; see greenLook). */
-const answerLook = (e: CalEvent) => {
-  const look = greenLook(e);
-  return look === 'green' ? ' green' : look === 'unsure' ? ' green unsure' : '';
-};
-
-/** What a screen reader hears of the same: the dashed edge's "not yet accepted", and "declined". */
-const answerSaid = (e: CalEvent) => (greenLook(e) === 'unsure' ? ', not yet accepted' : e.answer === 'declined' ? ', declined' : '');
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** At most one calendar overlay is open at a time: an event card, the add/edit form, or a drag-move guest prompt. */
+type Overlay =
+  | { kind: 'card'; event: CalEvent; opener: HTMLElement }
+  | { kind: 'form'; event: CalEvent | null; draft: Draft; opener: HTMLElement }
+  | { kind: 'move'; event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement };
 
 /** What the side panel shows for Google Calendar. */
 export function CalendarPanel() {
   const s = useCalendar();
-  // The form for a new event or a change, an overlay like the card (owner request, 2026-10-24, job 211), and the button it opened from.
-  const [editing, setEditing] = useState<{ event: CalEvent | null; draft: Draft; opener: HTMLElement } | null>(null);
-  // The small card a clicked event opens (owner request, 2026-10-19, job #108), and the button that opened it.
-  const [open, setOpen] = useState<{ event: CalEvent; opener: HTMLElement } | null>(null);
+  // The active overlay (event card, add/edit form, or drag-move prompt) and the button it opened from.
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
   // Set when a day is picked in the Month grid: its list sits under the grid, so it is scrolled into view (job #56).
   const reveal = useRef(false);
   const today = dayKey(new Date());
   const unit = s.view === 'week' ? 'week' : 'month';
-  // The list it was opened from changed (another week or month, by keyboard too): the card goes with it.
+  // The list it was opened from changed (another week or month, by keyboard too): the overlay goes with it.
   useLayoutEffect(() => {
-    if (open && !open.opener.isConnected) setOpen(null);
-    if (editing && !editing.opener.isConnected) setEditing(null);
+    if (overlay && !overlay.opener.isConnected) setOverlay(null);
   });
 
   // ‹ ›, Today, T and the arrows move to another week or month: the card goes with the list it was opened from (the Week
@@ -133,24 +74,22 @@ export function CalendarPanel() {
   useLayoutEffect(() => {
     if (jumped.current === s.jump) return;
     jumped.current = s.jump;
-    setOpen(null);
+    setOverlay((o) => (o?.kind === 'card' ? null : o));
   }, [s.jump]);
 
   const edit = (event: CalEvent, opener: HTMLElement) => {
-    setOpen(null);
-    setEditing({ event, draft: draftFor(event), opener });
+    setOverlay({ kind: 'form', event, draft: draftFor(event), opener });
   };
   // Clicking an event whose card is already open edits it (job #131); a read-only one has nothing to edit, so its card just stays,
   // and so does one with a change still on its way to Google (owner request 2026-11-17).
   const pick = (event: CalEvent, opener: HTMLElement) => {
-    if (open?.event.id !== event.id) setOpen({ event, opener });
+    if (overlay?.kind !== 'card' || overlay.event.id !== event.id) setOverlay({ kind: 'card', event, opener });
     else if (event.editable && !s.sending.includes(event.id)) edit(event, opener);
   };
   // The card shows the event as the list shows it now (a change that Google refused goes back in it too).
-  const openEvent = open && (s.events?.find((e) => e.id === open.event.id) ?? open.event);
-  const add = (day: DayKey, opener: HTMLElement) => setEditing({ event: null, draft: newDraft(day), opener });
+  const openEvent = overlay?.kind === 'card' ? (s.events?.find((e) => e.id === overlay.event.id) ?? overlay.event) : null;
+  const add = (day: DayKey, opener: HTMLElement) => setOverlay({ kind: 'form', event: null, draft: newDraft(day), opener });
   // Dragging an event onto another day (owner request, 2026-11-11): saved like an edit's Save, asking about the guests first.
-  const [moving, setMoving] = useState<{ event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement } | null>(null);
   const drag: OnDrag = (down, event) => {
     // Not while its last change is still on its way to Google (a press still opens its card).
     if (s.sending.includes(event.id)) return;
@@ -158,24 +97,23 @@ export function CalendarPanel() {
     beginEventDrag(down, (from, to) => {
       const draft = dragDraft(event, from, to);
       if (!draft) return;
-      setOpen(null);
-      if (emailGuests(event, draft)) setMoving({ event, from, to, opener });
-      else void calendar.move(event.id, from, to);
+      if (emailGuests(event, draft)) setOverlay({ kind: 'move', event, from, to, opener });
+      else {
+        setOverlay(null);
+        void calendar.move(event.id, from, to);
+      }
     });
   };
   // N, T, ← and → (owner request 2026-11-17); N closes an open card, as a click on a + would.
   const showSearch = () => {
-    setOpen(null);
+    setOverlay((o) => (o?.kind === 'card' ? null : o));
     calendar.openSearch();
     // The keyboard goes into the box once it is drawn (a box already open is focused again).
     requestAnimationFrame(() => document.querySelector<HTMLElement>('.cal-search input')?.focus());
   };
   useCalendarKeys(
-    editing !== null || moving !== null,
-    (day, opener) => {
-      setOpen(null);
-      add(day, opener);
-    },
+    overlay?.kind === 'form' || overlay?.kind === 'move',
+    (day, opener) => add(day, opener),
     showSearch,
   );
   // A result clicked in the search: its day is shown, then its card opens on the event there (waits while that day's events load).
@@ -184,12 +122,12 @@ export function CalendarPanel() {
     if (goTo === null || s.search || s.loading) return;
     const event = s.events?.find((e) => e.id === goTo);
     const opener = event && document.querySelector<HTMLElement>(`.side-panel [data-event="${CSS.escape(goTo)}"]`);
-    if (event && opener) setOpen({ event, opener });
+    if (event && opener) setOverlay({ kind: 'card', event, opener });
     setGoTo(null);
   });
   const found = (event: CalEvent) => {
     calendar.closeSearch();
-    setOpen(null);
+    setOverlay(null);
     setGoTo(event.id);
     void calendar.pickDay(event.start.slice(0, 10));
   };
@@ -253,18 +191,20 @@ export function CalendarPanel() {
           </>
         ))}
       {calendar.canDisconnect && !s.search?.text.trim() && s.events !== null && <Disconnect />}
-      {openEvent && open && (
+      {overlay?.kind === 'card' && openEvent && (
         <EventCard
           key={openEvent.id}
           event={openEvent}
           sending={s.sending.includes(openEvent.id)}
-          opener={open.opener}
-          onClose={() => setOpen(null)}
-          onEdit={() => edit(openEvent, open.opener)}
+          opener={overlay.opener}
+          onClose={() => setOverlay(null)}
+          onEdit={() => edit(openEvent, overlay.opener)}
         />
       )}
-      {editing && <EventForm event={editing.event} start={editing.draft} opener={editing.opener} onClose={() => setEditing(null)} />}
-      {moving && <MoveAsk key={moving.event.id} {...moving} onClose={() => setMoving(null)} />}
+      {overlay?.kind === 'form' && <EventForm event={overlay.event} start={overlay.draft} opener={overlay.opener} onClose={() => setOverlay(null)} />}
+      {overlay?.kind === 'move' && (
+        <MoveAsk key={overlay.event.id} event={overlay.event} from={overlay.from} to={overlay.to} opener={overlay.opener} onClose={() => setOverlay(null)} />
+      )}
     </div>
   );
 }
@@ -300,18 +240,6 @@ function Disconnect() {
           Couldn't disconnect. Try again.
         </p>
       )}
-    </div>
-  );
-}
-
-/** Why Google couldn't be reached, and the button to try again (or to Connect); straight from the click, so Google's window isn't blocked. */
-function Note({ note, needsAccess, retry }: { note: string; needsAccess: boolean; retry: () => void }) {
-  return (
-    <div className="cal-note" role="status">
-      <p className="history-note">{note}</p>
-      <button type="button" className={`tb-button${needsAccess ? ' cal-connect' : ''}`} onClick={retry}>
-        {needsAccess ? 'Connect Google Calendar' : 'Try again'}
-      </button>
     </div>
   );
 }
@@ -364,1106 +292,6 @@ function SearchResults({ search, today, onPick }: { search: NonNullable<Calendar
           ))}
         </section>
       ))}
-    </div>
-  );
-}
-
-/** Starts a drag from an event's chip (see `eventDrag.ts`); given only for the person's own events. */
-type OnDrag = (down: ReactPointerEvent<HTMLElement>, event: CalEvent) => void;
-
-function DayEvents({
-  day,
-  today,
-  past,
-  columns,
-  events,
-  reveal,
-  onPick,
-  onDrag,
-  onAdd,
-}: {
-  day: DayKey;
-  today: boolean;
-  /** Before today: shown faded (owner request, 2026-11-20). */
-  past: boolean;
-  /** The Week list: the date on the left, the events in a column to its right (owner request 2026-10-24, job 210). */
-  columns: boolean;
-  events: CalEvent[];
-  reveal: RefObject<boolean>;
-  onPick: (e: CalEvent, opener: HTMLElement) => void;
-  onDrag: OnDrag;
-  onAdd: (opener: HTMLElement) => void;
-}) {
-  const label = dayLabel(day);
-  const list = eventsOnDay(events, day);
-  // An event whose change is still on its way to Google is marked busy (owner request 2026-11-17).
-  const { sending } = useCalendar();
-  const section = useRef<HTMLElement>(null);
-  // Picking a day in the Month grid shows its list (under the grid, maybe below the visible part of the panel).
-  useEffect(() => {
-    if (!reveal.current) return;
-    reveal.current = false;
-    section.current?.scrollIntoView({ block: 'nearest' });
-  });
-  return (
-    <section ref={section} data-day={day} data-date={day} className={`cal-day${today ? ' today' : ''}${past ? ' past' : ''}${columns ? ' columns' : ''}`} aria-label={label} aria-current={today && columns ? 'date' : undefined}>
-      <h3>
-        {/* The column is narrow: "Thu 15", the month is in the range above (a section's own name keeps "Thu 15 Oct"). */}
-        {columns ? label.slice(0, label.lastIndexOf(' ')) : label}
-        {today && !columns && <span className="cal-today">· Today</span>}
-        <button type="button" className="icon-button cal-add" aria-label={`Add event on ${label}`} title="Add an event" onClick={(e) => onAdd(e.currentTarget)}>
-          <PlusIcon />
-        </button>
-      </h3>
-      {list.map((e) => (
-        <button
-          key={e.id}
-          type="button"
-          className={`cal-event${e.editable ? '' : ' read-only'}${answerLook(e)}`}
-          data-event={e.id}
-          aria-busy={sending.includes(e.id) || undefined}
-          aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}${answerSaid(e)}`}
-          onClick={(ev) => onPick(e, ev.currentTarget)}
-          onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
-        >
-          <span className="cal-time">{timeLabel(e)}</span>
-          <span className="cal-title">{e.title}</span>
-          {!e.editable && <ExternalIcon />}
-        </button>
-      ))}
-    </section>
-  );
-}
-
-/** How far below the list's top the week looked at is read: a little way in, so a short week brought to the top counts as that week. */
-const PROBE = 96;
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
-/**
- * The Week list as one list of days that scrolls on into earlier and later weeks (owner request, 2026-11-20). It draws
- * WEEKS_DRAWN weeks each side of a middle week, moving the middle as it is scrolled, and keeps the day at the top where it
- * is whenever weeks are added, removed or filled in above it (done here, as Safari has no CSS scroll anchoring). The week at
- * the top is the one looked at (the heading). ‹ ›, Today and a picked day (`jump`) scroll to the week of `day`: smoothly when
- * it is near (at once with reduced motion), at once from far away. A week whose events aren't known yet is a light placeholder.
- */
-function WeekList({ day, jump, loaded, today, dayList }: { day: DayKey; jump: number; loaded: DayKey[]; today: DayKey; dayList: (day: DayKey, columns: boolean) => ReactNode }) {
-  const list = useRef<HTMLDivElement>(null);
-  const [middle, setMiddle] = useState(() => sundayStart(day));
-  const weeks = useMemo(() => Array.from({ length: 2 * WEEKS_DRAWN + 1 }, (_, i) => addDays(middle, 7 * (i - WEEKS_DRAWN))), [middle]);
-  // The day row at the list's top and how far from the top it sits, as last seen.
-  const anchor = useRef<{ date: string; offset: number } | null>(null);
-  // The last `jump` scrolled to (null: none yet, the first is at once), and whether a smooth scroll of ours is under way.
-  const done = useRef<number | null>(null);
-  const ours = useRef<(() => void) | null>(null);
-  const middleRef = useRef(middle);
-  middleRef.current = middle;
-
-  const top = (el: Element) => el.getBoundingClientRect().top - list.current!.getBoundingClientRect().top;
-  const readAnchor = () => {
-    for (const row of list.current?.querySelectorAll<HTMLElement>('[data-date]') ?? []) {
-      const at = top(row);
-      if (at + row.offsetHeight > 0) return void (anchor.current = { date: row.dataset.date!, offset: at });
-    }
-  };
-  // The week at a line a little below the top: the one the heading names.
-  const follow = () => {
-    const box = list.current!;
-    const tops = [...box.querySelectorAll<HTMLElement>('[data-week]')].map((w): [DayKey, number] => [w.dataset.week!, top(w)]);
-    const week = weekAtLine(tops, Math.min(PROBE, box.clientHeight / 3));
-    if (!week) return;
-    void calendar.scrolledTo(week);
-    if (recenterOn(middleRef.current, week)) setMiddle(week);
-  };
-
-  useLayoutEffect(() => {
-    const box = list.current;
-    if (!box) return;
-    // Whatever changed above the day at the top (weeks added or let go, a placeholder filled in), it stays where it was;
-    // not during a glide of ours, which writing the scroll position would stop (the glide is set right where it ends).
-    // simple: the fix is a scroll position write, which can cut short a finger's fling on an iPhone when weeks above change
-    // mid-fling; if that shows on a real phone, hold the fix until the scroll stops.
-    const row = anchor.current && box.querySelector(`[data-date="${anchor.current.date}"]`);
-    if (row && anchor.current && !ours.current) {
-      const moved = top(row) - anchor.current.offset;
-      if (Math.abs(moved) >= 1) box.scrollTop += moved;
-    }
-    if (done.current !== jump) {
-      const target = sundayStart(day);
-      // Drawn around the week first (so there is room to bring it to the top), then scrolled to.
-      if (target !== middle) {
-        if (!row) anchor.current = null;
-        readAnchor();
-        return setMiddle(target);
-      }
-      const first = done.current === null;
-      done.current = jump;
-      const week = box.querySelector<HTMLElement>(`[data-week="${target}"]`);
-      if (week) {
-        const to = box.scrollTop + top(week);
-        // Near (the day that was at the top is still drawn): a smooth scroll; the first time, from far, or with reduced motion: at once.
-        const smooth = !first && row !== null && Math.abs(to - box.scrollTop) < 3 * box.clientHeight && !reducedMotion();
-        ours.current?.();
-        if (smooth) {
-          // The scroll is ours until it ends (`scrollend`, or where that is missing, once it has stood still for a moment):
-          // the week looked at is already the one asked for. It ends with the week exactly at the top, in case the rows
-          // above changed meanwhile.
-          let still = 0;
-          let last = box.scrollTop;
-          const stop = () => {
-            box.removeEventListener('scrollend', end);
-            clearInterval(timer);
-            ours.current = null;
-          };
-          const end = () => {
-            stop();
-            const week = box.querySelector<HTMLElement>(`[data-week="${target}"]`);
-            if (week && Math.abs(top(week)) >= 1) box.scrollTop += top(week);
-            readAnchor();
-            follow();
-          };
-          const timer = setInterval(() => {
-            still = Math.abs(box.scrollTop - last) < 1 ? still + 1 : 0;
-            last = box.scrollTop;
-            if (still >= 3) end();
-          }, 50);
-          box.addEventListener('scrollend', end);
-          ours.current = stop;
-          box.scrollTo({ top: to, behavior: 'smooth' });
-        } else box.scrollTop = to;
-      }
-    }
-    readAnchor();
-  });
-  useEffect(() => () => ours.current?.(), []);
-
-  const onScroll = () => {
-    readAnchor();
-    if (!ours.current) follow();
-  };
-
-  return (
-    <div className="cal-weeks" ref={list} onScroll={onScroll}>
-      {weeks.map((w) => (
-        <div key={w} className="cal-week" data-week={w}>
-          {loaded.includes(w)
-            ? weekDays(w).map((d) => dayList(d, true))
-            : weekDays(w).map((d) => {
-                const label = dayLabel(d);
-                return (
-                  <div key={d} data-date={d} className={`cal-day columns placeholder${d === today ? ' today' : ''}${d < today ? ' past' : ''}`}>
-                    <h3>{label.slice(0, label.lastIndexOf(' '))}</h3>
-                    <span className="cal-slot" />
-                  </div>
-                );
-              })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Cells under this width keep two lines, names only: a time leaves no room for the name. */
-const NARROW_CELL = 70;
-
-function MonthGrid({
-  day,
-  today,
-  events,
-  reveal,
-  onPick,
-  onDrag,
-  onAdd,
-}: {
-  day: DayKey;
-  today: DayKey;
-  events: CalEvent[];
-  reveal: RefObject<boolean>;
-  onPick: (e: CalEvent, opener: HTMLElement) => void;
-  onDrag: OnDrag;
-  onAdd: (day: DayKey, opener: HTMLElement) => void;
-}) {
-  const month = day.slice(0, 7);
-  const { sending } = useCalendar();
-  const [narrow, setNarrow] = useState(true);
-  const [grid, setGrid] = useState<HTMLDivElement | null>(null);
-  // Measured before the first paint, so a wide grid doesn't first show two lines.
-  useLayoutEffect(() => {
-    if (!grid) return;
-    const measure = () => setNarrow(grid.clientWidth / 7 < NARROW_CELL);
-    measure();
-    const watch = new ResizeObserver(measure);
-    watch.observe(grid);
-    return () => watch.disconnect();
-  }, [grid]);
-  return (
-    <div ref={setGrid} className={`cal-month${narrow ? ' narrow' : ''}`} role="grid" aria-label={rangeLabel('month', day)}>
-      <div role="row" className="cal-row">
-        {WEEKDAYS.map((d) => (
-          <span key={d} role="columnheader" className="cal-weekday">
-            {d}
-          </span>
-        ))}
-      </div>
-      {monthGrid(day).map((week) => (
-        <div key={week[0]} role="row" className="cal-row">
-          {week.map((d) => {
-            const list = eventsOnDay(events, d);
-            const { shown, more } = cellLines(list, narrow ? 2 : 3);
-            const count = list.length;
-            const name = `${dayLabel(d)}${count ? `, ${count} ${count === 1 ? 'event' : 'events'}` : ''}`;
-            const classes = ['cal-cell', d.slice(0, 7) !== month && 'outside', d === today && 'today', d < today && 'past'].filter(Boolean).join(' ');
-            const pickDay = () => {
-              reveal.current = true;
-              void calendar.pickDay(d);
-            };
-            // A click on the day that is already picked adds an event to it, as Google Calendar does and as its + does (job #131).
-            const clickDay = (opener: HTMLElement) => (d === day ? onAdd(d, opener) : pickDay());
-            return (
-              // The whole cell picks its day; the date is the button for the keyboard (buttons can't hold the event buttons).
-              <div key={d} role="gridcell" data-day={d} className={classes} aria-selected={d === day} aria-label={name} onClick={(e) => clickDay(e.currentTarget.querySelector<HTMLElement>('.cal-date')!)}>
-                <button type="button" className="cal-date" aria-label={`Show ${dayLabel(d)}`} onClick={(e) => (e.stopPropagation(), clickDay(e.currentTarget))}>
-                  {Number(d.slice(8))}
-                </button>
-                {shown.map((e) => {
-                  const time = cellTime(e, d);
-                  return (
-                    <button
-                      key={e.id}
-                      type="button"
-                      className={`cal-chip${e.allDay ? ' all-day' : ''}${e.editable ? '' : ' read-only'}${answerLook(e)}`}
-                      data-event={e.id}
-                      aria-busy={sending.includes(e.id) || undefined}
-                      aria-label={`${timeLabel(e)} ${e.title}${e.editable ? '' : ', read-only'}${answerSaid(e)}`}
-                      title={`${time && `${time} `}${e.title}`}
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        onPick(e, ev.currentTarget);
-                      }}
-                      onPointerDown={e.editable ? (ev) => onDrag(ev, e) : undefined}
-                    >
-                      {!e.allDay && <span className="cal-chip-dot" aria-hidden="true" />}
-                      <span>
-                        {time && <span className="cal-chip-time">{time}</span>}
-                        <span className="cal-chip-title">{e.title}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-                {more > 0 && (
-                  <button type="button" className="cal-more" onClick={(e) => (e.stopPropagation(), pickDay())}>
-                    +{more} more
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Where a card or overlay sits (job #108, and the form's overlay, job 211): just left of the panel,
- * level with the button it opened from, as `cardPosition` works out; `undefined` on a phone, where
- * its CSS makes it a sheet from the bottom. Measured again when something in `changes` makes it
- * taller, so it stays on screen, and when the panel or the window is resized, so it keeps to the panel's edge.
- */
-function useCardPlace(ref: RefObject<HTMLElement | null>, opener: HTMLElement, changes: unknown[]) {
-  const phone = usePhone();
-  const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
-  const s = useCalendar();
-  const panelWidth = s.widths[s.view];
-  // simple: level with where the opener was when it opened; it doesn't follow the list if the panel scrolls.
-  const at = useMemo(() => opener.getBoundingClientRect().top, [opener]);
-  useLayoutEffect(() => {
-    const measure = () => {
-      const card = ref.current;
-      const panel = opener.closest('.side-panel');
-      if (phone || !card || !panel || !opener.isConnected) return;
-      const size = { width: card.offsetWidth, height: card.offsetHeight };
-      setPlace(cardPosition({ top: at }, panel.getBoundingClientRect(), size, { width: window.innerWidth, height: window.innerHeight }));
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [ref, phone, opener, at, panelWidth, ...changes]);
-  return phone || !place ? undefined : place;
-}
-
-/**
- * The small card a clicked event opens, as in Google Calendar (owner request, 2026-10-19, job #108):
- * beside the event with the list still in view (a sheet from the bottom on a phone). The pencil opens
- * the change form, the trash deletes (as the form's Delete does: a one-off at once, a series after
- * asking which, job #209), and so do Delete and Backspace; pressed again, they answer a series' question
- * with all of it. Others' events, and Google's special kinds, show without pencil and trash.
- */
-function EventCard({ event, sending, opener, onClose, onEdit }: { event: CalEvent; sending: boolean; opener: HTMLElement; onClose: () => void; onEdit: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const draft = draftFor(event);
-  // Gone (another event's card opened, or the panel closed) before Google answered: nothing to close or focus.
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-  // Deleted: the keyboard goes to the panel, as the event's button is gone. The card may already be
-  // gone too (its button left the page first), so only a keyboard left with nowhere to be moves.
-  const { note, busy, ask, setAsk, next } = useChange(event, () => {
-    if (alive.current) onClose();
-    if (document.activeElement === document.body) document.querySelector<HTMLElement>('.side-panel')?.focus();
-  });
-  const remove = () => next('delete', draft, {}, 'start');
-  const close = () => {
-    onClose();
-    if (opener.isConnected) opener.focus();
-  };
-  const cancel = () => {
-    setAsk(null);
-    ref.current?.focus();
-  };
-  const place = useCardPlace(ref, opener, [ask, note]);
-
-  // preventScroll: the first focus can come before the card has its place.
-  useEffect(() => ref.current?.focus({ preventScroll: true }), []);
-  // Escape and Delete belong to the card while it is open, wherever the keyboard is (capture: before
-  // the board's own shortcuts, so a block selected on the board is never deleted behind it; and
-  // stopImmediatePropagation, so the side panel's own Escape never runs after it, whichever was added first).
-  // While a delete of all of a series is on its way the card stays, so Google's answer (or refusal) can show in it.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
-      if (shortcutsOpen || confirm || deleteCompleted || panelCovers() || isTextField(e.target)) return;
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        if (busy) return;
-        if (ask) cancel();
-        else close();
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        // Only a fresh press: a held key's auto-repeat never deletes or answers.
-        if (!event.editable || busy || sending || e.repeat) return;
-        if (!ask) remove();
-        // A fresh second press answers a series' "Delete?" with all of it (job #132). Never the guest-email question.
-        else if (ask.action === 'delete' && ask.step === 'which') next('delete', draft, { all: true }, 'which');
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.toLowerCase() === 'e' || (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a'))))) {
-        // E, or Enter on the card itself (a button keeps its own Enter), edits it as the pencil does (owner request 2026-11-17).
-        if (!event.editable || busy || sending || ask || e.repeat) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        onEdit();
-      } else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
-        // Ctrl+D: a copy at the same time, without its guests, so no one is invited unasked (owner request 2026-11-17).
-        // Never the board's duplicate or the browser's bookmark behind the card.
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        if (!event.editable || busy || sending || ask || e.repeat) return;
-        void calendar.copy(event.id);
-        close();
-      } else if ((busy || ask) && !e.ctrlKey && !e.metaKey && !e.altKey && ['n', 't', 'ArrowLeft', 'ArrowRight'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) {
-        // N, T, ← and → wait while its question is open or a series delete is on its way (they would close the card).
-        e.stopImmediatePropagation();
-      }
-    };
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  });
-  // A click or tap anywhere else closes it, except on the panel's resize strip, so the card can follow
-  // the edge, and on its own event's button, whose click edits it (job #131). While all of a series is being deleted, clicks elsewhere in the panel (another event, another
-  // week, the panel's ×) wait too, so the card stays to show Google's answer.
-  useEffect(() => {
-    const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
-    const down = (e: PointerEvent) => {
-      const on = e.target instanceof Element ? e.target : null;
-      if (!busy && outside(e.target) && on?.closest('[data-event]')?.getAttribute('data-event') !== event.id && !on?.closest('.panel-resize')) onClose();
-    };
-    const click = (e: MouseEvent) => {
-      if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    document.addEventListener('pointerdown', down, true);
-    document.addEventListener('click', click, true);
-    return () => {
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('click', click, true);
-    };
-  });
-
-  return (
-    <div ref={ref} className="cal-card" role="dialog" aria-label={event.title} tabIndex={-1} style={place}>
-      <div className="cal-card-tools">
-        {event.editable && (
-          <>
-            {/* Not while an earlier change to it is still on its way to Google (owner request 2026-11-17). */}
-            <button type="button" className="icon-button" aria-label="Edit event" title="Edit event" disabled={busy || sending || ask !== null} onClick={onEdit}>
-              <PencilIcon />
-            </button>
-            <button type="button" className="icon-button" aria-label="Delete event" title="Delete event" disabled={busy || sending || ask !== null} onClick={remove}>
-              <TrashIcon />
-            </button>
-          </>
-        )}
-        <button type="button" className="icon-button" aria-label="Close" title="Close" disabled={busy} onClick={close}>
-          <CloseIcon />
-        </button>
-      </div>
-      <h3 className="cal-detail-title">{event.title}</h3>
-      <p className="cal-detail-when">{whenLabel(event)}</p>
-      {draft.guests.length > 0 && (
-        <ul className="cal-guests" aria-label="Guests">
-          {draft.guests.map((g) => (
-            <li key={g}>
-              <span className="cal-guest">{g}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!event.editable && (
-        <>
-          <p className="history-note">Events from others, events with their own reminders, and Google’s special kinds (like Out of office) can only be changed in Google Calendar.</p>
-          <a className="tb-button cal-open" href={event.link} target="_blank" rel="noopener noreferrer">
-            <ExternalIcon />
-            Open in Google Calendar
-          </a>
-        </>
-      )}
-      {note && (
-        <p className="cal-error" role="status">
-          {note}
-        </p>
-      )}
-      {ask && <Question event={event} draft={draft} ask={ask} next={next} onCancel={cancel} />}
-    </div>
-  );
-}
-
-/**
- * The questions asked before saving or deleting (job #85): "which events?" for one of a repeating
- * series, then "Send update emails to guests?" when there are guests. A one-off event is deleted
- * without asking (owner request, 2026-10-24, job #209); its Undo message brings it back (job 217).
- */
-type Ask = { action: 'save' | 'delete'; step: 'which' | 'emails'; all?: boolean };
-type Next = (action: Ask['action'], d: Draft, choice: Choice, step: 'start' | Ask['step']) => void;
-
-/** Saving or deleting an event, asking first: used by the change form and the event's card alike. */
-function useChange(event: CalEvent | null, onDone: () => void) {
-  const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // "All events in the series" waits for Google with the form open, so its Save says Saving… (one event is shown at once).
-  const [saving, setSaving] = useState(false);
-  const [ask, setAsk] = useState<Ask | null>(null);
-
-  async function run(waits: boolean, action: () => Promise<string | null>) {
-    setBusy(true);
-    setSaving(waits);
-    const problem = await action();
-    setBusy(false);
-    setSaving(false);
-    if (problem) setNote(problem);
-    else onDone();
-  }
-
-  /** Asks the next question, or saves / deletes with the answers given. */
-  const next: Next = (action, d, choice, step) => {
-    if (step === 'start' && event?.series) return setAsk({ action, step: 'which' });
-    if (step !== 'emails' && emailGuests(event, action === 'save' ? d : null)) return setAsk({ action, step: 'emails', all: choice.all });
-    setAsk(null);
-    const waits = action === 'save' && choice.all === true && !!event?.series;
-    void run(waits, () => (action === 'save' ? calendar.save(event, d, choice) : calendar.remove(event!.id, choice)));
-  };
-
-  return { note, setNote, busy, saving, ask, setAsk, next };
-}
-
-/**
- * Adding (`event` null) or changing one of the person's own events; Delete asks only for a series or
- * guests (job #209). An overlay like the event card (owner request, 2026-10-24, job 211), opened from
- * `opener`, with the list still in view: adding starts as a small quick-add (title, day, times, All day), "More options" opens the
- * full form with what was typed kept; changing opens the full form straight away. Escape, × or a
- * click outside close it without saving; saving or deleting closes it.
- */
-function EventForm({ event, start, opener, onClose }: { event: CalEvent | null; start: Draft; opener: HTMLElement; onClose: () => void }) {
-  const [draft, setDraft] = useState(start);
-  const [guest, setGuest] = useState('');
-  const [more, setMore] = useState(event !== null);
-  const [seriesRepeat, setSeriesRepeat] = useState<{ status: 'loading' | 'ready' | 'error'; initial: Repeat; anchor: DayKey }>(() =>
-    event?.series ? { status: 'loading', initial: { kind: 'none' }, anchor: start.startDate } : { status: 'ready', initial: { kind: 'none' }, anchor: start.startDate },
-  );
-  const ref = useRef<HTMLFormElement>(null);
-  const title = useRef<HTMLInputElement>(null);
-  const phone = usePhone();
-  const cover = useKeyboardCover(phone);
-  // Load the series' repeat rule when editing an existing repeating event (anchored to the series' own first day).
-  useEffect(() => {
-    if (!event?.series) return;
-    let alive = true;
-    void calendar.getSeries(event.series).then((series) => {
-      if (!alive) return;
-      if (!series) return setSeriesRepeat({ status: 'error', initial: { kind: 'none' }, anchor: start.startDate });
-      const anchor = draftFor(series).startDate;
-      const parsed = parseRecurrence(series.recurrence, anchor);
-      setSeriesRepeat({ status: 'ready', initial: parsed, anchor });
-      setDraft((d) => (d.repeat === undefined ? { ...d, repeat: parsed } : d));
-    });
-    return () => {
-      alive = false;
-    };
-  }, [event?.series, start.startDate]);
-  // Focus goes back to the button it came from (the panel when that is gone, after a change moved the event).
-  const finish = () => {
-    (opener.isConnected ? opener : document.querySelector<HTMLElement>('.side-panel'))?.focus();
-    onClose();
-  };
-  const { note, setNote, busy, saving, ask, setAsk, next } = useChange(event, finish);
-  const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const endTimes = endTimeOptions(draft.startTime, draft.endDate === draft.startDate);
-  const cancel = () => {
-    setAsk(null);
-    ref.current?.focus();
-  };
-  const repeatAnchor = event?.series && seriesRepeat.status === 'ready' ? seriesRepeat.anchor : draft.startDate;
-  const currentRepeat: Repeat = draft.repeat ?? seriesRepeat.initial;
-  const repeatChanged =
-    Boolean(event?.series) &&
-    seriesRepeat.status === 'ready' &&
-    seriesRepeat.initial.kind !== 'unsupported' &&
-    draft.repeat !== undefined &&
-    !sameRepeat(seriesRepeat.initial, draft.repeat, repeatAnchor, start.allDay);
-  const repeatUnit = currentRepeat.kind === 'custom' ? currentRepeat.rule.unit : '';
-  const place = useCardPlace(ref, opener, [more, ask, note, draft.allDay, draft.guests.length, seriesRepeat.status, currentRepeat.kind, repeatUnit]);
-
-  // Escape closes it (first the question, if one is open), wherever the keyboard is, even in the title
-  // (capture and stopImmediatePropagation, as for the card: the board's shortcuts and the panel's own Escape never see it).
-  // While a change to all of a series is on its way it stays, so Google's answer (or refusal) can show in it.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const { shortcutsOpen, confirm, deleteCompleted } = appStore.getState().ui;
-      if (e.key !== 'Escape' || shortcutsOpen || confirm || deleteCompleted || panelCovers()) return;
-      e.stopImmediatePropagation();
-      // An open time list takes this Escape; the form stays.
-      if (closeTimeList() || busy) return;
-      if (ask) cancel();
-      else finish();
-    };
-    window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
-  });
-  // A click or tap anywhere else closes it, as for the card, except on the panel's resize strip (so the
-  // overlay can follow the edge). Nothing typed is asked about: it closes, as Google Calendar's does.
-  // While a change to all of a series is on its way, clicks elsewhere in the panel wait too.
-  useEffect(() => {
-    const outside = (t: EventTarget | null) => t instanceof Node && !ref.current?.contains(t);
-    const down = (e: PointerEvent) => {
-      if (!busy && outside(e.target) && !(e.target instanceof Element && e.target.closest('.panel-resize, .time-list'))) onClose();
-    };
-    const click = (e: MouseEvent) => {
-      if (busy && outside(e.target) && e.target instanceof Element && e.target.closest('.side-panel')) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    document.addEventListener('pointerdown', down, true);
-    document.addEventListener('click', click, true);
-    return () => {
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('click', click, true);
-    };
-  });
-
-  /** Adds the guest typed in: the draft with it, or null (and a note) when it isn't an email address. */
-  function addGuest(): Draft | null {
-    const email = guest.trim();
-    if (!email) return draft;
-    if (!isEmail(email)) {
-      setNote(BAD_EMAIL);
-      return null;
-    }
-    const next = { ...draft, guests: withGuest(event, draft.guests, email) };
-    setDraft(next);
-    setGuest('');
-    setNote(null);
-    return next;
-  }
-
-  return (
-    <form
-      ref={ref}
-      className={`cal-card cal-form${more ? ' more' : ''}`}
-      aria-label={event ? 'Change event' : 'New event'}
-      noValidate
-      tabIndex={-1}
-      style={phone && cover ? { bottom: cover, maxHeight: (window.visualViewport?.height ?? 0) - 16 } : place}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const typed = addGuest();
-        if (!typed) return;
-        // A time typed in the title ("Dinner 8pm") becomes the start, and leaves the title (owner request, 2026-11-22):
-        // only when the title was changed in this form, so an old name holding a time never moves the event. The form
-        // keeps what was typed, so a Save again after a question's Cancel saves the same.
-        const d = typed.title === start.title ? typed : titleTime(typed);
-        // Wrong times or repeat settings are said before any question (repeat is validated only when it will be saved).
-        if (!draftBody(d, 'UTC')) return setNote(BAD_TIMES);
-        if (!event?.series || repeatChanged) {
-          const repeatErr = d.repeat ? validateRepeat(d.repeat, repeatAnchor) : null;
-          if (repeatErr) return setNote(repeatErr);
-        }
-        if (event?.series && repeatChanged && !canChangeSeries(event, d)) return setNote(REPEAT_SERIES_ONLY);
-        setNote(null);
-        next('save', d, {}, 'start');
-      }}
-    >
-      <div className="cal-card-head">
-        <h3 className="cal-detail-title">{event ? 'Change event' : 'New event'}</h3>
-        <button type="button" className="icon-button" aria-label="Close" title="Close" disabled={busy} onClick={finish}>
-          <CloseIcon />
-        </button>
-      </div>
-      {/* Locked while a question is open, so the answer goes with what was asked about. */}
-      <fieldset className="cal-fields" disabled={ask !== null}>
-        <label className="cal-field">
-          {more && <span>Title</span>}
-          <input ref={title} type="text" aria-label="Title" autoFocus placeholder="(No title)" value={draft.title} onChange={(e) => change({ title: e.currentTarget.value })} />
-        </label>
-        {more ? (
-          <>
-            <label className="cal-check">
-              <input type="checkbox" checked={draft.allDay} onChange={(e) => change({ allDay: e.currentTarget.checked })} />
-              All day
-            </label>
-            <div className="cal-field">
-              <span>Starts</span>
-              <div className="cal-when">
-                <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
-                {!draft.allDay && <TimePicker label="Start time" value={draft.startTime} options={START_TIMES} onChange={(t) => setDraft(moveDraftStartTime(draft, t))} />}
-              </div>
-            </div>
-            <div className="cal-field">
-              <span>Ends</span>
-              <div className="cal-when">
-                <input type="date" aria-label="End date" value={draft.endDate} onChange={(e) => change({ endDate: e.currentTarget.value })} />
-                {!draft.allDay && <TimePicker label="End time" value={draft.endTime} options={endTimes} onChange={(t) => change({ endTime: t })} />}
-              </div>
-            </div>
-            <RepeatField
-              repeat={currentRepeat}
-              status={seriesRepeat.status}
-              startDate={repeatAnchor}
-              labelled={true}
-              onChange={(repeat) => {
-                setNote(null);
-                change({ repeat });
-              }}
-            />
-            <div className="cal-field">
-              <span>Guests</span>
-              {draft.guests.length > 0 && (
-                <ul className="cal-guests">
-                  {draft.guests.map((g) => (
-                    <li key={g}>
-                      <span className="cal-guest">{g}</span>
-                      <button type="button" className="icon-button" aria-label={`Remove guest ${g}`} title="Remove guest" onClick={() => change({ guests: draft.guests.filter((x) => x !== g) })}>
-                        <CloseIcon />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="cal-when">
-                <input
-                  type="email"
-                  aria-label="Guest email"
-                  placeholder="Add a guest by email"
-                  value={guest}
-                  onChange={(e) => setGuest(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    // Enter adds the guest rather than saving.
-                    if (e.key !== 'Enter') return;
-                    e.preventDefault();
-                    addGuest();
-                  }}
-                />
-                <button type="button" className="tb-button" aria-label="Add guest" onClick={addGuest}>
-                  Add
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="cal-field">
-              <input type="date" aria-label="Start date" value={draft.startDate} onChange={(e) => setDraft(moveDraftStart(draft, e.currentTarget.value))} />
-            </div>
-            {!draft.allDay && (
-              <div className="cal-field">
-                <div className="cal-when cal-times">
-                  <TimePicker label="Start time" value={draft.startTime} options={START_TIMES} onChange={(t) => setDraft(moveDraftStartTime(draft, t))} />
-                  <span aria-hidden="true">–</span>
-                  <TimePicker label="End time" value={draft.endTime} options={endTimes} onChange={(t) => change({ endTime: t })} />
-                </div>
-              </div>
-            )}
-            <label className="cal-check">
-              <input type="checkbox" checked={draft.allDay} onChange={(e) => change({ allDay: e.currentTarget.checked })} />
-              All day
-            </label>
-            <RepeatField
-              repeat={currentRepeat}
-              status={seriesRepeat.status}
-              startDate={repeatAnchor}
-              labelled={false}
-              onChange={(repeat) => {
-                setNote(null);
-                change({ repeat });
-              }}
-            />
-          </>
-        )}
-        {note && (
-          <p className="cal-error" role="status">
-            {note}
-          </p>
-        )}
-        <div className="cal-actions">
-          <button type="submit" className="tb-button cal-save" disabled={busy}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          {more ? (
-            <button type="button" className="tb-button" onClick={finish}>
-              Cancel
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="tb-button"
-              onClick={() => {
-                setMore(true);
-                title.current?.focus();
-              }}
-            >
-              More options
-            </button>
-          )}
-          {event && (
-            <button type="button" className="tb-button cal-delete" disabled={busy} onClick={() => next('delete', draft, {}, 'start')}>
-              Delete
-            </button>
-          )}
-        </div>
-      </fieldset>
-      {ask && <Question event={event} draft={draft} ask={ask} repeatChanged={repeatChanged} next={next} onCancel={cancel} />}
-    </form>
-  );
-}
-
-const PRESET_ORDER: PresetKind[] = ['none', 'daily', 'weekly', 'monthly-weekday', 'yearly', 'weekday', 'custom'];
-
-/** Repeat dropdown (Google Calendar presets + Custom…) for quick-add and full event forms (owner request, 2026-11-22). */
-function RepeatField({
-  repeat,
-  status,
-  startDate,
-  labelled,
-  onChange,
-}: {
-  repeat: Repeat;
-  status: 'loading' | 'ready' | 'error';
-  startDate: DayKey;
-  labelled: boolean;
-  onChange: (next: Repeat) => void;
-}) {
-  if (status === 'loading') {
-    return (
-      <label className="cal-field">
-        {labelled && <span>Repeat</span>}
-        <select className="cal-select" aria-label="Repeat" disabled value="loading">
-          <option value="loading">Loading repeat…</option>
-        </select>
-      </label>
-    );
-  }
-  if (status === 'error') {
-    return (
-      <div className="cal-field">
-        {labelled && <span>Repeat</span>}
-        <p className="cal-repeat-readonly">Repeat couldn’t be loaded (left unchanged)</p>
-      </div>
-    );
-  }
-  if (repeat.kind === 'unsupported') {
-    return (
-      <div className="cal-field">
-        {labelled && <span>Repeat</span>}
-        <p className="cal-repeat-readonly">Custom repeat (edit in Google Calendar)</p>
-      </div>
-    );
-  }
-
-  const labels = presetLabels(startDate);
-  const selectPreset = (kind: PresetKind) => {
-    if (kind === 'custom') onChange({ kind: 'custom', rule: customFrom(repeat, startDate) });
-    else onChange({ kind });
-  };
-  const updateCustom = (patch: Partial<CustomRepeat>) => {
-    if (repeat.kind !== 'custom') return;
-    onChange({ kind: 'custom', rule: { ...repeat.rule, ...patch } });
-  };
-  const changeUnit = (unit: RepeatUnit) => {
-    if (repeat.kind !== 'custom') return;
-    const base: CustomRepeat = { interval: repeat.rule.interval, unit, end: repeat.rule.end };
-    if (unit === 'week') base.days = repeat.rule.days?.length ? repeat.rule.days : [weekdayCodeOf(startDate)];
-    if (unit === 'month') base.monthlyBy = repeat.rule.monthlyBy ?? 'day';
-    onChange({ kind: 'custom', rule: base });
-  };
-  const toggleDay = (code: WeekdayCode) => {
-    if (repeat.kind !== 'custom') return;
-    const current = repeat.rule.days ?? [];
-    const has = current.includes(code);
-    if (has && current.length <= 1) return;
-    const nextDays = has ? current.filter((d) => d !== code) : [...current, code];
-    updateCustom({ days: WEEKDAY_CODES.filter((c) => nextDays.includes(c)) });
-  };
-
-  const monthly = monthlyLabels(startDate);
-  const plural = repeat.kind === 'custom' && repeat.rule.interval !== 1;
-
-  return (
-    <div className="cal-field">
-      {labelled && <span>Repeat</span>}
-      <select className="cal-select" aria-label="Repeat" value={repeat.kind} onChange={(e) => selectPreset(e.currentTarget.value as PresetKind)}>
-        {PRESET_ORDER.map((k) => (
-          <option key={k} value={k}>
-            {labels[k]}
-          </option>
-        ))}
-      </select>
-      {repeat.kind === 'custom' && (
-        <div className="cal-repeat-custom">
-          <div className="cal-repeat-row">
-            <span className="cal-repeat-label">Every</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={99}
-              className="cal-repeat-num"
-              aria-label="Repeat interval"
-              value={repeat.rule.interval > 0 ? repeat.rule.interval : ''}
-              onChange={(e) => updateCustom({ interval: e.currentTarget.value === '' ? 0 : Math.trunc(Number(e.currentTarget.value)) })}
-            />
-            <select className="cal-select cal-repeat-unit" aria-label="Repeat unit" value={repeat.rule.unit} onChange={(e) => changeUnit(e.currentTarget.value as RepeatUnit)}>
-              <option value="day">{plural ? 'days' : 'day'}</option>
-              <option value="week">{plural ? 'weeks' : 'week'}</option>
-              <option value="month">{plural ? 'months' : 'month'}</option>
-              <option value="year">{plural ? 'years' : 'year'}</option>
-            </select>
-          </div>
-          {repeat.rule.unit === 'week' && (
-            <div className="cal-repeat-days" role="group" aria-label="Repeat on">
-              {WEEKDAY_CODES.map((code, i) => {
-                const on = repeat.rule.days?.includes(code) ?? false;
-                return (
-                  <button key={code} type="button" className={`cal-repeat-day${on ? ' on' : ''}`} aria-label={WEEKDAY_NAMES[i]} aria-pressed={on} onClick={() => toggleDay(code)}>
-                    {WEEKDAY_INITIALS[i]}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {repeat.rule.unit === 'month' && (
-            <select
-              className="cal-select"
-              aria-label="Monthly on"
-              value={repeat.rule.monthlyBy ?? 'day'}
-              onChange={(e) => updateCustom({ monthlyBy: e.currentTarget.value as 'day' | 'weekday' })}
-            >
-              <option value="day">{monthly.day}</option>
-              <option value="weekday">{monthly.weekday}</option>
-            </select>
-          )}
-          <div className="cal-repeat-ends" role="radiogroup" aria-label="Ends">
-            <span className="cal-repeat-label">Ends</span>
-            <div className="cal-repeat-end">
-              <label className="cal-repeat-radio">
-                <input type="radio" name="cal-repeat-end" checked={repeat.rule.end.kind === 'never'} onChange={() => updateCustom({ end: { kind: 'never' } })} />
-                <span>Never</span>
-              </label>
-            </div>
-            <div className="cal-repeat-end">
-              <label className="cal-repeat-radio">
-                <input
-                  type="radio"
-                  name="cal-repeat-end"
-                  checked={repeat.rule.end.kind === 'on'}
-                  onChange={() => updateCustom({ end: { kind: 'on', date: repeat.rule.end.kind === 'on' ? repeat.rule.end.date : defaultEndDate(startDate) } })}
-                />
-                <span>On</span>
-              </label>
-              <input
-                type="date"
-                aria-label="Repeat end date"
-                value={repeat.rule.end.kind === 'on' ? repeat.rule.end.date : defaultEndDate(startDate)}
-                onFocus={() => {
-                  if (repeat.rule.end.kind !== 'on') updateCustom({ end: { kind: 'on', date: defaultEndDate(startDate) } });
-                }}
-                onChange={(e) => updateCustom({ end: { kind: 'on', date: e.currentTarget.value } })}
-              />
-            </div>
-            <div className="cal-repeat-end">
-              <label className="cal-repeat-radio">
-                <input
-                  type="radio"
-                  name="cal-repeat-end"
-                  checked={repeat.rule.end.kind === 'after'}
-                  onChange={() => updateCustom({ end: { kind: 'after', count: repeat.rule.end.kind === 'after' ? repeat.rule.end.count : 10 } })}
-                />
-                <span>After</span>
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={999}
-                className="cal-repeat-num"
-                aria-label="Repeat occurrences"
-                value={repeat.rule.end.kind === 'after' ? (repeat.rule.end.count > 0 ? repeat.rule.end.count : '') : 10}
-                onFocus={() => {
-                  if (repeat.rule.end.kind !== 'after') updateCustom({ end: { kind: 'after', count: 10 } });
-                }}
-                onChange={(e) => updateCustom({ end: { kind: 'after', count: e.currentTarget.value === '' ? 0 : Math.trunc(Number(e.currentTarget.value)) } })}
-              />
-              <span className="cal-repeat-suffix">{repeat.rule.end.kind === 'after' && repeat.rule.end.count === 1 ? 'time' : 'times'}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Phone: how much of the bottom of the window the on-screen keyboard covers, so the sheet sits above it (0 with no keyboard up). */
-function useKeyboardCover(phone: boolean) {
-  const [cover, setCover] = useState(0);
-  useEffect(() => {
-    const v = window.visualViewport;
-    if (!phone || !v) return;
-    const update = () => setCover(keyboardCover());
-    v.addEventListener('resize', update);
-    v.addEventListener('scroll', update);
-    return () => {
-      v.removeEventListener('resize', update);
-      v.removeEventListener('scroll', update);
-    };
-  }, [phone]);
-  return phone ? cover : 0;
-}
-
-/**
- * The guest question for a drag-and-drop move (owner request, 2026-11-11), a small card by the chip that was
- * dragged; the move itself waits for the answer. Escape, or a press anywhere else, drops it and the event stays.
- */
-function MoveAsk({ event, from, to, opener, onClose }: { event: CalEvent; from: DayKey; to: DayKey; opener: HTMLElement; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const draft = dragDraft(event, from, to)!;
-  const place = useCardPlace(ref, opener, []);
-  const cancel = () => {
-    onClose();
-    if (opener.isConnected) opener.focus();
-  };
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || panelCovers()) return;
-      e.stopImmediatePropagation();
-      cancel();
-    };
-    const down = (e: PointerEvent) => {
-      if (e.target instanceof Node && !ref.current?.contains(e.target)) onClose();
-    };
-    window.addEventListener('keydown', key, true);
-    document.addEventListener('pointerdown', down, true);
-    return () => {
-      window.removeEventListener('keydown', key, true);
-      document.removeEventListener('pointerdown', down, true);
-    };
-  });
-  return (
-    <div ref={ref} className="cal-card" style={place}>
-      <Question
-        event={event}
-        draft={draft}
-        ask={{ action: 'save', step: 'emails' }}
-        next={(_action, _d, choice) => {
-          onClose();
-          void calendar.move(event.id, from, to, choice);
-        }}
-        onCancel={cancel}
-      />
-    </div>
-  );
-}
-
-/** The question open before a save or delete goes ahead: which events, then whether to email the guests. */
-function Question({ event, draft, ask, repeatChanged = false, next, onCancel }: { event: CalEvent | null; draft: Draft; ask: Ask; repeatChanged?: boolean; next: Next; onCancel: () => void }) {
-  const seriesOk = canChangeSeries(event, draft);
-  const title = ask.step === 'emails' ? 'Send update emails to guests?' : ask.action === 'save' ? 'Save changes to which events?' : `Delete “${event?.title}”?`;
-  const pick = (all: boolean) => () => next(ask.action, draft, { all }, 'which');
-  // A series' delete question takes the keyboard itself, not a delete button, so a held Enter's auto-repeat
-  // (from the trash or the form's Delete) can't delete "Only this event" (job #209). Tab reaches the buttons.
-  const pair = ask.step === 'which' && ask.action === 'delete';
-  const seriesOnly = ask.step === 'which' && ask.action === 'save' && repeatChanged;
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (pair) box.current?.focus();
-  }, [pair]);
-  return (
-    <div
-      ref={box}
-      className="confirm cal-confirm"
-      role="alertdialog"
-      aria-label={title}
-      tabIndex={pair ? -1 : undefined}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onCancel();
-      }}
-    >
-      <div className="confirm-title">{title}</div>
-      {ask.step === 'which' && ask.action === 'save' && !seriesOk && <p className="history-note">Moving it to another day, or to or from all day, changes only this event.</p>}
-      {seriesOnly && seriesOk && <p className="history-note">Changing how it repeats updates all events in the series.</p>}
-      <div className={pair ? 'confirm-actions cal-pair' : 'confirm-actions'}>
-        {ask.step === 'emails' ? (
-          <>
-            <button type="button" className="confirm-cancel" onClick={() => next(ask.action, draft, { all: ask.all, notify: false }, 'emails')}>
-              Don’t send
-            </button>
-            <button type="button" className="confirm-send" autoFocus onClick={() => next(ask.action, draft, { all: ask.all, notify: true }, 'emails')}>
-              Send
-            </button>
-          </>
-        ) : (
-          // Only a series is asked which (job #209). Deleting has no Keep: Escape, × or a click outside keep it.
-          <>
-            {ask.action === 'save' && (
-              <button type="button" className="confirm-cancel" onClick={onCancel}>
-                Cancel
-              </button>
-            )}
-            {!seriesOnly && (
-              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={!pair} onClick={pick(false)}>
-                Only this event
-              </button>
-            )}
-            {(ask.action === 'delete' || seriesOk) && (
-              <button type="button" className={ask.action === 'delete' ? 'confirm-delete' : 'confirm-send'} autoFocus={seriesOnly} onClick={pick(true)}>
-                All events in the series
-              </button>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }

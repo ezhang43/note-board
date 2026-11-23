@@ -3,14 +3,17 @@ import { HOTKEYS_KEY, startingHotkeys } from '../model/hotkeys';
 import { COLOR_THEME_KEY, startingColorTheme } from '../model/theme';
 import { blockActions } from './actions/blocks';
 import { boardActions } from './actions/boards';
-import { completedPanelActions } from './actions/completedPanel';
 import { checklistActions } from './actions/checklist';
+import { checklistPanelActions } from './actions/checklistPanel';
+import { completedPanelActions } from './actions/completedPanel';
 import { formatActions } from './actions/format';
 import { gestureActions } from './actions/gestures';
+import { habitColorActions } from './actions/habitColor';
+import { habitActions } from './actions/habits';
+import { journalActions } from './actions/journal';
 import { planActions } from './actions/plan';
 import { templateActions } from './actions/templates';
 import { weightActions } from './actions/weight';
-import { habitColorActions } from './actions/habitColor';
 import { announce } from './announce';
 import { createCore } from './core';
 import { later, type Schedule } from './env';
@@ -36,6 +39,9 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
   // The color theme is a per-device setting like light / dark, started from what this device saved.
   ctx.updateView((v) => ({ ...v, colorTheme: startingColorTheme(saved(storage, COLOR_THEME_KEY)), hotkeys: startingHotkeys(saved(storage, HOTKEYS_KEY)) }));
   const boards = boardActions(ctx);
+  const journal = journalActions(ctx);
+  const habits = habitActions(ctx);
+  const checklistPanel = checklistPanelActions(ctx);
   /** Undo or redo, told to screen readers when it changed the board. */
   const step = (which: 'undo' | 'redo') => () => {
     const before = ctx.state.board;
@@ -65,8 +71,11 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     },
     ...blockActions(ctx),
     ...boards,
-    ...weightActions(ctx, boards.habitsBoard),
-    ...habitColorActions(ctx, boards.habitsBoard),
+    ...journal,
+    ...habits,
+    ...checklistPanel,
+    ...weightActions(ctx, habits.habitsBoard),
+    ...habitColorActions(ctx, habits.habitsBoard),
     ...gestureActions(ctx),
     ...templateActions(ctx),
     ...planActions(ctx),
@@ -105,7 +114,7 @@ export function createStore(storage: StorageLike | null, schedule: Schedule = la
     ...base,
     storeFor,
     ...completedPanelActions(ctx, {
-      checklist: boards.completedChecklist,
+      checklist: checklistPanel.completedChecklist,
       restoreOn: (id, itemId) => storeFor(id).restoreCompleted(itemId),
       undo: base.undo,
       redo: base.redo,

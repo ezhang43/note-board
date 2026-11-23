@@ -16,6 +16,8 @@ const RISKY = [
   /^src\/model\/workspace\.ts$/,
   // Sharing: who may see and change a board, and how copies of a shared board merge.
   /^src\/store\/sharing\.ts$/,
+  /^src\/store\/shareStorage\.ts$/,
+  /^src\/store\/shareComments\.ts$/,
   /^src\/store\/account\.ts$/,
   /^src\/model\/merge\.ts$/,
   /^src\/model\/sharing\.ts$/,

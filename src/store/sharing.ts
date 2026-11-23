@@ -1,15 +1,18 @@
-import { commentable, commentText, lastAt, threadOf, type Comment } from '../model/comments';
 import { deepEqual, mergeBoardSets } from '../model/merge';
 import { shownName } from '../model/board';
 import type { StorageLike } from '../model/persist';
 import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, randomKey, readShare, savedByNewer, serializeShare } from '../model/sharing';
 import type { Board } from '../model/types';
 import { readWorkspace, type Workspace } from '../model/workspace';
-import { NO_LINKS, ROLES, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
+import { NO_LINKS, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
+import { createShareComments } from './shareComments';
+import { noteOwn, readBase, readOwn, readRemembered, saveBase, saveRemembered } from './shareStorage';
 import type { Store } from './store';
 import { SYNC_DELAY, type Remote, type SaveState } from './sync';
 import type { ShareInfo } from './types';
 import { saveSafetyVersion, type VersionStore } from './versions';
+
+export { baseKey, boardsInKeptShares, commentsSeenKey, ownBoardsKey, sharesKey } from './shareStorage';
 
 // Shared boards (owner request, 2026-10-05: several people editing at once). A shared board, with
 // every board inside it, is kept online apart from its owner's other boards. Every page that has it
@@ -20,51 +23,6 @@ import { saveSafetyVersion, type VersionStore } from './versions';
 //   not sent yet).
 // The version both sides last agreed on ("base") is kept on the device, so changes made offline,
 // or before a reload, are still combined correctly later.
-
-/** Where the last agreed version of share `id` is kept on this device. */
-export const baseKey = (id: string) => `note-board:share-base:${id}`;
-/** Which shares this device had for person `uid`, so they are known as shared before the server answers. */
-export const sharesKey = (uid: string) => `note-board:shares:${uid}`;
-/** Up to when person `uid` has seen each card's comments on this device ({"share/card": time}): the chip's "new" dot (D2). */
-export const commentsSeenKey = (uid: string) => `note-board:comments-seen:${uid}`;
-/** Boards this device has seen as person `uid`'s own (see `own` in startSharing). */
-export const ownBoardsKey = (uid: string) => `note-board:own-boards:${uid}`;
-
-/**
- * Every board in the shares' data kept on this device (see baseKey) for person `uid`, read straight
- * from storage, so their own-board sync can leave them alone before the shares are known. Only the
- * shares on their list kept here (sharesKey), so another account's shares on this device don't
- * count; with no list kept yet, every share kept here counts except those on another account's
- * list (job #145: they are that account's).
- */
-export function boardsInKeptShares(storage: { length: number; key(i: number): string | null; getItem(key: string): string | null }, uid: string): Set<string> {
-  const out = new Set<string>();
-  try {
-    const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i) ?? '');
-    const listed = (key: string) => {
-      const list = JSON.parse(storage.getItem(key) || 'null') as unknown;
-      return Array.isArray(list) ? list.map((x) => baseKey(String((x as { id?: unknown })?.id))) : null;
-    };
-    const mine = listed(sharesKey(uid));
-    const theirs = (key: string) => {
-      try {
-        return listed(key) ?? [];
-      } catch {
-        return []; // another account's damaged list
-      }
-    };
-    const others = new Set(mine ? [] : keys.filter((k) => k.startsWith(sharesKey('')) && k !== sharesKey(uid)).flatMap(theirs));
-    for (const key of keys) {
-      if (!key.startsWith(baseKey('')) || (mine ? !mine.includes(key) : others.has(key))) continue;
-      const saved = JSON.parse(storage.getItem(key) || 'null') as { data?: unknown } | null;
-      const got = typeof saved?.data === 'string' ? readShare(saved.data) : null;
-      Object.keys(got?.boards ?? {}).forEach((id) => out.add(id));
-    }
-  } catch {
-    // Storage that can't be read: nothing known.
-  }
-  return out;
-}
 
 /**
  * Which boards the person's own-board sync (startSync) leaves alone: the shared ones (`shared`) and,
@@ -112,6 +70,17 @@ export function ownBoardsGuard(store: Store, online: Remote, shared: (boardId: s
 /** A save that failed (no connection, say) is tried again after this long. */
 const RETRY_MS = 5000;
 
+/**
+ * Upload lifecycle of a share:
+ * - `idle`: no request in flight (`failed` stays true after a refused save until a later save succeeds).
+ * - `uploading`: a save is in flight (`again` queues one follow-up save; `failed` keeps any prior refused banner until this save settles).
+ * - `deleting`: the owner is deleting the share; nothing more is scheduled or sent (`inFlight` tracks an upload started before deleteShare so a failed delete restores `uploading`).
+ */
+type UploadState =
+  | { kind: 'idle'; failed: boolean }
+  | { kind: 'uploading'; again: boolean; failed: boolean }
+  | { kind: 'deleting'; inFlight: boolean; again: boolean; failed: boolean };
+
 interface Share {
   id: string;
   /** The shared board; null until known (first download on this device). */
@@ -120,8 +89,6 @@ interface Share {
   ownerUid: string;
   links: Links;
   people: Member[];
-  /** Its comments (job 161, PR 4), as last heard. */
-  comments: Comment[];
   /** This person's role on it (job 161): from People, else as kept on this device; null while not known. Use roleOf. */
   role: Role | null;
   /** People has answered (or failed) at least once: a join waits for the role only until then. */
@@ -138,11 +105,7 @@ interface Share {
   /** Refused because it was saved by a newer version of the app: it stays on the person's list. Only read while the share has no starting board. */
   unreadable: boolean;
   timer: ReturnType<typeof setTimeout> | null;
-  uploading: boolean;
-  again: boolean;
-  failed: boolean;
-  /** The owner is deleting it: nothing more is sent. */
-  deleting: boolean;
+  upload: UploadState;
   /** Every board card that came with a version of its data (see groupBoardIds). */
   cameWith: Set<string>;
   /** The boards as last seen in the store, to notice changes made here. */
@@ -193,63 +156,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    * one of these. Kept on the device (a card pasted offline is still not followed after a reload),
    * and noted only once the shares this device had are open, so their boards aren't taken for own.
    */
-  const own = new Set<string>(readOwn());
+  const own = new Set<string>(readOwn(opts.storage, backend.me.uid));
   let noting = false;
-  /** Up to when each card's comments were seen here (see commentsSeenKey). */
-  const seen: Record<string, number> = readSeen();
-
-  function readSeen(): Record<string, number> {
-    try {
-      const got = JSON.parse(opts.storage?.getItem(commentsSeenKey(backend.me.uid)) ?? '{}') as unknown;
-      if (!got || typeof got !== 'object' || Array.isArray(got)) return {};
-      return Object.fromEntries(Object.entries(got).filter(([, v]) => typeof v === 'number'));
-    } catch {
-      return {};
-    }
-  }
-
-  /** Kept on the device, along with what another tab of this person's noted meanwhile (the later of the two). */
-  function saveSeen(drop?: string) {
-    for (const [k, at] of Object.entries(readSeen())) if (!(seen[k] >= at)) seen[k] = at;
-    if (drop) for (const k of Object.keys(seen)) if (k.startsWith(`${drop}/`)) delete seen[k];
-    try {
-      opts.storage?.setItem(commentsSeenKey(backend.me.uid), JSON.stringify(seen));
-    } catch {
-      // Storage full: seen on this page only.
-    }
-  }
-
-  /** Share `id`'s cards as seen here: {card: time}. */
-  const seenIn = (id: string) => Object.fromEntries(Object.entries(seen).flatMap(([k, at]) => (k.startsWith(`${id}/`) ? [[k.slice(id.length + 1), at]] : [])));
-
-  function readOwn(): string[] {
-    try {
-      const got = JSON.parse(opts.storage?.getItem(ownBoardsKey(backend.me.uid)) ?? '[]') as unknown;
-      return Array.isArray(got) ? got.filter((x): x is string => typeof x === 'string') : [];
-    } catch {
-      return [];
-    }
-  }
-
-  /** Notes the boards that cards on this person's own boards open (see `own`). */
-  function noteOwn(ws: Workspace, taken: Set<string>) {
-    let grew = false;
-    for (const [id, b] of Object.entries(ws.boards)) {
-      if (taken.has(id)) continue;
-      for (const c of Object.values(b.cards)) {
-        if (c.kind === 'board' && ws.boards[c.boardId] && !taken.has(c.boardId) && !own.has(c.boardId)) {
-          own.add(c.boardId);
-          grew = true;
-        }
-      }
-    }
-    if (!grew) return;
-    try {
-      opts.storage?.setItem(ownBoardsKey(backend.me.uid), JSON.stringify([...own].filter((id) => ws.boards[id])));
-    } catch {
-      // Storage full: still known on this page.
-    }
-  }
 
   /** This person's role on share `s` (whoever shared it is always an editor); null while not known. */
   const roleOf = (s: Share): Role | null => (s.owner ? 'edit' : s.role);
@@ -286,7 +194,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       ids.forEach((id) => taken.add(id));
       out.set(s.id, ids);
     }
-    if (noting) noteOwn(ws, taken);
+    if (noting) noteOwn(opts.storage, backend.me.uid, own, ws, taken);
     groupCache = { ws, key, groups: out };
     return out;
   }
@@ -298,16 +206,16 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     return Object.fromEntries(idsOf(s).map((id) => [id, all[id]]));
   }
 
-  function readBase(id: string): { root: string; boards: Record<string, Board>; rev: number } | null {
-    try {
-      const saved = JSON.parse(opts.storage?.getItem(baseKey(id)) ?? 'null') as { rev?: unknown; data?: unknown } | null;
-      if (!saved || typeof saved.rev !== 'number' || typeof saved.data !== 'string') return null;
-      const got = readShare(saved.data);
-      return got && { ...got, rev: saved.rev };
-    } catch {
-      return null;
-    }
-  }
+  const comments = createShareComments({
+    backend,
+    storage: opts.storage,
+    workspace: () => store.workspace(),
+    getShare: (id) => {
+      const s = shares.get(id);
+      return s ? { people: s.people, role: roleOf(s), boardIds: idsOf(s) } : null;
+    },
+    onChange: publish,
+  });
 
   /**
    * Whether it has been said which shares this person has (job #33): by this device's kept list (read once, at
@@ -316,30 +224,15 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
    */
   let said = false;
 
-  /** The shares this device had (see sharesKey), with this person's role on each when it was known (job 161). */
-  function readRemembered(): { id: string; owner: boolean; ownerUid: string; role: Role | null }[] {
-    try {
-      const got = JSON.parse(opts.storage?.getItem(sharesKey(backend.me.uid)) ?? 'null') as unknown;
-      if (!Array.isArray(got)) return [];
-      const ok = got.filter((x): x is { id: string; owner: boolean; ownerUid: string; role?: unknown } => typeof x?.id === 'string' && typeof x?.owner === 'boolean' && typeof x?.ownerUid === 'string');
-      said = ok.length === got.length;
-      return ok.map((x) => ({ ...x, role: ROLES.find((r) => r === x.role) ?? null }));
-    } catch {
-      return [];
-    }
-  }
-
   let remembered = '';
   function remember() {
     if (stopped) return;
-    const list = JSON.stringify([...shares.values()].map((s) => ({ id: s.id, owner: s.owner, ownerUid: s.ownerUid, role: roleOf(s) ?? undefined })));
-    if (list === remembered) return;
-    remembered = list;
-    try {
-      opts.storage?.setItem(sharesKey(backend.me.uid), list);
-    } catch {
-      // Storage full: the shares are known once the server answers.
-    }
+    remembered = saveRemembered(
+      opts.storage,
+      backend.me.uid,
+      [...shares.values()].map((s) => ({ id: s.id, owner: s.owner, ownerUid: s.ownerUid, role: roleOf(s) })),
+      remembered,
+    );
   }
 
   /**
@@ -364,7 +257,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     s.base = boards;
     s.baseRev = rev;
     boardCardKeys(boards).forEach((k) => s.cameWith.add(k));
-    saveBase(s);
+    saveBase(opts.storage, s.id, s.root, s.base, s.baseRev);
   }
 
   /** The share can't be used here (security review fix): it holds nothing, and a join waiting on it fails. */
@@ -375,14 +268,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     s.arrived.splice(0).forEach((fn) => fn());
     publish();
     checkReady();
-  }
-
-  function saveBase(s: Share) {
-    try {
-      opts.storage?.setItem(baseKey(s.id), s.base && s.root ? JSON.stringify({ rev: s.baseRev, data: serializeShare(s.root, s.base) }) : '');
-    } catch {
-      // Storage full: the share still works, it just isn't combined as well after a reload.
-    }
   }
 
   /** Puts the boards in `next` into the store, removing those of `now` it lacks. */
@@ -407,7 +292,18 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       .filter((s) => s.root && s.ready)
       .map((s) => {
         const role = roleOf(s);
-        return { id: s.id, root: s.root!, boards: idsOf(s), owner: s.owner, ownerUid: s.ownerUid, people: s.people, links: s.links, ...(role ? { role } : {}), comments: s.comments, seen: seenIn(s.id) };
+        return {
+          id: s.id,
+          root: s.root!,
+          boards: idsOf(s),
+          owner: s.owner,
+          ownerUid: s.ownerUid,
+          people: s.people,
+          links: s.links,
+          ...(role ? { role } : {}),
+          comments: comments.commentsOf(s.id),
+          seen: comments.seenOf(s.id),
+        };
       });
     const known = said && [...shares.values()].every((s) => s.ready);
     const ui = store.getState().ui;
@@ -418,7 +314,13 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     // Stopped (signed out, another person): uploads finishing late are no one's to show (job 172).
     if (stopped) return;
     const all = [...shares.values()];
-    opts.onSaveState?.(all.some((s) => s.failed) ? 'failed' : all.some((s) => s.timer || s.uploading) ? 'saving' : 'saved');
+    opts.onSaveState?.(
+      all.some((s) => s.upload.kind !== 'deleting' && s.upload.failed)
+        ? 'failed'
+        : all.some((s) => s.timer || s.upload.kind === 'uploading')
+          ? 'saving'
+          : 'saved',
+    );
   }
 
   function checkReady() {
@@ -428,7 +330,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   }
 
   function schedule(s: Share) {
-    if (s.deleting || stopped) return;
+    if (s.upload.kind === 'deleting' || stopped) return;
     if (s.timer) clearTimeout(s.timer);
     s.timer = setTimeout(() => upload(s), SYNC_DELAY);
     report();
@@ -438,9 +340,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function upload(s: Share) {
     if (s.timer) clearTimeout(s.timer);
     s.timer = null;
-    if (!s.ready || !s.root || !s.base || s.deleting || stopped || !shares.has(s.id)) return report();
-    if (s.uploading) {
-      s.again = true;
+    if (!s.ready || !s.root || !s.base || s.upload.kind === 'deleting' || stopped || !shares.has(s.id)) return report();
+    if (s.upload.kind === 'uploading') {
+      s.upload.again = true;
       return;
     }
     // After one on its way has landed (so what it saved isn't taken back here).
@@ -451,7 +353,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     // Its starting board isn't here (gone from this device): sending would delete it, with every
     // board in it, for everyone. The share's own version comes back with the next one received.
     if (!sent[root]) return report();
-    s.uploading = true;
+    s.upload = { kind: 'uploading', again: false, failed: s.upload.failed };
     report();
     s.seen = sent;
     backend
@@ -468,8 +370,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       )
       .then(
         (after) => {
-          s.uploading = false;
-          s.failed = false;
+          const again = s.upload.kind === 'uploading' && s.upload.again;
+          s.upload = s.upload.kind === 'deleting' ? { kind: 'deleting', inFlight: false, again: false, failed: false } : { kind: 'idle', failed: false };
           const got = readShare(after.data);
           if (got && after.rev > s.baseRev && shares.has(s.id)) {
             const boards = safeBoards(s, got.boards, root);
@@ -479,25 +381,26 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
             applyBoards(now, mergeBoardSets(sent, now, boards));
             s.seen = boardsOf(s);
           }
-          if (s.again) {
-            s.again = false;
-            upload(s);
-          }
+          if (again) upload(s);
           report();
         },
         (e: { code?: string }) => {
-          s.uploading = false;
+          const again = s.upload.kind === 'uploading' && s.upload.again;
+          const deleting = s.upload.kind === 'deleting';
           // Refused since this person can now only view or comment (lowered while it was on its way).
-          if (readOnly(s)) return putBack(s);
+          if (readOnly(s)) {
+            s.upload = deleting ? { kind: 'deleting', inFlight: false, again: false, failed: false } : { kind: 'idle', failed: false };
+            return putBack(s);
+          }
           // Refused (too big, say, in characters or in bytes: review 137-A L3): the red banner, and the
           // next change tries again (trying the same save again would only be refused again). No
           // connection: it tries again quietly.
           // (Firestore's failed-precondition and resource-exhausted can pass: saves clashing, a rate limit.)
-          s.failed = e?.code === 'permission-denied' || e?.code === 'invalid-argument';
+          const failed = e?.code === 'permission-denied' || e?.code === 'invalid-argument';
+          s.upload = deleting ? { kind: 'deleting', inFlight: false, again: false, failed } : { kind: 'idle', failed };
           // A change made while this one was on its way is a new version: it is tried once.
-          if (s.failed && s.again && !s.timer && shares.has(s.id)) schedule(s);
-          s.again = false;
-          if (!s.failed && !s.timer && shares.has(s.id)) s.timer = setTimeout(() => upload(s), RETRY_MS);
+          if (!deleting && failed && again && !s.timer && shares.has(s.id)) schedule(s);
+          if (!deleting && !failed && !s.timer && shares.has(s.id)) s.timer = setTimeout(() => upload(s), RETRY_MS);
           report();
         },
       );
@@ -511,8 +414,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   function putBack(s: Share) {
     if (s.timer) clearTimeout(s.timer);
     s.timer = null;
-    s.again = false;
-    s.failed = false;
+    if (s.upload.kind !== 'deleting') s.upload = { kind: 'idle', failed: false };
     const now = boardsOf(s);
     if (s.root && s.base?.[s.root] && !deepEqual(now, s.base)) {
       const name = shownName(s.base[s.root].name);
@@ -623,12 +525,8 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const versions = opts.versions?.();
     if (versions && ids.length) void saveSafetyVersion(store, versions, Date.now);
     close(s);
-    saveSeen(s.id);
-    try {
-      opts.storage?.setItem(baseKey(s.id), '');
-    } catch {
-      // Nothing to forget.
-    }
+    comments.dropSeen(s.id);
+    saveBase(opts.storage, s.id, null, null, 0);
     if (s.owner) {
       // The owner deleted it: like deleting any board, the boards inside it stay (theirs again).
       if (s.root && ws.boards[s.root]) {
@@ -672,7 +570,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       checkReady();
     }
     if (had || stopped) return had;
-    const saved = start ?? readBase(id);
+    const saved = start ?? readBase(opts.storage, id);
     const s: Share = {
       id,
       root: saved?.root ?? null,
@@ -680,7 +578,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       ownerUid: start ? backend.me.uid : ownerUid,
       links: start?.links ?? NO_LINKS,
       people: start ? [{ ...backend.me, role: 'edit' }] : [],
-      comments: [],
       role,
       heard: false,
       lowered: false,
@@ -690,10 +587,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
       waiting: null,
       unreadable: false,
       timer: null,
-      uploading: false,
-      again: false,
-      failed: false,
-      deleting: false,
+      upload: { kind: 'idle', failed: false },
       cameWith: boardCardKeys(saved?.boards ?? {}),
       seen: {},
       stops: [],
@@ -702,7 +596,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     shares.set(id, s);
     remember();
     s.seen = boardsOf(s);
-    if (start) saveBase(s);
+    if (start) saveBase(opts.storage, s.id, s.root, s.base, s.baseRev);
     s.stops.push(
       backend.watchShare(
         id,
@@ -721,8 +615,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           if (roleOf(s) !== was) remember();
           // Lowered to Can comment or Can view (job 161): changes not sent yet are put back now
           // (one on its way is dealt with when the server answers).
-          if (readOnly(s) && (was === 'edit' || s.failed)) s.lowered = true;
-          if (readOnly(s) && s.ready && !s.uploading && (s.lowered || s.failed)) putBack(s);
+          const failed = s.upload.kind !== 'deleting' && s.upload.failed;
+          if (readOnly(s) && (was === 'edit' || failed)) s.lowered = true;
+          if (readOnly(s) && s.ready && s.upload.kind !== 'uploading' && (s.lowered || failed)) putBack(s);
           publish();
           s.arrived.splice(0).forEach((fn) => fn()); // a join waiting for the role
         },
@@ -731,16 +626,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
           s.arrived.splice(0).forEach((fn) => fn());
         },
       ),
-      backend.watchComments(
-        id,
-        (comments) => {
-          s.comments = comments;
-          publish();
-        },
-        () => {
-          // Refused (not on it any more, or the rules not pasted yet): losing the board is the share's own watch's to report.
-        },
-      ),
+      comments.watch(id),
     );
     publish();
     return s;
@@ -748,7 +634,9 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
 
   // The shares this device had, straight away: their boards are known as shared before the server
   // answers (or if it can't), so the person's own boards never take them as theirs.
-  for (const r of readRemembered()) open(r.id, undefined, r.owner, r.ownerUid, r.role);
+  const initial = readRemembered(opts.storage, backend.me.uid);
+  said = initial.complete;
+  for (const r of initial.items) open(r.id, undefined, r.owner, r.ownerUid, r.role);
   noting = true;
   groupCache = null;
   groups();
@@ -762,7 +650,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         // Left on another device (only by the server's own list: the offline copy may be out of date).
         // One whose leave is on its way here waits for that leave: if it fails, nothing changes.
         for (const s of [...shares.values()])
-          if (!ids.includes(s.id) && s.ready && !s.deleting && !leaving.has(s.id)) gone(s, 'left');
+          if (!ids.includes(s.id) && s.ready && s.upload.kind !== 'deleting' && !leaving.has(s.id)) gone(s, 'left');
         said = true;
         // Kept even when empty, so the next page here knows at once (job #33).
         remember();
@@ -821,16 +709,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     return s;
   };
 
-  /** Share `id`, where this person may comment on card `card` (job 161, PR 4): refused otherwise. */
-  function commentsOn(id: string, card: string) {
-    const s = need(id);
-    const role = roleOf(s);
-    if (role !== 'edit' && role !== 'comment') throw new Error('You can’t comment on this board');
-    const ws = store.workspace();
-    if (!commentable(card) || !idsOf(s).some((b) => ws.boards[b]?.cards[card])) throw new Error('That card isn’t on this shared board');
-    return s;
-  }
-
   return {
     /** Whether board `id` is shared (it then syncs with its share, not with its owner's other boards). */
     isShared: (boardId: string) => shareOf(boardId) !== null,
@@ -851,7 +729,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
         if (!clash.length) continue;
         if (clash.includes(s.root)) [s.root, s.base] = [null, null];
         else s.base = Object.fromEntries(Object.entries(s.base).filter(([id]) => !clash.includes(id)));
-        saveBase(s);
+        saveBase(opts.storage, s.id, s.root, s.base, s.baseRev);
       }
       publish();
     },
@@ -934,48 +812,32 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     /** Owner: deletes the shared board for everyone (the boards inside it stay with the owner). */
     async deleteShare(id: string) {
       const s = need(id);
-      s.deleting = true;
+      s.upload = {
+        kind: 'deleting',
+        inFlight: s.upload.kind === 'uploading' || (s.upload.kind === 'deleting' && s.upload.inFlight),
+        again: s.upload.kind !== 'idle' && s.upload.again,
+        failed: s.upload.failed,
+      };
       if (s.timer) clearTimeout(s.timer);
       s.timer = null;
       try {
         await backend.deleteShare(id);
       } catch (e) {
-        s.deleting = false;
+        if (s.upload.kind === 'deleting') {
+          s.upload = s.upload.inFlight
+            ? { kind: 'uploading', again: s.upload.again, failed: s.upload.failed }
+            : { kind: 'idle', failed: s.upload.failed };
+        }
+        report();
         throw e;
       }
       gone(s, 'deleted');
     },
-    /** Card `card`'s thread on share `id` (job 161, PR 4). */
-    thread: (id: string, card: string) => threadOf(shares.get(id)?.comments ?? [], card),
-    /** Comments on a card as this person (editors and commenters): plain text, 1 to 1,000 characters. */
-    async addComment(id: string, card: string, raw: string) {
-      const s = commentsOn(id, card);
-      const text = commentText(raw);
-      if (!text) throw new Error('A comment is 1 to 1,000 characters');
-      // Their name and photo as on their member record (the rules check it).
-      const me = s.people.find((p) => p.uid === backend.me.uid) ?? backend.me;
-      await backend.addComment(id, { id: `m${randomKey(19)}`, card, text, name: me.name, photo: me.photo });
-    },
-    /** Resolves or reopens card `card`'s thread (kept on its first comment). */
-    async resolve(id: string, card: string, resolved: boolean) {
-      const s = commentsOn(id, card);
-      const first = threadOf(s.comments, card).first;
-      if (!first) throw new Error('No comments on that card');
-      await backend.resolveComment(id, first.id, resolved);
-    },
-    /** Its author, or the person who shared it (checked online). */
-    deleteComment: (id: string, commentId: string) => backend.deleteComment(id, commentId),
-    /** Card `card`'s thread was looked at: its comments so far are no longer new on this device. */
-    markSeen(id: string, card: string) {
-      // Only others' comments count (the dot is for them): this person's own may still carry this device's guess of the time.
-      const t = threadOf(shares.get(id)?.comments ?? [], card);
-      const at = lastAt({ ...t, comments: t.comments.filter((c) => c.author !== backend.me.uid) });
-      const key = `${id}/${card}`;
-      if (!at || seen[key] === at) return;
-      seen[key] = at;
-      saveSeen();
-      publish();
-    },
+    thread: comments.thread,
+    addComment: comments.addComment,
+    resolve: comments.resolve,
+    deleteComment: comments.deleteComment,
+    markSeen: comments.markSeen,
     /** The connection is back: send what is waiting now. */
     retry() {
       for (const s of shares.values()) upload(s);

@@ -217,13 +217,22 @@ export function devCalendarPlugin(): Plugin {
             // but the dev server keeps it simple: a deleted series just hides its instances).
             const withDeleted = url.searchParams.get('showDeleted') === 'true';
             const shown = (e: Event) => (withDeleted ? e.status === 'cancelled' || !gone(e) : !gone(e));
-            // q (search, owner request 2026-11-19): like Google, the text must be in the name, description, place or a guest's email or name.
-            const q = url.searchParams.get('q')?.toLowerCase();
-            const found = (e: Event) =>
-              !q ||
-              [e.summary, e.description, e.location, ...((e.attendees as { email?: string; displayName?: string }[] | undefined) ?? []).flatMap((a) => [a.email, a.displayName])].some(
-                (t) => typeof t === 'string' && t.toLowerCase().includes(q),
+            // q (search, owner request 2026-11-19): like Google Calendar's real `q` parameter, matches whole
+            // words/tokens across name, description, place and guests (not partial substrings — partial matching
+            // is handled client-side via listForSearch, owner request 2026-11-23).
+            const q = url.searchParams.get('q')?.trim().toLowerCase();
+            const words = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+            const qTerms = q ? words(q) : [];
+            const found = (e: Event) => {
+              if (!q) return true;
+              if (!qTerms.length) return false;
+              const pool = new Set(
+                [e.summary, e.description, e.location, ...((e.attendees as { email?: string; displayName?: string }[] | undefined) ?? []).flatMap((a) => [a.email, a.displayName])]
+                  .filter((t): t is string => typeof t === 'string')
+                  .flatMap(words),
               );
+              return qTerms.every((t) => pool.has(t));
+            };
             const items = events.filter((e) => !e.recurrence && shown(e) && found(e) && ms(e.start) < max && ms(e.end) > min).sort((a, b) => ms(a.start) - ms(b.start));
             return send(200, { kind: 'calendar#events', items });
           }

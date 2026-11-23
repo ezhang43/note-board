@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, matchesSearch, mergeSearchResults, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
 import { parseRecurrence, sameRepeat, toRecurrence, validateRepeat } from '../model/calendarRepeat';
 import { HELPER_URL } from '../calendar/helper';
 import { demoUser } from '../sync/demo';
@@ -102,6 +102,12 @@ export interface CalendarSource {
   disconnect?(): Promise<void>;
 }
 
+/** One event with its plain searchable text fields (summary, description, location, guest emails & names) for partial matching. */
+export interface SearchItem {
+  event: CalEvent;
+  fields: string[];
+}
+
 /** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
 export interface CalendarApi {
   list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
@@ -116,6 +122,8 @@ export interface CalendarApi {
   disconnect?(): Promise<void>;
   /** Google's own search of the whole primary calendar, past and future (owner request, 2026-11-19); `today` splits the two. Only reads. */
   search(text: string, today: DayKey): Promise<CalEvent[]>;
+  /** Reads events across a broad window without `q` so partial-word matches still work when Google's whole-word `q` misses them (owner request, 2026-11-23). */
+  listForSearch?(today: DayKey): Promise<SearchItem[]>;
   /** One event: a repeating event's series, to find its first day. */
   get(id: string): Promise<CalEvent | null>;
   /** Resolves to the new event's id (null if Google gave none). */
@@ -141,6 +149,29 @@ export const WIDE_PAGES = 4;
 const SEARCH_CAP = 125;
 // simple: a year with more than SEARCH_PAGES pages of 250 matches loses its newest ones; upgrade if a search ever matches that often.
 const SEARCH_PAGES = 4;
+// Partial-match index (owner request, 2026-11-23): reads 2 years forward and 2 past years a year at a time without `q`
+// (`maxResults=2500`, up to PARTIAL_PAGES pages per window) and keeps it in memory for the session.
+// simple: a single window exceeding PARTIAL_PAGES * 2500 events loses its newest entries; upgrade if a calendar ever has >5,000 events in one year.
+const PARTIAL_YEARS = 2;
+const PARTIAL_PAGES = 2;
+
+/** Searchable text fields of a raw Google event (outside data, checked): title, description, location, guest emails & display names. */
+function searchFields(raw: unknown): string[] {
+  if (typeof raw !== 'object' || raw === null) return [];
+  const e = raw as Record<string, unknown>;
+  const attendees = Array.isArray(e.attendees) ? e.attendees : [];
+  const out: string[] = [];
+  for (const v of [e.summary, e.description, e.location]) {
+    if (typeof v === 'string' && v.trim()) out.push(v);
+  }
+  for (const a of attendees) {
+    if (typeof a !== 'object' || a === null) continue;
+    const g = a as Record<string, unknown>;
+    if (typeof g.email === 'string' && g.email.trim()) out.push(g.email);
+    if (typeof g.displayName === 'string' && g.displayName.trim()) out.push(g.displayName);
+  }
+  return out;
+}
 
 /** The person's answers to the questions the form asks before saving or deleting (job #85). */
 export interface Choice {
@@ -227,6 +258,35 @@ export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url
       const seen = new Set(ahead.map((e) => e.id));
       const past = [...new Map(before.flat().map((e) => [e.id, e])).values()].filter((e) => !seen.has(e.id)).sort((a, b) => a.start.localeCompare(b.start)).slice(-SEARCH_CAP);
       return [...ahead, ...past];
+    },
+    async listForSearch(today) {
+      const [y, m, d] = today.split('-').map(Number);
+      const year = (n: number) => dayKey(new Date(y + n, m - 1, d));
+      const read = async (from: DayKey, to: DayKey): Promise<SearchItem[]> => {
+        const found: SearchItem[] = [];
+        let page: string | undefined;
+        for (let n = 0; n < PARTIAL_PAGES; n++) {
+          const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
+          if (page) q.set('pageToken', page);
+          const res = await call(`${events}?${q}`);
+          await ok(res);
+          const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
+          if (Array.isArray(body.items)) {
+            for (const raw of body.items) {
+              const event = parseEvent(raw);
+              if (event) found.push({ event, fields: searchFields(raw) });
+            }
+          }
+          if (typeof body.nextPageToken !== 'string' || !body.nextPageToken) break;
+          page = body.nextPageToken;
+        }
+        return found;
+      };
+      const pastYears = Array.from({ length: PARTIAL_YEARS }, (_, i) => i);
+      const [ahead, ...before] = await Promise.all([read(today, year(PARTIAL_YEARS)), ...pastYears.map((i) => read(year(-i - 1), year(-i)))]);
+      const byId = new Map<string, SearchItem>();
+      for (const item of [...ahead, ...before.flat()]) if (!byId.has(item.event.id)) byId.set(item.event.id, item);
+      return [...byId.values()];
     },
     async get(id) {
       const res = await call(one(id));
@@ -357,11 +417,14 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   const fetching = new Set<string>();
   /** The series master being read for an open event form, reused once by Save so "All events" doesn't ask Google twice. */
   const seriesReads = new Map<string, { req: Promise<CalEvent | null>; done: boolean; at: number }>();
+  /** Per-session index of events for partial-match search; cleared on any change, fresh open, or person switch. */
+  let searchIndex: Promise<SearchItem[]> | null = null;
   let generation = 0;
   const forget = () => {
     cache.clear();
     fetching.clear();
     seriesReads.clear();
+    searchIndex = null;
     generation++;
   };
   const keep = (key: string, events: CalEvent[]) => {
@@ -396,7 +459,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     const first = cacheFor === undefined;
     cacheFor = now;
     // Learning who it is for the first time is no change, unless something was already kept (then whose it is can't be known).
-    if (first && !cache.size && !state.events) return false;
+    if (first && !cache.size && !state.events && !searchIndex) return false;
     // As opening the panel afresh does, except showing the new person's week: the caller loads it.
     session++;
     forget();
@@ -759,14 +822,33 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     searchTimer = undefined;
     searched++;
   }
+  function getSearchIndex(day: DayKey): Promise<SearchItem[]> {
+    if (!api?.listForSearch) return Promise.resolve([]);
+    if (!searchIndex) {
+      const req = api.listForSearch(day).catch(() => {
+        if (searchIndex === req) searchIndex = null;
+        return [] as SearchItem[];
+      });
+      searchIndex = req;
+    }
+    return searchIndex;
+  }
   async function runSearch() {
     const box = state.search;
     if (!api || !box) return;
+    if (changedPerson()) return void load();
     const n = ++searched;
+    const query = box.text.trim();
+    const day = today();
     try {
-      const results = await api.search(box.text.trim(), today());
-      if (n === searched) set({ search: { ...box, results, note: null, needsAccess: false } });
+      const [fromGoogle, index] = await Promise.all([api.search(query, day), getSearchIndex(day)]);
+      if (changedPerson()) return void load();
+      if (n !== searched) return;
+      const partial = index.filter((item) => matchesSearch(item.fields, query)).map((item) => item.event);
+      const results = partial.length ? mergeSearchResults(fromGoogle, partial, day, SEARCH_CAP) : fromGoogle;
+      set({ search: { ...box, results, note: null, needsAccess: false } });
     } catch (e) {
+      if (changedPerson()) return void load();
       if (n === searched) set({ search: { ...box, results: null, ...accessNote(e) } });
     }
   }

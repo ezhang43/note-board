@@ -42,60 +42,29 @@ export function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       const key = shortcutKey(e);
+      const inChecklist = isInChecklist(e);
 
-      // Undo / redo go through the board's history from anywhere, even inside a text field —
-      // except while a panel covers the board, where they'd change the board unseen: in the panel's own
-      // box the browser undoes its typing (the board is inert then, so that can't reach it); elsewhere nothing.
-      if (panelCovers() && mod && (key === 'z' || key === 'y')) return isTextField(e.target) ? undefined : run(e, () => {});
-      // In the Journal or Habits panel they step that board's own history, leaving the open board as it is.
-      const panel = appStore.getState().ui.sidePanel;
-      const inPanel = e.target instanceof Element && e.target.closest('.side-panel') !== null;
-      // Any side panel, Version history too, the format bar, the toolbar's menus (File, Boards, Arrange, Color, ⋯), the Share
-      // panel and the Undo message: a button or tick box in them is not a text field, but its keys aren't the board's.
-      // The path is read from the event, not the target: Escape closes a menu before this runs and takes its button out of the page.
-      const inAnyPanel = e.composedPath().some((el) => el instanceof Element && el.matches(NOT_THE_BOARD));
-      const inJournal = inPanel && (panel === 'journal' || panel === 'habits');
-      // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
-      // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
-      const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && e.target.closest('.weight-new') !== null;
-      if (inPanel && mod && (key === 'z' || key === 'y') && !emptyWeight && e.target instanceof Element && e.target.closest('.habit-new, .weight-new, .jn-rename')) return;
-      // In the Completed panel they step back through the panel's own unticks, each on the board it changed (owner,
-      // 2026-11-13: it mixes in the Main checklist's items), and with none left do nothing, never the open board's.
-      if (inPanel && panel === 'completed' && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoCompleted);
-      if (inPanel && panel === 'completed' && mod && key === 'y') return run(e, appStore.redoCompleted);
-      // In the Checklist panel on the left, its time picker or items selected there, they step the checklist's own history (owner request, 2026-11-12), leaving the open board as it is.
-      const sel = appStore.getState().ui.itemSel;
-      // Not while typing elsewhere or on the board: there the keys are that box's or the board's.
-      const elsewhere = e.target instanceof Element && !e.target.closest('.checklist-panel') && (isTextField(e.target) || e.target.closest('[data-testid="canvas"]') !== null);
-      const selInChecklist = !!sel && storeOfCard(sel.cardId) !== appStore && !inAnyPanelBut(e, '.checklist-panel') && !elsewhere;
-      const inChecklist = (e.target instanceof Element && e.target.closest('.checklist-panel, [data-checklist-scope]') !== null) || selInChecklist;
-      if (inChecklist && mod && key === 'z' && !e.shiftKey) return run(e, appStore.undoChecklist);
-      if (inChecklist && mod && key === 'y') return run(e, appStore.redoChecklist);
-      const [undo, redo] = panel === 'habits' ? [appStore.undoHabits, appStore.redoHabits] : [appStore.undoJournal, appStore.redoJournal];
-      if (inJournal && mod && key === 'z' && !e.shiftKey) return run(e, undo);
-      if (inJournal && mod && key === 'y') return run(e, redo);
-      // With the Google Calendar panel open they also step this session's event changes, whichever of those and the
-      // board's is newer (owner request 2026-11-17). In the event form the browser undoes the typing; its buttons do nothing.
-      if (panel === 'calendar' && mod && (key === 'z' || key === 'y')) {
-        if (e.target instanceof Element && e.target.closest('.cal-form')) return isTextField(e.target) ? undefined : run(e, () => {});
-        const which = key === 'z' && !e.shiftKey ? 'undo' : 'redo';
-        if (calendarFirst(which, appStore.undoMarks(), calendar.marks())) return run(e, which === 'undo' ? calendar.undoLast : calendar.redo);
-      }
-      if (mod && key === 'z' && !e.shiftKey) return run(e, appStore.undo);
-      if (mod && key === 'y') return run(e, appStore.redo);
-      if (mod && key === 'z' && e.shiftKey) return run(e, () => {}); // does nothing, on purpose
+      const undoAction = resolveUndoAction(e, inChecklist);
+      if (undoAction !== null) return undoAction === 'browser' ? undefined : run(e, undoAction);
 
       // Zoom keys work everywhere, so the browser never zooms the whole page instead.
       if (mod && (key === '=' || key === '+')) return run(e, () => appStore.zoomAtCentre(ZOOM_STEP));
       if (mod && (key === '-' || key === '_')) return run(e, () => appStore.zoomAtCentre(1 / ZOOM_STEP));
       if (mod && key === '0') return run(e, appStore.resetZoom);
+
       // Keys pressed in a side panel never act on the board behind it (the Journal and Habits panels have their own
       // history above; undo, redo and zoom, handled above, work from every panel).
       // Not while a dialog covers the board (Brain dump, AI settings, Sign out?, Send feedback): the items selected in the panel
       // behind it are out of reach, so Tab, Delete and Ctrl+X on a dialog button leave them alone (undo and redo, above, still work).
       if (inChecklist && panelCovers()) return;
-      if (inChecklist) return checklistKeys(e, key, mod);
-      if (inAnyPanel) return;
+      if (inChecklist) {
+        handleChecklistKeys(e, key, mod, 'panel');
+        return;
+      }
+      // Any side panel, Version history too, the format bar, the toolbar's menus (File, Boards, Arrange, Color, ⋯), the Share
+      // panel and the Undo message: a button or tick box in them is not a text field, but its keys aren't the board's.
+      // The path is read from the event, not the target: Escape closes a menu before this runs and takes its button out of the page.
+      if (e.composedPath().some((el) => el instanceof Element && el.matches(NOT_THE_BOARD))) return;
       // Nothing below acts on the board while a panel covers it (Send feedback, Delete account),
       // wherever focus is: it can be on the page itself after a click on the panel's text.
       if (panelCovers()) return;
@@ -103,34 +72,8 @@ export function useShortcuts() {
       // Not over a word highlight: there "!" (Shift+1) is a typed character that replaces the words, like any letter.
       if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit1' && !isTextField(e.target) && !typesOverWords(e)) return run(e, appStore.fitToScreen);
 
-      // Arrows move between a card's fields and between cards; Alt+arrows jump card to card.
-      if (handleArrowKey(e)) return e.preventDefault();
-
-      // Text formatting (owner request): on the box being typed in, or else on the selected
-      // checklist items, or every text box in the selected cards and columns.
-      const format = mod && !e.altKey ? formatAsk(e, key) : null;
-      if (format) {
-        const typing = focusedBox();
-        if (typing) return run(e, () => appStore.formatBoxes([typing.box], format));
-        const boxes = isTextField(e.target) ? [] : appStore.selectedBoxes();
-        if (boxes.length) return run(e, () => appStore.formatBoxes(boxes, format));
-      }
-
-      // Escape while typing in a card leaves the text field, keeping the card selected (so arrows then move it).
-      if (key === 'escape' && isTextField(e.target) && (e.target as HTMLElement).closest('[data-card-id], [data-col-id]')) {
-        return leaveField(e.target as HTMLElement);
-      }
-
-      // Ctrl+A in a checklist item whose text is already all selected: every item in that list
-      // (step 2 of the Ctrl+A ladder; step 1 is the browser selecting the text).
-      if (mod && key === 'a' && e.target instanceof HTMLTextAreaElement) {
-        const field = e.target;
-        const cardId = field.closest('[data-item-id]') && field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
-        if (cardId && field.selectionStart === 0 && field.selectionEnd === field.value.length) {
-          leaveField(field);
-          return run(e, () => appStore.selectWholeList(cardId));
-        }
-      }
+      // Shared editing keys (formatting, arrows, Escape out of a text box, Ctrl+A step 2 in a checklist item).
+      if (handleChecklistKeys(e, key, mod, 'board', 'editing')) return;
 
       // Everything below is for blocks and checklist items, and is ignored while typing.
       if (isTextField(e.target) || e.altKey) return;
@@ -154,14 +97,6 @@ export function useShortcuts() {
         return appStore.clearSelection();
       }
 
-      // A Word-style highlight of letters across items (owner request, 2026-11-01): a typed letter or Enter replaces
-      // them; Delete, Backspace, Ctrl+C and Ctrl+X are the item keys below. Not while a container's "Delete …?" asks.
-      if (typesOverWords(e)) {
-        if (key === 'enter' && !e.shiftKey) return run(e, appStore.enterOverWords);
-        // simple: one typed letter replaces them; letters built from several keys (accents, Chinese input) aren't caught here.
-        if (e.key.length === 1) return run(e, () => appStore.deleteWords(e.key));
-      }
-
       // Ctrl+arrows switch boards (owner request, 2026-10-16). Control only: on a Mac the system
       // often keeps these keys for Spaces, and ⌘+arrows are the browser's.
       const move = BOARD_MOVE[e.key];
@@ -176,17 +111,8 @@ export function useShortcuts() {
         });
       }
 
-      // Several checklist items selected: these keys act on the items.
-      if (state.ui.itemSel) {
-        if (key === 'delete' || key === 'backspace') return removeItemByKey(e, appStore.deleteSelectedItems); // held: removes once
-        if (key === 'escape') return appStore.clearItemSelection();
-        // Ctrl+A again: every list in the column, then every item on the board.
-        if (mod && key === 'a') return run(e, appStore.selectAllStep);
-        if (key === 'tab' && !state.ui.confirm) return run(e, () => appStore.tabSelectedItems(e.shiftKey));
-        if (mod && key === 'c') return run(e, appStore.copyItems);
-        if (mod && key === 'x') return run(e, appStore.cutItems);
-        if (mod && key === 'v' && appStore.pasteItems()) return e.preventDefault();
-      }
+      // Checklist item keys (word-highlight typing, selected items, or Delete/Backspace on a focused item button).
+      if (handleChecklistKeys(e, key, mod, 'board', 'items')) return;
 
       // Arrows move the selected blocks one grid step (Shift: five). With nothing selected they pan the board
       // like scrolling (owner request 2026-10-29): a view change only, and not on a phone-sized window.
@@ -212,12 +138,6 @@ export function useShortcuts() {
       // simple: a paste key the person re-mapped can't see the clipboard, so it always pastes the copied blocks.
       if (matches(hk.paste, e) && !matches(DEFAULT_HOTKEYS.paste, e) && appStore.paste()) return e.preventDefault();
       if (matches(hk.duplicate, e)) return run(e, appStore.duplicate); // also stops the browser's bookmark shortcut
-      // Focus on a checklist item's tick box (or another of its buttons), with no other block selected: Delete, Backspace
-      // or the board's delete key removes that item like its trash can, never the whole card (owner report, job 218).
-      const at = itemOf(e.target);
-      if (at && state.ui.selection.every((id) => id === at.cardId) && (matches(hk.delete, e) || (!mod && (key === 'delete' || key === 'backspace')))) {
-        return removeItemByKey(e, () => appStore.trashItem(at.cardId, at.itemId));
-      }
       if (matches(hk.delete, e) || (!mod && key === 'backspace')) {
         if (appStore.deleteSelection()) e.preventDefault();
       } else if (!mod && key === 'escape') appStore.clearSelection();
@@ -282,57 +202,216 @@ function inAnyPanelBut(e: KeyboardEvent, but: string): boolean {
   return e.composedPath().some((el) => el instanceof Element && el.matches(NOT_THE_BOARD) && !el.matches(but));
 }
 
-/**
- * Keys in the Checklist panel (owner request, 2026-11-12): the checklist keys of a list on the board, acting on
- * the checklist's own board (storeOfCard). No block keys: nothing there deletes, copies or moves a board's blocks.
- */
-function checklistKeys(e: KeyboardEvent, key: string, mod: boolean) {
-  const format = mod && !e.altKey ? formatAsk(e, key) : null;
+const noop = () => {};
+
+/** Result of resolving an undo/redo chord: `null` (not undo/redo), `'browser'` (native text undo), or an action to run. */
+export type UndoResolution = 'browser' | (() => unknown) | null;
+
+/** True when a key belongs to the Checklist panel, its scoped popovers (time picker), or items selected in it. */
+function isInChecklist(e: KeyboardEvent): boolean {
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest('.checklist-panel, [data-checklist-scope]')) return true;
   const sel = appStore.getState().ui.itemSel;
-  if (format) {
-    const typing = focusedBox();
-    if (typing && 'cardId' in typing.box) {
-      const box = typing.box;
-      return run(e, () => storeOfCard(box.cardId).formatBoxes([box], format));
+  if (!sel || storeOfCard(sel.cardId) === appStore) return false;
+  // Not while typing elsewhere or on the board: there the keys are that box's or the board's.
+  const elsewhere = !!target && (isTextField(target) || target.closest('[data-testid="canvas"]') !== null);
+  return !elsewhere && !inAnyPanelBut(e, '.checklist-panel');
+}
+
+interface UndoScope {
+  match: () => boolean;
+  undo: () => unknown;
+  redo: () => unknown;
+}
+
+/**
+ * Picks which undo/redo history a Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z press targets:
+ * - `null`: not an undo/redo chord
+ * - `'browser'`: leave it to the browser's native text-box undo
+ * - a function: prevent default and run it (`noop` swallows the key)
+ */
+export function resolveUndoAction(e: KeyboardEvent, inChecklist = isInChecklist(e)): UndoResolution {
+  const mod = e.ctrlKey || e.metaKey;
+  const key = shortcutKey(e);
+  if (!mod || (key !== 'z' && key !== 'y')) return null;
+
+  // Undo / redo go through the board's history from anywhere, even inside a text field —
+  // except while a panel covers the board, where they'd change the board unseen: in the panel's own
+  // box the browser undoes its typing (the board is inert then, so that can't reach it); elsewhere nothing.
+  if (panelCovers()) return isTextField(e.target) ? 'browser' : noop;
+
+  const target = e.target instanceof Element ? e.target : null;
+  const panel = appStore.getState().ui.sidePanel;
+  const inPanel = !!target?.closest('.side-panel');
+
+  // The New habit and weight boxes aren't saved anywhere yet, so there the browser undoes the typing;
+  // an empty weight box (just saved) has none, so Ctrl+Z there takes back the saved weight.
+  const emptyWeight = e.target instanceof HTMLInputElement && e.target.value === '' && !!target?.closest('.weight-new');
+  if (inPanel && !emptyWeight && target?.closest('.habit-new, .weight-new, .jn-rename')) return 'browser';
+
+  const isUndo = key === 'z' && !e.shiftKey;
+  const isRedo = key === 'y';
+
+  // Scoped panels step their own history, leaving the open board as it is.
+  const scopes: UndoScope[] = [
+    // In the Completed panel they step back through the panel's own unticks, each on the board it changed (owner,
+    // 2026-11-13: it mixes in the Main checklist's items), and with none left do nothing, never the open board's.
+    { match: () => inPanel && panel === 'completed', undo: appStore.undoCompleted, redo: appStore.redoCompleted },
+    // In the Checklist panel on the left, its time picker or items selected there (owner request, 2026-11-12).
+    { match: () => inChecklist, undo: appStore.undoChecklist, redo: appStore.redoChecklist },
+    // In the Habits or Journal panel they step that board's own history.
+    { match: () => inPanel && panel === 'habits', undo: appStore.undoHabits, redo: appStore.redoHabits },
+    { match: () => inPanel && panel === 'journal', undo: appStore.undoJournal, redo: appStore.redoJournal },
+  ];
+  const scope = scopes.find((s) => s.match());
+  if (scope) return isUndo ? scope.undo : isRedo ? scope.redo : noop;
+
+  // With the Google Calendar panel open they also step this session's event changes, whichever of those and the
+  // board's is newer (owner request 2026-11-17). In the event form the browser undoes the typing; its buttons do nothing.
+  if (panel === 'calendar') {
+    if (target?.closest('.cal-form')) return isTextField(e.target) ? 'browser' : noop;
+    const which = isUndo ? 'undo' : 'redo';
+    if (calendarFirst(which, appStore.undoMarks(), calendar.marks())) {
+      return which === 'undo' ? calendar.undoLast : calendar.redo;
     }
-    const st = sel && !isTextField(e.target) ? storeOfCard(sel.cardId) : null;
-    const boxes = st?.selectedBoxes() ?? [];
-    if (st && boxes.length) return run(e, () => st.formatBoxes(boxes, format));
   }
-  // Alt+arrows jump between blocks on the board: not from the panel (nor back a page in the browser).
-  if (e.altKey && NUDGE[e.key]) return e.preventDefault();
-  // Up and Down move from item to item, as in a list on the board.
-  if (handleArrowKey(e)) return e.preventDefault();
-  if (key === 'escape' && isTextField(e.target)) return leaveField(e.target as HTMLElement);
-  if (mod && key === 'a' && e.target instanceof HTMLTextAreaElement) {
-    const field = e.target;
-    const cardId = field.closest('[data-item-id]') && field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
-    if (cardId && field.selectionStart === 0 && field.selectionEnd === field.value.length) {
-      leaveField(field);
-      return run(e, () => storeOfCard(cardId).selectWholeList(cardId));
+
+  // Open board history; Ctrl+Shift+Z does nothing, on purpose.
+  return isUndo ? appStore.undo : isRedo ? appStore.redo : noop;
+}
+
+export type ChecklistScope = 'board' | 'panel';
+export type ChecklistPhase = 'editing' | 'items' | 'all';
+
+/**
+ * Shared checklist keyboard shortcuts for both board checklists (`'board'`) and the Checklist panel (`'panel'`,
+ * owner request, 2026-11-12). In the panel, every action routes through `storeOfCard` so nothing changes the open board,
+ * and no block keys run. Returns `true` when the key was handled.
+ */
+export function handleChecklistKeys(
+  e: KeyboardEvent,
+  key: string,
+  mod: boolean,
+  scope: ChecklistScope,
+  phase: ChecklistPhase = 'all',
+): boolean {
+  if (phase === 'editing' || phase === 'all') {
+    // Text formatting (owner request): on the box being typed in, or else on the selected
+    // checklist items, or (on the board) every text box in the selected cards and columns.
+    const format = mod && !e.altKey ? formatAsk(e, key) : null;
+    if (format) {
+      const typing = focusedBox();
+      if (typing && (scope === 'board' || 'cardId' in typing.box)) {
+        const box = typing.box;
+        const st = 'cardId' in box ? storeOfCard(box.cardId) : appStore;
+        run(e, () => st.formatBoxes([box], format));
+        return true;
+      }
+      const sel = appStore.getState().ui.itemSel;
+      const st = isTextField(e.target) ? null : scope === 'board' ? appStore : sel ? storeOfCard(sel.cardId) : null;
+      const boxes = st?.selectedBoxes() ?? [];
+      if (st && boxes.length) {
+        run(e, () => st.formatBoxes(boxes, format));
+        return true;
+      }
     }
+
+    // Alt+arrows jump between blocks on the board: not from the panel (nor back a page in the browser).
+    if (scope === 'panel' && e.altKey && NUDGE[e.key]) {
+      e.preventDefault();
+      return true;
+    }
+    // Arrows move between a card's fields and between cards (on the board) or from item to item (in the panel).
+    if (handleArrowKey(e)) {
+      e.preventDefault();
+      return true;
+    }
+
+    // Escape while typing leaves the text field (on the board, only inside a card or column so arrows then move it).
+    if (key === 'escape' && isTextField(e.target) && (scope === 'panel' || (e.target as HTMLElement).closest('[data-card-id], [data-col-id]'))) {
+      leaveField(e.target as HTMLElement);
+      return true;
+    }
+
+    // Ctrl+A in a checklist item whose text is already all selected: every item in that list
+    // (step 2 of the Ctrl+A ladder; step 1 is the browser selecting the text).
+    if (mod && key === 'a' && e.target instanceof HTMLTextAreaElement) {
+      const field = e.target;
+      const cardId = field.closest('[data-item-id]') && field.closest<HTMLElement>('[data-card-id]')?.dataset.cardId;
+      if (cardId && field.selectionStart === 0 && field.selectionEnd === field.value.length) {
+        leaveField(field);
+        run(e, () => storeOfCard(cardId).selectWholeList(cardId));
+        return true;
+      }
+    }
+
+    if (phase === 'editing') return false;
+    if (isTextField(e.target) || e.altKey) return false;
   }
-  if (isTextField(e.target) || e.altKey) return;
+
   const state = appStore.getState();
-  if (sel && storeOfCard(sel.cardId) !== appStore) {
-    const st = storeOfCard(sel.cardId);
+  const sel = state.ui.itemSel;
+  const selStore = scope === 'board' ? appStore : sel ? storeOfCard(sel.cardId) : null;
+  // Several checklist items selected (in the panel, only when they belong to the panel's own board).
+  if (sel && selStore && (scope === 'board' || selStore !== appStore)) {
+    // A Word-style highlight of letters across items (owner request, 2026-11-01): a typed letter or Enter replaces
+    // them; Delete, Backspace, Ctrl+C and Ctrl+X are the item keys below. Not while a container's "Delete …?" asks.
     if (typesOverWords(e)) {
-      if (key === 'enter' && !e.shiftKey) return run(e, st.enterOverWords);
-      if (e.key.length === 1) return run(e, () => st.deleteWords(e.key));
+      if (key === 'enter' && !e.shiftKey) {
+        run(e, selStore.enterOverWords);
+        return true;
+      }
+      // simple: one typed letter replaces them; letters built from several keys (accents, Chinese input) aren't caught here.
+      if (e.key.length === 1) {
+        run(e, () => selStore.deleteWords(e.key));
+        return true;
+      }
     }
-    if (key === 'delete' || key === 'backspace') return removeItemByKey(e, st.deleteSelectedItems);
-    if (key === 'escape') return st.clearItemSelection();
-    // Ctrl+A again: every item in the list (the panel holds one list).
-    if (mod && key === 'a') return run(e, () => st.selectWholeList(sel.cardId));
-    if (key === 'tab' && !state.ui.confirm) return run(e, () => st.tabSelectedItems(e.shiftKey));
-    if (mod && key === 'c') return run(e, st.copyItems);
-    if (mod && key === 'x') return run(e, st.cutItems);
-    if (mod && key === 'v' && st.pasteItems()) return e.preventDefault();
-    return;
+    if (key === 'delete' || key === 'backspace') {
+      removeItemByKey(e, selStore.deleteSelectedItems); // held: removes once
+      return true;
+    }
+    if (key === 'escape') {
+      selStore.clearItemSelection();
+      return true;
+    }
+    // Ctrl+A again: every item in the list (panel holds one list) or every list in the column, then every item on the board.
+    if (mod && key === 'a') {
+      run(e, scope === 'panel' ? () => selStore.selectWholeList(sel.cardId) : appStore.selectAllStep);
+      return true;
+    }
+    if (key === 'tab' && !state.ui.confirm) {
+      run(e, () => selStore.tabSelectedItems(e.shiftKey));
+      return true;
+    }
+    if (mod && key === 'c') {
+      run(e, selStore.copyItems);
+      return true;
+    }
+    if (mod && key === 'x') {
+      run(e, selStore.cutItems);
+      return true;
+    }
+    if (mod && key === 'v' && selStore.pasteItems()) {
+      e.preventDefault();
+      return true;
+    }
+    if (scope === 'panel') return true;
   }
-  // Focus on an item's tick box (or another of its buttons): Delete or Backspace removes that item, like its trash can.
+
+  // Focus on a checklist item's tick box (or another of its buttons): Delete, Backspace (or the board's delete key)
+  // removes that item like its trash can, never the whole card (owner report, job 218).
   const at = itemOf(e.target);
-  if (at && !mod && (key === 'delete' || key === 'backspace')) return removeItemByKey(e, () => storeOfCard(at.cardId).trashItem(at.cardId, at.itemId));
+  if (
+    at &&
+    (scope === 'panel' || state.ui.selection.every((id) => id === at.cardId)) &&
+    ((!mod && (key === 'delete' || key === 'backspace')) || (scope === 'board' && matches(state.view.hotkeys.delete, e)))
+  ) {
+    removeItemByKey(e, () => storeOfCard(at.cardId).trashItem(at.cardId, at.itemId));
+    return true;
+  }
+
+  return false;
 }
 
 function run(e: KeyboardEvent, action: () => unknown) {

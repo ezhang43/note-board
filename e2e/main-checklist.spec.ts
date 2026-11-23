@@ -322,6 +322,68 @@ test('no key or drag in the panel changes the board: Backspace with a board bloc
   await expect.poll(() => texts(panel(page))).toEqual(['a', 'b']);
 });
 
+test('dragging in the Checklist panel (selecting up-left or dragging items) never pans the main board', async ({ page }) => {
+  await noteOnBoard(page, 'stay put');
+  await openWith(page, ['alpha item', 'beta item', 'gamma item', 'delta item']);
+  const canvas = page.getByTestId('canvas');
+  const pan = async () => ({
+    x: Number(await canvas.getAttribute('data-pan-x')),
+    y: Number(await canvas.getAttribute('data-pan-y')),
+  });
+  const before = await pan();
+
+  // Press in the fourth item (away from the screen edges) and drag up-left to the top-left corner of the panel.
+  const rows = panel(page).locator('[data-item-id]');
+  const fourth = await box(items(panel(page)).nth(3));
+  await page.mouse.move(fourth.x + 120, fourth.y + fourth.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(8, 60, { steps: 10 });
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  expect(await pan()).toEqual(before);
+
+  // Drag up-left within the first item's text to the top-left corner.
+  const first = await box(items(panel(page)).first());
+  await page.mouse.move(first.x + 120, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(8, 60, { steps: 10 });
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  expect(await pan()).toEqual(before);
+
+  // Drag an item by its grip up-left to the top-left corner of the panel.
+  await rows.nth(2).hover();
+  const grip = await box(rows.nth(2).getByRole('button', { name: 'Drag item' }));
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 40, grip.y - 20, { steps: 4 });
+  await page.mouse.move(8, 60, { steps: 10 });
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  expect(await pan()).toEqual(before);
+});
+
+test('highlighting text up-left inside one item of a board checklist does not pan the board', async ({ page }) => {
+  await clickEmpty(page);
+  await add(page, 'Checklist');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('highlight only this line');
+  const canvas = page.getByTestId('canvas');
+  const pan = async () => ({
+    x: Number(await canvas.getAttribute('data-pan-x')),
+    y: Number(await canvas.getAttribute('data-pan-y')),
+  });
+  const before = await pan();
+
+  const item = await box(items(boardCards(page).first()).first());
+  await page.mouse.move(item.x + item.width - 10, item.y + item.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(8, 60, { steps: 10 });
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  expect(await pan()).toEqual(before);
+});
+
 test('an item dragged from a list on the board and let go over the panel stays in its list', async ({ page }) => {
   await page.mouse.click(1000, 820);
   await add(page, 'Checklist');

@@ -1,15 +1,17 @@
 import { useSyncExternalStore } from 'react';
-import { addDays, canChangeSeries, dayKey, eventInRange, dragDraft, dropAccess, keepAccess, matchesSearch, mergeSearchResults, readAccess, draftBody, draftFor, emailGuests, exceptionChange, guestChanges, isEmail, moveView, NoAccess, PANEL_DEFAULT, parseEvent, savedEvent, seriesDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type PanelWidths } from '../model/calendar';
+import { addDays, BAD_TIMES, canChangeSeries, dayKey, dragDraft, draftBody, draftFor, emailGuests, eventInRange, exceptionChange, guestChanges, isEmail, matchesSearch, mergeSearchResults, moveView, PANEL_DEFAULT, REPEAT_SERIES_ONLY, savedEvent, seriesDraft, validateDraft, viewRange, type CalEvent, type CalView, type DayKey, type Draft, type EventBody, type Guest, type PanelWidths } from '../model/calendar';
 import { parseRecurrence, sameRepeat, toRecurrence, validateRepeat } from '../model/calendarRepeat';
-import { HELPER_URL } from '../calendar/helper';
-import { demoUser } from '../sync/demo';
-import { calendarDoneItems, vizWindow } from '../model/vizCalendar';
 import { weeksBetween } from '../model/weekList';
-import type { DoneItem, VizRange } from '../model/visualizer';
+import { accessNote, calendarApi, CalendarApiError, canRetry, DISCONNECTED, NO_WINDOW, NOT_CONNECTED, NOT_GIVEN, ONE_MORE_STEP, SEARCH_CAP, SERIES_FAILED, UNDO_PART, WIDE_PAGES, WRONG_ACCOUNT, type CalendarApi, type CalendarSource, type SearchItem } from '../calendar/api';
+import { calendarSource } from '../calendar/source';
+import { fetchCalendarDone, type VizCalendar } from '../calendar/vizFetch';
 import { announce } from './announce';
 import { deviceStorage } from './env';
 import { createWidthStore } from './panelWidths';
 import { tick, type CalendarMarks } from './undoClock';
+
+export { BAD_TIMES, calendarApi, CalendarApiError, canRetry, DISCONNECTED, fetchCalendarDone, NO_WINDOW, NOT_CONNECTED, NOT_GIVEN, ONE_MORE_STEP, REPEAT_SERIES_ONLY, SERIES_FAILED, UNDO_PART, WIDE_PAGES, WRONG_ACCOUNT };
+export type { CalendarApi, CalendarSource, SearchItem, VizCalendar };
 
 // Google Calendar side panel (owner request, 2026-10-06). Kept apart from the board store: calendar
 // events are Google's, not board data, so nothing here is synced with boards or kept in Version history.
@@ -17,29 +19,10 @@ import { tick, type CalendarMarks } from './undoClock';
 // back several steps through this session's event changes, and Ctrl+Y forward again (owner request
 // 2026-11-17); that history is in memory only, apart from the board's. It talks to the Calendar API (v3) directly with fetch.
 
-export const NOT_CONNECTED = 'Google Calendar isn’t connected yet. Try again later.';
-/** Without access yet (`needsAccess`), the panel offers Connect Google Calendar instead of Try again. */
-export const NO_WINDOW = 'Google’s window didn’t open or was closed. Click Connect Google Calendar to try again.';
-export const NOT_GIVEN = 'Calendar access wasn’t given. Click Connect Google Calendar to allow it.';
-/** With the calendar helper (owner decision 2026-11-20): another Google account was picked in Google's window than the one signed in. */
-export const WRONG_ACCOUNT = 'That was a different Google account. Click Connect Google Calendar and pick the one you signed in with.';
-/** With the helper: Google gave no lasting access (an earlier hourly one), which was taken back so the next window gives one. */
-export const ONE_MORE_STEP = 'One more step: click Connect Google Calendar to stay connected.';
-/** After Disconnect calendar. */
-export const DISCONNECTED = 'Google Calendar is disconnected. Click Connect Google Calendar to connect it again.';
-/** What the panel says when there is no access, by why (`NoAccess.reason`); anything else can't reach Google. */
-function accessNote(e: unknown): { note: string; needsAccess: boolean } {
-  if (!(e instanceof NoAccess)) return { note: NOT_CONNECTED, needsAccess: false };
-  const notes = { window: NO_WINDOW, refused: NOT_GIVEN, account: WRONG_ACCOUNT, again: ONE_MORE_STEP, disconnected: DISCONNECTED };
-  return { note: notes[e.reason], needsAccess: true };
-}
 export const SAVE_FAILED = 'That change didn’t reach Google Calendar. Try again later.';
-export const BAD_TIMES = 'The end must be after the start.';
 export const BAD_EMAIL = 'That doesn’t look like an email address.';
 export const SERIES_ZONE = 'This series is in another time zone: change all of it in Google Calendar.';
-export const SERIES_FAILED = 'Only this event changed: the rest of the series didn’t reach Google Calendar. Try again later.';
 export const SERIES_ALL_DAY = 'This event was changed to or from all day on its own: change all of the series in Google Calendar.';
-export const REPEAT_SERIES_ONLY = 'Changing how it repeats applies to the whole series, so keep the same day and all-day setting.';
 /** A Ctrl+Z or Ctrl+Y that didn't get through: its step is kept, and the message has Try again (owner decision 2026-11-17). */
 export const UNDO_FAILED = 'Undo didn’t reach Google Calendar.';
 export const REDO_FAILED = 'Redo didn’t reach Google Calendar.';
@@ -48,131 +31,15 @@ export const UNDO_REFUSED = 'This change can’t be undone: Google refused it.';
 export const REDO_REFUSED = 'This change can’t be redone: Google refused it.';
 /** A series Ctrl+Y that only half reached Google: dropped, as Google is left mixed. */
 export const SERIES_REDO_PART = 'Only this event was redone, not the rest of the series.';
-export const UNDO_PART = 'Only the series was put back: this event’s own change didn’t reach Google Calendar.';
 /** Ctrl+Z and Ctrl+Y keep this many event changes (owner request 2026-11-17). */
 export const UNDO_LIMIT = 50;
-
-/**
- * Google answered a call with this HTTP status (not 2xx); the message names it, as before. `reason` is the first
- * reason in Google's JSON answer (`error.errors[].reason`, such as "rateLimitExceeded"), if it gave one.
- */
-export class CalendarApiError extends Error {
-  constructor(readonly status: number, readonly reason?: string) {
-    super(`Calendar API: ${status}`);
-  }
-}
-
-/**
- * Whether a Ctrl+Z or Ctrl+Y that failed is kept to try again (owner decision 2026-11-17, "Keep step, retry"): yes when
- * it didn't get through (fetch threw, offline, a timeout, no access, a 5xx, or a 401 / 408 / 429, which a new token or a
- * wait can fix); no when Google says it can't be done (any other 4xx, such as 400, 403, 404 or 410), or when a series was
- * only half put back (UNDO_PART, SERIES_FAILED), as Google is left mixed.
- */
-export function canRetry(err: unknown): boolean {
-  if (err instanceof Error && (err.message === UNDO_PART || err.message === SERIES_FAILED)) return false;
-  if (!(err instanceof CalendarApiError)) return true;
-  // Google sends some rate limits as a 403 with one of these reasons, to be handled like a 429 (the Calendar API's
-  // error guide; owner decision 2026-11-17). Its other 403s ("forbiddenForNonOrganizer", "quotaExceeded"...) are refusals.
-  if (err.status === 403 && (err.reason === 'rateLimitExceeded' || err.reason === 'userRateLimitExceeded')) return true;
-  return err.status < 400 || err.status >= 500 || [401, 408, 429].includes(err.status);
-}
-
-/** The first reason in Google's error answer (`{ error: { errors: [{ reason }] } }`); none for anything else, such as a page that isn't JSON. */
-async function errorReason(res: Response): Promise<string | undefined> {
-  const body: unknown = await res.json().catch(() => null);
-  const errors = (body as { error?: { errors?: unknown } } | null)?.error?.errors;
-  if (!Array.isArray(errors)) return undefined;
-  const reason = errors.map((e) => (e as { reason?: unknown } | null)?.reason).find((r) => typeof r === 'string');
-  return reason as string | undefined;
-}
-
-/** Where the calendar is and how to get a token for it (kept in memory and on this device until it runs out, job 107). */
-export interface CalendarSource {
-  base: string;
-  token(): Promise<string>;
-  /** The token was refused: get a new one next time. */
-  forget(): void;
-  /** Gets ready before the panel opens, so the click can ask for access with no wait. */
-  prepare?(): void;
-  /** The token already kept on this device (over a minute left), or null — never opening Google's window (the Visualizer, owner 2026-11-13). */
-  keptToken?(): Promise<string | null>;
-  /** Who is signed in now (their uid), or null: what is kept in memory belongs to one person (owner request, 2026-11-20). */
-  person?(): string | null | undefined;
-  /** Only with the calendar helper (owner decision 2026-11-20): revokes and forgets the lasting connection. */
-  disconnect?(): Promise<void>;
-}
-
-/** One event with its plain searchable text fields (summary, description, location, guest emails & names) for partial matching. */
-export interface SearchItem {
-  event: CalEvent;
-  fields: string[];
-}
-
-/** `notify`: email the guests (sendUpdates=all) or not (none); left out when there are no guests. */
-export interface CalendarApi {
-  list(from: DayKey, to: DayKey): Promise<CalEvent[]>;
-  /**
-   * Many weeks in one request (owner request, 2026-11-20): pages followed, at most WIDE_PAGES of 250. `covered` is the day
-   * up to which (not included) every event is in `events`: `to` when Google had no more, else the day of the last one found.
-   */
-  listWide(from: DayKey, to: DayKey): Promise<{ events: CalEvent[]; covered: DayKey }>;
-  /** Who the calendar belongs to now (the signed-in person's uid), or null; the store forgets what it kept when this changes. */
-  person?(): string | null | undefined;
-  /** Disconnect calendar, when the source has it (the calendar helper). */
-  disconnect?(): Promise<void>;
-  /** Google's own search of the whole primary calendar, past and future (owner request, 2026-11-19); `today` splits the two. Only reads. */
-  search(text: string, today: DayKey): Promise<CalEvent[]>;
-  /** Reads events across a broad window without `q` so partial-word matches still work when Google's whole-word `q` misses them (owner request, 2026-11-23). */
-  listForSearch?(today: DayKey): Promise<SearchItem[]>;
-  /** One event: a repeating event's series, to find its first day. */
-  get(id: string): Promise<CalEvent | null>;
-  /** Resolves to the new event's id (null if Google gave none). */
-  create(body: EventBody, notify?: boolean): Promise<string | null>;
-  /** Without a start and end (an event changed on its own getting a new title), its time stays. */
-  update(id: string, body: Partial<EventBody>, notify?: boolean): Promise<void>;
-  /** Resolves to false when it was already gone (deleted in Google Calendar, say). */
-  remove(id: string, notify?: boolean): Promise<boolean>;
-  /**
-   * Brings a deleted event (or one event of a series, or a whole series) back, never emailing guests:
-   * Google keeps a deleted event's details on its organizer's calendar "so that they can be restored
-   * (undeleted)" (the Events reference, `status`), by setting its status back to confirmed (job 217).
-   */
-  restore(id: string): Promise<void>;
-}
-
 /** How long typing must stop before a search is sent (owner decision, 2026-11-19). */
 export const SEARCH_WAIT = 300;
-// Search looks this far back and forward from today (a call of the build, 2026-11-19), at most this many events each way.
-const SEARCH_YEARS = 5;
-/** The most pages a wide fetch follows (250 events each). */
-export const WIDE_PAGES = 4;
-const SEARCH_CAP = 125;
-// simple: a year with more than SEARCH_PAGES pages of 250 matches loses its newest ones; upgrade if a search ever matches that often.
-const SEARCH_PAGES = 4;
-// Partial-match index (owner request, 2026-11-23; widened to 5 years + preloaded on openSearch for instant results):
-// reads SEARCH_YEARS forward and SEARCH_YEARS past years a year at a time without `q` (`maxResults=2500`, up to
-// PARTIAL_PAGES pages per window) and keeps it in memory for the session.
-// simple: a single window exceeding PARTIAL_PAGES * 2500 events loses its newest entries; upgrade if a calendar ever has >5,000 events in one year.
-const PARTIAL_YEARS = SEARCH_YEARS;
-const PARTIAL_PAGES = 2;
 
-/** Searchable text fields of a raw Google event (outside data, checked): title, description, location, guest emails & display names. */
-function searchFields(raw: unknown): string[] {
-  if (typeof raw !== 'object' || raw === null) return [];
-  const e = raw as Record<string, unknown>;
-  const attendees = Array.isArray(e.attendees) ? e.attendees : [];
-  const out: string[] = [];
-  for (const v of [e.summary, e.description, e.location]) {
-    if (typeof v === 'string' && v.trim()) out.push(v);
-  }
-  for (const a of attendees) {
-    if (typeof a !== 'object' || a === null) continue;
-    const g = a as Record<string, unknown>;
-    if (typeof g.email === 'string' && g.email.trim()) out.push(g.email);
-    if (typeof g.displayName === 'string' && g.displayName.trim()) out.push(g.displayName);
-  }
-  return out;
-}
+const HISTORY_COPY = {
+  undo: { partErr: UNDO_PART, partMsg: UNDO_PART, failed: UNDO_FAILED, refused: UNDO_REFUSED, done: 'Undid the last change' },
+  redo: { partErr: SERIES_FAILED, partMsg: SERIES_REDO_PART, failed: REDO_FAILED, refused: REDO_REFUSED, done: 'Redid the last change' },
+} as const;
 
 /** The person's answers to the questions the form asks before saving or deleting (job #85). */
 export interface Choice {
@@ -180,145 +47,6 @@ export interface Choice {
   all?: boolean;
   /** "Send" update emails to guests; not asked (or "Don't send") never emails. */
   notify?: boolean;
-}
-
-/** Local midnight at the start of a day, as the API wants it. */
-const midnight = (key: DayKey) => {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toISOString();
-};
-
-/** The person's primary calendar through the Calendar API. */
-export function calendarApi(source: CalendarSource, fetchFn: typeof fetch = (url, init) => fetch(url, init)): CalendarApi {
-  const events = `${source.base}/calendars/primary/events`;
-  async function call(url: string, init: RequestInit = {}) {
-    const token = await source.token();
-    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-    if (init.body) headers['Content-Type'] = 'application/json';
-    const res = await fetchFn(url, { ...init, headers });
-    if (res.status === 401) source.forget();
-    return res;
-  }
-  // Only a 403's body is read, to find Google's reason (a rate limit sent as a 403); it is never shown.
-  // simple: a 403 whose answer stalls holds the undo queue until the browser gives up on it; add a timeout if that is ever seen.
-  const ok = async (res: Response) => {
-    if (!res.ok) throw new CalendarApiError(res.status, res.status === 403 ? await errorReason(res) : undefined);
-  };
-  const one = (id: string, notify?: boolean) => `${events}/${encodeURIComponent(id)}${updates(notify)}`;
-  const updates = (notify?: boolean) => (notify === undefined ? '' : `?sendUpdates=${notify ? 'all' : 'none'}`);
-  // Up to `pages` pages of events overlapping the days from `from` to `to`, oldest start first (so a cut-short answer is whole up to its last event).
-  async function listRange(from: DayKey, to: DayKey, pages: number) {
-    const found: CalEvent[] = [];
-    let page: string | undefined;
-    let more = false;
-    for (let n = 0; n < pages; n++) {
-      const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
-      if (page) q.set('pageToken', page);
-      const res = await call(`${events}?${q}`);
-      await ok(res);
-      const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
-      if (Array.isArray(body.items)) found.push(...body.items.map(parseEvent).filter((e): e is CalEvent => e !== null));
-      more = typeof body.nextPageToken === 'string' && body.nextPageToken !== '';
-      if (!more) break;
-      page = body.nextPageToken as string;
-    }
-    // A single page that was cut short has always been shown as it came (a week or month rarely has 250).
-    return { events: found, covered: more && pages > 1 && found.length ? found[found.length - 1].start.slice(0, 10) : to };
-  }
-  return {
-    person: () => source.person?.(),
-    disconnect: source.disconnect && (() => source.disconnect!()),
-    async list(from, to) {
-      // Repeating events come as single events (each with its series' id), in time order.
-      // simple: one page of up to 250 events, plenty for a week or month; the wide call below follows more pages.
-      return (await listRange(from, to, 1)).events;
-    },
-    listWide: (from, to) => listRange(from, to, WIDE_PAGES),
-    async search(text, today) {
-      const [y, m, d] = today.split('-').map(Number);
-      const year = (n: number) => dayKey(new Date(y + n, m - 1, d));
-      // Google can only sort oldest first, so the past is read a year at a time, each year whole, to keep the newest matches.
-      const read = async (from: DayKey, to: DayKey, max: number) => {
-        const found: CalEvent[] = [];
-        let page: string | undefined;
-        for (let n = 0; n < SEARCH_PAGES; n++) {
-          const q = new URLSearchParams({ q: text, timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: String(max) });
-          if (page) q.set('pageToken', page);
-          const res = await call(`${events}?${q}`);
-          await ok(res);
-          const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
-          if (Array.isArray(body.items)) found.push(...body.items.map(parseEvent).filter((e): e is CalEvent => e !== null));
-          if (max < 250 || typeof body.nextPageToken !== 'string') break;
-          page = body.nextPageToken;
-        }
-        return found;
-      };
-      const years = Array.from({ length: SEARCH_YEARS }, (_, i) => i);
-      const [ahead, ...before] = await Promise.all([read(today, year(SEARCH_YEARS), SEARCH_CAP), ...years.map((i) => read(year(-i - 1), year(-i), 250))]);
-      // An event running over a boundary comes from two requests: listed once, before the cap is applied.
-      const seen = new Set(ahead.map((e) => e.id));
-      const past = [...new Map(before.flat().map((e) => [e.id, e])).values()].filter((e) => !seen.has(e.id)).sort((a, b) => a.start.localeCompare(b.start)).slice(-SEARCH_CAP);
-      return [...ahead, ...past];
-    },
-    async listForSearch(today) {
-      const [y, m, d] = today.split('-').map(Number);
-      const year = (n: number) => dayKey(new Date(y + n, m - 1, d));
-      const read = async (from: DayKey, to: DayKey): Promise<SearchItem[]> => {
-        const found: SearchItem[] = [];
-        let page: string | undefined;
-        for (let n = 0; n < PARTIAL_PAGES; n++) {
-          const q = new URLSearchParams({ timeMin: midnight(from), timeMax: midnight(to), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500' });
-          if (page) q.set('pageToken', page);
-          const res = await call(`${events}?${q}`);
-          await ok(res);
-          const body = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
-          if (Array.isArray(body.items)) {
-            for (const raw of body.items) {
-              const event = parseEvent(raw);
-              if (event) found.push({ event, fields: searchFields(raw) });
-            }
-          }
-          if (typeof body.nextPageToken !== 'string' || !body.nextPageToken) break;
-          page = body.nextPageToken;
-        }
-        return found;
-      };
-      const pastYears = Array.from({ length: PARTIAL_YEARS }, (_, i) => i);
-      const [ahead, ...before] = await Promise.all([read(today, year(PARTIAL_YEARS)), ...pastYears.map((i) => read(year(-i - 1), year(-i)))]);
-      const byId = new Map<string, SearchItem>();
-      for (const item of [...ahead, ...before.flat()]) if (!byId.has(item.event.id)) byId.set(item.event.id, item);
-      return [...byId.values()];
-    },
-    async get(id) {
-      const res = await call(one(id));
-      await ok(res);
-      return parseEvent(await res.json());
-    },
-    async create(body, notify) {
-      const res = await call(`${events}${updates(notify)}`, { method: 'POST', body: JSON.stringify(body) });
-      await ok(res);
-      // Google has made it: an answer that can't be read only means no Undo, never a failed add (a retry would make two).
-      const id = await res.json().then((b: { id?: unknown } | null) => b?.id, () => null);
-      return typeof id === 'string' && id ? id : null;
-    },
-    async update(id, body, notify) {
-      // Google merges a changed start / end with the old one: clear the kind not used now, else a
-      // timed event made all-day (or back) would have both a date and a time, which Google refuses.
-      const clear = { date: null, dateTime: null, timeZone: null };
-      const patch = body.start && body.end ? { ...body, start: { ...clear, ...body.start }, end: { ...clear, ...body.end } } : body;
-      await ok(await call(one(id, notify), { method: 'PATCH', body: JSON.stringify(patch) }));
-    },
-    async remove(id, notify) {
-      const res = await call(one(id, notify), { method: 'DELETE' });
-      // Already deleted (in Google Calendar, say): that's what was wanted.
-      if (res.status === 404 || res.status === 410) return false;
-      await ok(res);
-      return true;
-    },
-    async restore(id) {
-      await ok(await call(one(id, false), { method: 'PATCH', body: JSON.stringify({ status: 'confirmed' }) }));
-    },
-  };
 }
 
 export interface CalendarState {
@@ -452,28 +180,6 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     remove: (...a) => changing(realApi.remove(...a)),
     restore: (...a) => changing(realApi.restore(...a)),
   };
-  // The person the kept weeks belong to (owner request, 2026-11-20): when another signs in (or out) with the panel still open,
-  // everything kept, and every answer still on its way, is dropped before anything is shown or kept.
-  // undefined: not known yet (Google's sign-in code is still loading), which is never a change.
-  let cacheFor = api?.person?.();
-  const changedPerson = () => {
-    const now = api?.person?.();
-    if (now === undefined || now === cacheFor) return false;
-    const first = cacheFor === undefined;
-    cacheFor = now;
-    // Learning who it is for the first time is no change, unless something was already kept (then whose it is can't be known).
-    if (first && !cache.size && !state.events && !searchIndex) return false;
-    // As opening the panel afresh does, except showing the new person's week: the caller loads it.
-    session++;
-    forget();
-    shownKey = null;
-    shownEarly.clear();
-    undos = [];
-    redos = [];
-    stopSearch();
-    set({ events: null, loaded: [], done: null, search: null });
-    return true;
-  };
   let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null, loaded: [], jump: 0 };
   let said = 0;
   const listeners = new Set<() => void>();
@@ -497,10 +203,19 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   // A whole series waits while one of its events still has a change on its way (its rollback could bring that one back).
   const sendingSeries = new Map<string, string>();
   const seriesBusy = (series: string) => [...sendingSeries.values()].includes(series);
+  /** Marks `ids` (and optionally `series` under `key`) as in-flight; returns a release callback that clears them. */
+  function trackFlight(key: string, ids: string[], series?: string | null, extra?: Partial<CalendarState>): () => void {
+    if (series) sendingSeries.set(key, series);
+    set({ sending: [...state.sending, ...ids], ...extra });
+    return () => {
+      sendingSeries.delete(key);
+      set({ sending: state.sending.filter((s) => !ids.includes(s)) });
+    };
+  }
   const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** Shows (and says aloud) the message after a change, with its Undo when it has a step to undo. */
   const tell = (text: string, step: Entry | null, retry: (() => Promise<unknown>) | null = null) => {
-    set({ done: { text, undo: step && (() => undoEntry(step)), retry, n: ++said } });
+    set({ done: { text, undo: step && (() => runHistoryEntry('undo', step)), retry, n: ++said } });
     // The button is on the message, away from the keyboard: say that it is there.
     announce(retry ? `${text} Try again is on the message.` : text);
   };
@@ -541,6 +256,40 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     redos = [];
     return e;
   }
+
+  /**
+   * Starts a fresh session: clears cached ranges, optimistic edits, undo/redo history, and search state.
+   * `cancelLoad` bumps `asked` so any in-flight `load()` will not overwrite the reset state (used by `disconnect`;
+   * `changedPerson` leaves `asked` untouched so `load()` can detect stale calls and re-load for the new person).
+   */
+  function resetSession(extra: Partial<CalendarState> = {}, cancelLoad = false) {
+    session++;
+    if (cancelLoad) asked++;
+    forget();
+    shownKey = null;
+    shownEarly.clear();
+    undos = [];
+    redos = [];
+    stopSearch();
+    set({ events: null, loaded: [], done: null, search: null, ...extra });
+  }
+
+  // The person the kept weeks belong to (owner request, 2026-11-20): when another signs in (or out) with the panel still open,
+  // everything kept, and every answer still on its way, is dropped before anything is shown or kept.
+  // undefined: not known yet (Google's sign-in code is still loading), which is never a change.
+  let cacheFor = api?.person?.();
+  const changedPerson = () => {
+    const now = api?.person?.();
+    if (now === undefined || now === cacheFor) return false;
+    const first = cacheFor === undefined;
+    cacheFor = now;
+    // Learning who it is for the first time is no change, unless something was already kept (then whose it is can't be known).
+    if (first && !cache.size && !state.events && !searchIndex) return false;
+    // As opening the panel afresh does, except showing the new person's week: the caller loads it.
+    resetSession();
+    return true;
+  };
+
   /**
    * Runs one undo or redo of `from`'s step after the ones already on their way, unless the panel was opened afresh
    * meanwhile; `to` (on the other list) gets the step once it has reached Google, or is dropped if it didn't. `from`
@@ -560,9 +309,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         return to.settle(null);
       }
       const step = from.step;
-      const key = `step ${to.at}`;
-      if (step.series) sendingSeries.set(key, step.series);
-      set({ sending: [...state.sending, ...step.ids] });
+      const release = trackFlight(`step ${to.at}`, step.ids, step.series);
       try {
         await run(step);
         drop(from);
@@ -573,50 +320,33 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
         to.settle(null);
       } finally {
         from.flying = false;
-        sendingSeries.delete(key);
-        set({ sending: state.sending.filter((s) => !step.ids.includes(s)) });
+        release();
       }
     });
     queue = job;
     return job;
   }
-  /** Undoes this step at Google (Ctrl+Z, or the message's Undo); Ctrl+Y can then redo it. */
-  function undoEntry(e: Entry): Promise<void> {
-    if (!undos.includes(e) || e.flying) return Promise.resolve();
-    const back = entry();
-    redos = onto(redos, back);
-    return inTurn(e, back, async (step) => {
+  /** Runs an undo (Ctrl+Z / Undo button) or redo (Ctrl+Y) step at Google, moving it to the opposite stack on success. */
+  function runHistoryEntry(dir: 'undo' | 'redo', e: Entry): Promise<void> {
+    const sourceList = dir === 'undo' ? undos : redos;
+    if (!sourceList.includes(e) || e.flying) return Promise.resolve();
+    const opposite = entry();
+    if (dir === 'undo') redos = onto(redos, opposite);
+    else undos = onto(undos, opposite);
+    const copy = HISTORY_COPY[dir];
+    return inTurn(e, opposite, async (step) => {
       try {
-        await step.undo();
+        await step[dir]();
       } catch (err) {
-        const part = err instanceof Error && err.message === UNDO_PART;
-        // Unless a newer change has its own message by now; a half-done undo is said anyway, as Google is left mixed.
-        // A kept step (the same canRetry as inTurn's) gets Try again: the same undo again, as Ctrl+Z again would.
+        const part = err instanceof Error && err.message === copy.partErr;
+        // Unless a newer change has its own message by now; a half-done undo/redo is said anyway, as Google is left mixed.
+        // A kept step (the same canRetry as inTurn's) gets Try again: the same undo/redo again, as Ctrl+Z/Ctrl+Y again would.
         const kept = canRetry(err);
-        if (state.done === null || part) tell(part ? UNDO_PART : kept ? UNDO_FAILED : UNDO_REFUSED, null, kept ? () => undoEntry(e) : null);
+        if (state.done === null || part) tell(part ? copy.partMsg : kept ? copy.failed : copy.refused, null, kept ? () => runHistoryEntry(dir, e) : null);
         if (part) await load();
         throw err;
       }
-      announce('Undid the last change');
-      await load();
-    });
-  }
-  /** Makes an undone step again at Google (Ctrl+Y); Ctrl+Z can then undo it again. */
-  function redoEntry(e: Entry): Promise<void> {
-    if (!redos.includes(e) || e.flying) return Promise.resolve();
-    const again = entry();
-    undos = onto(undos, again);
-    return inTurn(e, again, async (step) => {
-      try {
-        await step.redo();
-      } catch (err) {
-        const part = err instanceof Error && err.message === SERIES_FAILED;
-        const kept = canRetry(err);
-        if (state.done === null || part) tell(part ? SERIES_REDO_PART : kept ? REDO_FAILED : REDO_REFUSED, null, kept ? () => redoEntry(e) : null);
-        if (part) await load();
-        throw err;
-      }
-      announce('Redid the last change');
+      announce(copy.done);
       await load();
     });
   }
@@ -648,15 +378,13 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     // Its Ctrl+Z step is on the list from now (it waits for Google's answer), so Ctrl+Z never skips it.
     const step = remember();
     shownEarly.set(id, change);
-    if (series) sendingSeries.set(id, series);
     // The last change's message goes: its Undo must not race this change.
-    set({ sending: [...state.sending, id], done: null });
+    const release = trackFlight(id, [id], series, { done: null });
     patch(change);
     const sent = () => {
       shownEarly.delete(id);
       flights.delete(id);
-      sendingSeries.delete(id);
-      set({ sending: state.sending.filter((s) => s !== id) });
+      release();
     };
     const flight = answer.then(
       async (taken) => {
@@ -676,6 +404,140 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       },
     );
     flights.set(id, flight);
+  }
+
+  /** Saves a new event or a single-event update optimistically via `instant`. */
+  function saveSingle(event: CalEvent | null, draft: Draft, baseBody: EventBody, attendees: Guest[] | null, notify: boolean | undefined): null {
+    // Shown at once; Google is asked in this same tick (no wait before it, so asking for access isn't held back).
+    let body = attendees ? { ...baseBody, attendees } : baseBody;
+    const addRecurrence =
+      !event?.series && draft.repeat && draft.repeat.kind !== 'none' && draft.repeat.kind !== 'unsupported'
+        ? toRecurrence(draft.repeat, draft.startDate, draft.allDay)
+        : null;
+    if (addRecurrence && addRecurrence.length > 0) body = { ...body, recurrence: addRecurrence };
+    const sent = body;
+    if (event === null) {
+      const standIn = `local-${++standIns}`;
+      const shown = savedEvent(null, sent, standIn);
+      const createdSeries = sent.recurrence !== undefined && sent.recurrence.length > 0;
+      const answer = api!.create(sent, notify).then(
+        (id): Taken => ({
+          text: 'Event added',
+          // Redo brings the same event back, so a step made after it (an edit) still finds it.
+          step: id ? { undo: () => api!.remove(id, false), redo: () => api!.restore(id), ids: [id], ...(createdSeries && { series: id }) } : null,
+          // Already listed by Google's id (a fetch in between): shown once. No id: shown as Google has it.
+          after: (l) => (id && !l.some((e) => e.id === id) ? l.map((e) => (e.id === standIn ? { ...e, id } : e)) : l.filter((e) => e.id !== standIn)),
+          reload: !id || attendees !== null || createdSeries,
+        }),
+      );
+      instant(standIn, null, (l) => (l.some((e) => e.id === standIn) ? l : [...l, shown]), (l) => l.filter((e) => e.id !== standIn), answer);
+      return null;
+    }
+    const shown = savedEvent(event, sent, event.id);
+    const addedRepeat = sent.recurrence !== undefined && sent.recurrence.length > 0;
+    const answer = api!.update(event.id, sent, notify).then(
+      (): Taken => ({
+        text: 'Event saved',
+        step: undoSave(event.id, addedRepeat ? event.id : undefined, putBack(event.id, event, sent.attendees !== undefined, addedRepeat ? [] : undefined), () => api!.update(event.id, sent, false)),
+        after: (l) => l,
+        // Guests' answers, an event of a series (its id may change), or a newly repeating event as Google has them.
+        reload: sent.attendees !== undefined || event.series !== null || addedRepeat,
+      }),
+    );
+    // Only this event goes back, and only while it is still shown as changed.
+    instant(event.id, event.series, (l) => l.map((e) => (e.id === event.id ? shown : e)), (l) => l.map((e) => (e === shown ? event : e)), answer);
+    return null;
+  }
+
+  /** Saves "All events in the series": fetches the series master, applies exception + series updates, and reloads quietly. */
+  async function saveSeries(event: CalEvent, seriesId: string, draft: Draft, initialAttendees: Guest[] | null, notify: boolean | undefined): Promise<string | null> {
+    // "All events in the series" waits for Google (the form shows its answer), as before.
+    // Numbered now, so a board change made while Google answers counts as newer.
+    const started = tick();
+    let own: Partial<EventBody> | null;
+    let series: CalEvent | null;
+    let body: EventBody | null;
+    let attendees = initialAttendees;
+    let oldRecurrence: string[] | undefined;
+    try {
+      const loaded = seriesReads.get(seriesId);
+      seriesReads.delete(seriesId);
+      const fresh = loaded && (!loaded.done || Date.now() - loaded.at < 2000) ? loaded.req : null;
+      series = await (fresh ?? api!.get(seriesId));
+      if (!series) return SAVE_FAILED;
+      // simple: the series' times are written in this device's time zone, so one kept in
+      // another zone (which its repeat rule follows) is left to Google Calendar.
+      if (!series.allDay && series.timeZone !== timeZone()) return SERIES_ZONE;
+      // This event made all-day (or timed) on its own: its times don't fit the series.
+      if (series.allDay !== event.allDay) return SERIES_ALL_DAY;
+      const seriesStart = draftFor(series);
+      body = draftBody(seriesDraft(draft, draftFor(event), seriesStart), timeZone());
+      if (!body) return SAVE_FAILED;
+      // Only the guests added or removed here change the series' own list (and its guests' answers stay).
+      if (attendees) attendees = guestChanges(event, draft, series);
+      if (attendees) body = { ...body, attendees };
+      if (draft.repeat !== undefined && draft.repeat.kind !== 'unsupported') {
+        const anchor = seriesStart.startDate;
+        const current = parseRecurrence(series.recurrence, anchor);
+        if (!sameRepeat(current, draft.repeat, anchor, series.allDay)) {
+          const repeatErr = validateRepeat(draft.repeat, anchor);
+          if (repeatErr) return repeatErr;
+          const nextRec = toRecurrence(draft.repeat, anchor, series.allDay);
+          if (nextRec !== null) {
+            oldRecurrence = series.recurrence ?? [];
+            body = { ...body, recurrence: nextRec };
+          }
+        }
+      }
+      // Changing recurrence regenerates the series' occurrences, so don't patch an old exception id separately.
+      own = oldRecurrence !== undefined ? null : exceptionChange(event, draft, series);
+      // The edited event's own change goes first, since the series' change can give it a new id (job #88).
+      if (own) await api!.update(event.id, own, notify);
+    } catch {
+      return SAVE_FAILED;
+    }
+    let step: Step | null;
+    try {
+      const seriesBody = body;
+      await api!.update(seriesId, seriesBody, notify);
+      // The series first, which also gives its events back their old ids, then the edited event's own change.
+      const seriesBack = putBack(seriesId, series, attendees !== null, oldRecurrence);
+      const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
+      step = undoSave(
+        event.id,
+        seriesId,
+        seriesBack &&
+          (async () => {
+            await seriesBack();
+            // Half undone: the series is back but this event isn't, so the calendar is shown as Google has it.
+            if (ownBack) await api!.update(event.id, ownBack, false).catch(() => Promise.reject(new Error(UNDO_PART)));
+          }),
+        // Redone as it was saved: this event's own change first, then the series (half done: the calendar is shown as Google has it).
+        async () => {
+          if (own) await api!.update(event.id, own, false);
+          await api!.update(seriesId, seriesBody, false).catch((e) => Promise.reject(own ? new Error(SERIES_FAILED) : e));
+        },
+      );
+    } catch {
+      if (!own) return SAVE_FAILED;
+      // Only this event changed: show the calendar as it now is, and say so.
+      await load();
+      return SERIES_FAILED;
+    }
+    // Done once Google has it (calendar-save-speed): the form closes now, and the calendar is fetched again behind it, quietly.
+    // Until then the series' events show as on their way and can't be changed again (Google may have given them new ids).
+    const e = remember(started);
+    e.settle(step);
+    tell('Event saved', step ? e : null);
+    const key = `reload ${++standIns}`;
+    const ids = (state.events ?? []).filter((x) => x.id === event.id || x.series === seriesId).map((x) => x.id);
+    const release = trackFlight(key, ids, seriesId);
+    const reload = load().finally(() => {
+      flights.delete(key);
+      release();
+    });
+    flights.set(key, reload);
+    return null;
   }
 
   const rangeKey = (view: CalView, day: DayKey) => `${view} ${viewRange(view, day).from}`;
@@ -763,46 +625,33 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       const near = weeksShown();
       shownKey = null;
       set({ ...near, loading: !near.loaded.includes(from), note: null, needsAccess: false });
-      try {
-        const events = await api.list(from, to);
-        if (changedPerson()) return n === asked ? load() : undefined;
-        if (at === generation) keep(key, events);
-        // An answer for a week since scrolled past is still shown, if it is still near; never one that set out before a change
-        // (it may hold an event since deleted or moved: the weeks shown stay as they are until the fetch after the change).
-        if (state.view === 'week') set({ ...weeksShown(at === generation ? { key, events } : undefined), ...(n === asked && { loading: false }) });
-        if (n === asked) fetchAhead(view, day);
-      } catch (e) {
-        if (changedPerson()) return n === asked ? load() : undefined;
-        cache.delete(key);
-        const { note, needsAccess } = accessNote(e);
-        if (n !== asked) return;
-        // Scrolled into a week that didn't come: it stays a placeholder (asked again when scrolled back to) and the weeks
-        // shown stay. Stepped to (‹ ›, Today), with nothing shown, or when Google needs connecting again: the usual note.
-        if (scrolled && !needsAccess && state.loaded.length) set({ loading: false });
-        else set({ events: null, loaded: [], loading: false, note, needsAccess });
-      }
-      return;
-    }
-    if (state.loaded.length) set({ loaded: [] });
-    if (early) {
-      // Shown at once; the fresh list replaces it when it arrives. Looked at, so it is kept longest.
-      keep(key, early);
-      shownKey = key;
-      set({ events: withEarly(early), loading: false, note: null, needsAccess: false });
     } else {
-      // Never another range's events under this heading (a reload of the same range keeps what is shown).
-      if (shownKey !== key) {
-        shownKey = null;
-        set({ events: null });
+      if (state.loaded.length) set({ loaded: [] });
+      if (early) {
+        // Shown at once; the fresh list replaces it when it arrives. Looked at, so it is kept longest.
+        keep(key, early);
+        shownKey = key;
+        set({ events: withEarly(early), loading: false, note: null, needsAccess: false });
+      } else {
+        // Never another range's events under this heading (a reload of the same range keeps what is shown).
+        if (shownKey !== key) {
+          shownKey = null;
+          set({ events: null });
+        }
+        set({ loading: true, note: null, needsAccess: false });
       }
-      set({ loading: true, note: null, needsAccess: false });
     }
     try {
       const events = await api.list(from, to);
       // Another person since: this is not theirs, so it is neither kept nor shown; ask again for them.
       if (changedPerson()) return n === asked ? load() : undefined;
       if (at === generation) keep(key, events);
-      if (n === asked) {
+      if (view === 'week') {
+        // An answer for a week since scrolled past is still shown, if it is still near; never one that set out before a change
+        // (it may hold an event since deleted or moved: the weeks shown stay as they are until the fetch after the change).
+        if (state.view === 'week') set({ ...weeksShown(at === generation ? { key, events } : undefined), ...(n === asked && { loading: false }) });
+        if (n === asked) fetchAhead(view, day);
+      } else if (n === asked) {
         shownKey = key;
         set({ events: withEarly(events), loading: false });
         fetchAhead(view, day);
@@ -810,9 +659,14 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     } catch (e) {
       if (changedPerson()) return n === asked ? load() : undefined;
       cache.delete(key);
-      if (n === asked) {
-        shownKey = null;
-        set({ events: null, loading: false, ...accessNote(e) });
+      if (n !== asked) return;
+      const err = accessNote(e);
+      // Scrolled into a week that didn't come: it stays a placeholder (asked again when scrolled back to) and the weeks
+      // shown stay. Stepped to (‹ ›, Today), with nothing shown, or when Google needs connecting again: the usual note.
+      if (view === 'week' && scrolled && !err.needsAccess && state.loaded.length) set({ loading: false });
+      else {
+        if (view !== 'week') shownKey = null;
+        set({ events: null, ...(view === 'week' && { loaded: [] }), loading: false, ...err });
       }
     }
   }
@@ -897,15 +751,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       while (flights.size) await Promise.all(flights.values());
       await api.disconnect();
       // As opening the panel afresh does: nothing of the connection's is kept or shown.
-      session++;
-      asked++;
-      forget();
-      shownKey = null;
-      shownEarly.clear();
-      undos = [];
-      redos = [];
-      stopSearch();
-      set({ events: null, loaded: [], loading: false, note: DISCONNECTED, needsAccess: true, search: null, done: null });
+      resetSession({ loading: false, note: DISCONNECTED, needsAccess: true }, true);
     },
     get: () => state,
     subscribe(listener: () => void) {
@@ -914,14 +760,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     },
     /** The panel opened: today's week or month, fetched afresh (whoever is signed in now). */
     open() {
-      session++;
-      forget();
-      shownKey = null;
-      shownEarly.clear();
-      undos = [];
-      redos = [];
-      stopSearch();
-      set({ day: today(), events: null, loaded: [], done: null, search: null, jump: state.jump + 1 });
+      resetSession({ day: today(), jump: state.jump + 1 });
       return load();
     },
     /** Try again (or Connect Google Calendar) after a note. */
@@ -1034,151 +873,25 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     async save(opened: CalEvent | null, draft: Draft, choice: Choice = {}): Promise<string | null> {
       const event = opened && (editable(opened.id) ? opened : undefined);
       if (!api || event === undefined || (event && busy(event.id))) return SAVE_FAILED;
-      let body = draftBody(draft, timeZone());
+      const body = draftBody(draft, timeZone());
       if (!body) return BAD_TIMES;
       if (!draft.guests.every(isEmail)) return BAD_EMAIL;
       // The whole series keeps its days: only offered while the event is still on its own day.
       const all = choice.all === true;
-      if (!event?.series && draft.repeat) {
-        const repeatErr = validateRepeat(draft.repeat, draft.startDate);
-        if (repeatErr) return repeatErr;
-      }
-      if (all && event?.series && !canChangeSeries(event, draft)) {
-        return draft.repeat && draft.repeat.kind !== 'unsupported' ? REPEAT_SERIES_ONLY : SAVE_FAILED;
-      }
+      const repeatChanged = all && Boolean(draft.repeat && draft.repeat.kind !== 'unsupported');
+      const err = validateDraft(draft, {
+        event,
+        repeatChanged,
+        repeatAnchor: draft.startDate,
+        validateRepeat: event?.series ? undefined : validateRepeat,
+      });
+      if (err) return err;
       if (all && (!canChangeSeries(event, draft) || (event?.series && seriesBusy(event.series)))) return SAVE_FAILED;
       // Guests are sent only when the person changed them here (from what this event had).
-      let attendees = guestChanges(event, draft);
+      const attendees = guestChanges(event, draft);
       const notify = emailGuests(event, draft) ? choice.notify === true : undefined;
-      if (!all || !event?.series) {
-        // Shown at once; Google is asked in this same tick (no wait before it, so asking for access isn't held back).
-        if (attendees) body = { ...body, attendees };
-        const addRecurrence =
-          !event?.series && draft.repeat && draft.repeat.kind !== 'none' && draft.repeat.kind !== 'unsupported'
-            ? toRecurrence(draft.repeat, draft.startDate, draft.allDay)
-            : null;
-        if (addRecurrence && addRecurrence.length > 0) body = { ...body, recurrence: addRecurrence };
-        const sent = body;
-        if (event === null) {
-          const standIn = `local-${++standIns}`;
-          const shown = savedEvent(null, sent, standIn);
-          const createdSeries = sent.recurrence !== undefined && sent.recurrence.length > 0;
-          const answer = api.create(sent, notify).then(
-            (id): Taken => ({
-              text: 'Event added',
-              // Redo brings the same event back, so a step made after it (an edit) still finds it.
-              step: id ? { undo: () => api.remove(id, false), redo: () => api.restore(id), ids: [id], ...(createdSeries && { series: id }) } : null,
-              // Already listed by Google's id (a fetch in between): shown once. No id: shown as Google has it.
-              after: (l) => (id && !l.some((e) => e.id === id) ? l.map((e) => (e.id === standIn ? { ...e, id } : e)) : l.filter((e) => e.id !== standIn)),
-              reload: !id || attendees !== null || createdSeries,
-            }),
-          );
-          instant(standIn, null, (l) => (l.some((e) => e.id === standIn) ? l : [...l, shown]), (l) => l.filter((e) => e.id !== standIn), answer);
-          return null;
-        }
-        const shown = savedEvent(event, sent, event.id);
-        const addedRepeat = sent.recurrence !== undefined && sent.recurrence.length > 0;
-        const answer = api.update(event.id, sent, notify).then(
-          (): Taken => ({
-            text: 'Event saved',
-            step: undoSave(event.id, addedRepeat ? event.id : undefined, putBack(event.id, event, sent.attendees !== undefined, addedRepeat ? [] : undefined), () => api.update(event.id, sent, false)),
-            after: (l) => l,
-            // Guests' answers, an event of a series (its id may change), or a newly repeating event as Google has them.
-            reload: sent.attendees !== undefined || event.series !== null || addedRepeat,
-          }),
-        );
-        // Only this event goes back, and only while it is still shown as changed.
-        instant(event.id, event.series, (l) => l.map((e) => (e.id === event.id ? shown : e)), (l) => l.map((e) => (e === shown ? event : e)), answer);
-        return null;
-      }
-      // "All events in the series" waits for Google (the form shows its answer), as before.
-      // Numbered now, so a board change made while Google answers counts as newer.
-      const started = tick();
-      const seriesId = event.series;
-      let own: Partial<EventBody> | null;
-      let series: CalEvent | null;
-      let oldRecurrence: string[] | undefined;
-      try {
-        const loaded = seriesReads.get(seriesId);
-        seriesReads.delete(seriesId);
-        const fresh = loaded && (!loaded.done || Date.now() - loaded.at < 2000) ? loaded.req : null;
-        series = await (fresh ?? api.get(seriesId));
-        if (!series) return SAVE_FAILED;
-        // simple: the series' times are written in this device's time zone, so one kept in
-        // another zone (which its repeat rule follows) is left to Google Calendar.
-        if (!series.allDay && series.timeZone !== timeZone()) return SERIES_ZONE;
-        // This event made all-day (or timed) on its own: its times don't fit the series.
-        if (series.allDay !== event.allDay) return SERIES_ALL_DAY;
-        const seriesStart = draftFor(series);
-        body = draftBody(seriesDraft(draft, draftFor(event), seriesStart), timeZone());
-        if (!body) return SAVE_FAILED;
-        // Only the guests added or removed here change the series' own list (and its guests' answers stay).
-        if (attendees) attendees = guestChanges(event, draft, series);
-        if (attendees) body = { ...body, attendees };
-        if (draft.repeat !== undefined && draft.repeat.kind !== 'unsupported') {
-          const anchor = seriesStart.startDate;
-          const current = parseRecurrence(series.recurrence, anchor);
-          if (!sameRepeat(current, draft.repeat, anchor, series.allDay)) {
-            const repeatErr = validateRepeat(draft.repeat, anchor);
-            if (repeatErr) return repeatErr;
-            const nextRec = toRecurrence(draft.repeat, anchor, series.allDay);
-            if (nextRec !== null) {
-              oldRecurrence = series.recurrence ?? [];
-              body = { ...body, recurrence: nextRec };
-            }
-          }
-        }
-        // Changing recurrence regenerates the series' occurrences, so don't patch an old exception id separately.
-        own = oldRecurrence !== undefined ? null : exceptionChange(event, draft, series);
-        // The edited event's own change goes first, since the series' change can give it a new id (job #88).
-        if (own) await api.update(event.id, own, notify);
-      } catch {
-        return SAVE_FAILED;
-      }
-      let step: Step | null;
-      try {
-        const seriesBody = body;
-        await api.update(seriesId, seriesBody, notify);
-        // The series first, which also gives its events back their old ids, then the edited event's own change.
-        const seriesBack = putBack(seriesId, series, attendees !== null, oldRecurrence);
-        const ownBack = own && { ...(own.summary !== undefined && { summary: draftFor(event).title }), ...(own.attendees && { attendees: event.guests }) };
-        step = undoSave(
-          event.id,
-          seriesId,
-          seriesBack &&
-            (async () => {
-              await seriesBack();
-              // Half undone: the series is back but this event isn't, so the calendar is shown as Google has it.
-              if (ownBack) await api.update(event.id, ownBack, false).catch(() => Promise.reject(new Error(UNDO_PART)));
-            }),
-          // Redone as it was saved: this event's own change first, then the series (half done: the calendar is shown as Google has it).
-          async () => {
-            if (own) await api.update(event.id, own, false);
-            await api.update(seriesId, seriesBody, false).catch((e) => Promise.reject(own ? new Error(SERIES_FAILED) : e));
-          },
-        );
-      } catch {
-        if (!own) return SAVE_FAILED;
-        // Only this event changed: show the calendar as it now is, and say so.
-        await load();
-        return SERIES_FAILED;
-      }
-      // Done once Google has it (calendar-save-speed): the form closes now, and the calendar is fetched again behind it, quietly.
-      // Until then the series' events show as on their way and can't be changed again (Google may have given them new ids).
-      const e = remember(started);
-      e.settle(step);
-      tell('Event saved', step ? e : null);
-      const key = `reload ${++standIns}`;
-      const ids = (state.events ?? []).filter((x) => x.id === event.id || x.series === seriesId).map((x) => x.id);
-      sendingSeries.set(key, seriesId);
-      set({ sending: [...state.sending, ...ids] });
-      const reload = load().finally(() => {
-        flights.delete(key);
-        sendingSeries.delete(key);
-        set({ sending: state.sending.filter((s) => !ids.includes(s)) });
-      });
-      flights.set(key, reload);
-      return null;
+      if (!all || !event?.series) return saveSingle(event, draft, body, attendees, notify);
+      return saveSeries(event, event.series, draft, attendees, notify);
     },
     /**
      * Dragging an event onto another day (owner request, 2026-11-11): `from` is the day it was picked
@@ -1258,12 +971,12 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     /** Ctrl+Z with the panel open: undoes the newest event change of this session, once Google has it. */
     undoLast(): Promise<void> {
       const e = newest(undos);
-      return e ? undoEntry(e) : Promise.resolve();
+      return e ? runHistoryEntry('undo', e) : Promise.resolve();
     },
     /** Ctrl+Y (or Ctrl+Shift+Z): makes the last undone event change again. */
     redo(): Promise<void> {
       const e = newest(redos);
-      return e ? redoEntry(e) : Promise.resolve();
+      return e ? runHistoryEntry('redo', e) : Promise.resolve();
     },
     /** The newest undo and redo steps on the counter shared with the board (0: none), so the newer one is stepped. */
     marks: (): CalendarMarks => ({ undo: newest(undos)?.at ?? 0, redo: newest(redos)?.at ?? 0 }),
@@ -1277,177 +990,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
   };
 }
 
-const GOOGLE_API = 'https://www.googleapis.com/calendar/v3';
-
-/**
- * The published site uses the signed-in person's Google Calendar (a token from Google, asked for
- * when the panel first opens); `npm run dev` with ?demo-user=… a pretend calendar in the dev server
- * (src/calendar/devServer.ts); otherwise there is no calendar.
- */
-function defaultSource(): CalendarSource | null {
-  if (import.meta.env.VITE_SYNC === 'on') {
-    // Kept once loaded, so a click on the button reaches Google without waiting (a window opened
-    // after a wait may be blocked, Safari especially).
-    let ready: typeof import('../calendar/google') | null = null;
-    const google = () => import('../calendar/google').then((g) => (ready = g));
-    return {
-      base: GOOGLE_API,
-      token: () => (ready ? ready.token() : google().then((g) => g.token())),
-      forget: () => ready?.forget(),
-      prepare: () => void google().then((g) => g.prepare()),
-      keptToken: () => (ready ? Promise.resolve(ready.keptToken()) : google().then((g) => g.keptToken())),
-      person: () => ready?.person(),
-      // Only with the calendar helper (owner decision 2026-11-20); its address is fixed when the site is built.
-      disconnect: HELPER_URL ? () => google().then((g) => g.disconnect()) : undefined,
-    };
-  }
-  const demo = demoUser();
-  if (!demo) return null;
-  // Locally, ?demo-calendar=blocked (or =refused) makes the first ask for access fail as Google's
-  // window does when it is blocked or closed (or access isn't given), to try Connect Google Calendar.
-  let noAccess = new URLSearchParams(location.search).get('demo-calendar');
-  // Kept on this device for an hour, as on the published site, so a reload or new tab doesn't ask again.
-  const device = deviceStorage;
-  const helper = new URLSearchParams(location.search).get('demo-helper') === 'on';
-  let notConnected = false;
-  /** The pretend helper's answer: the access, or null when it has no connection. */
-  const askHelper = async (path: 'access' | 'connect' | 'disconnect'): Promise<string | null> => {
-    const res = await fetch(`${import.meta.env.BASE_URL}__calendar-helper/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${demo.uid}` } });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Calendar helper answered ${res.status}`);
-    return path === 'disconnect' ? null : ((await res.json()) as { access_token: string }).access_token;
-  };
-  const keepDemo = (token: string | null) => {
-    if (!token) throw new NoAccess('window');
-    keepAccess(device, { token, expiresAt: Date.now() + 3599_000, user: demo.uid });
-    return token;
-  };
-  return {
-    base: `${import.meta.env.BASE_URL}__calendar/calendar/v3`,
-    async token() {
-      const kept = readAccess(device, demo.uid);
-      const reason = noAccess === 'blocked' ? 'window' : noAccess === 'refused' ? 'refused' : null;
-      noAccess = null; // only the first ask: once connected (kept for every tab, job 107), the setting has no effect
-      if (kept) return kept.token;
-      // ?demo-helper=on: the dev server's pretend calendar helper keeps the connection, so after the
-      // first time a new access comes without the pretend window (as the published site's helper does).
-      // As on the published site, once it said there is no connection, Connect goes straight to the window.
-      const fresh = helper && !notConnected ? await askHelper('access') : null;
-      if (fresh) return keepDemo(fresh);
-      notConnected = helper;
-      if (reason) throw new NoAccess(reason);
-      const token = keepDemo(helper ? await askHelper('connect') : demo.uid);
-      notConnected = false;
-      return token;
-    },
-    disconnect: helper
-      ? async () => {
-          await askHelper('disconnect');
-          dropAccess(device);
-          notConnected = true;
-        }
-      : undefined,
-    forget: () => dropAccess(device),
-    keptToken: async () => readAccess(device, demo.uid)?.token ?? null,
-    person: () => demo.uid,
-  };
-}
-
-/** What the Visualizer gets when it asks for past and deleted calendar events (owner, 2026-11-13). */
-export type VizCalendar =
-  | { status: 'signed-out' } // no calendar here, or nobody signed in: show nothing about the calendar
-  | { status: 'no-access' } // signed in, but no fresh access kept on this device: "Open Calendar once"
-  | { status: 'ok'; items: DoneItem[] }
-  | { status: 'error' }; // the fetch failed: the Visualizer shows a quiet line and no events
-
-// One fetch per open and range, paged. The window never exceeds the chart's two years, so one page of 2500
-// almost always covers it; a few pages are read at most, then it stops.
-// Google lists oldest-first only (orderBy=startTime; there is no descending order), so a calendar too full for the
-// cap would lose its NEWEST events, the recent days that matter most (owner, 2026-11-15: keep the newest). Then the
-// window is read again in pieces, newest piece first, until the pages run out; a piece the pages cannot finish is
-// left out whole, so what is kept is an unbroken run up to today and what goes is the oldest.
-const VIZ_MAX_PAGES = 5;
-const VIZ_PIECE_DAYS = 30;
-
-/**
- * Past and deleted events on the person's primary calendar within `range`, using only access already kept on
- * this device (never opening Google's window). Off the animation path: the Visualizer calls this in an effect,
- * not while drawing. `uid` null means nobody is signed in, so there is no calendar at all.
- */
-export async function fetchCalendarDone(
-  uid: string | null,
-  range: VizRange,
-  today: DayKey,
-  signal?: AbortSignal,
-  fetchFn: typeof fetch = (url, init) => fetch(url, init),
-  src: CalendarSource | null = source,
-): Promise<VizCalendar> {
-  if (!src || uid === null) return { status: 'signed-out' };
-  const token = src.keptToken ? await src.keptToken() : null;
-  if (!token) return { status: 'no-access' };
-  const { timeMin, timeMax } = vizWindow(range, today);
-  // Built as a string (not new URL): the dev server's base is a relative path, which new URL() would reject.
-  const endpoint = `${src.base}/calendars/primary/events`;
-
-  /** Reads [min, max) page by page, at most `budget` pages. `done` is false when Google still had more. */
-  const read = async (min: string, max: string, budget: number): Promise<{ items: unknown[]; pages: number; done: boolean } | 'no-access' | 'error'> => {
-    const items: unknown[] = [];
-    let pageToken: string | undefined;
-    for (let pages = 1; pages <= budget; pages++) {
-      const q = new URLSearchParams({
-        timeMin: min,
-        timeMax: max,
-        singleEvents: 'true', // each past instance of a repeating event, once
-        showDeleted: 'true', // include deleted (cancelled) events
-        eventTypes: 'default', // not working-location / out-of-office / focus-time / birthday
-        orderBy: 'startTime',
-        maxResults: '2500',
-      });
-      if (pageToken) q.set('pageToken', pageToken);
-      const res = await fetchFn(`${endpoint}?${q}`, { headers: { Authorization: `Bearer ${token}` }, signal });
-      if (res.status === 401) return 'no-access'; // access ran out: ask to open Calendar again
-      if (!res.ok) return 'error';
-      const data = (await res.json()) as { items?: unknown; nextPageToken?: unknown };
-      if (Array.isArray(data.items)) items.push(...data.items);
-      pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : undefined;
-      if (!pageToken) return { items, pages, done: true };
-    }
-    return { items, pages: budget, done: false };
-  };
-
-  let raw: unknown[];
-  try {
-    const whole = await read(timeMin, timeMax, VIZ_MAX_PAGES);
-    if (typeof whole === 'string') return { status: whole };
-    raw = whole.items;
-    if (!whole.done) {
-      // Too full for the cap: read it again newest piece first, so the oldest are what is left out. A piece's first page
-      // is free (a quiet month must not use up the budget; there are at most about 25 pieces in two years); the rest share VIZ_MAX_PAGES.
-      raw = [];
-      let left = VIZ_MAX_PAGES;
-      const oldest = Date.parse(timeMin);
-      for (let to = Date.parse(timeMax); to > oldest; ) {
-        const from = Math.max(oldest, to - VIZ_PIECE_DAYS * 86400000);
-        const piece = await read(new Date(from).toISOString(), new Date(to).toISOString(), left + 1);
-        if (typeof piece === 'string') return { status: piece };
-        // A piece the pages cannot finish is left out whole, so nothing newer than what is kept is missing.
-        // simple: unless nothing newer was found; then its first pages (its OLDEST days) are kept. Upgrade if 30 days can ever hold 12,500 events.
-        if (!piece.done && raw.length) break;
-        raw.push(...piece.items);
-        left -= piece.pages - 1;
-        to = from;
-        if (!piece.done) break;
-      }
-    }
-  } catch (e) {
-    if (signal?.aborted) throw e; // a cancelled fetch is not a failure to show
-    return { status: 'error' };
-  }
-  return { status: 'ok', items: calendarDoneItems(raw, range, today) };
-}
-
-const source = defaultSource();
-export const calendar = Object.assign(createCalendar(source && calendarApi(source), undefined, deviceStorage()), { prepare: () => source?.prepare?.() });
+export const calendar = Object.assign(createCalendar(calendarSource && calendarApi(calendarSource), undefined, deviceStorage()), { prepare: () => calendarSource?.prepare?.() });
 
 export function useCalendar(): CalendarState {
   return useSyncExternalStore(calendar.subscribe, calendar.get);

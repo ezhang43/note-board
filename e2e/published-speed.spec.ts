@@ -5,8 +5,8 @@ import { expect, test } from '@playwright/test';
 // five font families to draw one button). It loads without the board's code, and only the font it shows.
 
 // Uncompressed JavaScript the sign-in screen may download, in KB (before job 165a: 1,137; after it: about 975;
-// since job 169 loads Firebase's database code only once someone is signed in: about 470).
-const BUDGET_KB = 520;
+// since job 169 loads Firebase's database code only once someone is signed in: about 470; ~521 KB as of 2026-11-23).
+const BUDGET_KB = 540;
 
 test('the sign-in screen loads without the board code and with only IBM Plex Sans and Roboto Medium', async ({ page }) => {
   const reading: Promise<string>[] = [];

@@ -718,6 +718,24 @@ export function expandedMonthWidth(windowWidth: number): number {
   return clampPanelWidth(Math.round(windowWidth * 0.8), windowWidth);
 }
 
+/**
+ * Split widths when the Month calendar is expanded beside the open Checklist panel on desktop:
+ * both panels meet at a single divider (`left + right === windowWidth`), each at least `PANEL_MIN`.
+ * `expandedRight` is the dragged expanded calendar width (null until dragged, defaulting to
+ * `expandedMonthWidth(windowWidth)` or wider on very wide screens when Checklist is narrower).
+ */
+export function expandedSplitWidths(
+  windowWidth: number,
+  expandedRight: number | null,
+  checklistSavedWidth: number,
+): { left: number; right: number } {
+  const maxRight = Math.max(PANEL_MIN, windowWidth - PANEL_MIN);
+  const defaultRight = Math.max(expandedMonthWidth(windowWidth), windowWidth - clampPanelWidth(checklistSavedWidth, windowWidth));
+  const right = Math.max(PANEL_MIN, Math.min(Math.round(expandedRight ?? defaultRight), maxRight));
+  const left = Math.max(PANEL_MIN, windowWidth - right);
+  return { left, right };
+}
+
 /** How many event lines a Month cell shows before "+N more": 3 when narrow, 4 at normal desktop width, 5 when wide/expanded. */
 export function monthCellLimit(cellWidth: number): number {
   if (cellWidth < 60) return 3;

@@ -34,7 +34,7 @@ import { HabitsPanel } from './components/HabitsPanel';
 import { CalendarPanel } from './components/CalendarPanel';
 import { PanelResizeHandle } from './components/PanelResizeHandle';
 import { ExpandPanelIcon } from './components/icons';
-import { clampPanelWidth, expandedMonthWidth, PANEL_MIN } from './model/calendar';
+import { clampPanelWidth, expandedMonthWidth, expandedSplitWidths, PANEL_MIN } from './model/calendar';
 import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
 import { announce } from './store/announce';
@@ -80,6 +80,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   const calendarWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().widths[calendar.get().view]);
   const calendarView = useSyncExternalStore(calendar.subscribe, () => calendar.get().view);
   const calendarExpanded = useSyncExternalStore(calendar.subscribe, () => calendar.get().expanded && calendar.get().view === 'month');
+  const calendarExpandedWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().expandedWidth);
   const others = usePanelWidths();
   const [win, setWin] = useState(window.innerWidth);
   useEffect(() => {
@@ -87,21 +88,30 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+  // The Checklist panel on the left (owner request, 2026-11-12), open beside any panel on the right. With one
+  // open there it gives way first, keeping 300px of board between the two while the window allows.
+  const checklistOpen = useAppState((s) => s.ui.checklistOpen);
   // Closing the Calendar panel or entering phone layout exits temporary Month expansion without touching saved widths.
   useEffect(() => {
     if ((sidePanel !== 'calendar' || phone) && calendarExpanded) calendar.setExpanded(false);
   }, [sidePanel, phone, calendarExpanded]);
+  // Closing Checklist while Month is expanded returns the expanded calendar to its default ~80% width.
+  useEffect(() => {
+    if (!checklistOpen && calendarExpandedWidth !== null) calendar.setExpandedWidth(null);
+  }, [checklistOpen, calendarExpandedWidth]);
   const panel = sidePanel ?? (historyShown ? 'history' : null);
-  const effectiveCalendarWidth = calendarExpanded ? expandedMonthWidth(win) : calendarWidth;
+  // When Month is expanded beside the open Checklist on desktop, both panels meet edge-to-edge with one shared divider.
+  const expandedSplit = panel === 'calendar' && calendarExpanded && checklistOpen && !phone;
+  const split = expandedSplit ? expandedSplitWidths(win, calendarExpandedWidth, others.checklist) : null;
+  const effectiveCalendarWidth = split ? split.right : calendarExpanded ? expandedMonthWidth(win) : calendarWidth;
   const resize =
     panel && !phone
       ? panel === 'calendar'
-        ? { name: 'calendar', width: effectiveCalendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
+        ? expandedSplit
+          ? { name: 'calendar', width: effectiveCalendarWidth, set: (w: number) => calendar.setExpandedWidth(w), reset: () => calendar.setExpandedWidth(null) }
+          : { name: 'calendar', width: effectiveCalendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
         : { name: RESIZE_NAME[panel], width: others[panel], set: (w: number) => panelWidths.set(panel, w), reset: () => panelWidths.reset(panel) }
       : null;
-  // The Checklist panel on the left (owner request, 2026-11-12), open beside any panel on the right. With one
-  // open there it gives way first, keeping 300px of board between the two while the window allows.
-  const checklistOpen = useAppState((s) => s.ui.checklistOpen);
   // A phone shows one panel at a time: a panel opened on the right closes the checklist.
   useEffect(() => {
     if (phone && checklistOpen && historyOpen) appStore.openChecklist();
@@ -115,10 +125,15 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   // give way (the CSS above). `leftBeside` is the Checklist's width as shown, held back from the right panel.
   const rightShown = resize ? clampPanelWidth(resize.width, win) : 0;
   const leftShown = Math.min(clampPanelWidth(others.checklist, win), Math.max(PANEL_MIN, win - PANEL_MIN - rightShown));
-  const leftBeside = checklistOpen && !phone ? Math.max(0, Math.min(leftShown, win - PANEL_MIN - rightShown)) : 0;
+  const leftBeside = checklistOpen && !phone && !expandedSplit ? Math.max(0, Math.min(leftShown, win - PANEL_MIN - rightShown)) : 0;
   const style = {
     ...(resize && { '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` }),
-    ...(checklistOpen && !phone && { '--left-width': `clamp(${PANEL_MIN}px, ${others.checklist}px, ${room})` }),
+    ...(checklistOpen &&
+      !phone && {
+        '--left-width': expandedSplit
+          ? `clamp(${PANEL_MIN}px, calc(100vw - var(--side-width)), 100vw - ${PANEL_MIN}px)`
+          : `clamp(${PANEL_MIN}px, ${others.checklist}px, ${room})`,
+      }),
   } as CSSProperties;
   const calendarActions =
     !phone && calendarView === 'month' ? (
@@ -168,7 +183,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
       )}
       {resize && <PanelResizeHandle name={resize.name} width={resize.width} beside={leftBeside} onSet={resize.set} onReset={resize.reset} />}
       {checklistOpen && <ChecklistPanel />}
-      {checklistOpen && !phone && (
+      {checklistOpen && !phone && !expandedSplit && (
         <PanelResizeHandle
           side="left"
           name="checklist"

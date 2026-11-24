@@ -245,6 +245,119 @@ test('Selected-day agenda sits side-by-side when wide (expanded / >= 800px) and 
   expect(errors).toEqual([]);
 });
 
+test('when Month calendar is expanded beside Main checklist, dragging and arrowing the divider resizes both panels smoothly within limits', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const errors = await openAs(page);
+  const checklist = page.getByRole('complementary', { name: 'Checklist', exact: true });
+  const divider = page.getByRole('separator', { name: 'Resize calendar' });
+  const checklistWidth = async () => Math.round((await checklist.boundingBox())!.width);
+  const dragDividerTo = async (x: number) => {
+    const box = (await divider.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(x, box.y + 200, { steps: 2 });
+    await page.mouse.up();
+  };
+
+  // Open Main checklist (420px) and switch Calendar to Month (720px).
+  await page.locator('.corner-controls').getByRole('button', { name: 'Checklist', exact: true }).click();
+  await expect(checklist).toBeVisible();
+  await viewButton(page, 'Month').click();
+  await expect.poll(() => widthOf(page)).toBe(720);
+  await expect.poll(() => checklistWidth()).toBe(420);
+
+  // Expand Month calendar: panels meet at x = 300 (Checklist 300px, Calendar 1140px) with one shared divider.
+  await panel(page).getByRole('button', { name: 'Expand calendar' }).click();
+  await expect.poll(() => widthOf(page)).toBe(1140);
+  await expect.poll(() => checklistWidth()).toBe(300);
+  await expect(page.getByRole('separator', { name: 'Resize checklist' })).toHaveCount(0);
+  await expect(divider).toBeVisible();
+
+  // Drag right to x = 560, then back left to x = 400.
+  await dragDividerTo(560);
+  await expect.poll(() => checklistWidth()).toBe(560);
+  await expect.poll(() => widthOf(page)).toBe(880);
+  await dragDividerTo(400);
+  await expect.poll(() => checklistWidth()).toBe(400);
+  await expect.poll(() => widthOf(page)).toBe(1040);
+
+  // Clamps so neither panel shrinks below 300px.
+  await dragDividerTo(1400);
+  await expect.poll(() => widthOf(page)).toBe(300);
+  await expect.poll(() => checklistWidth()).toBe(1140);
+  await dragDividerTo(50);
+  await expect.poll(() => checklistWidth()).toBe(300);
+  await expect.poll(() => widthOf(page)).toBe(1140);
+
+  // Keyboard arrows move the split by 20px, and double-click resets it to the default expanded split.
+  await divider.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => checklistWidth()).toBe(320);
+  await expect.poll(() => widthOf(page)).toBe(1120);
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => checklistWidth()).toBe(300);
+  await expect.poll(() => widthOf(page)).toBe(1140);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => checklistWidth()).toBe(320);
+  await divider.dblclick();
+  await expect.poll(() => checklistWidth()).toBe(300);
+  await expect.poll(() => widthOf(page)).toBe(1140);
+
+  expect(errors).toEqual([]);
+});
+
+test('dragging the expanded Month / Checklist divider preserves saved widths on collapse, Week switch, and closing Checklist', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const errors = await openAs(page);
+  const checklist = page.getByRole('complementary', { name: 'Checklist', exact: true });
+  const divider = page.getByRole('separator', { name: 'Resize calendar' });
+  const checklistWidth = async () => Math.round((await checklist.boundingBox())!.width);
+  const dragDividerTo = async (x: number) => {
+    const box = (await divider.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(x, box.y + 200, { steps: 2 });
+    await page.mouse.up();
+  };
+
+  await page.locator('.corner-controls').getByRole('button', { name: 'Checklist', exact: true }).click();
+  await viewButton(page, 'Month').click();
+  await panel(page).getByRole('button', { name: 'Expand calendar' }).click();
+  await expect.poll(() => widthOf(page)).toBe(1140);
+
+  // Drag divider to x = 600: stays expanded, neither saved width is written.
+  await dragDividerTo(600);
+  await expect.poll(() => checklistWidth()).toBe(600);
+  await expect.poll(() => widthOf(page)).toBe(840);
+  await expect(panel(page).getByRole('button', { name: 'Collapse calendar' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:calendar-width'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('note-board:panel-widths'))).toBeNull();
+
+  // Collapse restores saved Month (720px) and Checklist (420px) widths, and Checklist's own strip returns.
+  await panel(page).getByRole('button', { name: 'Collapse calendar' }).click();
+  await expect.poll(() => widthOf(page)).toBe(720);
+  await expect.poll(() => checklistWidth()).toBe(420);
+  await expect(page.getByRole('separator', { name: 'Resize checklist' })).toBeVisible();
+
+  // Expand, drag, then close Checklist: expanded Calendar returns to default 1140px.
+  await panel(page).getByRole('button', { name: 'Expand calendar' }).click();
+  await dragDividerTo(620);
+  await expect.poll(() => checklistWidth()).toBe(620);
+  await checklist.getByRole('button', { name: 'Close checklist' }).click();
+  await expect(checklist).toHaveCount(0);
+  await expect.poll(() => widthOf(page)).toBe(1140);
+
+  // Reopen Checklist, drag, then switch to Week: restores Week (420px) and Checklist (420px).
+  await page.locator('.corner-controls').getByRole('button', { name: 'Checklist', exact: true }).click();
+  await dragDividerTo(580);
+  await expect.poll(() => checklistWidth()).toBe(580);
+  await viewButton(page, 'Week').click();
+  await expect.poll(() => widthOf(page)).toBe(420);
+  await expect.poll(() => checklistWidth()).toBe(420);
+
+  expect(errors).toEqual([]);
+});
+
 test.describe('on a phone-sized screen', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
 

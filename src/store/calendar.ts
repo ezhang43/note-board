@@ -89,6 +89,8 @@ export interface CalendarState {
   jump: number;
   /** Temporary wide mode for Month view on desktop (view state only; never overwrites saved widths). */
   expanded: boolean;
+  /** Temporary expanded Month width while dragging the split divider beside Checklist (null = default). Never saved. */
+  expandedWidth: number | null;
 }
 
 /** A change to the list of events shown. */
@@ -182,7 +184,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     remove: (...a) => changing(realApi.remove(...a)),
     restore: (...a) => changing(realApi.restore(...a)),
   };
-  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null, loaded: [], jump: 0, expanded: false };
+  let state: CalendarState = { view: 'week', day: today(), events: null, loading: false, note: null, needsAccess: false, widths: widthStore.get(), done: null, sending: [], search: null, loaded: [], jump: 0, expanded: false, expandedWidth: null };
   let said = 0;
   const listeners = new Set<() => void>();
   // Only the answer for the days shown now is used (back / forward may be clicked quickly).
@@ -762,7 +764,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     },
     /** The panel opened: today's week or month, fetched afresh (whoever is signed in now). */
     open() {
-      resetSession({ day: today(), jump: state.jump + 1, expanded: false });
+      resetSession({ day: today(), jump: state.jump + 1, expanded: false, expandedWidth: null });
       return load();
     },
     /** Try again (or Connect Google Calendar) after a note. */
@@ -792,13 +794,21 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
       if (state.search?.text.trim()) return runSearch();
     },
     setView(view: CalView) {
-      set({ view, expanded: false });
+      set({ view, expanded: false, expandedWidth: null });
       return load();
     },
     /** Toggles temporary wide mode for Month view (never writes to saved widths). */
     setExpanded(expanded: boolean) {
       const next = expanded && state.view === 'month';
-      if (state.expanded !== next) set({ expanded: next });
+      if (state.expanded !== next || (!next && state.expandedWidth !== null)) {
+        set({ expanded: next, expandedWidth: null });
+      }
+    },
+    /** Adjusts the temporary expanded Month width while dragging the split divider beside Checklist (never writes to saved widths). */
+    setExpandedWidth(width: number | null) {
+      if (!state.expanded || state.view !== 'month') return;
+      const next = width === null ? null : Math.round(width);
+      if (state.expandedWidth !== next) set({ expandedWidth: next });
     },
     step(n: number) {
       set({ day: moveView(state.view, state.day, n), jump: state.jump + 1 });
@@ -838,7 +848,7 @@ export function createCalendar(realApi: CalendarApi | null, today: () => DayKey 
     /** The panel was dragged (or nudged) to this width for this view: remembered on this device. */
     setWidth(view: CalView, width: number) {
       widthStore.set(view, width);
-      set({ widths: widthStore.get(), expanded: false });
+      set({ widths: widthStore.get(), expanded: false, expandedWidth: null });
     },
     resetWidth(view: CalView) {
       this.setWidth(view, PANEL_DEFAULT[view]);

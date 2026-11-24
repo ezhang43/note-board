@@ -8,6 +8,7 @@ import {
   PANEL_STEP,
   clampPanelWidth,
   expandedMonthWidth,
+  expandedSplitWidths,
   monthCellLimit,
   readWidths,
   SIDE_DEFAULT,
@@ -1075,6 +1076,20 @@ describe('Month view readability (expanded width, cell event cap, and location)'
     expect(expandedMonthWidth(1280)).toBe(980);
     expect(expandedMonthWidth(1000)).toBe(700);
     expect(expandedMonthWidth(500)).toBe(300);
+  });
+
+  it('expandedSplitWidths splits the viewport cleanly between Checklist and expanded Month calendar', () => {
+    // Default split (no drag yet): panels meet edge-to-edge with no gap.
+    expect(expandedSplitWidths(1440, null, 420)).toEqual({ left: 300, right: 1140 });
+    expect(expandedSplitWidths(1280, null, 420)).toEqual({ left: 300, right: 980 });
+    expect(expandedSplitWidths(1920, null, 420)).toEqual({ left: 384, right: 1536 });
+    expect(expandedSplitWidths(2560, null, 420)).toEqual({ left: 420, right: 2140 });
+    // Dragged split: both panels move together and keep at least PANEL_MIN (300px) each.
+    expect(expandedSplitWidths(1440, 880, 420)).toEqual({ left: 560, right: 880 });
+    expect(expandedSplitWidths(1440, 200, 420)).toEqual({ left: 1140, right: 300 });
+    expect(expandedSplitWidths(1440, 1300, 420)).toEqual({ left: 300, right: 1140 });
+    // Narrowest desktop viewport (600px): 300 / 300.
+    expect(expandedSplitWidths(600, 400, 420)).toEqual({ left: 300, right: 300 });
   });
 
   it('monthCellLimit shows 3 events when narrow, 4 at normal desktop width, and 5 when wide/expanded', () => {

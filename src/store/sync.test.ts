@@ -617,6 +617,20 @@ describe('the account being deleted on another page', () => {
     expect(onSaveState).toHaveBeenLastCalledWith('failed');
   });
 
+  it('a refused upload stays refused and keeps local boards if deleting fails and boards come back with no new edit', async () => {
+    const { store, fake, onSaveState } = open();
+    fake.control.fail = true;
+    store.renameBoard('Refused');
+    vi.advanceTimersByTime(SYNC_DELAY);
+    await settled();
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+    fake.send(started());
+    // Deleting failed and the server's older boards came back; this page's refused edit must stay.
+    fake.send({ data: boardJson('Put back'), client: 'laptop' });
+    expect(store.getState().board.name).toBe('Refused');
+    expect(onSaveState).toHaveBeenLastCalledWith('failed');
+  });
+
   it('once it is done, this page is told (it then checks the sign-in), and still uploads nothing', () => {
     const { store, fake, onGone } = open();
     fake.send(started());
@@ -839,6 +853,25 @@ describe('changes held back while the account is being deleted elsewhere (181-A 
     vi.advanceTimersByTime(SYNC_DELAY);
     expect(next.fake.writes).toHaveLength(1);
     expect(next.fake.writes[0].data).toContain('Typed while held');
+  });
+
+  it('opened from this device’s offline copy of a marker, server confirms the same marker, then timeout uploads this device’s copy', async () => {
+    const { first, base } = typedWhileHeld();
+    const next = page({ ...started(), cached: true }, base, first.store);
+    // Cached marker does not start the timeout.
+    vi.advanceTimersByTime(DELETING_WAIT_MS * 2);
+    expect(next.fake.writes).toEqual([]);
+    // Server confirms the same marker: stays held and starts the timeout.
+    next.fake.send(started());
+    expect(next.onSaveState).toHaveBeenLastCalledWith('held');
+    vi.advanceTimersByTime(DELETING_WAIT_MS - 1);
+    expect(next.fake.writes).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(next.fake.writes).toHaveLength(1);
+    expect(next.fake.writes[0].data).toContain('Typed while held');
+    await settled();
+    expect(next.onHeld).toHaveBeenLastCalledWith(null);
+    expect(next.onSaveState).toHaveBeenLastCalledWith('saved');
   });
 
   it('a change already taken back when the marker comes isn’t noted, and the note goes once the boards are back', () => {

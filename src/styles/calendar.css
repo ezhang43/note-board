@@ -54,12 +54,36 @@
 .cal-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
 /* A name may wrap onto a second line, then it is cut (job #56). */
 .cal-title { flex: 1; min-width: 0; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-/* Under the Month grid the picked day's names show in full (job #131); the Week view keeps the two lines. */
-.cal-month ~ .cal-day .cal-title { overflow: visible; display: block; -webkit-line-clamp: none; line-clamp: none; }
+/* Under the Month grid (or beside it when wide) the picked day's names show in full (job #131); the Week view keeps the two lines. */
+.cal-month ~ .cal-day .cal-title, .cal-month-layout .cal-day .cal-title { overflow: visible; display: block; -webkit-line-clamp: none; line-clamp: none; }
+/* Month view Expand / Collapse button in the panel header (desktop only). */
+.cal-expand-btn[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+.history-head .cal-expand-btn[aria-pressed='true'] svg { stroke: var(--accent-ink); }
+/* Month + selected-day agenda: stacked when narrow or on a phone, side-by-side when the panel is wide (>= 800px / expanded). */
+.cal-month-wrap { container-type: inline-size; }
+.cal-month-layout { display: flex; flex-direction: column; gap: 8px; }
+@container (min-width: 760px) {
+  .cal-month-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(210px, 26%, 300px);
+    gap: 12px;
+    align-items: start;
+  }
+  .cal-month-layout > .cal-day {
+    border-top: none;
+    padding-top: 0;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+  }
+}
+.app.phone .cal-month-layout { display: flex; flex-direction: column; }
+.app.phone .cal-month-layout > .cal-day { position: static; border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 4px; }
 .cal-month { display: flex; flex-direction: column; gap: 2px; }
 .cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
-/* A day in the month grid: its date, then up to 3 event names (2 in a narrow panel), like Google Calendar's month (job #47). */
+/* A day in the month grid: its date, then up to 3/4/5 event chips depending on cell width. */
 .cal-cell {
   display: flex;
   flex-direction: column;
@@ -92,10 +116,10 @@
 .cal-cell.today .cal-date { font-weight: 600; color: var(--accent-ink); }
 .cal-chip {
   position: relative;
-  display: -webkit-box; /* the one child, the line of text, is cut at two lines with … (owner pick 2026-10-24, job #207) */
+  display: -webkit-box; /* up to 3 lines with … so longer event titles stay readable in Month cells */
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
   min-width: 0;
   padding: 0 3px;
@@ -118,13 +142,14 @@
 @media (hover: hover) {
   .cal-chip.all-day:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 }
-.cal-chip:not(.all-day) { padding-left: 11px; }
-.cal-chip-dot { position: absolute; left: 3px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
-/* The time and the name are one run of text: the name follows the time and wraps under it, two lines at most (jobs #131, #207). */
+/* Slim colored left bar reclaims horizontal space compared to the old 11px-indented dot. */
+.cal-chip:not(.all-day) { border-left: 2.5px solid var(--accent); padding-left: 4px; border-radius: 2px 3px 3px 2px; }
+/* The time and the name are one run of text: the name follows the time and wraps under it, three lines at most. */
 .cal-chip-time { margin-right: 3px; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-.cal-month.narrow .cal-chip-time, .cal-month.narrow .cal-chip-dot { display: none; }
-.cal-month.narrow .cal-chip, .cal-month.narrow .cal-more { padding: 0 1px; }
-.cal-chip.read-only .cal-chip-dot { background: var(--control-edge); }
+.cal-month.narrow .cal-chip-time { display: none; }
+.cal-month.narrow .cal-chip:not(.all-day) { border-left-width: 2px; padding-left: 2px; padding-right: 1px; }
+.cal-month.narrow .cal-chip.all-day, .cal-month.narrow .cal-more { padding: 0 1px; }
+.cal-chip.read-only:not(.all-day) { border-left-color: var(--control-edge); }
 .cal-chip.all-day.read-only { background: var(--hover); color: var(--ink); }
 /* Dragging an event onto another day (owner request, 2026-11-11): the chip's copy follows the pointer, the day under it is outlined, the chip left behind dims. Normal arrow cursor throughout (rule 6). */
 .cal-day[data-drop], .cal-cell[data-drop] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 6px; }
@@ -139,7 +164,7 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 .cal-day.past .cal-event { background: var(--hover); border-left-color: var(--control-edge); color: var(--ink-soft); }
 .cal-cell.past .cal-chip { color: var(--ink-soft); }
 .cal-cell.past .cal-chip.all-day { background: var(--hover); color: var(--ink-soft); }
-.cal-cell.past .cal-chip-dot { background: var(--control-edge); }
+.cal-cell.past .cal-chip:not(.all-day) { border-left-color: var(--control-edge); }
 /*
  * Events not declined are green (owner request, 2026-11-21: "can accepted meetings be turned into green color please?"): the
  * person's own, accepted, and Maybe or unanswered invites (those also get a dashed edge, a reminder to reply). Past ones take a
@@ -152,7 +177,7 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 @media (hover: hover) {
   .cal-event.green:hover, .cal-day.past .cal-event.green:hover { border-color: var(--cal-green); }
 }
-.cal-chip.green .cal-chip-dot { background: var(--cal-green); }
+.cal-chip.green:not(.all-day) { border-left-color: var(--cal-green); }
 .cal-chip.all-day.green { background: var(--cal-green-soft); color: var(--cal-green-ink); }
 /* The dashed edge is drawn as an outline, so the chip keeps its size; a keyboard focus still shows the usual ring (rule 6). */
 .cal-chip.unsure { outline: 1px dashed var(--cal-green); outline-offset: -1px; }
@@ -160,9 +185,40 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
 @media (hover: hover) {
   .cal-chip.all-day.green:hover { box-shadow: inset 0 0 0 1px var(--cal-green); }
 }
-.cal-cell.past .cal-chip.green .cal-chip-dot { background: var(--cal-green-past-edge); }
+.cal-cell.past .cal-chip.green:not(.all-day) { border-left-color: var(--cal-green-past-edge); }
 .cal-cell.past .cal-chip.all-day.green { background: var(--cal-green-past); color: var(--ink-soft); }
 .cal-cell.past .cal-chip.unsure:not(:focus-visible) { outline-color: var(--cal-green-past-edge); }
+/* Desktop hover preview popover for Month chips: non-interactive, origin-aware, skips animation on adjacent chip swaps. */
+.cal-hover-preview {
+  position: fixed;
+  z-index: 20;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(31, 29, 26, 0.16);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cal-hover-preview.read-only { border-left-color: var(--control-edge); }
+.cal-hover-preview.green { border-left-color: var(--cal-green); }
+.cal-hover-preview.unsure { border-left-style: dashed; }
+.cal-hover-preview[data-place='above'] { transform-origin: bottom left; }
+.cal-hover-preview[data-place='below'] { transform-origin: top left; }
+.cal-hover-title { font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.cal-hover-when { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.cal-hover-location { font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) {
+  .cal-hover-preview { transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out); }
+  @starting-style { .cal-hover-preview { opacity: 0; transform: scale(0.96); } }
+  .cal-hover-preview[data-instant] { transition-duration: 0ms; }
+}
 /* The scrolling Week list (owner request, 2026-11-20): its own scroll area under the bars, which stay put; anchoring is done in code (Safari has none). */
 .cal.weekly { flex: 1; min-height: 0; }
 .history-panel:has(.cal-weeks) { overflow-y: hidden; }
@@ -183,7 +239,7 @@ body.cal-dragging { user-select: none; -webkit-user-select: none; }
   scale: 1.03;
 }
 .cal-ghost.cal-chip:not(.all-day) { background: var(--surface); }
-.cal-ghost.narrow .cal-chip-time, .cal-ghost.narrow .cal-chip-dot { display: none; }
+.cal-ghost.narrow .cal-chip-time { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .cal-ghost { animation: cal-lift 120ms var(--ease-out); }
   @keyframes cal-lift { from { scale: 1; box-shadow: none; } }

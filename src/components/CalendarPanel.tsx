@@ -186,10 +186,12 @@ export function CalendarPanel() {
         (s.view === 'week' ? (
           <WeekList day={s.day} jump={s.jump} loaded={s.loaded} today={today} dayList={dayList} />
         ) : (
-          <>
-            <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} onPick={pick} onDrag={drag} onAdd={add} />
-            {dayList(s.day)}
-          </>
+          <div className="cal-month-wrap">
+            <div className="cal-month-layout">
+              <MonthGrid day={s.day} today={today} events={s.events} reveal={reveal} overlayOpen={overlay !== null} onPick={pick} onDrag={drag} onAdd={add} />
+              {dayList(s.day)}
+            </div>
+          </div>
         ))}
       {calendar.canDisconnect && !s.search?.text.trim() && s.events !== null && <Disconnect />}
       {overlay?.kind === 'card' && openEvent && (

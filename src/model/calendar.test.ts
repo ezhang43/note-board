@@ -7,6 +7,8 @@ import {
   PANEL_DEFAULT,
   PANEL_STEP,
   clampPanelWidth,
+  expandedMonthWidth,
+  monthCellLimit,
   readWidths,
   SIDE_DEFAULT,
   addDays,
@@ -1064,4 +1066,40 @@ describe('validateDraft', () => {
     expect(validateDraft(movedDay, { event: e, repeatChanged: false, repeatAnchor: '2026-10-01', validateRepeat })).toBeNull();
   });
 });
+
+describe('Month view readability (expanded width, cell event cap, and location)', () => {
+  it('expandedMonthWidth targets ~80% of the viewport while keeping PANEL_MIN of board', () => {
+    expect(expandedMonthWidth(1920)).toBe(1536);
+    expect(expandedMonthWidth(1600)).toBe(1280);
+    expect(expandedMonthWidth(1440)).toBe(1140);
+    expect(expandedMonthWidth(1280)).toBe(980);
+    expect(expandedMonthWidth(1000)).toBe(700);
+    expect(expandedMonthWidth(500)).toBe(300);
+  });
+
+  it('monthCellLimit shows 3 events when narrow, 4 at normal desktop width, and 5 when wide/expanded', () => {
+    expect(monthCellLimit(40)).toBe(3);
+    expect(monthCellLimit(59)).toBe(3);
+    expect(monthCellLimit(60)).toBe(4);
+    expect(monthCellLimit(109)).toBe(4);
+    expect(monthCellLimit(110)).toBe(5);
+    expect(monthCellLimit(160)).toBe(5);
+  });
+
+  it('parseEvent keeps a trimmed location when present and omits it when absent or empty', () => {
+    const base = { id: 'loc1', summary: 'Dentist', start: { dateTime: '2026-10-06T10:00:00' }, end: { dateTime: '2026-10-06T11:00:00' } };
+    expect(parseEvent({ ...base, location: '  123 Main St, Suite 4  ' })?.location).toBe('123 Main St, Suite 4');
+    expect(parseEvent({ ...base, location: '   ' })?.location).toBeUndefined();
+    expect(parseEvent({ ...base, location: 42 })?.location).toBeUndefined();
+    expect(parseEvent(base)?.location).toBeUndefined();
+  });
+
+  it('savedEvent preserves an existing event’s location on edit', () => {
+    const was = timed({ location: 'Room 4B' });
+    const body = draftBody({ ...draftFor(was), title: 'Updated' }, 'Europe/London')!;
+    expect(savedEvent(was, body, was.id).location).toBe('Room 4B');
+    expect(savedEvent(null, body, 'local-1').location).toBeUndefined();
+  });
+});
+
 

@@ -1050,30 +1050,29 @@ test('the month grid shows each day’s event names; clicking one opens it; “+
   await expect(form(page).getByLabel('Title')).toHaveValue('Team stand-up');
   await form(page).getByRole('button', { name: 'Cancel' }).click();
 
-  // The wide Month panel has room for three lines; a fourth event today makes the last say "+2 more".
-  for (const [title, start, end] of [['Swim', '07:00', '07:45'], ['Run', '06:00', '06:30']]) {
+  // The wide Month panel has room for four lines; a fifth event today makes the last say "+2 more".
+  for (const [title, start, end] of [['Swim', '07:00', '07:45'], ['Run', '06:00', '06:30'], ['Stretch', '05:00', '05:30']]) {
     await day(page, now).getByRole('button', { name: `Add event on ${label(now)}` }).click();
     await page.keyboard.type(title);
     await setTime(form(page).getByLabel('Start time'), start);
     await setTime(form(page).getByLabel('End time'), end);
     await form(page).getByRole('button', { name: 'Save' }).click();
   }
-  await expect(todayCell.locator('.cal-chip')).toHaveText(['6amRun', '7amSwim']);
+  await expect(todayCell.locator('.cal-chip')).toHaveText(['5amStretch', '6amRun', '7amSwim']);
   await expect(todayCell.getByRole('button', { name: '+2 more' })).toBeVisible();
-  // Clicking another day, then "+2 more", lists all of today's events under the grid.
+  // Clicking another day, then "+2 more", lists all of today's events in the picked day's list.
   await cell(now.getDate() === 1 ? daysFromToday(1) : daysFromToday(-1)).locator('.cal-date').click();
   await todayCell.getByRole('button', { name: '+2 more' }).click();
   await expect(todayCell).toHaveAttribute('aria-selected', 'true');
-  await expect(day(page, now).locator('.cal-event')).toHaveCount(4);
-  // The list is under the grid, so it is scrolled into view (not left below the bottom of the panel).
+  await expect(day(page, now).locator('.cal-event')).toHaveCount(5);
+  // The picked day's list is in view (beside the grid when wide, scrolled into view when stacked).
   await expect(day(page, now).locator('h3')).toBeInViewport({ ratio: 1 });
   await expect(day(page, now).locator('.cal-event').last()).toBeInViewport({ ratio: 1 });
   expect(errors).toEqual([]);
 });
 
-// Job #131 (owner requests 2026-10-21): full names in the Month view, a click on the picked day adds an event,
-// and a click on an event whose card is open edits it.
-test('the month grid cuts a long name at two lines with …; the full name is in the hover text and the day’s list', async ({ page }) => {
+// Job #131 (owner requests 2026-10-21) & Month readability (3-line wrap, hover preview, side-by-side agenda).
+test('the month grid cuts a long name at three lines with …; the full name is in the hover preview and the day’s list', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   const now = nowDate();
@@ -1086,21 +1085,20 @@ test('the month grid cuts a long name at two lines with …; the full name is in
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
   const cell = panel(page).getByRole('grid').getByRole('gridcell', { name: new RegExp(`^${label(now)}`) });
   const chip = cell.locator('.cal-chip').filter({ hasText: long });
-  // At most two 16px lines (job #207 replaces job #131's "never cut"), cut with … (line-clamp), the rest hidden.
-  await expect(chip).toHaveCSS('-webkit-line-clamp', '2');
-  expect((await chip.boundingBox())!.height).toBeLessThanOrEqual(34);
+  // At most three 16px lines, cut with … (line-clamp), the rest hidden.
+  await expect(chip).toHaveCSS('-webkit-line-clamp', '3');
+  expect((await chip.boundingBox())!.height).toBeLessThanOrEqual(50);
   await expect(chip).toHaveAttribute('title', new RegExp(`${long}$`));
   const [cellBox, chipBox] = [(await cell.boundingBox())!, (await chip.boundingBox())!];
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(cellBox.y + cellBox.height);
-  // The picked day's list under the grid shows the full name (no two-line cut).
+  // The picked day's list shows the full name (no line cut).
   await expect(day(page, now).locator('.cal-title').filter({ hasText: long })).toHaveCSS('-webkit-line-clamp', 'none');
   expect(errors).toEqual([]);
 });
 
-// Job #207 (owner complaint 2026-10-24): the name read as a thin ragged column beside the time, broken mid-word.
-// Now the time and the name are one run of text: the name continues after the time and wraps under it, at spaces,
-// and an event shows at most two lines, then …
-test('Month: a long name continues after the time, wraps under it in two lines at most, and no word is split', async ({ page }) => {
+// Job #207 (owner complaint 2026-10-24) & Month readability: the time and the name are one run of text,
+// wrapping under the time at spaces, up to three lines at most, then …
+test('Month: a long name continues after the time, wraps under it in three lines at most, and no word is split', async ({ page }) => {
   const errors = await openAs(page);
   await button(page).click();
   const now = nowDate();
@@ -1124,8 +1122,8 @@ test('Month: a long name continues after the time, wraps under it in two lines a
     }
     return { box: { top: box.top, bottom: box.bottom }, time: { left: time.left, top: time.top }, words };
   });
-  // At most two lines (16px each), and the name is long enough to be cut.
-  expect(m.box.bottom - m.box.top).toBeLessThanOrEqual(34);
+  // At most three lines (16px each), and the name is long enough to be cut.
+  expect(m.box.bottom - m.box.top).toBeLessThanOrEqual(50);
   const visible = m.words.filter((w) => w.rects.length && w.rects[0].bottom <= m.box.bottom + 1);
   expect(visible.length).toBeGreaterThanOrEqual(2);
   expect(visible.length).toBeLessThan(m.words.length);
@@ -3155,19 +3153,19 @@ test('meetings not said no to are green (own reminders stay blue): an unanswered
   const color = (l: Locator) => l.evaluate((el) => getComputedStyle(el).color);
   expect(await color(day(page, daysFromToday(-1)).locator('h3'))).not.toBe(await color(tomorrow.locator('h3')));
 
-  // The Month grid: a green dot for timed events, dashed when unanswered, the all-day Holiday on green.
+  // The Month grid: a slim green left bar for timed meetings, dashed when unanswered, the all-day Holiday not green.
   await panel(page).getByRole('button', { name: 'Month', exact: true }).click();
   const cell = (n: number) => panel(page).locator(`.cal-cell[data-day="${key(daysFromToday(n))}"]`);
-  const dot = (l: Locator) => l.locator('.cal-chip-dot').evaluate((el) => getComputedStyle(el).backgroundColor);
+  const bar = (l: Locator) => l.evaluate((el) => getComputedStyle(el).borderLeftColor);
   await expect(cell(1).getByRole('button', { name: /Design review/ })).toBeVisible();
-  expect(await dot(cell(1).getByRole('button', { name: /Design review/ }))).toBe(green.bar);
-  expect(await dot(cell(5).getByRole('button', { name: /Budget talk/ }))).not.toBe(green.bar);
+  expect(await bar(cell(1).getByRole('button', { name: /Design review/ }))).toBe(green.bar);
+  expect(await bar(cell(5).getByRole('button', { name: /Budget talk/ }))).not.toBe(green.bar);
   expect(await cell(4).getByRole('button', { name: /Team lunch/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');
   // The person's own all-day Holiday, with no guests, is not a meeting: not green (owner request, 2026-11-22).
   expect(await cell(3).getByRole('button', { name: /Holiday/ }).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(green.bg);
-  expect(await dot(cell(1).getByRole('button', { name: /Lunch with Sam/ }))).toBe(green.bar);
-  expect(await dot(cell(0).getByRole('button', { name: /Dentist/ }))).not.toBe(green.bar);
-  expect(await dot(cell(-1).getByRole('button', { name: /Old review/ }))).not.toBe(green.bar);
+  expect(await bar(cell(1).getByRole('button', { name: /Lunch with Sam/ }))).toBe(green.bar);
+  expect(await bar(cell(0).getByRole('button', { name: /Dentist/ }))).not.toBe(green.bar);
+  expect(await bar(cell(-1).getByRole('button', { name: /Old review/ }))).not.toBe(green.bar);
   // A keyboard focus on an unanswered chip, past or not, shows the usual ring, not the dashed edge.
   expect(await cell(-1).getByRole('button', { name: /Old review/ }).evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed');
   for (const lunch of [cell(4).getByRole('button', { name: /Team lunch/ }), cell(-1).getByRole('button', { name: /Old review/ })]) {

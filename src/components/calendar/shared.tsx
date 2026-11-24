@@ -39,6 +39,7 @@ export function useCardPlace(ref: RefObject<HTMLElement | null>, opener: HTMLEle
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
   const s = useCalendar();
   const panelWidth = s.widths[s.view];
+  const expanded = s.expanded;
   // simple: level with where the opener was when it opened; it doesn't follow the list if the panel scrolls.
   const at = useMemo(() => opener.getBoundingClientRect().top, [opener]);
   useLayoutEffect(() => {
@@ -52,6 +53,6 @@ export function useCardPlace(ref: RefObject<HTMLElement | null>, opener: HTMLEle
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [ref, phone, opener, at, panelWidth, ...changes]);
+  }, [ref, phone, opener, at, panelWidth, expanded, ...changes]);
   return phone || !place ? undefined : place;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CalEvent } from './calendar';
-import { cardPosition, whenLabel } from './eventCard';
+import { cardPosition, hoverPreviewPosition, whenLabel } from './eventCard';
 
 // The small card a calendar event opens (owner request, 2026-10-19, job #108).
 
@@ -65,3 +65,26 @@ describe('where the card sits beside the panel', () => {
     expect(cardPosition({ top: 300 }, panel, { width: 300, height: 1000 }, screen)).toEqual({ left: 692, top: 56 });
   });
 });
+
+describe('where the Month hover preview sits', () => {
+  const screen = { width: 1440, height: 900 };
+  const pop = { width: 260, height: 80 };
+
+  it('sits above the chip by default, aligned to its left edge', () => {
+    expect(hoverPreviewPosition({ left: 900, top: 300, bottom: 320 }, pop, screen)).toEqual({ left: 900, top: 214, placement: 'above' });
+  });
+
+  it('flips below the chip when there is not enough room above', () => {
+    expect(hoverPreviewPosition({ left: 900, top: 60, bottom: 80 }, pop, screen)).toEqual({ left: 900, top: 86, placement: 'below' });
+  });
+
+  it('clamps horizontally inside the viewport', () => {
+    expect(hoverPreviewPosition({ left: 1300, top: 300, bottom: 320 }, pop, screen)).toEqual({ left: 1172, top: 214, placement: 'above' });
+    expect(hoverPreviewPosition({ left: -10, top: 300, bottom: 320 }, pop, screen)).toEqual({ left: 8, top: 214, placement: 'above' });
+  });
+
+  it('clamps vertically inside the viewport when placed below', () => {
+    expect(hoverPreviewPosition({ left: 900, top: 40, bottom: 850 }, pop, screen)).toEqual({ left: 900, top: 812, placement: 'below' });
+  });
+});
+

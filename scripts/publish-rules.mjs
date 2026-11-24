@@ -8,6 +8,7 @@ const RISKY = [
   /^src\/sync\//,
   /^src\/store\/core\.ts$/,
   /^src\/store\/sync\.ts$/,
+  /^src\/store\/gestureBusy\.ts$/,
   /^src\/store\/versions\.ts$/,
   /^src\/store\/actions\/boards\.ts$/,
   /^src\/model\/persist\.ts$/,

@@ -62,8 +62,9 @@ export interface TodoItem {
   style?: TextStyle;
   /**
    * Its sub-items are hidden (owner request, 2026-11-09): saved with the board, left out when open.
-   * Only counts while it has 2 or more sub-items (see isFolded, owner request 2026-11-11); a fold left with none is dropped on the next change,
-   * and one left with a single sub-item is kept as saved but shows open, so it is back when a second one comes.
+   * Counts from 1+ sub-items at the top level (owner decision 2026-11-23) and 2+ sub-items when nested
+   * (see isFolded, owner request 2026-11-11); a fold left with none is dropped on the next change, and
+   * one left on a nested item with a single sub-item is kept as saved but shows open, so it is back when a second one comes.
    */
   folded?: true;
   /** How long it should take, in whole minutes from 1 to a day (MAX_ESTIMATE). Left out when not set. */

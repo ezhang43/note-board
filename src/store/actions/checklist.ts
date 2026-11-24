@@ -88,7 +88,21 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
     const sel = ctx.state.ui.itemSel;
     // Tab doesn't apply across several lists (owner's choice).
     if (!sel || sel.lists || asking()) return;
-    commit((b) => C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids))));
+    commit((b) => {
+      const before = b.cards[sel.cardId];
+      if (before?.kind !== 'todo') return b;
+      const all = new Set(C.withHidden(before.items, sel.ids));
+      const board = C.editItems(b, sel.cardId, (items) => (outdent ? C.outdentItems(items, sel.ids) : C.indentItems(items, sel.ids)));
+      const after = board.cards[sel.cardId];
+      if (board === b || after?.kind !== 'todo') return board;
+      const ids = C.shownIds(after.items).filter((id) => all.has(id));
+      const anchor = ids.includes(sel.anchor) ? sel.anchor : (ids[0] ?? sel.anchor);
+      const words = sel.words && ids.includes(sel.words.anchor.id) && ids.includes(sel.words.focus.id) ? sel.words : undefined;
+      const itemSel: ItemSelection | null = ids.length
+        ? { cardId: sel.cardId, anchor, ids, ...(sel.level ? { level: sel.level } : {}), ...(words ? { words } : {}) }
+        : null;
+      return { board, ui: { itemSel } };
+    });
   }
 
   /** A container's "Delete …?" is asking: no item key edits the list behind the question. */
@@ -177,9 +191,14 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
 
   /** Pastes fresh copies of `source` (the copied items) into a list (`put` decides where) and selects them: one undo step. */
   function pasteAndSelect(cardId: string, source: TodoItem[], put: (items: TodoItem[], fresh: TodoItem[]) => TodoItem[]): boolean {
+    const card = ctx.state.board.cards[cardId];
+    if (card?.kind !== 'todo') return false;
     const fresh = C.freshCopies(source);
-    commit((b) => C.editItems(b, cardId, (items) => put(items, fresh)), {
-      ui: { itemSel: { cardId, anchor: fresh[0].id, ids: C.shownIds(fresh) } }, // not what pasted folded items hide
+    const next = put(card.items, fresh);
+    const freshIds = new Set(C.flatIds(fresh));
+    const ids = C.shownIds(next).filter((id) => freshIds.has(id));
+    commit((b) => C.editItems(b, cardId, () => next), {
+      ui: { itemSel: { cardId, anchor: fresh[0].id, ids } }, // not what pasted folded items hide
     });
     return true;
   }
@@ -506,9 +525,6 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
       if (!d) return;
       const h = d.hint;
       if (!h) return updateUi({ itemDrag: null });
-      const card = ctx.state.board.cards[d.cardId];
-      const shown = new Set(card?.kind === 'todo' ? C.shownIds(card.items) : []);
-      const keep = d.roots.length > 1 ? d.allIds.filter((id) => shown.has(id)) : null; // not what folded items hide
       if ('newList' in h) {
         const id = newId('k');
         const snap = (v: number) => snapIf(ctx.state.board.snap, v);
@@ -520,6 +536,9 @@ export function checklistActions(ctx: StoreContext, shared: { items: TodoItem[] 
       }
       commit((b) => {
         const board = C.moveItems(b, d.cardId, d.roots, { cardId: h.cardId, drop: h.drop });
+        const dst = board.cards[h.cardId];
+        const shown = new Set(dst?.kind === 'todo' ? C.shownIds(dst.items) : []);
+        const keep = d.roots.length > 1 ? d.allIds.filter((id) => shown.has(id)) : null; // not what folded items hide
         const ui = { itemDrag: null, itemSel: keep ? { cardId: h.cardId, anchor: d.roots[0], ids: keep } : null };
         return { board, ui: board.cards[d.cardId] ? ui : { ...ui, selection: [h.cardId] } };
       });

@@ -36,6 +36,8 @@ export interface CalEvent {
   meeting?: true;
   /** The series' repeat rule lines (RRULE:…), present only on a series master fetched by id. */
   recurrence?: string[];
+  /** Where the event takes place, when Google provides one (shown in the Month hover preview). */
+  location?: string;
 }
 
 /**
@@ -264,6 +266,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
   // Where the series put it (one event of a series): a different start means it was moved on its own.
   const first = readWhen(e.originalStartTime);
   const recurrence = Array.isArray(e.recurrence) ? e.recurrence.filter((r): r is string => typeof r === 'string' && r.trim() !== '') : [];
+  const location = typeof e.location === 'string' && e.location.trim() ? e.location.trim() : undefined;
   return {
     id: e.id,
     title: typeof e.summary === 'string' && e.summary.trim() ? e.summary : UNTITLED,
@@ -279,6 +282,7 @@ export function parseEvent(raw: unknown): CalEvent | null {
     ...withAnswer(myAnswer(e)),
     ...(isMeeting(e) && { meeting: true as const }),
     ...(recurrence.length > 0 && { recurrence }),
+    ...(location && { location }),
   };
 }
 
@@ -648,6 +652,7 @@ export function savedEvent(e: CalEvent | null, body: EventBody, id: string): Cal
     ...withAnswer(e ? e.answer : 'going'),
     // Only the person's own events are changed here, so it is a meeting once it has another guest.
     ...(isMeeting({ attendees: guests }) && { meeting: true as const }),
+    ...(e?.location && { location: e.location }),
   };
 }
 
@@ -706,6 +711,18 @@ export type PanelWidths = Record<CalView, number>;
 /** A width between 300px and the window width minus 300px (so 300px of board stays visible). */
 export function clampPanelWidth(width: number, windowWidth: number): number {
   return Math.max(PANEL_MIN, Math.min(Math.round(width), windowWidth - PANEL_MIN));
+}
+
+/** Target width when Month view is expanded on desktop (~80% of viewport, keeping PANEL_MIN of board). */
+export function expandedMonthWidth(windowWidth: number): number {
+  return clampPanelWidth(Math.round(windowWidth * 0.8), windowWidth);
+}
+
+/** How many event lines a Month cell shows before "+N more": 3 when narrow, 4 at normal desktop width, 5 when wide/expanded. */
+export function monthCellLimit(cellWidth: number): number {
+  if (cellWidth < 60) return 3;
+  if (cellWidth < 110) return 4;
+  return 5;
 }
 
 /** The remembered widths, one for each name in `defaults`; anything missing or bad (not a number from 300 to 4000) is its default. */

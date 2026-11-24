@@ -36,3 +36,22 @@ export function cardPosition(
     top: Math.max(panel.top, Math.min(event.top, screen.height - card.height - GAP)),
   };
 }
+
+const HOVER_GAP = 6;
+
+/**
+ * Where a Month chip's hover preview sits: above the chip by default, flipping below when there is
+ * not enough room above, and clamped cleanly inside the viewport.
+ */
+export function hoverPreviewPosition(
+  anchor: { left: number; top: number; bottom: number },
+  popover: { width: number; height: number },
+  screen: { width: number; height: number },
+): { left: number; top: number; placement: 'above' | 'below' } {
+  const aboveTop = anchor.top - popover.height - HOVER_GAP;
+  const placement = aboveTop >= GAP ? 'above' : 'below';
+  const top = placement === 'above' ? aboveTop : Math.max(GAP, Math.min(anchor.bottom + HOVER_GAP, screen.height - popover.height - GAP));
+  const left = Math.max(GAP, Math.min(anchor.left, screen.width - popover.width - GAP));
+  return { left, top, placement };
+}
+

@@ -33,7 +33,8 @@ import { JournalPanel } from './components/JournalPanel';
 import { HabitsPanel } from './components/HabitsPanel';
 import { CalendarPanel } from './components/CalendarPanel';
 import { PanelResizeHandle } from './components/PanelResizeHandle';
-import { clampPanelWidth, PANEL_MIN } from './model/calendar';
+import { ExpandPanelIcon } from './components/icons';
+import { clampPanelWidth, expandedMonthWidth, PANEL_MIN } from './model/calendar';
 import { panelWidths, usePanelWidths } from './store/panelWidths';
 import { calendar } from './store/calendar';
 import { announce } from './store/announce';
@@ -77,12 +78,25 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   // Each panel's width is the person's own (owner requests 2026-10-16 and 2026-10-20), the calendar's
   // for Week and Month separately. The CSS clamp keeps 300px of board beside it when the window shrinks.
   const calendarWidth = useSyncExternalStore(calendar.subscribe, () => calendar.get().widths[calendar.get().view]);
+  const calendarView = useSyncExternalStore(calendar.subscribe, () => calendar.get().view);
+  const calendarExpanded = useSyncExternalStore(calendar.subscribe, () => calendar.get().expanded && calendar.get().view === 'month');
   const others = usePanelWidths();
+  const [win, setWin] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWin(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  // Closing the Calendar panel or entering phone layout exits temporary Month expansion without touching saved widths.
+  useEffect(() => {
+    if ((sidePanel !== 'calendar' || phone) && calendarExpanded) calendar.setExpanded(false);
+  }, [sidePanel, phone, calendarExpanded]);
   const panel = sidePanel ?? (historyShown ? 'history' : null);
+  const effectiveCalendarWidth = calendarExpanded ? expandedMonthWidth(win) : calendarWidth;
   const resize =
     panel && !phone
       ? panel === 'calendar'
-        ? { name: 'calendar', width: calendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
+        ? { name: 'calendar', width: effectiveCalendarWidth, set: (w: number) => calendar.setWidth(calendar.get().view, w), reset: () => calendar.resetWidth(calendar.get().view) }
         : { name: RESIZE_NAME[panel], width: others[panel], set: (w: number) => panelWidths.set(panel, w), reset: () => panelWidths.reset(panel) }
       : null;
   // The Checklist panel on the left (owner request, 2026-11-12), open beside any panel on the right. With one
@@ -99,12 +113,6 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
   // Each panel's strip moves only its own panel (owner request, 2026-11-19). The right panel's strip stops where
   // 300px of board would be left beside the open Checklist; only a window too narrow for both lets the Checklist
   // give way (the CSS above). `leftBeside` is the Checklist's width as shown, held back from the right panel.
-  const [win, setWin] = useState(window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setWin(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
   const rightShown = resize ? clampPanelWidth(resize.width, win) : 0;
   const leftShown = Math.min(clampPanelWidth(others.checklist, win), Math.max(PANEL_MIN, win - PANEL_MIN - rightShown));
   const leftBeside = checklistOpen && !phone ? Math.max(0, Math.min(leftShown, win - PANEL_MIN - rightShown)) : 0;
@@ -112,6 +120,19 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
     ...(resize && { '--side-width': `clamp(${PANEL_MIN}px, ${resize.width}px, 100vw - ${PANEL_MIN}px)` }),
     ...(checklistOpen && !phone && { '--left-width': `clamp(${PANEL_MIN}px, ${others.checklist}px, ${room})` }),
   } as CSSProperties;
+  const calendarActions =
+    !phone && calendarView === 'month' ? (
+      <button
+        type="button"
+        className="icon-button cal-expand-btn"
+        aria-label={calendarExpanded ? 'Collapse calendar' : 'Expand calendar'}
+        title={calendarExpanded ? 'Collapse calendar' : 'Expand calendar'}
+        aria-pressed={calendarExpanded}
+        onClick={() => calendar.setExpanded(!calendarExpanded)}
+      >
+        <ExpandPanelIcon expanded={calendarExpanded} />
+      </button>
+    ) : undefined;
   return (
     <div className={classes} style={style}>
       <LiveRegion />
@@ -128,7 +149,7 @@ export function App({ onSignOut, saveNote }: { onSignOut?: () => void; saveNote?
         </SidePanel>
       )}
       {sidePanel === 'calendar' && (
-        <SidePanel title="Google Calendar" onClose={closeCalendar}>
+        <SidePanel title="Google Calendar" onClose={closeCalendar} actions={calendarActions}>
           <CalendarPanel />
         </SidePanel>
       )}

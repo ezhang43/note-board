@@ -451,3 +451,23 @@ export function ClipboardCheckIcon() {
     </svg>
   );
 }
+
+/** Expand or collapse the Calendar panel in Month view (arrows pointing out to widen, in to restore). */
+export function ExpandPanelIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" strokeWidth="1.7" {...common}>
+      {expanded ? (
+        <>
+          <path d="M6.5 6.5L2.5 2.5M6.5 3.5v3h-3" />
+          <path d="M9.5 9.5l4 4M9.5 12.5v-3h3" />
+        </>
+      ) : (
+        <>
+          <path d="M2.5 6.5v-4h4M2.5 2.5l4 4" />
+          <path d="M13.5 9.5v4h-4M13.5 13.5l-4-4" />
+        </>
+      )}
+    </svg>
+  );
+}
+

@@ -137,6 +137,25 @@ describe('a board back from a deleted share (review 137-A M3)', () => {
     expect(fake.writes).toEqual([]);
   });
 
+  it('a board with the same content online in a different key order is left as it is', async () => {
+    const { store, fake, home, trip, shared, sync } = setup();
+    store.openBoard(trip);
+    store.addCard('note');
+    store.addCard('note');
+    const [firstId, secondId] = store.getState().board.order;
+    const local = store.workspace().boards[trip];
+    // Same cards in a different key order (as saved by another device).
+    const reorderedBoard = { ...local, cards: { [secondId]: local.cards[secondId], [firstId]: local.cards[firstId] } };
+    fake.send({ data: serializeWorkspace({ home, boards: { [home]: store.workspace().boards[home], [trip]: reorderedBoard } }), client: 'other-device' });
+    const before = store.workspace().boards[trip];
+    shared.delete(trip);
+    sync.sharedChanged();
+    await Promise.resolve();
+    expect(store.workspace().boards[trip]).toBe(before);
+    vi.advanceTimersByTime(SYNC_DELAY * 3);
+    expect(fake.writes).toEqual([]);
+  });
+
   it('uploads this device’s copy, as before, when the online copy doesn’t have it', () => {
     const { store, fake, home, trip, shared, sync } = setup();
     fake.send({ data: serializeWorkspace({ home, boards: { [home]: store.workspace().boards[home] } }), client: 'other-device' });

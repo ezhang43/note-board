@@ -5,6 +5,7 @@ import { boardCardKeys, boardsToShare, clashingBoards, groupBoardIds, joinLink, 
 import type { Board } from '../model/types';
 import { readWorkspace, type Workspace } from '../model/workspace';
 import { NO_LINKS, type CollabBackend, type Links, type Member, type NewKeys, type Role, type ShareDoc } from './collab';
+import { isGestureBusy } from './gestureBusy';
 import { createShareComments } from './shareComments';
 import { noteOwn, readBase, readOwn, readRemembered, saveBase, saveRemembered } from './shareStorage';
 import type { Store } from './store';
@@ -163,11 +164,6 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
   const roleOf = (s: Share): Role | null => (s.owner ? 'edit' : s.role);
   /** They may only view or comment on it (job 161): nothing of theirs is sent. */
   const readOnly = (s: Share) => roleOf(s) === 'view' || roleOf(s) === 'comment';
-
-  const busy = () => {
-    const ui = store.getState().ui;
-    return Boolean(ui.drag || ui.resize || ui.newDrag || ui.itemDrag);
-  };
 
   /**
    * The boards that go with each share now (its board, the boards inside it, the ones it had); a
@@ -446,7 +442,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     const missing = !s.root || !now[s.root];
     if (doc.rev > s.baseRev || !s.base || missing) {
       const got = readShare(doc.data);
-      if (got && busy()) {
+      if (got && isGestureBusy(store)) {
         s.waiting = doc;
         return;
       }
@@ -678,7 +674,7 @@ export function startSharing(store: Store, backend: CollabBackend, opts: Sharing
     if (ws === lastWs && ![...shares.values()].some((s) => s.waiting)) return;
     lastWs = ws;
     for (const s of shares.values()) {
-      if (s.waiting && !busy()) {
+      if (s.waiting && !isGestureBusy(store)) {
         const doc = s.waiting;
         s.waiting = null;
         received(s, doc);

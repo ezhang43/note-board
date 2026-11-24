@@ -43,8 +43,8 @@ export function subtreeHeight(item: TodoItem): number {
 }
 
 /** The bottom-most item shown under (or as) this item. */
-function lastVisible(item: TodoItem): TodoItem {
-  return item.children.length && !isFolded(item) ? lastVisible(item.children[item.children.length - 1]) : item;
+function lastVisible(item: TodoItem, depth = 0): TodoItem {
+  return item.children.length && !isFolded(item, depth) ? lastVisible(item.children[item.children.length - 1], depth + 1) : item;
 }
 
 /** Every item, shown or hidden in a fold, top to bottom. */
@@ -54,27 +54,32 @@ export function flatIds(items: TodoItem[]): string[] {
 
 // ---------- folding a parent item's sub-items (owner request, 2026-11-09) ----------
 
-/** Whether an item can fold: it has 2 or more direct sub-items (owner request, 2026-11-11; one sub-item needs no fold). */
-export function canFold(item: TodoItem): boolean {
-  return item.children.length >= 2;
+/**
+ * Whether an item can fold: a top-level parent (depth 0) can fold with 1 or more direct sub-items
+ * (owner decision, 2026-11-23), while a nested parent (depth >= 1) requires 2 or more direct sub-items
+ * (owner request, 2026-11-11).
+ */
+export function canFold(item: TodoItem, depth = 0): boolean {
+  return item.children.length >= (depth === 0 ? 1 : 2);
 }
 
 /** Whether a list has a top-level parent that can fold, so its arrow needs room left of the rows. */
 export function hasFoldable(items: TodoItem[]): boolean {
-  return items.some(canFold);
+  return items.some((it) => canFold(it, 0));
 }
 
 /**
- * Whether an item's sub-items are hidden: a fold counts only while it can fold. A fold saved on an item with
- * one sub-item (or none) is kept as saved but shows as open, so it is back if a second sub-item comes.
+ * Whether an item's sub-items are hidden: a fold counts only while it can fold at its depth. A fold saved on a
+ * nested item with one sub-item (or any item with none) is kept as saved but shows as open, so it is back if a
+ * second sub-item comes.
  */
-export function isFolded(item: TodoItem): boolean {
-  return !!item.folded && canFold(item);
+export function isFolded(item: TodoItem, depth = 0): boolean {
+  return !!item.folded && canFold(item, depth);
 }
 
 /** The items shown, top to bottom: everything under a folded item is left out. */
-export function shownIds(items: TodoItem[]): string[] {
-  return items.flatMap((it) => [it.id, ...(isFolded(it) ? [] : shownIds(it.children))]);
+export function shownIds(items: TodoItem[], depth = 0): string[] {
+  return items.flatMap((it) => [it.id, ...(isFolded(it, depth) ? [] : shownIds(it.children, depth + 1))]);
 }
 
 /** `ids` plus everything hidden under the folded items among them (what a copy, cut or delete takes), in list order. */
@@ -84,29 +89,31 @@ export function withHidden(items: TodoItem[], ids: string[], alone: readonly str
   const out: string[] = [];
   let added = false;
   // One walk down the list: under a given folded item, everything is taken.
-  const walk = (list: TodoItem[], taken: boolean) => {
+  const walk = (list: TodoItem[], taken: boolean, depth: number) => {
     for (const it of list) {
       if (taken || given.has(it.id)) out.push(it.id);
       if (taken && !given.has(it.id)) added = true;
-      walk(it.children, taken || (given.has(it.id) && !skip.has(it.id) && isFolded(it)));
+      walk(it.children, taken || (given.has(it.id) && !skip.has(it.id) && isFolded(it, depth)), depth + 1);
     }
   };
-  walk(items, false);
+  walk(items, false, 0);
   return added ? out : ids;
 }
 
 /** Unfolds every item above `id`, so it is in sight (the same list when none is folded). */
 export function showItem(items: TodoItem[], id: string): TodoItem[] {
-  if (!ancestorsOf(items, id).some(isFolded)) return items;
+  if (!ancestorsOf(items, id).some((a, depth) => isFolded(a, depth))) return items;
   const next = cloned(items);
-  for (const a of ancestorsOf(next, id)) if (isFolded(a)) delete a.folded; // a saved fold on a one-sub-item parent stays
+  ancestorsOf(next, id).forEach((a, depth) => {
+    if (isFolded(a, depth)) delete a.folded; // a saved fold on a nested one-sub-item parent stays
+  });
   return next;
 }
 
-/** Folds an item with 2 or more sub-items, or unfolds it (the open state is left out, not saved as false). Null for an item that can't fold. */
+/** Folds an item that can fold at its depth, or unfolds it (the open state is left out, not saved as false). Null for an item that can't fold. */
 export function toggleFold(items: TodoItem[], id: string): TodoItem[] | null {
   const loc = findItem(items, id);
-  if (!loc || !canFold(loc.item)) return null;
+  if (!loc || !canFold(loc.item, loc.depth)) return null;
   const next = cloned(items);
   const it = findItem(next, id)!.item;
   if (it.folded) delete it.folded;
@@ -237,7 +244,7 @@ export function enterItem(
   // A ticked half keeps the day it was ticked; the time estimate stays on the first half only.
   const done = after !== '' && loc.item.done;
   const added: TodoItem = { ...blank, text: rest, done, ...(done && loc.item.doneOn ? { doneOn: loc.item.doneOn } : {}) };
-  if (loc.item.children.length && !isFolded(loc.item)) loc.item.children.unshift(added);
+  if (loc.item.children.length && !isFolded(loc.item, loc.depth)) loc.item.children.unshift(added);
   else loc.list.splice(loc.index + 1, 0, added);
   reopenAbove(next, added); // e.g. Enter at the end of the last ticked sub-item: its new blank sibling unticks the parent
   return { items: next, focus: added.id, offset: 0 };
@@ -604,7 +611,7 @@ export function dropOnRow(
   }
   if (t.depth + dragged.height > MAX_DEPTH) return null;
   const mode = at.lowerHalf ? 'after' : 'before';
-  const markId = at.lowerHalf && t.item.children.length ? lastVisible(t.item).id : targetId;
+  const markId = at.lowerHalf && t.item.children.length ? lastVisible(t.item, t.depth).id : targetId;
   return { drop: { mode, targetId }, markId, markMode: mode };
 }
 

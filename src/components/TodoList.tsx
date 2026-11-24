@@ -20,7 +20,7 @@ import { EstimateChip } from './Estimate';
 
 /** The rows drawn: a folded item's sub-items are not (owner request, 2026-11-09). */
 function flatten(items: TodoItem[], depth = 0): { item: TodoItem; depth: number }[] {
-  return items.flatMap((item) => [{ item, depth }, ...(isFolded(item) ? [] : flatten(item.children, depth + 1))]);
+  return items.flatMap((item) => [{ item, depth }, ...(isFolded(item, depth) ? [] : flatten(item.children, depth + 1))]);
 }
 
 /** A to-do list's title. It sits on the card's button row (see CardView), so the list's body starts right under it. */
@@ -160,7 +160,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
       e.preventDefault();
       const el = e.currentTarget;
       storeOfCard(cardId).itemEnter(cardId, item.id, el.selectionStart, el.selectionEnd);
-    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && canFold(item) && (e.key === 'ArrowUp') !== isFolded(item)) {
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !readOnly && canFold(item, depth) && (e.key === 'ArrowUp') !== isFolded(item, depth)) {
       // Ctrl+Up hides this item's sub-items, Ctrl+Down shows them (as in outliners such as Workflowy). With nothing
       // to fold or unfold, the key is left to the browser (jump by paragraph; on a Mac, to the start or end).
       e.preventDefault();
@@ -200,7 +200,7 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     lifting && 'lifting',
     findTarget && 'find-target',
   ];
-  const folded = isFolded(item);
+  const folded = isFolded(item, depth);
   const foldLabel = folded ? 'Show sub-items' : 'Hide sub-items';
   return (
     <div
@@ -212,8 +212,8 @@ const ItemRow = memo(function ItemRow({ cardId, item, depth }: { cardId: string;
     >
       {/* The label widens the area you can press to 24px; the box itself stays 16px. */}
       {/* A clicked box keeps the keyboard, in Safari too (which doesn't focus it), so Delete then removes this item, not the card; a tapped one leaves it where it was (job 218). */}
-      {/* A parent item's arrow, just left of its tick box (owner request, 2026-11-09): hides or shows its sub-items. Only with 2 or more of them (owner request, 2026-11-11). A press keeps the cursor where it is. */}
-      {canFold(item) && (
+      {/* A parent item's arrow, just left of its tick box (owner request, 2026-11-09): hides or shows its sub-items. Top-level with 1+ (owner decision, 2026-11-23), nested with 2+ (owner request, 2026-11-11). A press keeps the cursor where it is. */}
+      {canFold(item, depth) && (
         <button
           type="button"
           className="item-fold"

@@ -39,11 +39,11 @@ export function rangesIn(text: string, query: string): [number, number][] {
  */
 function boxes(board: Board): { key: string; text: string; showInstead: string | null }[] {
   const out: { key: string; text: string; showInstead: string | null }[] = [];
-  const items = (card: Card, list: TodoItem[], hidden: string | null, prefix: 'item' | 'done') => {
+  const items = (card: Card, list: TodoItem[], hidden: string | null, prefix: 'item' | 'done', depth = 0) => {
     for (const it of list) {
       out.push({ key: `${prefix}:${card.id}:${it.id}`, text: it.text, showInstead: hidden });
       // Sub-items folded away (owner request, 2026-11-09) show as their folded item; the Completed panel shows every item.
-      items(card, it.children, hidden ?? (prefix === 'item' && isFolded(it) ? it.id : null), prefix);
+      items(card, it.children, hidden ?? (prefix === 'item' && isFolded(it, depth) ? it.id : null), prefix, depth + 1);
     }
   };
   const cardBoxes = (card: Card, hiddenBy: string | null) => {

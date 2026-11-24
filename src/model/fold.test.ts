@@ -172,52 +172,88 @@ describe('a fold with nothing left under it', () => {
   });
 });
 
-// Eric, 2026-11-11: "for sub-checklist items, the collapse button should only be there if there are 2 or more items."
-describe('a fold needs two sub-items', () => {
-  it('canFold is true from two direct sub-items, at any level', () => {
+// Eric, 2026-11-11: nested sub-items need 2+ direct sub-items to fold.
+// Eric, 2026-11-23: top-level parents can always fold as long as they have at least 1 sub-item.
+describe('top-level folds with one sub-item; nested folds need two', () => {
+  it('canFold is true from 1 direct sub-item at top level, and from 2 direct sub-items when nested', () => {
     expect(C.canFold(item('a'))).toBe(false);
-    expect(C.canFold(item('a', [item('a1')]))).toBe(false);
-    expect(C.canFold(item('a', [item('a1'), item('a2')]))).toBe(true);
-    // Two levels down only counts for the item that has them as direct sub-items.
-    expect(C.canFold(item('a', [item('a1', [item('x'), item('y')])]))).toBe(false);
+    expect(C.canFold(item('a', [item('a1')]))).toBe(true);
+    expect(C.canFold(item('a', [item('a1')],), 0)).toBe(true);
+    expect(C.canFold(item('a', [item('a1'), item('a2')]), 0)).toBe(true);
+    // Nested (depth >= 1) still requires 2 or more direct sub-items.
+    expect(C.canFold(item('a1'), 1)).toBe(false);
+    expect(C.canFold(item('a1', [item('x')]), 1)).toBe(false);
+    expect(C.canFold(item('a1', [item('x'), item('y')]), 1)).toBe(true);
+    // Grandchildren don't count as direct sub-items for a nested parent.
+    expect(C.canFold(item('a1', [item('x', [item('z1'), item('z2')])]), 1)).toBe(false);
   });
 
-  it('a fold saved on an item with one sub-item counts as open: the sub-item shows, and the saved data is not rewritten', () => {
+  it('top-level parent with one sub-item folds across display, selection, Enter, drag, search and wordRange', () => {
     const items = [item('a', [item('a1')], { folded: true }), item('b')];
-    expect(C.isFolded(items[0])).toBe(false);
-    expect(C.shownIds(items)).toEqual(['a', 'a1', 'b']);
-    expect(items[0].folded).toBe(true);
-    // Copying it takes nothing hidden, and a search match in the sub-item is not "in a folded item".
-    expect(C.withHidden(items, ['a'])).toEqual(['a']);
-    expect(C.isFolded(item('a', [item('a1'), item('a2')], { folded: true }))).toBe(true);
-  });
-
-  it('an item with one sub-item has nothing to fold', () => {
-    expect(C.toggleFold([item('a', [item('a1')])], 'a')).toBeNull();
-    expect(C.toggleFold([item('a', [item('a1')], { folded: true })], 'a')).toBeNull();
-    expect(C.toggleFold([item('a', [item('a1'), item('a2')])], 'a')![0].folded).toBe(true);
-  });
-
-  it('a fold on an item with one sub-item is kept (not dropped as empty), so it is there again when a second one comes', () => {
-    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items: [item('a', [item('a1')], { folded: true })] };
+    expect(C.isFolded(items[0], 0)).toBe(true);
+    expect(C.shownIds(items)).toEqual(['a', 'b']);
+    expect(C.withHidden(items, ['a'])).toEqual(['a', 'a1']);
+    const afterEnter = C.enterItem(items, 'a', 1, 1, item('new'))!;
+    expect(ids(afterEnter.items)).toBe('a(a1) new b');
+    const hint = C.dropOnRow(items, 'a', { xInRow: 10, lowerHalf: true }, { ids: ['b'], height: 0 })!;
+    expect(hint.markId).toBe('a');
+    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items };
     const b: Board = { ...createBoard(), cards: { t1: card }, order: ['t1'] };
-    const after = (C.editItems(b, 't1', (its) => its.map((it) => ({ ...it, text: 'x' }))).cards.t1 as TodoCard).items;
-    expect(after[0].folded).toBe(true);
+    expect(findMatches(b, 'a1')[0].showInstead).toBe('a');
+    const del = W.deleteRange(items, { anchor: { id: 'a', offset: 1 }, focus: { id: 'b', offset: 0 } })!;
+    expect(ids(del.items)).toBe('a(a1)');
   });
 
-  it('showItem opens only the folds that hide something: a saved fold on a one-sub-item ancestor is kept', () => {
-    const items = [item('g', [item('p', [item('x')], { folded: true }), item('q')], { folded: true })];
+  it('a fold saved on a nested item with one sub-item counts as open: the sub-item shows, and saved data is not rewritten', () => {
+    const items = [item('a', [item('a1', [item('x')], { folded: true }), item('a2')])];
+    expect(C.isFolded(items[0].children[0], 1)).toBe(false);
+    expect(C.shownIds(items)).toEqual(['a', 'a1', 'x', 'a2']);
+    expect(items[0].children[0].folded).toBe(true);
+    // Copying it takes nothing hidden, Enter goes inside it, drag mark lands on its visible child, and search does not ring it as folded.
+    expect(C.withHidden(items, ['a1'])).toEqual(['a1']);
+    const afterEnter = C.enterItem(items, 'a1', 2, 2, item('new'))!;
+    expect(ids(afterEnter.items)).toBe('a(a1(new x) a2)');
+    const hint = C.dropOnRow(items, 'a1', { xInRow: 10, lowerHalf: true }, { ids: ['a2'], height: 0 })!;
+    expect(hint.markId).toBe('x');
+    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items };
+    const b: Board = { ...createBoard(), cards: { t1: card }, order: ['t1'] };
+    expect(findMatches(b, 'x')[0].showInstead).toBeNull();
+    // With 2 direct sub-items, the nested item IS folded.
+    expect(C.isFolded(item('a1', [item('x'), item('y')], { folded: true }), 1)).toBe(true);
+  });
+
+  it('toggleFold folds a top-level item with 1 sub-item, refuses a nested item with 1, and folds a nested item with 2', () => {
+    const topOne = C.toggleFold([item('a', [item('a1')])], 'a')!;
+    expect(topOne[0].folded).toBe(true);
+    expect('folded' in C.toggleFold(topOne, 'a')![0]).toBe(false);
+
+    expect(C.toggleFold([item('a', [item('a1', [item('x')])])], 'a1')).toBeNull();
+    expect(C.toggleFold([item('a', [item('a1', [item('x')], { folded: true })])], 'a1')).toBeNull();
+    const nestedTwo = C.toggleFold([item('a', [item('a1', [item('x'), item('y')])])], 'a1')!;
+    expect(nestedTwo[0].children[0].folded).toBe(true);
+  });
+
+  it('a fold on a nested item with one sub-item is kept (not dropped as empty), so it is there again when a second one comes', () => {
+    const card: TodoCard = { ...(createCard('todo', 't1') as TodoCard), items: [item('a', [item('a1', [item('x')], { folded: true })])] };
+    const b: Board = { ...createBoard(), cards: { t1: card }, order: ['t1'] };
+    const after = (C.editItems(b, 't1', (its) => its.map((it) => ({ ...it, text: 'y' }))).cards.t1 as TodoCard).items;
+    expect(after[0].children[0].folded).toBe(true);
+  });
+
+  it('showItem opens active folds (including top-level with 1 sub-item) and keeps a saved fold on a nested one-sub-item ancestor', () => {
+    const items = [item('g', [item('p', [item('x')], { folded: true })], { folded: true })];
     const shown = C.showItem(items, 'x');
     expect(shown[0].folded).toBeUndefined();
     expect(shown[0].children[0].folded).toBe(true);
+    expect(C.shownIds(shown)).toEqual(['g', 'p', 'x']);
   });
 
-  it('hasFoldable says whether a list needs room for its top-level fold arrows', () => {
-    expect(C.hasFoldable([item('a', [item('a1')]), item('b')])).toBe(false);
-    expect(C.hasFoldable([item('a', [item('a1')]), item('b', [item('b1'), item('b2')])])).toBe(true);
-    // Only top-level parents give the list its arrow room.
-    expect(C.hasFoldable([item('a', [item('a1', [item('x'), item('y')]), item('a2')])])).toBe(true);
-    expect(C.hasFoldable([item('a', [item('a1', [item('x'), item('y')])])])).toBe(false);
+  it('hasFoldable is true whenever any top-level parent has at least 1 sub-item (at any index)', () => {
+    expect(C.hasFoldable([item('a'), item('b')])).toBe(false);
+    expect(C.hasFoldable([item('a', [item('a1')]), item('b')])).toBe(true);
+    // Index >= 1 at top level still counts as depth 0 (guards against passing array index as depth).
+    expect(C.hasFoldable([item('a'), item('b', [item('b1')])])).toBe(true);
+    expect(C.hasFoldable([item('a', [item('a1', [item('x'), item('y')])])])).toBe(true);
   });
 });
 

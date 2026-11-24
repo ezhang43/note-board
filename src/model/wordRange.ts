@@ -95,7 +95,8 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
   const i = order.indexOf(o.start.id);
   const j = order.indexOf(o.end.id);
   const next = structuredClone(items);
-  const first = findItem(next, o.start.id)!.item;
+  const firstLoc = findItem(next, o.start.id)!;
+  const first = firstLoc.item;
   const last = findItem(next, o.end.id)!.item;
   const tail = last.text.slice(o.end.offset);
   if (i === j) {
@@ -127,7 +128,7 @@ export function deleteRange(items: TodoItem[], r: WordRange, insert = ''): { ite
   const kids = last.children;
   last.children = [];
   // A folded first item keeps its hidden sub-items (they come before the last item's in the list).
-  const firstFolded = isFolded(first);
+  const firstFolded = isFolded(first, firstLoc.depth);
   const kept = removeExactly(next, order.slice(i + 1, j + 1));
   const joined = findItem(kept, first.id)!;
   if (joined.depth < MAX_DEPTH) {

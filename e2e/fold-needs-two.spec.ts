@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fontsLoaded } from './helpers';
 
-// Owner request 2026-11-11: "for sub-checklist items, the collapse button should only be there if there are 2 or more
-// items. a sub-checklist item with only one item doesn't need the ability to collapse." The fold arrow shows only on a
-// parent with 2 or more direct sub-items, at every level. A fold saved on a parent with one sub-item shows that
-// sub-item and no arrow (the saved data is not rewritten). The done count is unchanged. The list's extra left room
-// for top-level arrows (has-fold) follows the same rule.
+// Owner request 2026-11-11: nested sub-checklist items need 2 or more direct sub-items to collapse.
+// Owner decision 2026-11-23: top-level parent items can always collapse as long as they have at least 1 sub-item
+// (everywhere: both board checklists and the Main checklist), while nested sub-items still require 2 or more.
+// A fold saved on a nested parent with one sub-item shows that sub-item and no arrow (the saved data is not
+// rewritten). The done count is unchanged. The list's extra left room for top-level arrows (has-fold) applies
+// whenever any top-level parent has at least 1 sub-item.
 
 type Item = { id: string; text: string; done: boolean; children: Item[]; folded?: true };
 const item = (id: string, children: Item[] = [], folded = false, done = false): Item => ({ id, text: id, done, children, ...(folded ? { folded: true as const } : {}) });
@@ -31,24 +32,40 @@ test.beforeEach(async ({ page }) => {
   await fontsLoaded(page);
 });
 
-test('one sub-item: no arrow, at the top level and nested; its count still shows', async ({ page }) => {
+test('top-level with 1 sub-item shows arrow and folds (click + Ctrl+Up/Down); nested with 1 sub-item has no arrow', async ({ page }) => {
   await seed(page, [item('trip', [item('fl', [item('seat', [], false, true)])], false)]);
-  await expect(fold(page, 'trip')).toHaveCount(0);
+  await expect(fold(page, 'trip')).toHaveCount(1);
   await expect(fold(page, 'fl')).toHaveCount(0);
   await expect(row(page, 'trip').locator('.item-count')).toHaveText('1/2'); // counts everything under it
-  await expect(card(page).locator('.todo-items')).not.toHaveClass(/has-fold/);
-});
+  await expect(card(page).locator('.todo-items')).toHaveClass(/has-fold/);
 
-test('one sub-item that was saved folded is shown, with no arrow, and the save is left as it was', async ({ page }) => {
-  await seed(page, [item('trip', [item('fl')], true), item('milk')]);
+  // Click folds and unfolds the top-level parent with 1 sub-item.
+  await fold(page, 'trip').click();
+  await expect(row(page, 'fl')).toHaveCount(0);
+  await expect(row(page, 'seat')).toHaveCount(0);
+  await expect(fold(page, 'trip')).toHaveAttribute('aria-expanded', 'false');
+  await fold(page, 'trip').click();
   await expect(row(page, 'fl')).toBeVisible();
-  await expect(fold(page, 'trip')).toHaveCount(0);
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:v1')!).board.cards.t1.items[0].folded);
-  expect(saved).toBe(true);
-  // Ctrl+Up has nothing to fold: the key is left to the browser.
+  await expect(row(page, 'seat')).toBeVisible();
+
+  // Ctrl+Up / Ctrl+Down fold and unfold the top-level parent with 1 sub-item.
   await text(page, 'trip').click();
   await page.keyboard.press('Control+ArrowUp');
+  await expect(row(page, 'fl')).toHaveCount(0);
+  await page.keyboard.press('Control+ArrowDown');
   await expect(row(page, 'fl')).toBeVisible();
+});
+
+test('nested parent with 1 sub-item saved folded is shown open, with no arrow, and the save is left as it was', async ({ page }) => {
+  await seed(page, [item('trip', [item('fl', [item('seat')], true), item('ho')])]);
+  await expect(row(page, 'seat')).toBeVisible();
+  await expect(fold(page, 'fl')).toHaveCount(0);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('note-board:v1')!).board.cards.t1.items[0].children[0].folded);
+  expect(saved).toBe(true);
+  // Ctrl+Up on the nested parent with 1 sub-item has nothing to fold: the key is left to the browser.
+  await text(page, 'fl').click();
+  await page.keyboard.press('Control+ArrowUp');
+  await expect(row(page, 'seat')).toBeVisible();
 });
 
 test('two sub-items: the arrow is there, at the top level and nested, and it folds', async ({ page }) => {
@@ -61,41 +78,69 @@ test('two sub-items: the arrow is there, at the top level and nested, and it fol
   await expect(row(page, 'ho')).toBeVisible();
 });
 
-test('a parent whose sub-items have two but is itself one-in-one gets no arrow and no extra room', async ({ page }) => {
-  const plain = [item('a', [item('b', [item('c'), item('d')])])];
-  await seed(page, plain);
-  await expect(fold(page, 'a')).toHaveCount(0);
-  await expect(fold(page, 'b')).toHaveCount(1);
-  await expect(card(page).locator('.todo-items')).not.toHaveClass(/has-fold/); // only top-level parents need the room
-});
-
-test('the list gives its boxes room only when a top-level parent has two sub-items', async ({ page }) => {
-  await seed(page, [item('a', [item('a1')]), item('b')]);
+test('the list gives its boxes room as soon as a top-level parent has 1 sub-item', async ({ page }) => {
+  await seed(page, [item('a'), item('b')]);
+  await expect(card(page).locator('.todo-items')).not.toHaveClass(/has-fold/);
   const without = await tickX(page, 'a');
-  await seed(page, [item('a', [item('a1'), item('a2')]), item('b')]);
+  await seed(page, [item('a', [item('a1')]), item('b')]);
+  await expect(card(page).locator('.todo-items')).toHaveClass(/has-fold/);
   expect(await tickX(page, 'a')).toBeGreaterThan(without + 1);
 });
 
-test('going from one sub-item to two brings the arrow, and back to one takes it away', async ({ page }) => {
-  await seed(page, [item('trip', [item('fl')])]);
-  await expect(fold(page, 'trip')).toHaveCount(0);
-  const x1 = await tickX(page, 'trip');
-  await text(page, 'fl').click();
-  await page.keyboard.press('End');
-  await page.keyboard.press('Enter'); // a second sub-item
-  await page.keyboard.type('ho');
+test('nested parent going from 1 sub-item to 2 brings its arrow, and back to 1 takes it away', async ({ page }) => {
+  await seed(page, [item('trip', [item('fl', [item('s1')])])]);
   await expect(fold(page, 'trip')).toHaveCount(1);
-  expect(await tickX(page, 'trip')).toBeGreaterThan(x1 + 1);
+  await expect(fold(page, 'fl')).toHaveCount(0);
+  await text(page, 's1').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter'); // a second sub-item under nested `fl`
+  await page.keyboard.type('s2');
+  await expect(fold(page, 'fl')).toHaveCount(1);
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Backspace'); // the empty second sub-item goes
-  await expect(card(page).locator('[data-item-id]')).toHaveCount(2);
-  await expect(fold(page, 'trip')).toHaveCount(0);
-  expect(await tickX(page, 'trip')).toBeCloseTo(x1, 0);
+  await expect(card(page).locator('[data-item-id]')).toHaveCount(3);
+  await expect(fold(page, 'fl')).toHaveCount(0);
+  await expect(fold(page, 'trip')).toHaveCount(1);
 });
 
-test('a parent folded with two sub-items stays folded while it has two; the sub-items it hides are not shown', async ({ page }) => {
-  await seed(page, [item('trip', [item('fl'), item('ho')], true)]);
+test('a top-level parent saved folded with 1 sub-item stays folded and hides its sub-item', async ({ page }) => {
+  await seed(page, [item('trip', [item('fl')], true), item('milk')]);
   await expect(fold(page, 'trip')).toHaveAttribute('aria-expanded', 'false');
   await expect(row(page, 'fl')).toHaveCount(0);
+  await expect(row(page, 'milk')).toBeVisible();
+});
+
+test('Main checklist: top-level with 1 sub-item folds; nested needs 2', async ({ page }) => {
+  await page.locator('.corner-controls').getByRole('button', { name: 'Checklist', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Checklist', exact: true });
+  await expect(panel).toBeVisible();
+  await page.keyboard.type('Errands');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('Post office');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('Stamps');
+
+  // Top-level "Errands" has 1 sub-item -> has arrow; nested "Post office" has 1 sub-item -> no arrow.
+  const rows = panel.locator('.todo-item');
+  await expect(panel.locator('.todo-items')).toHaveClass(/has-fold/);
+  await expect(rows.nth(0).locator('.item-fold')).toHaveCount(1);
+  await expect(rows.nth(1).locator('.item-fold')).toHaveCount(0);
+
+  // Fold and unfold top-level "Errands" via click.
+  await rows.nth(0).locator('.item-fold').click();
+  await expect(rows).toHaveCount(1);
+  await rows.nth(0).locator('.item-fold').click();
+  await expect(rows).toHaveCount(3);
+
+  // Add a second sub-item under nested "Post office" -> now nested gets an arrow and folds.
+  await rows.nth(2).locator('textarea').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Envelopes');
+  await expect(rows.nth(1).locator('.item-fold')).toHaveCount(1);
+  await rows.nth(1).locator('.item-fold').click();
+  await expect(rows).toHaveCount(2);
 });

@@ -83,7 +83,7 @@ for (const size of ['normal', 'large', 'huge'] as FontSize[]) test(`in a narrow 
     }));
   });
   for (const [i, r] of rows.entries()) {
-    expect(r.text, `level ${i} text width`).toBeGreaterThanOrEqual(32);
+    expect(r.text, `level ${i} text width`).toBeGreaterThanOrEqual(31.9); // 32px floor, allowing Chromium subpixel rounding with fractional --fold-room padding
     expect(r.boxInside, `level ${i} box inside the card`).toBe(true);
     // Never less deeper than the level above it, and a full 32px per level while there is room.
     if (i) expect(r.indent).toBeGreaterThanOrEqual(rows[i - 1].indent);

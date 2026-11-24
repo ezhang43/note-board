@@ -6,20 +6,30 @@ import type { Store } from './store';
 
 /**
  * Sync lifecycle phase:
- * - `loading`: waiting for the first online snapshot (`held` is set mid-callback when a `deleting`
- *   marker arrives on first load, before `handleFirstLoad` completes).
- * - `active`: first load finished; normal two-way sync (`failed` stays true after a refused upload
- *   until a later upload succeeds, so versions from elsewhere are not applied meanwhile).
- * - `held`: another page is deleting the account (see RemoteDoc.deleting); uploads wait (`failed`
- *   preserves any prior refused upload so its banner and remote-ignore guard survive).
- * - `stopped`: terminal state (unreadable online copy, account gone, or `stop()` called); nothing
- *   more is sent or applied.
+ * - `Loading` / `LoadingHeld`: waiting for the first online snapshot (`LoadingHeld` is set mid-callback
+ *   when a `deleting` marker arrives on first load, before `handleFirstLoad` completes).
+ * - `Active` / `ActiveFailed`: first load finished; normal two-way sync (`ActiveFailed` stays set after
+ *   a refused upload until a later upload succeeds, so versions from elsewhere are not applied meanwhile).
+ * - `Held` / `HeldFailed`: another page is deleting the account (see RemoteDoc.deleting); uploads wait
+ *   (`HeldFailed` preserves any prior refused upload so its banner and remote-ignore guard survive).
+ * - `Stopped`: terminal state (unreadable online copy, account gone, or `stop()` called); nothing more
+ *   is sent or applied.
  */
+const PHASE_LOADING = 0;
+const PHASE_LOADING_HELD = 1;
+const PHASE_ACTIVE = 2;
+const PHASE_ACTIVE_FAILED = 3;
+const PHASE_HELD = 4;
+const PHASE_HELD_FAILED = 5;
+const PHASE_STOPPED = 6;
 type SyncPhase =
-  | { kind: 'loading'; held: boolean }
-  | { kind: 'active'; failed: boolean }
-  | { kind: 'held'; failed: boolean }
-  | { kind: 'stopped' };
+  | typeof PHASE_LOADING
+  | typeof PHASE_LOADING_HELD
+  | typeof PHASE_ACTIVE
+  | typeof PHASE_ACTIVE_FAILED
+  | typeof PHASE_HELD
+  | typeof PHASE_HELD_FAILED
+  | typeof PHASE_STOPPED;
 
 /** The online copy of every board: the saved boards' JSON and which open page last wrote it. */
 export interface RemoteDoc {
@@ -153,12 +163,14 @@ export function startSync(
     const shared = Object.keys(here).filter((id) => id !== ws.home && isShared(id));
     return { home: ws.home, boards: { ...own(ws).boards, ...Object.fromEntries(shared.map((id) => [id, here[id]])) } };
   };
-  let phase: SyncPhase = { kind: 'loading', held: false };
-  const isReady = () => phase.kind === 'active' || phase.kind === 'held';
-  const isHeld = () => phase.kind === 'held' || (phase.kind === 'loading' && phase.held);
-  const isFailed = () => (phase.kind === 'active' || phase.kind === 'held') && phase.failed;
+  let phase: SyncPhase = PHASE_LOADING;
+  const isLoading = () => phase === PHASE_LOADING || phase === PHASE_LOADING_HELD;
+  const isReady = () => phase >= PHASE_ACTIVE && phase <= PHASE_HELD_FAILED;
+  const isHeld = () => phase === PHASE_LOADING_HELD || phase === PHASE_HELD || phase === PHASE_HELD_FAILED;
+  const isFailed = () => phase === PHASE_ACTIVE_FAILED || phase === PHASE_HELD_FAILED;
   const setFailed = (value: boolean) => {
-    if (phase.kind === 'active' || phase.kind === 'held') phase = { ...phase, failed: value };
+    if (phase === PHASE_ACTIVE || phase === PHASE_ACTIVE_FAILED) phase = value ? PHASE_ACTIVE_FAILED : PHASE_ACTIVE;
+    else if (phase === PHASE_HELD || phase === PHASE_HELD_FAILED) phase = value ? PHASE_HELD_FAILED : PHASE_HELD;
   };
   /**
    * The boards (as ownKey) last sent or received, so nothing is sent back and forth twice. Received
@@ -234,7 +246,7 @@ export function startSync(
     if (!back.length) return false;
     // Not inside the store change that said so: the store's other listeners would see this one first.
     queueMicrotask(() => {
-      if (phase.kind === 'stopped') return;
+      if (phase === PHASE_STOPPED) return;
       const now = store.workspace().boards;
       const unchanged = back.filter((id) => now[id] === boards[id] && !isShared(id));
       const take = unchanged.filter((id) => !deepEqual(now[id], from[id]));
@@ -315,13 +327,14 @@ export function startSync(
   /** Opened on this device's offline copy with changes held back noted: the server's copy decides (see reconcileHeld). */
   let checkHeld = false;
   const release = () => {
-    if (phase.kind === 'held') phase = { kind: 'active', failed: phase.failed };
-    else if (phase.kind === 'loading') phase = { kind: 'loading', held: false };
+    if (phase === PHASE_HELD) phase = PHASE_ACTIVE;
+    else if (phase === PHASE_HELD_FAILED) phase = PHASE_ACTIVE_FAILED;
+    else if (phase === PHASE_LOADING_HELD) phase = PHASE_LOADING;
     toldGone = false;
     clearHoldTimer();
   };
   const enterStopped = () => {
-    phase = { kind: 'stopped' };
+    phase = PHASE_STOPPED;
     waiting = null;
     clearUploadTimer();
     clearHoldTimer();
@@ -332,7 +345,7 @@ export function startSync(
     clearUploadTimer();
     // A newer version waits for a drag to end: this device's boards are older (the drag's own
     // change, if it makes one, is sent after it).
-    if (phase.kind === 'stopped' || waiting || isHeld()) return;
+    if (phase === PHASE_STOPPED || waiting || isHeld()) return;
     const ws = store.workspace();
     const key = ownKey(ws);
     if (key === lastSynced) {
@@ -347,14 +360,14 @@ export function startSync(
         // Saved, unless syncing stopped meanwhile (job 172) or a newer version was sent since. The
         // online copy is this page's again even while a new change waits (review 137-A M5: a change
         // typed and taken back left "failed" on for good); "Saved" waits for that change.
-        if (phase.kind === 'stopped' || lastSynced !== key) return;
+        if (phase === PHASE_STOPPED || lastSynced !== key) return;
         setFailed(false);
         noteHeld(null);
         opts.onSaveState?.(timer ? 'saving' : 'saved');
       },
       () => {
         // Not saved online: the next change tries again.
-        if (phase.kind === 'stopped') return;
+        if (phase === PHASE_STOPPED) return;
         if (lastSynced === key) lastSynced = null;
         setFailed(true);
         opts.onSaveState?.('failed');
@@ -364,7 +377,7 @@ export function startSync(
 
   function schedule() {
     if (!isReady()) return;
-    if (phase.kind === 'held') {
+    if (isHeld()) {
       if (madeHere && ownKey(store.workspace()) !== lastSynced) holdChange();
       return;
     }
@@ -400,7 +413,7 @@ export function startSync(
    */
   function read(data: string) {
     const got = readWorkspace(data);
-    if (got && (!got.legacy || phase.kind === 'loading')) return got.ws;
+    if (got && (!got.legacy || isLoading())) return got.ws;
     if (got) {
       const ws = store.workspace();
       return { home: ws.home, boards: { ...ws.boards, [ws.home]: got.ws.boards[HOME_ID] } };
@@ -418,34 +431,36 @@ export function startSync(
   /**
    * Deals with account-deletion markers (review 137-A H5): holds uploads while another page deletes
    * the account, starts the 10½-minute safety timeout for a marker left behind, reports when done,
-   * and releases the hold if deleting fails and the boards come back.
+   * and releases the hold if deleting fails and the boards come back. Returns `undefined` when the
+   * snapshot was fully handled; otherwise returns the document to keep processing.
    */
-  function handleDeletingMarker(got: RemoteDoc | null): { done: true } | { done: false; doc: RemoteDoc | null } {
+  function handleDeletingMarker(got: RemoteDoc | null): RemoteDoc | null | undefined {
     if (got?.deleting) {
       const marker = got;
       // This page's own marker, from deleting that failed: as if there were no online boards, so this
       // page's go back (the rules let only it do that).
-      if (marker.deleting === 'started' && marker.client === opts.client) return { done: false, doc: null };
+      if (marker.deleting === 'started' && marker.client === opts.client) return null;
       // Another page is deleting the account (or did, or got as far as the sign-in): this page's
       // changes wait, and it isn't signed out, since the deleting may yet fail.
       clearUploadTimer();
       const inIt = marker.deleting === 'started' && marker.data ? readWorkspace(marker.data)?.ws : null;
       heldOn = inIt ? heldHash(inIt) : null;
       const wasReady = isReady();
-      if (phase.kind === 'loading') phase = { kind: 'loading', held: true };
-      else if (phase.kind === 'active') phase = { kind: 'held', failed: phase.failed };
+      if (phase === PHASE_LOADING) phase = PHASE_LOADING_HELD;
+      else if (phase === PHASE_ACTIVE) phase = PHASE_HELD;
+      else if (phase === PHASE_ACTIVE_FAILED) phase = PHASE_HELD_FAILED;
       const waitsHere = wasReady && madeHere && ownKey(store.workspace()) !== lastSynced;
       if (waitsHere) holdChange();
       if (marker.deleting === 'done' || !marker.data) {
         clearHoldTimer();
         if (!wasReady) {
-          phase = { kind: 'held', failed: false };
+          phase = PHASE_HELD;
           opts.onReady();
         }
-        if (marker.deleting === 'started' || toldGone) return { done: true };
+        if (marker.deleting === 'started' || toldGone) return undefined;
         toldGone = true;
         opts.onGone?.();
-        return { done: true };
+        return undefined;
       }
       // Left over 10 minutes, its page is taken to have closed part-way: the boards go back online.
       // Only once the server has it (this device's offline copy may be out of date).
@@ -456,8 +471,8 @@ export function startSync(
           upload();
         }, DELETING_WAIT_MS);
       // The boards in it are shown as any version arriving, unless a change made here waits to go (it is newer).
-      if (waitsHere) return { done: true };
-      return { done: false, doc: marker };
+      if (waitsHere) return undefined;
+      return marker;
     }
     if (isHeld() && got) {
       // The deleting failed and the boards are back: a change made here meanwhile is the newest.
@@ -465,11 +480,11 @@ export function startSync(
       if (madeHere) {
         lastSynced = null;
         upload();
-        return { done: true };
+        return undefined;
       }
       if (!isFailed()) opts.onSaveState?.('saved');
     }
-    return { done: false, doc: got };
+    return got;
   }
 
   /**
@@ -501,15 +516,15 @@ export function startSync(
 
   /** First snapshot from the online copy: hydrates the store, handles heldBase and pending/overLimit checks, and fires onReady. */
   function handleFirstLoad(doc: RemoteDoc | null) {
-    const heldOnLoad = phase.kind === 'loading' && phase.held;
+    const nextPhase = phase === PHASE_LOADING_HELD ? PHASE_HELD : PHASE_ACTIVE;
     if (!doc) {
-      phase = { kind: heldOnLoad ? 'held' : 'active', failed: false };
+      phase = nextPhase;
       upload();
       return opts.onReady();
     }
     const ws = read(doc.data);
     if (!ws) return;
-    phase = { kind: heldOnLoad ? 'held' : 'active', failed: false };
+    phase = nextPhase;
     const key = ownKey(ws);
     synced(key);
     sharedBefore = new Set(Object.keys(store.workspace().boards).filter(isShared));
@@ -582,10 +597,9 @@ export function startSync(
   }
 
   const stopWatching = remote.watch((got) => {
-    if (phase.kind === 'stopped') return;
-    const marker = handleDeletingMarker(got);
-    if (marker.done) return;
-    const doc = marker.doc;
+    if (phase === PHASE_STOPPED) return;
+    const doc = handleDeletingMarker(got);
+    if (doc === undefined) return;
     if (reconcileHeld(doc)) return;
     const nowFresh = !fresh && !doc?.cached;
     if (nowFresh) fresh = true;
@@ -596,7 +610,7 @@ export function startSync(
       enterStopped();
       return opts.onGone?.();
     }
-    if (phase.kind === 'loading') return handleFirstLoad(doc);
+    if (isLoading()) return handleFirstLoad(doc);
     handleRemoteUpdate(doc, nowFresh);
   }, opts.onError);
 
